@@ -15,6 +15,29 @@ import {
 } from "@/mocks/fixtures/practice";
 import { OccasionLifecycle } from "./OccasionLifecycle";
 
+/**
+ * Ticking a moment and flipping the drafts switch have to change what is on screen, so the harness
+ * holds both. Only one story used to go through it; the rest paired a frozen `selected` with `fn()`,
+ * so clicking a node did nothing at all — the single most important thing this strip does.
+ */
+function ControlledLifecycle(args: React.ComponentProps<typeof OccasionLifecycle>) {
+	const [selected, setSelected] = useState<string[]>([...args.selected]);
+	const [onDrafts, setOnDrafts] = useState(args.onDrafts);
+	return (
+		<OccasionLifecycle
+			{...args}
+			selected={selected}
+			onDrafts={onDrafts}
+			onDraftsChange={setOnDrafts}
+			onToggle={(signal, chosen) =>
+				setSelected((current) =>
+					chosen ? [...current, signal] : current.filter((value) => value !== signal),
+				)
+			}
+		/>
+	);
+}
+
 const meta = {
 	title: "Workspace admin/Practices/Occasion lifecycle",
 	component: OccasionLifecycle,
@@ -30,6 +53,7 @@ const meta = {
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
+	render: (args) => <ControlledLifecycle {...args} />,
 } satisfies Meta<typeof OccasionLifecycle>;
 
 export default meta;
@@ -125,27 +149,8 @@ export const Disabled: Story = {
 	args: { disabled: true },
 };
 
-function ControlledLifecycle(args: React.ComponentProps<typeof OccasionLifecycle>) {
-	const [selected, setSelected] = useState<string[]>([...args.selected]);
-	const [onDrafts, setOnDrafts] = useState(args.onDrafts);
-	return (
-		<OccasionLifecycle
-			{...args}
-			selected={selected}
-			onDrafts={onDrafts}
-			onDraftsChange={setOnDrafts}
-			onToggle={(signal, chosen) =>
-				setSelected((current) =>
-					chosen ? [...current, signal] : current.filter((value) => value !== signal),
-				)
-			}
-		/>
-	);
-}
-
 /** Clicking anywhere on a node toggles it, because the node is the label of a real checkbox. */
 export const TogglingMoments: Story = {
-	render: (args) => <ControlledLifecycle {...args} />,
 	play: async ({ canvas, userEvent }) => {
 		const merged = canvas.getByRole("checkbox", { name: /^Merged/ });
 		await expect(merged).not.toBeChecked();

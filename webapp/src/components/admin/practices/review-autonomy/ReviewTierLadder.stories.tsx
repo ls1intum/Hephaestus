@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
+import { Stateful } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewTierLadder } from "./ReviewTierLadder";
 
@@ -20,6 +21,25 @@ const meta = {
 		),
 	],
 	tags: ["autodocs"],
+	/**
+	 * The rung a story starts on is `args.value`; clicking another moves it. With only `fn()` behind
+	 * `onChange` the ladder could not be operated at all — every rung stayed where the args put it,
+	 * which is the one thing a ladder has to be able to do.
+	 */
+	render: (args) => (
+		<Stateful initial={args.value}>
+			{(value, setValue) => (
+				<ReviewTierLadder
+					{...args}
+					value={value}
+					onChange={(next) => {
+						args.onChange(next);
+						setValue(next);
+					}}
+				/>
+			)}
+		</Stateful>
+	),
 } satisfies Meta<typeof ReviewTierLadder>;
 
 export default meta;

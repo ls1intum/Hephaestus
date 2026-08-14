@@ -4,8 +4,8 @@ import { expect, fn, screen, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunsPage } from "./ReviewRunsPage";
+import { StatefulPatch } from "@/stories/stateful";
 import { reviewHandlers } from "./story-mock-server";
-import { StatefulSearch } from "./story-search-harness";
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Reviews",
@@ -24,11 +24,11 @@ const meta = {
 	},
 	/** See `ObservationsListPage.stories`: a controlled screen needs somewhere to put its answer. */
 	render: (args) => (
-		<StatefulSearch initial={args.search}>
+		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
 				<ReviewRunsPage {...args} search={search} onSearchChange={onSearchChange} />
 			)}
-		</StatefulSearch>
+		</StatefulPatch>
 	),
 } satisfies Meta<typeof ReviewRunsPage>;
 

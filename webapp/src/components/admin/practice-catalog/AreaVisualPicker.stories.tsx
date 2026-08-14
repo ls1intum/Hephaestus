@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
+import { StatefulPatch } from "@/stories/stateful";
 import { AreaVisualPicker, type AreaVisualPickerProps } from "./AreaVisualPicker";
 
 const meta = {
@@ -16,6 +17,25 @@ const meta = {
 		name: "Code quality",
 		onChange: fn(),
 	},
+	/**
+	 * The swatch and the icon are props, so with only `fn()` behind `onChange` the preview never
+	 * changed: clicking amber left the trigger the colour it started as. The picker's whole job is to
+	 * show you what you just chose.
+	 */
+	render: (args) => (
+		<StatefulPatch initial={{ icon: args.icon, color: args.color }}>
+			{(visual, patch) => (
+				<AreaVisualPicker
+					{...args}
+					{...visual}
+					onChange={(next) => {
+						args.onChange(next);
+						patch(next);
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 } satisfies Meta<typeof AreaVisualPicker>;
 
 export default meta;

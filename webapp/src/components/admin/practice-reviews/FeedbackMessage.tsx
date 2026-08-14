@@ -59,8 +59,15 @@ const UNTRUSTED_MARKDOWN_COMPONENTS = {
  * hundred words, and the default `mt-8` above each one left a gap the product owner measured as
  * "almost doubling what you would expect". Tightened to a rhythm that suits the length of the thing.
  */
+/**
+ * The composer quotes the developer's own code in fenced blocks, and Typography gives a `pre`
+ * `overflow-x: auto`. A block wider than the card then becomes a scrollable region no keyboard can
+ * reach — axe's `scrollable-region-focusable`, and a real one: on a phone the right-hand end of the
+ * line is unreachable without a horizontal drag inside a vertically scrolling page. Wrapping is the
+ * right answer for a quotation of two or three lines inside a comment, which is what these are.
+ */
 const FEEDBACK_PROSE =
-	"prose prose-sm dark:prose-invert max-w-none break-words prose-headings:mt-4 prose-headings:mb-1.5 prose-headings:text-sm prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 first:prose-headings:mt-0";
+	"prose prose-sm dark:prose-invert max-w-none break-words prose-headings:mt-4 prose-headings:mb-1.5 prose-headings:text-sm prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:overflow-x-visible prose-pre:whitespace-pre-wrap prose-pre:break-words first:prose-headings:mt-0";
 
 type FeedbackView = "rendered" | "source";
 

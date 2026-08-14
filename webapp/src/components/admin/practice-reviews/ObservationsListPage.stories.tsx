@@ -5,8 +5,8 @@ import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationsListPage } from "./ObservationsListPage";
 import { manyObservations } from "./story-mock-data";
+import { StatefulPatch } from "@/stories/stateful";
 import { reviewHandlers } from "./story-mock-server";
-import { StatefulSearch } from "./story-search-harness";
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Observations",
@@ -33,16 +33,37 @@ const meta = {
 	 * returned the same array for every query made a working filter look broken all over again.
 	 */
 	render: (args) => (
-		<StatefulSearch initial={args.search}>
+		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
 				<ObservationsListPage {...args} search={search} onSearchChange={onSearchChange} />
 			)}
-		</StatefulSearch>
+		</StatefulPatch>
 	),
 } satisfies Meta<typeof ObservationsListPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
+
+/**
+ * Open a facet, choose an option, and close it again.
+ *
+ * Closing matters: the popup stays open after a choice, because these facets are multi-select and
+ * shutting it after every tick would make picking two severities take four clicks. A story that then
+ * opens a second facet has two listboxes on screen, and a bare `findByRole("listbox")` throws. The
+ * trigger element is captured before the click because choosing an option renames it.
+ */
+async function pickFacet(
+	canvas: ReturnType<typeof within>,
+	userEvent: { click: (element: Element) => Promise<void> },
+	facet: string,
+	option: RegExp,
+) {
+	const trigger = canvas.getByRole("combobox", { name: facet });
+	await userEvent.click(trigger);
+	const listbox = await screen.findByRole("listbox", { name: `${facet} options` });
+	await userEvent.click(await within(listbox).findByRole("option", { name: option }));
+	await userEvent.click(trigger);
+}
 
 /** Every facet is on the toolbar. "More filters" is gone; a filter you must find is one you do not use. */
 export const Default: Story = {
@@ -71,10 +92,7 @@ export const FilterToOneSeverity: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
 		await canvas.findByText("12 observations.");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
-		const listbox = await screen.findByRole("listbox");
-		await userEvent.click(await within(listbox).findByRole("option", { name: /Major/ }));
-		await userEvent.keyboard("{Escape}");
+		await pickFacet(canvas, userEvent, "Severity", /Major/);
 		await canvas.findByText("2 observations match your filters.");
 		await expect(canvas.queryByText(/leaks the ledger's table name/)).not.toBeInTheDocument();
 	},
@@ -105,14 +123,8 @@ export const FilteredToNothing: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
 		await canvas.findByText("12 observations.");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Severity" }));
-		const listbox = await screen.findByRole("listbox");
-		await userEvent.click(await within(listbox).findByRole("option", { name: /Critical/ }));
-		await userEvent.keyboard("{Escape}");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Area" }));
-		const areas = await screen.findByRole("listbox");
-		await userEvent.click(await within(areas).findByRole("option", { name: /Testing/ }));
-		await userEvent.keyboard("{Escape}");
+		await pickFacet(canvas, userEvent, "Severity", /Critical/);
+		await pickFacet(canvas, userEvent, "Area", /Testing/);
 		await canvas.findByText("No observations match these filters");
 		canvas.getByRole("button", { name: "Reset" });
 	},

@@ -13,6 +13,7 @@ import {
 } from "@/mocks/fixtures/practice";
 import { ADD_BINDING_ID } from "./bindings";
 import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
+import { Stateful } from "@/stories/stateful";
 import { outcome } from "./story-mock-data";
 
 const meta = {
@@ -25,6 +26,25 @@ const meta = {
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
+	/**
+	 * Adding an occasion, ticking a moment or editing its evidence all replace the whole binding list,
+	 * so the editor cannot show any of it without somewhere to put the new list. Every story here paired
+	 * a frozen `bindings` with `fn()`, which made the entire screen a picture of one configuration.
+	 */
+	render: (args) => (
+		<Stateful initial={args.bindings}>
+			{(bindings, setBindings) => (
+				<PracticeBindingsEditor
+					{...args}
+					bindings={bindings}
+					onChange={(next) => {
+						args.onChange(next);
+						setBindings(next);
+					}}
+				/>
+			)}
+		</Stateful>
+	),
 } satisfies Meta<typeof PracticeBindingsEditor>;
 
 export default meta;

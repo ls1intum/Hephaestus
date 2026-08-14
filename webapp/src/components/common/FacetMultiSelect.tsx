@@ -156,7 +156,10 @@ export function FacetMultiSelect<TValue extends string | number>({
 					aria-label={`Search ${title.toLowerCase()} options`}
 				/>
 				<ComboboxEmpty>{options.length === 0 ? emptyLabel : "No matches"}</ComboboxEmpty>
-				<ComboboxList>
+				{/* The list is its own `role="listbox"`, so labelling the popup around it does not name
+				    it: a screen reader arriving on the options hears "listbox" and nothing else. Every
+				    other combobox in the app already labels its list; this one did not. */}
+				<ComboboxList aria-label={`${title} options`}>
 					{(option: FacetOption<TValue>) => (
 						<ComboboxItem key={option.value} value={option}>
 							<ComboboxItemIndicator />

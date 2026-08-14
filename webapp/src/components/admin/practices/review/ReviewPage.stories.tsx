@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
 import { buildAutonomyFixture } from "@/components/admin/practices/review-autonomy/story-mock-data";
+import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewPage } from "./ReviewPage";
 
@@ -63,6 +64,31 @@ const meta = {
 		overridesOnly: false,
 		onOverridesOnlyChange: fn(),
 	},
+	/**
+	 * The tabs and the scope switch are controlled — the route puts both in the URL. With `fn()` behind
+	 * them and a fixed `section`, clicking another tab never changed panel, so the one thing this
+	 * screen is (three sections behind three tabs) could not be seen in any story but the one that
+	 * named each section in its args.
+	 */
+	render: (args) => (
+		<StatefulPatch initial={{ section: args.section, overridesOnly: args.overridesOnly }}>
+			{(view, patch) => (
+				<ReviewPage
+					{...args}
+					section={view.section}
+					overridesOnly={view.overridesOnly}
+					onSectionChange={(section) => {
+						args.onSectionChange(section);
+						patch({ section });
+					}}
+					onOverridesOnlyChange={(overridesOnly) => {
+						args.onOverridesOnlyChange(overridesOnly);
+						patch({ overridesOnly });
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 } satisfies Meta<typeof ReviewPage>;
 
 export default meta;

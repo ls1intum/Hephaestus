@@ -5,8 +5,8 @@ import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackListPage } from "./FeedbackListPage";
 import { manyFeedback } from "./story-mock-data";
+import { StatefulPatch } from "@/stories/stateful";
 import { reviewHandlers } from "./story-mock-server";
-import { StatefulSearch } from "./story-search-harness";
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Delivery",
@@ -25,11 +25,11 @@ const meta = {
 	},
 	/** See `ObservationsListPage.stories`: a controlled screen needs somewhere to put its answer. */
 	render: (args) => (
-		<StatefulSearch initial={args.search}>
+		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
 				<FeedbackListPage {...args} search={search} onSearchChange={onSearchChange} />
 			)}
-		</StatefulSearch>
+		</StatefulPatch>
 	),
 } satisfies Meta<typeof FeedbackListPage>;
 
@@ -108,10 +108,13 @@ export const FilterToOneWithholdingFamily: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
 		await canvas.findByText("11 pieces of feedback.");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Why withheld" }));
-		const listbox = await screen.findByRole("listbox");
+		const trigger = canvas.getByRole("combobox", { name: "Why withheld" });
+		await userEvent.click(trigger);
+		const listbox = await screen.findByRole("listbox", { name: "Why withheld options" });
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Housekeeping/ }));
-		await userEvent.keyboard("{Escape}");
+		// Closed again: the popup stays open after a choice, and axe reads an open unnamed listbox as
+		// part of the story. See `ObservationsListPage.stories`.
+		await userEvent.click(trigger);
 		await canvas.findByText("1 piece of feedback matches your filters.");
 		canvas.getByText("Nearly the same as other feedback from the same review.");
 	},

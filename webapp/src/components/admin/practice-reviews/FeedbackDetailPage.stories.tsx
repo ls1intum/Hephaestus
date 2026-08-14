@@ -75,10 +75,12 @@ export const Delivered: Story = {
 export const LongFeedback: Story = {
 	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
 	parameters: { chromatic: { viewports: [320, 1440] } },
-	play: async ({ canvas, canvasElement }) => {
+	play: async ({ canvas }) => {
 		await canvas.findByText(/2 issues to tighten in this change/);
 		// The end of the note is on the page too, so nothing between them was dropped.
 		canvas.getByText(/without HTTP\./);
+		// And the quoted code in the middle of it, which is the part a preview cannot carry.
+		canvas.getByText(/repository\.findVisible/);
 		// It draws on two observations, and each is named by its role in the note.
 		canvas.getByRole("link", {
 			name: "A cache miss and a permission failure come back as the same 404",
@@ -88,7 +90,6 @@ export const LongFeedback: Story = {
 		});
 		canvas.getByText("What this feedback is about");
 		canvas.getByText("Supporting this feedback");
-		await expect(canvasElement.querySelector("pre")).not.toBeInTheDocument();
 		await expectNoPageOverflow();
 	},
 };

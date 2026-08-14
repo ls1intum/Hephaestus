@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
@@ -81,6 +82,44 @@ const meta = {
 		),
 	],
 	tags: ["autodocs"],
+	/**
+	 * The work-type filter and each area's icon, colour and dashboard visibility are props this screen
+	 * renders from, and its container writes back after the server accepts the change. Behind `fn()`
+	 * alone none of them moved: choosing "Issues" left every practice on screen, and picking a colour
+	 * left the area the colour it started as.
+	 *
+	 * The three area edits are applied here optimistically, which is what the container does while its
+	 * mutation is in flight — so this is the state the screen really passes through, not a shortcut.
+	 */
+	render: (args) => (
+		<StatefulPatch initial={{ focusFilter: args.focusFilter, areas: args.areas }}>
+			{(view, patch) => (
+				<PracticeCatalog
+					{...args}
+					focusFilter={view.focusFilter}
+					areas={view.areas}
+					onFocusFilterChange={(focusFilter) => {
+						args.onFocusFilterChange(focusFilter);
+						patch({ focusFilter });
+					}}
+					onSetAreaVisual={(slug, visual) => {
+						args.onSetAreaVisual(slug, visual);
+						patch({
+							areas: view.areas.map((area) => (area.slug === slug ? { ...area, ...visual } : area)),
+						});
+					}}
+					onSetAreaDashboardVisibility={(slug, visibleInPracticeDashboards) => {
+						args.onSetAreaDashboardVisibility(slug, visibleInPracticeDashboards);
+						patch({
+							areas: view.areas.map((area) =>
+								area.slug === slug ? { ...area, visibleInPracticeDashboards } : area,
+							),
+						});
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 } satisfies Meta<typeof PracticeCatalog>;
 
 export default meta;

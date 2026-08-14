@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
+import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { tracedArtifactPage, tracedArtifacts } from "./story-mock-data";
 import { TraceListPage } from "./TraceListPage";
@@ -25,6 +26,26 @@ const meta = {
 		search: {},
 		onSearchChange: fn(),
 	},
+	/**
+	 * The work-kind picker and the pager are controlled, so a story that passed only `fn()` could not
+	 * show a chosen kind: clicking "Documents" left the trigger reading "All work". The harness holds
+	 * the answer, and the spy still records the patch — the stories below assert on the *shape* of
+	 * what is emitted, which is where the `kind=__all` sentinel would escape into a shareable URL.
+	 */
+	render: (args) => (
+		<StatefulPatch initial={args.search}>
+			{(search, patch) => (
+				<TraceListPage
+					{...args}
+					search={search}
+					onSearchChange={(next) => {
+						args.onSearchChange(next);
+						patch(next);
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 } satisfies Meta<typeof TraceListPage>;
 
 export default meta;

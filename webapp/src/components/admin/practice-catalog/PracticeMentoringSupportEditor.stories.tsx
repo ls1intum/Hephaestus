@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { Stateful } from "@/stories/stateful";
 import { PracticeMentoringSupportEditor } from "./PracticeMentoringSupportEditor";
 
 const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
@@ -16,6 +17,25 @@ const meta = {
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
+	/**
+	 * The editor is controlled, so with only `fn()` behind `onChange` none of it could be operated:
+	 * picking a mode, typing the reason human review is needed, or adding a limitation all left the
+	 * form exactly as the args set it.
+	 */
+	render: (args) => (
+		<Stateful initial={args.value}>
+			{(value, setValue) => (
+				<PracticeMentoringSupportEditor
+					{...args}
+					value={value}
+					onChange={(next) => {
+						args.onChange(next);
+						setValue(next);
+					}}
+				/>
+			)}
+		</Stateful>
+	),
 } satisfies Meta<typeof PracticeMentoringSupportEditor>;
 
 export default meta;

@@ -76,7 +76,7 @@ export const Mobile: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvasElement }) => {
-		within(canvasElement).getByText("Withheld");
+		expect(within(canvasElement).getAllByText("Withheld")).toHaveLength(4);
 		await expectNoPageOverflow();
 	},
 };

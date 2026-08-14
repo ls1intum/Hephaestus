@@ -12,6 +12,16 @@ import {
 } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
+/**
+ * The editor is controlled, so changing a source's role or ticking "use recommended" only shows if
+ * something holds the answer. One story used to; in the rest a frozen `needs` sat behind `fn()`, so
+ * every segment on the screen was decorative.
+ */
+function ControlledEvidence(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
+	const [needs, setNeeds] = useState(args.needs);
+	return <PracticeEvidenceEditor {...args} needs={needs} onChange={setNeeds} />;
+}
+
 const meta = {
 	title: "Workspace admin/Practices/Occasion evidence",
 	component: PracticeEvidenceEditor,
@@ -28,11 +38,6 @@ const meta = {
 
 export default meta;
 type Story = StoryObj<typeof meta>;
-
-function ControlledEvidence(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
-	const [needs, setNeeds] = useState(args.needs);
-	return <PracticeEvidenceEditor {...args} needs={needs} onChange={setNeeds} />;
-}
 
 /** Closed, the answer is the chips: three required sources out of the eleven a pull request offers. */
 export const RecommendedEvidence: Story = {

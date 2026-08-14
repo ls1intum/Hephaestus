@@ -18,7 +18,7 @@ import {
  * <p>The list stories used to hand MSW a fixed array and return it for every request. Choosing a
  * severity then changed the URL, refetched, and got the same rows back — so the toolbar looked
  * connected and the list underneath it was a photograph. Combined with a story whose `search` prop
- * could not change (see `story-search-harness`), that is two independent reasons a filter appeared
+ * could not change (see `@/stories/stateful`), that is two independent reasons a filter appeared
  * to do nothing, and fixing one alone would still have looked broken.
  *
  * <p>These handlers filter and paginate the fixture the way the server does, so a story can show a

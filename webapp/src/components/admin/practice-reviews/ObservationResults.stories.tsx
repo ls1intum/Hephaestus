@@ -61,8 +61,8 @@ export const Default: Story = {
 		canvas.getByText("Not applicable");
 		canvas.getByText("Could not be determined");
 		// The origin badge is silent for the ordinary case and speaks for the two that are not.
-		canvas.getByText("From a review of past work");
-		canvas.getByText("Requested by hand");
+		expect(canvas.getAllByText("From a review of past work")).toHaveLength(2);
+		expect(canvas.getAllByText("Requested by hand")).toHaveLength(2);
 		await expect(canvas.queryAllByText("No result")).toHaveLength(0);
 	},
 };

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { withWidePage } from "@/stories/decorators";
+import { Stateful } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewAutonomyPage } from "./ReviewAutonomyPage";
 import { type AutonomyFixture, buildAutonomyFixture, scaleFixture } from "./story-mock-data";
@@ -142,6 +143,32 @@ const meta = {
 	},
 	decorators: [withWidePage],
 	tags: ["autodocs"],
+	/**
+	 * The scope filter is controlled, and behind `fn()` alone it could not be switched: "Only what was
+	 * set by hand" left all four areas on screen. It is held here so the filter works.
+	 *
+	 * <p>The tier setters stay spies, deliberately. Every fixture on this page is *derived* from a spec
+	 * by {@link buildAutonomyFixture}, which resolves the whole three-level inheritance chain the way
+	 * the server does — so applying one tier locally would need the same resolution done again by hand,
+	 * and the first time the two disagreed the page would be showing a rollup its own rows contradict.
+	 * That is the state this fixture exists to make unwritable. A story asserting the emitted call is
+	 * asserting the thing the page is actually responsible for; the ladder's own behaviour when it
+	 * moves is covered where it lives, in `ReviewTierLadder.stories`.
+	 */
+	render: (args) => (
+		<Stateful initial={args.overridesOnly}>
+			{(overridesOnly, setOverridesOnly) => (
+				<ReviewAutonomyPage
+					{...args}
+					overridesOnly={overridesOnly}
+					onOverridesOnlyChange={(next) => {
+						args.onOverridesOnlyChange(next);
+						setOverridesOnly(next);
+					}}
+				/>
+			)}
+		</Stateful>
+	),
 } satisfies Meta<typeof ReviewAutonomyPage>;
 
 export default meta;
