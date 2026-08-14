@@ -5,13 +5,15 @@ import {
 	artifactKindOfSignal,
 	bindingsProblem,
 	claimedSignals,
+	everyMomentClaimed,
 	normalizeBinding,
 	orderedWorkTypes,
 	recommendedBinding,
 	roleOf,
+	signalOwners,
 	withRole,
 } from "@/components/admin/practice-catalog/bindings";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { mockMergeBinding, mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 
 const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
 const aiSupported = pullRequests.recommendedPolicy;
@@ -130,6 +132,7 @@ describe("orderedWorkTypes", () => {
 			"scm.pull_request",
 			"scm.issue",
 			"chat.conversation_thread",
+			"docs.document",
 		]);
 	});
 
@@ -145,6 +148,7 @@ describe("orderedWorkTypes", () => {
 			"scm.pull_request",
 			"scm.issue",
 			"chat.conversation_thread",
+			"docs.document",
 			"docs.page",
 		]);
 	});
@@ -236,5 +240,28 @@ describe("bindingsProblem", () => {
 			"Guidance only cannot read any evidence.",
 		);
 		expect(bindingsProblem([binding({ needs: [] })], guidanceOnly, pullRequests)).toBeUndefined();
+	});
+});
+
+describe("signalOwners", () => {
+	it("names the occasion holding each moment, so the author knows which card to change", () => {
+		const owners = signalOwners(
+			[{ signals: ["scm.pull_request.opened"], needs: [] }, mockMergeBinding],
+			1,
+		);
+
+		expect(owners.get("scm.pull_request.opened")).toBe(1);
+		expect(owners.get("scm.pull_request.merged")).toBeUndefined();
+	});
+});
+
+describe("everyMomentClaimed", () => {
+	it("ignores the hand-asked review, which no occasion can claim", () => {
+		const lifecycle = pullRequests.signals
+			.filter((option) => option.signal !== "scm.pull_request.manual_review")
+			.map((option) => option.signal);
+
+		expect(everyMomentClaimed(pullRequests, new Set(lifecycle))).toBe(true);
+		expect(everyMomentClaimed(pullRequests, new Set(lifecycle.slice(1)))).toBe(false);
 	});
 });

@@ -1,4 +1,4 @@
-import { Plus, Trash2 } from "lucide-react";
+import { PlusIcon, Trash2Icon } from "lucide-react";
 import type {
 	PracticeBinding,
 	PracticeEvidenceOutcome,
@@ -10,24 +10,18 @@ import {
 	bindingFieldId,
 	bindingIdPrefix,
 	claimedSignals,
-	hasDrafts,
+	everyMomentClaimed,
 	MAX_BINDINGS,
 	normalizeBinding,
 	recommendedBinding,
+	signalOwners,
 } from "@/components/admin/practice-catalog/bindings";
+import { OccasionLifecycle } from "@/components/admin/practice-catalog/OccasionLifecycle";
 import { PracticeEvidenceEditor } from "@/components/admin/practice-catalog/PracticeEvidenceEditor";
 import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-	Field,
-	FieldDescription,
-	FieldError,
-	FieldGroup,
-	FieldLabel,
-	FieldLegend,
-	FieldSet,
-} from "@/components/ui/field";
+import { FieldError } from "@/components/ui/field";
+import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 
 /**
  * Rendering the message is not enough on its own: an author sent to the control that has to change
@@ -67,13 +61,20 @@ export function PracticeBindingsEditor({
 	disabled = false,
 }: PracticeBindingsEditorProps) {
 	const claimed = claimedSignals(bindings);
-	const allSignalsClaimed = options.signals.every((option) => claimed.has(option.signal));
-	const canAdd = bindings.length < MAX_BINDINGS && !allSignalsClaimed;
+	const allClaimed = everyMomentClaimed(options, claimed);
+	const canAdd = bindings.length < MAX_BINDINGS && !allClaimed;
+	const WorkIcon = artifactKindIcon(options.artifactKind);
 	const replaceAt = (index: number, binding: PracticeBinding) =>
 		onChange(bindings.map((item, itemIndex) => (itemIndex === index ? binding : item)));
 
 	return (
 		<div className="space-y-4">
+			{/* The work type once, above every occasion, so each card can be about the moments alone
+			    rather than restating which kind of work they belong to. */}
+			<p className="flex items-center gap-2 text-sm font-medium">
+				<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
+				{artifactKindLabel(options.artifactKind)}
+			</p>
 			{outcome && (
 				<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
 			)}
@@ -90,7 +91,7 @@ export function PracticeBindingsEditor({
 							binding={binding}
 							index={index}
 							total={bindings.length}
-							claimedElsewhere={claimedSignals(bindings.filter((_, other) => other !== index))}
+							heldElsewhere={signalOwners(bindings, index)}
 							canAttemptReview={canAttemptReview}
 							guidanceOnly={guidanceOnly}
 							errorFocusId={belongsToBinding(errorFocusId, index) ? errorFocusId : undefined}
@@ -121,10 +122,10 @@ export function PracticeBindingsEditor({
 						])
 					}
 				>
-					<Plus className="size-4" />
+					<PlusIcon className="size-4" />
 					Add occasion
 				</Button>
-				{allSignalsClaimed && bindings.length > 0 && (
+				{allClaimed && bindings.length > 0 && (
 					<p className="text-sm text-muted-foreground">
 						Every moment this kind of work offers is already claimed by an occasion.
 					</p>
@@ -140,7 +141,7 @@ interface BindingCardProps {
 	binding: PracticeBinding;
 	index: number;
 	total: number;
-	claimedElsewhere: ReadonlySet<string>;
+	heldElsewhere: ReadonlyMap<string, number>;
 	canAttemptReview: boolean;
 	guidanceOnly: boolean;
 	errorFocusId?: string;
@@ -155,7 +156,7 @@ function BindingCard({
 	binding,
 	index,
 	total,
-	claimedElsewhere,
+	heldElsewhere,
 	canAttemptReview,
 	guidanceOnly,
 	errorFocusId,
@@ -168,16 +169,11 @@ function BindingCard({
 	const occasionLabel = `occasion ${index + 1}`;
 	const signalsInvalid = errorFocusId === bindingFieldId(index, "signals");
 	const evidenceInvalid = errorFocusId === bindingFieldId(index, "evidence");
-	const chosen = options.signals.filter((option) => binding.signals.includes(option.signal));
-	const summary =
-		chosen.length > 0
-			? chosen.map((option) => option.displayName).join(", ")
-			: "No moment chosen yet";
-	const toggleSignal = (signal: string, checked: boolean) =>
+	const toggleSignal = (signal: string, chosen: boolean) =>
 		onChange(
 			normalizeBinding({
 				...binding,
-				signals: checked
+				signals: chosen
 					? [...binding.signals, signal]
 					: binding.signals.filter((value) => value !== signal),
 			}),
@@ -185,12 +181,11 @@ function BindingCard({
 
 	return (
 		<div className="space-y-4">
-			<div className="flex items-start justify-between gap-3">
-				<div className="min-w-0">
+			{/* An ordinal only where there is something to tell apart. One occasion needs no number, and
+			    the moments it holds are on the strip below rather than repeated as a sentence here. */}
+			{total > 1 && (
+				<div className="flex items-start justify-between gap-3">
 					<p className="font-medium">Occasion {index + 1}</p>
-					<p className="truncate text-sm text-muted-foreground">{summary}</p>
-				</div>
-				{total > 1 && (
 					<Button
 						type="button"
 						variant="ghost"
@@ -199,74 +194,25 @@ function BindingCard({
 						onClick={onRemove}
 						aria-label={`Remove occasion ${index + 1}`}
 					>
-						<Trash2 className="size-4" />
+						<Trash2Icon className="size-4" />
 					</Button>
-				)}
-			</div>
-
-			<FieldSet
-				data-invalid={signalsInvalid || undefined}
-				aria-describedby={signalsInvalid ? errorId : undefined}
-				id={bindingFieldId(index, "signals")}
-				// Focusable only programmatically: a form-level error sends focus here so the author lands
-				// in the occasion it names, but the group stays out of the tab order.
-				tabIndex={-1}
-				// Scoped by occasion so a screen reader hears which one it is in rather than a run of
-				// identical "Starts a review when" groups.
-				aria-label={`Starts a review when, ${occasionLabel}`}
-			>
-				<FieldLegend variant="label">Starts a review when *</FieldLegend>
-				<FieldGroup data-slot="checkbox-group" className="grid gap-3 sm:grid-cols-2">
-					{options.signals.map((option) => {
-						const takenElsewhere = claimedElsewhere.has(option.signal);
-						const controlId = `${idPrefix}-signal-${option.signal}`;
-						return (
-							<FieldLabel
-								key={option.signal}
-								htmlFor={controlId}
-								className="flex cursor-pointer items-center gap-2 text-sm font-normal"
-							>
-								<Checkbox
-									id={controlId}
-									checked={binding.signals.includes(option.signal)}
-									// The server refuses a signal bound twice outright, so the second occasion
-									// cannot be allowed to claim it and discover that on save.
-									disabled={disabled || takenElsewhere}
-									onCheckedChange={(checked) => toggleSignal(option.signal, checked === true)}
-								/>
-								<span>
-									{option.displayName}
-									{takenElsewhere && (
-										<span className="text-muted-foreground"> · used by another occasion</span>
-									)}
-								</span>
-							</FieldLabel>
-						);
-					})}
-				</FieldGroup>
-			</FieldSet>
-
-			{hasDrafts(options.artifactKind) && (
-				<Field orientation="horizontal" className="gap-2" data-disabled={disabled}>
-					<Checkbox
-						id={`${idPrefix}-on-drafts`}
-						disabled={disabled}
-						checked={binding.onDrafts === true}
-						onCheckedChange={(checked) =>
-							onChange(normalizeBinding({ ...binding, onDrafts: checked === true }))
-						}
-					/>
-					<FieldLabel htmlFor={`${idPrefix}-on-drafts`} className="font-normal">
-						<span>
-							Also while it is still a draft
-							<FieldDescription>
-								Off by default. Worth turning on where the point is to help early, and worth leaving
-								off where the judgement is about finished work.
-							</FieldDescription>
-						</span>
-					</FieldLabel>
-				</Field>
+				</div>
 			)}
+
+			<OccasionLifecycle
+				workType={options}
+				selected={binding.signals}
+				heldElsewhere={heldElsewhere}
+				onToggle={toggleSignal}
+				onDrafts={binding.onDrafts === true}
+				onDraftsChange={(onDrafts) => onChange(normalizeBinding({ ...binding, onDrafts }))}
+				idPrefix={idPrefix}
+				groupId={bindingFieldId(index, "signals")}
+				occasionLabel={occasionLabel}
+				disabled={disabled}
+				invalid={signalsInvalid}
+				errorId={errorId}
+			/>
 
 			{guidanceOnly ? (
 				<p className="text-sm text-muted-foreground">

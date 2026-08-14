@@ -3,6 +3,7 @@ import type {
 	PracticeAutomatedReviewValidation,
 	PracticeBinding,
 	PracticeDefinitionOptions,
+	PracticeEvidenceSourceOption,
 } from "@/api/types.gen";
 
 export const mockAuthorDeclaredEvidenceValidation = {
@@ -59,6 +60,21 @@ const mockConversationPolicy = {
 	],
 } satisfies PracticeAutomatedReviewPolicy;
 
+const mockDocumentPolicy = {
+	sourceContractVersion: "1.0.0",
+	automatedReview: {
+		mode: "LANGUAGE_MODEL",
+		evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
+	},
+	whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
+	knownLimitations: [
+		{
+			code: "READERSHIP_NOT_OBSERVED",
+			description: "A published document does not establish whether anyone acted on it.",
+		},
+	],
+} satisfies PracticeAutomatedReviewPolicy;
+
 export const mockPullRequestBinding = {
 	signals: ["scm.pull_request.opened", "scm.pull_request.ready", "scm.pull_request.synchronized"],
 	needs: [
@@ -72,6 +88,7 @@ export const mockMergeBinding = {
 	signals: ["scm.pull_request.merged"],
 	needs: [
 		{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" },
+		{ sourceKind: "scm.repository.tree", stance: "CONTEXTUAL" },
 		{ sourceKind: "scm.review-threads", stance: "EXHAUSTIVE" },
 	],
 } satisfies PracticeBinding;
@@ -88,6 +105,57 @@ export const mockConversationBinding = {
 	signals: ["chat.conversation_thread.settled"],
 	needs: [{ sourceKind: "slack.conversation.thread", stance: "REQUIRED" }],
 } satisfies PracticeBinding;
+
+export const mockDocumentBinding = {
+	signals: ["docs.document.published", "docs.document.updated"],
+	needs: [{ sourceKind: "docs.document.core", stance: "REQUIRED" }],
+} satisfies PracticeBinding;
+
+/**
+ * Sources several work types share, declared once so a story cannot show a practice reading "Earlier
+ * observations about this person" on a pull request and something differently worded on an issue.
+ *
+ * The wire ids are the server's; nothing here is shown to an operator except `displayName` and
+ * `description`, which are copied verbatim from `contracts/artifact-source/1.0.0/catalog.json`.
+ */
+const relatedWorkSource = {
+	sourceKind: "workspace.project-inventory",
+	displayName: "Related workspace work",
+	description:
+		"Other work items in the same workspace, supplied so a change can be read against related work.",
+	privacyClass: "PERSONAL",
+	requiredQuality: "ANY_CAPTURE",
+	supportsExhaustiveEvidence: true,
+} satisfies PracticeEvidenceSourceOption;
+
+const referencedDocumentsSource = {
+	sourceKind: "outline.documents",
+	displayName: "Referenced Outline documents",
+	description: "Outline documents the reviewed work references.",
+	privacyClass: "PERSONAL",
+	requiredQuality: "ANY_CAPTURE",
+	supportsExhaustiveEvidence: false,
+} satisfies PracticeEvidenceSourceOption;
+
+const observationHistorySource = {
+	sourceKind: "hephaestus.observation-history",
+	displayName: "Earlier observations about this person",
+	description:
+		"Observations earlier reviews in this workspace recorded about the person whose work is under review.",
+	privacyClass: "PERSONAL",
+	requiredQuality: "ANY_CAPTURE",
+	supportsExhaustiveEvidence: false,
+} satisfies PracticeEvidenceSourceOption;
+
+const feedbackHistorySource = {
+	sourceKind: "hephaestus.feedback-history",
+	displayName: "Feedback already delivered to this person",
+	description:
+		"Feedback earlier reviews already delivered to the person whose work is under review, with the place it went to.",
+	privacyClass: "PERSONAL",
+	requiredQuality: "ANY_CAPTURE",
+	supportsExhaustiveEvidence: false,
+} satisfies PracticeEvidenceSourceOption;
 
 export const mockPracticeDefinitionOptions = {
 	workTypes: [
@@ -129,7 +197,8 @@ export const mockPracticeDefinitionOptions = {
 				{
 					sourceKind: "scm.pull-request.core",
 					displayName: "Pull request details",
-					description: "Pull request metadata and commit subjects for the reviewed pull request.",
+					description:
+						"The pull request record: title, description, author, branches, state, labels, and commit subjects.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,
@@ -137,35 +206,60 @@ export const mockPracticeDefinitionOptions = {
 				{
 					sourceKind: "scm.pull-request.diff",
 					displayName: "Code changes",
-					description: "Code changes in the reviewed pull request.",
-					privacyClass: "PERSONAL",
+					description:
+						"The code changes the pull request introduces, as a unified diff annotated with line numbers.",
+					privacyClass: "INTERNAL",
 					requiredQuality: "COMPLETE_AND_NON_EMPTY",
 					supportsExhaustiveEvidence: true,
 				},
 				{
 					sourceKind: "scm.pull-request.comments",
 					displayName: "Inline review comments",
-					description: "Inline review comments mirrored by the application.",
+					description: "Review comments left on specific lines of the pull request.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
 				},
 				{
 					sourceKind: "scm.review-threads",
-					displayName: "Review threads",
-					description: "Review conversations and whether each one was resolved.",
+					displayName: "Review threads and decisions",
+					description:
+						"Review conversations on the pull request, whether each was resolved, and each reviewer's decision.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
 				},
 				{
+					sourceKind: "scm.general-review-comments",
+					displayName: "General review comments",
+					description:
+						"Review comments addressing the pull request as a whole rather than a specific line.",
+					privacyClass: "PERSONAL",
+					requiredQuality: "ANY_CAPTURE",
+					supportsExhaustiveEvidence: true,
+				},
+				{
+					sourceKind: "scm.repository.tree",
+					displayName: "Repository files",
+					description:
+						"Files from elsewhere in the repository, supplied as context for reading the change. Not reviewed on their own.",
+					privacyClass: "INTERNAL",
+					requiredQuality: "ANY_CAPTURE",
+					supportsExhaustiveEvidence: true,
+				},
+				{
 					sourceKind: "scm.linked-work-items",
-					displayName: "Linked issues",
-					description: "Issues this pull request references.",
+					displayName: "Linked work items",
+					description:
+						"Issues the pull request states it addresses, resolved from its description, branch name, and commit subjects.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: false,
 				},
+				relatedWorkSource,
+				referencedDocumentsSource,
+				observationHistorySource,
+				feedbackHistorySource,
 			],
 		},
 		{
@@ -187,7 +281,8 @@ export const mockPracticeDefinitionOptions = {
 				{
 					sourceKind: "scm.issue.core",
 					displayName: "Issue details",
-					description: "Issue metadata and rendered description.",
+					description:
+						"The issue record: title, description, author, state, labels, and assignees.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,
@@ -195,11 +290,15 @@ export const mockPracticeDefinitionOptions = {
 				{
 					sourceKind: "scm.issue.comments",
 					displayName: "Issue comments",
-					description: "Issue discussion comments.",
+					description: "The discussion recorded on the issue.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
 				},
+				relatedWorkSource,
+				referencedDocumentsSource,
+				observationHistorySource,
+				feedbackHistorySource,
 			],
 		},
 		{
@@ -218,12 +317,46 @@ export const mockPracticeDefinitionOptions = {
 				{
 					sourceKind: "slack.conversation.thread",
 					displayName: "Slack thread",
-					description: "Ordered human messages from one Slack thread.",
+					description:
+						"One Slack thread in chronological order, read only from channels whose consent is active.",
+					privacyClass: "SENSITIVE_PERSONAL",
+					requiredQuality: "COMPLETE",
+					supportsExhaustiveEvidence: true,
+				},
+				relatedWorkSource,
+				observationHistorySource,
+				feedbackHistorySource,
+			],
+		},
+		{
+			artifactKind: "docs.document",
+			signals: [
+				{ signal: "docs.document.published", displayName: "Published", recommended: true },
+				{ signal: "docs.document.updated", displayName: "Content changed", recommended: true },
+				{ signal: "docs.document.archived", displayName: "Archived", recommended: false },
+			],
+			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
+			recommendedPolicy: mockDocumentPolicy,
+			recommendedNeeds: mockDocumentBinding.needs,
+			allowedSources: [
+				{
+					sourceKind: "docs.document.core",
+					displayName: "Document under review",
+					description:
+						"The written document a review is about: its prose, title, collection, author, and upstream timestamps.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,
 				},
+				observationHistorySource,
+				feedbackHistorySource,
 			],
 		},
 	],
 } satisfies PracticeDefinitionOptions;
+
+/** Named rather than indexed, so a work type added here cannot silently repoint a story. */
+export const mockPullRequestWorkType = mockPracticeDefinitionOptions.workTypes[0];
+export const mockIssueWorkType = mockPracticeDefinitionOptions.workTypes[1];
+export const mockConversationWorkType = mockPracticeDefinitionOptions.workTypes[2];
+export const mockDocumentWorkType = mockPracticeDefinitionOptions.workTypes[3];

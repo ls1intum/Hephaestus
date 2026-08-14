@@ -2,24 +2,24 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, userEvent, within } from "storybook/test";
 import {
 	mockConversationBinding,
+	mockConversationWorkType,
+	mockDocumentBinding,
+	mockDocumentWorkType,
 	mockIssueBinding,
+	mockIssueWorkType,
 	mockMergeBinding,
-	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
+	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { ADD_BINDING_ID } from "./bindings";
 import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
 import { outcome } from "./story-mock-data";
 
-const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
-const issues = mockPracticeDefinitionOptions.workTypes[1];
-const conversations = mockPracticeDefinitionOptions.workTypes[2];
-
 const meta = {
 	title: "Workspace admin/Practices/Occasions",
 	component: PracticeBindingsEditor,
 	args: {
-		options: pullRequests,
+		options: mockPullRequestWorkType,
 		bindings: [mockPullRequestBinding],
 		onChange: fn(),
 	},
@@ -30,10 +30,66 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const OneOccasion: Story = {
+/**
+ * A pull request offers the fullest lifecycle of the four work types: it starts once, churns while it
+ * is open, and ends one of two ways. The three bands are what say so — a single arrow through all six
+ * moments would claim "Merged" comes after "Closed without merging".
+ */
+export const PullRequestLifecycle: Story = {
 	play: async ({ canvas }) => {
+		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		await expect(strip.getByRole("checkbox", { name: /^Opened/ })).toBeChecked();
+		await expect(strip.getByRole("checkbox", { name: /^Merged/ })).not.toBeChecked();
+		// Binding a moment that recurs is a decision about volume, so the node says it recurs.
+		await expect(
+			strip.getByRole("checkbox", { name: "New commits pushed every time" }),
+		).toBeVisible();
 		// Nothing to remove when there is only one: a practice with no occasion cannot be saved.
 		await expect(canvas.queryByRole("button", { name: "Remove occasion 1" })).toBeNull();
+	},
+};
+
+/**
+ * An issue has no draft state and no churn worth reviewing beyond labelling, so its strip is three
+ * nodes — the same visual language, shorter.
+ */
+export const IssueLifecycle: Story = {
+	args: { options: mockIssueWorkType, bindings: [mockIssueBinding] },
+	play: async ({ canvas }) => {
+		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		await expect(strip.getByRole("checkbox", { name: "Labeled every time" })).toBeChecked();
+		// An issue is never a draft, so the question is not asked.
+		await expect(canvas.queryByRole("switch", { name: /^Include drafts/ })).toBeNull();
+	},
+};
+
+/**
+ * A document is published, changes, and is eventually archived. The moments differ from a pull
+ * request's entirely; the strip does not.
+ */
+export const DocumentLifecycle: Story = {
+	args: { options: mockDocumentWorkType, bindings: [mockDocumentBinding] },
+	play: async ({ canvas }) => {
+		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		await expect(strip.getByRole("checkbox", { name: /^Published/ })).toBeChecked();
+		await expect(strip.getByRole("checkbox", { name: "Content changed every time" })).toBeChecked();
+		await expect(strip.getByRole("checkbox", { name: /^Archived/ })).not.toBeChecked();
+	},
+};
+
+/**
+ * A conversation offers exactly one moment worth reviewing, so the strip is one node and the band
+ * headings drop away — there is no lifecycle to narrate. The "Add occasion" button goes with them,
+ * because a second occasion would have nothing left to start on.
+ */
+export const ConversationHasOneMoment: Story = {
+	args: { options: mockConversationWorkType, bindings: [mockConversationBinding] },
+	play: async ({ canvas }) => {
+		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		await expect(strip.getAllByRole("checkbox")).toHaveLength(1);
+		await expect(canvas.queryByText("Along the way")).toBeNull();
+		await expect(canvas.getByRole("button", { name: "Add occasion" })).toBeDisabled();
+		await expect(canvas.getByText(/already claimed by an occasion/)).toBeVisible();
 	},
 };
 
@@ -44,63 +100,56 @@ export const OneOccasion: Story = {
 export const TwoOccasionsReadingDifferentThings: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
 	play: async ({ canvas }) => {
-		await expect(
-			within(canvas.getByRole("group", { name: "Starts a review when, occasion 2" })).getByRole(
-				"checkbox",
-				{ name: "Merged" },
-			),
-		).toBeChecked();
+		const second = within(canvas.getByRole("group", { name: "Reviews when, occasion 2" }));
+		await expect(second.getByRole("checkbox", { name: /^Merged/ })).toBeChecked();
 		await expect(
 			within(canvas.getByRole("group", { name: "What this review reads, occasion 2" })).getByText(
-				/and nothing missing from it/,
+				/whole/,
 			),
 		).toBeVisible();
 	},
 };
 
 /**
- * The server rejects a signal bound twice, and the refusal would otherwise arrive as a failed save
- * with nothing on screen explaining it.
+ * The server rejects a moment bound twice, and the refusal would otherwise arrive as a failed save
+ * with nothing on screen explaining it. Naming the occasion that holds it saves the author hunting
+ * through the cards for which one to change.
  */
 export const AMomentBelongsToOneOccasion: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
 	play: async ({ canvas }) => {
-		const second = within(canvas.getByRole("group", { name: "Starts a review when, occasion 2" }));
+		const second = within(canvas.getByRole("group", { name: "Reviews when, occasion 2" }));
 		await expect(second.getByRole("checkbox", { name: /^Opened/ })).toHaveAttribute(
 			"aria-disabled",
 			"true",
 		);
-		await expect(second.getAllByText(/used by another occasion/)).toHaveLength(3);
+		await expect(second.getAllByText("in occasion 1")).toHaveLength(3);
 	},
 };
 
-export const EveryMomentClaimed: Story = {
-	args: {
-		options: conversations,
-		bindings: [mockConversationBinding],
-	},
+/**
+ * A review somebody asks for by hand runs every practice bound to that kind of work, whatever state
+ * it is in — so it is stated, not offered. Ticking it would have changed nothing, and an occasion
+ * holding only that moment would have looked configured while never firing on its own.
+ */
+export const AskingByHandIsNotAMoment: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Add occasion" })).toBeDisabled();
-		await expect(canvas.getByText(/already claimed by an occasion/)).toBeVisible();
+		await expect(canvas.queryByRole("checkbox", { name: /Review requested by hand/ })).toBeNull();
+		await expect(canvas.getByText(/Anyone can also ask for a review by hand/)).toBeVisible();
 	},
 };
 
-/** An issue is never a draft, so the question is not asked. */
-export const IssuesHaveNoDrafts: Story = {
-	args: { options: issues, bindings: [mockIssueBinding] },
-	play: async ({ canvas }) => {
-		await expect(
-			canvas.queryByRole("checkbox", { name: /Also while it is still a draft/ }),
-		).toBeNull();
-	},
-};
-
+/**
+ * Drafts widen which pull requests the moments apply to, so the switch belongs to the occasion rather
+ * than to the practice — reviewing early as the work arrives is compatible with judging only finished
+ * work at the merge.
+ */
 export const DraftsAreAPropertyOfTheOccasion: Story = {
 	args: {
 		bindings: [{ ...mockPullRequestBinding, onDrafts: true }, mockMergeBinding],
 	},
 	play: async ({ canvas }) => {
-		const drafts = canvas.getAllByRole("checkbox", { name: /Also while it is still a draft/ });
+		const drafts = canvas.getAllByRole("switch", { name: /^Include drafts/ });
 		await expect(drafts[0]).toBeChecked();
 		await expect(drafts[1]).not.toBeChecked();
 	},
@@ -134,15 +183,14 @@ export const WithRecentOutcomes: Story = {
 		}),
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByText(/skipped this practice in 5 of the last 12 reviews/),
-		).toBeVisible();
+		await expect(canvas.getByText("7 of 12 reviews ran")).toBeVisible();
 	},
 };
 
 /**
  * A submit sends focus to the control that has to change, and the message has to travel with it: on
- * its own it is text somewhere else on a long form.
+ * its own it is text somewhere else on a long form. The strip carries the fault too — every empty node
+ * takes the destructive outline, so the occasion at fault is visible before the message is read.
  */
 export const Invalid: Story = {
 	args: {
@@ -151,9 +199,8 @@ export const Invalid: Story = {
 		errorFocusId: "practice-binding-0-signals",
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("No moment chosen yet")).toBeVisible();
 		await expect(
-			canvas.getByRole("group", { name: "Starts a review when, occasion 1" }),
+			canvas.getByRole("group", { name: "Reviews when, occasion 1" }),
 		).toHaveAccessibleDescription("Choose when this occasion starts a review.");
 		// Only the faulted group carries it — describing every group with it would make the message
 		// mean "something on this form is wrong" rather than "this is the thing to change".
@@ -188,7 +235,7 @@ export const NoOccasionAtAll: Story = {
 export const AddingAnOccasion: Story = {
 	args: {
 		options: {
-			...pullRequests,
+			...mockPullRequestWorkType,
 			recommendedNeeds: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }],
 		},
 	},
@@ -209,8 +256,8 @@ export const AddingAnOccasion: Story = {
 
 export const ChoosingAMoment: Story = {
 	play: async ({ args, canvas }) => {
-		const group = within(canvas.getByRole("group", { name: "Starts a review when, occasion 1" }));
-		await userEvent.click(group.getByRole("checkbox", { name: "Review submitted" }));
+		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		await userEvent.click(strip.getByRole("checkbox", { name: /^Review submitted/ }));
 
 		// Sorted on the way out, so an untouched practice does not come back looking edited.
 		await expect(args.onChange).toHaveBeenCalledWith([

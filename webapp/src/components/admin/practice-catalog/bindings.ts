@@ -5,6 +5,7 @@ import type {
 	PracticeEvidenceRequirement,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
+import { lifecycleSignals } from "@/components/admin/practice-catalog/occasion-moments";
 import { ARTIFACT_KIND, ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
 
 export type EvidenceStance = PracticeEvidenceRequirement["stance"];
@@ -69,7 +70,10 @@ export function recommendedBinding(
 	usedSignals: readonly string[] = [],
 ): PracticeBinding {
 	const taken = new Set(usedSignals);
-	const free = options.signals.filter((option) => !taken.has(option.signal));
+	// Only moments on the artifact's lifecycle are candidates. Seeding a new occasion with the
+	// hand-asked review would hand the author an occasion that never fires on its own — the server
+	// matches a manual request against any binding of the kind, so the signal decides nothing.
+	const free = lifecycleSignals(options.signals).filter((option) => !taken.has(option.signal));
 	const recommended = free.filter((option) => option.recommended);
 	const signals = (recommended.length > 0 ? recommended : free.slice(0, 1)).map(
 		(option) => option.signal,
@@ -79,6 +83,31 @@ export function recommendedBinding(
 
 export function claimedSignals(bindings: readonly PracticeBinding[]): Set<string> {
 	return new Set(bindings.flatMap((binding) => binding.signals));
+}
+
+/**
+ * Which occasion holds each moment, numbered as the author sees them, skipping the occasion being
+ * edited. The strip needs the number and not just the fact: "already taken" leaves the author hunting
+ * for which card to change.
+ */
+export function signalOwners(
+	bindings: readonly PracticeBinding[],
+	exceptIndex: number,
+): Map<string, number> {
+	const owners = new Map<string, number>();
+	bindings.forEach((binding, index) => {
+		if (index === exceptIndex) return;
+		for (const signal of binding.signals) owners.set(signal, index + 1);
+	});
+	return owners;
+}
+
+/** True once no moment on this kind's lifecycle is left for another occasion to start on. */
+export function everyMomentClaimed(
+	options: PracticeWorkTypeDefinitionOptions,
+	claimed: ReadonlySet<string>,
+): boolean {
+	return lifecycleSignals(options.signals).every((option) => claimed.has(option.signal));
 }
 
 export function workTypeOptionsFor(
