@@ -90,7 +90,9 @@ describe("practice review routes", () => {
 	it("carries a filter through the Findings redirect", async () => {
 		const location = await land("/w/acme/admin/practices/reviews/findings?severity=MAJOR");
 
-		expect(location.searchStr).toContain("severity=MAJOR");
+		// The multi-value params serialise as a JSON array, so this asserts the value survived rather
+		// than the encoding: the point is that a filtered bookmark stays filtered across the rename.
+		expect(decodeURIComponent(location.searchStr)).toContain('severity=["MAJOR"]');
 	});
 
 	it("treats reviewed work as a neutral view and carries its scope into Delivery", async () => {
@@ -107,7 +109,7 @@ describe("practice review routes", () => {
 			),
 		);
 		renderRouteAtWithRouter("/w/acme/admin/practices/reviews/targets/pull-request/42");
-		await screen.findByText("No review output found");
+		await screen.findByText("Nothing has been reviewed on this work");
 		const navigation = screen.getByRole("navigation", { name: "Practice review sections" });
 		expect(within(navigation).queryByRole("link", { current: "page" })).toBeNull();
 

@@ -7,8 +7,9 @@ import {
 	deliveryOutcome,
 } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 /**
@@ -95,27 +96,33 @@ export function FeedbackMessage({ feedback, className }: FeedbackMessageProps) {
 		<Card className={cn("gap-0 border py-0", className)}>
 			<CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-3">
 				{unsent ? <StatusBadge def={deliveryOutcome(feedback)} /> : <span />}
-				<ToggleGroup
-					value={[view]}
-					onValueChange={(next: string[]) => {
-						// A toggle group can be emptied by re-pressing the active item; the body must always
-						// be showing something, so an empty selection keeps the current view.
-						const [chosen] = next;
-						if (chosen === "rendered" || chosen === "source") setView(chosen);
-					}}
-					variant="outline"
-					size="sm"
-					aria-label="How to show the feedback"
-				>
-					<ToggleGroupItem value="rendered" aria-label="Show the feedback as the developer sees it">
+				{/* Two pressed-state buttons rather than a `ToggleGroup`: the Base UI group renders
+				    `role="group"` *and* `aria-orientation`, which axe rejects as an attribute that role
+				    does not allow, and `src/components/ui` is vendored and not ours to patch. Two
+				    buttons with `aria-pressed` say the same thing in a way a screen reader already
+				    understands, and one of them is always pressed. */}
+				<ButtonGroup aria-label="How to show the feedback">
+					<Button
+						variant={view === "rendered" ? "secondary" : "outline"}
+						size="sm"
+						aria-pressed={view === "rendered"}
+						aria-label="Show the feedback as the developer sees it"
+						onClick={() => setView("rendered")}
+					>
 						<TextIcon aria-hidden />
 						Rendered
-					</ToggleGroupItem>
-					<ToggleGroupItem value="source" aria-label="Show the Markdown that was composed">
+					</Button>
+					<Button
+						variant={view === "source" ? "secondary" : "outline"}
+						size="sm"
+						aria-pressed={view === "source"}
+						aria-label="Show the Markdown that was composed"
+						onClick={() => setView("source")}
+					>
 						<CodeIcon aria-hidden />
 						Source
-					</ToggleGroupItem>
-				</ToggleGroup>
+					</Button>
+				</ButtonGroup>
 			</CardHeader>
 			<CardContent className="py-4">
 				{view === "rendered" ? (

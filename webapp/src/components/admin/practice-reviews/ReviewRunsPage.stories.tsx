@@ -1,39 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, screen, within } from "storybook/test";
 import type { ReviewRunSummary } from "@/api/types.gen";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunsPage } from "./ReviewRunsPage";
-import { reviewArtifact } from "./story-mock-data";
+import { reviewRuns } from "./story-mock-data";
+import { StatefulSearch } from "./story-search-harness";
 
-const reviews: ReviewRunSummary[] = [
-	{
-		id: "11111111-1111-1111-1111-111111111111",
-		status: "COMPLETED",
-		target: reviewArtifact,
-		createdAt: new Date("2026-07-28T13:42:00Z"),
-		observations: { strengths: 2, problems: 1, notApplicable: 1, inconclusive: 1 },
-		feedback: { delivered: 1, failed: 0, prepared: 0, superseded: 0, suppressed: 1 },
-	},
-	{
-		id: "22222222-2222-2222-2222-222222222222",
-		status: "RUNNING",
-		target: {
-			id: 43,
-			type: "scm.pull_request",
-			provider: "GITLAB",
-			number: 17,
-			repositoryName: "team/service",
-			title: "Keep the controller thin",
-		},
-		createdAt: new Date("2026-07-28T12:10:00Z"),
-		observations: { strengths: 0, problems: 0, notApplicable: 0, inconclusive: 0 },
-		feedback: { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 0 },
-	},
-];
-
-const reviewsHandler = (content: ReviewRunSummary[] = reviews) =>
+const reviewsHandler = (content: ReviewRunSummary[] = reviewRuns) =>
 	http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
 		HttpResponse.json({
 			content,
@@ -56,15 +31,54 @@ const meta = {
 		search: {},
 		onSearchChange: fn(),
 	},
+	/** See `ObservationsListPage.stories`: a controlled screen needs somewhere to put its answer. */
+	render: (args) => (
+		<StatefulSearch initial={args.search}>
+			{(search, onSearchChange) => (
+				<ReviewRunsPage {...args} search={search} onSearchChange={onSearchChange} />
+			)}
+		</StatefulSearch>
+	),
 } satisfies Meta<typeof ReviewRunsPage>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * Four reviews across four kinds of work, at four different points in their life.
+ *
+ * <p>Each row is named after the work rather than after the review, because a review has no name an
+ * operator knows — it has a UUID. What it produced sits underneath as two sentences, and only when
+ * there is something true to say: a running review says results are still coming, and one that
+ * stopped early says it produced nothing rather than showing four zeroes.
+ */
 export const Default: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		viewport: { defaultViewport: "desktop" },
+	parameters: { viewport: { defaultViewport: "desktop" } },
+	play: async ({ canvas }) => {
+		const list = await canvas.findByRole("list", { name: /Practice reviews/ });
+		for (const review of reviewRuns) {
+			within(list).getByRole("link", { name: review.target.title });
+		}
+		canvas.getByText("2 strengths · 1 improvement · 1 not applicable · 1 could not be determined");
+		canvas.getByText("Results appear as it finishes.");
+		canvas.getByText("It produced nothing before it stopped.");
+	},
+};
+
+/**
+ * The status filter, drawn as the tags the rows wear.
+ *
+ * It used to be plain grey text beside a list of coloured tags, so choosing a filter meant matching a
+ * word to a tag from memory. Trigger and list now render the same `StatusBadge` the row does.
+ */
+export const StatusFilter: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, userEvent }) => {
+		await canvas.findByRole("list", { name: /Practice reviews/ });
+		await userEvent.click(canvas.getByRole("combobox"));
+		const listbox = await screen.findByRole("listbox");
+		await userEvent.click(within(listbox).getByRole("option", { name: /Failed/ }));
+		await expect(canvas.getByRole("combobox")).toHaveTextContent("Failed");
 	},
 };
 
@@ -75,11 +89,8 @@ export const Mobile: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		const list = await canvas.findByRole("list");
-		const review = await within(list).findByRole("link", {
-			name: /ls1intum\/Hephaestus.*PR #1423/i,
-		});
-		await expect(review).toBeVisible();
+		const list = await canvas.findByRole("list", { name: /Practice reviews/ });
+		await within(list).findByRole("link", { name: reviewRuns[0].target.title });
 		await expectNoPageOverflow();
 	},
 };
@@ -89,8 +100,8 @@ export const Empty: Story = {
 		chromatic: { viewports: [1440] },
 		msw: { handlers: [reviewsHandler([])] },
 	},
-	play: async ({ canvasElement }) => {
-		await expect(await within(canvasElement).findByText("No reviews found")).toBeVisible();
+	play: async ({ canvas }) => {
+		await canvas.findByText("No reviews found");
 	},
 };
 
@@ -106,7 +117,7 @@ export const LoadFailed: Story = {
 			],
 		},
 	},
-	play: async ({ canvasElement }) => {
-		await expect(await within(canvasElement).findByText("Couldn't load reviews")).toBeVisible();
+	play: async ({ canvas }) => {
+		await canvas.findByText("Couldn't load reviews");
 	},
 };

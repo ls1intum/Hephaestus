@@ -67,6 +67,8 @@ export const NotDelivered: Story = {
 		const canvas = within(canvasElement);
 		// Withheld text is badged where it is shown *and* traced under Delivery, and the trace is the
 		// only place the reason sentence appears.
+		// Twice, and deliberately: once on the card around the text — so a body that never reached
+		// anybody cannot be quoted as though it had — and once as the trace's terminal step.
 		await expect(await canvas.findAllByText("Withheld")).toHaveLength(2);
 		canvas.getByRole("link", { name: "See everything reviewed on this work" });
 		// The parent review is a link in the line under the title, not a UUID in a drawer.

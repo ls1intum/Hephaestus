@@ -55,7 +55,8 @@ export const Default: Story = {
 	play: async ({ canvas }) => {
 		// The leading icon and the badge both come from `observationResult`, so a shortfall shows its
 		// assessment and its severity, and a presence that ends the question shows only itself.
-		canvas.getByText("Needs improvement");
+		// Two shortfalls in the fixture, so this is a count and not a lookup.
+		expect(canvas.getAllByText("Needs improvement")).toHaveLength(2);
 		canvas.getByText("Critical");
 		canvas.getByText("Not applicable");
 		canvas.getByText("Could not be determined");
@@ -70,8 +71,11 @@ export const Default: Story = {
 export const PracticeOpensItsDefinition: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		const link = await canvas.findByRole("link", { name: /Thin controllers/ });
-		await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
+		// Three observations name this practice; every one of them reaches the same definition.
+		const links = await canvas.findAllByRole("link", { name: /Thin controllers/ });
+		for (const link of links) {
+			await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
+		}
 	},
 };
 

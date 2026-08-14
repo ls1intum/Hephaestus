@@ -109,7 +109,11 @@ export const PickADateRange: Story = {
 		await canvas.findByText(`${reviewObservations.length} observations.`);
 		await userEvent.click(canvas.getByRole("button", { name: "Date" }));
 		const dialog = await screen.findByRole("dialog");
-		const days = await within(dialog).findAllByRole("gridcell", { selected: false });
+		// The month is the only `role="grid"` on screen and the day buttons are the only buttons
+		// inside it. Testing Library maps a `<td>` to `cell`, not `gridcell`, whatever role its
+		// ancestor table carries, so the grid is the anchor rather than the cells.
+		const grid = await within(dialog).findByRole("grid");
+		const days = within(grid).getAllByRole("button");
 		await userEvent.click(days[4]);
 		await userEvent.click(days[10]);
 		await canvas.findByText(/–/);

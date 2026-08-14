@@ -63,7 +63,8 @@ export const PullRequest: Story = {
 		await canvas.findByRole("heading", { name: reviewArtifact.title, level: 2 });
 		// The breadcrumb stops before repeating the heading, and the eyebrow is gone.
 		await expect(canvas.queryAllByText("Reviewed work")).toHaveLength(0);
-		canvas.getByText("ls1intum/Hephaestus · PR #1423");
+		// The header names the work once, and every row under it names it again in its meta line.
+		expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
 		await canvas.findByText(reviewFeedback[0].bodyPreview);
 		await canvas.findByText(reviewObservations[0].title);
 		await expectNoPageOverflow();
@@ -87,7 +88,7 @@ export const Conversation: Story = {
 	},
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", { name: slackConversation.title, level: 2 });
-		canvas.getByText("#engineering");
+		expect(canvas.getAllByText("#engineering").length).toBeGreaterThan(0);
 	},
 };
 

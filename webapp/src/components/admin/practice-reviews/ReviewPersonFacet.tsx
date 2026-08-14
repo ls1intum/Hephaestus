@@ -121,7 +121,9 @@ export function ReviewPersonFacet({
 							? "No people in this workspace"
 							: "No matches"}
 				</ComboboxEmpty>
-				<ComboboxList>
+				{/* The list carries the name, not just the popup: in single-select mode Base UI puts
+				    `role="listbox"` on this element, and an unnamed listbox fails axe. */}
+				<ComboboxList aria-label={`${title} options`}>
 					{(option: PersonOption) => (
 						<ComboboxItem key={option.userId} value={option}>
 							<ComboboxItemIndicator />

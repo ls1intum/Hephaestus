@@ -48,7 +48,8 @@ type Story = StoryObj<typeof meta>;
  */
 export const Default: Story = {
 	play: async ({ canvas, canvasElement }) => {
-		canvas.getByRole("heading", { name: reviewObservationDetail.title, level: 2 });
+		// The page fetches, so the first query has to wait; everything after it is already rendered.
+		await canvas.findByRole("heading", { name: reviewObservationDetail.title, level: 2 });
 		canvas.getByRole("link", { name: "in a review" });
 		// The reasoning is introduced by what it is, not by the product's name.
 		canvas.getByRole("heading", { name: "Why this was raised", level: 3 });
@@ -70,7 +71,7 @@ export const Default: Story = {
  */
 export const EvidenceAcrossSources: Story = {
 	play: async ({ canvas }) => {
-		canvas.getByText("4 passages from 3 sources.");
+		await canvas.findByText("4 passages from 3 sources.");
 		canvas.getByRole("heading", { name: "The code changes", level: 4 });
 		canvas.getByRole("heading", { name: "Comments on the pull request", level: 4 });
 		canvas.getByRole("heading", { name: "Referenced documents", level: 4 });
@@ -87,7 +88,7 @@ export const EvidenceAcrossSources: Story = {
  */
 export const LinkedFeedback: Story = {
 	play: async ({ canvas }) => {
-		const link = canvas.getByRole("link", { name: "Feedback about this observation" });
+		const link = await canvas.findByRole("link", { name: "Feedback about this observation" });
 		await expect(link).toHaveAttribute(
 			"href",
 			expect.stringContaining("/admin/practices/reviews/delivery/"),

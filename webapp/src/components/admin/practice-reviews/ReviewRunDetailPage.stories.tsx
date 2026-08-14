@@ -107,7 +107,7 @@ export const DeclinedForInsufficientEvidence: Story = {
 		await expect(canvas.queryByText("No observations were recorded")).toBeNull();
 		await expect(canvas.queryByText("No feedback")).toBeNull();
 		await expect(
-			await canvas.findAllByText(/required evidence was missing, unreadable, out of date/),
+			await canvas.findAllByText(/the material it needed was missing, unreadable, out of date/),
 		).not.toHaveLength(0);
 	},
 };

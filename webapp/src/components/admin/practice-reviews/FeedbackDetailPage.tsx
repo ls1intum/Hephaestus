@@ -5,10 +5,8 @@ import { getPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.ge
 import type { ReviewPlacement } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DeliveryTrace } from "@/components/practice-vocabulary/DeliveryTrace";
-import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
 import { PLACEMENT_DEFS } from "@/components/practice-vocabulary/placement-defs";
-import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import {
 	Empty,
 	EmptyDescription,
@@ -91,8 +89,10 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{breadcrumbs}
+			{/* No outcome chip in the header: the trace below states it, and the card around the text
+			    states it again for text that was not sent — a third copy three lines above the trace
+			    is the redundancy this rewrite exists to remove. */}
 			<ReviewDetailHeader
-				chips={<StatusBadge def={deliveryOutcome(feedback)} />}
 				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
 				provenance={
 					<ReviewProvenanceLine
