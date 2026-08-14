@@ -18,8 +18,34 @@ export interface ReviewRowProps {
 	title: ReactNode;
 	/** The facts that place the row — practice, work, who, when. One or two lines, no controls. */
 	meta?: ReactNode;
-	/** Status badges and the person, right-aligned on a wide screen and wrapped under on a narrow one. */
-	chips?: ReactNode;
+	/**
+	 * Status badges and the person, in fixed slots: right-aligned on a wide screen, wrapped under on a
+	 * narrow one. See {@link ReviewRowChip} for why this is a list of reserved slots and not a fragment.
+	 */
+	chips?: ReviewRowChip[];
+}
+
+/**
+ * One reserved position in a row's chip group.
+ *
+ * <p>The chips used to be a fragment in a `flex-wrap` box, so a row with no severity and a row with
+ * one put their next badge at different x, and the eye had to re-find the column on every line. Two
+ * of the four things an observation row shows are conditional, which means *most* rows differed.
+ * A slot keeps its width when its `node` is absent, so the badge that follows it does not move —
+ * the alignment a table gives for free (NN/g, "Data Tables"), on a list that is not a table.
+ *
+ * <p>The width is the caller's because it belongs to the list, not to the row: every row of one
+ * list passes the same slots in the same order, and that is what makes the column constant. The
+ * widths are `lg:`-prefixed, so below that the chips wrap as they always did and an empty slot
+ * collapses: reserving four columns' worth of space needs a screen wide enough to hold the whole
+ * strip, and forcing it on a tablet would push the row wider than the page.
+ */
+export interface ReviewRowChip {
+	key: string;
+	/** Reserved width from `lg` up, e.g. `"lg:w-28"`. Constant across every row of one list. */
+	width: string;
+	/** What sits in the slot. Absent keeps the space and shows nothing. */
+	node?: ReactNode;
 }
 
 /**
@@ -31,9 +57,12 @@ export interface ReviewRowProps {
  * and one of them always drifts — which is how the observations table grew a "Developer and reviewed
  * work" column that the card version split in two, and how the skeleton came to match neither.
  *
- * <p>A table earns its keep when a reader compares the same cell down a column. Nothing here is
- * comparable in that way: the dominant cell is a sentence of prose. So this is one row that reflows,
- * and the tables are gone.
+ * <p>A table earns its keep when a reader compares the same cell down a column, and the row's name —
+ * a sentence of prose, of any length — is not comparable in that way. So this is one row that
+ * reflows, and the tables are gone. What *is* comparable down the list keeps a column anyway: the
+ * chips sit in fixed slots (see {@link ReviewRowChip}) and a tally is drawn as a fixed grid (see
+ * `ReviewCountStrip`), so a badge and a number each land at one x on every row without a `<table>`
+ * around them.
  *
  * <h4>Why the whole row is not a link</h4>
  * The obvious construction — `<Item render={<Link/>}>` — makes the row itself an anchor, and then a
@@ -60,8 +89,20 @@ export function ReviewRow({ status, title, meta, chips }: ReviewRowProps) {
 					</div>
 					{meta && <div className="min-w-0 space-y-0.5 text-xs text-muted-foreground">{meta}</div>}
 				</div>
-				{chips && (
-					<div className="relative flex flex-wrap items-center gap-1.5 sm:justify-end">{chips}</div>
+				{chips && chips.length > 0 && (
+					<div className="relative flex flex-wrap items-start gap-1.5 lg:flex-nowrap">
+						{chips.map((chip) => (
+							<span
+								key={chip.key}
+								className={cn(
+									"flex min-w-0 flex-wrap items-center gap-1.5 empty:hidden lg:shrink-0 lg:empty:flex",
+									chip.width,
+								)}
+							>
+								{chip.node}
+							</span>
+						))}
+					</div>
 				)}
 			</div>
 		</li>

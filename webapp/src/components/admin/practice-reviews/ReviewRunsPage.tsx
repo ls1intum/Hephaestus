@@ -15,8 +15,10 @@ import {
 } from "@/components/practice-vocabulary/review-status-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { statusValues } from "@/components/practice-vocabulary/status-def";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -31,12 +33,11 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { ReviewArtifactLabel } from "./ReviewArtifact";
-import { FeedbackCountsSummary, ObservationCountsSummary } from "./ReviewBadges";
+import { feedbackCountSlots, observationCountSlots, ReviewCountStrip } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import type { RunsSearch } from "./review-search";
+import { REVIEW_PAGE_SIZE, type RunsSearch } from "./review-search";
 
-const PAGE_SIZE = 20;
 const ACTIVE_REVIEW_POLL_MS = 5_000;
 const STATUSES = statusValues(REVIEW_STATUS_DEFS);
 /** The "no filter" sentinel. A `Select` has to hold some value, and `undefined` is not one. */
@@ -74,7 +75,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 	const query = useQuery({
 		...listPracticeReviewsOptions({
 			path: { workspaceSlug },
-			query: { page: search.page ?? 0, size: PAGE_SIZE, status: search.status },
+			query: { page: search.page ?? 0, size: REVIEW_PAGE_SIZE, status: search.status },
 		}),
 		refetchInterval: (result) =>
 			result.state.data?.content?.some(
@@ -140,7 +141,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 					onRetry={() => query.refetch()}
 				/>
 			) : query.isLoading ? (
-				<ReviewResultsSkeleton label="Loading reviews" />
+				<ReviewResultsSkeleton label="Loading reviews" rows={REVIEW_PAGE_SIZE} />
 			) : reviews.length === 0 ? (
 				<Empty className="border">
 					<EmptyHeader>
@@ -150,10 +151,23 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						<EmptyTitle>No reviews found</EmptyTitle>
 						<EmptyDescription>
 							{search.status
-								? "Try another status."
+								? `No review is ${REVIEW_STATUS_DEFS[search.status].label.toLowerCase()}. Other reviews may exist under another status.`
 								: "Reviews appear when an enabled practice is triggered or a contributor requests one."}
 						</EmptyDescription>
 					</EmptyHeader>
+					{search.status && (
+						<EmptyContent>
+							{/* The advice used to be "Try another status" with nothing to press. See
+							    `ObservationResultsState`. */}
+							<Button
+								variant="outline"
+								size="sm"
+								onClick={() => onSearchChange({ status: undefined, page: 0 })}
+							>
+								Clear all filters
+							</Button>
+						</EmptyContent>
+					)}
 				</Empty>
 			) : (
 				<ReviewRowList label="Practice reviews, newest first">
@@ -193,9 +207,9 @@ export interface ReviewRunRowProps {
  * One review: the work it read, and what it produced.
  *
  * <p>The row is named after the work rather than after the review, because a review has no name an
- * operator knows — it has a UUID. The two tallies sit under it as sentences, and only when there is
- * something true to say: a review that has not finished says so, and one that ended without output
- * says that instead of showing four zeroes.
+ * operator knows — it has a UUID. The two tallies sit under it as a numeric strip, and only when
+ * there is something true to count: a review that has not finished says so, and one that ended
+ * without output says that instead of drawing nine zeroes.
  */
 export function ReviewRunRow({ workspaceSlug, review, search }: ReviewRunRowProps) {
 	return (
@@ -222,7 +236,13 @@ export function ReviewRunRow({ workspaceSlug, review, search }: ReviewRunRowProp
 					<RunOutputSummary review={review} />
 				</>
 			}
-			chips={<StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />}
+			chips={[
+				{
+					key: "status",
+					width: "lg:w-40",
+					node: <StatusBadge def={REVIEW_STATUS_DEFS[review.status]} />,
+				},
+			]}
 		/>
 	);
 }
@@ -240,20 +260,20 @@ function hasFeedbackOutput(review: ReviewRunSummary) {
 /**
  * What the review produced, or why there is nothing to show.
  *
- * A run that is still going has an empty tally that means "not yet", and one that failed has an
- * empty tally that means "never". Printing "No observations" for both would make the first look like
- * a finished review that found nothing.
+ * <p>A run that is still going has an empty tally that means "not yet", and one that failed has an
+ * empty tally that means "never". Printing nine zeroes for both would make the first look like a
+ * finished review that found nothing.
+ *
+ * <p>Once there *is* a tally it is drawn as two strips rather than two sentences, because these nine
+ * numbers are the row's dominant content and they are read down the list, not along the row. See
+ * `ReviewCountStrip` for why the zeroes are drawn rather than dropped.
  */
 function RunOutputSummary({ review }: { review: ReviewRunSummary }) {
 	if (review.status === "COMPLETED" || hasObservationOutput(review) || hasFeedbackOutput(review)) {
 		return (
 			<>
-				<p>
-					<ObservationCountsSummary counts={review.observations} />
-				</p>
-				<p>
-					<FeedbackCountsSummary counts={review.feedback} prefix="Feedback:" />
-				</p>
+				<ReviewCountStrip label="Observations" slots={observationCountSlots(review.observations)} />
+				<ReviewCountStrip label="Feedback" slots={feedbackCountSlots(review.feedback)} />
 			</>
 		);
 	}

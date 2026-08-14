@@ -124,13 +124,9 @@ export const RenderedAndSource: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, canvasElement, userEvent }) => {
 		await canvas.findByText(/2 issues to tighten in this change/);
-		await userEvent.click(
-			canvas.getByRole("button", { name: /Show the Markdown that was composed/ }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
 		await expect(canvasElement.querySelector("pre")?.textContent).toContain("```java");
-		await userEvent.click(
-			canvas.getByRole("button", { name: /Show the feedback as the developer sees it/ }),
-		);
+		await userEvent.click(canvas.getByRole("button", { name: "Rendered" }));
 		await canvas.findByText(/2 issues to tighten in this change/);
 	},
 };

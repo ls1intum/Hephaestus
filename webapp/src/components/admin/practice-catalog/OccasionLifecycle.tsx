@@ -1,5 +1,10 @@
 import type { PracticeSignalOption, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
-import { hasDrafts } from "@/components/admin/practice-catalog/bindings";
+import {
+	bindingFieldId,
+	bindingIdPrefix,
+	hasDrafts,
+	occasionLabel,
+} from "@/components/admin/practice-catalog/bindings";
 import {
 	lifecycleSignals,
 	manualRequestSignal,
@@ -8,9 +13,35 @@ import {
 	PHASE_LABEL,
 } from "@/components/admin/practice-catalog/occasion-moments";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+
+/**
+ * Which occasion this is. The id prefix that keeps occasion 2's checkboxes off occasion 1's, the id a
+ * form-level error sends focus to, and the words that tell a reader which of two identical groups
+ * they are in were four separate scalars, and they are four spellings of one fact: the occasion's
+ * position in the practice. They are derived from it here instead, so no caller can spell one of them
+ * differently from the rest.
+ */
+export interface OccasionIdentity {
+	/** The occasion's position among the practice's occasions, from zero. */
+	index: number;
+	/**
+	 * The id of the message describing what is wrong — passed only while *this* occasion is the one
+	 * failing validation, which is also what draws the moments in the invalid state. One field rather
+	 * than an `invalid` flag beside an id, because "invalid with nothing to point at" and "an error to
+	 * point at that nobody is showing" are both states the screen has no rendering for.
+	 */
+	errorId?: string;
+}
 
 export interface OccasionLifecycleProps {
 	/**
@@ -18,6 +49,7 @@ export interface OccasionLifecycleProps {
 	 * whether drafts are a state this work can even be in.
 	 */
 	workType: PracticeWorkTypeDefinitionOptions;
+	occasion: OccasionIdentity;
 	/** The moments this occasion reviews on. */
 	selected: readonly string[];
 	/** Moment id to the occasion number already holding it, since the server refuses a moment bound twice. */
@@ -25,18 +57,7 @@ export interface OccasionLifecycleProps {
 	onToggle: (signal: string, chosen: boolean) => void;
 	onDrafts: boolean;
 	onDraftsChange: (onDrafts: boolean) => void;
-	/** Prefix for control ids, so ticking a moment in occasion 2 cannot toggle occasion 1's. */
-	idPrefix: string;
-	/** The id a form-level error sends focus to. */
-	groupId: string;
-	/**
-	 * Appended to the group's accessible name. Two occasions otherwise present two identically named
-	 * groups and a screen-reader user cannot tell which one they are in.
-	 */
-	occasionLabel: string;
 	disabled?: boolean;
-	invalid?: boolean;
-	errorId?: string;
 }
 
 /**
@@ -54,18 +75,19 @@ export interface OccasionLifecycleProps {
  */
 export function OccasionLifecycle({
 	workType,
+	occasion,
 	selected,
 	heldElsewhere,
 	onToggle,
 	onDrafts,
 	onDraftsChange,
-	idPrefix,
-	groupId,
-	occasionLabel,
 	disabled = false,
-	invalid = false,
-	errorId,
 }: OccasionLifecycleProps) {
+	const { index, errorId } = occasion;
+	const idPrefix = bindingIdPrefix(index);
+	const invalid = errorId !== undefined;
+	const draftsId = `${idPrefix}-on-drafts`;
+	const draftsHintId = `${draftsId}-hint`;
 	const chosen = new Set(selected);
 	// A moment that is not on the lifecycle is not on the strip — with one exception: a practice saved
 	// before this screen stopped offering the hand-asked review still holds it, and hiding it would
@@ -76,13 +98,13 @@ export function OccasionLifecycle({
 
 	return (
 		<FieldSet
-			id={groupId}
+			id={bindingFieldId(index, "signals")}
 			data-invalid={invalid || undefined}
-			aria-describedby={invalid ? errorId : undefined}
+			aria-describedby={errorId}
 			// Focusable only programmatically: a form-level error sends focus here so the author lands in
 			// the occasion it names, but the group stays out of the tab order.
 			tabIndex={-1}
-			aria-label={`Reviews when, ${occasionLabel}`}
+			aria-label={`Reviews when, ${occasionLabel(index)}`}
 		>
 			<FieldLegend variant="label">Reviews when *</FieldLegend>
 			<div className="flex flex-wrap items-start gap-x-6 gap-y-4">
@@ -131,19 +153,26 @@ export function OccasionLifecycle({
 			{hasDrafts(workType.artifactKind) && (
 				<Field orientation="horizontal" className="mt-1 gap-3" data-disabled={disabled}>
 					<Switch
-						id={`${idPrefix}-on-drafts`}
+						id={draftsId}
 						disabled={disabled}
 						checked={onDrafts}
 						onCheckedChange={onDraftsChange}
+						aria-describedby={draftsHintId}
 					/>
-					<FieldLabel htmlFor={`${idPrefix}-on-drafts`} className="font-normal">
-						<span>
+					{/* Label and description are siblings inside `FieldContent`, which is the anatomy the
+					    kit is built for. Nesting the description inside the label instead put a `<p>` inside
+					    a `<label>`, whose content model is phrasing content only, and — worse — handed the
+					    switch an accessible name of "Include drafts Off by default: read the work once it is
+					    offered as finished". A name is what the control *is*; the sentence explaining the
+					    default belongs to `aria-describedby`, which is what the switch points at above. */}
+					<FieldContent>
+						<FieldLabel htmlFor={draftsId} className="font-normal">
 							Include drafts
-							<FieldDescription>
-								Off by default: read the work once it is offered as finished.
-							</FieldDescription>
-						</span>
-					</FieldLabel>
+						</FieldLabel>
+						<FieldDescription id={draftsHintId}>
+							Off by default: read the work once it is offered as finished.
+						</FieldDescription>
+					</FieldContent>
 				</Field>
 			)}
 		</FieldSet>

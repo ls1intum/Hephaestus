@@ -142,6 +142,7 @@ function ConfigAuditView({
 					onChange={(values) => onSearchChange({ action: nonEmpty(values) })}
 				/>
 				<DateRangeFacet
+					title="Changed"
 					value={dateRange}
 					onChange={(range) => onSearchChange(fromDateRange(range))}
 				/>

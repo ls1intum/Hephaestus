@@ -253,54 +253,147 @@ vocabulary somewhere a grep for the screen text will not find it.
 
 ## Component design rubric
 
-Seven rules. They are short because a rubric nobody finishes reading is not a rubric, and every one
-of them is here because its absence already cost us a rewrite.
+Fourteen rules, each with the source you can check it against. They are short because a rubric nobody
+finishes reading is not a rubric. Where a rule is ours rather than received practice it says so —
+"house policy" means you may argue with it in review; a cited normative rule you may not.
+
+### Shape of the props
 
 **1. An atom takes the domain object, not five scalars.** `<StatusBadge def={…} />`, not `label` +
 `variant` + `icon`. A caller holding the pieces can combine pieces that do not belong together — a
 "Delivered" label wearing the destructive variant — and no type catches it. Where the answer depends
 on several fields at once, take the record: `deliveryOutcome(feedback)` reads channel, state and
 reason together, because a state without its channel can produce a sentence that never happens.
-`Pick<WireType, …>` for the prop type, so every read model that has those fields fits as it is.
+`Pick<WireType, …>` for the prop type, so every read model that has those fields fits as it is. This
+also catches the quieter version: four scalars that are four spellings of one identity —
+`OccasionLifecycle` took `idPrefix`, `groupId`, `occasionLabel` and `errorId`, all derivable from the
+occasion's position, and now takes an `occasion`. *"Many props is a signal that a component is solving
+too many problems or is too opinionated"* —
+<https://github.com/Shopify/polaris/blob/main/polaris.shopify.com/content/contributing/components.mdx>
 
-**2. One defs module per enum, and no component defines its own copy for one.**
-`src/components/practice-vocabulary/*-defs.ts` holds `{ label, icon, badgeVariant, description }` per
-value, as a total `Record` over the generated wire union — so a value the server adds fails
+**2. One canonical registry per enum, and no component defines its own copy.** The unit is the enum,
+not the file: `review-status-defs.ts` correctly holds two registries for two different enums
+(`REVIEW_STATUS_DEFS`, `SUMMARY_POST_DEFS`). Each is `{ label, icon, badgeVariant, description }` per
+value, as a total `Record` over the generated wire union, so a value the server adds fails
 `typecheck:webapp` rather than rendering blank. Badges, facet options, select items and empty states
 all read that one entry. The rule exists because six label maps and two `switch`es returning badge
 variants were spread over four files, and the filter dropdown ended up as grey text beside a table of
-coloured tags. Colour is never the only channel, so `icon` is required, not optional (WCAG 2.2 SC
-1.4.1) — and within one enum no two entries may share an icon.
+coloured tags. `icon` is required, not optional: WCAG 2.2 SC 1.4.1 is stronger than a contrast
+argument — *"if content relies on the user's ability to accurately perceive or differentiate a
+particular color an additional visual indicator will be required **regardless of the contrast
+ratio**"* — and within one enum no two entries may share an icon, because two values that look
+identical are one value.
+<https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html>
 
-**3. An async list surface takes a discriminated-union `state` prop.** The house pattern is
-`FeedbackResults.tsx`: `{ status: "loading" } | { status: "empty"; filtered: boolean } | { status:
-"ready"; … }`. The container turns query flags into one value; the presentational component renders
-one branch. Never pass `isLoading` and `items` and `error` as parallel props — that shape can express
-"loading with an error and three rows", which is four impossible states per surface, and a story then
-has to reproduce a combination production never sends.
+**3. Make impossible states unrepresentable: an async surface takes one discriminated-union `state`
+prop.** `{ status: "loading" } | { status: "error"; … } | { status: "empty"; filtered: boolean } |
+{ status: "ready"; … }`. The container turns query flags into one value; the presentational component
+renders one branch. Never pass `isLoading` and `items` and `error` as parallel props — that shape can
+express "loading with an error and three rows", and a story then has to reproduce a combination
+production never sends. *Every branch a query can actually reach must be in the union* — a `loading |
+empty | ready` union with no error branch is this rule broken while appearing to follow it, and is
+exactly why `FeedbackResultsState` is **not** the exemplar to copy.
+<https://react.dev/learn/choosing-the-state-structure>
 
-**4. Slots go through Base UI's `render=`, never `asChild`.** This kit is Base UI (`@base-ui/react`),
+**4. Enum over boolean, and separate components over flag arguments.** Two booleans are four states,
+of which you render two. `variant="compact" | "full"` reads at the call site; `compact` +
+`showHeader` does not, and grows a third boolean next quarter. When the flag makes the component do a
+different job, ship two components instead — a caller that must pass a literal `true` to pick the
+behaviour is asking for a different function. The exception is a flag a caller *derives* rather than
+types: <https://martinfowler.com/bliki/FlagArgument.html>,
+<https://nathanacurtis.substack.com/p/configuration-collapse>
+
+**5. The accessible name is part of the props type.** A component with no visible label must *require*
+`aria-label` or `aria-labelledby` in its props — not accept it, require it — so a caller cannot ship
+an unnamed control. The same goes for a name that has to disambiguate two instances on one screen:
+`OccasionLifecycle` takes the occasion because two occasions otherwise present two identically named
+groups. <https://react-spectrum.adobe.com/react-aria/quality.html>
+
+**6. `className`, the remaining DOM props and `ref` reach the root element, always.** A stability
+contract, not a configuration knob: a screen that needs one margin here must not have to fork the
+component. **Exempt from rule 12** — these do not need two callers, and they do not get deleted for
+having one. `React.ComponentProps<"div">` (or of the primitive being wrapped), minus the props you
+own, is the type. <https://github.com/carbon-design-system/carbon/blob/main/docs/style.md>
+
+### Composition
+
+**7. Slots go through Base UI's `render=`, never `asChild`.** This kit is Base UI (`@base-ui/react`),
 not Radix. `<Item render={<Link to="…" />}>`, `<PopoverTrigger render={<Button …/>} />`. Anything
 copied from a Radix-based registry — including most "shadcn Timeline" snippets — will not drop in;
-port the markup and rewire the slot. Check `src/components/ui/` for what actually exists before
-assuming a primitive is available: there is **no** Timeline component, and three steps of a vertical
-rail is ~30 lines of border and rounded spans (`DeliveryTrace.tsx`), not a dependency.
+port the markup and rewire the slot.
 
-**5. Badge the exception, not the norm.** A badge on every row colours the baseline and hides the one
-row that is different. `ObservationOriginBadge` renders nothing for `LIVE`; `ClaimCurrentnessBadge`
-renders nothing for `CURRENT`; a tally of five delivery outcomes is a sentence, not five badges. The
-words in that sentence still come from the registry — a count reading "not delivered" beside a badge
-reading "Withheld" is rule 2 broken by the back door.
+**8. A slotted element keeps four obligations, and syntax is the easy one.** The primitive hands you
+its behaviour and steps back; what it hands over is *unrendered*, so your element must (a) forward
+its `ref`, (b) spread **every** prop it receives onto the real DOM node — dropping `aria-*`,
+`role`, `id` or the handlers is how a trigger stops announcing its popup — (c) render exactly one
+root element, never a fragment, and (d) stay the element type the primitive expects, since a `div`
+where a `button` was expected loses Enter/Space and the tab stop. Radix puts it plainly: *"it is your
+responsibility to ensure it remains accessible"*.
+<https://base-ui.com/react/handbook/composition>,
+<https://react-spectrum.adobe.com/react-aria/advanced.html>,
+<https://www.radix-ui.com/primitives/docs/guides/composition>
 
-**6. A hover card carries supplementary content only, on a link whose destination is a superset of
-the card.** It must never hold the only copy of a fact, or the only control that reaches one: hover
-is unavailable on touch and awkward on keyboard, so anything reachable only that way is unreachable
-for some readers. Everything in the card must also be on the page the link goes to.
+**9. Pass JSX as `children` before reaching for a prop, and for a prop before reaching for context.**
+A `title` prop that only ever receives a `<span>` should have been `children`; a "props drilled three
+levels" problem is usually one `children` away from not existing. Context is the last step, not the
+first — it is for what genuinely has no owner in the tree.
+<https://react.dev/learn/passing-data-deeply-with-context>
 
-**7. Every prop needs two real call sites, or it dies.** One caller means the value belongs inline at
-that caller, where it can be read. A `variant`, a `display`, a `size` earns its place when two
-screens genuinely disagree — otherwise it is a fork you are paying to keep open in every story,
-snapshot and type. The same applies to a whole component: delete it and inline it.
+**10. Make the common case configurable and the uncommon case composable — and know where to stop.**
+The ladder runs primitives → composed parts → a configured component; move up it only when a real
+second caller disagrees. The counterweight is honest: every step toward composition moves the
+accessibility work onto the consumer, and a kit of parts with no configured default is a kit where
+every screen re-derives the same aria wiring slightly differently. If it is a decision the product
+makes once, configure it. <https://atlassian.design/get-started/develop/composition/>,
+<https://nathanacurtis.substack.com/p/configuration-collapse>,
+<https://maecapozzi.com/blog/composition-vs-configuration/>
+
+**11. Controlled or uncontrolled is a decision you state, not one you leave to the reader.** Default
+to **controlled** for anything whose value the URL, a form, or a server mutation also holds — which
+is nearly everything we own. Use uncontrolled with a `defaultValue` only for state that never leaves
+the component. Never both: a `value` that is ignored unless `onChange` is present is a bug waiting for
+its story. Say which one it is in the component's doc comment, and name the pair `value`/`onValueChange`
++ `defaultValue`, matching Base UI. <https://react.dev/learn/sharing-state-between-components>
+
+### House policy
+
+**12. A prop needs two real call sites, or it dies (house policy).** No design system publishes a
+number; two is ours. One caller usually means the value belongs inline at that caller, where it can
+be read. A `variant`, a `display`, a `size` earns its place when two screens genuinely disagree —
+otherwise it is a fork you pay to keep open in every story, snapshot and type. The same applies to a
+whole component: delete it and inline it. **Two carve-outs.** Rule 6's `className`/`...rest`/`ref` are
+a contract, not a knob, and are exempt. And one caller justifies a prop when that caller *derives* the
+value from data rather than typing a literal — deleting it then just moves the branch somewhere worse.
+<https://kentcdodds.com/blog/inversion-of-control>,
+<https://martinfowler.com/bliki/FlagArgument.html>
+
+**13. Badge the exception, not the norm (house policy).** A signal-to-noise heuristic, not received
+practice: a badge on every row colours the baseline and hides the one row that is different.
+`ObservationOriginBadge` renders nothing for `LIVE`; `ClaimCurrentnessBadge` renders nothing for
+`CURRENT`; a tally of five delivery outcomes is a sentence, not five badges. **Rendering nothing must
+not make the fact unavailable** — if the norm is something a reader needs, it stays in the row's
+accessible text (a `sr-only` span, a `title`, or the surrounding sentence). "Silent because it is
+ordinary" is a visual decision; it is not permission to drop the information. The words in whatever
+does render still come from the registry — a count reading "not delivered" beside a badge reading
+"Withheld" is rule 2 broken by the back door.
+
+**14. A hover card carries supplementary content only, on a link whose destination is a superset of
+the card.** It must never hold the only copy of a fact, or the only control that reaches one: hover is
+unavailable on touch and awkward on keyboard. The normative rule is WCAG 2.2 SC 1.4.13 — content shown
+on hover or focus must be **dismissible** (*"a mechanism is available to dismiss the additional content
+without moving pointer hover or keyboard focus"*), **hoverable** (*"the pointer can be moved over the
+additional content without the additional content disappearing"*) and **persistent** (*"remains visible
+until the hover or focus trigger is removed, the user dismisses it, or its information is no longer
+valid"*). Everything in the card must also be on the page the link goes to.
+<https://www.w3.org/WAI/WCAG22/Understanding/content-on-hover-or-focus.html>
+
+### Before you build anything
+
+Check `src/components/ui/` for what actually exists. The shadcn registry has no `timeline`, no
+`stepper` and no `data-table` — three steps of a vertical rail is ~30 lines of border and rounded
+spans (`DeliveryTrace.tsx`), not a dependency. And check the kit's own patches before working around
+one: `toggle-group.tsx` and `field.tsx` are vendored *and ours*, so an upstream defect gets fixed
+there once rather than hand-rolled at each call site.
 
 ## Routing (TanStack Router)
 

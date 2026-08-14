@@ -6,8 +6,10 @@ import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outco
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -18,11 +20,13 @@ import { ReviewArtifactLabel } from "./ReviewArtifact";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import type { ReviewScopeSearch } from "./review-search";
+import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 
+/** See `ObservationResultsState`: a filtered empty state has to carry the way out of itself. */
 export type FeedbackResultsState =
 	| { status: "loading" }
-	| { status: "empty"; filtered: boolean }
+	| { status: "empty"; filtered: false }
+	| { status: "empty"; filtered: true; onClearFilters: () => void }
 	| { status: "ready"; feedback: ReviewFeedback[] };
 
 export interface FeedbackResultsProps {
@@ -31,7 +35,8 @@ export interface FeedbackResultsProps {
 }
 
 export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) {
-	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading feedback" />;
+	if (state.status === "loading")
+		return <ReviewResultsSkeleton label="Loading feedback" rows={REVIEW_PAGE_SIZE} />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -44,10 +49,17 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 					</EmptyTitle>
 					<EmptyDescription>
 						{state.filtered
-							? "Try removing a filter to broaden the results."
+							? "Every filter still applies. Clear them to see the whole list, or narrow one at a time."
 							: "Delivered and withheld feedback appears here after reviews run."}
 					</EmptyDescription>
 				</EmptyHeader>
+				{state.filtered && (
+					<EmptyContent>
+						<Button variant="outline" size="sm" onClick={state.onClearFilters}>
+							Clear all filters
+						</Button>
+					</EmptyContent>
+				)}
 			</Empty>
 		);
 	}
@@ -119,12 +131,12 @@ export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps
 					)}
 				</>
 			}
-			chips={
-				<>
-					<ReviewPerson person={feedback.recipient} />
-					<StatusBadge def={deliveryOutcome(feedback)} />
-				</>
-			}
+			chips={[
+				// Two slots of fixed width, so the outcome badge is at one x down the list however long
+				// the recipient's name is. See `ReviewRowChip`.
+				{ key: "person", width: "lg:w-40", node: <ReviewPerson person={feedback.recipient} /> },
+				{ key: "outcome", width: "lg:w-48", node: <StatusBadge def={deliveryOutcome(feedback)} /> },
+			]}
 		/>
 	);
 }

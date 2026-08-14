@@ -1,4 +1,5 @@
 import { type LucideIcon, PencilLineIcon } from "lucide-react";
+import type * as React from "react";
 import type { ReactNode } from "react";
 import type { ReviewFeedback, ReviewPlacement } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -23,10 +24,17 @@ import {
 export type DeliveryTraceFeedback = DeliveryFacts &
 	Pick<ReviewFeedback, "createdAt" | "deliveredAt"> & { placements?: ReviewPlacement[] };
 
-export interface DeliveryTraceProps {
+interface DeliveryTraceOwnProps {
 	feedback: DeliveryTraceFeedback;
-	className?: string;
 }
+
+/**
+ * `className` and the rest of the list's DOM props reach the root, always — a stability contract for
+ * a shared component rather than a configuration knob, and so exempt from the two-caller rule.
+ * https://github.com/carbon-design-system/carbon/blob/main/docs/style.md
+ */
+export type DeliveryTraceProps = DeliveryTraceOwnProps &
+	Omit<React.ComponentProps<"ol">, keyof DeliveryTraceOwnProps>;
 
 /**
  * What became of one piece of feedback, as the two or three things that actually happened to it.
@@ -43,7 +51,7 @@ export interface DeliveryTraceProps {
  * component, and the registry copies that call themselves one are Radix-based, while this kit is
  * Base UI.
  */
-export function DeliveryTrace({ feedback, className }: DeliveryTraceProps) {
+export function DeliveryTrace({ feedback, className, ...props }: DeliveryTraceProps) {
 	const outcome = deliveryOutcome(feedback);
 	const place = DELIVERY_PLACE_DEFS[feedback.channel];
 	const placements = feedback.placements ?? [];
@@ -59,7 +67,7 @@ export function DeliveryTrace({ feedback, className }: DeliveryTraceProps) {
 		: [place.label];
 
 	return (
-		<ol className={cn("min-w-0", className)}>
+		<ol className={cn("min-w-0", className)} {...props}>
 			<TraceStep icon={PencilLineIcon} title="Composed">
 				<RelativeTime value={feedback.createdAt} />
 			</TraceStep>

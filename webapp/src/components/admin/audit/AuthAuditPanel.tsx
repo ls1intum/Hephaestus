@@ -142,6 +142,7 @@ export function AuthAuditPanel({
 					onChange={(values) => onSearchChange({ outcome: nonEmpty(values) })}
 				/>
 				<DateRangeFacet
+					title="Occurred"
 					value={dateRange}
 					onChange={(range) => onSearchChange(fromDateRange(range))}
 				/>

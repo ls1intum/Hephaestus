@@ -149,6 +149,14 @@ export function bindingFieldId(index: number, field: string): string {
 	return `${bindingIdPrefix(index)}-${field}`;
 }
 
+/**
+ * How an occasion is named to a reader who cannot see which card they are in. Two occasions present
+ * two identically shaped groups, so every accessible name that belongs to one ends with this.
+ */
+export function occasionLabel(index: number): string {
+	return `occasion ${index + 1}`;
+}
+
 export function belongsToBinding(focusId: string | undefined, index: number): boolean {
 	return focusId?.startsWith(`${bindingIdPrefix(index)}-`) ?? false;
 }

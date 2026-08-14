@@ -223,12 +223,18 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 										]}
 									/>
 								}
-								chips={
-									<>
-										<ObservationResultBadge observation={observation} />
-										<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
-									</>
-								}
+								chips={[
+									{
+										key: "result",
+										width: "lg:w-64",
+										node: <ObservationResultBadge observation={observation} />,
+									},
+									{
+										key: "currentness",
+										width: "lg:w-44",
+										node: <ClaimCurrentnessBadge currentness={observation.claimCurrentness} />,
+									},
+								]}
 							/>
 						))}
 					</ReviewRowList>

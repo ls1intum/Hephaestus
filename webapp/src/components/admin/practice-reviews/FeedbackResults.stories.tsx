@@ -1,8 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect, fn, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackResults } from "./FeedbackResults";
 import { reviewFeedback } from "./story-mock-data";
+
+/** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
+const clearFilters = fn();
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Delivery results",
@@ -105,7 +108,17 @@ export const Empty: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 };
 
+/**
+ * Over-filtered, with the way out on screen.
+ *
+ * The copy used to advise removing a filter and offer nothing to press, which is how a reader
+ * "incorrectly assume[s] products don't exist when filters are simply too restrictive" (Baymard).
+ */
 export const FilteredToNothing: Story = {
-	args: { state: { status: "empty", filtered: true } },
+	args: { state: { status: "empty", filtered: true, onClearFilters: clearFilters } },
 	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
+		await expect(clearFilters).toHaveBeenCalled();
+	},
 };

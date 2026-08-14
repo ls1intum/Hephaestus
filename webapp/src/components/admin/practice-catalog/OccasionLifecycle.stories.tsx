@@ -47,9 +47,7 @@ const meta = {
 		onToggle: fn(),
 		onDrafts: false,
 		onDraftsChange: fn(),
-		idPrefix: "practice-binding-0",
-		groupId: "practice-binding-0-signals",
-		occasionLabel: "occasion 1",
+		occasion: { index: 0 },
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
@@ -108,8 +106,7 @@ export const EveryWorkType: Story = {
 						{...args}
 						workType={workType}
 						selected={selected}
-						idPrefix={`work-type-${index}`}
-						groupId={`work-type-${index}-signals`}
+						occasion={{ index }}
 					/>
 				</section>
 			))}
@@ -124,7 +121,7 @@ export const EveryWorkType: Story = {
 export const MomentsHeldByAnotherOccasion: Story = {
 	args: {
 		selected: ["scm.pull_request.merged"],
-		occasionLabel: "occasion 2",
+		occasion: { index: 1 },
 		heldElsewhere: new Map([
 			["scm.pull_request.opened", 1],
 			["scm.pull_request.ready", 1],
@@ -142,7 +139,7 @@ export const MomentsHeldByAnotherOccasion: Story = {
 
 /** The fault is on the strip, not only in the message: an occasion with no moment shows it. */
 export const NoMomentChosen: Story = {
-	args: { selected: [], invalid: true, errorId: "practice-bindings-error" },
+	args: { selected: [], occasion: { index: 0, errorId: "practice-bindings-error" } },
 };
 
 export const Disabled: Story = {
@@ -161,5 +158,26 @@ export const TogglingMoments: Story = {
 		const drafts = canvas.getByRole("switch", { name: /^Include drafts/ });
 		await userEvent.click(drafts);
 		await expect(canvas.getByRole("switch", { name: /^Include drafts/ })).toBeChecked();
+	},
+};
+
+/**
+ * The switch is named by its label and *described* by the sentence under it. The description used to
+ * sit inside the label, so the switch announced itself as "Include drafts Off by default: read the
+ * work once it is offered as finished" — a name is what a control is, not the paragraph arguing for
+ * its default — and it put a `<p>` inside a `<label>`, which no content model allows.
+ */
+export const DraftsSwitchIsNamedByItsLabelAlone: Story = {
+	play: async ({ canvas }) => {
+		// Exact string, not a prefix: a prefix match is what let the run-on name through before.
+		const drafts = canvas.getByRole("switch", { name: "Include drafts" });
+		const hint = canvas.getByText(/Off by default/);
+		await expect(drafts).toHaveAccessibleName("Include drafts");
+		await expect(drafts).toHaveAccessibleDescription(
+			"Off by default: read the work once it is offered as finished.",
+		);
+		// The description is a paragraph, and it is outside the label rather than inside it.
+		await expect(hint.tagName).toBe("P");
+		await expect(hint.closest("label")).toBeNull();
 	},
 };

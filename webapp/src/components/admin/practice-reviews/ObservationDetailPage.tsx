@@ -212,12 +212,18 @@ export function ObservationDetailPage({
 								// Where it went is a tag, not a word on the meta line. It is one of a closed
 								// set of three, and the registry already gives each one a mark and a tone —
 								// as prose it was the one fact on the row a reader had to stop and parse.
-								chips={
-									<>
-										<StatusBadge def={DELIVERY_PLACE_DEFS[feedback.channel]} />
-										<StatusBadge def={deliveryOutcome(feedback)} />
-									</>
-								}
+								chips={[
+									{
+										key: "place",
+										width: "lg:w-40",
+										node: <StatusBadge def={DELIVERY_PLACE_DEFS[feedback.channel]} />,
+									},
+									{
+										key: "outcome",
+										width: "lg:w-48",
+										node: <StatusBadge def={deliveryOutcome(feedback)} />,
+									},
+								]}
 							/>
 						))}
 					</ReviewRowList>

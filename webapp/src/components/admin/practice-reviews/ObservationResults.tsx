@@ -3,8 +3,11 @@ import { ScanSearchIcon } from "lucide-react";
 import type { ReviewObservation } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
@@ -15,17 +18,26 @@ import {
 	ClaimCurrentnessBadge,
 	FeedbackCountsSummary,
 	ObservationOriginBadge,
-	ObservationResultBadge,
+	observationSeverity,
 } from "./ReviewBadges";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import type { ReviewScopeSearch } from "./review-search";
+import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 
+/**
+ * The filtered empty state carries the way out of itself.
+ *
+ * A reader who over-filters "incorrectly assume[s] products don't exist when filters are simply too
+ * restrictive" (Baymard, "How to Design Applied Filters"), and this screen's own advice — try
+ * removing a filter — named no control that could do it. Making the callback part of the state
+ * rather than an optional prop means a filtered empty state cannot be rendered without one.
+ */
 export type ObservationResultsState =
 	| { status: "loading" }
-	| { status: "empty"; filtered: boolean }
+	| { status: "empty"; filtered: false }
+	| { status: "empty"; filtered: true; onClearFilters: () => void }
 	| { status: "ready"; observations: ReviewObservation[] };
 
 export interface ObservationResultsProps {
@@ -40,7 +52,8 @@ export interface ObservationResultsProps {
  * and a card list below it — with different fields in each and a skeleton matching neither.
  */
 export function ObservationResults({ workspaceSlug, state }: ObservationResultsProps) {
-	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading observations" />;
+	if (state.status === "loading")
+		return <ReviewResultsSkeleton label="Loading observations" rows={REVIEW_PAGE_SIZE} />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -53,16 +66,25 @@ export function ObservationResults({ workspaceSlug, state }: ObservationResultsP
 					</EmptyTitle>
 					<EmptyDescription>
 						{state.filtered
-							? "Try removing a filter to broaden the results."
+							? "Every filter still applies. Clear them to see the whole list, or narrow one at a time."
 							: "Observations appear after a practice review completes."}
 					</EmptyDescription>
 				</EmptyHeader>
+				{state.filtered && (
+					<EmptyContent>
+						<Button variant="outline" size="sm" onClick={state.onClearFilters}>
+							Clear all filters
+						</Button>
+					</EmptyContent>
+				)}
 			</Empty>
 		);
 	}
 
+	// Named "Observations" and not "Observations, newest first": this is the one list whose order the
+	// reader chooses, and a label naming an ordering the toolbar can change is wrong half the time.
 	return (
-		<ReviewRowList label="Observations, newest first">
+		<ReviewRowList label="Observations">
 			{state.observations.map((observation) => (
 				<ObservationRow
 					key={observation.id}
@@ -98,6 +120,7 @@ export interface ObservationRowProps {
  * observation judged against a practice that has since changed.
  */
 export function ObservationRow({ workspaceSlug, observation, scope }: ObservationRowProps) {
+	const severity = observationSeverity(observation);
 	return (
 		<ReviewRow
 			status={observationResult(observation)}
@@ -133,14 +156,29 @@ export function ObservationRow({ workspaceSlug, observation, scope }: Observatio
 					</p>
 				</>
 			}
-			chips={
-				<>
-					<ReviewPerson person={observation.subject} />
-					<ObservationResultBadge observation={observation} />
-					<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
-					<ObservationOriginBadge origin={observation.origin} />
-				</>
-			}
+			chips={[
+				{ key: "person", width: "lg:w-36", node: <ReviewPerson person={observation.subject} /> },
+				{
+					key: "result",
+					width: "lg:w-44",
+					node: <StatusBadge def={observationResult(observation)} />,
+				},
+				// Its own slot rather than sitting beside the result badge, because the result label runs
+				// from "Strength" to "Expected but not observed" and a severity trailing it would land
+				// somewhere different on every row. Empty on the rows that have no severity, and still
+				// that width, which is what keeps the column.
+				{ key: "severity", width: "lg:w-28", node: severity && <StatusBadge def={severity} /> },
+				{
+					key: "flags",
+					width: "lg:w-48",
+					node: (
+						<>
+							<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
+							<ObservationOriginBadge origin={observation.origin} />
+						</>
+					),
+				},
+			]}
 		/>
 	);
 }

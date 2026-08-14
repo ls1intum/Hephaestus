@@ -47,11 +47,28 @@ export const Delivered: Story = {
  */
 export const SwitchToSource: Story = {
 	play: async ({ canvas, canvasElement, userEvent }) => {
-		await userEvent.click(
-			canvas.getByRole("button", { name: /Show the Markdown that was composed/ }),
+		// One control on one thing: a toggle group holding the view, so exactly one of the two is
+		// pressed by construction rather than by two `onClick`s agreeing. The group is `role="group"`
+		// with no `aria-orientation` — the vendored wrapper drops the attribute the Base UI primitive
+		// would otherwise put on a role that ARIA does not allow it on.
+		const views = canvas.getByRole("group", { name: "How to show the feedback" });
+		await expect(views).not.toHaveAttribute("aria-orientation");
+		await expect(canvas.getByRole("button", { name: "Rendered" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
 		);
+
+		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
 		await expect(canvasElement.querySelector("pre")?.textContent).toContain("## What worked");
 		await expect(canvas.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: "Source" })).toHaveAttribute(
+			"aria-pressed",
+			"true",
+		);
+
+		// Pressing the held view again is refused: there is no state in which the body shows nothing.
+		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
+		await expect(canvasElement.querySelector("pre")?.textContent).toContain("## What worked");
 	},
 };
 

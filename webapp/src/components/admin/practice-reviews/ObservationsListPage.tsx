@@ -19,12 +19,13 @@ import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { statusFacetOptions } from "@/components/practice-vocabulary/status-def";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
+import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
 import { ObservationResults } from "./ObservationResults";
+import { ObservationSortSelect } from "./ObservationSortSelect";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { ReviewPersonFacet } from "./ReviewPersonFacet";
-import { type ObservationsSearch, observationsQuery } from "./review-search";
+import { type ObservationsSearch, observationsQuery, REVIEW_PAGE_SIZE } from "./review-search";
 
-const PAGE_SIZE = 25;
 /** Every option wears the badge its rows wear; see the note on `FeedbackListPage`'s facets. */
 const ASSESSMENT_OPTIONS = statusFacetOptions(ASSESSMENT_DEFS);
 const PRESENCE_OPTIONS = statusFacetOptions(PRESENCE_DEFS);
@@ -44,7 +45,7 @@ export function ObservationsListPage({
 	const observationsQueryResult = useQuery({
 		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
-			query: observationsQuery(search, PAGE_SIZE),
+			query: observationsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 	});
 	const areasQuery = useQuery({ ...listAreasOptions({ path: { workspaceSlug } }) });
@@ -102,11 +103,19 @@ export function ObservationsListPage({
 				hasFilter={hasFilter}
 				onReset={reset}
 				actions={
-					<ResultCount
-						total={observationsQueryResult.data?.page?.totalElements}
-						noun={["observation", "observations"]}
-						hasFilter={hasFilter}
-					/>
+					<>
+						{/* Sort sits with the count rather than among the facets: it does not narrow the set,
+						    and `Reset` deliberately leaves it alone. */}
+						<ObservationSortSelect
+							value={search.order}
+							onChange={(order) => onSearchChange({ order, page: 0 })}
+						/>
+						<ResultCount
+							total={observationsQueryResult.data?.page?.totalElements}
+							noun={["observation", "observations"]}
+							hasFilter={hasFilter}
+						/>
+					</>
 				}
 			>
 				<div className="flex flex-wrap gap-2">
@@ -153,11 +162,34 @@ export function ObservationsListPage({
 						onChange={(subjectUserId) => patchFilter({ subjectUserId })}
 						fallbackName={subject?.name ?? subject?.login}
 					/>
+					{/* "Observed" rather than "Date": this range filters `observedAt`, and the same control
+					    on Delivery filters when the feedback was composed. A filter label has to be
+					    "concrete and predictable" (NN/g, "Filter Categories and Values"). */}
 					<DateRangeFacet
+						title="Observed"
 						value={toDateRange(search)}
 						onChange={(range) => patchFilter(fromDateRange(range))}
 					/>
 				</div>
+				<AppliedFacetPills
+					pills={[
+						...facetPills("Area", areaOptions, search.areaSlug, (values) =>
+							patchFilter({ areaSlug: nonEmpty(values) }),
+						),
+						...facetPills("Practice", practiceOptions, search.practiceSlug, (values) =>
+							patchFilter({ practiceSlug: nonEmpty(values) }),
+						),
+						...facetPills("Result", ASSESSMENT_OPTIONS, search.assessment, (values) =>
+							patchFilter({ assessment: nonEmpty(values) }),
+						),
+						...facetPills("Severity", SEVERITY_OPTIONS, search.severity, (values) =>
+							patchFilter({ severity: nonEmpty(values) }),
+						),
+						...facetPills("Practice status", PRESENCE_OPTIONS, search.presence, (values) =>
+							patchFilter({ presence: nonEmpty(values) }),
+						),
+					]}
+				/>
 				{search.agentJobId && (
 					<ReferenceFilterPill
 						label="Review"
@@ -190,7 +222,9 @@ export function ObservationsListPage({
 						observationsQueryResult.isLoading
 							? { status: "loading" }
 							: observations.length === 0
-								? { status: "empty", filtered: hasFilter }
+								? hasFilter
+									? { status: "empty", filtered: true, onClearFilters: reset }
+									: { status: "empty", filtered: false }
 								: { status: "ready", observations }
 					}
 				/>

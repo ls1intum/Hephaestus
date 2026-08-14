@@ -2,8 +2,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 export interface ReviewResultsSkeletonProps {
 	label: string;
-	/** Matches the page size the list is about to show, so the page does not jump when it arrives. */
-	rows?: number;
+	/**
+	 * The page size the list is about to show. Required, and no default: the default was five, no
+	 * caller ever overrode it, and the lists it stood in for render twenty-five — so the page jumped
+	 * by twenty rows at the moment this prop exists to make uneventful. A skeleton that does not
+	 * mimic the layout it replaces (NN/g, "Skeleton Screens") is a slower blank page.
+	 */
+	rows: number;
 }
 
 /**
@@ -14,7 +19,7 @@ export interface ReviewResultsSkeletonProps {
  * matched no list on any screen — which is the inconsistency the product owner flagged twice, and it
  * was inevitable while each list had two renderings and the skeleton had a third.
  */
-export function ReviewResultsSkeleton({ label, rows = 5 }: ReviewResultsSkeletonProps) {
+export function ReviewResultsSkeleton({ label, rows }: ReviewResultsSkeletonProps) {
 	return (
 		<div className="divide-y rounded-lg border" role="status">
 			<span className="sr-only">{label}</span>

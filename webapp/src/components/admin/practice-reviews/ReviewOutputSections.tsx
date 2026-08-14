@@ -16,6 +16,15 @@ import { ObservationRow } from "./ObservationResults";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRowList } from "./ReviewRow";
 
+/**
+ * How many of each a scoped section shows before it links to the full list.
+ *
+ * Exported because both screens that render these sections have to *request* this many, and the
+ * skeleton has to draw this many: three numbers that were separately written down (5, 5 and 2) for
+ * one quantity, so the section grew by three rows the moment the answer arrived.
+ */
+export const REVIEW_PREVIEW_SIZE = 5;
+
 export type ReviewSectionState<T> =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
@@ -111,7 +120,7 @@ function FeedbackSection({
 				shown={items.length}
 			/>
 			{state.status === "loading" ? (
-				<ReviewResultsSkeleton label="Loading feedback" rows={2} />
+				<ReviewResultsSkeleton label="Loading feedback" rows={REVIEW_PREVIEW_SIZE} />
 			) : state.status === "error" ? (
 				<QueryErrorAlert
 					error={state.error}
@@ -177,7 +186,7 @@ function ObservationsSection({
 				shown={items.length}
 			/>
 			{state.status === "loading" ? (
-				<ReviewResultsSkeleton label="Loading observations" rows={2} />
+				<ReviewResultsSkeleton label="Loading observations" rows={REVIEW_PREVIEW_SIZE} />
 			) : state.status === "error" ? (
 				<QueryErrorAlert
 					error={state.error}

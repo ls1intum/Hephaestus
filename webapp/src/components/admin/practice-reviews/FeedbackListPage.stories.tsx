@@ -50,6 +50,9 @@ export const Default: Story = {
 		for (const name of ["Outcome", "Place", "Why withheld", "Recipient"]) {
 			canvas.getByRole("combobox", { name });
 		}
+		// The date facet says which date it filters. On this screen it is when the feedback was
+		// composed, which is neither when it was delivered nor when the observation was made.
+		canvas.getByRole("button", { name: "Composed" });
 		canvas.getByText("Nearly the same as other feedback from the same review.");
 		canvas.getByText("Found while reviewing past work, which is measured but never sent.");
 		canvas.getByText("The developer has opted out of AI feedback.");
@@ -117,6 +120,14 @@ export const FilterToOneWithholdingFamily: Story = {
 		await userEvent.click(trigger);
 		await canvas.findByText("1 piece of feedback matches your filters.");
 		canvas.getByText("Nearly the same as other feedback from the same review.");
+
+		// Add a place nothing under that family went to, and the empty state carries the way out.
+		await userEvent.click(canvas.getByRole("combobox", { name: "Place" }));
+		const places = await screen.findByRole("listbox", { name: "Place options" });
+		await userEvent.click(await within(places).findByRole("option", { name: /In conversation/ }));
+		await canvas.findByText("No feedback matches these filters");
+		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
+		await canvas.findByText("11 pieces of feedback.");
 	},
 };
 

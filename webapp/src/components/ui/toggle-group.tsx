@@ -39,6 +39,19 @@ function ToggleGroup({
 			data-size={size}
 			data-spacing={spacing}
 			data-orientation={orientation}
+			orientation={orientation}
+			// Upstream bug, fixed here so no call site has to. The primitive renders `role="group"` and
+			// then hands its props to `CompositeRoot`, whose `useCompositeRoot` unconditionally adds
+			// `aria-orientation` (only the value `'both'` suppresses it, and the public API cannot reach
+			// it). ARIA 1.2 lists `aria-orientation` under `scrollbar select separator slider tablist
+			// toolbar` — `group` is not among them, so axe fails every group this kit renders.
+			// https://www.w3.org/TR/wai-aria-1.2/#group — Radix shipped the same bug
+			// (radix-ui/primitives#964). `undefined` is enough to drop it because Base UI's `mergeProps`
+			// assigns every own key of the later object, `undefined` included, and React omits an
+			// attribute whose value is `undefined`; the arrow-key roving focus is unaffected because
+			// `CompositeRoot` reads its axis from the `orientation` prop above, not from the attribute.
+			// `toggle-group.stories.tsx` asserts the attribute is absent in both orientations.
+			aria-orientation={undefined}
 			style={{ "--gap": spacing } as React.CSSProperties}
 			className={cn(
 				"rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch",

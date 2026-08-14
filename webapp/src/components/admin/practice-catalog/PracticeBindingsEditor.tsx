@@ -14,6 +14,7 @@ import {
 	hasDrafts,
 	MAX_BINDINGS,
 	normalizeBinding,
+	occasionLabel,
 	recommendedBinding,
 	signalOwners,
 } from "@/components/admin/practice-catalog/bindings";
@@ -187,7 +188,7 @@ function BindingCard({
 	onRemove,
 }: BindingCardProps) {
 	const idPrefix = bindingIdPrefix(index);
-	const occasionLabel = `occasion ${index + 1}`;
+	const label = occasionLabel(index);
 	const signalsInvalid = errorFocusId === bindingFieldId(index, "signals");
 	const evidenceInvalid = errorFocusId === bindingFieldId(index, "evidence");
 	const toggleSignal = (signal: string, chosen: boolean) =>
@@ -222,17 +223,13 @@ function BindingCard({
 
 			<OccasionLifecycle
 				workType={options}
+				occasion={{ index, errorId: signalsInvalid ? errorId : undefined }}
 				selected={binding.signals}
 				heldElsewhere={heldElsewhere}
 				onToggle={toggleSignal}
 				onDrafts={binding.onDrafts === true}
 				onDraftsChange={(onDrafts) => onChange(normalizeBinding({ ...binding, onDrafts }))}
-				idPrefix={idPrefix}
-				groupId={bindingFieldId(index, "signals")}
-				occasionLabel={occasionLabel}
 				disabled={disabled}
-				invalid={signalsInvalid}
-				errorId={errorId}
 			/>
 
 			{guidanceOnly ? (
@@ -244,7 +241,7 @@ function BindingCard({
 					options={options}
 					needs={binding.needs}
 					idPrefix={idPrefix}
-					occasionLabel={occasionLabel}
+					occasionLabel={label}
 					disabled={disabled}
 					invalid={evidenceInvalid}
 					errorId={evidenceInvalid ? errorId : undefined}

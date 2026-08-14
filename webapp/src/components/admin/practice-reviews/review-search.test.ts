@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { feedbackQuery, feedbackSearchSchema, observationsSearchSchema } from "./review-search";
+import {
+	feedbackQuery,
+	feedbackSearchSchema,
+	observationsQuery,
+	observationsSearchSchema,
+} from "./review-search";
 
 describe("practice review search", () => {
 	it("canonicalizes invalid URL filters", () => {
@@ -38,6 +43,18 @@ describe("practice review search", () => {
 		expect(query.to).toBeInstanceOf(Date);
 		expect(query.to?.getDate()).toBe(4);
 		expect(query.to?.getHours()).toBe(0);
+	});
+
+	it("sends the chosen ordering as the parameter the endpoint names, and nothing when it is the default", () => {
+		const chosen = observationsSearchSchema.parse({ order: "ACTIONABILITY" });
+		const untouched = observationsSearchSchema.parse({});
+		// The word another route already owns: a `sort=name` arriving from anywhere else is not an
+		// ordering this list has, so it is dropped rather than sent on to the API.
+		const foreign = observationsSearchSchema.parse({ order: "name" });
+
+		expect(observationsQuery(chosen, 25).sort).toBe("ACTIONABILITY");
+		expect(observationsQuery(untouched, 25).sort).toBeUndefined();
+		expect(observationsQuery(foreign, 25).sort).toBeUndefined();
 	});
 
 	it("does not send an artifact id without its type", () => {

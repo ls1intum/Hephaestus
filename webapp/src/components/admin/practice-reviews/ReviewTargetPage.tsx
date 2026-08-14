@@ -16,16 +16,13 @@ import { artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds"
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";
-import { ReviewOutputSections } from "./ReviewOutputSections";
+import { REVIEW_PREVIEW_SIZE, ReviewOutputSections } from "./ReviewOutputSections";
 
 export interface ReviewTargetPageProps {
 	workspaceSlug: string;
 	artifactKind: KnownArtifactKind;
 	artifactId: number;
 }
-
-/** How many of each to show before the section offers a link to the full, filtered list. */
-const PREVIEW_SIZE = 5;
 
 /**
  * Everything the reviews have said about one piece of work.
@@ -46,13 +43,13 @@ export function ReviewTargetPage({
 	const feedbackQuery = useQuery({
 		...listPracticeReviewFeedbackOptions({
 			path: { workspaceSlug },
-			query: { ...scope, size: PREVIEW_SIZE },
+			query: { ...scope, size: REVIEW_PREVIEW_SIZE },
 		}),
 	});
 	const observationsQuery = useQuery({
 		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
-			query: { ...scope, size: PREVIEW_SIZE },
+			query: { ...scope, size: REVIEW_PREVIEW_SIZE },
 		}),
 	});
 	const feedback = feedbackQuery.data?.content ?? [];

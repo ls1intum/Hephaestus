@@ -1195,6 +1195,28 @@ export function manyObservations(count: number): ReviewObservation[] {
 	});
 }
 
+/**
+ * A workspace with more people in it than the members endpoint returns in one page.
+ *
+ * The person facet asks for 100 and filters what came back in the browser, because the endpoint
+ * takes no name. At exactly this size the facet has to say so — a search box that answers "No
+ * matches" for a colleague who is simply the 140th member is a screen telling an operator something
+ * untrue about their own workspace.
+ */
+export function manyMembers(count: number): WorkspaceMembership[] {
+	return Array.from({ length: count }, (_, index) => {
+		const source = workspaceMembers[index % workspaceMembers.length];
+		const cycle = Math.floor(index / workspaceMembers.length);
+		if (cycle === 0) return source;
+		return {
+			...source,
+			userId: (source.userId ?? 0) + cycle * 100,
+			userLogin: `${source.userLogin}-${cycle}`,
+			userName: `${source.userName} ${cycle}`,
+		};
+	});
+}
+
 export function manyFeedback(count: number): ReviewFeedback[] {
 	const base = reviewFeedback;
 	return Array.from({ length: count }, (_, index) => {

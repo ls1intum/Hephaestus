@@ -19,7 +19,17 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { getInitials } from "@/lib/avatar";
 
-/** The workspace's members are the only people who can be the subject of a review. */
+/**
+ * The workspace's members are the only people who can be the subject of a review, and this is the
+ * most the members endpoint will return in one page.
+ *
+ * <p>The endpoint takes `page` and `size` and nothing else — no query, no name filter — so the
+ * search box in this popover filters what has already arrived and cannot reach anyone past the
+ * hundredth. In a workspace larger than that, some people are unselectable *and* the search says
+ * "No matches" for them, which reads as "that person does not exist here". Until the server can be
+ * asked for a name, the popover states the limit rather than hiding it: a stated boundary sends the
+ * reader somewhere else, an unstated one sends them to the wrong conclusion.
+ */
 const MEMBER_PAGE_SIZE = 100;
 
 interface PersonOption {
@@ -76,6 +86,9 @@ export function ReviewPersonFacet({
 	const selectedOption =
 		options.find((option) => option.userId === selected) ??
 		(selected != null ? { userId: selected, label: fallbackName ?? `#${selected}` } : null);
+	// A full page is the only signal the endpoint gives that there may be more; it returns a bare
+	// array, so there is no total to compare against.
+	const capped = (membersQuery.data?.length ?? 0) >= MEMBER_PAGE_SIZE;
 
 	return (
 		<Combobox
@@ -141,6 +154,12 @@ export function ReviewPersonFacet({
 						</ComboboxItem>
 					)}
 				</ComboboxList>
+				{capped && (
+					<p className="border-t px-2 py-1.5 text-xs text-muted-foreground">
+						Showing the first {MEMBER_PAGE_SIZE} members. Search looks only at these — to filter by
+						someone further down the list, open their work and follow the link from a row.
+					</p>
+				)}
 				{selectedOption && (
 					<>
 						<ComboboxSeparator />

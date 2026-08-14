@@ -285,9 +285,13 @@ function CatalogToolbar({
 				</SelectContent>
 			</Select>
 			{/*
-			 * toolbar, not the default group: ToggleGroup emits aria-orientation, which ARIA allows on
-			 * toolbar but not on group, and these buttons already have the roving arrow-key focus a
-			 * toolbar implies. radiogroup would be worse — the items are aria-pressed, not radios.
+			 * toolbar, not the primitive's default group: Base UI gives the group a roving tabindex, so
+			 * Tab enters it once and the arrow keys move between the filters. `toolbar` is the role that
+			 * contract belongs to; `group` says nothing about how to move inside it. radiogroup would be
+			 * worse — the items are aria-pressed, not radios.
+			 *
+			 * Not an axe workaround: the vendored `ToggleGroup` suppresses the `aria-orientation` the
+			 * primitive would otherwise put on `role="group"`, so this reads the same under either role.
 			 */}
 			<ToggleGroup
 				role="toolbar"

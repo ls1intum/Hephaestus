@@ -18,12 +18,12 @@ import { statusFacetOptions } from "@/components/practice-vocabulary/status-def"
 import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withholding-defs";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
+import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
 import { FeedbackResults } from "./FeedbackResults";
 import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { ReviewPersonFacet } from "./ReviewPersonFacet";
-import { type FeedbackSearch, feedbackQuery } from "./review-search";
+import { type FeedbackSearch, feedbackQuery, REVIEW_PAGE_SIZE } from "./review-search";
 
-const PAGE_SIZE = 25;
 /**
  * Three facets, none of them nested behind a "More filters" popover.
  *
@@ -36,7 +36,12 @@ const PAGE_SIZE = 25;
  * are recognisably about the same thing — they used to be plain grey text next to coloured tags.
  */
 const OUTCOME_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
-const PLACE_OPTIONS = statusFacetOptions(DELIVERY_PLACE_DEFS, FILTERABLE_PLACES);
+// The one facet that offers a subset: a place nothing is ever written to would be a filter with no
+// rows behind it. Narrowing here rather than in `statusFacetOptions` keeps the registry total, so a
+// value the server adds still renders on a row.
+const PLACE_OPTIONS = statusFacetOptions(DELIVERY_PLACE_DEFS).filter((option) =>
+	FILTERABLE_PLACES.includes(option.value),
+);
 const WITHHELD_FAMILY_OPTIONS = statusFacetOptions(WITHHOLDING_FAMILY_DEFS);
 
 export interface FeedbackListPageProps {
@@ -49,7 +54,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 	const query = useQuery({
 		...listPracticeReviewFeedbackOptions({
 			path: { workspaceSlug },
-			query: feedbackQuery(search, PAGE_SIZE),
+			query: feedbackQuery(search, REVIEW_PAGE_SIZE),
 		}),
 	});
 	const feedback = query.data?.content ?? [];
@@ -125,11 +130,30 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 						onChange={(recipientUserId) => patchFilter({ recipientUserId })}
 						fallbackName={recipient?.name ?? recipient?.login}
 					/>
+					{/* "Composed" rather than "Date": this range filters when the feedback was written, which
+					    is not when it was delivered and not when the observation behind it was made. */}
 					<DateRangeFacet
+						title="Composed"
 						value={toDateRange(search)}
 						onChange={(range) => patchFilter(fromDateRange(range))}
 					/>
 				</div>
+				<AppliedFacetPills
+					pills={[
+						...facetPills("Outcome", OUTCOME_OPTIONS, search.deliveryState, (values) =>
+							patchFilter({ deliveryState: nonEmpty(values) }),
+						),
+						...facetPills("Place", PLACE_OPTIONS, search.channel, (values) =>
+							patchFilter({ channel: nonEmpty(values) }),
+						),
+						...facetPills(
+							"Why withheld",
+							WITHHELD_FAMILY_OPTIONS,
+							search.withheldFamily,
+							(values) => patchFilter({ withheldFamily: nonEmpty(values) }),
+						),
+					]}
+				/>
 				{search.agentJobId && (
 					<ReferenceFilterPill
 						label="Review"
@@ -162,7 +186,9 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 						query.isLoading
 							? { status: "loading" }
 							: feedback.length === 0
-								? { status: "empty", filtered: hasFilter }
+								? hasFilter
+									? { status: "empty", filtered: true, onClearFilters: reset }
+									: { status: "empty", filtered: false }
 								: { status: "ready", feedback }
 					}
 				/>

@@ -14,6 +14,28 @@ import { ARTIFACT_KIND_VALUES, type KnownArtifactKind } from "@/lib/artifact-kin
 import { dayAfterInstant, dayStartInstant, fromDayParam } from "@/lib/date-range-search";
 import { multiValue, narrowToEnum } from "@/lib/search-params";
 
+/**
+ * One page size for every practice-review list, and for the skeleton that stands in for one.
+ *
+ * The three lists ran on 25, 25 and 20, and every skeleton drew five rows — so arriving results
+ * pushed the pagination down the screen by four rows' worth on two screens and fifteen on the third,
+ * which is the jump the skeleton exists to prevent (NN/g, "Skeleton Screens": a skeleton mimics the
+ * layout of the page it replaces). One constant, read by the query and by the skeleton, is what
+ * stops the two from disagreeing again.
+ */
+export const REVIEW_PAGE_SIZE = 25;
+
+/**
+ * How the observations list is ordered, as the server names it.
+ *
+ * `ACTIONABILITY` puts shortfalls first, worst severity down to informational, then strengths, then
+ * the observations that judged nothing. The endpoint has understood it all along and no screen ever
+ * asked: "show me the worst thing first" is the question this list exists for, and it was the one
+ * question an operator could not put to it.
+ */
+export const OBSERVATION_SORTS = ["NEWEST", "ACTIONABILITY"] as const;
+export type ObservationSort = (typeof OBSERVATION_SORTS)[number];
+
 const uuidParam = z.uuid().optional().catch(undefined);
 const positiveId = z.coerce.number().int().positive().optional().catch(undefined);
 const page = z.coerce.number().int().min(0).optional().catch(undefined);
@@ -69,6 +91,14 @@ export const observationsSearchSchema = z
 		assessment: enumValues(statusValues(ASSESSMENT_DEFS)),
 		severity: enumValues(statusValues(SEVERITY_DEFS)),
 		subjectUserId: positiveId,
+		// In the URL like every filter, so an ordering is part of what a bookmarked or pasted link
+		// carries. `NEWEST` is the server's default and is left out rather than written down.
+		//
+		// Spelled `order` rather than `sort`, which is what the endpoint calls it: two other routes
+		// already put a `sort` in the URL with entirely different values, and TanStack's search params
+		// are one namespace — a third meaning of the word makes `search={(previous) => previous}`, the
+		// idiom every link on this screen uses to carry the reader's filters forward, stop compiling.
+		order: z.enum(OBSERVATION_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
 
@@ -138,5 +168,6 @@ export function observationsQuery(search: ObservationsSearch, size: number) {
 		assessment: search.assessment,
 		severity: search.severity,
 		subjectUserId: search.subjectUserId,
+		sort: search.order,
 	};
 }

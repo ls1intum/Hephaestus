@@ -78,15 +78,15 @@ export function statusValues<TValue extends string>(
 /**
  * Filter options built from the registry, so a dropdown cannot say something a badge does not.
  *
- * Pass `only` to offer a subset — the one caller that does is the delivery place filter, which hides
- * a place nothing is ever written to. Omitting a value here is the *only* sanctioned way to narrow a
- * facet: the registry itself stays total, so the value still renders if the server ever sends one.
+ * <p>Every value, in registry order. A facet that wants fewer filters the result — one caller does,
+ * the delivery place filter, and it says why at its call site. That is a fact about that one screen
+ * and it used to live here as an `only` parameter whose own documentation named its single caller,
+ * which is the shape of a prop that should have been a `.filter()`.
  */
 export function statusFacetOptions<TValue extends string>(
 	defs: StatusDefs<TValue>,
-	only?: readonly TValue[],
 ): FacetOption<TValue>[] {
-	return (only ?? statusValues(defs)).map((value) => {
+	return statusValues(defs).map((value) => {
 		const def = defs[value];
 		return {
 			value,

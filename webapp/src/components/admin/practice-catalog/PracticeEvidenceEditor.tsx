@@ -15,7 +15,14 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldLabel,
+	FieldLegend,
+	FieldSet,
+} from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
 
@@ -238,10 +245,11 @@ function SourceRow({
 					onRoleChange={onRoleChange}
 				/>
 			</div>
-			{/* A segmented control drawn on radios rather than on the toggle group: three roles are
-			    mutually exclusive and exactly one always holds, which is what a radio group means. The
-			    toggle group also renders `aria-orientation` on `role="group"`, which ARIA does not allow
-			    and axe fails the story on. */}
+			{/* A segmented control drawn on radios rather than on the toggle group, on semantics alone:
+			    the three roles are mutually exclusive and exactly one always holds, which is what a radio
+			    group *means*. A toggle group is a set of independently pressed buttons that this screen
+			    would then have to stop from all being off at once, and a reader would hear three
+			    pressable things rather than one choice with three answers. */}
 			<RadioGroup
 				className="flex w-fit shrink-0 gap-0 overflow-hidden rounded-lg border"
 				disabled={disabled}
@@ -296,25 +304,32 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 	if (role === "CONTEXTUAL" || role === "NOT_USED") return null;
 	if (!source.supportsExhaustiveEvidence) return null;
 	const checkboxId = `${controlId}-exhaustive`;
+	const claimed = role === "EXHAUSTIVE";
+	const consequenceId = `${checkboxId}-consequence`;
 	return (
 		<Field orientation="horizontal" className="mt-1.5 gap-2" data-disabled={disabled}>
 			<Checkbox
 				id={checkboxId}
 				disabled={disabled}
-				checked={role === "EXHAUSTIVE"}
+				checked={claimed}
 				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
+				aria-describedby={claimed ? consequenceId : undefined}
 			/>
-			<FieldLabel htmlFor={checkboxId} className="text-xs font-normal">
-				<span>
+			{/* Label and description as siblings inside `FieldContent`, the kit's own anatomy. Nested, the
+			    description put a `<p>` inside a `<label>` — invalid, its content model is phrasing content
+			    — and ran into the checkbox's accessible name, so the box announced itself as the claim
+			    plus the paragraph explaining what the claim costs. The consequence is a description. */}
+			<FieldContent>
+				<FieldLabel htmlFor={checkboxId} className="text-xs font-normal">
 					Can say what is missing from {source.displayName}
-					{role === "EXHAUSTIVE" && (
-						<FieldDescription>
-							A partial capture then refuses the review: an incomplete list cannot tell “it is not
-							there” apart from “we did not fetch it”.
-						</FieldDescription>
-					)}
-				</span>
-			</FieldLabel>
+				</FieldLabel>
+				{claimed && (
+					<FieldDescription id={consequenceId}>
+						A partial capture then refuses the review: an incomplete list cannot tell “it is not
+						there” apart from “we did not fetch it”.
+					</FieldDescription>
+				)}
+			</FieldContent>
 		</Field>
 	);
 }

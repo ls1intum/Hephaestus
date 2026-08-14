@@ -33,7 +33,7 @@ import { problemDetailOf } from "@/lib/problem-detail";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";
-import { ReviewOutputSections } from "./ReviewOutputSections";
+import { REVIEW_PREVIEW_SIZE, ReviewOutputSections } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
 import { ReviewRunCard } from "./ReviewRunCard";
 import type { RunsSearch } from "./review-search";
@@ -59,14 +59,14 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 	const findingsQuery = useQuery({
 		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
-			query: { agentJobId: jobId, sort: "ACTIONABILITY", size: 5 },
+			query: { agentJobId: jobId, sort: "ACTIONABILITY", size: REVIEW_PREVIEW_SIZE },
 		}),
 		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
 	});
 	const feedbackQuery = useQuery({
 		...listPracticeReviewFeedbackOptions({
 			path: { workspaceSlug },
-			query: { agentJobId: jobId, size: 5 },
+			query: { agentJobId: jobId, size: REVIEW_PREVIEW_SIZE },
 		}),
 		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
 	});

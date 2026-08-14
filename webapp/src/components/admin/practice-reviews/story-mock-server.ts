@@ -111,6 +111,31 @@ function filterFeedback(rows: ReviewFeedback[], url: URL) {
 	);
 }
 
+/**
+ * Worst first: shortfalls by severity, then strengths, then the observations that judged nothing.
+ *
+ * This is the server's `ACTIONABILITY` ordering, written out so a story can *show* it. The mock used
+ * only to check that the parameter was sent and then answer in the fixture's order — which would let
+ * a control that sets the wrong value, or a screen that reads the answer back in its own order, pass
+ * a story that claims the list is sorted.
+ */
+const ACTIONABILITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
+
+function actionability(row: ReviewObservation): number {
+	if (row.assessment === "BAD") return ACTIONABILITY_RANK[row.severity ?? "INFO"] ?? 4;
+	return row.assessment === "GOOD" ? 5 : 6;
+}
+
+function sortObservations(rows: ReviewObservation[], url: URL) {
+	if (single(url, "sort") !== "ACTIONABILITY") return rows;
+	// Ties are newest first, as on the server.
+	return [...rows].sort(
+		(a, b) =>
+			actionability(a) - actionability(b) ||
+			new Date(b.observedAt).getTime() - new Date(a.observedAt).getTime(),
+	);
+}
+
 export interface ReviewMockOptions {
 	/** Override the rows the observation list serves — used by the long-page stories. */
 	observations?: ReviewObservation[];
@@ -148,7 +173,7 @@ export function reviewHandlers({
 					{ status: 400 },
 				);
 			}
-			return page(filterObservations(observationRows, url), url);
+			return page(sortObservations(filterObservations(observationRows, url), url), url);
 		}),
 		http.get(
 			"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId",
