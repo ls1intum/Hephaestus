@@ -2,10 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
+import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationsListPage } from "./ObservationsListPage";
 import { manyObservations } from "./story-mock-data";
-import { StatefulPatch } from "@/stories/stateful";
 import { reviewHandlers } from "./story-mock-server";
 
 const meta = {

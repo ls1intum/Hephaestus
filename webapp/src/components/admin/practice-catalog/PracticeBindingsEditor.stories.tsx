@@ -11,9 +11,9 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
+import { Stateful } from "@/stories/stateful";
 import { ADD_BINDING_ID } from "./bindings";
 import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
-import { Stateful } from "@/stories/stateful";
 import { outcome } from "./story-mock-data";
 
 const meta = {
