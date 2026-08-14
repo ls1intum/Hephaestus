@@ -78,9 +78,9 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(canvas.getByText("How it is reviewed")).toBeVisible();
 		// Both occasions, each with its own evidence — a merged list would claim the practice always
 		// reads the review threads whole, which only the review at the merge does.
-		await expect(canvas.getByText(/Occasion 1: Opened, Marked ready for review/)).toBeVisible();
-		await expect(canvas.getByText(/Occasion 2: Merged/)).toBeVisible();
-		await expect(canvas.getByText(/it can say what is missing/)).toBeVisible();
+		await expect(canvas.getAllByText("Marked ready for review").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("Merged").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("· whole").length).toBeGreaterThan(0);
 		expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Pull request details").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();

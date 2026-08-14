@@ -1,3 +1,10 @@
+import {
+	CircleDashedIcon,
+	FileSearchIcon,
+	HistoryIcon,
+	type LucideIcon,
+	NetworkIcon,
+} from "lucide-react";
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeEvidenceOutcome,
@@ -15,18 +22,91 @@ export function evidenceSourceLabel(
 	);
 }
 
-/** The source contract answers this, not the practice: completeness is a property of the source. */
-export function evidenceQualityLabel(
+/**
+ * How good a capture of this source has to be, or null where the answer is the norm.
+ *
+ * The source contract answers this, not the practice: completeness is a property of the source. Most
+ * sources take any capture at all, so naming that on every row would colour the baseline and hide the
+ * two or three rows that genuinely demand more.
+ */
+export function evidenceQualityRequirement(
 	quality: PracticeEvidenceSourceOption["requiredQuality"] | undefined,
-) {
+): string | null {
 	switch (quality) {
 		case "COMPLETE_AND_NON_EMPTY":
-			return "Complete, and not empty";
+			return "Must be captured whole, and not be empty";
 		case "COMPLETE":
-			return "Complete";
+			return "Must be captured whole";
 		default:
-			return "Available; partial or unknown completeness allowed";
+			return null;
 	}
+}
+
+/**
+ * Which part of the picture a source belongs to.
+ *
+ * A pull request offers eleven sources, and as one flat list they read as eleven equal questions. They
+ * are not: three are the change itself, several are the surroundings it has to be read against, and
+ * two are what this workspace already said to this person. Grouping is what turns a wall into three
+ * short decisions.
+ */
+export type EvidenceSourceFamily = "work" | "around" | "history" | "other";
+
+export interface EvidenceSourceFamilyDef {
+	label: string;
+	icon: LucideIcon;
+}
+
+export const EVIDENCE_SOURCE_FAMILY: Record<EvidenceSourceFamily, EvidenceSourceFamilyDef> = {
+	work: { label: "The work itself", icon: FileSearchIcon },
+	around: { label: "Around the work", icon: NetworkIcon },
+	history: { label: "This person's history", icon: HistoryIcon },
+	other: { label: "Other sources", icon: CircleDashedIcon },
+};
+
+/**
+ * Keys are wire ids and never reach an operator; every word on screen comes from the source's own
+ * `displayName`. A source this build has not been taught falls to "Other sources" rather than being
+ * filed under a heading that would be a guess about what it is.
+ */
+const SOURCE_FAMILIES: Record<string, EvidenceSourceFamily> = {
+	"scm.pull-request.core": "work",
+	"scm.pull-request.diff": "work",
+	"scm.pull-request.comments": "work",
+	"scm.review-threads": "work",
+	"scm.general-review-comments": "work",
+	"scm.issue.core": "work",
+	"scm.issue.comments": "work",
+	"slack.conversation.thread": "work",
+	"docs.document.core": "work",
+	"scm.repository.tree": "around",
+	"scm.linked-work-items": "around",
+	"workspace.project-inventory": "around",
+	"outline.documents": "around",
+	"hephaestus.observation-history": "history",
+	"hephaestus.feedback-history": "history",
+};
+
+export interface EvidenceSourceGroup {
+	family: EvidenceSourceFamily;
+	def: EvidenceSourceFamilyDef;
+	sources: PracticeEvidenceSourceOption[];
+}
+
+const FAMILY_ORDER: EvidenceSourceFamily[] = ["work", "around", "history", "other"];
+
+/**
+ * The work type's sources in family order, keeping the catalogue's order within each family and
+ * dropping families this work type has no source for — a document offers two of the four.
+ */
+export function groupEvidenceSources(
+	sources: readonly PracticeEvidenceSourceOption[],
+): EvidenceSourceGroup[] {
+	return FAMILY_ORDER.map((family) => ({
+		family,
+		def: EVIDENCE_SOURCE_FAMILY[family],
+		sources: sources.filter((source) => (SOURCE_FAMILIES[source.sourceKind] ?? "other") === family),
+	})).filter((group) => group.sources.length > 0);
 }
 
 export function canAttemptAutomatedReview(

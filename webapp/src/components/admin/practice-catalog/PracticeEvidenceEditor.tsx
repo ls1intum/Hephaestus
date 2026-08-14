@@ -1,5 +1,5 @@
 import deepEqual from "fast-deep-equal";
-import { ChevronRight, RotateCcw } from "lucide-react";
+import { ChevronRightIcon, RotateCcwIcon } from "lucide-react";
 import { useState } from "react";
 import type {
 	PracticeEvidenceRequirement,
@@ -8,32 +8,25 @@ import type {
 } from "@/api/types.gen";
 import { type EvidenceRole, roleOf, withRole } from "@/components/admin/practice-catalog/bindings";
 import {
-	evidenceQualityLabel,
-	evidenceSourceLabel,
+	evidenceQualityRequirement,
+	groupEvidenceSources,
 } from "@/components/admin/practice-catalog/evidence-presentation";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import {
-	Field,
-	FieldDescription,
-	FieldGroup,
-	FieldLabel,
-	FieldLegend,
-	FieldSet,
-	FieldTitle,
-} from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel, FieldLegend, FieldSet } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { cn } from "@/lib/utils";
 
 /**
- * EXHAUSTIVE is deliberately not a role here: it is REQUIRED plus one further claim, and it is
+ * EXHAUSTIVE is deliberately not a segment here: it is REQUIRED plus one further claim, and it is
  * offered as that claim — see {@link AbsenceClaim}.
  */
 const EVIDENCE_ROLE_OPTIONS = [
 	{ value: "REQUIRED", label: "Required" },
-	{ value: "CONTEXTUAL", label: "Optional context" },
-	{ value: "NOT_USED", label: "Not used" },
+	{ value: "CONTEXTUAL", label: "Context" },
+	{ value: "NOT_USED", label: "Off" },
 ] satisfies Array<{ value: Exclude<EvidenceRole, "EXHAUSTIVE">; label: string }>;
 
 function selectedRole(role: EvidenceRole): string {
@@ -62,6 +55,14 @@ export interface PracticeEvidenceEditorProps {
 	errorId?: string;
 }
 
+/**
+ * What one occasion reads, as chips over a grouped set of one-line choices.
+ *
+ * <p>The panel used to open on a flat list of eleven cards, each carrying a title, a badge, a sentence
+ * of prose and three radios — a wall of text for a decision that is one word per source. The words are
+ * still all here; they are just not all shouting at once. Collapsed, the answer is the chips. Open, a
+ * source is a line: its name, what it is, and a three-way switch.
+ */
 export function PracticeEvidenceEditor({
 	options,
 	needs,
@@ -84,58 +85,56 @@ export function PracticeEvidenceEditor({
 		setLastInvalid(invalid);
 		if (invalid) setOpen(true);
 	}
-	const required = needs.filter((need) => need.stance !== "CONTEXTUAL");
-	const contextual = needs.filter((need) => need.stance === "CONTEXTUAL");
+	const required = options.allowedSources.filter(
+		(source) => roleOf(needs, source.sourceKind) !== "NOT_USED" && !isContextual(needs, source),
+	);
+	const contextual = options.allowedSources.filter((source) => isContextual(needs, source));
 	const usesRecommendedNeeds = deepEqual(needs, options.recommendedNeeds);
 
 	return (
 		<FieldSet
+			id={`${idPrefix}-evidence`}
 			data-invalid={invalid || undefined}
 			aria-describedby={errorId}
 			aria-label={`What this review reads, ${occasionLabel}`}
+			// A focus target for a form-level error, not a Tab stop.
+			tabIndex={-1}
 		>
-			<FieldLegend variant="label">What this review reads</FieldLegend>
-			<div
-				className="rounded-lg border bg-muted/30 p-3 text-sm"
-				id={`${idPrefix}-evidence`}
-				// A focus target for a form-level error, not a Tab stop.
-				tabIndex={-1}
-			>
-				<dl className="grid gap-2 sm:grid-cols-[8rem_1fr]">
-					<dt className="font-medium text-muted-foreground">Must have</dt>
-					<dd>
-						{required.length > 0 ? (
-							<ul className="space-y-1">
-								{required.map((need) => (
-									<li key={need.sourceKind}>
-										{evidenceSourceLabel(need.sourceKind, options.allowedSources)}
-										{need.stance === "EXHAUSTIVE" && (
-											<span className="text-muted-foreground"> · and nothing missing from it</span>
-										)}
-									</li>
-								))}
-							</ul>
-						) : (
-							<span className="text-muted-foreground">Nothing yet</span>
-						)}
-					</dd>
-					<dt className="font-medium text-muted-foreground">May also use</dt>
-					<dd>
-						{contextual.length > 0 ? (
-							contextual
-								.map((need) => evidenceSourceLabel(need.sourceKind, options.allowedSources))
-								.join(", ")
-						) : (
-							<span className="text-muted-foreground">Nothing</span>
-						)}
-					</dd>
-				</dl>
-				<p className="mt-2 text-muted-foreground">
-					{canAttemptReview
-						? "Every source under “Must have” is checked before this review runs. Missing or incomplete evidence makes Hephaestus skip the practice instead of guessing."
-						: "Recorded for this occasion, but nothing is reviewed while the practice asks for a human."}
-				</p>
-			</div>
+			<FieldLegend variant="label">Reads</FieldLegend>
+			<dl className="grid gap-x-3 gap-y-1.5 text-sm sm:grid-cols-[6.5rem_1fr]">
+				<dt className="text-muted-foreground">Must have</dt>
+				<dd className="flex flex-wrap gap-1.5">
+					{required.length > 0 ? (
+						required.map((source) => (
+							<Badge key={source.sourceKind} variant="secondary">
+								{source.displayName}
+								{roleOf(needs, source.sourceKind) === "EXHAUSTIVE" && (
+									<span className="text-muted-foreground">· whole</span>
+								)}
+							</Badge>
+						))
+					) : (
+						<span className="text-muted-foreground">Nothing yet</span>
+					)}
+				</dd>
+				<dt className="text-muted-foreground">May also use</dt>
+				<dd className="flex flex-wrap gap-1.5">
+					{contextual.length > 0 ? (
+						contextual.map((source) => (
+							<Badge key={source.sourceKind} variant="outline">
+								{source.displayName}
+							</Badge>
+						))
+					) : (
+						<span className="text-muted-foreground">Nothing</span>
+					)}
+				</dd>
+			</dl>
+			<p className="text-sm text-muted-foreground">
+				{canAttemptReview
+					? "Everything under “Must have” is checked before the review runs. Missing or incomplete evidence skips the practice rather than guessing."
+					: "Recorded for this occasion, but nothing is reviewed while the practice asks for a human."}
+			</p>
 
 			<Collapsible open={open} onOpenChange={setOpen}>
 				<div className="flex flex-wrap items-center gap-2">
@@ -143,7 +142,7 @@ export function PracticeEvidenceEditor({
 						disabled={disabled}
 						render={
 							<Button type="button" variant="outline" size="sm" disabled={disabled}>
-								<ChevronRight className="size-4 transition-transform group-aria-expanded:rotate-90" />
+								<ChevronRightIcon className="size-4 transition-transform group-aria-expanded:rotate-90" />
 								Choose sources
 							</Button>
 						}
@@ -157,33 +156,48 @@ export function PracticeEvidenceEditor({
 							disabled={disabled}
 							onClick={() => onChange([...options.recommendedNeeds])}
 						>
-							<RotateCcw className="size-4" />
+							<RotateCcwIcon className="size-4" />
 							Use recommended evidence
 						</Button>
 					)}
 				</div>
-				<CollapsibleContent className="mt-3 space-y-3">
+				<CollapsibleContent className="mt-3 space-y-4">
 					<FieldDescription>
 						Choosing a source does not collect or authorize it; instance governance and workspace
 						integrations control that separately.
 					</FieldDescription>
-					<FieldGroup className="gap-3">
-						{options.allowedSources.map((source) => (
-							<SourceRow
-								key={source.sourceKind}
-								source={source}
-								role={roleOf(needs, source.sourceKind)}
-								idPrefix={idPrefix}
-								occasionLabel={occasionLabel}
-								disabled={disabled}
-								onRoleChange={(role) => onChange(withRole(needs, source.sourceKind, role))}
-							/>
-						))}
-					</FieldGroup>
+					{groupEvidenceSources(options.allowedSources).map((group) => (
+						<div key={group.family} className="space-y-1.5">
+							<p className="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+								<group.def.icon className="size-3.5" aria-hidden />
+								{group.def.label}
+							</p>
+							<ul className="divide-y overflow-hidden rounded-lg border">
+								{group.sources.map((source) => (
+									<SourceRow
+										key={source.sourceKind}
+										source={source}
+										role={roleOf(needs, source.sourceKind)}
+										idPrefix={idPrefix}
+										occasionLabel={occasionLabel}
+										disabled={disabled}
+										onRoleChange={(role) => onChange(withRole(needs, source.sourceKind, role))}
+									/>
+								))}
+							</ul>
+						</div>
+					))}
 				</CollapsibleContent>
 			</Collapsible>
 		</FieldSet>
 	);
+}
+
+function isContextual(
+	needs: readonly PracticeEvidenceRequirement[],
+	source: PracticeEvidenceSourceOption,
+): boolean {
+	return roleOf(needs, source.sourceKind) === "CONTEXTUAL";
 }
 
 interface SourceRowProps {
@@ -204,45 +218,16 @@ function SourceRow({
 	onRoleChange,
 }: SourceRowProps) {
 	const controlId = `${idPrefix}-source-${source.sourceKind}`;
-	const groupLabel = `Use ${source.displayName} in ${occasionLabel}`;
+	const inUse = role !== "NOT_USED";
+	const quality = evidenceQualityRequirement(source.requiredQuality);
 	return (
-		<div className="rounded-lg border p-3">
-			<div className="flex flex-wrap items-center gap-2">
-				<p className="font-medium">{source.displayName}</p>
-				<Badge variant="outline">{evidenceQualityLabel(source.requiredQuality)}</Badge>
-			</div>
-			<p className="mt-1 text-sm text-muted-foreground">{source.description}</p>
-			<FieldSet className="mt-2">
-				<FieldLegend variant="label" className="sr-only">
-					{groupLabel}
-				</FieldLegend>
-				<RadioGroup
-					value={selectedRole(role)}
-					onValueChange={(next) => {
-						// Leaving "Required" drops the absence claim with it: a source that is only optional
-						// context can never be the ground for saying something is not there.
-						if (next) onRoleChange(next as EvidenceRole);
-					}}
-					className="flex flex-wrap gap-x-4 gap-y-2"
-					aria-label={groupLabel}
-				>
-					{EVIDENCE_ROLE_OPTIONS.map((option) => (
-						<FieldLabel
-							key={option.value}
-							htmlFor={`${controlId}-${option.value}`}
-							className="font-normal"
-						>
-							<Field orientation="horizontal" className="gap-2" data-disabled={disabled}>
-								<RadioGroupItem
-									id={`${controlId}-${option.value}`}
-									value={option.value}
-									disabled={disabled}
-								/>
-								<FieldTitle className="font-normal">{option.label}</FieldTitle>
-							</Field>
-						</FieldLabel>
-					))}
-				</RadioGroup>
+		<li className={cn("flex flex-wrap items-start gap-x-4 gap-y-2 p-2.5", inUse && "bg-muted/40")}>
+			<div className="min-w-0 flex-1 basis-56">
+				<p className="text-sm font-medium">{source.displayName}</p>
+				{/* Two lines is enough for every source the catalogue ships and bounds the height of a
+				    list that is otherwise eleven paragraphs long. */}
+				<p className="line-clamp-2 text-xs text-muted-foreground">{source.description}</p>
+				{inUse && quality && <p className="mt-0.5 text-xs text-muted-foreground">{quality}</p>}
 				<AbsenceClaim
 					source={source}
 					role={role}
@@ -250,8 +235,46 @@ function SourceRow({
 					disabled={disabled}
 					onRoleChange={onRoleChange}
 				/>
-			</FieldSet>
-		</div>
+			</div>
+			{/* A segmented control drawn on radios rather than on the toggle group: three roles are
+			    mutually exclusive and exactly one always holds, which is what a radio group means. The
+			    toggle group also renders `aria-orientation` on `role="group"`, which ARIA does not allow
+			    and axe fails the story on. */}
+			<RadioGroup
+				className="flex w-fit shrink-0 gap-0 overflow-hidden rounded-lg border"
+				disabled={disabled}
+				aria-label={`How ${source.displayName} is used, ${occasionLabel}`}
+				value={selectedRole(role)}
+				onValueChange={(next) => {
+					if (next) onRoleChange(next as EvidenceRole);
+				}}
+			>
+				{EVIDENCE_ROLE_OPTIONS.map((option) => (
+					<label
+						key={option.value}
+						htmlFor={`${controlId}-${option.value}`}
+						className={cn(
+							"cursor-pointer border-l px-2.5 py-1 text-[0.8rem] font-medium text-muted-foreground transition-colors first:border-l-0",
+							"has-[[aria-checked=true]]:bg-primary has-[[aria-checked=true]]:text-primary-foreground",
+							"hover:bg-muted has-[[aria-checked=true]]:hover:bg-primary",
+							"has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring has-[:focus-visible]:ring-inset",
+							disabled && "cursor-not-allowed opacity-70",
+						)}
+					>
+						{/* Clipped, not replaced: the radio keeps its role, its arrow-key navigation and its
+						    accessible name, and the label it is bound to is what a reader clicks. */}
+						<span className="sr-only">
+							<RadioGroupItem
+								id={`${controlId}-${option.value}`}
+								value={option.value}
+								disabled={disabled}
+							/>
+						</span>
+						{option.label}
+					</label>
+				))}
+			</RadioGroup>
+		</li>
 	);
 }
 
@@ -272,20 +295,22 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 	if (!source.supportsExhaustiveEvidence) return null;
 	const checkboxId = `${controlId}-exhaustive`;
 	return (
-		<Field orientation="horizontal" className="mt-2 gap-2" data-disabled={disabled}>
+		<Field orientation="horizontal" className="mt-1.5 gap-2" data-disabled={disabled}>
 			<Checkbox
 				id={checkboxId}
 				disabled={disabled}
 				checked={role === "EXHAUSTIVE"}
 				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
 			/>
-			<FieldLabel htmlFor={checkboxId} className="font-normal">
+			<FieldLabel htmlFor={checkboxId} className="text-xs font-normal">
 				<span>
-					This review says what is <em>missing</em> from {source.displayName}
-					<FieldDescription>
-						A partial capture then refuses the review: an incomplete list cannot tell “it is not
-						there” apart from “we did not fetch it”.
-					</FieldDescription>
+					Can say what is missing from {source.displayName}
+					{role === "EXHAUSTIVE" && (
+						<FieldDescription>
+							A partial capture then refuses the review: an incomplete list cannot tell “it is not
+							there” apart from “we did not fetch it”.
+						</FieldDescription>
+					)}
 				</span>
 			</FieldLabel>
 		</Field>

@@ -5,14 +5,11 @@ import type {
 	PracticeEvidenceSourceOption,
 	PracticeSignalOption,
 } from "@/api/types.gen";
+import { momentDef } from "@/components/admin/practice-catalog/occasion-moments";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import {
-	evidenceQualityLabel,
-	evidenceSourceLabel,
-	mentoringSupportLabel,
-} from "./evidence-presentation";
+import { evidenceSourceLabel, mentoringSupportLabel } from "./evidence-presentation";
 
 const VALIDATION_LABELS: Record<PracticeAutomatedReviewValidation["status"], string> = {
 	AUTHOR_DECLARED: "Not independently validated",
@@ -37,7 +34,6 @@ function signalLabel(signal: string, signals: readonly PracticeSignalOption[]) {
 
 interface OccasionSummaryProps {
 	binding: PracticeBinding;
-	index: number;
 	sources: readonly PracticeEvidenceSourceOption[];
 	signals: readonly PracticeSignalOption[];
 }
@@ -45,47 +41,51 @@ interface OccasionSummaryProps {
 /**
  * Listed per occasion rather than merged into one set: a merged list would say the practice reads the
  * review threads whole without saying that only the review at the merge does.
+ *
+ * <p>The moments wear the same glyphs the editor's lifecycle strip draws, so an operator who set this
+ * up recognises it here without translating.
  */
-function OccasionSummary({ binding, index, sources, signals }: OccasionSummaryProps) {
+function OccasionSummary({ binding, sources, signals }: OccasionSummaryProps) {
 	const required = binding.needs.filter((need) => need.stance !== "CONTEXTUAL");
 	const contextual = binding.needs.filter((need) => need.stance === "CONTEXTUAL");
 	return (
-		<div className="rounded-md border p-3">
-			<p className="font-medium">
-				Occasion {index + 1}:{" "}
-				{binding.signals.map((signal) => signalLabel(signal, signals)).join(", ")}
-				{binding.onDrafts && (
-					<span className="font-normal text-muted-foreground"> · also while a draft</span>
-				)}
-			</p>
-			<dl className="mt-2 grid gap-x-4 gap-y-1 sm:grid-cols-[8rem_1fr]">
+		<div className="space-y-2 rounded-md border p-3">
+			<div className="flex flex-wrap items-center gap-1.5">
+				{binding.signals.map((signal) => {
+					const Icon = momentDef(signal).icon;
+					return (
+						<Badge key={signal} variant="secondary">
+							<Icon className="size-3" aria-hidden />
+							{signalLabel(signal, signals)}
+						</Badge>
+					);
+				})}
+				{binding.onDrafts && <Badge variant="outline">Drafts included</Badge>}
+			</div>
+			<dl className="grid gap-x-4 gap-y-1.5 sm:grid-cols-[6.5rem_1fr]">
 				<dt className="text-muted-foreground">Must have</dt>
-				<dd>
+				<dd className="flex flex-wrap gap-1.5">
 					{required.length > 0 ? (
-						<ul>
-							{required.map((need) => (
-								<li key={need.sourceKind}>
-									{evidenceSourceLabel(need.sourceKind, sources)}
-									<span className="text-muted-foreground">
-										{" · "}
-										{need.stance === "EXHAUSTIVE"
-											? "captured whole, so it can say what is missing"
-											: evidenceQualityLabel(
-													sources.find((source) => source.sourceKind === need.sourceKind)
-														?.requiredQuality,
-												)}
-									</span>
-								</li>
-							))}
-						</ul>
+						required.map((need) => (
+							<Badge key={need.sourceKind} variant="secondary">
+								{evidenceSourceLabel(need.sourceKind, sources)}
+								{need.stance === "EXHAUSTIVE" && (
+									<span className="text-muted-foreground">· whole</span>
+								)}
+							</Badge>
+						))
 					) : (
 						<span className="text-muted-foreground">Nothing</span>
 					)}
 				</dd>
 				<dt className="text-muted-foreground">May also use</dt>
-				<dd>
+				<dd className="flex flex-wrap gap-1.5">
 					{contextual.length > 0 ? (
-						contextual.map((need) => evidenceSourceLabel(need.sourceKind, sources)).join(", ")
+						contextual.map((need) => (
+							<Badge key={need.sourceKind} variant="outline">
+								{evidenceSourceLabel(need.sourceKind, sources)}
+							</Badge>
+						))
 					) : (
 						<span className="text-muted-foreground">Nothing</span>
 					)}
@@ -124,27 +124,10 @@ export function PracticeAutomatedReviewValidationSummary({
 				</p>
 			)}
 			{validation.status !== "AUTHOR_DECLARED" && (
-				<>
-					<p className="text-muted-foreground">
-						Validated for source contract {validation.sourceContractVersion}{" "}
-						<RelativeTime value={validation.validatedAt} fallback="at an unknown time" />
-					</p>
-					<details className="text-muted-foreground">
-						<summary className="cursor-pointer">Technical details</summary>
-						<p className="mt-1">
-							Review rules <code className="break-all">{validation.reviewRuleFingerprint}</code>
-							<br />
-							Review policy <code className="break-all">{validation.policyDigest}</code>
-							{validation.evaluatorProcedureFingerprint && (
-								<>
-									<br />
-									Evaluator procedure{" "}
-									<code className="break-all">{validation.evaluatorProcedureFingerprint}</code>
-								</>
-							)}
-						</p>
-					</details>
-				</>
+				<p className="text-muted-foreground">
+					Validated for source contract {validation.sourceContractVersion}{" "}
+					<RelativeTime value={validation.validatedAt} fallback="at an unknown time" />
+				</p>
 			)}
 		</div>
 	);
@@ -166,7 +149,7 @@ export function PracticeEvidenceSummary({
 				<dd className="text-muted-foreground">
 					{mentoringSupportLabel(policy.automatedReview)}
 					<span className="mt-1 block text-xs">
-						Developers, peers, and mentors may use context that Hephaestus cannot access.
+						Developers, peers, and mentors may use context no automated review can reach.
 					</span>
 				</dd>
 			</div>
@@ -182,7 +165,6 @@ export function PracticeEvidenceSummary({
 							<OccasionSummary
 								key={binding.signals.join(",") || index}
 								binding={binding}
-								index={index}
 								sources={sources}
 								signals={signals}
 							/>
@@ -211,12 +193,26 @@ export function PracticeEvidenceSummary({
 				</div>
 			)}
 			<div className="sm:col-span-2">
-				<dt className="sr-only">Technical evidence contract</dt>
+				<dt className="sr-only">Technical details</dt>
 				<dd>
+					{/* One disclosure, not two. The contract version and the digests are the same kind of
+					    answer — provenance for somebody reproducing a decision — and splitting them left two
+					    identically named triangles a paragraph apart. */}
 					<details className="text-muted-foreground">
-						<summary className="cursor-pointer">Technical evidence contract</summary>
+						<summary className="cursor-pointer">Technical details</summary>
 						<p className="mt-1">
 							Source contract {policy.sourceContractVersion} · {workTypeLabel}
+							<br />
+							Review rules <code className="break-all">{validation.reviewRuleFingerprint}</code>
+							<br />
+							Review policy <code className="break-all">{validation.policyDigest}</code>
+							{validation.evaluatorProcedureFingerprint && (
+								<>
+									<br />
+									Evaluator procedure{" "}
+									<code className="break-all">{validation.evaluatorProcedureFingerprint}</code>
+								</>
+							)}
 						</p>
 					</details>
 				</dd>
