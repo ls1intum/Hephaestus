@@ -178,7 +178,7 @@ carries one entry per staged file and a TOASTed `jsonb` has no partial read.
 An observation is one practice's answer about one piece of work, written once and immutable. It carries a
 `Presence` — `PRESENT`, `ABSENT`, `NOT_APPLICABLE` or `INCONCLUSIVE` — and, only when the presence carries
 valence, an assessment. `PracticeDetectionResultParser` force-nulls the assessment on an `INCONCLUSIVE`
-finding, so a detector that hedges and still attaches a strength cannot slip an unearned one into the
+observation, so a detector that hedges and still attaches a strength cannot slip an unearned one into the
 series.
 
 `INCONCLUSIVE` means the evidence the practice needs *was* present and *was* read and does not settle the
@@ -194,8 +194,8 @@ normalizer and again at server-side delivery, for the same reason the citation a
 the sandbox guard runs inside the thing it is checking.
 
 Identity is assigned at persistence, not by the detector: an occurrence key dedupes within a run
-(`insertIfAbsent`, `ON CONFLICT DO NOTHING`), and a recurrence key hashes the locus so the same finding is
-recognisable across runs.
+(`insertIfAbsent`, `ON CONFLICT DO NOTHING`), and a recurrence key hashes the locus so the same observation
+is recognisable across runs.
 
 **Guidance is authored inline by the detector, and Delivery is not where wording is decided.**
 `DeliveryComposer`'s own contract says so: *"The `reasoning` and `guidance` on a finding are written by the
@@ -207,16 +207,16 @@ the catalogue are where you look; the composer will not save you.
 
 ## Delivery
 
-Delivery turns admitted findings into a message and records what happened to it, including when nothing was
-sent. A withheld finding is written to the ledger as `SUPPRESSED` with a reason rather than dropped, so "we
+Delivery turns admitted observations into feedback and records what happened to it, including when nothing was
+sent. A withheld observation is written to the ledger as `SUPPRESSED` with a reason rather than dropped, so "we
 saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation.
 
 Three gates decide admission, and they are ANDed. `FeedbackAdmission.delivers(origin, tier, reach, channel)`
 is the single place they meet, so a new channel, tier, reach or origin has one place to be reasoned about:
 
 - **`PracticeReviewTier`** — how much autonomy the system has over this practice: `OFF`, `PROPOSE`,
-  `DELIVER`. Only `DELIVER` delivers. `PROPOSE` runs the review and records every observation, and the
-  findings are dropped before a body is composed, so nothing is sent and nothing is stored to send later.
+  `DELIVER`. Only `DELIVER` delivers. `PROPOSE` runs the review and records every observation, and those
+  observations are dropped before a body is composed, so nothing is sent and nothing is stored to send later.
   The tier is the **effective** one, resolved practice → area → workspace, because either of the first two
   levels may hold no opinion. Withheld here means `PRACTICE_TIER_QUIET`.
 - **`FeedbackReach`** — where this workspace lets feedback go at all: `CONVERSATION`, or `ON_THE_WORK`
@@ -285,7 +285,7 @@ sequenceDiagram
 
 Artifact-specific handlers assemble context and delivery constraints — `PullRequestReviewHandler`,
 `IssueReviewHandler`, `ConversationReviewHandler` — and all of them share one practice-agent runtime and
-one findings model. Provider adapters own provider identifiers, diff and comment APIs, and conversation
+one observations model. Provider adapters own provider identifiers, diff and comment APIs, and conversation
 storage; the practices module owns practice definitions, observations, and the feedback ledger.
 
 The durable boundaries, which the implementation may reschedule freely behind:
@@ -295,8 +295,9 @@ The durable boundaries, which the implementation may reschedule freely behind:
   [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
 - **Workspace ABI** — the sandbox receives read-only `inputs/`, disposable `work/`, and returns only
   `out/`. [Agent workspace ABI](agent/workspace-abi.mdx) is the source of truth for paths and exit codes.
-- **Findings** — the agent reports through `report_finding`; `PracticeDetectionResultParser` validates and
-  never throws, and persistence assigns occurrence and recurrence identity.
+- **Observations** — the agent reports through `report_finding` (the sandbox contract keeps the older word);
+  `PracticeDetectionResultParser` validates and never throws, and persistence assigns occurrence and
+  recurrence identity.
 - **Feedback** — server-side composition, with every attempt, withholding, replacement and placement
   recorded in the ledger.
 
@@ -323,7 +324,7 @@ workspace:
 
 So a practice at `PROPOSE` is `REVIEWED` with `observationCount > 0`, `deliveredCount = 0` and
 `PRACTICE_TIER_QUIET` in `withheldReasons` — measured, and deliberately quiet. That trio is how a held
-finding reaches a reader at all; the `SUPPRESSED` ledger row behind it is storage, not a screen.
+observation reaches a reader at all; the `SUPPRESSED` ledger row behind it is storage, not a screen.
 `TURNED_OFF` is the workspace's own choice and is checked *before* any mechanical
 reason, so it never masks one. It is not called `SILENCED`: silence is what `PROPOSE` does, and
 `PRACTICE_TIER_QUIET` already covers it.

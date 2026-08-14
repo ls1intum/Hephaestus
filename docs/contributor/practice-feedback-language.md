@@ -19,9 +19,8 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Practice area**     | A group of related practices                                                    | category, goal, learning objective |
 | **Unassigned**        | Practices that are not in a practice area                                       | ungrouped, unbound                 |
 | **Observation**       | One recorded result of reviewing one practice against one piece of reviewed work | finding, detection                 |
-| **Practice feedback** | The collective guidance created from observations                               | AI feedback, feedback items        |
-| **Message**           | One countable unit of feedback                                                  | ledger unit                        |
-| **Delivery**          | A message's prepared, delivered, withheld, failed, or replaced outcome          | placement, surface                 |
+| **Practice feedback** | Guidance written from observations and addressed to a developer — both the whole and the countable unit | message, AI feedback, feedback item, ledger unit |
+| **Delivery**          | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced | placement, surface            |
 | **Channel**           | Where feedback is intended to appear; see [feedback reach](./practice-review-glossary.mdx#feedback-reach) for which destinations exist | destination, surface |
 | **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
 | **Developer**         | The person an observation is about                                              | learner                            |
@@ -41,10 +40,38 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 Use provider-specific names such as **pull request** or **merge request** when the provider is known;
 otherwise write **pull or merge request**.
 
-**Observation, not finding**, for the measurement. *Finding* names the right thing only on the delivery
-side, where it means a note pinned to a place in a diff (`FindingAnchor`, `InlineFindingChannel`) rather
-than a measurement. The read APIs and the reviews UI say *findings* because renaming a wire contract is its
-own change; that is a reason to leave them alone, not a licence to write *finding* in new copy.
+**Feedback is the countable unit, and there is no other word for it.** Do not reach for *message*, *item*,
+*note*, or *entry* to get a noun that pluralises; *feedback* is uncountable, so the fix is to phrase the
+count so the noun is not needed rather than to invent a second word for the same thing.
+
+| Instead of           | Write                                                       |
+| -------------------- | ----------------------------------------------------------- |
+| 3 messages           | 3 pieces of feedback                                        |
+| Messages             | Feedback — a heading naming the collection needs no plural  |
+| No messages yet      | No feedback yet                                             |
+| This message         | This feedback                                               |
+| Message details      | Feedback details                                            |
+| Findings behind this message | Observations behind this feedback                   |
+
+A column that counts per row is headed **Feedback** and the cell holds the number alone. Where a sentence
+needs a singular subject, name what the feedback is *about* — "the feedback for this observation", not
+"the message for this observation".
+
+**Observation, not finding**, for the measurement — in copy, in URLs, in API schema and field names, and in
+new Java. *Finding* names the right thing in exactly two places, and both mean a note pinned to a position
+in a diff rather than a measurement:
+
+- the delivery-side anchor and channel types — `FindingAnchor`, `InlineFindingChannel`, and the provider
+  implementations behind them;
+- the `findings` array in the sandbox contract the reviewing model returns, which
+  `PracticeDetectionResultParser` reads. That is a prompt-and-parser contract with a model, not a name
+  a reader ever sees.
+
+**The earlier exemption for the read APIs and the reviews UI is withdrawn.** It let the surfaces an
+operator actually reads carry the one word this page bans, which is worse than the cost of the rename it
+was avoiding. Those names are now `ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`,
+`observationId`, and `/practices/reviews/observations`. Nothing is grandfathered: a new *finding* outside
+the two bullets above is a bug.
 
 For how much a workspace lets the system do on its own about a practice — including whether it is
 reviewed at all — use **autonomy tier** and its three values **Off**, **Propose**, **Deliver**, as

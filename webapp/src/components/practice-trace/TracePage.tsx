@@ -416,7 +416,7 @@ export function TracePage({
 			<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
 				<RadarIcon className="size-3.5 shrink-0" aria-hidden />
 				Silence here is always a decision with a reason. If a reason looks wrong, a workspace admin
-				can change the practice or its loudness.
+				can change the practice or its autonomy tier.
 			</p>
 		</article>
 	);

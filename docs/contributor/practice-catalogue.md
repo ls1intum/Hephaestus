@@ -37,7 +37,7 @@ definition or an existing workspace.
 | Instance administrator | Curate the defaults offered to new workspaces | Rewrite existing workspace practices |
 | Workspace administrator | Adapt practices, set the workspace default tier and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance |
 | Instance operator | Approve source purposes, privacy, retention, and erasure coverage | Decide that connected evidence proves a practice |
-| Developer, peer, or mentor | Use findings and available human context in a review | Supply hidden context to Hephaestus implicitly |
+| Developer, peer, or mentor | Use observations and available human context in a review | Supply hidden context to Hephaestus implicitly |
 
 ## Authoring experience
 
@@ -96,7 +96,7 @@ workspace integrations remain separate gates.
 
 The author does not choose source-contract identifiers or runtime states in this common path. If the
 required pull-request details or diff are missing, or captured less completely than their contract
-demands, Hephaestus skips the practice instead of inventing a finding. A more contextual practice,
+demands, Hephaestus skips the practice instead of inventing an observation. A more contextual practice,
 such as whether a developer understood a trade-off discussed privately with a mentor, should use
 **Human review needed** and name that missing context.
 
@@ -108,7 +108,7 @@ for the architectural decision.
 
 ## Durable invariants
 
-- **Slug is identity.** It participates in provenance and finding recurrence. Change the display name
+- **Slug is identity.** It participates in provenance and observation recurrence. Change the display name
   freely; rename a slug only with an explicit remapping strategy.
 - **Definitions and order are independent.** Reordering does not create a definition override or an
   audit event. **Use Hephaestus order** removes custom positions.

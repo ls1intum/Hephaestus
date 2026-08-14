@@ -24,24 +24,24 @@ Use the executable sources for exact details:
 | `PracticeArea` | Workspace-defined grouping for practices | Has many practices; a practice may be unassigned |
 | `Practice` | Configurable criterion used by detection | Belongs to a workspace and may belong to an area |
 | `PracticeRevision` | Criteria snapshot used to interpret a past result | Belongs to one practice; an observation may pin one revision |
-| `Observation` | Evidence produced by one review job | Belongs to one practice and one job; may support many feedback messages |
-| `Feedback` | One recipient-specific message and its delivery outcome | Belongs to one job; may draw on many observations and have many placements |
-| `FeedbackObservation` | Ordered evidence binding between a message and an observation | Joins feedback to observations with a primary or supporting role |
-| `FeedbackPlacement` | Where a feedback message was placed | Belongs to one feedback message; records a summary, inline, or conversation placement |
-| `Reaction` | A developer response to delivered feedback | Belongs to one feedback message and retains its recurrence key |
+| `Observation` | Evidence produced by one review job | Belongs to one practice and one job; may support many pieces of feedback |
+| `Feedback` | One recipient-specific piece of feedback and its delivery outcome | Belongs to one job; may draw on many observations and have many placements |
+| `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role |
+| `FeedbackPlacement` | Where a piece of feedback was placed | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
+| `Reaction` | A developer response to delivered feedback | Belongs to one `Feedback` and retains its recurrence key |
 
 ## Invariants
 
-### Evidence and messages are separate
+### Evidence and feedback are separate
 
-An observation records what a review detected. Feedback records the message prepared from one or more
-observations and what happened to that message. A placement records where that message appeared. This
-separation preserves findings even when no message is composed or delivery is withheld.
+An observation records what a review detected. Feedback records the guidance prepared from one or more
+observations and what happened to it. A placement records where that feedback appeared. This
+separation preserves observations even when no feedback is composed or delivery is withheld.
 
 Observation rows are immutable. Practice criteria are mutable, so each observation can reference the
 criteria revision that applied to its review. Feedback content, provenance, and replacement link are
-immutable. A replacement is inserted with a link to the prior message before guarded lifecycle updates
-supersede that message. Other guarded updates may change delivery state, delivery timestamp, or
+immutable. A replacement is inserted with a link to the prior feedback before guarded lifecycle updates
+supersede it. Other guarded updates may change delivery state, delivery timestamp, or
 suppression reason.
 
 ### Occurrence and recurrence have different identities
@@ -104,9 +104,9 @@ The persistence model is not an authorization boundary. Controllers define who m
 
 - developer observation list, detail, summary, and reflection endpoints are scoped to the authenticated
   developer;
-- the pull-request observation projection shows workspace members every relevant finding for that pull
+- the pull-request observation projection shows workspace members every relevant observation for that pull
   request;
-- the workspace-admin practice-review endpoints expose findings and feedback across that workspace;
+- the workspace-admin practice-review endpoints expose observations and feedback across that workspace;
 - learner-facing practice projections omit detector criteria by construction.
 
 Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.

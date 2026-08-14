@@ -127,21 +127,21 @@ which did not order: a mentor chat is not obviously quieter or louder than one r
 boundary between the middle tiers was unpickable. Autonomy does order, and it is the adoption ladder a team
 actually walks.
 
-**Nothing is composed or stored at `PROPOSE`.** A withheld finding is filtered out before the feedback body
-is built, and the ledger row it leaves behind carries no body, so there is no draft anywhere: no surface can
-show an administrator the message the practice would have sent, because that message was never written. Do
+**Nothing is composed or stored at `PROPOSE`.** A withheld observation is filtered out before the feedback
+body is built, and the ledger row it leaves behind carries no body, so there is no draft anywhere: no surface
+can show an administrator the feedback the practice would have sent, because it was never written. Do
 not describe the tier as preparing feedback or as offering a preview. Every write boundary — practice, area
 and workspace — accepts `PROPOSE` like any other tier.
 
-**A held finding stays visible as a refusal, not as a queue.** Each one is written to the feedback ledger as
+**A held observation stays visible as a refusal, not as a queue.** Each one is written to the feedback ledger as
 `SUPPRESSED` with reason `PRACTICE_TIER_QUIET` rather than dropped, bound to the observation it came from,
 so "we saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation. On
 the artifact's practice trace the same fact reads as outcome `REVIEWED` with `observationCount > 0`,
 `deliveredCount = 0`, and `PRACTICE_TIER_QUIET` among the `withheldReasons`. There is no approval queue and
-nobody approves an individual finding: what is held is released by raising the practice's effective tier to
+nobody approves an individual observation: what is held is released by raising the practice's effective tier to
 `DELIVER`. Should an approval step ever be built, do not reuse `FeedbackDeliveryState.PREPARED` for it —
 that state is an auto-advancing mentor-conversation slot with a 14-day TTL, flipped to `DELIVERED` by the
-next chat turn that links the finding, so parking approvals there would deliver them without anybody
+next chat turn that links the feedback, so parking approvals there would deliver them without anybody
 approving anything.
 
 ## Tier inheritance
