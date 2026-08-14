@@ -37,13 +37,13 @@ export const HumanReviewReasonIsNotALimitation: Story = {
 			},
 			insufficiencyReason: {
 				code: "MENTOR_CONVERSATION_NOT_OBSERVED",
-				description: "The trade-off was agreed in a conversation Hephaestus cannot read.",
+				description: "The trade-off was agreed in a conversation no automated review can read.",
 			},
 		},
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByLabelText(/Why is human review needed/)).toHaveValue(
-			"The trade-off was agreed in a conversation Hephaestus cannot read.",
+			"The trade-off was agreed in a conversation no automated review can read.",
 		);
 		await expect(
 			canvas.getByDisplayValue(

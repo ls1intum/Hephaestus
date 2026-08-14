@@ -174,7 +174,7 @@ const EMPTY_POLICY: PracticeAutomatedReviewPolicy = {
 };
 
 /**
- * Keeps the answer the author already gave about how far Hephaestus may go: changing what is
+ * Keeps the answer the author already gave about how far automated review may go: changing what is
  * reviewed is not a decision to start reviewing it.
  */
 function recommendedPolicyWithCurrentSupport(
@@ -419,7 +419,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				<div className="max-w-3xl space-y-10">
 					<p className="text-sm text-muted-foreground">
 						Define one observable habit. The same definition should make sense to a developer, peer,
-						human mentor, and Hephaestus.
+						human mentor, and an automated reviewer.
 					</p>
 
 					<section className="space-y-4">
@@ -485,7 +485,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						<div>
 							<h2 className="text-lg font-semibold">Review guidance</h2>
 							<p className="text-sm text-muted-foreground">
-								Explain the habit in plain language before configuring how Hephaestus supports it.
+								Explain the habit in plain language before configuring how it is reviewed.
 							</p>
 						</div>
 						<Field data-invalid={criteriaError ? "true" : undefined}>

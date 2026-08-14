@@ -168,7 +168,7 @@ export function PracticeMentoringSupportEditor({
 		>
 			<div>
 				<h2 id="practice-support-heading" className="text-lg font-semibold" tabIndex={-1}>
-					How Hephaestus can help
+					How this practice is mentored
 				</h2>
 				<p className="text-sm text-muted-foreground">
 					Choose the responsible level of support. This does not limit what a developer, peer, or
@@ -180,7 +180,7 @@ export function PracticeMentoringSupportEditor({
 				value={support}
 				onValueChange={(next) => next && updateSupport(next as MentoringSupport)}
 				className="gap-3"
-				aria-label="How Hephaestus supports this practice"
+				aria-label="How this practice is mentored"
 			>
 				<FieldLabel htmlFor="practice-mentoring-ai-supported">
 					<Field orientation="horizontal" data-disabled={disabled || !supportsAiReview}>
@@ -192,8 +192,8 @@ export function PracticeMentoringSupportEditor({
 						<FieldContent>
 							<FieldTitle>AI-supported mentoring</FieldTitle>
 							<FieldDescription>
-								Hephaestus may review connected work and offer practice-focused guidance. It skips
-								the practice when required evidence is unavailable.
+								An automated review reads the connected work and offers practice-focused guidance.
+								It skips the practice when required evidence is unavailable.
 								{!supportsAiReview && (
 									<> This work type has no AI review available on this instance.</>
 								)}
@@ -211,8 +211,8 @@ export function PracticeMentoringSupportEditor({
 						<FieldContent>
 							<FieldTitle>Human review needed</FieldTitle>
 							<FieldDescription>
-								Connected work cannot support a responsible conclusion. Hephaestus steps back so a
-								developer, peer, or mentor can review it.
+								Connected work cannot support a responsible conclusion, so no automated review runs
+								and a developer, peer, or mentor reviews it instead.
 							</FieldDescription>
 						</FieldContent>
 					</Field>
@@ -227,7 +227,7 @@ export function PracticeMentoringSupportEditor({
 						<FieldContent>
 							<FieldTitle>Guidance only</FieldTitle>
 							<FieldDescription>
-								Keep the criteria and guidance without asking Hephaestus to review this practice.
+								Keep the criteria and guidance without running any automated review.
 							</FieldDescription>
 						</FieldContent>
 					</Field>
