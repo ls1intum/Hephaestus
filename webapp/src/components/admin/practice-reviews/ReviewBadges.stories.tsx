@@ -33,7 +33,7 @@ export const Unverifiable: Story = {
 /**
  * The common case renders nothing at all.
  *
- * A result on the current rules is the norm, and a banner saying so on every finding would be a line
+ * A result on the current rules is the norm, and a banner saying so on every observation would be a line
  * every reader learns to skip — which is what would make the two above invisible when they appear.
  */
 export const Current: Story = {
