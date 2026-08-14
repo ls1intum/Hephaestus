@@ -11,11 +11,11 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A finding that contributed to a message")
-public record ReviewBoundFindingDTO(
-    @NonNull UUID findingId,
-    @NonNull @Schema(description = "Whether the finding leads the message or reinforces it") EvidenceRole role,
-    @NonNull @Schema(description = "Render order within the message (lower renders earlier)") Integer ordinal,
+@Schema(description = "An observation that contributed to a piece of feedback")
+public record ReviewBoundObservationDTO(
+    @NonNull UUID observationId,
+    @NonNull @Schema(description = "Whether the observation leads the feedback or reinforces it") EvidenceRole role,
+    @NonNull @Schema(description = "Render order within the feedback (lower renders earlier)") Integer ordinal,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
@@ -23,12 +23,12 @@ public record ReviewBoundFindingDTO(
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
+    @NonNull @Schema(description = "Observation confidence", minimum = "0", maximum = "1") Float confidence,
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt
 ) {
-    public static ReviewBoundFindingDTO from(BoundObservation row) {
-        return new ReviewBoundFindingDTO(
+    public static ReviewBoundObservationDTO from(BoundObservation row) {
+        return new ReviewBoundObservationDTO(
             row.getObservationId(),
             row.getRole(),
             row.getOrdinal(),

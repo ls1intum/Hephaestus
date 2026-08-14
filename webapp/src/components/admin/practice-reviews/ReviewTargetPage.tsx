@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { FileQuestionIcon } from "lucide-react";
 import {
 	listPracticeReviewFeedbackOptions,
-	listPracticeReviewFindingsOptions,
+	listPracticeReviewObservationsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import {
 	Empty,
@@ -36,7 +36,7 @@ export function ReviewTargetPage({
 		}),
 	});
 	const findingsQuery = useQuery({
-		...listPracticeReviewFindingsOptions({
+		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
 			query: { ...scope, size: 5 },
 		}),
@@ -62,7 +62,9 @@ export function ReviewTargetPage({
 							<FileQuestionIcon />
 						</EmptyMedia>
 						<EmptyTitle>No review output found</EmptyTitle>
-						<EmptyDescription>No findings or feedback are recorded for this work.</EmptyDescription>
+						<EmptyDescription>
+							No observations or feedback are recorded for this work.
+						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			) : (
@@ -78,7 +80,7 @@ export function ReviewTargetPage({
 								</h2>
 							)}
 							<p className="text-sm text-muted-foreground">
-								Findings and feedback recorded across reviews of this work.
+								Observations and feedback recorded across reviews of this work.
 							</p>
 						</div>
 						{artifact && <ReviewArtifactLink artifact={artifact} variant="label" display="full" />}

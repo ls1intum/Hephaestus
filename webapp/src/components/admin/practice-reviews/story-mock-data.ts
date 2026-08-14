@@ -2,8 +2,8 @@ import type {
 	ReviewArtifact,
 	ReviewFeedback,
 	ReviewFeedbackDetail,
-	ReviewFinding,
-	ReviewFindingDetail,
+	ReviewObservation,
+	ReviewObservationDetail,
 } from "@/api/types.gen";
 
 export const reviewArtifact: ReviewArtifact = {
@@ -28,7 +28,7 @@ export const reviewFeedback = [
 		createdAt: new Date("2026-07-28T13:42:00Z"),
 		deliveredAt: new Date("2026-07-28T13:43:00Z"),
 		deliveryState: "DELIVERED",
-		findingCount: 2,
+		observationCount: 2,
 		recipient: { id: 7, login: "ada", name: "Ada Lovelace" },
 		subject: { id: 7, login: "ada", name: "Ada Lovelace" },
 	},
@@ -42,7 +42,7 @@ export const reviewFeedback = [
 		channel: "IN_CONTEXT",
 		createdAt: new Date("2026-07-28T12:10:00Z"),
 		deliveryState: "SUPPRESSED",
-		findingCount: 1,
+		observationCount: 1,
 		recipient: { id: 9, login: "grace", name: "Grace Hopper" },
 		subject: { id: 9, login: "grace", name: "Grace Hopper" },
 		suppressionReason: "ARTIFACT_MERGED",
@@ -86,7 +86,7 @@ export const reviewFindings = [
 		subject: { id: 9, login: "grace", name: "Grace Hopper" },
 		title: "The route exposes an internal detection term",
 	},
-] satisfies [ReviewFinding, ReviewFinding];
+] satisfies [ReviewObservation, ReviewObservation];
 
 const suppressedFeedback = reviewFeedback[1];
 const improvementFinding = reviewFindings[1];
@@ -99,9 +99,9 @@ export const reviewFeedbackDetail: ReviewFeedbackDetail = {
 	channel: "IN_CONTEXT",
 	createdAt: suppressedFeedback.createdAt,
 	deliveryState: "SUPPRESSED",
-	findings: [
+	observations: [
 		{
-			findingId: improvementFinding.id,
+			observationId: improvementFinding.id,
 			area: improvementFinding.area,
 			assessment: "BAD",
 			claimCurrentness: "CURRENT",
@@ -122,7 +122,7 @@ export const reviewFeedbackDetail: ReviewFeedbackDetail = {
 	suppressionReason: "ARTIFACT_MERGED",
 };
 
-export const reviewFindingDetail: ReviewFindingDetail = {
+export const reviewFindingDetail: ReviewObservationDetail = {
 	id: improvementFinding.id,
 	agentJobId: improvementFinding.agentJobId,
 	artifact: reviewArtifact,

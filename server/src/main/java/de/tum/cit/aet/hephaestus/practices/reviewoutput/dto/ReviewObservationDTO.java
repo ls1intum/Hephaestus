@@ -13,21 +13,21 @@ import java.util.Map;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A practice review finding with its linked feedback outcomes")
-public record ReviewFindingDTO(
+@Schema(description = "A practice review observation with its linked feedback outcomes")
+public record ReviewObservationDTO(
     @NonNull UUID id,
     @NonNull UUID agentJobId,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
     @NonNull ReviewArtifactDTO artifact,
-    @Schema(description = "Whose work the finding is about; null when the identity is no longer resolvable")
+    @Schema(description = "Whose work the observation is about; null when the identity is no longer resolvable")
     ReviewSubjectDTO subject,
     @NonNull String title,
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
+    @NonNull @Schema(description = "Observation confidence", minimum = "0", maximum = "1") Float confidence,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
     @NonNull
     @Schema(
@@ -38,16 +38,16 @@ public record ReviewFindingDTO(
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt,
     @NonNull
-    @Schema(description = "Counts of linked messages by delivery state")
+    @Schema(description = "Counts of linked feedback by delivery state")
     ReviewFeedbackDispositionDTO feedbackDisposition
 ) {
-    public static ReviewFindingDTO from(
+    public static ReviewObservationDTO from(
         OperatorObservationRow row,
         ObservationFeedbackDisposition disposition,
         ReviewArtifactDTO artifact,
         Map<Long, ReviewSubjectDTO> subjects
     ) {
-        return new ReviewFindingDTO(
+        return new ReviewObservationDTO(
             row.getId(),
             row.getAgentJobId(),
             row.getPracticeSlug(),

@@ -36,7 +36,7 @@ public class PracticeReviewSummaryController {
 
     @GetMapping
     @Operation(
-        summary = "List practice reviews with finding and feedback outcomes",
+        summary = "List practice reviews with observation and feedback outcomes",
         description = "Results are ordered newest first.",
         operationId = "listPracticeReviews"
     )

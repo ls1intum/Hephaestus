@@ -27,7 +27,7 @@ const deliveredFeedbackDetail = {
 } satisfies ReviewFeedbackDetail;
 
 const meta = {
-	title: "Workspace admin/Practice reviews/Message details",
+	title: "Workspace admin/Practice reviews/Feedback details",
 	component: FeedbackDetailPage,
 	parameters: {
 		layout: "padded",
@@ -62,9 +62,9 @@ export const NotDelivered: Story = {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Not delivered")).toBeVisible();
 		await expect(
-			canvas.getByRole("link", { name: "View all findings and feedback for this work" }),
+			canvas.getByRole("link", { name: "View all observations and feedback for this work" }),
 		).toBeVisible();
-		await expect(canvas.getByText("This message was not posted.")).toBeVisible();
+		await expect(canvas.getByText("This feedback was not posted.")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -87,6 +87,6 @@ export const Delivered: Story = {
 		await expect(
 			canvas.getByText("server/src/main/java/ReviewController.java:42–44"),
 		).toBeVisible();
-		await expect(canvas.queryByText("This message was not posted.")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("This feedback was not posted.")).not.toBeInTheDocument();
 	},
 };

@@ -3,8 +3,8 @@ import type {
 	ReviewFeedback,
 	ReviewFeedbackCounts,
 	ReviewFeedbackDisposition,
-	ReviewFinding,
-	ReviewFindingCounts,
+	ReviewObservation,
+	ReviewObservationCounts,
 } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -16,7 +16,7 @@ import {
 	severityBadgeVariant,
 } from "./review-format";
 
-type NonCurrentClaimCurrentness = Exclude<ReviewFinding["claimCurrentness"], "CURRENT">;
+type NonCurrentClaimCurrentness = Exclude<ReviewObservation["claimCurrentness"], "CURRENT">;
 
 const CLAIM_CURRENTNESS_CONFIG = {
 	STALE: {
@@ -49,7 +49,7 @@ export function FeedbackStateBadge({ state }: { state: ReviewFeedback["deliveryS
 	return <Badge variant={deliveryStateBadgeVariant(state)}>{DELIVERY_STATE_LABELS[state]}</Badge>;
 }
 
-type FindingResult = Pick<ReviewFinding, "presence" | "assessment" | "severity">;
+type FindingResult = Pick<ReviewObservation, "presence" | "assessment" | "severity">;
 
 export function FindingResultBadge({ finding }: { finding: FindingResult }) {
 	if (finding.presence === "NOT_APPLICABLE") {
@@ -85,7 +85,7 @@ export function FindingResultBadge({ finding }: { finding: FindingResult }) {
  * than a random draw from the work, so reading them as though they were live is the mistake this
  * exists to prevent.
  */
-export function ObservationOriginBadge({ origin }: { origin: ReviewFinding["origin"] }) {
+export function ObservationOriginBadge({ origin }: { origin: ReviewObservation["origin"] }) {
 	if (origin === "LIVE") return null;
 	return (
 		<Badge variant="outline">
@@ -97,7 +97,7 @@ export function ObservationOriginBadge({ origin }: { origin: ReviewFinding["orig
 export function ClaimCurrentnessBadge({
 	currentness,
 }: {
-	currentness: ReviewFinding["claimCurrentness"];
+	currentness: ReviewObservation["claimCurrentness"];
 }) {
 	if (currentness === "CURRENT") return null;
 	const config = CLAIM_CURRENTNESS_CONFIG[currentness];
@@ -107,7 +107,7 @@ export function ClaimCurrentnessBadge({
 export function ClaimCurrentnessAlert({
 	currentness,
 }: {
-	currentness: ReviewFinding["claimCurrentness"];
+	currentness: ReviewObservation["claimCurrentness"];
 }) {
 	if (currentness === "CURRENT") return null;
 	const { Icon, title, description } = CLAIM_CURRENTNESS_CONFIG[currentness];
@@ -123,7 +123,7 @@ export function ClaimCurrentnessAlert({
 export function FindingFeedbackSummary({
 	disposition,
 }: {
-	disposition: ReviewFinding["feedbackDisposition"];
+	disposition: ReviewObservation["feedbackDisposition"];
 }) {
 	const summary = feedbackCountsLabel(disposition);
 	return (
@@ -154,7 +154,7 @@ export function FeedbackCountsSummary({ counts }: { counts: FeedbackCounts }) {
 	);
 }
 
-export function FindingCountsSummary({ counts }: { counts: ReviewFindingCounts }) {
+export function FindingCountsSummary({ counts }: { counts: ReviewObservationCounts }) {
 	const parts = [
 		counts.strengths > 0
 			? `${counts.strengths} ${counts.strengths === 1 ? "strength" : "strengths"}`
@@ -167,7 +167,7 @@ export function FindingCountsSummary({ counts }: { counts: ReviewFindingCounts }
 	].filter(Boolean);
 	return (
 		<p className="text-sm text-muted-foreground">
-			{parts.length > 0 ? parts.join(" · ") : "No findings"}
+			{parts.length > 0 ? parts.join(" · ") : "No observations"}
 		</p>
 	);
 }

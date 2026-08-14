@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
-import type { ReviewFinding } from "@/api/types.gen";
+import type { ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FindingResults } from "./FindingResults";
 import { reviewFindings } from "./story-mock-data";
@@ -10,7 +10,7 @@ const findingWithoutFeedback = {
 	id: "77777777-7777-7777-7777-777777777777",
 	feedbackDisposition: { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 0 },
 	title: "The finding was not selected for feedback",
-} satisfies ReviewFinding;
+} satisfies ReviewObservation;
 
 const longContentFinding = {
 	...reviewFindings[0],
@@ -22,7 +22,7 @@ const longContentFinding = {
 		login: "alexandria-occasional-contributor",
 		name: "Alexandria Catherine Montgomery-Worthington",
 	},
-} satisfies ReviewFinding;
+} satisfies ReviewObservation;
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Finding results",

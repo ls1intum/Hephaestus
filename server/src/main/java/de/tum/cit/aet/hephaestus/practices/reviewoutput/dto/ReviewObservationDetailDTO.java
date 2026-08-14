@@ -12,8 +12,8 @@ import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A finding with evidence and linked feedback")
-public record ReviewFindingDetailDTO(
+@Schema(description = "An observation with evidence and linked feedback")
+public record ReviewObservationDetailDTO(
     @NonNull UUID id,
     @NonNull UUID agentJobId,
     @NonNull String practiceSlug,
@@ -21,13 +21,13 @@ public record ReviewFindingDetailDTO(
     @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
     @Schema(description = "Criteria revision selected as of job start, when available") Long practiceRevisionId,
     @NonNull ReviewArtifactDTO artifact,
-    @Schema(description = "Whose work the finding is about; null when the identity is no longer resolvable")
+    @Schema(description = "Whose work the observation is about; null when the identity is no longer resolvable")
     ReviewSubjectDTO subject,
     @NonNull String title,
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Finding confidence", minimum = "0", maximum = "1") Float confidence,
+    @NonNull @Schema(description = "Observation confidence", minimum = "0", maximum = "1") Float confidence,
     ObservationEvidenceDTO evidence,
     String reasoning,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
@@ -35,7 +35,7 @@ public record ReviewFindingDetailDTO(
     @NonNull Instant observedAt,
     @NonNull @Schema(description = "Linked feedback, newest first") List<ReviewBoundFeedbackDTO> feedback
 ) {
-    public static ReviewFindingDetailDTO from(
+    public static ReviewObservationDetailDTO from(
         Observation observation,
         ReviewArtifactDTO artifact,
         ReviewSubjectDTO subject,
@@ -44,7 +44,7 @@ public record ReviewFindingDetailDTO(
     ) {
         var practice = observation.getPractice();
         var revision = observation.getPracticeRevision();
-        return new ReviewFindingDetailDTO(
+        return new ReviewObservationDetailDTO(
             observation.getId(),
             observation.getAgentJobId(),
             practice.getSlug(),

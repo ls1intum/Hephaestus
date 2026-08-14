@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.OperatorFeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewArtifactResolver.ArtifactRef;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundFindingDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundObservationDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewPlacementDTO;
@@ -74,10 +74,10 @@ class ReviewFeedbackQueryService {
         Feedback feedback = feedbackRepository
             .findByIdAndWorkspaceId(feedbackId, workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
-        List<ReviewBoundFindingDTO> findings = feedbackObservationRepository
+        List<ReviewBoundObservationDTO> observations = feedbackObservationRepository
             .findBoundObservations(workspaceId, feedbackId)
             .stream()
-            .map(ReviewBoundFindingDTO::from)
+            .map(ReviewBoundObservationDTO::from)
             .toList();
         List<ReviewPlacementDTO> placements = feedbackPlacementRepository
             .findByFeedbackIdInDisplayOrder(feedbackId)
@@ -98,7 +98,7 @@ class ReviewFeedbackQueryService {
             artifact,
             subjects.get(feedback.getRecipientUserId()),
             subjects.get(feedback.getAboutUserId()),
-            findings,
+            observations,
             placements
         );
     }

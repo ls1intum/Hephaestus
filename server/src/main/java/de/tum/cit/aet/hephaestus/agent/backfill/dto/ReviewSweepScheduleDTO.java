@@ -12,7 +12,7 @@ import org.jspecify.annotations.NonNull;
  * A standing instruction to review recent work on a cadence, as an admin sees it.
  *
  * @param lookbackDays how far back each sweep looks. Bounded at write time to twice the cadence and
- *     never more than a week, which is what keeps a sweep's findings admissible in the same trend line
+ *     never more than a week, which is what keeps a sweep's observations admissible in the same trend line
  *     as reviews that events triggered.
  * @param nextRunAt when the next sweep is due. Shown because it is the only way to tell a schedule that
  *     is working from one whose workspace has been skipping it.

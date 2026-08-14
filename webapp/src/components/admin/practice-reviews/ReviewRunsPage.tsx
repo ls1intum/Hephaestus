@@ -173,7 +173,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 
 function RunFindingSummary({ review }: { review: ReviewRunSummary }) {
 	if (review.status === "COMPLETED" || hasFindingOutput(review)) {
-		return <FindingCountsSummary counts={review.findings} />;
+		return <FindingCountsSummary counts={review.observations} />;
 	}
 	if (review.status === "QUEUED" || review.status === "RUNNING") {
 		return <span className="text-muted-foreground">Pending</span>;
@@ -181,7 +181,7 @@ function RunFindingSummary({ review }: { review: ReviewRunSummary }) {
 	return (
 		<span className="text-muted-foreground">
 			<span aria-hidden>—</span>
-			<span className="sr-only">No findings produced</span>
+			<span className="sr-only">No observations produced</span>
 		</span>
 	);
 }
@@ -202,7 +202,7 @@ function RunFeedbackSummary({ review }: { review: ReviewRunSummary }) {
 }
 
 function hasFindingOutput(review: ReviewRunSummary) {
-	const { strengths, problems, notApplicable, inconclusive } = review.findings;
+	const { strengths, problems, notApplicable, inconclusive } = review.observations;
 	return strengths + problems + notApplicable + inconclusive > 0;
 }
 
@@ -216,7 +216,7 @@ function RunCardOutputSummary({ review }: { review: ReviewRunSummary }) {
 	if (review.status === "COMPLETED" || hasOutput) {
 		return (
 			<>
-				<FindingCountsSummary counts={review.findings} />
+				<FindingCountsSummary counts={review.observations} />
 				<FeedbackCountsSummary counts={review.feedback} />
 			</>
 		);
@@ -245,7 +245,7 @@ function ReviewList({
 						<TableRow>
 							<TableHead scope="col">Reviewed work</TableHead>
 							<TableHead scope="col">Status</TableHead>
-							<TableHead scope="col">Findings</TableHead>
+							<TableHead scope="col">Observations</TableHead>
 							<TableHead scope="col">Feedback</TableHead>
 							<TableHead scope="col" className="w-32">
 								Created

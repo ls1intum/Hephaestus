@@ -25,8 +25,8 @@ const VIEWS = [
 	{
 		id: "findings",
 		to: "/w/$workspaceSlug/admin/practices/reviews/findings",
-		label: "Findings",
-		title: "Findings",
+		label: "Observations",
+		title: "Observations",
 		description: "Explore strengths and improvements, with evidence from reviewed work.",
 		icon: ScanSearch,
 	},
@@ -35,7 +35,8 @@ const VIEWS = [
 		to: "/w/$workspaceSlug/admin/practices/reviews/delivery",
 		label: "Delivery",
 		title: "Feedback delivery",
-		description: "See each message Hephaestus prepared and whether it reached its recipient.",
+		description:
+			"See each piece of feedback Hephaestus prepared and whether it reached its recipient.",
 		icon: MessageSquareText,
 	},
 ] as const;

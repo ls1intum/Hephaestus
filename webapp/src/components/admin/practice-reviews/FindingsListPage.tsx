@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect } from "react";
 import {
 	listAreasOptions,
-	listPracticeReviewFindingsOptions,
+	listPracticeReviewObservationsOptions,
 	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
@@ -45,7 +45,7 @@ export interface FindingsListPageProps {
 
 export function FindingsListPage({ workspaceSlug, search, onSearchChange }: FindingsListPageProps) {
 	const findingsQueryResult = useQuery({
-		...listPracticeReviewFindingsOptions({
+		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
 			query: findingsQuery(search, PAGE_SIZE),
 		}),
@@ -101,14 +101,14 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 	}, [onSearchChange, search.page, totalPages]);
 
 	return (
-		<section aria-label="Practice review findings" className="space-y-4">
+		<section aria-label="Practice review observations" className="space-y-4">
 			<FilterToolbar
 				hasFilter={hasFilter}
 				onReset={reset}
 				actions={
 					<ResultCount
 						total={findingsQueryResult.data?.page?.totalElements}
-						noun={["finding", "findings"]}
+						noun={["observation", "observations"]}
 						hasFilter={hasFilter}
 					/>
 				}
@@ -189,7 +189,7 @@ export function FindingsListPage({ workspaceSlug, search, onSearchChange }: Find
 			{findingsQueryResult.isError ? (
 				<QueryErrorAlert
 					error={findingsQueryResult.error}
-					title="Couldn't load findings"
+					title="Couldn't load observations"
 					onRetry={() => findingsQueryResult.refetch()}
 				/>
 			) : (

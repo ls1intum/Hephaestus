@@ -43,7 +43,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findByText(`${reviewFeedback.length} messages.`)).toBeVisible();
+		await expect(
+			await canvas.findByText(`${reviewFeedback.length} pieces of feedback.`),
+		).toBeVisible();
 	},
 };
 
@@ -54,7 +56,7 @@ export const Mobile: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		await expect(
-			await within(canvasElement).findByText(`${reviewFeedback.length} messages.`),
+			await within(canvasElement).findByText(`${reviewFeedback.length} pieces of feedback.`),
 		).toBeVisible();
 		await expectNoPageOverflow();
 	},

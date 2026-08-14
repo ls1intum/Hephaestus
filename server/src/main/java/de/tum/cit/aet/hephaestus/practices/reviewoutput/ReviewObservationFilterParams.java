@@ -17,7 +17,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.server.ResponseStatusException;
 
-public record ReviewFindingFilterParams(
+public record ReviewObservationFilterParams(
     @RequestParam(required = false) @Nullable List<String> practiceSlug,
     @RequestParam(required = false) @Nullable List<String> areaSlug,
     @RequestParam(required = false) @Nullable List<Presence> presence,
@@ -40,8 +40,8 @@ public record ReviewFindingFilterParams(
     Long artifactId,
     @RequestParam(required = false) @Positive @Nullable Long subjectUserId,
     /**
-     * What occasioned the measurement. Without it this surface cannot separate a campaign's findings from
-     * live ones — a population-mixing hazard in exactly the place an operator judges whether a campaign was
+     * What occasioned the measurement. Without it this surface cannot separate a campaign's observations
+     * from live ones — a population-mixing hazard in exactly the place an operator judges whether a campaign was
      * worth what it cost.
      */
     @Parameter(description = "What occasioned the measurement: LIVE, MANUAL or BACKFILL")

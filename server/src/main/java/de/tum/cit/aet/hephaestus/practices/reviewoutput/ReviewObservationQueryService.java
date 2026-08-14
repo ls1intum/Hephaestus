@@ -12,8 +12,8 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.Ope
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.ReviewArtifactResolver.ArtifactRef;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewArtifactDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewBoundFeedbackDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFindingDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFindingDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewSubjectDTO;
 import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import java.util.List;
@@ -29,7 +29,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
-class ReviewFindingQueryService {
+class ReviewObservationQueryService {
 
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
@@ -38,16 +38,16 @@ class ReviewFindingQueryService {
     private final EvidenceAuthorization evidenceAuthorization;
 
     @Transactional(readOnly = true)
-    Page<ReviewFindingDTO> list(
+    Page<ReviewObservationDTO> list(
         Long workspaceId,
         ObservationQueryFilter filter,
-        ReviewFindingSort sort,
+        ReviewObservationSort sort,
         Pageable pageable
     ) {
         Page<OperatorObservationRow> rows = observationRepository.findForWorkspace(
             workspaceId,
             filter,
-            sort == ReviewFindingSort.ACTIONABILITY,
+            sort == ReviewObservationSort.ACTIONABILITY,
             pageable
         );
         Map<Long, ReviewSubjectDTO> subjects = subjectResolver.resolve(
@@ -78,17 +78,17 @@ class ReviewFindingQueryService {
                 ArtifactKind.of(row.getArtifactKind()),
                 row.getArtifactId()
             );
-            return ReviewFindingDTO.from(row, dispositions.get(row.getId()), artifacts.get(key), subjects);
+            return ReviewObservationDTO.from(row, dispositions.get(row.getId()), artifacts.get(key), subjects);
         });
     }
 
     @Transactional(readOnly = true)
-    ReviewFindingDetailDTO get(Long workspaceId, UUID findingId) {
+    ReviewObservationDetailDTO get(Long workspaceId, UUID observationId) {
         Observation observation = observationRepository
-            .findByIdAndWorkspaceId(findingId, workspaceId)
-            .orElseThrow(() -> new EntityNotFoundException("Finding", findingId.toString()));
+            .findByIdAndWorkspaceId(observationId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Observation", observationId.toString()));
         List<ReviewBoundFeedbackDTO> feedback = feedbackObservationRepository
-            .findBoundFeedbackUnits(workspaceId, findingId)
+            .findBoundFeedbackUnits(workspaceId, observationId)
             .stream()
             .map(ReviewBoundFeedbackDTO::from)
             .toList();
@@ -106,6 +106,6 @@ class ReviewFindingQueryService {
             observation,
             SourceUsePurpose.OPERATOR_EVIDENCE_REVIEW
         );
-        return ReviewFindingDetailDTO.from(observation, artifact, subject, feedback, includeEvidence);
+        return ReviewObservationDetailDTO.from(observation, artifact, subject, feedback, includeEvidence);
     }
 }

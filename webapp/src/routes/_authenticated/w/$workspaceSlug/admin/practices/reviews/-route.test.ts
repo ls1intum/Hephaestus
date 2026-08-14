@@ -42,8 +42,11 @@ describe("practice review routes", () => {
 	it.each([
 		["Reviews", "/w/acme/admin/practices/reviews"],
 		["Reviews", "/w/acme/admin/practices/reviews/11111111-1111-1111-1111-111111111111"],
-		["Findings", "/w/acme/admin/practices/reviews/findings"],
-		["Findings", "/w/acme/admin/practices/reviews/findings/55555555-5555-5555-5555-555555555555"],
+		["Observations", "/w/acme/admin/practices/reviews/findings"],
+		[
+			"Observations",
+			"/w/acme/admin/practices/reviews/findings/55555555-5555-5555-5555-555555555555",
+		],
 		["Delivery", "/w/acme/admin/practices/reviews/delivery"],
 		["Delivery", "/w/acme/admin/practices/reviews/delivery/33333333-3333-3333-3333-333333333333"],
 	])("marks only %s as current on %s", async (expectedCurrent, url) => {
@@ -76,7 +79,7 @@ describe("practice review routes", () => {
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
 				HttpResponse.json(emptyPage),
 			),
-			http.get("*/workspaces/:workspaceSlug/practices/reviews/findings", () =>
+			http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", () =>
 				HttpResponse.json(emptyPage),
 			),
 		);

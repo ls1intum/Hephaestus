@@ -13,21 +13,21 @@ import org.jspecify.annotations.NonNull;
 public record ReviewFeedbackDTO(
     @NonNull UUID id,
     @NonNull UUID agentJobId,
-    @Schema(description = "Work item the message targets; null for an unanchored message") ReviewArtifactDTO artifact,
-    @Schema(description = "Who the message is addressed to; null when the identity is no longer resolvable")
+    @Schema(description = "Work item the feedback targets; null when it is unanchored") ReviewArtifactDTO artifact,
+    @Schema(description = "Who the feedback is addressed to; null when the identity is no longer resolvable")
     ReviewSubjectDTO recipient,
-    @Schema(description = "Whose work the message addresses; may equal the recipient") ReviewSubjectDTO subject,
+    @Schema(description = "Whose work the feedback addresses; may equal the recipient") ReviewSubjectDTO subject,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,
-    @Schema(description = "Why the message was withheld; null unless the state is SUPPRESSED")
+    @Schema(description = "Why the feedback was withheld; null unless the state is SUPPRESSED")
     FeedbackSuppressionReason suppressionReason,
-    @Schema(description = "The message this one replaced; null on a first delivery") UUID replacesId,
+    @Schema(description = "The feedback this one replaced; null on a first delivery") UUID replacesId,
     @NonNull Instant createdAt,
-    @Schema(description = "When the message was placed; null if it was not delivered") Instant deliveredAt,
-    @Schema(description = "Leading characters of the composed body; null when the message carries no body")
+    @Schema(description = "When the feedback was placed; null if it was not delivered") Instant deliveredAt,
+    @Schema(description = "Leading characters of the composed body; null when the feedback carries no body")
     String bodyPreview,
     @Schema(requiredMode = Schema.RequiredMode.REQUIRED) boolean bodyTruncated,
-    @NonNull @Schema(description = "Number of findings used to compose the message") Long findingCount
+    @NonNull @Schema(description = "Number of observations used to compose the feedback") Long observationCount
 ) {
     public static ReviewFeedbackDTO from(
         OperatorFeedbackRow row,

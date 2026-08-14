@@ -16,20 +16,20 @@ import io.swagger.v3.oas.annotations.media.Schema;
  */
 @Schema(description = "Reaction engagement for a developer, split into the response (uptake) and validity axes")
 public record ReactionEngagementDTO(
-    // --- RESPONSE axis (uptake): the findings the developer engaged with as feedback ---
+    // --- RESPONSE axis (uptake): the observations the developer engaged with as feedback ---
     @Schema(
-        description = "RESPONSE: findings the developer acted on (the recipience act, not the outcome)",
+        description = "RESPONSE: observations the developer acted on (the recipience act, not the outcome)",
         requiredMode = Schema.RequiredMode.REQUIRED
     )
     long addressed,
     @Schema(
-        description = "RESPONSE: findings the developer rejected with a reasoned explanation",
+        description = "RESPONSE: observations the developer rejected with a reasoned explanation",
         requiredMode = Schema.RequiredMode.REQUIRED
     )
     long disputed,
     // --- VALIDITY axis (scope signal): NOT part of any uptake ratio ---
     @Schema(
-        description = "VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count",
+        description = "VALIDITY: observations marked out-of-scope — a detector-scope signal, NOT an uptake count",
         requiredMode = Schema.RequiredMode.REQUIRED
     )
     long notApplicable

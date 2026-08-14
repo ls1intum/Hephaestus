@@ -14,7 +14,7 @@ const meta = {
 		chromatic: { viewports: [320, 768, 1440] },
 		msw: {
 			handlers: [
-				http.get("*/workspaces/:workspaceSlug/practices/reviews/findings/:findingId", () =>
+				http.get("*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId", () =>
 					HttpResponse.json(reviewFindingDetail),
 				),
 			],

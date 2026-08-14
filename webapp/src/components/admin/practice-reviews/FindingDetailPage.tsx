@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { InfoIcon, MessageSquareTextIcon } from "lucide-react";
-import { getPracticeReviewFindingOptions } from "@/api/@tanstack/react-query.gen";
+import { getPracticeReviewObservationOptions } from "@/api/@tanstack/react-query.gen";
 import { DetailRow } from "@/components/common/DetailRow";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -40,13 +40,15 @@ export interface FindingDetailPageProps {
 
 export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingDetailPageProps) {
 	const query = useQuery({
-		...getPracticeReviewFindingOptions({ path: { workspaceSlug, findingId } }),
+		...getPracticeReviewObservationOptions({
+			path: { workspaceSlug, observationId: findingId },
+		}),
 	});
 	const breadcrumbs = (
 		<ReviewBreadcrumbs
 			workspaceSlug={workspaceSlug}
 			section={{
-				label: "Findings",
+				label: "Observations",
 				link: (
 					<Link
 						to="/w/$workspaceSlug/admin/practices/reviews/findings"
@@ -55,7 +57,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 					/>
 				),
 			}}
-			current="Finding"
+			current="Observation"
 		/>
 	);
 
@@ -74,7 +76,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 				{breadcrumbs}
 				<QueryErrorAlert
 					error={query.error}
-					title="Couldn't load this finding"
+					title="Couldn't load this observation"
 					onRetry={() => query.refetch()}
 				/>
 			</article>
@@ -114,7 +116,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 									artifactId: String(finding.artifact.id),
 								}}
 							>
-								View all findings and feedback for this work
+								View all observations and feedback for this work
 							</Link>
 						)}
 					</div>
@@ -124,8 +126,8 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 
 			<Alert>
 				<InfoIcon />
-				<AlertTitle>AI-generated finding</AlertTitle>
-				<AlertDescription>Verify this finding against the evidence.</AlertDescription>
+				<AlertTitle>AI-generated observation</AlertTitle>
+				<AlertDescription>Verify this observation against the evidence.</AlertDescription>
 			</Alert>
 			{finding.reasoning && (
 				<section aria-labelledby="review-heading" className="space-y-2">
@@ -145,7 +147,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 			<section aria-labelledby="created-feedback-heading" className="space-y-3">
 				<div>
 					<h3 id="created-feedback-heading" className="text-lg font-semibold">
-						Feedback created from this finding
+						Feedback created from this observation
 					</h3>
 				</div>
 				{finding.feedback.length === 0 ? (
@@ -185,7 +187,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 									</ItemContent>
 									<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
 										<Badge variant="outline">
-											{feedback.role === "PRIMARY" ? "Main finding" : "Supporting finding"}
+											{feedback.role === "PRIMARY" ? "Main observation" : "Supporting observation"}
 										</Badge>
 										<FeedbackStateBadge state={feedback.deliveryState} />
 									</ItemFooter>
@@ -198,7 +200,7 @@ export function FindingDetailPage({ workspaceSlug, findingId, search }: FindingD
 
 			<ReviewTechnicalDetails>
 				<dl className="divide-y">
-					<DetailRow label="Finding ID">
+					<DetailRow label="Observation ID">
 						<code>{finding.id}</code>
 					</DetailRow>
 					<DetailRow label="Review">

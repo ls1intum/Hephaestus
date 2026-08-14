@@ -14,7 +14,7 @@ const handlers = (feedback: unknown[] = reviewFeedback, findings: unknown[] = re
 	http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
 		HttpResponse.json(page(feedback)),
 	),
-	http.get("*/workspaces/:workspaceSlug/practices/reviews/findings", () =>
+	http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", () =>
 		HttpResponse.json(page(findings)),
 	),
 ];
@@ -68,7 +68,7 @@ export const FindingsFailed: Story = {
 					HttpResponse.json(page(reviewFeedback)),
 				),
 				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/findings",
+					"*/workspaces/:workspaceSlug/practices/reviews/observations",
 					() => new HttpResponse(null, { status: 500 }),
 				),
 			],
@@ -77,7 +77,7 @@ export const FindingsFailed: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByRole("heading", { name: reviewArtifact.title })).toBeVisible();
-		await expect(await canvas.findByText("Couldn't load findings")).toBeVisible();
+		await expect(await canvas.findByText("Couldn't load observations")).toBeVisible();
 		await expect(await canvas.findByText(reviewFeedback[0].bodyPreview)).toBeVisible();
 	},
 };

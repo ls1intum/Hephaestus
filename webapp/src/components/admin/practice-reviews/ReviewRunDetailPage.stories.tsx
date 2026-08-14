@@ -32,7 +32,7 @@ const handlers = (
 	http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback", () =>
 		HttpResponse.json(page(feedback)),
 	),
-	http.get("*/workspaces/:workspaceSlug/practices/reviews/findings", ({ request }) => {
+	http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", ({ request }) => {
 		if (new URL(request.url).searchParams.get("sort") !== "ACTIONABILITY") {
 			return HttpResponse.json({ detail: "Expected actionability order" }, { status: 400 });
 		}
@@ -69,7 +69,7 @@ export const CompletedWithMixedOutput: Story = {
 		await expect(canvas.getByText("Summary comment: Delivered")).toBeVisible();
 		await expect(await canvas.findByText(reviewFeedback[0].bodyPreview)).toBeVisible();
 		await expect(await canvas.findByText(reviewFindings[1].title)).toBeVisible();
-		await expect(canvas.getByRole("link", { name: "View all 30 findings" })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: "View all 30 observations" })).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -101,8 +101,8 @@ export const DeclinedForInsufficientEvidence: Story = {
 		await waitFor(async () =>
 			expect(await canvas.findAllByText("Nothing was assessed")).toHaveLength(2),
 		);
-		await expect(canvas.queryByText("No findings were recorded")).toBeNull();
-		await expect(canvas.queryByText("No messages")).toBeNull();
+		await expect(canvas.queryByText("No observations were recorded")).toBeNull();
+		await expect(canvas.queryByText("No feedback")).toBeNull();
 		await expect(
 			await canvas.findAllByText(/required evidence was missing, unreadable, out of date/),
 		).not.toHaveLength(0);
@@ -119,13 +119,13 @@ export const InProgressWithoutOutput: Story = {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Running")).toBeVisible();
 		await expect(
-			await canvas.findByText("Findings will appear when the review finishes."),
+			await canvas.findByText("Observations will appear when the review finishes."),
 		).toBeVisible();
 		await expect(
 			await canvas.findByText("Feedback will appear when the review finishes."),
 		).toBeVisible();
-		await expect(canvas.queryByText("No findings were recorded")).not.toBeInTheDocument();
-		await expect(canvas.queryByText("No messages")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("No observations were recorded")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("No feedback")).not.toBeInTheDocument();
 	},
 };
 
@@ -139,7 +139,7 @@ export const FailedWithoutOutput: Story = {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review couldn't be completed")).toBeVisible();
 		await expect(
-			await canvas.findByText("This review ended before it produced findings or feedback."),
+			await canvas.findByText("This review ended before it produced observations or feedback."),
 		).toBeVisible();
 		await expect(canvas.queryByText(rawFailure)).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: "Technical details" }));

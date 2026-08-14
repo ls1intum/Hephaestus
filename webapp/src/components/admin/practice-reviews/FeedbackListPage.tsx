@@ -95,7 +95,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 				actions={
 					<ResultCount
 						total={query.data?.page?.totalElements}
-						noun={["message", "messages"]}
+						noun={["piece of feedback", "pieces of feedback"]}
 						hasFilter={hasFilter}
 					/>
 				}

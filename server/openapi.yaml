@@ -70,9 +70,6 @@ tags:
   name: Outline collections
 - description: Team management within workspace
   name: Teams
-- description: "Workspace-admin access to review runs, findings, and message delivery\
-    \ history"
-  name: Practice reviews
 - description: The starting catalog copied into new workspaces
   name: Admin Practice Catalog
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
@@ -105,6 +102,9 @@ tags:
   name: Admin LLM
 - description: Up/down votes on mentor assistant messages
   name: Mentor Votes
+- description: "Workspace-admin access to review runs, observations, and feedback\
+    \ delivery history"
+  name: Practice reviews
 - description: Public JWK set for verifying Hephaestus session JWTs
   name: Auth discovery
 - description: GDPR Art. 20 self-service data export
@@ -4706,8 +4706,8 @@ paths:
       description: "Per-practice cards a developer can READ — why the practice matters,\
         \ what good looks like, where they stand, the specific feedback to act on,\
         \ and what they already do well. The third feedback channel alongside in-context\
-        \ SCM notes and the conversational mentor; the same findings reorganised by\
-        \ practice for self-paced reflection, not a scoreboard of counts."
+        \ SCM notes and the conversational mentor; the same observations reorganised\
+        \ by practice for self-paced reflection, not a scoreboard of counts."
       operationId: getReflection
       parameters:
       - description: Workspace slug
@@ -4999,7 +4999,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Invalid filter or pagination
-      summary: List practice reviews with finding and feedback outcomes
+      summary: List practice reviews with observation and feedback outcomes
       tags:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes:
@@ -5150,7 +5150,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PagedModelReviewFeedback"
-          description: Paginated messages returned
+          description: Paginated feedback returned
         "400":
           content:
             application/problem+json:
@@ -5183,21 +5183,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewFeedbackDetail"
-          description: Message details returned
+          description: Feedback detail returned
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Feedback not found in this workspace
-      summary: "Get feedback with its stored body, findings and placements"
+      summary: "Get feedback with its stored body, observations and placements"
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/findings:
+  /workspaces/{workspaceSlug}/practices/reviews/observations:
     get:
       description: Results include linked feedback outcomes and are ordered newest
         first by default.
-      operationId: listPracticeReviewFindings
+      operationId: listPracticeReviewObservations
       parameters:
       - description: Workspace slug
         in: path
@@ -5224,7 +5224,7 @@ paths:
           maximum: 100
           minimum: 1
       - description: "Sorting strategy. ACTIONABILITY orders problems from CRITICAL\
-          \ to INFO, then strengths, then not-applicable findings; ties are newest\
+          \ to INFO, then strengths, then not-applicable observations; ties are newest\
           \ first."
         in: query
         name: sort
@@ -5341,20 +5341,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewFinding"
-          description: Paginated findings returned
+                $ref: "#/components/schemas/PagedModelReviewObservation"
+          description: Paginated observations returned
         "400":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Invalid filter or pagination
-      summary: List practice review findings across the workspace
+      summary: List practice review observations across the workspace
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}:
+  /workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}:
     get:
-      operationId: getPracticeReviewFinding
+      operationId: getPracticeReviewObservation
       parameters:
       - description: Workspace slug
         in: path
@@ -5364,7 +5364,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: findingId
+        name: observationId
         required: true
         schema:
           type: string
@@ -5374,15 +5374,15 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ReviewFindingDetail"
-          description: Finding detail returned
+                $ref: "#/components/schemas/ReviewObservationDetail"
+          description: Observation detail returned
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Finding not found in this workspace
-      summary: Get a finding with its evidence and linked feedback
+          description: Observation not found in this workspace
+      summary: Get an observation with its evidence and linked feedback
       tags:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/sweep-schedules:
@@ -7332,9 +7332,9 @@ components:
           description: Number of retry attempts
         reviewOutcome:
           type: string
-          description: "Why a COMPLETED run produced the findings it did. INSUFFICIENT_EVIDENCE\
+          description: "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE\
             \ means no model ran because required evidence was missing, unreadable,\
-            \ stale, or unauthorized — so no findings means nothing was assessed,\
+            \ stale, or unauthorized — so no observations means nothing was assessed,\
             \ not that nothing was wrong. REVIEWED means the model ran against sufficient\
             \ evidence."
           enum:
@@ -9798,7 +9798,8 @@ components:
           - BAD
         claimCurrentness:
           type: string
-          description: Whether a finding was produced using the current review rules
+          description: Whether an observation was produced using the current review
+            rules
           enum:
           - CURRENT
           - STALE
@@ -9901,7 +9902,8 @@ components:
           - BAD
         claimCurrentness:
           type: string
-          description: Whether a finding was produced using the current review rules
+          description: Whether an observation was produced using the current review
+            rules
           enum:
           - CURRENT
           - STALE
@@ -10294,13 +10296,13 @@ components:
             $ref: "#/components/schemas/ReviewFeedback"
         page:
           $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewFinding:
+    PagedModelReviewObservation:
       type: object
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/ReviewFinding"
+            $ref: "#/components/schemas/ReviewObservation"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewRunSummary:
@@ -11423,17 +11425,17 @@ components:
         addressed:
           type: integer
           format: int64
-          description: "RESPONSE: findings the developer acted on (the recipience\
+          description: "RESPONSE: observations the developer acted on (the recipience\
             \ act, not the outcome)"
         disputed:
           type: integer
           format: int64
-          description: "RESPONSE: findings the developer rejected with a reasoned\
+          description: "RESPONSE: observations the developer rejected with a reasoned\
             \ explanation"
         notApplicable:
           type: integer
           format: int64
-          description: "VALIDITY: findings marked out-of-scope — a detector-scope\
+          description: "VALIDITY: observations marked out-of-scope — a detector-scope\
             \ signal, NOT an uptake count"
       required:
       - addressed
@@ -11815,7 +11817,7 @@ components:
       - toAt
     ReviewBoundFeedback:
       type: object
-      description: A message composed from a finding
+      description: Feedback composed from an observation
       properties:
         agentJobId:
           type: string
@@ -11846,7 +11848,7 @@ components:
           format: uuid
         role:
           type: string
-          description: Whether the finding led the message or reinforced it
+          description: Whether the observation led the feedback or reinforced it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -11875,9 +11877,9 @@ components:
       - deliveryState
       - feedbackId
       - role
-    ReviewBoundFinding:
+    ReviewBoundObservation:
       type: object
-      description: A finding that contributed to a message
+      description: An observation that contributed to a piece of feedback
       properties:
         area:
           $ref: "#/components/schemas/ReviewPracticeArea"
@@ -11890,7 +11892,8 @@ components:
           - BAD
         claimCurrentness:
           type: string
-          description: Whether a finding was produced using the current review rules
+          description: Whether an observation was produced using the current review
+            rules
           enum:
           - CURRENT
           - STALE
@@ -11898,10 +11901,10 @@ components:
         confidence:
           type: number
           format: float
-          description: Finding confidence
+          description: Observation confidence
           maximum: 1
           minimum: 0
-        findingId:
+        observationId:
           type: string
           format: uuid
         observedAt:
@@ -11910,7 +11913,7 @@ components:
         ordinal:
           type: integer
           format: int32
-          description: Render order within the message (lower renders earlier)
+          description: Render order within the feedback (lower renders earlier)
         practiceName:
           type: string
         practiceSlug:
@@ -11924,7 +11927,7 @@ components:
           - INCONCLUSIVE
         role:
           type: string
-          description: Whether the finding leads the message or reinforces it
+          description: Whether the observation leads the feedback or reinforces it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -11941,7 +11944,7 @@ components:
       required:
       - claimCurrentness
       - confidence
-      - findingId
+      - observationId
       - observedAt
       - ordinal
       - practiceName
@@ -11957,10 +11960,10 @@ components:
           format: uuid
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
-          description: Work item the message targets; null for an unanchored message
+          description: Work item the feedback targets; null when it is unanchored
         bodyPreview:
           type: string
-          description: Leading characters of the composed body; null when the message
+          description: Leading characters of the composed body; null when the feedback
             carries no body
         bodyTruncated:
           type: boolean
@@ -11976,7 +11979,7 @@ components:
         deliveredAt:
           type: string
           format: date-time
-          description: When the message was placed; null if it was not delivered
+          description: When the feedback was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -11985,27 +11988,27 @@ components:
           - SUPERSEDED
           - SUPPRESSED
           - FAILED
-        findingCount:
-          type: integer
-          format: int64
-          description: Number of findings used to compose the message
         id:
           type: string
           format: uuid
+        observationCount:
+          type: integer
+          format: int64
+          description: Number of observations used to compose the feedback
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Who the message is addressed to; null when the identity is
+          description: Who the feedback is addressed to; null when the identity is
             no longer resolvable
         replacesId:
           type: string
           format: uuid
-          description: The message this one replaced; null on a first delivery
+          description: The feedback this one replaced; null on a first delivery
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the message addresses; may equal the recipient
+          description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why the feedback was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -12027,8 +12030,8 @@ components:
       - channel
       - createdAt
       - deliveryState
-      - findingCount
       - id
+      - observationCount
     ReviewFeedbackCounts:
       type: object
       description: Counts of feedback by delivery state
@@ -12063,7 +12066,7 @@ components:
           format: uuid
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
-          description: Work item the message targets; null for an unanchored message
+          description: Work item the feedback targets; null when it is unanchored
         body:
           type: string
           description: Stored composed body; null when none was produced
@@ -12079,7 +12082,7 @@ components:
         deliveredAt:
           type: string
           format: date-time
-          description: When the message was placed; null if it was not delivered
+          description: When the feedback was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -12088,14 +12091,14 @@ components:
           - SUPERSEDED
           - SUPPRESSED
           - FAILED
-        findings:
-          type: array
-          description: Source findings in render order
-          items:
-            $ref: "#/components/schemas/ReviewBoundFinding"
         id:
           type: string
           format: uuid
+        observations:
+          type: array
+          description: Source observations in render order
+          items:
+            $ref: "#/components/schemas/ReviewBoundObservation"
         placements:
           type: array
           description: Recorded placements; empty when none
@@ -12103,18 +12106,18 @@ components:
             $ref: "#/components/schemas/ReviewPlacement"
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Who the message is addressed to; null when the identity is
+          description: Who the feedback is addressed to; null when the identity is
             no longer resolvable
         replacesId:
           type: string
           format: uuid
-          description: The message this one replaced; null on a first delivery
+          description: The feedback this one replaced; null on a first delivery
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the message addresses; may equal the recipient
+          description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why the feedback was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -12138,8 +12141,8 @@ components:
       - channel
       - createdAt
       - deliveryState
-      - findings
       - id
+      - observations
       - placements
     ReviewFeedbackDisposition:
       type: object
@@ -12148,32 +12151,32 @@ components:
         delivered:
           type: integer
           format: int64
-          description: Linked messages delivered
+          description: Linked feedback delivered
         failed:
           type: integer
           format: int64
-          description: Linked messages whose delivery failed
+          description: Linked feedback whose delivery failed
         prepared:
           type: integer
           format: int64
-          description: Linked messages awaiting delivery
+          description: Linked feedback awaiting delivery
         superseded:
           type: integer
           format: int64
-          description: Linked messages delivered and later replaced
+          description: Linked feedback delivered and later replaced
         suppressed:
           type: integer
           format: int64
-          description: Linked messages withheld by policy
+          description: Linked feedback withheld by policy
       required:
       - delivered
       - failed
       - prepared
       - superseded
       - suppressed
-    ReviewFinding:
+    ReviewObservation:
       type: object
-      description: A practice review finding with its linked feedback outcomes
+      description: A practice review observation with its linked feedback outcomes
       properties:
         agentJobId:
           type: string
@@ -12191,7 +12194,8 @@ components:
           - BAD
         claimCurrentness:
           type: string
-          description: Whether a finding was produced using the current review rules
+          description: Whether an observation was produced using the current review
+            rules
           enum:
           - CURRENT
           - STALE
@@ -12199,12 +12203,12 @@ components:
         confidence:
           type: number
           format: float
-          description: Finding confidence
+          description: Observation confidence
           maximum: 1
           minimum: 0
         feedbackDisposition:
           $ref: "#/components/schemas/ReviewFeedbackDisposition"
-          description: Counts of linked messages by delivery state
+          description: Counts of linked feedback by delivery state
         id:
           type: string
           format: uuid
@@ -12244,8 +12248,8 @@ components:
           - INFO
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the finding is about; null when the identity is
-            no longer resolvable
+          description: Whose work the observation is about; null when the identity
+            is no longer resolvable
         title:
           type: string
       required:
@@ -12261,9 +12265,9 @@ components:
       - practiceSlug
       - presence
       - title
-    ReviewFindingCounts:
+    ReviewObservationCounts:
       type: object
-      description: Counts of findings by assessment
+      description: Counts of observations by assessment
       properties:
         inconclusive:
           type: integer
@@ -12286,9 +12290,9 @@ components:
       - notApplicable
       - problems
       - strengths
-    ReviewFindingDetail:
+    ReviewObservationDetail:
       type: object
-      description: A finding with evidence and linked feedback
+      description: An observation with evidence and linked feedback
       properties:
         agentJobId:
           type: string
@@ -12306,7 +12310,8 @@ components:
           - BAD
         claimCurrentness:
           type: string
-          description: Whether a finding was produced using the current review rules
+          description: Whether an observation was produced using the current review
+            rules
           enum:
           - CURRENT
           - STALE
@@ -12314,7 +12319,7 @@ components:
         confidence:
           type: number
           format: float
-          description: Finding confidence
+          description: Observation confidence
           maximum: 1
           minimum: 0
         evidence:
@@ -12360,8 +12365,8 @@ components:
           - INFO
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the finding is about; null when the identity is
-            no longer resolvable
+          description: Whose work the observation is about; null when the identity
+            is no longer resolvable
         title:
           type: string
       required:
@@ -12485,18 +12490,18 @@ components:
       - status
     ReviewRunSummary:
       type: object
-      description: A review run with finding and feedback outcome counts
+      description: A review run with observation and feedback outcome counts
       properties:
         createdAt:
           type: string
           format: date-time
         feedback:
           $ref: "#/components/schemas/ReviewFeedbackCounts"
-        findings:
-          $ref: "#/components/schemas/ReviewFindingCounts"
         id:
           type: string
           format: uuid
+        observations:
+          $ref: "#/components/schemas/ReviewObservationCounts"
         status:
           type: string
           enum:
@@ -12511,8 +12516,8 @@ components:
       required:
       - createdAt
       - feedback
-      - findings
       - id
+      - observations
       - status
       - target
     ReviewRunTarget:
@@ -12597,7 +12602,7 @@ components:
           format: int32
           description: |-
             how far back each sweep looks. Bounded at write time to twice the cadence and
-                 never more than a week, which is what keeps a sweep's findings admissible in the same trend line
+                 never more than a week, which is what keeps a sweep's observations admissible in the same trend line
                  as reviews that events triggered.
         nextRunAt:
           type: string

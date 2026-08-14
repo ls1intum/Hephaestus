@@ -14,7 +14,7 @@ const meta = {
 		chromatic: { viewports: [320, 768, 1440] },
 		msw: {
 			handlers: [
-				http.get("*/workspaces/:workspaceSlug/practices/reviews/findings", () =>
+				http.get("*/workspaces/:workspaceSlug/practices/reviews/observations", () =>
 					HttpResponse.json({
 						content: reviewFindings,
 						page: {
@@ -71,7 +71,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		await expect(await canvas.findByText(`${reviewFindings.length} findings.`)).toBeVisible();
+		await expect(await canvas.findByText(`${reviewFindings.length} observations.`)).toBeVisible();
 		for (const name of ["Area", "Practice", "Result"]) {
 			await expect(canvas.getByRole("combobox", { name })).toBeVisible();
 		}
@@ -99,7 +99,7 @@ export const Mobile: Story = {
 	},
 	play: async ({ canvasElement }) => {
 		await expect(
-			await within(canvasElement).findByText(`${reviewFindings.length} findings.`),
+			await within(canvasElement).findByText(`${reviewFindings.length} observations.`),
 		).toBeVisible();
 		await expectNoPageOverflow();
 	},

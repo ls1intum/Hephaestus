@@ -42,7 +42,7 @@ export interface FeedbackResultsProps {
 }
 
 export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) {
-	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading messages" />;
+	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading feedback" />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -51,12 +51,12 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 						<MessageSquareTextIcon />
 					</EmptyMedia>
 					<EmptyTitle>
-						{state.filtered ? "No messages match these filters" : "No messages yet"}
+						{state.filtered ? "No feedback matches these filters" : "No feedback yet"}
 					</EmptyTitle>
 					<EmptyDescription>
 						{state.filtered
 							? "Try removing a filter to broaden the results."
-							: "Delivered and withheld messages appear here after reviews run."}
+							: "Delivered and withheld feedback appears here after reviews run."}
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -68,10 +68,10 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 		<>
 			<div className="hidden xl:block">
 				<Table containerClassName="rounded-lg border">
-					<TableCaption className="sr-only">Feedback messages, newest first</TableCaption>
+					<TableCaption className="sr-only">Feedback, newest first</TableCaption>
 					<TableHeader>
 						<TableRow>
-							<TableHead scope="col">Message</TableHead>
+							<TableHead scope="col">Feedback</TableHead>
 							<TableHead scope="col">Outcome</TableHead>
 							<TableHead scope="col">Reviewed work</TableHead>
 							<TableHead scope="col" className="w-32">
@@ -89,14 +89,15 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 										search={(previous) => previous}
 										className="line-clamp-2 font-medium hover:underline"
 									>
-										Message for {subjectLabel(item.recipient)}
+										Feedback for {subjectLabel(item.recipient)}
 									</Link>
 									{item.bodyPreview && (
 										<p className="mt-1 line-clamp-2 text-sm">{item.bodyPreview}</p>
 									)}
 									<div className="mt-2 text-xs text-muted-foreground">
 										<span>
-											{item.findingCount} {item.findingCount === 1 ? "finding" : "findings"}
+											{item.observationCount}{" "}
+											{item.observationCount === 1 ? "observation" : "observations"}
 										</span>
 									</div>
 								</TableCell>
@@ -135,7 +136,7 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 						>
 							<ItemContent className="min-w-0">
 								<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-									Message for {subjectLabel(item.recipient)}
+									Feedback for {subjectLabel(item.recipient)}
 								</ItemTitle>
 								{item.bodyPreview && (
 									<ItemDescription className="line-clamp-2 text-sm text-foreground">
@@ -143,7 +144,8 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 									</ItemDescription>
 								)}
 								<p className="text-xs text-muted-foreground">
-									{item.findingCount} {item.findingCount === 1 ? "finding" : "findings"}
+									{item.observationCount}{" "}
+									{item.observationCount === 1 ? "observation" : "observations"}
 								</p>
 								<div className="mt-1 flex flex-wrap items-center gap-2">
 									<FeedbackStateBadge state={item.deliveryState} />

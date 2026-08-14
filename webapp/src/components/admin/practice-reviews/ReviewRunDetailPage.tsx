@@ -7,7 +7,7 @@ import {
 	getAgentJobOptions,
 	getAgentJobQueryKey,
 	listPracticeReviewFeedbackOptions,
-	listPracticeReviewFindingsOptions,
+	listPracticeReviewObservationsOptions,
 	listPracticeReviewsQueryKey,
 	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -59,7 +59,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 	});
 	const runIsActive = jobQuery.data?.status === "QUEUED" || jobQuery.data?.status === "RUNNING";
 	const findingsQuery = useQuery({
-		...listPracticeReviewFindingsOptions({
+		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
 			query: { agentJobId: jobId, sort: "ACTIONABILITY", size: 5 },
 		}),
@@ -207,7 +207,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 						</EmptyMedia>
 						<EmptyTitle>Review couldn't be completed</EmptyTitle>
 						<EmptyDescription>
-							This review ended before it produced findings or feedback.
+							This review ended before it produced observations or feedback.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>

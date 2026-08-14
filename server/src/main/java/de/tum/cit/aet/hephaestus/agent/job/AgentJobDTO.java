@@ -19,9 +19,10 @@ public record AgentJobDTO(
     @Schema(description = "Job output (agent results)") Object output,
     @NonNull
     @Schema(
-        description = "Why a COMPLETED run produced the findings it did. INSUFFICIENT_EVIDENCE means no model ran " +
-            "because required evidence was missing, unreadable, stale, or unauthorized — so no findings means " +
-            "nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against sufficient evidence."
+        description = "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model " +
+            "ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations " +
+            "means nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against " +
+            "sufficient evidence."
     )
     ReviewRunOutcome reviewOutcome,
     @NonNull

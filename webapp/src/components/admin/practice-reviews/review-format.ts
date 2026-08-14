@@ -1,13 +1,13 @@
 import type {
 	ReviewFeedback,
-	ReviewFinding,
+	ReviewObservation,
 	ReviewPlacement,
 	ReviewSubject,
 } from "@/api/types.gen";
 
-export type Presence = ReviewFinding["presence"];
-export type ReviewResult = NonNullable<ReviewFinding["assessment"]>;
-export type Severity = NonNullable<ReviewFinding["severity"]>;
+export type Presence = ReviewObservation["presence"];
+export type ReviewResult = NonNullable<ReviewObservation["assessment"]>;
+export type Severity = NonNullable<ReviewObservation["severity"]>;
 export type FeedbackDeliveryState = ReviewFeedback["deliveryState"];
 export type FeedbackSuppressionReason = NonNullable<ReviewFeedback["suppressionReason"]>;
 export type FeedbackChannel = ReviewFeedback["channel"];
@@ -50,7 +50,7 @@ export const DELIVERY_STATE_LABELS: Record<FeedbackDeliveryState, string> = {
 
 export const SUPPRESSION_REASON_LABELS: Record<FeedbackSuppressionReason, string> = {
 	VOLUME_CAPPED: "Over the delivery volume limit",
-	COMPOSER_DEDUPED: "Near-duplicate of another finding in the same review",
+	COMPOSER_DEDUPED: "Near-duplicate of another observation in the same review",
 	REACTED_DISPUTED: "The developer disputed this earlier",
 	REACTED_NOT_APPLICABLE: "The developer marked this not applicable earlier",
 	CONVERSATION_EXPIRED: "Never raised in a conversation with Heph, then aged out",

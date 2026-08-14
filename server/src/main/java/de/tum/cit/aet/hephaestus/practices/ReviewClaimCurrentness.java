@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.Nullable;
 
-@Schema(description = "Whether a finding was produced using the current review rules")
+@Schema(description = "Whether an observation was produced using the current review rules")
 public enum ReviewClaimCurrentness {
     CURRENT,
     STALE,

@@ -1953,7 +1953,7 @@ export type ReviewSweepSchedule = {
     lastRunAt?: Date;
     /**
      * how far back each sweep looks. Bounded at write time to twice the cadence and
-     * never more than a week, which is what keeps a sweep's findings admissible in the same trend line
+     * never more than a week, which is what keeps a sweep's observations admissible in the same trend line
      * as reviews that events triggered.
      */
     lookbackDays: number;
@@ -1998,21 +1998,21 @@ export type ReviewRunTarget = {
 };
 
 /**
- * A review run with finding and feedback outcome counts
+ * A review run with observation and feedback outcome counts
  */
 export type ReviewRunSummary = {
     createdAt: Date;
     feedback: ReviewFeedbackCounts;
-    findings: ReviewFindingCounts;
     id: string;
+    observations: ReviewObservationCounts;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
     target: ReviewRunTarget;
 };
 
 /**
- * Counts of findings by assessment
+ * Counts of observations by assessment
  */
-export type ReviewFindingCounts = {
+export type ReviewObservationCounts = {
     /**
      * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
      */
@@ -2108,9 +2108,9 @@ export type ReviewPlacement = {
 };
 
 /**
- * A finding with evidence and linked feedback
+ * An observation with evidence and linked feedback
  */
-export type ReviewFindingDetail = {
+export type ReviewObservationDetail = {
     agentJobId: string;
     /**
      * Practice area; null when the practice is Unassigned
@@ -2122,11 +2122,11 @@ export type ReviewFindingDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Whether a finding was produced using the current review rules
+     * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Finding confidence
+     * Observation confidence
      */
     confidence: number;
     evidence?: ObservationEvidence;
@@ -2153,14 +2153,14 @@ export type ReviewFindingDetail = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Whose work the finding is about; null when the identity is no longer resolvable
+     * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
     title: string;
 };
 
 /**
- * A message composed from a finding
+ * Feedback composed from an observation
  */
 export type ReviewBoundFeedback = {
     agentJobId: string;
@@ -2173,7 +2173,7 @@ export type ReviewBoundFeedback = {
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
     feedbackId: string;
     /**
-     * Whether the finding led the message or reinforced it
+     * Whether the observation led the feedback or reinforced it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
@@ -2234,9 +2234,9 @@ export type ReviewArtifact = {
 };
 
 /**
- * A practice review finding with its linked feedback outcomes
+ * A practice review observation with its linked feedback outcomes
  */
-export type ReviewFinding = {
+export type ReviewObservation = {
     agentJobId: string;
     /**
      * Practice area; null when the practice is Unassigned
@@ -2248,15 +2248,15 @@ export type ReviewFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Whether a finding was produced using the current review rules
+     * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Finding confidence
+     * Observation confidence
      */
     confidence: number;
     /**
-     * Counts of linked messages by delivery state
+     * Counts of linked feedback by delivery state
      */
     feedbackDisposition: ReviewFeedbackDisposition;
     id: string;
@@ -2277,7 +2277,7 @@ export type ReviewFinding = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Whose work the finding is about; null when the identity is no longer resolvable
+     * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
     title: string;
@@ -2288,23 +2288,23 @@ export type ReviewFinding = {
  */
 export type ReviewFeedbackDisposition = {
     /**
-     * Linked messages delivered
+     * Linked feedback delivered
      */
     delivered: number;
     /**
-     * Linked messages whose delivery failed
+     * Linked feedback whose delivery failed
      */
     failed: number;
     /**
-     * Linked messages awaiting delivery
+     * Linked feedback awaiting delivery
      */
     prepared: number;
     /**
-     * Linked messages delivered and later replaced
+     * Linked feedback delivered and later replaced
      */
     superseded: number;
     /**
-     * Linked messages withheld by policy
+     * Linked feedback withheld by policy
      */
     suppressed: number;
 };
@@ -2315,7 +2315,7 @@ export type ReviewFeedbackDisposition = {
 export type ReviewFeedbackDetail = {
     agentJobId: string;
     /**
-     * Work item the message targets; null for an unanchored message
+     * Work item the feedback targets; null when it is unanchored
      */
     artifact?: ReviewArtifact;
     /**
@@ -2325,33 +2325,33 @@ export type ReviewFeedbackDetail = {
     channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
     createdAt: Date;
     /**
-     * When the message was placed; null if it was not delivered
+     * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
-    /**
-     * Source findings in render order
-     */
-    findings: Array<ReviewBoundFinding>;
     id: string;
+    /**
+     * Source observations in render order
+     */
+    observations: Array<ReviewBoundObservation>;
     /**
      * Recorded placements; empty when none
      */
     placements: Array<ReviewPlacement>;
     /**
-     * Who the message is addressed to; null when the identity is no longer resolvable
+     * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
     /**
-     * The message this one replaced; null on a first delivery
+     * The feedback this one replaced; null on a first delivery
      */
     replacesId?: string;
     /**
-     * Whose work the message addresses; may equal the recipient
+     * Whose work the feedback addresses; may equal the recipient
      */
     subject?: ReviewSubject;
     /**
-     * Why the message was withheld; null unless the state is SUPPRESSED
+     * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
     /**
@@ -2361,9 +2361,9 @@ export type ReviewFeedbackDetail = {
 };
 
 /**
- * A finding that contributed to a message
+ * An observation that contributed to a piece of feedback
  */
-export type ReviewBoundFinding = {
+export type ReviewBoundObservation = {
     /**
      * Practice area; null when the practice is Unassigned
      */
@@ -2373,24 +2373,24 @@ export type ReviewBoundFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Whether a finding was produced using the current review rules
+     * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Finding confidence
+     * Observation confidence
      */
     confidence: number;
-    findingId: string;
+    observationId: string;
     observedAt: Date;
     /**
-     * Render order within the message (lower renders earlier)
+     * Render order within the feedback (lower renders earlier)
      */
     ordinal: number;
     practiceName: string;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
-     * Whether the finding leads the message or reinforces it
+     * Whether the observation leads the feedback or reinforces it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
@@ -2403,40 +2403,40 @@ export type ReviewBoundFinding = {
 export type ReviewFeedback = {
     agentJobId: string;
     /**
-     * Work item the message targets; null for an unanchored message
+     * Work item the feedback targets; null when it is unanchored
      */
     artifact?: ReviewArtifact;
     /**
-     * Leading characters of the composed body; null when the message carries no body
+     * Leading characters of the composed body; null when the feedback carries no body
      */
     bodyPreview?: string;
     bodyTruncated: boolean;
     channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
     createdAt: Date;
     /**
-     * When the message was placed; null if it was not delivered
+     * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
-    /**
-     * Number of findings used to compose the message
-     */
-    findingCount: number;
     id: string;
     /**
-     * Who the message is addressed to; null when the identity is no longer resolvable
+     * Number of observations used to compose the feedback
+     */
+    observationCount: number;
+    /**
+     * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
     /**
-     * The message this one replaced; null on a first delivery
+     * The feedback this one replaced; null on a first delivery
      */
     replacesId?: string;
     /**
-     * Whose work the message addresses; may equal the recipient
+     * Whose work the feedback addresses; may equal the recipient
      */
     subject?: ReviewSubject;
     /**
-     * Why the message was withheld; null unless the state is SUPPRESSED
+     * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
     suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
 };
@@ -2656,15 +2656,15 @@ export type ReflectionItem = {
  */
 export type ReactionEngagement = {
     /**
-     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
+     * RESPONSE: observations the developer acted on (the recipience act, not the outcome)
      */
     addressed: number;
     /**
-     * RESPONSE: findings the developer rejected with a reasoned explanation
+     * RESPONSE: observations the developer rejected with a reasoned explanation
      */
     disputed: number;
     /**
-     * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
+     * VALIDITY: observations marked out-of-scope — a detector-scope signal, NOT an uptake count
      */
     notApplicable: number;
 };
@@ -3435,8 +3435,8 @@ export type PagedModelReviewRunSummary = {
     page?: PageMetadata;
 };
 
-export type PagedModelReviewFinding = {
-    content?: Array<ReviewFinding>;
+export type PagedModelReviewObservation = {
+    content?: Array<ReviewObservation>;
     page?: PageMetadata;
 };
 
@@ -3499,7 +3499,7 @@ export type ObservationList = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Whether a finding was produced using the current review rules
+     * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
@@ -3753,7 +3753,7 @@ export type AgentJob = {
      */
     retryCount: number;
     /**
-     * Why a COMPLETED run produced the findings it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no findings means nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against sufficient evidence.
+     * Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations means nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against sufficient evidence.
      */
     reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE';
     /**
@@ -3913,7 +3913,7 @@ export type ObservationDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Whether a finding was produced using the current review rules
+     * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
@@ -9740,7 +9740,7 @@ export type ListPracticeReviewFeedbackError = ListPracticeReviewFeedbackErrors[k
 
 export type ListPracticeReviewFeedbackResponses = {
     /**
-     * Paginated messages returned
+     * Paginated feedback returned
      */
     200: PagedModelReviewFeedback;
 };
@@ -9771,14 +9771,14 @@ export type GetPracticeReviewFeedbackError = GetPracticeReviewFeedbackErrors[key
 
 export type GetPracticeReviewFeedbackResponses = {
     /**
-     * Message details returned
+     * Feedback detail returned
      */
     200: ReviewFeedbackDetail;
 };
 
 export type GetPracticeReviewFeedbackResponse = GetPracticeReviewFeedbackResponses[keyof GetPracticeReviewFeedbackResponses];
 
-export type ListPracticeReviewFindingsData = {
+export type ListPracticeReviewObservationsData = {
     body?: never;
     path: {
         /**
@@ -9790,7 +9790,7 @@ export type ListPracticeReviewFindingsData = {
         page?: number;
         size?: number;
         /**
-         * Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, then not-applicable findings; ties are newest first.
+         * Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, then not-applicable observations; ties are newest first.
          */
         sort?: 'NEWEST' | 'ACTIONABILITY';
         practiceSlug?: Array<string>;
@@ -9821,57 +9821,57 @@ export type ListPracticeReviewFindingsData = {
          */
         to?: Date;
     };
-    url: '/workspaces/{workspaceSlug}/practices/reviews/findings';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/observations';
 };
 
-export type ListPracticeReviewFindingsErrors = {
+export type ListPracticeReviewObservationsErrors = {
     /**
      * Invalid filter or pagination
      */
     400: ProblemDetail;
 };
 
-export type ListPracticeReviewFindingsError = ListPracticeReviewFindingsErrors[keyof ListPracticeReviewFindingsErrors];
+export type ListPracticeReviewObservationsError = ListPracticeReviewObservationsErrors[keyof ListPracticeReviewObservationsErrors];
 
-export type ListPracticeReviewFindingsResponses = {
+export type ListPracticeReviewObservationsResponses = {
     /**
-     * Paginated findings returned
+     * Paginated observations returned
      */
-    200: PagedModelReviewFinding;
+    200: PagedModelReviewObservation;
 };
 
-export type ListPracticeReviewFindingsResponse = ListPracticeReviewFindingsResponses[keyof ListPracticeReviewFindingsResponses];
+export type ListPracticeReviewObservationsResponse = ListPracticeReviewObservationsResponses[keyof ListPracticeReviewObservationsResponses];
 
-export type GetPracticeReviewFindingData = {
+export type GetPracticeReviewObservationData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        findingId: string;
+        observationId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}';
 };
 
-export type GetPracticeReviewFindingErrors = {
+export type GetPracticeReviewObservationErrors = {
     /**
-     * Finding not found in this workspace
+     * Observation not found in this workspace
      */
     404: ProblemDetail;
 };
 
-export type GetPracticeReviewFindingError = GetPracticeReviewFindingErrors[keyof GetPracticeReviewFindingErrors];
+export type GetPracticeReviewObservationError = GetPracticeReviewObservationErrors[keyof GetPracticeReviewObservationErrors];
 
-export type GetPracticeReviewFindingResponses = {
+export type GetPracticeReviewObservationResponses = {
     /**
-     * Finding detail returned
+     * Observation detail returned
      */
-    200: ReviewFindingDetail;
+    200: ReviewObservationDetail;
 };
 
-export type GetPracticeReviewFindingResponse = GetPracticeReviewFindingResponses[keyof GetPracticeReviewFindingResponses];
+export type GetPracticeReviewObservationResponse = GetPracticeReviewObservationResponses[keyof GetPracticeReviewObservationResponses];
 
 export type ListSweepSchedulesData = {
     body?: never;

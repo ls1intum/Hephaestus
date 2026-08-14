@@ -1,15 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
 /**
- * Why a run that reached {@link AgentJobStatus#COMPLETED} produced the findings it did.
+ * Why a run that reached {@link AgentJobStatus#COMPLETED} produced the observations it did.
  *
  * <p>A run that skips automated review for insufficient evidence completes successfully, because
  * nothing failed. Status alone therefore cannot distinguish it from a run that assessed the work and
- * produced no findings. Without that distinction a skipped review is indistinguishable from a clean
+ * produced no observations. Without that distinction a skipped review is indistinguishable from a clean
  * result, which is precisely the reading an abstention exists to prevent.
  */
 public enum ReviewRunOutcome {
-    /** Automated review ran against sufficient evidence; no findings means none were identified. */
+    /** Automated review ran against sufficient evidence; no observations means none were identified. */
     REVIEWED,
     /**
      * Required evidence was missing, unreadable, out of date, or unauthorized, so no model ran and no

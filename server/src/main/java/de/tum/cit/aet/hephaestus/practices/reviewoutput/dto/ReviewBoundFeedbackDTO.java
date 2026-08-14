@@ -10,10 +10,10 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A message composed from a finding")
+@Schema(description = "Feedback composed from an observation")
 public record ReviewBoundFeedbackDTO(
     @NonNull UUID feedbackId,
-    @NonNull @Schema(description = "Whether the finding led the message or reinforced it") EvidenceRole role,
+    @NonNull @Schema(description = "Whether the observation led the feedback or reinforced it") EvidenceRole role,
     @NonNull UUID agentJobId,
     @NonNull FeedbackChannel channel,
     @NonNull FeedbackDeliveryState deliveryState,

@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon, ScanSearchIcon } from "lucide-react";
 import { useId } from "react";
-import type { AgentJob, ReviewFeedback, ReviewFinding } from "@/api/types.gen";
+import type { AgentJob, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import {
@@ -46,7 +46,7 @@ export interface ReviewOutputSectionsProps {
 	scope: ReviewOutputScope;
 	context: "review" | "target";
 	feedback: ReviewSectionState<ReviewFeedback>;
-	findings: ReviewSectionState<ReviewFinding>;
+	findings: ReviewSectionState<ReviewObservation>;
 	/**
 	 * Distinguishes "looked and found nothing" from "declined to look". Omitted by aggregate views,
 	 * which span several runs and so have no single outcome.
@@ -127,7 +127,7 @@ function FeedbackSection({
 							<MessageSquareTextIcon />
 						</EmptyMedia>
 						<EmptyTitle>
-							{outcome === "INSUFFICIENT_EVIDENCE" ? "Nothing was assessed" : "No messages"}
+							{outcome === "INSUFFICIENT_EVIDENCE" ? "Nothing was assessed" : "No feedback"}
 						</EmptyTitle>
 						{outcome === "INSUFFICIENT_EVIDENCE" && (
 							<EmptyDescription>{INSUFFICIENT_EVIDENCE_EXPLANATION}</EmptyDescription>
@@ -150,7 +150,7 @@ function FeedbackSection({
 							>
 								<ItemContent className="min-w-0">
 									<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-										Message for {subjectLabel(item.recipient)}
+										Feedback for {subjectLabel(item.recipient)}
 									</ItemTitle>
 									{item.bodyPreview && (
 										<ItemDescription className="line-clamp-2 text-sm text-foreground">
@@ -191,7 +191,7 @@ function FindingsSection({
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
 	context: "review" | "target";
-	state: ReviewSectionState<ReviewFinding>;
+	state: ReviewSectionState<ReviewObservation>;
 }) {
 	const items = state.status === "ready" ? state.items : [];
 	const headingId = useId();
@@ -199,7 +199,7 @@ function FindingsSection({
 		<section aria-labelledby={headingId} className="space-y-3">
 			<SectionHeader
 				id={headingId}
-				title="Findings"
+				title="Observations"
 				to="/w/$workspaceSlug/admin/practices/reviews/findings"
 				workspaceSlug={workspaceSlug}
 				scope={scope}
@@ -207,16 +207,16 @@ function FindingsSection({
 				shown={items.length}
 			/>
 			{state.status === "loading" ? (
-				<Spinner aria-label="Loading findings" />
+				<Spinner aria-label="Loading observations" />
 			) : state.status === "error" ? (
 				<QueryErrorAlert
 					error={state.error}
-					title="Couldn't load findings"
+					title="Couldn't load observations"
 					onRetry={state.onRetry}
 				/>
 			) : state.status === "pending" ? (
 				<p className="text-sm text-muted-foreground">
-					Findings will appear when the review finishes.
+					Observations will appear when the review finishes.
 				</p>
 			) : items.length === 0 ? (
 				<Empty className="border">
@@ -227,7 +227,7 @@ function FindingsSection({
 						<EmptyTitle>
 							{outcome === "INSUFFICIENT_EVIDENCE"
 								? "Nothing was assessed"
-								: "No findings were recorded"}
+								: "No observations were recorded"}
 						</EmptyTitle>
 						{outcome === "INSUFFICIENT_EVIDENCE" && (
 							<EmptyDescription>{INSUFFICIENT_EVIDENCE_EXPLANATION}</EmptyDescription>

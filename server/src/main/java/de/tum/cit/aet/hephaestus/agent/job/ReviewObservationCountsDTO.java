@@ -3,8 +3,8 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "Counts of findings by assessment")
-public record ReviewFindingCountsDTO(
+@Schema(description = "Counts of observations by assessment")
+public record ReviewObservationCountsDTO(
     @NonNull Long strengths,
     @NonNull Long problems,
     @NonNull @Schema(description = "Practices whose subject did not occur in this work") Long notApplicable,
@@ -16,7 +16,7 @@ public record ReviewFindingCountsDTO(
     )
     Long inconclusive
 ) {
-    public static ReviewFindingCountsDTO empty() {
-        return new ReviewFindingCountsDTO(0L, 0L, 0L, 0L);
+    public static ReviewObservationCountsDTO empty() {
+        return new ReviewObservationCountsDTO(0L, 0L, 0L, 0L);
     }
 }

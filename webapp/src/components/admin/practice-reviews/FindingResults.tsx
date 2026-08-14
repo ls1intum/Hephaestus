@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon, ScanSearchIcon } from "lucide-react";
-import type { ReviewFinding } from "@/api/types.gen";
+import type { ReviewObservation } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import {
 	Empty,
@@ -40,7 +40,7 @@ import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 export type FindingResultsState =
 	| { status: "loading" }
 	| { status: "empty"; filtered: boolean }
-	| { status: "ready"; findings: ReviewFinding[] };
+	| { status: "ready"; findings: ReviewObservation[] };
 
 export interface FindingResultsProps {
 	workspaceSlug: string;
@@ -48,7 +48,7 @@ export interface FindingResultsProps {
 }
 
 export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
-	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading findings" />;
+	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading observations" />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -57,12 +57,12 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 						<ScanSearchIcon />
 					</EmptyMedia>
 					<EmptyTitle>
-						{state.filtered ? "No findings match these filters" : "No findings yet"}
+						{state.filtered ? "No observations match these filters" : "No observations yet"}
 					</EmptyTitle>
 					<EmptyDescription>
 						{state.filtered
 							? "Try removing a filter to broaden the results."
-							: "Findings appear after a practice review completes."}
+							: "Observations appear after a practice review completes."}
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -74,10 +74,12 @@ export function FindingResults({ workspaceSlug, state }: FindingResultsProps) {
 		<>
 			<div className="hidden xl:block">
 				<Table containerClassName="rounded-lg border">
-					<TableCaption className="sr-only">Practice review findings, newest first</TableCaption>
+					<TableCaption className="sr-only">
+						Practice review observations, newest first
+					</TableCaption>
 					<TableHeader>
 						<TableRow>
-							<TableHead scope="col">Finding</TableHead>
+							<TableHead scope="col">Observation</TableHead>
 							<TableHead scope="col">Practice</TableHead>
 							<TableHead scope="col">Developer and reviewed work</TableHead>
 							<TableHead scope="col" className="w-32">

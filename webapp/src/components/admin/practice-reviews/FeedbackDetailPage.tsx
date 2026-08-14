@@ -57,7 +57,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 					/>
 				),
 			}}
-			current="Message"
+			current="Feedback"
 		/>
 	);
 
@@ -76,7 +76,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 				{breadcrumbs}
 				<QueryErrorAlert
 					error={query.error}
-					title="Couldn't load this message"
+					title="Couldn't load this feedback"
 					onRetry={() => query.refetch()}
 				/>
 			</article>
@@ -95,7 +95,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 			<header className="space-y-4">
 				<div className="space-y-1">
 					<h2 className="break-words text-2xl font-semibold tracking-tight">
-						Message for {subjectLabel(feedback.recipient)}
+						Feedback for {subjectLabel(feedback.recipient)}
 					</h2>
 					<p className="text-sm text-muted-foreground">
 						Composed <RelativeTime value={feedback.createdAt} />
@@ -120,16 +120,16 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 									artifactId: String(feedback.artifact.id),
 								}}
 							>
-								View all findings and feedback for this work
+								View all observations and feedback for this work
 							</Link>
 						)}
 					</div>
 				</div>
 			</header>
 
-			<section aria-labelledby="feedback-message-heading" className="space-y-3">
-				<h3 id="feedback-message-heading" className="text-lg font-semibold">
-					Message
+			<section aria-labelledby="feedback-body-heading" className="space-y-3">
+				<h3 id="feedback-body-heading" className="text-lg font-semibold">
+					Feedback
 				</h3>
 				<FeedbackMessage
 					body={feedback.body}
@@ -137,7 +137,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 					suppressionReason={feedback.suppressionReason}
 				/>
 				{feedback.body && (
-					<Accordion aria-label="Message source">
+					<Accordion aria-label="Feedback source">
 						<AccordionItem value="source">
 							<AccordionTrigger>View Markdown source</AccordionTrigger>
 							<AccordionContent>
@@ -150,47 +150,52 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 				)}
 			</section>
 
-			<section aria-labelledby="source-findings-heading" className="space-y-3">
+			<section aria-labelledby="source-observations-heading" className="space-y-3">
 				<div>
-					<h3 id="source-findings-heading" className="text-lg font-semibold">
-						Findings behind this message
+					<h3 id="source-observations-heading" className="text-lg font-semibold">
+						Observations behind this feedback
 					</h3>
 				</div>
-				{feedback.findings.length === 0 ? (
+				{feedback.observations.length === 0 ? (
 					<Empty className="border">
 						<EmptyHeader>
 							<EmptyMedia variant="icon">
 								<ScanSearchIcon />
 							</EmptyMedia>
-							<EmptyTitle>No findings are linked to this message</EmptyTitle>
+							<EmptyTitle>No observations are linked to this feedback</EmptyTitle>
 						</EmptyHeader>
 					</Empty>
 				) : (
 					<ItemGroup>
-						{feedback.findings.map((finding) => (
-							<div key={finding.findingId} role="listitem">
+						{feedback.observations.map((observation) => (
+							<div key={observation.observationId} role="listitem">
 								<Item
 									variant="outline"
 									render={
 										<Link
 											to="/w/$workspaceSlug/admin/practices/reviews/findings/$findingId"
-											params={{ workspaceSlug, findingId: finding.findingId }}
+											params={{ workspaceSlug, findingId: observation.observationId }}
 											search={reviewScopeSearch(search)}
 										/>
 									}
 								>
 									<ItemContent className="min-w-0">
 										<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-											{finding.title}
+											{observation.title}
 										</ItemTitle>
-										<ReviewPracticeLabel area={finding.area} practiceName={finding.practiceName} />
+										<ReviewPracticeLabel
+											area={observation.area}
+											practiceName={observation.practiceName}
+										/>
 									</ItemContent>
 									<ItemFooter className="justify-start sm:basis-auto sm:justify-end">
 										<Badge variant="outline">
-											{finding.role === "PRIMARY" ? "Main finding" : "Supporting finding"}
+											{observation.role === "PRIMARY"
+												? "Main observation"
+												: "Supporting observation"}
 										</Badge>
-										<FindingResultBadge finding={finding} />
-										<ClaimCurrentnessBadge currentness={finding.claimCurrentness} />
+										<FindingResultBadge finding={observation} />
+										<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
 									</ItemFooter>
 								</Item>
 							</div>
@@ -215,13 +220,13 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 						))}
 					</ItemGroup>
 				) : (
-					<p className="text-sm text-muted-foreground">This message was not posted.</p>
+					<p className="text-sm text-muted-foreground">This feedback was not posted.</p>
 				)}
 			</section>
 
 			<ReviewTechnicalDetails>
 				<dl className="divide-y">
-					<DetailRow label="Message ID">
+					<DetailRow label="Feedback ID">
 						<code>{feedback.id}</code>
 					</DetailRow>
 					<DetailRow label="Review">

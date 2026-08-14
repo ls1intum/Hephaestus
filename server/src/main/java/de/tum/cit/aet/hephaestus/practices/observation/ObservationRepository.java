@@ -63,12 +63,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         """,
         nativeQuery = true
     )
-    List<ReviewFindingCounts> summarizeReviewFindings(
+    List<ReviewObservationCounts> summarizeReviewObservations(
         @Param("workspaceId") Long workspaceId,
         @Param("jobIds") Collection<UUID> jobIds
     );
 
-    interface ReviewFindingCounts {
+    interface ReviewObservationCounts {
         UUID getJobId();
         Long getStrengths();
         Long getProblems();
