@@ -1,4 +1,4 @@
-import { ChevronsUpDownIcon, PlusCircleIcon } from "lucide-react";
+import { ChevronsUpDownIcon, type LucideIcon, PlusCircleIcon } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,13 @@ export interface FacetOption<TValue extends string | number = string> {
 	value: TValue;
 	label: string;
 	description?: string;
+	/**
+	 * The same icon the value's badge carries elsewhere, so a filter reads as the thing it filters.
+	 * Options built from a status registry get this for free; see `statusFacetOptions`.
+	 */
+	icon?: LucideIcon;
+	/** Tone for `icon`, matching its badge variant. */
+	iconClassName?: string;
 }
 
 export interface FacetMultiSelectProps<TValue extends string | number> {
@@ -108,9 +115,10 @@ export function FacetMultiSelect<TValue extends string | number>({
 										<Badge
 											key={option.value}
 											variant="secondary"
-											className="hidden max-w-36 truncate rounded-sm px-1 font-normal sm:inline-flex"
+											className="hidden max-w-36 rounded-sm px-1 font-normal sm:inline-flex"
 										>
-											{option.label}
+											{option.icon && <option.icon aria-hidden className={option.iconClassName} />}
+											<span className="truncate">{option.label}</span>
 										</Badge>
 									))
 								)}
@@ -152,6 +160,12 @@ export function FacetMultiSelect<TValue extends string | number>({
 					{(option: FacetOption<TValue>) => (
 						<ComboboxItem key={option.value} value={option}>
 							<ComboboxItemIndicator />
+							{option.icon && (
+								<option.icon
+									aria-hidden
+									className={cn("size-3.5 shrink-0", option.iconClassName)}
+								/>
+							)}
 							<span className="min-w-0 truncate">
 								{option.label}
 								{option.description && (
