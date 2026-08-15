@@ -6,6 +6,7 @@ const meta = {
 	title: "Common/Reference filter pill",
 	component: ReferenceFilterPill,
 	parameters: { layout: "padded" },
+	tags: ["autodocs"],
 	args: { label: "Actor", id: 7, onClear: fn() },
 } satisfies Meta<typeof ReferenceFilterPill>;
 

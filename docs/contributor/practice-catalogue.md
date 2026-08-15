@@ -20,7 +20,7 @@ it propagates:
 | Decision | Hephaestus defaults | Instance catalog | Workspace practices |
 | --- | --- | --- | --- |
 | Name, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
-| Bindings — the occasions a practice is reviewed on and the evidence each reads | declared as `on` in the bundled catalog; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
+| Binding — the one occasion a practice is reviewed on and the evidence it reads | declared as `on` in the bundled catalog; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Review frame — contract version, review mode, known limitations | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form | copied, then customizable in the same practice form |
 | Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
 | Autonomy tier | not a repository setting | not a curated-catalog setting | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
@@ -48,10 +48,12 @@ The practice editor follows the decisions an author can make confidently:
 2. **Review guidance** — describe what to look for, why it matters, and one concrete example.
 3. **How Hephaestus can help** — choose AI-supported mentoring, human review, or guidance only.
 
-The generated identifier, the occasions a review runs on, and the optional static-analysis script are
-under **Technical settings**. New practices start with bindings that fit the selected work type.
-Authors only change those defaults when the practice genuinely needs a different occasion. This keeps
-runtime plumbing out of the common path without hiding it from expert authors.
+The generated identifier, the occasion a review runs on, and the optional static-analysis script are
+under **Technical settings**. A new practice starts with a binding that fits the selected work type.
+Authors only change that default when the practice genuinely needs a different occasion. This keeps
+runtime plumbing out of the common path without hiding it from expert authors. A practice has exactly one
+occasion: reading different evidence at a different moment is a second practice, which is what the shipped
+catalogue does, and asking for a review by hand is not an occasion to choose at all.
 The definition-options API supplies the signals a practice on that work type may bind to, the evidence
 a new binding starts with, and the sources it may read, so the editor and runtime cannot silently
 disagree about what is bindable. The practice never states its artifact kind: it is read off the
@@ -70,12 +72,12 @@ settings:
 - **AI-supported mentoring** lets Hephaestus review connected work after every required source passes.
 - **Human review needed** records that connected work is not enough. Hephaestus skips the practice,
   while a developer, peer, or mentor may still review it from context the system does not collect.
-  It still names its occasions — that is where its artifact kind comes from, and saying what a
+  It still names its occasion — that is where its artifact kind comes from, and saying what a
   practice is about was never the same claim as asking Hephaestus to act on it — but it cannot define
   a static-analysis script and its autonomy tier is forced to `OFF`.
 - **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
-Each binding starts with the recommended evidence for its work type. Most authors should keep it.
+The binding starts with the recommended evidence for its work type. Most authors should keep it.
 **Customize evidence** reveals each source's display name, privacy class, the capture quality its
 contract demands, and whether it can be captured whole — so an author knows whether an `EXHAUSTIVE`
 stance is available — along with the practice's known limitations. How strictly a source must be
@@ -221,13 +223,13 @@ standard as an experiment or a convention as a proven outcome.
 
 1. State the user problem and supported reviewed work.
 2. Cite and classify the evidence.
-3. Draft applicability, signals, exclusions, per-binding evidence, and severity.
+3. Draft applicability, signals, exclusions, the binding's evidence, and severity.
 4. Confirm every source applies to the binding's artifact kind and that its governance decision permits
    the product purpose, audience, processor egress, and retention. A new source follows the
    [artifact-source governance gate](../admin/dsms/artifact-source-governance).
 5. Update `server/src/main/resources/practices/default-catalog.json`; its adjacent JSON Schema provides
-   editor completion and CI validation, and Git history is the bundled version history. Declare the
-   occasions as `on` — a bare signal name is shorthand for a binding on that signal reading the
+   editor completion and CI validation, and Git history is the bundled version history. Declare the one
+   occasion as `on` — a bare signal name is shorthand for a binding on that signal reading the
    artifact kind's default evidence. Reference any precompute script explicitly; a script must be named
    after the practice slug, and an unreferenced one fails validation.
 6. Add or update focused automated-review tests, including required-source skipping and valid-empty evidence.

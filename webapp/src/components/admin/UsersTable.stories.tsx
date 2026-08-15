@@ -125,6 +125,7 @@ const meta: Meta<typeof UsersTable> = {
 	parameters: {
 		layout: "fullscreen",
 	},
+	tags: ["autodocs"],
 	args: {
 		users: mockUsers,
 		teams: mockTeams,

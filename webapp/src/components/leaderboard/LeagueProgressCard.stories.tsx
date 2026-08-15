@@ -5,6 +5,7 @@ import { LeagueProgressCard } from "./LeagueProgressCard";
 const meta = {
 	component: LeagueProgressCard,
 	parameters: { layout: "centered" },
+	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
 			<div className="min-w-[340px]">

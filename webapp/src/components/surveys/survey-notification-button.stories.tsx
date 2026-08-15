@@ -11,6 +11,7 @@ const meta = {
 	title: "Surveys/Survey notification button",
 	component: SurveyNotificationButton,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 } satisfies Meta<typeof SurveyNotificationButton>;
 
 export default meta;

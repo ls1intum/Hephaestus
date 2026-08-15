@@ -83,7 +83,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 
 ## 6. Frontend (webapp) expectations
 
-- Follow the container/presentation split already in place (route files under `src/routes/**` fetch data and pass it to components under `src/components/**`). Keep components pure and side-effect free. A cohesive section may own data used only within that section; every story that renders it, directly or through a parent, must mock its requests.
+- Follow the container/presentation split already in place (route files under `src/routes/**` fetch data and pass it to components under `src/components/**`). Keep components pure and side-effect free. A component under `src/components/**` takes its data as props and does not import `@/api/@tanstack/react-query.gen`; reusable wiring belongs in a `src/hooks/use-*.ts` module. `pnpm run check:components` enforces this against a shrink-only allowlist. A story therefore renders with no network — a query parameter the screen must send belongs in a route test, not a story mock.
 - Fetch data exclusively with TanStack Query v5 and the generated helpers in `@/api/@tanstack/react-query.gen.ts`. Spread the option objects: `useQuery(getTeamsOptions({ ... }))`. Use the generated `*.QueryKey()` helpers for cache invalidation.
 - Do not call `fetch` directly; reuse the generated `@hey-api` client from `src/api/client/` — `src/main.tsx` calls `client.setConfig(...)` once at startup — and the shared QueryClient from `src/integrations/tanstack-query/root-provider.tsx`.
 - State management lives in the colocated Zustand stores (`src/stores/**`). Derive UI state from TanStack Query results instead of duplicating loading/error flags.

@@ -25,6 +25,7 @@ const adminUser: AdminAccountView = {
 const meta = {
 	component: ChangeRoleDialog,
 	parameters: { layout: "centered" },
+	tags: ["autodocs"],
 	args: { onOpenChange: fn(), onConfirm: fn(), isPending: false },
 } satisfies Meta<typeof ChangeRoleDialog>;
 

@@ -21,6 +21,7 @@ const errorReports: ConsentCategory = {
 const meta = {
 	component: ConsentBanner,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	args: {
 		values: { analytics: false, errorMonitoring: false },
 		editing: false,

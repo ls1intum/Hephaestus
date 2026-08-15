@@ -23,6 +23,7 @@ function member(index: number): ExtendedUserTeams {
 const meta = {
 	component: AdminAchievementsTable,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	args: {
 		users: Array.from({ length: 8 }, (_, index) => member(index + 1)),
 		workspaceSlug: "acme",

@@ -5,6 +5,7 @@ import { CatalogOriginBadge } from "./CatalogOriginBadge";
 const meta = {
 	title: "Workspace admin/Practices/Catalog status",
 	component: CatalogOriginBadge,
+	tags: ["autodocs"],
 	args: {
 		kind: "practice",
 		origin: { slug: "clear-pr-description", link: "IN_SYNC", sourceOffered: true },

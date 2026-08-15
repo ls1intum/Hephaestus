@@ -196,8 +196,8 @@ Delivery turns admitted observations into feedback and records what happened to 
 sent. A withheld observation is written to the ledger as `SUPPRESSED` with a reason rather than dropped, so "we
 saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation.
 
-Three gates decide admission, and they are ANDed. `FeedbackAdmission.delivers(origin, tier, reach, channel)`
-is the single place they meet, so a new channel, tier, reach or origin has one place to be reasoned about.
+Two gates decide admission, and they are ANDed. `FeedbackAdmission.delivers(origin, tier, channel)`
+is the single place they meet, so a new channel, tier or origin has one place to be reasoned about.
 Note where the resolution happens: only the tier is inherited, and it is resolved before the conjunction,
 never inside it.
 
@@ -210,8 +210,7 @@ flowchart LR
     A --> T
     W --> T
     D --> T
-    T --> AND{"all three say yes?"}
-    R["workspace feedback reach"] --> AND
+    T --> AND{"do both say yes?"}
     O["observation origin"] --> AND
     AND -->|no| Q["SUPPRESSED, with the reason"]
     AND -->|yes| S["composed and sent"]
@@ -223,11 +222,9 @@ flowchart LR
   `DELIVER`. Only `DELIVER` delivers. `PROPOSE` runs the review and records every observation, and those
   observations are dropped before a body is composed, so nothing is sent and nothing is stored to send later.
   The tier is the **effective** one, resolved practice → area → workspace, because either of the first two
-  levels may hold no opinion. Withheld here means `PRACTICE_TIER_QUIET`.
-- **`FeedbackReach`** — where this workspace lets feedback go at all: `CONVERSATION`, or `ON_THE_WORK`
-  which adds the artifact. One setting per workspace, not per practice. Withheld here also means
-  `PRACTICE_TIER_QUIET` — from the recipient's side it is the same fact, that the workspace chose to stay
-  quiet here.
+  levels may hold no opinion. Withheld here means `PRACTICE_TIER_QUIET`. There is no second, unordered
+  axis narrowing *where* a delivering practice may speak: `DELIVER` delivers wherever the reviewed work
+  allows, and that is the whole decision.
 - **`ObservationOrigin`** — `LIVE` and `MANUAL` deliver everywhere; `BACKFILL` is entitled only to
   `PROFILE`. Withheld here means `BACKFILL_QUIET`.
 

@@ -6,6 +6,7 @@ const meta = {
 	title: "Common/Filter toolbar",
 	component: FilterToolbar,
 	parameters: { layout: "padded" },
+	tags: ["autodocs"],
 	args: {
 		hasFilter: false,
 		onReset: fn(),

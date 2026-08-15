@@ -24,6 +24,7 @@ const meta = {
 	title: "Tests/Toggle group orientation",
 	component: ToggleGroup,
 	parameters: { layout: "padded", chromatic: { disableSnapshot: true } },
+	tags: ["autodocs"],
 } satisfies Meta<typeof ToggleGroup>;
 
 export default meta;

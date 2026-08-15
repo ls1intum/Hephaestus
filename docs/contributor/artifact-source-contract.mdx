@@ -200,16 +200,23 @@ terms. A practice makes two separate statements.
 runs at all, the refusal behaviour, and the claims that kind of evidence can never support whatever the
 occasion. It does not itself list sources.
 
-**The bindings** are the occasions, each carrying the evidence a review occasioned that way reads. Evidence
-belongs here rather than on the practice because what a review needs is a function of what occasioned it: a
-review that runs when a change merges may have to establish that no decision was ever recorded, while the
-same practice reviewed when the change was opened is only reading what is in front of it. It is also the only
-shape in which one practice can watch both sides of a question.
+**The binding** is the occasion, carrying the evidence a review occasioned that way reads. A practice
+declares exactly one; `PracticeDefinitionValidator` refuses a second, and the wire schema caps `on` at one
+entry. Evidence belongs on the binding rather than on the practice because what a review needs is a function
+of what occasioned it: a review that runs when a change merges may have to establish that no decision was
+ever recorded, while a review of the same question when the change was opened is only reading what is in
+front of it. Those are two practices, not two occasions on one — one row, one autonomy tier and one feedback
+history then describe one habit. The `on` array keeps its list shape so that relaxing the rule stays a
+validator change rather than a data migration.
 
-A binding's artifact kind is read off its signals' shared prefix and is never written down separately: a
-second statement of the same fact is a second thing to keep in agreement, and a practice whose declared kind
-contradicts its own signals cannot be resolved. All signals in one binding must share one artifact kind, and
-all bindings on one practice must agree on it.
+One occasion may still name several signals, which is how a practice judged all the way along a piece of
+work is written. Its artifact kind is read off those signals' shared prefix and is never written down
+separately: a second statement of the same fact is a second thing to keep in agreement, and a practice whose
+declared kind contradicts its own signals cannot be resolved. All signals in the binding must therefore share
+one artifact kind.
+
+A signal that names a hand-requested review is refused: such a review already covers every practice on that
+work type whatever state the work is in, so it is a door rather than an occasion an author opts into.
 
 Each entry in `needs` names a source and the stance the practice takes towards it:
 
@@ -259,10 +266,11 @@ on that signal reading the artifact kind's default evidence. A binding may set `
 occasioned by an artifact still marked draft; it defaults to false, because most practices judge work that
 has been handed over.
 
-Validation rejects unknown versions or source kinds, signals no registered domain declares, sources that do
-not apply to the binding's artifact kind, duplicate sources within one binding, a binding with no signal,
-bindings that mix artifact kinds, an `EXHAUSTIVE` stance over a source that can never report a complete
-capture, and a policy that carries `needs` or a retired `evidenceProfile`. An `EXHAUSTIVE` stance over a
+Validation rejects unknown versions or source kinds, signals no registered domain declares, a signal that
+names a hand-requested review, sources that do not apply to the binding's artifact kind, duplicate sources
+within one binding, a binding with no signal, a second binding, a binding whose signals mix artifact kinds, an
+`EXHAUSTIVE` stance over a source that can never report a complete capture, and a policy that carries `needs`
+or a retired `evidenceProfile`. An `EXHAUSTIVE` stance over a
 source that could never be captured whole is caught at authoring time rather than at review time, because
 "switched on and permanently refusing" is indistinguishable from "nobody has done this yet" in the report it
 produces.

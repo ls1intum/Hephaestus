@@ -5,7 +5,7 @@ Use these product terms in user-facing interfaces, documentation, and release no
 This page owns the vocabulary for **observations and the feedback built from them**. The
 [practice review glossary](./practice-review-glossary.mdx) owns the vocabulary for **the review
 operation, the evidence contract, and the exact API, Java, and persistence names**, including
-*practice review*, *binding*, *signal*, *evidence stance*, *autonomy tier* and *feedback reach*. A term is defined in
+*practice review*, *binding*, *signal*, *evidence stance* and *autonomy tier*. A term is defined in
 one of the two and cited from the other; when the two disagree, that is a bug in one of them, not a
 choice for the writer.
 
@@ -21,13 +21,13 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Observation**       | One recorded result of reviewing one practice against one piece of reviewed work | finding, detection                 |
 | **Practice feedback** | Guidance written from observations and addressed to a developer — both the whole and the countable unit | message, AI feedback, feedback item, ledger unit |
 | **Delivery**          | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced | placement, surface            |
-| **Channel**           | Where feedback is intended to appear; see [feedback reach](./practice-review-glossary.mdx#feedback-reach) for which destinations exist | destination, surface |
+| **Channel**           | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting; the destinations are the `FeedbackChannel` constants | destination, surface, reach |
 | **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
 | **Developer**         | The person an observation is about                                              | learner                            |
 | **Contributor**       | A repository role relevant to review eligibility                                | user, when the role matters        |
 | **Heph**              | The conversational assistant                                                    | agent, bot                         |
 | **Mentor**            | The product area for conversations with Heph                                    |                                    |
-| **Hephaestus**        | The application that runs reviews and prepares feedback                         | agent                              |
+| **Hephaestus**        | The application, named only where the application itself is the subject — installing it, an account linked to it, a release of it | agent |
 | **Hephaestus default** | A practice or area bundled with the running Hephaestus release                  | shipped entry                      |
 | **Instance catalog**  | The starting set copied into each new workspace                                  | curated catalog                    |
 | **Workspace practices** | Independent definitions used for reviews in one workspace                     | workspace catalog                  |
@@ -52,10 +52,29 @@ count so the noun is not needed rather than to invent a second word for the same
 | This message         | This feedback                                               |
 | Message details      | Feedback details                                            |
 | Findings behind this message | Observations behind this feedback                   |
+| Queued for conversation | Prepared for conversation                                |
 
 A column that counts per row is headed **Feedback** and the cell holds the number alone. Where a sentence
 needs a singular subject, name what the feedback is *about* — "the feedback for this observation", not
 "the message for this observation".
+
+**Say what happens, not who does it.** On a practice surface, and in the footer of a delivered review
+comment, the subject is the operation and its results — *a practice review*, *a review*, *feedback*, *an
+observation* — not the application performing them. "What a review does on its own", not "What Hephaestus
+does on its own"; "Practice review", not "Hephaestus Agent". Two reasons, and both outlive the current copy:
+the product name adds a second voice to a screen that is already inside the product (and, on a provider, the
+bot account the comment is posted under has already attributed it), and reaching for a name for the doer is
+exactly what pulls a writer towards *agent*, the word this vocabulary bans. **Hephaestus** stays the right
+word where the application itself is the subject — installing it, linking an account to it, a release of it,
+and in the compound terms **Hephaestus default** and **No Hephaestus default** — and it is still the actor a
+contributor doc names when explaining what the system does. This rule is about the surfaces a developer or a
+workspace administrator reads.
+
+**Feedback waiting for a mentor conversation is *prepared*, never *queued*.** A queue implies somebody has
+to work it; nothing does — `FeedbackDeliveryState.PREPARED` auto-advances to `DELIVERED` on the next chat
+turn that links the feedback. The label is **Prepared for conversation**. *Prepared* is also not available
+for a suppressed observation: at the **Propose** tier no feedback is composed at all, so nothing is prepared
+there either.
 
 **Observation, not finding**, for the measurement — in copy, in URLs, in API schema and field names, and in
 new Java. *Finding* names the right thing in exactly two places, and both mean a note pinned to a position
@@ -80,8 +99,9 @@ the [practice review glossary](./practice-review-glossary.mdx#product-terms) def
 between silent measurement and unasked delivery. "Not reviewed at all" is the **Off** tier, not a separate
 concept. **Propose** reviews the work and records everything it sees and sends nothing; do not write that
 it prepares, drafts or previews feedback, because at that tier no feedback is ever composed. Do not write
-*loudness tier*: it mixes how much the system does with where it says it, and where it says it is
-**feedback reach**, a separate workspace setting.
+*loudness tier*: it reads as a volume control, and the tier is not one — it is the whole delivery decision,
+so **Deliver** means delivered wherever the reviewed work allows. There is no second setting narrowing
+where a delivering practice may speak; do not write *feedback reach*, which named one that no longer exists.
 
 A tier is also rarely a fact about one practice alone. Most practices hold no tier and inherit their area's,
 and most areas inherit the workspace's, so write **effective tier** for the one in force and **override**

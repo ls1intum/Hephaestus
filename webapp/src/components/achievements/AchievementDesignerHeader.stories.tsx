@@ -8,6 +8,7 @@ const meta = {
 	title: "Workspace admin/Achievements/Designer header",
 	component: AchievementDesignerHeader,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>

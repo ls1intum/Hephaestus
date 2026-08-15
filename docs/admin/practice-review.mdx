@@ -133,9 +133,8 @@ a campaign, so it sits under *When and where* beside the other things that start
    *Assigned review participants*.
 5. **Same page → Review scope.** **Target branches** and **Repositories** narrow which work is reviewed at
    all. Leave both empty to review everything the workspace monitors.
-6. **Same page's *How much* section.** Set **How much the system does on its own** and **Where feedback
-   goes** for the whole workspace. These two are the only settings you need to start; everything below
-   inherits from them.
+6. **Same page's *How much* section.** Set **How much the system does on its own** for the whole workspace.
+   That one answer is all you need to start; everything below inherits from it.
 7. **Same section, further down.** Override step 6 only for the areas or practices where the workspace
    answer is wrong. You are not expected to touch most of them. Practice setup shows each practice's tier
    and where it came from, but does not change it — the tier has one editor, and this is it.
@@ -143,40 +142,39 @@ a campaign, so it sits under *When and where* beside the other things that start
 Whether a draft is reviewed is decided **per practice**, on the practice itself
 (*Also while it is still a draft*), not by a workspace switch.
 
-## How much, where, and how wide
+## How much, and how wide
 
-Three independent settings, and confusing them is the most common misconfiguration.
+Two independent settings, and confusing them is the most common misconfiguration.
 
 - **How much the system does on its own** — `Off`, `Propose`, `Deliver`. Only `Off` stops the review.
   `Propose` runs it and records every observation exactly as `Deliver` does, and sends nothing to anybody.
   Turning a noisy practice down therefore does not put a hole in the measurement; turning it `Off` does.
   What a `Propose` practice held back is not lost: **Review activity** shows it as reviewed, with the
   measurements it took, nothing delivered, and the tier named as the reason. Raise the practice to
-  `Deliver` when you want it heard.
-- **Where feedback goes** — *In the mentor conversation only*, or *Also on the work itself* (pull-request
-  summaries, inline notes, issue comments). One choice for the whole workspace. It can only ever narrow
-  where feedback lands; it never gives a practice more autonomy than its own tier allows.
+  `Deliver` when you want it heard. `Deliver` then delivers wherever the reviewed work allows — there is no
+  second setting choosing between the mentor conversation and the work itself, so a practice that reviews
+  on its own but speaks only in private is not a shape you can configure.
 - **Review scope** is per workspace: two exact-match lists, target branches and repositories, ANDed onto
   every practice. Exact names only, no patterns, and a branch list cannot narrow issue review because an
   issue has no target branch.
 
 ### You set this once, not a hundred times
 
-Both settings above are **workspace** settings, and every area and every practice follows them until you
-say otherwise. An area can override the workspace, and a practice can override its area:
+**How much** is answered once for the **workspace**, and every area and every practice follows that answer
+until you say otherwise. An area can override the workspace, and a practice can override its area:
 
 > practice → its area → the workspace
 
 Anything you have not decided shows as **inherited**, with the level it came from, and can be reset back to
-inheriting at any time. Start with the two workspace answers, then override the handful of areas where they
-are wrong; a workspace runs dozens of practices across a dozen areas, and a setting you have to apply per
-row is a setting nobody applies.
+inheriting at any time. Start with the one workspace answer, then override the handful of areas where it is
+wrong; a workspace runs dozens of practices across a dozen areas, and a setting you have to apply per row is
+a setting nobody applies. (Review scope is not inherited — it is one workspace-wide pair of lists.)
 
 The **Review → How much** section shows, above the list, how many practices sit at each setting — for the
 workspace and per area. Read that line before changing anything; it is the fastest way to see whether an
 override somebody made long ago is still doing what you think.
 
-Both are defined in full, with their refusal semantics, in the
+Both settings are defined in full, with their refusal semantics, in the
 [practice review glossary](/contributor/practice-review-glossary). Do not re-derive them from this page.
 
 ## What costs money
@@ -290,7 +288,7 @@ status, the model it ran on, and its error message — the fastest way to tell "
 | Live events, comment command, cooldown | Administration → Practices → Review → **When and where** → *Project review triggers* |
 | Post after merge, eligible work | Administration → Practices → Review → **When and where** → *Project review rules* |
 | Target branches, repositories | Administration → Practices → Review → **When and where** → *Review scope* |
-| Workspace default and where feedback goes | Administration → Practices → Review → **How much** |
+| Workspace default tier | Administration → Practices → Review → **How much** |
 | Per-area and per-practice overrides | Administration → Practices → Review → **How much** |
 | Draft handling | On the practice itself — *Also while it is still a draft* |
 | One-off campaign | Administration → Practices → Review → **Past work** |

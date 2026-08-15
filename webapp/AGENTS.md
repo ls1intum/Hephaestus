@@ -144,8 +144,30 @@ export function UserCard(props: UserCardProps) {
 ### Container/Presentation Split
 
 - **Routes** (`src/routes/**`): Data fetching, loaders, auth guards, side effects
-- **Components** (`src/components/**`): Pure by default. A cohesive section may own data used only
-  within that section; every story that renders it must mock its requests.
+- **Hooks** (`src/hooks/use-*.ts`): A route's fetching, factored out when more than one route needs it
+- **Components** (`src/components/**`): Presentational, with no exception for a "cohesive section".
+  They take their data as props and never import the query layer.
+
+`node scripts/check-presentational-components.mjs` enforces it, and `pnpm run check` runs it. Two
+halves, because they fail differently:
+
+- **A component under `src/components/**` may not import `@/api/@tanstack/react-query.gen`,
+  `@/api/sdk.gen` or the client, or call a TanStack query hook.** `@/api/types.gen` is pure types and
+  stays allowed everywhere. Put the `useQuery` in the route file and pass plain props down; when two
+  routes need the same call, move it to `src/hooks/use-*.ts` and let both routes call that.
+- **A story file may not install MSW handlers.** Autodocs mounts every story of a file into one
+  document and `msw-storybook-addon` installs on a single global worker, so the last story's handlers
+  answer for the whole page — one error story silently breaks its siblings' Docs page while every
+  isolated story, and therefore every test and every snapshot, stays green. That is not hypothetical:
+  it is what made a screen's Docs page read "Couldn't load this feedback".
+
+The allowlist inside that script is **shrink-only** — an entry that scans clean fails the build, so it
+cannot go stale. Fix the file, do not add to it.
+
+**A story renders with no network at all.** A story's job is to prove the component renders what it is
+given. A wire contract — that the screen sends `?reviewTier=OFF`, that a filter reaches the query key —
+is not a rendering fact and does not belong in a story mock; assert it in a route test, which owns the
+query. Storybook is where you look at the component; the route test is where you check what it asks for.
 
 ### Seeding a form from props
 
@@ -501,6 +523,23 @@ it("submits form on click", async () => {
   expect(onSubmit).toHaveBeenCalled();
 });
 ```
+
+### No jest-dom matchers in a Vitest test
+
+`@testing-library/jest-dom` is **not** registered in the Vitest unit project — `vite.config.ts` lists
+one setup file, `./src/test/setup-msw.ts`, and it does not import the matchers. So
+`expect(el).toBeInTheDocument()` in a `*.test.tsx` throws `Invalid Chai property: toBeInTheDocument`,
+at runtime, with `tsc` perfectly happy. Assert on plain values instead:
+
+| Instead of | Write |
+|------------|-------|
+| `expect(el).toBeInTheDocument()` | `expect(el).not.toBeNull()` |
+| `expect(q).not.toBeInTheDocument()` | `expect(q).toBeNull()` (use `queryBy*`, which returns null) |
+| `expect(el).toHaveAttribute("href", "/x")` | `expect(el.getAttribute("href")).toBe("/x")` |
+| `expect(el).toBeDisabled()` | `expect((el as HTMLButtonElement).disabled).toBe(true)` |
+
+The matchers **are** available in stories, because `expect` from `storybook/test` ships them. Copying
+an assertion out of a story and into a route test is exactly how this bites.
 
 ### Query Priority
 

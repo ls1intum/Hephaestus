@@ -46,6 +46,7 @@ const editingOutline: LoginProviderView = {
 const meta = {
 	component: LoginProviderFormDialog,
 	parameters: { layout: "centered" },
+	tags: ["autodocs"],
 	args: {
 		open: true,
 		onOpenChange: fn(),
