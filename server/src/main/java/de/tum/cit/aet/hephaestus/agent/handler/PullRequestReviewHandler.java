@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.reflection.ReflectionCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -239,6 +240,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
         practiceCatalogInjector.inject(files, job, ArtifactKinds.PULL_REQUEST, practices);
+        // Asks the run for a second, separate turn after its measurements are final: process-level
+        // feedback for this developer's reflection surface, composed over their record rather than over this
+        // diff. Absent for a backfill sweep — see ReflectionCompositionInputs.
+        ReflectionCompositionInputs.stage(files, PracticeDetectionDeliveryService.originOf(metadata));
         ContextMapWriter.write(files);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;

@@ -167,7 +167,7 @@ export function CuratedCatalog({
 				{customOrder && (
 					<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
 						<p className="text-muted-foreground">
-							This catalog keeps your custom order when Hephaestus changes.
+							This catalog keeps your custom order when the Hephaestus defaults change.
 						</p>
 						<Button
 							variant="outline"

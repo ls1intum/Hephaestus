@@ -226,14 +226,19 @@ flowchart LR
   axis narrowing *where* a delivering practice may speak: `DELIVER` delivers wherever the reviewed work
   allows, and that is the whole decision.
 - **`ObservationOrigin`** — `LIVE` and `MANUAL` deliver everywhere; `BACKFILL` is entitled only to
-  `PROFILE`. Withheld here means `BACKFILL_QUIET`.
+  `REFLECTION`. Withheld here means `BACKFILL_QUIET`.
 
-`FeedbackChannel.PROFILE` is **declared and unwritten**: nothing in the application produces a `PROFILE`
-unit, and an ArchUnit rule (`ProfileChannelUnwrittenArchTest`) keeps it that way by allowlisting the three
-classes permitted to name the constant. The consequence is the one worth remembering: a backfill
-observation is entitled only to a channel with no producer, so it is measured and never delivered — by
-construction, not by configuration. `BACKFILL_QUIET` is deliberately distinct from `PRACTICE_TIER_QUIET`
-because a tier is a dial an admin can turn and this is not one.
+`FeedbackChannel.REFLECTION` is the developer's own **My feedback** page: the process level of the three,
+where a habit that recurs across several pieces of their work is named along with what to do differently
+next time. Its body is the only text the system composes about a named person that the person is the sole
+audience for — `IN_CONTEXT` bodies are already public on the work, `CONVERSATION` bodies are NULL until
+the mentor speaks them — so an ArchUnit rule (`ReflectionChannelProducerArchTest`) keeps the set of
+classes that may write one or read one back small and named, and `ReviewFeedbackQueryService` withholds
+the body from every operator surface. The `BACKFILL` entitlement is a ceiling, not an instruction: a
+backfilled observation may reach only this channel, and the router refuses a cluster made entirely of
+backfilled measurements, so it is still measured and not delivered — by construction, not by
+configuration. `BACKFILL_QUIET` is deliberately distinct from `PRACTICE_TIER_QUIET` because a tier is a
+dial an admin can turn and this is not one.
 
 The full suppression vocabulary lives on `FeedbackSuppressionReason`, which also carries one deprecated
 constant (`ARTIFACT_DRAFT`) kept only so old rows still read back.

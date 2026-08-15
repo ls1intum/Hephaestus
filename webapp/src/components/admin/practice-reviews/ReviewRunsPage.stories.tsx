@@ -119,7 +119,9 @@ export const WhatEachReviewProduced: Story = {
 			"1 delivered",
 			"2 withheld",
 			"0 failed to deliver",
-			"0 prepared for conversation",
+			// The bare stored state: this strip counts a run's units across every channel, so it cannot
+			// name the moment one lane's prepared unit is waiting for.
+			"0 prepared",
 		]) {
 			await expect(feedback).toHaveTextContent(pair);
 		}

@@ -38,6 +38,8 @@ tags:
   name: Slack channel activation
 - description: Per-workspace LLM spend rollup and budget status
   name: LLM Usage
+- description: The developer's own prepared practice feedback
+  name: Reflection Feedback
 - description: Manage practice areas
   name: Practice Areas
 - description: Workspace-scoped mentor chat threads
@@ -4515,6 +4517,36 @@ paths:
       summary: Get engagement statistics
       tags:
       - Feedback Reaction
+  /workspaces/{workspaceSlug}/practices/feedback/reflection:
+    get:
+      description: "Process-level messages prepared for the authenticated developer:\
+        \ for each habit that recurs in their work, what the pattern is, the pieces\
+        \ of work it was observed on, and one thing to try next. Distinct from in-context\
+        \ notes (which say what is wrong in one diff) and from the mentor conversation\
+        \ (which asks rather than tells). Reading a message is what delivers it, so\
+        \ this GET records the delivery."
+      operationId: getReflectionFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReflectionFeedback"
+          description: "Reflection messages returned, newest first"
+      security: []
+      summary: The current developer's reflection feedback
+      tags:
+      - Reflection Feedback
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
     get:
       description: "Returns the current user's most recent reaction to the specified\
@@ -5116,7 +5148,7 @@ paths:
             enum:
             - IN_CONTEXT
             - CONVERSATION
-            - PROFILE
+            - REFLECTION
       - in: query
         name: agentJobId
         required: false
@@ -10582,6 +10614,13 @@ components:
           items:
             type: string
           minItems: 1
+        subject:
+          type: string
+          description: Whose conduct this review judges; omit for AUTHOR
+          enum:
+          - AUTHOR
+          - ASSIGNEE
+          - REVIEWER
       required:
       - needs
       - signals
@@ -11447,6 +11486,85 @@ components:
       - addressed
       - disputed
       - notApplicable
+    ReflectionEvidence:
+      type: object
+      description: One piece of work the pattern was observed on
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Identifier of the work within its kind
+        artifactKind:
+          type: string
+          description: "Kind of work, e.g. scm.pull_request"
+        observedAt:
+          type: string
+          format: date-time
+          description: When the measurement behind this occurrence was taken
+        title:
+          type: string
+          description: What the review recorded on this piece of work
+      required:
+      - artifactId
+      - artifactKind
+      - observedAt
+    ReflectionFeedback:
+      type: object
+      description: A process-level message on the developer's own reflection surface
+      properties:
+        areaName:
+          type: string
+          description: Area display name; null when the practice has none
+        areaSlug:
+          type: string
+          description: Area the practice sits in; null when the practice has none
+        body:
+          type: string
+          description: "The message, as Markdown; ends with the habit to try next"
+        evidence:
+          type: array
+          description: "The pieces of work the habit was observed on, newest first"
+          items:
+            $ref: "#/components/schemas/ReflectionEvidence"
+        headline:
+          type: string
+          description: "Short headline naming the habit, never the person"
+        id:
+          type: string
+          format: uuid
+        occurrenceCount:
+          type: integer
+          format: int32
+          description: How many pieces of work carry it — the length of the evidence
+            list
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+          description: Practice this habit belongs to
+        preparedAt:
+          type: string
+          format: date-time
+          description: When the message was composed
+        readAt:
+          type: string
+          format: date-time
+          description: When this developer first opened it; null until they have
+        whatGoodLooksLike:
+          type: string
+          description: "What good looks like, in the learner's framing"
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in the learner's framing"
+      required:
+      - body
+      - evidence
+      - headline
+      - id
+      - occurrenceCount
+      - practiceName
+      - practiceSlug
+      - preparedAt
     ReflectionItem:
       type: object
       description: A single piece of practice feedback to read and act on
@@ -11833,7 +11951,7 @@ components:
           enum:
           - IN_CONTEXT
           - CONVERSATION
-          - PROFILE
+          - REFLECTION
         createdAt:
           type: string
           format: date-time
@@ -11978,7 +12096,7 @@ components:
           enum:
           - IN_CONTEXT
           - CONVERSATION
-          - PROFILE
+          - REFLECTION
         createdAt:
           type: string
           format: date-time
@@ -12075,13 +12193,15 @@ components:
           description: Work item the feedback targets; null when it is unanchored
         body:
           type: string
-          description: Stored composed body; null when none was produced
+          description: "Stored composed body; null when none was produced, and always\
+            \ null on the REFLECTION channel — the developer's reflection surface\
+            \ is not readable by an operator"
         channel:
           type: string
           enum:
           - IN_CONTEXT
           - CONVERSATION
-          - PROFILE
+          - REFLECTION
         createdAt:
           type: string
           format: date-time

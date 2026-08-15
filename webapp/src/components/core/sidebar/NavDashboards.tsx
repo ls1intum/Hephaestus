@@ -1,5 +1,5 @@
 import { Link, useMatchRoute } from "@tanstack/react-router";
-import { Radar, Sparkles, Trophy, User, Users } from "lucide-react";
+import { NotebookPen, Radar, Sparkles, Trophy, User, Users } from "lucide-react";
 import {
 	SidebarGroup,
 	SidebarGroupLabel,
@@ -25,6 +25,7 @@ export function NavDashboards({
 	const onLeaderboard = Boolean(matchRoute({ to: "/w/$workspaceSlug", fuzzy: false }));
 	const onTeams = Boolean(matchRoute({ to: "/w/$workspaceSlug/teams", fuzzy: true }));
 	const onReviews = Boolean(matchRoute({ to: "/w/$workspaceSlug/reviews", fuzzy: true }));
+	const onMyFeedback = Boolean(matchRoute({ to: "/w/$workspaceSlug/my-feedback", fuzzy: true }));
 
 	return (
 		<SidebarGroup>
@@ -43,6 +44,19 @@ export function NavDashboards({
 					>
 						<User />
 						<span>Profile</span>
+					</SidebarMenuButton>
+				</SidebarMenuItem>
+				{/* Next to Profile, because it is the same person's page — but its own entry rather than a
+				    tab of the public one: the profile is addressed by whose it is, and this is the page
+				    only its owner can ever see. Not feature-gated, for the reason given below. */}
+				<SidebarMenuItem>
+					<SidebarMenuButton
+						tooltip="My feedback"
+						isActive={onMyFeedback}
+						render={<Link to="/w/$workspaceSlug/my-feedback" params={{ workspaceSlug }} />}
+					>
+						<NotebookPen />
+						<span>My feedback</span>
 					</SidebarMenuButton>
 				</SidebarMenuItem>
 				{achievementsEnabled && (

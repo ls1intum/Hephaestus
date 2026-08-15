@@ -68,6 +68,9 @@ public class PiRuntimeFactory {
         for (String sidecar : spec.runnerProfile().sidecarScripts()) {
             promptScaffolding.put(sidecar, loadClasspathResource(sidecar));
         }
+        for (String prompt : spec.runnerProfile().promptResources()) {
+            promptScaffolding.put(prompt, loadClasspathResource(prompt));
+        }
         String promptDigest = ProvenanceDigest.rootDigestHex(promptScaffolding);
         inputFiles.putAll(promptScaffolding);
         inputFiles.putAll(spec.extraInputs());

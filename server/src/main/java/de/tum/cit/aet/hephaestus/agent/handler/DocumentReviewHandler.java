@@ -37,7 +37,7 @@ import tools.jackson.databind.node.ObjectNode;
  * collection and its authorship — at {@code inputs/context/document.md}.
  *
  * <p><b>Delivery records observations and stops there.</b> {@code docs.document} has one lane,
- * {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane#PROFILE}, and no channel writes to
+ * {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane#REFLECTION}, and no channel writes to
  * it, so publishing a delivery event would look like feedback and reach nobody; add a delivery step only
  * alongside a channel for that lane.
  */

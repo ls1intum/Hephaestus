@@ -204,6 +204,10 @@
         "onDrafts": {
           "description": "Whether an artifact still marked draft occasions this review. Defaults to false.",
           "type": "boolean"
+        },
+        "subject": {
+          "description": "Whose conduct a review occasioned this way judges, and therefore which person its observations are filed against. Defaults to AUTHOR. A practice about reviewing somebody else's work names REVIEWER.",
+          "enum": ["AUTHOR", "ASSIGNEE", "REVIEWER"]
         }
       }
     },

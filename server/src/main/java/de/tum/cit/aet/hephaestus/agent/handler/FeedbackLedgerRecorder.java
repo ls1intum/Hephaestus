@@ -106,6 +106,14 @@ public class FeedbackLedgerRecorder {
      */
     public static final int TIER_WITHHELD_UNIT_ORDINAL_BASE = 6000;
 
+    /**
+     * REFLECTION units start here, one band clear of the one above. They share the review job's
+     * {@code agent_job_id} because the process-level message is composed inside that job's run, so they
+     * need a band of their own exactly as the conversational units do. Public so
+     * {@code ReflectionFeedbackPreparer} derives its positions from the one shared constant.
+     */
+    public static final int REFLECTION_UNIT_ORDINAL_BASE = 7000;
+
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;

@@ -48,7 +48,7 @@ export const Withheld: Story = {
 	},
 };
 
-/** `PREPARED` only ever occurs on the conversation lane, and carries no delivered timestamp. */
+/** `PREPARED` carries no delivered timestamp, and names the moment its own lane is waiting for. */
 export const PreparedForConversation: Story = {
 	args: {
 		feedback: {
@@ -60,6 +60,25 @@ export const PreparedForConversation: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText("Prepared for conversation");
 		canvas.getByText("In conversation");
+	},
+};
+
+/**
+ * The reflection lane waits on nobody: the developer opening their own feedback page is what delivers
+ * it, so the row must not borrow the conversation lane's words and promise a chat that will never
+ * happen to it. The operator sees this much; the composed text is withheld from them.
+ */
+export const PreparedForTheReflectionSurface: Story = {
+	args: {
+		feedback: {
+			channel: "REFLECTION",
+			deliveryState: "PREPARED",
+			createdAt: composedAt,
+		},
+	},
+	play: async ({ canvas }) => {
+		canvas.getByText("Prepared for their feedback page");
+		canvas.getByText("On their feedback page");
 	},
 };
 

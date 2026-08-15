@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -67,7 +68,16 @@ public final class PracticeDefinitionValidator {
         if (declared.isEmpty()) {
             throw new IllegalArgumentException("No registered domain declares signals for " + artifactKind);
         }
+        Set<ActorRole> roles = signalOptions.rolesFor(artifactKind);
         for (PracticeBinding binding : bindings) {
+            // An occasion may only be about a relation this kind of work can actually identify a person
+            // in. Attributing a result to a role the artifact cannot resolve leaves an observation about
+            // nobody — or, worse, one filed against whichever person the kind happens to name.
+            if (!roles.contains(binding.subject())) {
+                throw new IllegalArgumentException(
+                    "This work type cannot identify a " + binding.subject() + ", so a review of it cannot be about one"
+                );
+            }
             for (SignalName signal : binding.signals()) {
                 if (signalOptions.isManualRequest(signal)) {
                     throw new IllegalArgumentException(

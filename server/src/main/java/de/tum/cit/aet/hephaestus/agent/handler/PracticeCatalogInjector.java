@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
@@ -159,11 +160,15 @@ class PracticeCatalogInjector {
                 )
                 .toList();
         }
+        practices = practices
+            .stream()
+            .filter(p -> attributable(p, signal, job))
+            .toList();
         if (practices.isEmpty()) {
             throw new JobPreparationException(
                 "No active " +
                     focus +
-                    " practices for workspace: workspaceId=" +
+                    " practices this review can attribute to a person: workspaceId=" +
                     job.getWorkspace().getId() +
                     ", jobId=" +
                     job.getId()
@@ -178,6 +183,33 @@ class PracticeCatalogInjector {
             }
         }
         return practices;
+    }
+
+    /**
+     * Whether this run can name the person a practice's result would be about.
+     *
+     * <p>A review job resolves exactly one person — the artifact's author, or the subject a repo-less job
+     * carries explicitly ({@code PracticeDetectionDeliveryService#resolveTarget}). A practice whose
+     * occasion is about a REVIEWER therefore has nobody this job can attribute it to: the review event
+     * names no reviewer, and the mirrored threads routinely carry several. Running it anyway is what
+     * filed a judgement of Bob's review under Alice's name, on every pull request Alice opened.
+     *
+     * <p>Refused here rather than at delivery so the run is never paid for. Delivery refuses it again —
+     * a job already in flight, and a review asked for by hand (which names no occasion and so injects
+     * every practice of the kind), both reach the ledger without passing this.
+     */
+    private boolean attributable(Practice practice, @Nullable SignalName signal, AgentJob job) {
+        ActorRole subject = PracticeBinding.subjectRoleOf(practice.getBindings(), signal);
+        if (subject == ActorRole.AUTHOR) {
+            return true;
+        }
+        log.debug(
+            "Practice withheld from review: no {} this job can name, slug={}, jobId={}",
+            subject,
+            practice.getSlug(),
+            job.getId()
+        );
+        return false;
     }
 
     void inject(Map<String, byte[]> files, AgentJob job, ArtifactKind focus, List<Practice> practices) {

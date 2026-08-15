@@ -1,6 +1,4 @@
-import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
-import { Streamdown } from "streamdown";
-import { MarkdownCode } from "@/components/common/MarkdownCode";
+import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import {
 	type DeliveryFacts,
 	deliveryOutcome,
@@ -21,50 +19,6 @@ export interface FeedbackBodyProps {
 	feedback: FeedbackBodyFeedback;
 	className?: string;
 }
-
-const HTTP_URL = /^https?:\/\//i;
-
-function SafeAnchor({ href, children, className }: AnchorHTMLAttributes<HTMLAnchorElement>) {
-	if (typeof href !== "string" || !HTTP_URL.test(href)) {
-		return <span className={className}>{children}</span>;
-	}
-	return (
-		<a href={href} className={className} rel="noopener noreferrer" target="_blank">
-			{children}
-		</a>
-	);
-}
-
-function PreviewHeading({ children, className }: HTMLAttributes<HTMLHeadingElement>) {
-	return <h4 className={className}>{children}</h4>;
-}
-
-const UNTRUSTED_MARKDOWN_COMPONENTS = {
-	a: SafeAnchor,
-	code: MarkdownCode,
-	img: () => null,
-	h1: PreviewHeading,
-	h2: PreviewHeading,
-	h3: PreviewHeading,
-	h4: PreviewHeading,
-	h5: PreviewHeading,
-	h6: PreviewHeading,
-};
-
-/**
- * Two departures from Tailwind Typography's defaults, which are sized for an article rather than a
- * short comment inside a card.
- *
- * <p>The heading rhythm is tightened, because `mt-8` above a heading assumes a section the reader
- * scrolled to rather than one of three inside a few hundred words.
- *
- * <p>`pre` gives up `overflow-x: auto` and wraps instead. The composer quotes the developer's own
- * code in fenced blocks, and a block wider than the card becomes a scrollable region no keyboard can
- * reach — axe's `scrollable-region-focusable`, and a real problem on a phone, where the end of the
- * line needs a horizontal drag inside a vertically scrolling page.
- */
-const FEEDBACK_PROSE =
-	"prose prose-sm dark:prose-invert max-w-none break-words prose-headings:mt-4 prose-headings:mb-1.5 prose-headings:text-sm prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:overflow-x-visible prose-pre:whitespace-pre-wrap prose-pre:break-words first:prose-headings:mt-0";
 
 /**
  * The header badge appears only on text that did *not* simply reach the developer: badging the
@@ -107,15 +61,8 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 					{unsent && <StatusBadge def={deliveryOutcome(feedback)} />}
 				</CardHeader>
 				<CardContent className="pb-4">
-					<TabsContent value="rendered" className={FEEDBACK_PROSE}>
-						<Streamdown
-							mode="static"
-							rehypePlugins={[]}
-							remarkRehypeOptions={{ allowDangerousHtml: false }}
-							components={UNTRUSTED_MARKDOWN_COMPONENTS}
-						>
-							{body}
-						</Streamdown>
+					<TabsContent value="rendered" className={UNTRUSTED_MARKDOWN_PROSE}>
+						<UntrustedMarkdown>{body}</UntrustedMarkdown>
 					</TabsContent>
 					{/* Uncapped, like the rendered view: a height cap here would make the same text a
 					    scrollable region in one view and not the other, and a scroll box with no

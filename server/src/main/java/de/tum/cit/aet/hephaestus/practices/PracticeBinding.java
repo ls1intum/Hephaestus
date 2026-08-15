@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotEmpty;
@@ -35,6 +36,12 @@ import org.jspecify.annotations.Nullable;
  * @param signals  the signals that occasion this review; at least one, and all of one artifact kind
  * @param onDrafts whether a draft artifact occasions this review; defaults to false since most
  *                 practices judge work that has been handed over
+ * @param subject  whose conduct a review occasioned this way judges. Defaults to {@link ActorRole#AUTHOR},
+ *                 which is what almost every practice is about; a practice about reviewing names
+ *                 {@link ActorRole#REVIEWER}. Declared on the occasion rather than on the signal because
+ *                 one signal occasions both kinds: {@code scm.pull_request.reviewed} starts
+ *                 {@code engaging-with-inline-review-comments} (about the author) and
+ *                 {@code leaves-useful-specific-review-comments} (about the reviewer) in the same run.
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(
@@ -48,22 +55,33 @@ public record PracticeBinding(
     @Schema(description = "Sources a review occasioned this way reads, each with the stance it takes")
     List<PracticeEvidenceRequirement> needs,
     @Schema(description = "Whether an artifact still marked draft occasions this review; omit for false")
-    boolean onDrafts
+    boolean onDrafts,
+    // Bare, like onDrafts above it: the field is additive, and every binding written before roles
+    // existed omits it. Requiring it on the wire would refuse those payloads outright.
+    @Schema(description = "Whose conduct this review judges; omit for AUTHOR") ActorRole subject
 ) {
     /**
-     * Reads a binding that omits {@code onDrafts}: Jackson will not default a primitive from an absent
-     * key, so without this every binding would have to spell out {@code "onDrafts": false}.
+     * Reads a binding that omits {@code onDrafts} or {@code subject}: Jackson will not default a
+     * primitive from an absent key, and an absent {@code subject} must read as AUTHOR so every binding
+     * written before roles existed keeps its meaning.
      */
     @JsonCreator
     static PracticeBinding fromJson(
         @JsonProperty("signals") List<SignalName> signals,
         @JsonProperty("needs") List<PracticeEvidenceRequirement> needs,
-        @JsonProperty("onDrafts") @Nullable Boolean onDrafts
+        @JsonProperty("onDrafts") @Nullable Boolean onDrafts,
+        @JsonProperty("subject") @Nullable ActorRole subject
     ) {
-        return new PracticeBinding(signals, needs, Boolean.TRUE.equals(onDrafts));
+        return new PracticeBinding(
+            signals,
+            needs,
+            Boolean.TRUE.equals(onDrafts),
+            subject == null ? ActorRole.AUTHOR : subject
+        );
     }
 
     public PracticeBinding {
+        subject = subject == null ? ActorRole.AUTHOR : subject;
         // Sorted and de-duplicated: both lists are digested into the review-rule fingerprint, so the
         // same binding written in a different order must not read as a second rule.
         signals = List.copyOf(
@@ -97,9 +115,37 @@ public record PracticeBinding(
         }
     }
 
+    /** A binding whose review judges the artifact's author — what almost every practice is about. */
+    public PracticeBinding(List<SignalName> signals, List<PracticeEvidenceRequirement> needs, boolean onDrafts) {
+        this(signals, needs, onDrafts, ActorRole.AUTHOR);
+    }
+
     /** A binding on one signal that reads the evidence the artifact kind's default names. */
     public static PracticeBinding on(SignalName signal, List<PracticeEvidenceRequirement> needs) {
-        return new PracticeBinding(List.of(signal), needs, false);
+        return new PracticeBinding(List.of(signal), needs, false, ActorRole.AUTHOR);
+    }
+
+    /**
+     * Whose conduct a review of these bindings, occasioned by {@code signal}, judges — the fact that
+     * decides which person an observation is filed against.
+     *
+     * <p>A {@code null} signal means nobody named an occasion (a review asked for by hand, or a replay
+     * with no ledger row), so every binding applies; the single-occasion rule makes that one binding in
+     * practice. Where several occasions somehow disagree the answer is the one that is NOT
+     * {@link ActorRole#AUTHOR}, because attributing a reviewer's conduct to the author is the failure
+     * this method exists to prevent and the reverse merely withholds.
+     */
+    public static ActorRole subjectRoleOf(List<PracticeBinding> bindings, @Nullable SignalName signal) {
+        ActorRole role = ActorRole.AUTHOR;
+        for (PracticeBinding binding : bindings) {
+            if (signal == null || binding.matches(signal)) {
+                if (binding.subject() != ActorRole.AUTHOR) {
+                    return binding.subject();
+                }
+                role = binding.subject();
+            }
+        }
+        return role;
     }
 
     /**

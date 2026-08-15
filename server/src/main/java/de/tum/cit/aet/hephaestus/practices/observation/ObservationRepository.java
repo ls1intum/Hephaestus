@@ -849,4 +849,45 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         UUID getReviewId();
         Instant getObservedAt();
     }
+
+    /**
+     * One person's own measurements of one practice inside a window — the evidence a process-level
+     * message about that practice stands on.
+     *
+     * <p>Workspace-scoped through the practice, exactly as every other read here: {@code observation}
+     * carries no workspace column of its own, so the join IS the tenancy predicate and dropping it would
+     * make a pattern about one workspace citable in another.
+     *
+     * <p>Deliberately NOT deduped to each artifact's latest run: whether a problem recurred across
+     * separate pieces of work is the question, and a re-review of the same pull request is the same
+     * occurrence, which the caller collapses by artifact rather than by run.
+     */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
+    @Query(
+        """
+        SELECT o FROM Observation o
+        JOIN o.practice p
+        WHERE p.workspace.id = :workspaceId
+          AND p.slug = :practiceSlug
+          AND o.aboutUserId = :aboutUserId
+          AND o.observedAt >= :since
+        ORDER BY o.observedAt DESC
+        """
+    )
+    List<Observation> findRecentForSubjectAndPractice(
+        @Param("workspaceId") Long workspaceId,
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("since") Instant since,
+        Pageable pageable
+    );
+
+    /**
+     * The distinct people this job filed measurements against — the recipients a cycle can compose for.
+     *
+     * <p>Ordered, because callers hand each recipient a slice of a fixed ordinal band and a re-run has to
+     * assign the same slices for its idempotency guard to recognise what it already wrote.
+     */
+    @Query("SELECT DISTINCT o.aboutUserId FROM Observation o WHERE o.agentJobId = :agentJobId ORDER BY o.aboutUserId")
+    List<Long> findSubjectUserIdsByAgentJobId(@Param("agentJobId") UUID agentJobId);
 }

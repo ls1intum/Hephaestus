@@ -2,10 +2,12 @@ import {
 	BotMessageSquareIcon,
 	CircleAlertIcon,
 	CircleCheckIcon,
+	ClockIcon,
 	EyeOffIcon,
 	HistoryIcon,
 	HourglassIcon,
 	MessageSquareDashedIcon,
+	UserRoundIcon,
 } from "lucide-react";
 import type { ReviewFeedback } from "@/api/types.gen";
 import type { StatusDef, StatusDefs } from "./status-def";
@@ -19,8 +21,8 @@ export type DeliveryFacts = Pick<ReviewFeedback, "channel" | "deliveryState" | "
  * first, and a cell shows one or the other, never a value from each.
  *
  * <p>Keyed by the stored state, because that is what the list endpoint filters on. What a *row*
- * renders is {@link deliveryOutcome}, which says more: `DELIVERED` means two different things
- * depending on the lane it went down. `PREPARED` only ever occurs on the conversation lane.
+ * renders is {@link deliveryOutcome}, which says more: `DELIVERED` and `PREPARED` each mean
+ * different things depending on the lane the unit went down, so both are refined per lane below.
  */
 export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 	DELIVERED: {
@@ -30,10 +32,14 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 		description: "It reached the developer where it was placed.",
 	},
 	PREPARED: {
-		label: "Prepared for conversation",
-		icon: MessageSquareDashedIcon,
+		// The bare state, which is what the Outcome facet can offer. Both lanes that use it refine the
+		// words below: what a prepared unit is waiting *for* differs, and naming one lane's moment here
+		// mislabelled the other's rows.
+		label: "Prepared",
+		icon: ClockIcon,
 		badgeVariant: "secondary",
-		description: "Waiting for the developer's next chat with the mentor, which is what sends it.",
+		description:
+			"Composed, and waiting for the moment that delivers it — which differs by channel.",
 	},
 	SUPERSEDED: {
 		label: "Replaced by newer",
@@ -56,13 +62,19 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 };
 
 /**
- * The rows where the stored state under-describes what happened, both on the conversation lane.
+ * The rows where the stored state under-describes what happened, on the conversation lane.
  *
  * <p>Each label **must begin with the label of the state it refines**. The Outcome facet can only
  * offer the stored states, so a badge whose words share no stem with any option leaves a reader
  * unable to find the filter for the row in front of them.
  */
 const CONVERSATION_OVERRIDES = {
+	PREPARED: {
+		label: "Prepared for conversation",
+		icon: MessageSquareDashedIcon,
+		badgeVariant: "secondary",
+		description: "Waiting for the developer's next chat with the mentor, which is what sends it.",
+	},
 	RAISED: {
 		label: "Delivered in conversation",
 		icon: BotMessageSquareIcon,
@@ -77,12 +89,30 @@ const CONVERSATION_OVERRIDES = {
 	},
 } as const satisfies Record<string, StatusDef>;
 
+/**
+ * The same, on the reflection lane. A prepared unit here is not waiting on the mentor: nothing sends
+ * it, and the developer opening their own feedback page is the delivery. Saying "waiting for their
+ * next chat" about one of these rows would describe an event that will never happen to it.
+ */
+const REFLECTION_OVERRIDES = {
+	PREPARED: {
+		label: "Prepared for their feedback page",
+		icon: UserRoundIcon,
+		badgeVariant: "secondary",
+		description: "Waiting on the developer's own feedback page; opening it is what delivers it.",
+	},
+} as const satisfies Record<string, StatusDef>;
+
 /** What a row should say became of this feedback. */
 export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	const { channel, deliveryState, suppressionReason } = feedback;
 	if (channel === "CONVERSATION") {
+		if (deliveryState === "PREPARED") return CONVERSATION_OVERRIDES.PREPARED;
 		if (deliveryState === "DELIVERED") return CONVERSATION_OVERRIDES.RAISED;
 		if (suppressionReason === "CONVERSATION_EXPIRED") return CONVERSATION_OVERRIDES.EXPIRED;
+	}
+	if (channel === "REFLECTION" && deliveryState === "PREPARED") {
+		return REFLECTION_OVERRIDES.PREPARED;
 	}
 	return DELIVERY_STATE_DEFS[deliveryState];
 }

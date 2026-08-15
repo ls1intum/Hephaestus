@@ -2797,4 +2797,37 @@
         ]]></rollback>
     </changeSet>
 
+    <!-- The third feedback lane is named REFLECTION, for how the developer engages with it, rather than
+         PROFILE, which named a storage location and collided with the public user profile at /user/{username}.
+         The released 1781092589259-67 re-aligned this CHECK to 'PROFILE'; that changeSet is immutable, so the
+         re-alignment is made forward here.
+
+         No data migration: nothing ever wrote this channel. Until -67 the released CHECK admitted only
+         'REFLECTION_DASHBOARD', so 'PROFILE' was unwritable at the database; after -67 an ArchUnit rule
+         (ProfileChannelUnwrittenArchTest, now ReflectionChannelProducerArchTest) held the lane producerless
+         until this branch added the first producer, which already writes 'REFLECTION'. The ADD CONSTRAINT
+         below validates existing rows, so if that premise is ever wrong the migration fails loudly here
+         instead of leaving an unreadable row behind. -->
+    <changeSet author="hephaestus-terminology" id="1785743133884-52">
+        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_channel already names the reflection lane">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_feedback_channel'
+                  AND conrelid = 'feedback'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%PROFILE%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Re-align chk_feedback_channel to the lane's final name: REFLECTION, not PROFILE.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_channel;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_channel
+                CHECK (channel IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION'));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_channel;
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_channel
+                CHECK (channel IN ('IN_CONTEXT', 'CONVERSATION', 'PROFILE'));
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

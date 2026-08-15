@@ -50,6 +50,23 @@ public final class SandboxLayout {
     public static final String MANIFEST_PATH = INPUTS_PREFIX + "manifest.json";
 
     /**
+     * Workspace-relative path of the feedback-composition request: whether this run should compose
+     * process-level feedback for the developer's reflection surface after its measurements are final, and the
+     * bounds it must respect.
+     *
+     * <p>Absence is the off switch, and it is data rather than an env flag on purpose — the handler that
+     * knows whether a run is a live measurement of somebody's current work is the same handler that
+     * writes this file, so the decision and its parameters travel together.
+     */
+    public static final String FEEDBACK_COMPOSITION_PATH = INPUTS_PREFIX + "feedback-composition.json";
+
+    /** Workspace-relative filename of the composition stage's output, collected from {@link #OUTPUT_PATH}. */
+    public static final String REFLECTION_FEEDBACK_FILENAME = "reflection-feedback.json";
+
+    /** Workspace-relative filename of the composition stage's instructions, staged beside the runner. */
+    public static final String REFLECTION_COMPOSER_PROMPT_FILENAME = "reflection-composer.md";
+
+    /**
      * Workspace-relative prefix for what earlier reviews recorded and already said.
      *
      * <p>Separate from {@link #CONTEXT_PREFIX} because it is the one part of the sandbox that is not

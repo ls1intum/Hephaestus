@@ -336,7 +336,7 @@ public class PracticeService {
         if (!afterDefinition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
             practice.setReviewTier(PracticeReviewTier.OFF);
         }
-        definitionValidator.validate(afterDefinition);
+        validateUpdate(afterDefinition, request.bindings() != null);
         practice = practiceRepository.save(practice);
         revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         configAudit.record(
@@ -455,8 +455,47 @@ public class PracticeService {
         );
     }
 
+    /**
+     * Validates an edit, holding the single-occasion rule to what the caller actually said.
+     *
+     * <p>A practice reviewed on one occasion is a rule about the occasion somebody <em>submits</em>. An
+     * update that omits {@code bindings} makes no statement about occasions at all — a rename is the
+     * plainest example — so carrying the stored occasion forward and then refusing it would leave a
+     * practice written while two were still legal impossible to edit ever again, by anyone, in any
+     * field. Refusing the caller's own second occasion still happens, in the same words, both here and
+     * in bean validation on the request.
+     *
+     * <p>Carried-over occasions are not waved through: they are validated one at a time, because this
+     * same request can move the review policy they hang off — a different source-contract version can
+     * retire a source an untouched occasion reads. Only the count is a property of the list; every
+     * other rule the validator applies is a property of a single occasion, so checking each alone is
+     * the same coverage minus exactly the rule that does not apply.
+     */
+    private void validateUpdate(PracticeDefinition afterDefinition, boolean occasionSubmitted) {
+        if (occasionSubmitted || afterDefinition.bindings().size() <= 1) {
+            definitionValidator.validate(afterDefinition);
+            return;
+        }
+        for (PracticeBinding carried : afterDefinition.bindings()) {
+            definitionValidator.validate(withBindings(afterDefinition, List.of(carried)));
+        }
+    }
+
+    private static PracticeDefinition withBindings(PracticeDefinition definition, List<PracticeBinding> bindings) {
+        return new PracticeDefinition(
+            definition.name(),
+            bindings,
+            definition.criteria(),
+            definition.precomputeScript(),
+            definition.automatedReviewPolicy(),
+            definition.whyItMatters(),
+            definition.whatGoodLooksLike(),
+            definition.areaSlug()
+        );
+    }
+
     private static PracticeBinding withoutEvidence(PracticeBinding binding) {
-        return new PracticeBinding(binding.signals(), List.of(), binding.onDrafts());
+        return new PracticeBinding(binding.signals(), List.of(), binding.onDrafts(), binding.subject());
     }
 
     private static void applyDefinition(Practice practice, PracticeDefinition definition) {

@@ -115,8 +115,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void promptDigest_matchesScaffoldingBytes() {
-            // The digest is exactly the root digest over orchestrator + runner + sidecars — recomputable
-            // from the plan's own input files, so a replay can verify it.
+            // The digest is exactly the root digest over orchestrator + runner + sidecars + prompt
+            // resources — recomputable from the plan's own input files, so a replay can verify it.
+            // Insertion order mirrors PiRuntimeFactory: sidecars, then prompts.
             var plan = factory.build(spec("openai-completions", "m", false));
             var scaffolding = new java.util.LinkedHashMap<String, byte[]>();
             scaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, plan.inputFiles().get(SandboxLayout.ORCHESTRATOR_PATH));
@@ -126,6 +127,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 scaffolding.put(sidecar, plan.inputFiles().get(sidecar));
+            }
+            for (String prompt : PRACTICE.promptResources()) {
+                scaffolding.put(prompt, plan.inputFiles().get(prompt));
             }
 
             assertThat(plan.promptDigest()).isEqualTo(ProvenanceDigest.rootDigestHex(scaffolding));

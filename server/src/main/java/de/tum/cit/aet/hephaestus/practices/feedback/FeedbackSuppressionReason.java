@@ -38,9 +38,16 @@ public enum FeedbackSuppressionReason {
      */
     PRACTICE_TIER_QUIET,
     /**
-     * Like {@link #PRACTICE_TIER_QUIET}, but for a backfill campaign whose only entitled channel has no
-     * producer — undone by different acts: a tier is a dial an admin can turn, this lifts only when a
-     * profile-surface producer exists.
+     * Like {@link #PRACTICE_TIER_QUIET}, but for a backfill campaign: measured retrospectively, so it is
+     * not said out loud where it would read as today's work.
+     *
+     * <p>This once meant "the only channel this provenance is entitled to has no producer, and this
+     * lifts when one exists". A producer now exists — the reflection surface — and backfill is still held
+     * back, for a reason that outlives it: {@link de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin}
+     * calls a backfilled population "sound as a snapshot, unusable as a trend against LIVE rows", and a
+     * process-level message is precisely a trend claim. The reflection lane records that refusal under its
+     * own name ({@code ReflectionRoutingDecision.BACKFILL_HELD}), so lifting it there is a decision taken
+     * with a real workspace in view rather than a side effect of shipping a producer.
      */
     BACKFILL_QUIET,
 }

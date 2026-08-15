@@ -107,8 +107,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 						<AlertDialogDescription>
 							This replaces the customization and discards unsaved changes. It does not change
 							whether the practice is included in new workspaces. Existing workspaces remain
-							unchanged. Future Hephaestus updates apply automatically until the practice is
-							customized again.
+							unchanged. Future updates apply automatically until the practice is customized again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

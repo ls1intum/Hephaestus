@@ -20,6 +20,14 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 
+    /**
+     * The composition stage's instructions, read by {@link #SCRIPT} from the workspace root. Kept out of
+     * {@code .pi/AGENTS.md} deliberately: that file is the detector's orchestration prompt and is loaded
+     * into every session implicitly, while composing feedback is a different job with a different voice
+     * and must not inherit the vocabulary of the one that took the measurements.
+     */
+    private static final List<String> PROMPTS = List.of(SandboxLayout.REFLECTION_COMPOSER_PROMPT_FILENAME);
+
     private static final List<String> FLAGS = List.of("--no-warnings");
 
     @Override
@@ -30,6 +38,11 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     @Override
     public List<String> sidecarScripts() {
         return SIDECARS;
+    }
+
+    @Override
+    public List<String> promptResources() {
+        return PROMPTS;
     }
 
     @Override

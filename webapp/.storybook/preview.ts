@@ -144,6 +144,7 @@ const preview: Preview = {
 					"Workspace admin",
 					"Instance admin",
 					"Practice trace",
+					"My feedback",
 					"Workspace",
 					"Surveys",
 					"Common",

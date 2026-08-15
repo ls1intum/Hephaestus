@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -152,10 +153,14 @@ public class PracticeDetectionDeliveryService {
                         job.getId()
                 );
             }
+            enforceAttribution(finding, revision, job);
             enforceEvidenceBoundary(finding, revision, evidenceBoundary, job);
         }
 
         ObservationOrigin origin = originOf(metadata);
+        // The one person this job resolved. Sound for every finding only because the catalogue injector
+        // withheld every practice whose occasion is about somebody else, and enforceAttribution above
+        // refuses one that reached here anyway.
         Long aboutUserId = target.aboutUserId();
         ArtifactKind artifactKind = target.type();
         Long artifactId = target.id();
@@ -260,6 +265,37 @@ public class PracticeDetectionDeliveryService {
         );
 
         return new DeliveryResult(inserted, discardedDuplicate, hasNegative, observationKeys);
+    }
+
+    /**
+     * Refuses a finding whose practice is about somebody this job cannot name.
+     *
+     * <p>{@link #resolveTarget} resolves exactly one person, and it is the artifact's author (or the
+     * subject a repo-less job carries). A practice whose occasion declares a non-AUTHOR
+     * {@link ActorRole} — a practice about how somebody <em>reviews</em> — has no resolvable subject
+     * here: the run knows the pull request, not which of its reviewers each observation is about.
+     * Persisting it would file a judgement of one person's conduct under another person's name, which is
+     * both wrong feedback and a record about a data subject that is simply false.
+     *
+     * <p>{@code PracticeCatalogInjector} already withholds these practices at preparation, so this
+     * refuses only a job prepared before that filter existed. Loud rather than silent: the alternative is
+     * dropping a finding a review was paid for with nothing saying so.
+     */
+    private void enforceAttribution(ValidatedFinding finding, PracticeRevision revision, AgentJob job) {
+        ActorRole subject = PracticeBinding.subjectRoleOf(
+            revision.getBindings(),
+            PracticeCatalogInjector.signalOf(job)
+        );
+        if (subject != ActorRole.AUTHOR) {
+            throw new JobDeliveryException(
+                "Finding is about a " +
+                    subject +
+                    " this review cannot name, so it has nobody to be filed against: slug=" +
+                    finding.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
+        }
     }
 
     private void enforceEvidenceBoundary(

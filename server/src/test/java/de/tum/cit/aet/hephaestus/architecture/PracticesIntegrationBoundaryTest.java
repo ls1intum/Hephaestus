@@ -57,6 +57,8 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
         "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
         "de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
         "de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
+        "de.tum.cit.aet.hephaestus.practices.feedback.reflection.ReflectionFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
+        "de.tum.cit.aet.hephaestus.practices.feedback.reflection.ReflectionFeedbackService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository",
         "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider",
         "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue",
         "de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate -> de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest",

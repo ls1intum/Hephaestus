@@ -27,5 +27,5 @@ public enum FeedbackLane {
      * The recipient's private reflection surface inside Hephaestus. Deliberately not deliverable by an
      * integration — it is ours, and a vendor claiming it would be claiming a surface it cannot reach.
      */
-    PROFILE,
+    REFLECTION,
 }

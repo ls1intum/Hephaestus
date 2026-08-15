@@ -29,6 +29,12 @@ const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
+// The feedback-composition stage (see reflection-composer.md). Mirrors SandboxLayout:
+// FEEDBACK_COMPOSITION_PATH / REFLECTION_FEEDBACK_FILENAME / REFLECTION_COMPOSER_PROMPT_FILENAME.
+const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
+const REFLECTION_FEEDBACK_PATH = `${OUTPUT}/reflection-feedback.json`;
+const COMPOSER_PROMPT_PATH = `${CWD}/reflection-composer.md`;
+const OBSERVATION_HISTORY_PATH = `${CWD}/inputs/history/observations.json`;
 const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
 if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
     throw new Error(`AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`);
@@ -41,6 +47,9 @@ if (!AGENT_DIR) {
 const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
 const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
 const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5));
+// Ceiling for the feedback-composition stage. Never additive to the review's own allowance: the stage
+// runs only from what is left over, and skips itself when the review used its time (see main()).
+const COMPOSITION_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.15));
 
 // Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
@@ -381,6 +390,202 @@ const reportFindingTool = defineTool({
         };
     },
 });
+
+// ── Feedback composition stage ────────────────────────────────────────────────
+//
+// A SECOND LLM turn, after the review's measurements are final, that turns what has been observed
+// about this developer ACROSS pieces of work into process-level messages for their reflection surface.
+// Observation and feedback are separate acts; this is where the separation lives in the runtime.
+//
+// Strictly additive. It runs only after result.json is on disk and valid, in its OWN session, and
+// every failure inside it is swallowed: a review that measured correctly is a successful review
+// whether or not anything was composed from it. Nothing here can touch reviewState or the exit code.
+
+const composedFeedback = { messages: [] };
+
+function loadCompositionRequest() {
+    try {
+        if (!existsSync(COMPOSITION_REQUEST_PATH)) return null;
+        const request = JSON.parse(readFileSync(COMPOSITION_REQUEST_PATH, "utf8"));
+        if (!request || request.enabled !== true) return null;
+        return {
+            maxMessages: Math.max(1, Math.min(Number(request.maxMessages) || 2, 10)),
+            minDistinctArtifacts: Math.max(2, Number(request.minDistinctArtifacts) || 2),
+        };
+    } catch (e) {
+        console.error(`[pi-runner] composition request unreadable: ${e.message}`);
+        return null;
+    }
+}
+
+// The practices a message may be about: what this run evaluated, plus what this developer's recorded
+// history mentions. A pattern routinely predates the current run, so restricting to the run's own
+// practice set would make the commonest true pattern unsayable. The server resolves the slug to this
+// person's own measurements regardless, so an unknown one simply finds no evidence.
+function composablePracticeSlugs() {
+    const slugs = new Set(admittedPractices);
+    try {
+        if (existsSync(OBSERVATION_HISTORY_PATH)) {
+            const history = JSON.parse(readFileSync(OBSERVATION_HISTORY_PATH, "utf8"));
+            for (const entry of history?.observations ?? []) {
+                if (typeof entry?.practiceSlug === "string" && entry.practiceSlug.trim()) {
+                    slugs.add(entry.practiceSlug);
+                }
+            }
+        }
+    } catch (e) {
+        console.error(`[pi-runner] observation history unreadable for composition: ${e.message}`);
+    }
+    return [...slugs].sort();
+}
+
+function persistComposedFeedback() {
+    writeFileSync(REFLECTION_FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
+}
+
+// Structurally distinct from report_finding, and that is the point: no presence, no assessment, no
+// severity, no confidence, no citations. An intervention that could carry a verdict would eventually
+// be read back as one.
+function buildProcessFeedbackTool(practiceSlugs, maxMessages) {
+    return defineTool({
+        name: "report_process_feedback",
+        label: "Report Process Feedback",
+        description:
+            "Persist exactly one process-level message for the developer's reflection surface. Call it as soon as one message is ready, one call per practice. This is an intervention, not a measurement: it takes no presence, assessment, severity or confidence.",
+        parameters: {
+            type: "object",
+            additionalProperties: false,
+            required: ["message"],
+            properties: {
+                message: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["practiceSlug", "title", "body", "nextStep"],
+                    properties: {
+                        practiceSlug: {
+                            type: "string",
+                            enum: practiceSlugs,
+                            description: "The practice whose recurring pattern this message is about.",
+                        },
+                        title: {
+                            type: "string",
+                            maxLength: 255,
+                            description: "Names the pattern in a few words. Never names the person.",
+                        },
+                        body: {
+                            type: "string",
+                            maxLength: 8000,
+                            description:
+                                "The message, as Markdown, addressed to the developer as 'you'. Read verbatim. Cites the pieces of work, never a line of code.",
+                        },
+                        nextStep: {
+                            type: "string",
+                            maxLength: 2000,
+                            description:
+                                "One habit to try on the NEXT piece of work. If it can be done right now on one diff, it is the wrong level.",
+                        },
+                    },
+                },
+            },
+        },
+        execute: async (_toolCallId, params) => {
+            const message = params.message;
+            if (composedFeedback.messages.some((m) => m.practiceSlug === message.practiceSlug)) {
+                return {
+                    content: [{ type: "text", text: `Already have a message for ${message.practiceSlug}; skipped.` }],
+                    details: { stored: 0, total: composedFeedback.messages.length },
+                };
+            }
+            if (composedFeedback.messages.length >= maxMessages) {
+                return {
+                    content: [{ type: "text", text: `Message cap of ${maxMessages} reached; skipped.` }],
+                    details: { stored: 0, total: composedFeedback.messages.length },
+                };
+            }
+            composedFeedback.messages.push({
+                practiceSlug: message.practiceSlug,
+                title: message.title,
+                body: message.body,
+                nextStep: message.nextStep,
+            });
+            // Written on every call, like report_finding, so a stage killed by the watchdog still
+            // leaves behind what it had already decided.
+            persistComposedFeedback();
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Stored a process-level message for ${message.practiceSlug}. ${composedFeedback.messages.length}/${maxMessages} used.`,
+                    },
+                ],
+                details: { stored: 1, total: composedFeedback.messages.length },
+            };
+        },
+    });
+}
+
+async function runCompositionStage(sharedDeps, budgetMs) {
+    const request = loadCompositionRequest();
+    if (!request) {
+        console.error(`[pi-runner] Composition stage: not requested for this run`);
+        return null;
+    }
+    if (!existsSync(COMPOSER_PROMPT_PATH)) {
+        console.error(`[pi-runner] Composition stage: ${COMPOSER_PROMPT_PATH} missing, skipping`);
+        return null;
+    }
+    if (budgetMs < 30_000) {
+        console.error(`[pi-runner] Composition stage: only ${budgetMs}ms left, skipping`);
+        return null;
+    }
+    const practiceSlugs = composablePracticeSlugs();
+    if (practiceSlugs.length === 0) {
+        return null;
+    }
+    const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
+    const tool = buildProcessFeedbackTool(practiceSlugs, request.maxMessages);
+
+    // A SEPARATE session, not another turn on the review's. Two reasons, both structural: the review's
+    // conversation is a record of taking measurements, and re-sending it would both cost its full
+    // token weight again and invite the composer to treat its own reasoning as evidence.
+    const { session } = await createAgentSession({
+        cwd: CWD,
+        agentDir: AGENT_DIR,
+        tools: ["read", "grep", "report_process_feedback"],
+        customTools: [tool],
+        sessionManager: SessionManager.inMemory(),
+        settingsManager: sharedDeps.settingsManager,
+        authStorage: sharedDeps.authStorage,
+        modelRegistry: sharedDeps.modelRegistry,
+    });
+
+    let aborted = false;
+    const timer = setTimeout(() => {
+        aborted = true;
+        console.error(`[pi-runner] Composition stage hard timeout — aborting`);
+        session.abort().catch((err) => console.error(`[pi-runner] composition abort failed: ${err.message}`));
+    }, budgetMs);
+    const startMs = Date.now();
+    try {
+        await session.prompt(
+            `${instructions}\n\n## This turn\n` +
+                `Write at most ${request.maxMessages} message(s). A pattern needs at least ` +
+                `${request.minDistinctArtifacts} distinct pieces of work. Persist each with ` +
+                `report_process_feedback. If nothing clears the bar, write nothing and say so in one line.`,
+        );
+    } catch (err) {
+        console.error(`[pi-runner] Composition stage prompt error: ${err.message}`);
+    } finally {
+        clearTimeout(timer);
+    }
+    // Always written, even empty: an empty payload is the stage saying it looked and composed nothing,
+    // which is a different fact from the stage never having run.
+    persistComposedFeedback();
+    console.error(
+        `[pi-runner] Composition stage: ${composedFeedback.messages.length} message(s) in ${((Date.now() - startMs) / 1000).toFixed(1)}s, aborted=${aborted}`,
+    );
+    return session;
+}
 
 function extractUsageFromSession(session) {
     const messages = session.messages || [];
@@ -825,6 +1030,29 @@ async function main() {
     console.error(
         `[pi-runner] Initial: ${(initialDurationMs / 1000).toFixed(1)}s, calls=${initialUsage.totalCalls}, softTimeout=${softTimeoutFired}, hardAbort=${hardAborted}, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
+
+    // ── Feedback composition ─────────────────────────────────────────────────
+    //
+    // The second LLM step: observations were the measurement, this turns them into an intervention for
+    // the developer's reflection surface. Runs only when the review already has durable state, only from time
+    // the review did not need, and never when the review was itself short of time — a review that had to
+    // be nudged or aborted needs its retry allowance more than the reflection surface needs a message today.
+    // Isolated: any failure is logged and this review's outcome is untouched.
+    if (hasPersistedReviewState() && !softTimeoutFired && !hardAborted) {
+        try {
+            const remainingMs = AGENT_BUDGET_MS - (Date.now() - startMs);
+            const composeSession = await runCompositionStage(
+                { settingsManager, authStorage, modelRegistry },
+                Math.min(COMPOSITION_TIMEOUT_MS, Math.max(0, remainingMs - RETRY_TIMEOUT_MS)),
+            );
+            if (composeSession) {
+                accumulateUsage(null, extractUsageFromSession(composeSession.state));
+                persistUsage();
+            }
+        } catch (err) {
+            console.error(`[pi-runner] Composition stage failed (review unaffected): ${err.message}`);
+        }
+    }
 
     if (checkResultFile()) {
         console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);

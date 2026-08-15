@@ -22,7 +22,7 @@ class FeedbackAdmissionTest extends BaseUnitTest {
         /**
          * A backfilled observation is refused on both channels a producer writes to today, at every tier —
          * so a campaign is measured and delivered nowhere. The other half of that claim, that nothing
-         * produces a {@code PROFILE} unit, is pinned by {@code ProfileChannelUnwrittenArchTest}.
+         * produces a {@code REFLECTION} unit, is pinned by {@code ReflectionChannelUnwrittenArchTest}.
          */
         @Test
         void aBackfilledObservationIsRefusedOnEveryChannelAProducerWritesToday() {
@@ -38,10 +38,10 @@ class FeedbackAdmissionTest extends BaseUnitTest {
             }
         }
 
-        /** …and the reason is specifically PROFILE's, not a blanket refusal we would forget to revisit. */
+        /** …and the reason is specifically REFLECTION's, not a blanket refusal we would forget to revisit. */
         @Test
-        void aBackfillIsEntitledToTheProfileChannelAndOnlyThat() {
-            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.PROFILE)).isTrue();
+        void aBackfillIsEntitledToTheReflectionChannelAndOnlyThat() {
+            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.REFLECTION)).isTrue();
             assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_CONTEXT)).isFalse();
             assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.CONVERSATION)).isFalse();
         }

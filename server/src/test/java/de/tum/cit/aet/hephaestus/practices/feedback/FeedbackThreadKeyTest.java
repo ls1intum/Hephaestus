@@ -46,11 +46,11 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
     @Test
     @DisplayName("a non-artifact-anchored unit (null artifact) is stable and keyed by recipient + surface")
     void nullArtifactStable() {
-        String n1 = FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.PROFILE);
-        String n2 = FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.PROFILE);
+        String n1 = FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.REFLECTION);
+        String n2 = FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.REFLECTION);
         assertThat(n1).isEqualTo(n2).hasSize(64);
         assertThat(n1)
-            .as("a profile digest is distinct from an in-context unit")
+            .as("a reflection digest is distinct from an in-context unit")
             .isNotEqualTo(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.IN_CONTEXT));
     }
 
@@ -62,8 +62,12 @@ class FeedbackThreadKeyTest extends BaseUnitTest {
         assertThat(FeedbackThreadKey.compute(TYPE, 42L, 7L, FeedbackChannel.IN_CONTEXT)).isEqualTo(
             "a94dab8733d9b5e1ae7933969116e27e717b88f43e06ee63c23cf905d1b3fc96"
         );
-        assertThat(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.PROFILE)).isEqualTo(
-            "920ac864efe41848722be5c5ee7f8a7785002c673aed740fd2674452b13b5460"
+        // Re-pinned when the channel was renamed PROFILE → REFLECTION. The digest takes the channel's
+        // name, so the rename moved this vector — safe only because the lane had no producer until it
+        // was named REFLECTION, so no thread was ever opened under the old spelling. A future rename of
+        // a channel that has shipped feedback orphans every thread it opened, and needs a migration.
+        assertThat(FeedbackThreadKey.compute("", null, 7L, FeedbackChannel.REFLECTION)).isEqualTo(
+            "bb385db1ef94b5a7e85e4c09d3a66ea0f3c73c01d9761a04d5121b063c7450f7"
         );
     }
 }

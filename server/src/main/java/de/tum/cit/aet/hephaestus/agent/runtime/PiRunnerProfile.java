@@ -20,6 +20,16 @@ public interface PiRunnerProfile {
         return List.of();
     }
 
+    /**
+     * Prompt files this runner reads from the workspace root by name (e.g. the composition stage's
+     * instructions). Staged like the sidecars, and digested with the rest of the prompt scaffolding —
+     * they ARE prompt content, so a run's recorded prompt version must move when they do. Empty by
+     * default.
+     */
+    default List<String> promptResources() {
+        return List.of();
+    }
+
     /** V8 flags for the {@code node} invocation. */
     List<String> nodeFlags();
 

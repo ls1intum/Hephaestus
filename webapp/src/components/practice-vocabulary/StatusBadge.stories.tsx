@@ -73,7 +73,9 @@ export const EveryRegistry: Story = {
 		</div>
 	),
 	play: async ({ canvas }) => {
-		canvas.getByText("Prepared for conversation");
+		// The bare stored state, which is what this gallery shows: the per-lane refinements of it are
+		// `deliveryOutcome`'s job and appear on a row, never in the registry.
+		canvas.getByText("Prepared");
 		canvas.getByText("Withheld");
 		canvas.getByText("On the work");
 	},

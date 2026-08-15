@@ -24,19 +24,27 @@ export const DELIVERY_PLACE_DEFS: StatusDefs<DeliveryPlace> = {
 		badgeVariant: "outline",
 		description: "Held back until the developer's next chat with the mentor, then raised there.",
 	},
-	PROFILE: {
-		label: "On the profile",
+	REFLECTION: {
+		label: "On their feedback page",
 		icon: UserRoundIcon,
 		badgeVariant: "outline",
-		description: "Shown only on the developer's own profile.",
+		description:
+			"Shown only on the developer's own feedback page, which is also what delivers it. The text is withheld from every operator surface, including this one.",
 	},
 };
 
 /**
- * The places worth offering as a filter. Nothing writes a `PROFILE` unit —
- * `ProfileChannelUnwrittenArchTest` fails the build if any production class so much as reads the
- * constant — so a filter for it could only ever return an empty page, which an operator would read
- * as "none today" rather than "never any". The registry above still keeps its words, against the
- * day the server does write one.
+ * The places worth offering as a filter — now all of them.
+ *
+ * <p>`REFLECTION` was held out while the channel was declared and unwritten, because a filter for it
+ * could only ever return an empty page and an operator would read that as "none today" rather than
+ * "never any". A producer exists, so rows badged *On their feedback page* now appear in the list, and a
+ * badge whose words match no option leaves a reader unable to filter for the row in front of them.
+ * Filtering to it shows the same thing every other row shows minus the composed text, which the
+ * query service withholds for this channel alone.
  */
-export const FILTERABLE_PLACES: readonly DeliveryPlace[] = ["IN_CONTEXT", "CONVERSATION"];
+export const FILTERABLE_PLACES: readonly DeliveryPlace[] = [
+	"IN_CONTEXT",
+	"CONVERSATION",
+	"REFLECTION",
+];

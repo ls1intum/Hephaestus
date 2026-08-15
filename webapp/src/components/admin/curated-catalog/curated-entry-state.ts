@@ -27,7 +27,7 @@ export function curatedEntryCopy(
 				label: "Customized on this instance",
 				tone: "info",
 				detail: status.offered
-					? `This ${kind} is customized on this instance. Hephaestus updates require review.`
+					? `This ${kind} is customized on this instance. Updates to the Hephaestus default need review before they apply.`
 					: `This customized ${kind} is excluded from new workspaces.`,
 			};
 		case "UPDATE_WAITING":
@@ -57,8 +57,8 @@ export function curatedEntryCopy(
 				label: "Removed from Hephaestus defaults",
 				tone: "attention",
 				detail: status.offered
-					? `Hephaestus no longer provides this ${kind}. Keep it as a custom ${kind}, or exclude it from new workspaces.`
-					: `This ${kind} is no longer included with Hephaestus and is excluded from new workspaces. Existing workspaces do not change.`,
+					? `This ${kind} is no longer a Hephaestus default. Keep it as a custom ${kind}, or exclude it from new workspaces.`
+					: `This ${kind} is no longer a Hephaestus default and is excluded from new workspaces. Existing workspaces do not change.`,
 			};
 		// Named rather than defaulted: a state added by the API later must become a type error, not
 		// silently render the most reassuring answer.

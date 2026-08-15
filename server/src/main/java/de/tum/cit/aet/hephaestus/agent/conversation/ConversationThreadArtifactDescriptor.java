@@ -66,7 +66,7 @@ public class ConversationThreadArtifactDescriptor implements ArtifactDescriptor 
      */
     @Override
     public Set<FeedbackLane> lanes() {
-        return Set.of(FeedbackLane.CONVERSATION, FeedbackLane.PROFILE);
+        return Set.of(FeedbackLane.CONVERSATION, FeedbackLane.REFLECTION);
     }
 
     /** A thread is one room. What was decided in another one, or in a call, is not in it. */

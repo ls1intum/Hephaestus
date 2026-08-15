@@ -1088,6 +1088,10 @@ export type PracticeBinding = {
      * Signals that occasion this review, e.g. scm.pull_request.merged
      */
     signals: Array<string>;
+    /**
+     * Whose conduct this review judges; omit for AUTHOR
+     */
+    subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER';
 };
 
 /**
@@ -2153,7 +2157,7 @@ export type ReviewObservationDetail = {
  */
 export type ReviewBoundFeedback = {
     agentJobId: string;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION';
     createdAt: Date;
     /**
      * When the message was placed; null if it was not delivered
@@ -2308,10 +2312,10 @@ export type ReviewFeedbackDetail = {
      */
     artifact?: ReviewArtifact;
     /**
-     * Stored composed body; null when none was produced
+     * Stored composed body; null when none was produced, and always null on the REFLECTION channel — the developer's reflection surface is not readable by an operator
      */
     body?: string;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION';
     createdAt: Date;
     /**
      * When the feedback was placed; null if it was not delivered
@@ -2400,7 +2404,7 @@ export type ReviewFeedback = {
      */
     bodyPreview?: string;
     bodyTruncated: boolean;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION';
     createdAt: Date;
     /**
      * When the feedback was placed; null if it was not delivered
@@ -2638,6 +2642,80 @@ export type ReflectionItem = {
      * The headline of the feedback
      */
     title: string;
+};
+
+/**
+ * A process-level message on the developer's own reflection surface
+ */
+export type ReflectionFeedback = {
+    /**
+     * Area display name; null when the practice has none
+     */
+    areaName?: string;
+    /**
+     * Area the practice sits in; null when the practice has none
+     */
+    areaSlug?: string;
+    /**
+     * The message, as Markdown; ends with the habit to try next
+     */
+    body: string;
+    /**
+     * The pieces of work the habit was observed on, newest first
+     */
+    evidence: Array<ReflectionEvidence>;
+    /**
+     * Short headline naming the habit, never the person
+     */
+    headline: string;
+    id: string;
+    /**
+     * How many pieces of work carry it — the length of the evidence list
+     */
+    occurrenceCount: number;
+    practiceName: string;
+    /**
+     * Practice this habit belongs to
+     */
+    practiceSlug: string;
+    /**
+     * When the message was composed
+     */
+    preparedAt: Date;
+    /**
+     * When this developer first opened it; null until they have
+     */
+    readAt?: Date;
+    /**
+     * What good looks like, in the learner's framing
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in the learner's framing
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * One piece of work the pattern was observed on
+ */
+export type ReflectionEvidence = {
+    /**
+     * Identifier of the work within its kind
+     */
+    artifactId: number;
+    /**
+     * Kind of work, e.g. scm.pull_request
+     */
+    artifactKind: string;
+    /**
+     * When the measurement behind this occurrence was taken
+     */
+    observedAt: Date;
+    /**
+     * What the review recorded on this piece of work
+     */
+    title?: string;
 };
 
 /**
@@ -2888,6 +2966,80 @@ export type ProfileReviewActivity = {
      * Timestamp when the review was submitted
      */
     submittedAt: Date;
+};
+
+/**
+ * A process-level message on the developer's own private view
+ */
+export type ProfileFeedback = {
+    /**
+     * Area display name; null when the practice has none
+     */
+    areaName?: string;
+    /**
+     * Area the practice sits in; null when the practice has none
+     */
+    areaSlug?: string;
+    /**
+     * The message, as Markdown; ends with the habit to try next
+     */
+    body: string;
+    /**
+     * The pieces of work the habit was observed on, newest first
+     */
+    evidence: Array<ProfileEvidence>;
+    /**
+     * Short headline naming the habit, never the person
+     */
+    headline: string;
+    id: string;
+    /**
+     * How many pieces of work carry it — the length of the evidence list
+     */
+    occurrenceCount: number;
+    practiceName: string;
+    /**
+     * Practice this habit belongs to
+     */
+    practiceSlug: string;
+    /**
+     * When the message was composed
+     */
+    preparedAt: Date;
+    /**
+     * When this developer first opened it; null until they have
+     */
+    readAt?: Date;
+    /**
+     * What good looks like, in the learner's framing
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in the learner's framing
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * One piece of work the pattern was observed on
+ */
+export type ProfileEvidence = {
+    /**
+     * Identifier of the work within its kind
+     */
+    artifactId: number;
+    /**
+     * Kind of work, e.g. scm.pull_request
+     */
+    artifactKind: string;
+    /**
+     * When the measurement behind this occurrence was taken
+     */
+    observedAt: Date;
+    /**
+     * What the review recorded on this piece of work
+     */
+    title?: string;
 };
 
 /**
@@ -9279,6 +9431,48 @@ export type GetEngagementResponses = {
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
 
+export type GetPrivateViewData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/profile';
+};
+
+export type GetPrivateViewResponses = {
+    /**
+     * Private-view messages returned, newest first
+     */
+    200: Array<ProfileFeedback>;
+};
+
+export type GetPrivateViewResponse = GetPrivateViewResponses[keyof GetPrivateViewResponses];
+
+export type GetReflectionFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/reflection';
+};
+
+export type GetReflectionFeedbackResponses = {
+    /**
+     * Reflection messages returned, newest first
+     */
+    200: Array<ReflectionFeedback>;
+};
+
+export type GetReflectionFeedbackResponse = GetReflectionFeedbackResponses[keyof GetReflectionFeedbackResponses];
+
 export type GetLatestReactionData = {
     body?: never;
     path: {
@@ -9702,7 +9896,7 @@ export type ListPracticeReviewFeedbackData = {
         size?: number;
         deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
         suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
-        channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
+        channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION'>;
         agentJobId?: string;
         /**
          * Kind of reviewed work, e.g. scm.pull_request

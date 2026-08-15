@@ -175,10 +175,13 @@ public class BundledPracticeCatalogLoader {
                 throw new IllegalStateException("invalid bundled practice binding: " + slug, exception);
             }
             if (binding.needs().isEmpty()) {
+                // Every component but `needs` is carried through: filling in the kind's default evidence
+                // must not quietly reset whose conduct the occasion judges.
                 binding = new PracticeBinding(
                     binding.signals(),
                     evidenceDefaults.needsFor(binding.artifactKind()),
-                    binding.onDrafts()
+                    binding.onDrafts(),
+                    binding.subject()
                 );
             }
             bindings.add(binding);

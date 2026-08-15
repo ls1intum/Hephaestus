@@ -310,6 +310,7 @@
               "signals": [
                 "scm.pull_request.reviewed"
               ],
+              "subject": "REVIEWER",
               "needs": [
                 {
                   "sourceKind": "scm.general-review-comments",
@@ -347,6 +348,7 @@
               "signals": [
                 "scm.pull_request.reviewed"
               ],
+              "subject": "REVIEWER",
               "needs": [
                 {
                   "sourceKind": "scm.general-review-comments",
@@ -376,6 +378,7 @@
               "signals": [
                 "scm.pull_request.reviewed"
               ],
+              "subject": "REVIEWER",
               "needs": [
                 {
                   "sourceKind": "scm.general-review-comments",

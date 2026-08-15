@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactCatalog;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
@@ -73,6 +74,15 @@ public class PracticeSignalOptions {
 
     public Set<SignalName> eligibleFor(ArtifactKind kind) {
         return bindableOptionsFor(kind).stream().map(SignalOption::signal).collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * The relations this kind of work can identify a person in — the roles an occasion on it may name as
+     * its subject. Read off the descriptor, which is the ceiling; a kind whose descriptor names no role
+     * has nobody to address what a review of it finds, so it can carry no occasion either.
+     */
+    public Set<ActorRole> rolesFor(ArtifactKind kind) {
+        return artifacts.descriptorFor(kind).map(ArtifactDescriptor::roles).orElseGet(Set::of);
     }
 
     /**

@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackQueryFilter;
@@ -99,7 +100,22 @@ class ReviewFeedbackQueryService {
             subjects.get(feedback.getRecipientUserId()),
             subjects.get(feedback.getAboutUserId()),
             observations,
-            placements
+            placements,
+            bodyVisibleToOperator(feedback)
         );
+    }
+
+    /**
+     * Whether an operator may read this unit's composed text.
+     *
+     * <p>No for {@link FeedbackChannel#REFLECTION}, and only for it. That body is the developer's private
+     * view — the one place the system writes about a named person where the person is the sole audience,
+     * and in the course deployment a workspace admin is their instructor. Everything else about the unit
+     * still shows: that it exists, its state, why it was withheld, who it was for, how many observations
+     * fed it. See {@code FeedbackRepository#findForWorkspace}, which withholds the same body from the
+     * list projection in SQL.
+     */
+    private static boolean bodyVisibleToOperator(Feedback feedback) {
+        return feedback.getChannel() != FeedbackChannel.REFLECTION;
     }
 }

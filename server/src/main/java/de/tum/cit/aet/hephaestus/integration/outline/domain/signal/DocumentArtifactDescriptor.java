@@ -68,7 +68,7 @@ public class DocumentArtifactDescriptor implements ArtifactDescriptor {
 
     @Override
     public Set<FeedbackLane> lanes() {
-        return Set.of(FeedbackLane.PROFILE);
+        return Set.of(FeedbackLane.REFLECTION);
     }
 
     @Override

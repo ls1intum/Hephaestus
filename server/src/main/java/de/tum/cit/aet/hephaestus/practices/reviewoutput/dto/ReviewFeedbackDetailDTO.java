@@ -26,17 +26,27 @@ public record ReviewFeedbackDetailDTO(
     @Schema(description = "Cross-run continuity key tying successive deliveries together") String threadKey,
     @NonNull Instant createdAt,
     @Schema(description = "When the feedback was placed; null if it was not delivered") Instant deliveredAt,
-    @Schema(description = "Stored composed body; null when none was produced") String body,
+    @Schema(
+        description = "Stored composed body; null when none was produced, and always null on the REFLECTION " +
+            "channel — the developer's reflection surface is not readable by an operator"
+    )
+    String body,
     @NonNull @Schema(description = "Source observations in render order") List<ReviewBoundObservationDTO> observations,
     @NonNull @Schema(description = "Recorded placements; empty when none") List<ReviewPlacementDTO> placements
 ) {
+    /**
+     * @param bodyVisible whether this caller may read the composed text. A withheld body is rendered as
+     *     absent rather than as an empty string, so "we are not showing you this" reads the same as
+     *     "there was nothing to show" on the wire and neither invites a client to display a blank card.
+     */
     public static ReviewFeedbackDetailDTO from(
         Feedback feedback,
         ReviewArtifactDTO artifact,
         ReviewSubjectDTO recipient,
         ReviewSubjectDTO subject,
         List<ReviewBoundObservationDTO> observations,
-        List<ReviewPlacementDTO> placements
+        List<ReviewPlacementDTO> placements,
+        boolean bodyVisible
     ) {
         return new ReviewFeedbackDetailDTO(
             feedback.getId(),
@@ -51,7 +61,7 @@ public record ReviewFeedbackDetailDTO(
             feedback.getThreadKey(),
             feedback.getCreatedAt(),
             feedback.getDeliveredAt(),
-            feedback.getBody(),
+            bodyVisible ? feedback.getBody() : null,
             observations,
             placements
         );

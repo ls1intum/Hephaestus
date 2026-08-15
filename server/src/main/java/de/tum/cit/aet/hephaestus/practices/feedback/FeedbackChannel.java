@@ -8,8 +8,10 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * ({@link Feedback#getRecipientUserId()}), never to a mentor, instructor, or grader. The system has no
  * facilitator/evaluative delivery channel.
  *
- * <p>Constrained at the DB by {@code chk_feedback_channel} (the {@code PROFILE} value is the ADR-0022 §5
- * rename of the dropped {@code REFLECTION_DASHBOARD}).
+ * <p>Constrained at the DB by {@code chk_feedback_channel}. {@code REFLECTION} names how the developer
+ * engages with the feedback, not where it is stored — the three values are the task, self-regulation and
+ * process levels of Hattie &amp; Timperley's model. It was briefly {@code REFLECTION_DASHBOARD} (dropped
+ * for naming a page) and then {@code PROFILE} (dropped for colliding with the public user profile).
  *
  * <p>This is the destination a delivery is recorded against, not the thing that does the delivering:
  * the vendor pipes are {@code integration.core.spi.SummaryChannel}, {@code InlineFindingChannel} and
@@ -22,6 +24,6 @@ public enum FeedbackChannel {
     IN_CONTEXT,
     /** A turn in an ongoing mentor conversation with the recipient. */
     CONVERSATION,
-    /** Aggregated onto the recipient's private profile / reflection dashboard. */
-    PROFILE,
+    /** Aggregated onto the recipient's own reflection surface inside Hephaestus. */
+    REFLECTION,
 }

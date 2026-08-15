@@ -101,10 +101,12 @@ reader infer them:
   a moment an author can tick.
 
 `MANUAL` and `BACKFILL` are self-selected samples and `LIVE` is not, which is why they are held apart in
-every behavioural read. A `BACKFILL` observation is additionally entitled only to `PROFILE`, a channel
-nothing in the application writes — `ProfileChannelUnwrittenArchTest` pins that there is no producer — so a
-backfill observation is measured and never delivered, by construction rather than by configuration. Do not
-describe any tier or channel as touching a profile or reflection surface.
+every behavioural read. A `BACKFILL` observation is additionally entitled only to `REFLECTION` — the
+developer's own **My feedback** page — and that entitlement is a ceiling, not an instruction: the
+reflection router refuses a cluster made entirely of backfilled measurements (`BACKFILL_HELD`), so a
+backfill observation is measured and never delivered, by construction rather than by configuration. Do
+not write *profile* for this channel: **Profile** is the public page at `/user/{username}`, and the two
+are different surfaces with different audiences.
 
 ## Autonomy tiers
 
@@ -318,7 +320,7 @@ it has found one it could not call, and the answer is `INCONCLUSIVE`.
 4. Put stable reason codes in machine fields and plain explanations in UI messages.
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
-7. Say what a tier does, never how loud it is: a tier is autonomy, and it is the only delivery decision a workspace configures. Nothing reaches a profile.
+7. Say what a tier does, never how loud it is: a tier is autonomy, and it is the only delivery decision a workspace configures. Nothing a tier does reaches the public **Profile** page.
 8. Never write bare **binding**. Two unrelated things carry the word — a *practice binding* (an occasion
    a practice is reviewed on, `PracticeBinding`) and a *model binding* (a workspace's AI model for a
    purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,

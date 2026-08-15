@@ -332,6 +332,24 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
           AND (CAST(:#{#f.to()} AS timestamptz) IS NULL OR f.created_at < CAST(:#{#f.to()} AS timestamptz))
         """;
 
+    /**
+     * The operator's page of feedback units.
+     *
+     * <p><b>REFLECTION bodies are never returned here.</b> {@code IN_CONTEXT} bodies are already public on
+     * the pull request and {@code CONVERSATION} bodies are NULL by construction, so until now "operators
+     * can read feedback bodies" exposed nothing private. A {@code REFLECTION} body is the first
+     * system-authored text about a named person that lives nowhere else — and in the course deployment
+     * the workspace admin is the instructor. {@link FeedbackChannel}'s own contract says every channel is
+     * developer-facing, "never to a mentor, instructor, or grader"; handing this one to an admin would
+     * make that statement false.
+     *
+     * <p>Operators still see that the unit exists, its channel, its state, its suppression reason, its
+     * recipient and how many observations fed it — everything needed to audit whether the pipeline
+     * behaved. They do not see what it said. Withheld in the projection rather than in a mapper so a
+     * second caller cannot forget, and mirrored in {@code ReviewFeedbackQueryService#get} for the detail
+     * route. This is the reversible direction: opening it up later is a decision somebody can take;
+     * un-publishing a body an instructor has already read is not a decision at all.
+     */
     @Query(
         value = "SELECT f.id AS \"id\"," +
             " f.agent_job_id AS \"agentJobId\"," +
@@ -345,10 +363,12 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             " f.replaces_id AS \"replacesId\"," +
             " f.created_at AS \"createdAt\"," +
             " f.delivered_at AS \"deliveredAt\"," +
-            " left(f.body, " +
+            // REFLECTION bodies are withheld from the operator surface in SQL rather than in a mapper, so a
+            // second projection cannot forget. Pinned by ReviewFeedbackReflectionBodyTest.
+            " CASE WHEN f.channel = 'REFLECTION' THEN NULL ELSE left(f.body, " +
             BODY_PREVIEW_LENGTH +
-            ") AS \"bodyPreview\"," +
-            " (f.body IS NOT NULL AND length(f.body) > " +
+            ") END AS \"bodyPreview\"," +
+            " (f.channel <> 'REFLECTION' AND f.body IS NOT NULL AND length(f.body) > " +
             BODY_PREVIEW_LENGTH +
             ") AS \"bodyTruncated\"," +
             " (SELECT count(*) FROM feedback_observation fo" +
@@ -419,4 +439,83 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         FeedbackSuppressionReason getSuppressionReason();
         long getUnits();
     }
+
+    // --- the reflection lane ---
+    //
+    // Every query below carries `workspace_id` by hand. `feedback` is scoped by a raw scalar with no
+    // Hibernate tenancy filter (see the @WorkspaceAgnostic reason on this interface), so on this table
+    // the predicate IS the tenancy boundary — and these rows are the first genuinely private,
+    // system-authored text about a named person, so a missing one leaks more than a count.
+
+    /**
+     * What the recipient may read on their own reflection surface: their REFLECTION units that were prepared or
+     * already read, newest first. Suppressed and superseded rows are excluded — the operator surface is
+     * where "we withheld this, and here is why" is answered; the developer's own surface shows what was
+     * actually said to them.
+     */
+    @Query(
+        """
+        SELECT f FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.REFLECTION
+          AND f.deliveryState IN (
+              de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED,
+              de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
+          )
+        ORDER BY f.createdAt DESC, f.id DESC
+        """
+    )
+    List<Feedback> findReadableReflectionForRecipient(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        Pageable pageable
+    );
+
+    /**
+     * Flips a PREPARED reflection unit to DELIVERED at the moment its recipient actually reads it
+     * (compare-and-set, so two concurrent page loads cannot both claim the flip and the second sees
+     * rowcount 0).
+     *
+     * <p>This lane is the only one where "delivered" is a fact we can observe rather than infer: we own
+     * the surface. Recording it at write time instead would enter text nobody opened into the ledger as
+     * received, which would quietly corrupt the one delivery measurement the system can make honestly.
+     *
+     * <p>Native because {@link Feedback} is {@code @Immutable} — the ORM cannot update it.
+     *
+     * @return {@code 1} on a clean flip, {@code 0} if the unit was no longer PREPARED
+     */
+    @Modifying
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = :at " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND channel = 'REFLECTION' AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markReflectionDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("at") Instant at);
+
+    /**
+     * When a REFLECTION unit about this practice was last written for this recipient, whatever became of it
+     * — the cooldown that stops one habit being restated on every pull request.
+     *
+     * <p>Counts SUPPRESSED rows too: a volume-capped or backfill-held row still records that the cycle
+     * considered this habit, and re-considering it the next day would produce the same answer at the
+     * same cost.
+     */
+    @Query(
+        """
+        SELECT MAX(f.createdAt) FROM Feedback f, FeedbackObservation fo
+        WHERE fo.feedback = f
+          AND fo.observation.practice.slug = :practiceSlug
+          AND fo.observation.practice.workspace.id = :workspaceId
+          AND f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.REFLECTION
+        """
+    )
+    Optional<Instant> lastReflectionSurfacedAt(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("practiceSlug") String practiceSlug
+    );
 }

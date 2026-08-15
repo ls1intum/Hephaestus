@@ -354,7 +354,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
         @Test
         void claimingHephaestusOwnProfileSurfaceIsRefused() {
             List<String> violations = validate(
-                contribution(Set.of(WIDGET), Map.of(), Map.of(WIDGET, Set.of(FeedbackLane.PROFILE))),
+                contribution(Set.of(WIDGET), Map.of(), Map.of(WIDGET, Set.of(FeedbackLane.REFLECTION))),
                 Set.of(Capability.FEEDBACK_DELIVERY)
             );
 

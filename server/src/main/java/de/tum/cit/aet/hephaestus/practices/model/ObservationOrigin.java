@@ -30,14 +30,20 @@ public enum ObservationOrigin {
      * second half of the delivery predicate; {@link PracticeReviewTier#delivers} is the first, and a unit
      * travels only where <em>both</em> admit it.
      *
-     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#PROFILE} and nothing else: posting a
+     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#REFLECTION} and nothing else: posting a
      * backfilled finding in context would notify everyone subscribed to a merged pull request about work
      * nobody can act on.
+     *
+     * <p>The REFLECTION entitlement is a ceiling, not an instruction. That lane now has a producer, and it
+     * refuses backfilled evidence on its own account — a process-level message is a claim about a trend,
+     * and a backfilled population is explicitly not one (see the class note above). Keeping the
+     * entitlement here rather than closing it keeps the two questions apart: this one asks what a
+     * provenance may <em>ever</em> be said on, and the lane asks whether today is the day.
      */
     public boolean delivers(FeedbackChannel channel) {
         return switch (this) {
             case LIVE, MANUAL -> true;
-            case BACKFILL -> channel == FeedbackChannel.PROFILE;
+            case BACKFILL -> channel == FeedbackChannel.REFLECTION;
         };
     }
 }
