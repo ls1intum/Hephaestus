@@ -57,7 +57,12 @@ const handlers = (content: AuthEventView[] = events) => [
 
 const meta = {
 	component: AuthAuditPanel,
-	parameters: { layout: "padded", msw: { handlers: handlers() } },
+	parameters: {
+		layout: "padded",
+		msw: { handlers: handlers() },
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 	args: {
 		search: { tab: "signins" },

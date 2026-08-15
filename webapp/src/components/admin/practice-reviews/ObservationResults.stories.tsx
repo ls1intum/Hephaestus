@@ -25,6 +25,8 @@ const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Observation results",
 	component: ObservationResults,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		chromatic: { viewports: [320, 768, 1440] },
 		// The practice name is a link with the practice's own prose behind it, so the rows own one

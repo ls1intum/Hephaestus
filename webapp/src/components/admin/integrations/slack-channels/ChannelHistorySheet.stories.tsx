@@ -49,7 +49,11 @@ const events: SlackChannelConsentEvent[] = [
 
 const meta = {
 	component: ChannelHistorySheet,
-	parameters: { layout: "centered" },
+	parameters: {
+		layout: "centered",
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo-workspace",

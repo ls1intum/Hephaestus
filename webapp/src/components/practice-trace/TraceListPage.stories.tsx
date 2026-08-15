@@ -14,6 +14,8 @@ const meta = {
 	title: "Practice trace/Review activity list",
 	component: TraceListPage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
 		msw: {

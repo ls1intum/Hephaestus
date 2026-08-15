@@ -37,6 +37,8 @@ const meta = {
 	title: "Practice trace/Review activity detail",
 	component: TracePage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		chromatic: { viewports: [320, 768, 1440] },
 		msw: { handlers: [http.get(TRACE_URL, () => HttpResponse.json(artifactTrace))] },

@@ -22,6 +22,8 @@ const membershipRead = [
 const meta = {
 	component: AdminSettingsPage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		msw: { handlers: membershipRead },
 		chromatic: { viewports: [320, 1440] },

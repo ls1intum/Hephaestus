@@ -11,6 +11,8 @@ const meta = {
 	title: "Workspace admin/Practice reviews/Reviews",
 	component: ReviewRunsPage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		msw: { handlers: reviewHandlers() },
 		chromatic: { viewports: [320, 768, 1440] },

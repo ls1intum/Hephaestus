@@ -12,6 +12,8 @@ const meta = {
 	title: "Workspace admin/Practice reviews/Observation details",
 	component: ObservationDetailPage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },

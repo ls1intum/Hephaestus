@@ -50,6 +50,8 @@ const meta = {
 	title: "Workspace admin/Practices/Review/Overview",
 	component: ReviewPage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		chromatic: { viewports: [320, 1440] },
 		viewport: { defaultViewport: "reflow" },

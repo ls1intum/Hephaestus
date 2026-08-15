@@ -7,7 +7,11 @@ import { AddCollectionDialog } from "./AddCollectionDialog";
 
 const meta = {
 	component: AddCollectionDialog,
-	parameters: { layout: "centered" },
+	parameters: {
+		layout: "centered",
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 	decorators: [
 		(Story) => (

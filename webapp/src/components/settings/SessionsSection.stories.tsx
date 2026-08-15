@@ -11,7 +11,11 @@ import { SessionsSection } from "./SessionsSection";
  */
 const meta = {
 	component: SessionsSection,
-	parameters: { layout: "centered" },
+	parameters: {
+		layout: "centered",
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof SessionsSection>;
 
