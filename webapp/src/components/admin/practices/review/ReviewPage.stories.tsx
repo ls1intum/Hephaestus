@@ -97,10 +97,11 @@ export const HowMuch: Story = {
 			await canvas.findByRole("tab", { name: "How much" }, { timeout: 5000 }),
 		).toHaveAttribute("aria-selected", "true");
 		await expect(
-			await canvas.findByText(
-				"Practice reviews are running in this workspace.",
-				{},
-				{ timeout: 5000 },
+			await canvas.findByText("Reviews are running", {}, { timeout: 5000 }),
+		).toBeVisible();
+		await expect(
+			canvas.getByText(
+				"Practice reviews are on and a review model is ready, so new work gets reviewed.",
 			),
 		).toBeVisible();
 		await expect(await canvas.findByText("Ready to run reviews.")).toBeVisible();
@@ -116,7 +117,7 @@ export const WhenAndWhere: Story = {
 	args: { section: "when-and-where" },
 	play: async ({ canvas }) => {
 		await expect(
-			await canvas.findByRole("heading", { name: "Practice review status" }, { timeout: 5000 }),
+			await canvas.findByRole("heading", { name: "Practice reviews" }, { timeout: 5000 }),
 		).toBeVisible();
 		// A standing check over recent work is a trigger, not a campaign over history.
 		await expect(canvas.getByRole("heading", { name: "Keep checking new work" })).toBeVisible();
@@ -140,11 +141,10 @@ export const PastWork: Story = {
 export const ReviewsAreOff: Story = {
 	parameters: { msw: { handlers: handlers({ workspace: { practicesEnabled: false } }) } },
 	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("Reviews are off", {}, { timeout: 5000 })).toBeVisible();
 		await expect(
-			await canvas.findByText(
+			canvas.getByText(
 				"Practice reviews are off in this workspace, so nothing below takes effect yet.",
-				{},
-				{ timeout: 5000 },
 			),
 		).toBeVisible();
 	},
@@ -154,11 +154,10 @@ export const NoModelIsReady: Story = {
 	parameters: { msw: { handlers: handlers({ agents: [] }) } },
 	play: async ({ canvas }) => {
 		await expect(
-			await canvas.findByText(
-				"Practice reviews are on, but no review model is ready, so none can start.",
-				{},
-				{ timeout: 5000 },
-			),
+			await canvas.findByText("Reviews can't start", {}, { timeout: 5000 }),
+		).toBeVisible();
+		await expect(
+			canvas.getByText("Practice reviews are on, but no review model is ready, so none can start."),
 		).toBeVisible();
 		await expect(
 			canvas.getByText("No model is bound, so no review can run at any tier below."),

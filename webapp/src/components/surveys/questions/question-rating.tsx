@@ -138,7 +138,6 @@ export function QuestionRating({
 									key={rating}
 									value={String(rating)}
 									aria-label={`Rating ${rating} out of ${ratingScale}`}
-									className="data-pressed:border-primary data-pressed:bg-background data-pressed:text-primary data-pressed:shadow-sm data-pressed:data-[spacing=0]:data-[variant=outline]:border-l-1 not-first:data-pressed:ml-[-1px]"
 								>
 									{rating}
 								</ToggleGroupItem>

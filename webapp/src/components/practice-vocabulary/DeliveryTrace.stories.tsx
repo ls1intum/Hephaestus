@@ -49,7 +49,7 @@ export const Withheld: Story = {
 };
 
 /** `PREPARED` only ever occurs on the conversation lane, and carries no delivered timestamp. */
-export const QueuedForConversation: Story = {
+export const PreparedForConversation: Story = {
 	args: {
 		feedback: {
 			channel: "CONVERSATION",
@@ -58,7 +58,7 @@ export const QueuedForConversation: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("Queued for conversation");
+		canvas.getByText("Prepared for conversation");
 		canvas.getByText("In conversation");
 	},
 };

@@ -26,7 +26,7 @@ export const Default: Story = {
 	play: async ({ canvas }) => {
 		// A conversation row's outcome is refined by its place, and still begins with the stem of the
 		// stored state so the Outcome facet remains findable from the row.
-		canvas.getByText("Queued for conversation");
+		canvas.getByText("Prepared for conversation");
 		canvas.getByText("Delivered in conversation");
 		canvas.getByText("Failed to deliver");
 		canvas.getByText("Replaced by newer");

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, waitFor, within } from "storybook/test";
 import { FeedbackBody } from "./FeedbackBody";
 
 const body =
@@ -20,37 +20,53 @@ type Story = StoryObj<typeof meta>;
 
 /**
  * The ordinary case wears no badge: text that reached the developer needs no marking, and the page
- * this card sits on says so once already.
+ * this card sits on says so once already. The header row is then the view switch alone, sitting on
+ * the same left edge as the note below it.
  */
 export const Delivered: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByRole("heading", { level: 4, name: "What worked" });
 		await expect(canvas.queryByText("Delivered")).not.toBeInTheDocument();
+		canvas.getByRole("tablist", { name: "How to show the feedback" });
 	},
 };
 
+/**
+ * Switching views, and the wiring a screen reader needs to follow it: the two views are named, the
+ * one being shown says so in `aria-selected` rather than only in colour, and the body announces the
+ * view it belongs to.
+ */
 export const SwitchToSource: Story = {
-	play: async ({ canvas, canvasElement, userEvent }) => {
-		// The group is `role="group"` with no `aria-orientation`: the vendored wrapper drops the
-		// attribute the Base UI primitive would otherwise put on a role ARIA does not allow it on.
-		const views = canvas.getByRole("group", { name: "How to show the feedback" });
-		await expect(views).not.toHaveAttribute("aria-orientation");
-		await expect(canvas.getByRole("button", { name: "Rendered" })).toHaveAttribute(
-			"aria-pressed",
-			"true",
+	play: async ({ canvas, userEvent }) => {
+		const views = within(canvas.getByRole("tablist", { name: "How to show the feedback" }));
+		const rendered = views.getByRole("tab", { name: "Rendered" });
+		const source = views.getByRole("tab", { name: "Source" });
+		await expect(rendered).toHaveAttribute("aria-selected", "true");
+		await expect(source).toHaveAttribute("aria-selected", "false");
+		// The body is the tab's panel, not a sibling div that happens to sit under it.
+		await expect(canvas.getByRole("tabpanel", { name: "Rendered" })).toHaveAttribute(
+			"id",
+			rendered.getAttribute("aria-controls"),
 		);
 
-		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
-		await expect(canvasElement.querySelector("pre")?.textContent).toContain("## What worked");
-		await expect(canvas.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Source" })).toHaveAttribute(
-			"aria-pressed",
-			"true",
+		await userEvent.click(source);
+		await expect(canvas.getByRole("tabpanel", { name: "Source" }).textContent).toContain(
+			"## What worked",
 		);
+		await expect(source).toHaveAttribute("aria-selected", "true");
+		await expect(rendered).toHaveAttribute("aria-selected", "false");
+		// The view left behind goes: one panel, and no heading from the Markdown it was showing.
+		// Awaited because the primitive keeps the closing panel until its transition finishes.
+		await waitFor(() => {
+			expect(canvas.queryByRole("heading", { level: 4 })).not.toBeInTheDocument();
+			expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
+		});
 
-		// Pressing the held view again is refused: there is no state in which the body shows nothing.
-		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
-		await expect(canvasElement.querySelector("pre")?.textContent).toContain("## What worked");
+		// The arrow keys walk the views and Enter opens one, which is what a tab list promises a
+		// keyboard user; switching back is never a state in which the body shows nothing.
+		await userEvent.keyboard("{ArrowLeft}{Enter}");
+		canvas.getByRole("heading", { level: 4, name: "What worked" });
+		await expect(rendered).toHaveAttribute("aria-selected", "true");
 	},
 };
 
@@ -72,11 +88,12 @@ export const FailedToDeliver: Story = {
 	args: { feedback: { body, channel: "IN_CONTEXT", deliveryState: "FAILED" } },
 };
 
-/** `PREPARED` only ever exists on the conversation lane, so the badge can name the queue it is in. */
-export const QueuedForConversation: Story = {
+/** `PREPARED` only ever exists on the conversation lane, so the badge can name the lane it waits on. */
+export const PreparedForConversation: Story = {
 	args: { feedback: { body, channel: "CONVERSATION", deliveryState: "PREPARED" } },
 	play: async ({ canvas }) => {
-		canvas.getByText("Queued for conversation");
+		// The lane, not the exact wording: the `PREPARED` label lives in `delivery-outcome-defs`.
+		canvas.getByText(/for conversation/);
 	},
 };
 

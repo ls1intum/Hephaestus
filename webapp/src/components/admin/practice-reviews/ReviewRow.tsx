@@ -15,32 +15,45 @@ export interface ReviewRowProps {
 	title: ReactNode;
 	/** Facts that place the row. No controls — the title's hit area covers this area. */
 	meta?: ReactNode;
-	/** See {@link ReviewRowChip}: reserved slots, not a fragment. */
+	/** See {@link ReviewRowChip}: reserved slots and free ones, not a fragment. */
 	chips?: ReviewRowChip[];
 }
 
 /**
- * One reserved position in a row's chip group. A slot keeps its width when its `node` is absent, so
- * a conditional badge does not shift the badge after it and the column holds down the list — the
- * alignment a table gives for free, on a list that is not a table.
+ * One position in a row's chip group, either **reserved** or **free**.
  *
- * The width is the caller's because it belongs to the list: the column is only constant if every row
- * of one list passes the same slots in the same order. Reserving the space needs a screen wide
- * enough for the whole strip, so widths are `lg:`-prefixed and below that the chips simply wrap.
+ * <p>A reserved chip carries a `width` and keeps it when its `node` is absent, so a conditional
+ * badge does not shift the badge after it and the column holds down the list — the alignment a table
+ * gives for free, on a list that is not a table. The width is the caller's because it belongs to the
+ * list: the column is only constant if every row of one list passes the same slots in the same
+ * order. Reserving space needs a screen wide enough for the whole strip, so widths are
+ * `lg:`-prefixed and below that the chips simply wrap.
+ *
+ * <p>A free chip has no `width`, takes only the space its badges need, and takes none at all when it
+ * is empty. **Reserve a slot only for a fact that is on nearly every row** — a column that is
+ * usually blank aligns nothing and charges the whole list its width, which is what made these rows
+ * look mostly empty. Exception badges are free chips.
+ *
+ * <p>Because the strip sits at the row's right edge, free chips are passed **before** the reserved
+ * ones: they then flow leftwards into the gap after the title, and the reserved columns keep the
+ * same x on every row whether or not the exception fired.
  */
 export interface ReviewRowChip {
 	key: string;
-	/** Reserved width from `lg` up, e.g. `"lg:w-28"`. Constant across every row of one list. */
-	width: string;
-	/** Absent keeps the space and shows nothing. */
+	/**
+	 * Reserved width from `lg` up, e.g. `"lg:w-44"`, constant across every row of one list. Omit for
+	 * a chip that should take only the width it needs.
+	 */
+	width?: string;
+	/** Absent shows nothing: a reserved slot keeps its space, a free chip takes none. */
 	node?: ReactNode;
 }
 
 /**
  * One reflowing row rather than a `<table>`: a table earns its keep when a reader compares the same
  * cell down a column, and the row's name is a sentence of prose of any length. What *is* comparable
- * keeps a column anyway — chips sit in fixed slots (see {@link ReviewRowChip}) and a tally is drawn
- * as a fixed grid (see `ReviewCountStrip`).
+ * and usually present keeps a column anyway — those chips sit in fixed slots (see
+ * {@link ReviewRowChip}) and a tally is drawn as a fixed grid (see `ReviewCountStrip`).
  *
  * <h4>Why the whole row is not a link</h4>
  * The obvious construction — `<Item render={<Link/>}>` — makes the row itself an anchor, and then a
@@ -73,7 +86,11 @@ export function ReviewRow({ status, title, meta, chips }: ReviewRowProps) {
 							<span
 								key={chip.key}
 								className={cn(
-									"flex min-w-0 flex-wrap items-center gap-1.5 empty:hidden lg:shrink-0 lg:empty:flex",
+									"flex min-w-0 flex-wrap items-center gap-1.5 empty:hidden",
+									// `lg:empty:flex` is what re-shows an empty reserved slot so it can hold its
+									// width; a free chip keeps `empty:hidden` at every width and, having no
+									// `shrink-0`, gives way to the reserved columns before the row can overflow.
+									chip.width && "lg:shrink-0 lg:empty:flex",
 									chip.width,
 								)}
 							>

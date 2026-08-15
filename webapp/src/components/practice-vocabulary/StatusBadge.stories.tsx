@@ -73,7 +73,7 @@ export const EveryRegistry: Story = {
 		</div>
 	),
 	play: async ({ canvas }) => {
-		canvas.getByText("Queued for conversation");
+		canvas.getByText("Prepared for conversation");
 		canvas.getByText("Withheld");
 		canvas.getByText("On the work");
 	},

@@ -38,7 +38,7 @@ export const RetryFailedDelivery: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Retry feedback comment" }));
 		const dialog = within(await screen.findByRole("alertdialog"));
-		dialog.getByText("Hephaestus will try to post the failed comment again.");
+		dialog.getByText("The failed comment will be posted again.");
 		await userEvent.click(dialog.getByRole("button", { name: "Retry feedback comment" }));
 		await expect(args.onRetry).toHaveBeenCalledOnce();
 	},

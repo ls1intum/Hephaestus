@@ -9,7 +9,6 @@ import type {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Empty,
 	EmptyDescription,
@@ -101,72 +100,70 @@ export function PracticeReviewSweepSchedule({
 	const availableKinds = WORK_KIND_ITEMS.filter((kind) => !scheduledKinds.has(kind.value));
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Keep checking new work</h2>
-				</CardTitle>
-				<CardDescription>
+		<section className="space-y-4" aria-labelledby="sweep-heading">
+			<div className="space-y-1">
+				<h2 id="sweep-heading" className="font-semibold text-lg">
+					Keep checking new work
+				</h2>
+				<p className="text-muted-foreground text-sm">
 					Reviews normally start the moment work happens. When a notification is lost, nothing ever
 					arrives — and there is no record of the review that did not happen. A recurring check
 					looks again over the last few days, so anything missed still gets reviewed.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				{isError ? (
-					<Alert variant="destructive">
-						<AlertCircle />
-						<AlertTitle>Recurring checks couldn't be loaded</AlertTitle>
-						<AlertDescription>
-							<p>Whatever is scheduled is still running — this is only about showing it here.</p>
-							<Button variant="outline" size="sm" onClick={onRetry}>
-								Try again
-							</Button>
-						</AlertDescription>
-					</Alert>
-				) : null}
+				</p>
+			</div>
+			{isError ? (
+				<Alert variant="destructive">
+					<AlertCircle />
+					<AlertTitle>Recurring checks couldn't be loaded</AlertTitle>
+					<AlertDescription>
+						<p>Whatever is scheduled is still running — this is only about showing it here.</p>
+						<Button variant="outline" size="sm" onClick={onRetry}>
+							Try again
+						</Button>
+					</AlertDescription>
+				</Alert>
+			) : null}
 
-				{isLoading ? (
-					<div className="flex justify-center py-6">
-						<Spinner />
-					</div>
-				) : schedules.length === 0 ? (
-					<Empty>
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<CalendarClock />
-							</EmptyMedia>
-							<EmptyTitle>Nothing is checked on a schedule</EmptyTitle>
-							<EmptyDescription>
-								Work that never raised a notification is never reviewed, and nothing says so. Add a
-								check below and Hephaestus looks over the last few days again.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<div className="space-y-2">
-						{schedules.map((schedule) => (
-							<ScheduleRow
-								key={schedule.id}
-								schedule={schedule}
-								isSaving={isSaving}
-								onReplace={onReplace}
-								onDelete={onDelete}
-							/>
-						))}
-					</div>
-				)}
+			{isLoading ? (
+				<div className="flex justify-center py-6">
+					<Spinner />
+				</div>
+			) : schedules.length === 0 ? (
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<CalendarClock />
+						</EmptyMedia>
+						<EmptyTitle>Nothing is checked on a schedule</EmptyTitle>
+						<EmptyDescription>
+							Work that never raised a notification is never reviewed, and nothing says so. Add a
+							check below to review the last few days again.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			) : (
+				<div className="space-y-2">
+					{schedules.map((schedule) => (
+						<ScheduleRow
+							key={schedule.id}
+							schedule={schedule}
+							isSaving={isSaving}
+							onReplace={onReplace}
+							onDelete={onDelete}
+						/>
+					))}
+				</div>
+			)}
 
-				{availableKinds.length > 0 ? (
-					<AddScheduleForm
-						availableKinds={availableKinds}
-						isSaving={isSaving}
-						isLoading={isLoading}
-						onCreate={onCreate}
-					/>
-				) : null}
-			</CardContent>
-		</Card>
+			{availableKinds.length > 0 ? (
+				<AddScheduleForm
+					availableKinds={availableKinds}
+					isSaving={isSaving}
+					isLoading={isLoading}
+					onCreate={onCreate}
+				/>
+			) : null}
+		</section>
 	);
 }
 

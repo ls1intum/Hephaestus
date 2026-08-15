@@ -62,13 +62,34 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * A switch row stays a row: the control sits after its label and description, on the same line. This
+ * is measured rather than believed because the reflow fix below it could have been bought by letting
+ * the row stack instead, which is not the layout this surface wants at any width.
+ */
+async function expectSwitchSitsBesideItsLabel(control: HTMLElement) {
+	const field = control.closest<HTMLElement>('[data-slot="field"]');
+	const content = field?.querySelector<HTMLElement>('[data-slot="field-content"]');
+	await expect(content, "The switch is not in a Field with a FieldContent.").not.toBeNull();
+
+	const controlBox = control.getBoundingClientRect();
+	const contentBox = (content as HTMLElement).getBoundingClientRect();
+	await expect(controlBox.left).toBeGreaterThanOrEqual(contentBox.right);
+	await expect(controlBox.top).toBeGreaterThanOrEqual(contentBox.top);
+	await expect(controlBox.top).toBeLessThan(contentBox.bottom);
+}
+
 export const Configured: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async () => {
+	play: async ({ canvas }) => {
 		await expectNoPageOverflow();
+		// Fitting at 320px is not the same as fitting by stacking: the row survives the narrow width.
+		await expectSwitchSitsBesideItsLabel(
+			canvas.getByRole("switch", { name: "Start practice reviews" }),
+		);
 	},
 };
 
@@ -107,22 +128,45 @@ export const ModelReadinessUnavailable: Story = {
 	args: { model: { ...model, binding: undefined, isError: true } },
 };
 
+/**
+ * Both options carry the sentence that explains them, so neither is hidden behind a closed menu —
+ * the reason to pick the narrower one is exactly what a menu would have hidden.
+ */
 export const ReviewRoleOnly: Story = {
 	args: { policy: { ...policy, settings: { ...settings, runForAllUsers: false } } },
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async () => {
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByRole("radio", { name: /Only assignees with the review role/ }),
+		).toBeChecked();
 		await expectNoPageOverflow();
 	},
 };
 
+export const WideningToAllWork: Story = {
+	args: {
+		policy: { ...policy, onUpdate: fn(), settings: { ...settings, runForAllUsers: false } },
+	},
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("radio", { name: /All matching work/ }));
+
+		await expect(args.policy.onUpdate).toHaveBeenCalledWith({ runForAllUsers: true });
+	},
+};
+
+/**
+ * Reviews on with both doors shut is the one state the page banner cannot see — it reads the switch
+ * and the model, not the triggers — so it is said beside the switches that cause it.
+ */
 export const TriggersOff: Story = {
 	args: {
 		workspace: { ...workspace, autoTriggerEnabled: false, manualTriggerEnabled: false },
 	},
 	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Nothing can start a review")).toBeVisible();
 		await expect(canvas.getByText(/both ways in are switched off/i)).toBeVisible();
 	},
 };
@@ -131,6 +175,11 @@ export const RequestedReviewsNamesEveryDoor: Story = {
 	play: async ({ canvas }) => {
 		const requested = canvas.getByRole("switch", { name: "Reviews somebody asks for" });
 		await expect(requested).toBeVisible();
+
+		// This story runs at the default viewport; the width is asserted so the row check below cannot
+		// pass by being measured at a narrow one.
+		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
+		await expectSwitchSitsBesideItsLabel(requested);
 
 		const description = canvas.getByText(/Turning this off stops every one of them/i);
 		await expect(description).toHaveTextContent("Review this now");

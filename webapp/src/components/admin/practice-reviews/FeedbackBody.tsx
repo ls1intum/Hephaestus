@@ -1,5 +1,4 @@
-import { CodeIcon, TextIcon } from "lucide-react";
-import { type AnchorHTMLAttributes, type HTMLAttributes, useState } from "react";
+import type { AnchorHTMLAttributes, HTMLAttributes } from "react";
 import { Streamdown } from "streamdown";
 import { MarkdownCode } from "@/components/common/MarkdownCode";
 import {
@@ -8,7 +7,7 @@ import {
 } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 
 /**
@@ -67,15 +66,16 @@ const UNTRUSTED_MARKDOWN_COMPONENTS = {
 const FEEDBACK_PROSE =
 	"prose prose-sm dark:prose-invert max-w-none break-words prose-headings:mt-4 prose-headings:mb-1.5 prose-headings:text-sm prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:overflow-x-visible prose-pre:whitespace-pre-wrap prose-pre:break-words first:prose-headings:mt-0";
 
-type FeedbackView = "rendered" | "source";
-
 /**
  * The header badge appears only on text that did *not* simply reach the developer: badging the
  * ordinary case would colour every card and repeat what the surrounding page already says, while
- * text that was withheld, failed, is queued or has been replaced can otherwise be read as sent.
+ * text that was withheld, failed, is prepared or has been replaced can otherwise be read as sent.
+ *
+ * <p>Rendered and Source are two views of one body, so they are `Tabs`: the primitive holds "exactly
+ * one view is showing", gives each view a `role="tab"` with `aria-selected`, ties the body to the
+ * control that chose it, and answers the arrow keys. Nothing here keeps that by hand.
  */
 export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
-	const [view, setView] = useState<FeedbackView>("rendered");
 	const { body } = feedback;
 	const unsent = feedback.deliveryState !== "DELIVERED";
 
@@ -91,34 +91,23 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 
 	return (
 		<Card className={cn("gap-0 border py-0", className)}>
-			<CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-3">
-				{unsent ? <StatusBadge def={deliveryOutcome(feedback)} /> : <span />}
-				{/* The group holds the current view, so "exactly one is pressed" is the control's
-				    invariant rather than something two `onClick`s keep by hand. Deselecting the pressed
-				    item is refused below — there is no third state in which the body shows nothing. */}
-				<ToggleGroup
-					variant="outline"
-					size="sm"
-					value={[view]}
-					onValueChange={(next) => {
-						const chosen = next[0] as FeedbackView | undefined;
-						if (chosen) setView(chosen);
-					}}
-					aria-label="How to show the feedback"
-				>
-					<ToggleGroupItem value="rendered">
-						<TextIcon aria-hidden />
-						Rendered
-					</ToggleGroupItem>
-					<ToggleGroupItem value="source">
-						<CodeIcon aria-hidden />
-						Source
-					</ToggleGroupItem>
-				</ToggleGroup>
-			</CardHeader>
-			<CardContent className="py-4">
-				{view === "rendered" ? (
-					<div className={FEEDBACK_PROSE}>
+			{/* No separator and no band: the note is what this card is for, and a ruled strip above it
+			    spends height saying only that a two-word switch lives there. The switch sits on the
+			    body's own left edge, so the row still reads as a row when nothing is badged. */}
+			<Tabs defaultValue="rendered" className="gap-0">
+				<CardHeader className="flex flex-wrap items-center justify-between gap-2 pt-3 pb-2">
+					<TabsList aria-label="How to show the feedback">
+						<TabsTrigger value="rendered" className="px-3">
+							Rendered
+						</TabsTrigger>
+						<TabsTrigger value="source" className="px-3">
+							Source
+						</TabsTrigger>
+					</TabsList>
+					{unsent && <StatusBadge def={deliveryOutcome(feedback)} />}
+				</CardHeader>
+				<CardContent className="pb-4">
+					<TabsContent value="rendered" className={FEEDBACK_PROSE}>
 						<Streamdown
 							mode="static"
 							rehypePlugins={[]}
@@ -127,13 +116,17 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 						>
 							{body}
 						</Streamdown>
-					</div>
-				) : (
-					<pre className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs">
-						{body}
-					</pre>
-				)}
-			</CardContent>
+					</TabsContent>
+					{/* Uncapped, like the rendered view: a height cap here would make the same text a
+					    scrollable region in one view and not the other, and a scroll box with no
+					    tabindex is unreachable by keyboard. Wrapping keeps it off the horizontal axis. */}
+					<TabsContent value="source">
+						<pre className="whitespace-pre-wrap break-words rounded-md bg-muted p-3 text-xs">
+							{body}
+						</pre>
+					</TabsContent>
+				</CardContent>
+			</Tabs>
 		</Card>
 	);
 }

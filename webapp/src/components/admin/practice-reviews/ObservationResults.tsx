@@ -3,7 +3,6 @@ import { ScanSearchIcon } from "lucide-react";
 import type { ReviewObservation } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
-import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Button } from "@/components/ui/button";
 import {
 	Empty,
@@ -18,7 +17,7 @@ import {
 	ClaimCurrentnessBadge,
 	FeedbackCountsSummary,
 	ObservationOriginBadge,
-	observationSeverity,
+	ObservationResultBadge,
 } from "./ReviewBadges";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
@@ -103,7 +102,6 @@ export interface ObservationRowProps {
  * observation judged against a practice that has since changed.
  */
 export function ObservationRow({ workspaceSlug, observation, scope }: ObservationRowProps) {
-	const severity = observationSeverity(observation);
 	return (
 		<ReviewRow
 			status={observationResult(observation)}
@@ -140,26 +138,28 @@ export function ObservationRow({ workspaceSlug, observation, scope }: Observatio
 				</>
 			}
 			chips={[
-				{ key: "person", width: "lg:w-36", node: <ReviewPerson person={observation.subject} /> },
-				{
-					key: "result",
-					width: "lg:w-44",
-					node: <StatusBadge def={observationResult(observation)} />,
-				},
-				// Its own slot rather than sitting beside the result badge, because the result label runs
-				// from "Strength" to "Expected but not observed" and a severity trailing it would land
-				// somewhere different on every row. Empty on the rows that have no severity, and still
-				// that width, which is what keeps the column.
-				{ key: "severity", width: "lg:w-28", node: severity && <StatusBadge def={severity} /> },
+				// The two flags fire on unusual rows only, so they are free chips: reserving their width
+				// spent it on every row to align a column that was blank most of the way down. Passing
+				// them first puts them left of the reserved columns, which therefore keep their x
+				// whether or not a flag fired. See {@link ReviewRowChip}.
 				{
 					key: "flags",
-					width: "lg:w-48",
 					node: (
 						<>
 							<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
 							<ObservationOriginBadge origin={observation.origin} />
 						</>
 					),
+				},
+				{ key: "person", width: "lg:w-36", node: <ReviewPerson person={observation.subject} /> },
+				// Severity rides in the result's slot rather than one of its own: it exists only where
+				// the result is a shortfall, so its own column would be blank on every other row, and it
+				// is read as a qualifier of the result — beside it where it fits, wrapped under it where
+				// it does not, which costs no height in a row this tall.
+				{
+					key: "result",
+					width: "lg:w-44",
+					node: <ObservationResultBadge observation={observation} />,
 				},
 			]}
 		/>

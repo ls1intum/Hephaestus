@@ -30,7 +30,7 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 		description: "It reached the developer where it was placed.",
 	},
 	PREPARED: {
-		label: "Queued for conversation",
+		label: "Prepared for conversation",
 		icon: MessageSquareDashedIcon,
 		badgeVariant: "secondary",
 		description: "Waiting for the developer's next chat with the mentor, which is what sends it.",

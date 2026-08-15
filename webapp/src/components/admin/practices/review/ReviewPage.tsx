@@ -1,14 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { AlertCircle, ScanEye } from "lucide-react";
+import { ScanEye } from "lucide-react";
 import { getWorkspaceOptions, listAgentsOptions } from "@/api/@tanstack/react-query.gen";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import type { BadgeVariant } from "@/components/practice-vocabulary/status-def";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ReviewHowMuchSection } from "./ReviewHowMuchSection";
 import { ReviewPastWorkSection } from "./ReviewPastWorkSection";
 import { ReviewWhenAndWhereSection } from "./ReviewWhenAndWhereSection";
-import { type ReviewRunningTone, reviewRunningSummary } from "./review-readiness";
+import { REVIEW_RUNNING_DEFS, reviewRunningTone } from "./review-readiness";
 import { REVIEW_SECTIONS, type ReviewSectionId } from "./review-sections";
 
 export interface ReviewPageProps {
@@ -70,16 +71,28 @@ export function ReviewPage({
 	);
 }
 
-/** Only the states that stop reviews are coloured: a header that is always tinted stops being read. */
-const TONE_VARIANTS: Record<ReviewRunningTone, "default" | "warning"> = {
-	running: "default",
-	unknown: "default",
-	blocked: "warning",
-	off: "warning",
+/**
+ * The registry speaks in badge tones because that is the shared vocabulary of status across the
+ * practice surfaces; the Alert kit names four of its own. Kept as a total map so a tone added to the
+ * registry fails `typecheck:webapp` here rather than falling back to a silent neutral banner.
+ */
+const ALERT_VARIANTS: Record<BadgeVariant, "default" | "destructive" | "success" | "warning"> = {
+	default: "default",
+	secondary: "default",
+	outline: "default",
+	destructive: "destructive",
+	success: "success",
+	warning: "warning",
 };
 
 /**
- * `role="status"`, not `alert`: this is the standing state of the page rather than a response to
+ * The one thing worth saying above three tabs of settings: whether any of it is in force. It is a
+ * status, so it is drawn as one — icon, headline, tone — rather than a grey sentence that reads as
+ * boilerplate. Healthy is affirmed once, quietly green; only the states that stop reviews escalate to
+ * warning, which is what keeps a tinted header meaning something when it appears. The icon and the
+ * headline repeat what the tone says, so colour is never the only carrier (WCAG 2.2 SC 1.4.1).
+ *
+ * <p>`role="status"`, not `alert`: this is the standing state of the page rather than a response to
  * anything the reader just did, and an assertive announcement on every visit would interrupt them
  * mid-sentence.
  */
@@ -91,7 +104,7 @@ function ReviewRunningBanner({ workspaceSlug }: { workspaceSlug: string }) {
 
 	if (workspaceQuery.isPending || !workspaceQuery.data) return null;
 
-	const { tone, sentence } = reviewRunningSummary({
+	const tone = reviewRunningTone({
 		enabled: workspaceQuery.data.practicesEnabled,
 		model: {
 			binding: bindingsQuery.data?.find((agent) => agent.purpose === "PRACTICE_REVIEW"),
@@ -99,11 +112,13 @@ function ReviewRunningBanner({ workspaceSlug }: { workspaceSlug: string }) {
 			isError: bindingsQuery.isError,
 		},
 	});
+	const { label, description, icon: ToneIcon, badgeVariant } = REVIEW_RUNNING_DEFS[tone];
 
 	return (
-		<Alert variant={TONE_VARIANTS[tone]} role="status">
-			{tone === "blocked" || tone === "off" ? <AlertCircle /> : null}
-			<AlertDescription>{sentence}</AlertDescription>
+		<Alert variant={ALERT_VARIANTS[badgeVariant]} role="status">
+			<ToneIcon />
+			<AlertTitle>{label}</AlertTitle>
+			<AlertDescription>{description}</AlertDescription>
 		</Alert>
 	);
 }

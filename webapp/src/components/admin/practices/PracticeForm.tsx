@@ -116,9 +116,9 @@ export function PracticeForm(props: PracticeFormProps) {
 						<h2 className="text-lg font-semibold">What the author declared</h2>
 						<p className="text-sm text-muted-foreground">
 							The requirements above are the author's own claim about this practice. Nobody has
-							checked them independently, and nothing here says the observations it produces are
-							correct. The digests record the exact rules that were declared, so a later change to
-							them is visible rather than silent.
+							checked them independently, and nothing here says the observations recorded under it
+							are correct. The digests record the exact rules that were declared, so a later change
+							to them is visible rather than silent.
 						</p>
 					</div>
 					<PracticeAutomatedReviewValidationSummary
@@ -128,9 +128,9 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">Review results</h2>
+						<h2 className="text-lg font-semibold">What the reviews observed</h2>
 						<p className="text-sm text-muted-foreground">
-							View every observation this practice produced across the workspace.
+							Every observation recorded for this practice across the workspace.
 						</p>
 					</div>
 					<Link
@@ -195,8 +195,8 @@ export function PracticeFormShell({
 				title={mode === "create" ? "Create practice" : `Edit: ${practiceName ?? "practice"}`}
 				description={
 					mode === "create"
-						? "Define a way of working and choose how Hephaestus should support it."
-						: "Update the practice guidance and review support."
+						? "Define a way of working and choose how it is reviewed."
+						: "Update this practice's review rules and developer guidance."
 				}
 			/>
 			{children}

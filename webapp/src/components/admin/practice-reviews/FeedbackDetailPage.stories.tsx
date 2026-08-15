@@ -85,11 +85,12 @@ export const LongFeedback: Story = {
 	},
 };
 
-export const QueuedForConversation: Story = {
+export const PreparedForConversation: Story = {
 	args: { feedbackId: "11111111-4444-4444-4444-444444444444" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await canvas.findAllByText("Queued for conversation");
+		// The lane, not the exact wording: the `PREPARED` label lives in `delivery-outcome-defs`.
+		await canvas.findAllByText(/for conversation/);
 		canvas.getByText("How should we roll back the pricing migration?");
 	},
 };
@@ -97,13 +98,18 @@ export const QueuedForConversation: Story = {
 export const RenderedAndSource: Story = {
 	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas, canvasElement, userEvent }) => {
+	play: async ({ canvas, userEvent }) => {
 		await canvas.findByRole("link", { name: "See the feedback this replaced" });
 		await canvas.findByText(/2 issues to tighten in this change/);
-		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
-		await expect(canvasElement.querySelector("pre")?.textContent).toContain("```java");
-		await userEvent.click(canvas.getByRole("button", { name: "Rendered" }));
-		await canvas.findByText(/2 issues to tighten in this change/);
+
+		// Read each view inside its own panel: the body has a fenced code block, so both views hold a
+		// `pre`, and the panel being left behind outlives the click by a frame.
+		await userEvent.click(canvas.getByRole("tab", { name: "Source" }));
+		await expect(canvas.getByRole("tabpanel", { name: "Source" }).textContent).toContain("```java");
+		await userEvent.click(canvas.getByRole("tab", { name: "Rendered" }));
+		await expect(canvas.getByRole("tabpanel", { name: "Rendered" }).textContent).toContain(
+			"2 issues to tighten in this change",
+		);
 	},
 };
 

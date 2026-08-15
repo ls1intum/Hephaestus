@@ -53,13 +53,13 @@ function renderSettings(props: Partial<React.ComponentProps<typeof PracticeRevie
 }
 
 describe("PracticeReviewSettings", () => {
-	it("reports model readiness and points at the page that owns the binding", async () => {
+	it("points at the page that owns the binding without restating the page banner", async () => {
 		await renderSettings();
 
-		await screen.findByText("Ready to run");
-		expect(screen.getByRole("link", { name: "Change" }).getAttribute("href")).toBe(
-			"/w/acme/admin/models",
-		);
+		const change = await screen.findByRole("link", { name: "Change the review model" });
+		expect(change.getAttribute("href")).toBe("/w/acme/admin/models");
+		// Readiness is the banner's sentence; saying it again here was the same fact three times.
+		expect(screen.queryByText("Ready to run")).toBeNull();
 	});
 
 	it("explains when the selected model can no longer run", async () => {
@@ -99,6 +99,29 @@ describe("PracticeReviewSettings", () => {
 
 		fireEvent.click(automatic);
 		expect(onUpdate).toHaveBeenCalledWith({ practiceReviewAutoTriggerEnabled: true });
+	});
+
+	it("offers both eligibility options with the sentence that explains each", async () => {
+		const onUpdate = vi.fn();
+		await renderSettings({
+			policy: {
+				settings: { ...settings, runForAllUsers: false },
+				isSaving: false,
+				onUpdate,
+				onReset: vi.fn(),
+			},
+		});
+
+		const narrow = await screen.findByRole("radio", {
+			name: /Only assignees with the review role/,
+		});
+		expect(narrow.getAttribute("aria-checked")).toBe("true");
+		// The role is granted per account outside this workspace, so the copy says so rather than
+		// naming the product as the thing that "manages" it.
+		expect(screen.getByText(/An instance admin grants that role per person/)).not.toBeNull();
+
+		fireEvent.click(screen.getByRole("radio", { name: /All matching work/ }));
+		expect(onUpdate).toHaveBeenCalledWith({ runForAllUsers: true });
 	});
 
 	it("allows conversation reviews without a project trigger", async () => {

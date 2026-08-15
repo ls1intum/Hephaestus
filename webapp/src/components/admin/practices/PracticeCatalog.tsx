@@ -586,7 +586,7 @@ function PracticeRowDetails({
 				<Badge variant="outline">
 					{/* `position: absolute` blockifies the prefix, so every engine inserts the space and it is
 					    announced as a sentence rather than welded to the tier name. */}
-					<span className="sr-only">How far Hephaestus may go: </span>
+					<span className="sr-only">Autonomy tier: </span>
 					{REVIEW_TIER_LABELS[practice.reviewTier.effective]}
 				</Badge>
 				{/* The tier alone cannot be acted on: an admin who reads "Off" needs to know whether this

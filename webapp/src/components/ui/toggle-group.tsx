@@ -81,8 +81,18 @@ function ToggleGroupItem({
 			data-variant={context.variant || variant}
 			data-size={context.size || size}
 			data-spacing={context.spacing}
+			// Match the axis on `data-orientation`, never on `data-horizontal`. Base UI derives its state
+			// attributes through `getStateAttributesProps`, which writes a non-boolean state as
+			// `data-<key>="<value>"`; a `group-data-horizontal/…` variant compiles to `[data-horizontal]`
+			// and so matches nothing, which is how joined groups came to render square-cornered with a
+			// doubled border down every seam.
+			//
+			// Joined segments overlap by one pixel instead of dropping a border, so the selected segment
+			// keeps a border on all four sides and raises it over its neighbours (`aria-pressed:z-10` in
+			// `toggle.tsx`) — a segment missing its leading edge cannot show a selection the eye reads as
+			// one box.
 			className={cn(
-				"group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 group-data-horizontal/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-vertical/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-horizontal/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-vertical/toggle-group:data-[spacing=0]:last:rounded-b-lg shrink-0 focus:z-10 focus-visible:z-10 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:border-l-0 group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:border-t-0 group-data-horizontal/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-l group-data-vertical/toggle-group:data-[spacing=0]:data-[variant=outline]:first:border-t",
+				"group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:last:rounded-b-lg shrink-0 focus:z-10 focus-visible:z-10 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-ml-px group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-mt-px",
 				toggleVariants({
 					variant: context.variant || variant,
 					size: context.size || size,

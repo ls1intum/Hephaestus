@@ -69,7 +69,7 @@ export function ReviewRunActions({
 						<AlertDialogHeader>
 							<AlertDialogTitle>Retry the feedback comment?</AlertDialogTitle>
 							<AlertDialogDescription>
-								Hephaestus will try to post the failed comment again.
+								The failed comment will be posted again.
 							</AlertDialogDescription>
 						</AlertDialogHeader>
 						<AlertDialogFooter>

@@ -126,8 +126,9 @@ export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps
 				</>
 			}
 			chips={[
-				// Two slots of fixed width, so the outcome badge is at one x down the list however long
-				// the recipient's name is. See `ReviewRowChip`.
+				// Both facts are on every row, which is what earns them reserved slots: the outcome badge
+				// then sits at one x down the list however long the recipient's name is. A badge that only
+				// some rows carry belongs in a free chip instead — see `ReviewRowChip`.
 				{ key: "person", width: "lg:w-40", node: <ReviewPerson person={feedback.recipient} /> },
 				{ key: "outcome", width: "lg:w-48", node: <StatusBadge def={deliveryOutcome(feedback)} /> },
 			]}

@@ -1,4 +1,5 @@
-import { Label } from "@/components/ui/label";
+import { useId } from "react";
+import { FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
 	REVIEW_TIER_ADDS,
@@ -18,7 +19,7 @@ export interface ReviewTierLadderProps {
 	value: ReviewTier;
 	onChange: (tier: ReviewTier) => void;
 	disabled?: boolean;
-	/** `full` spells out what each rung adds and draws the cumulative rail. */
+	/** `full` spells out what each rung adds to the one before it. */
 	variant?: "full" | "compact";
 	/** Marks the value as inherited: shown, but somebody else's decision, so it recedes. */
 	muted?: boolean;
@@ -26,10 +27,27 @@ export interface ReviewTierLadderProps {
 }
 
 /**
+ * Controlled, always: the tier in force is the server's, and every change is a write. There is no
+ * `defaultValue` — a ladder that kept its own value would show a rung the workspace never accepted.
+ *
  * Radio semantics rather than a toggle group: the rungs are mutually exclusive states of one setting,
  * which is what `role="radiogroup"` means, and it carries arrow-key movement along the axis. A toggle
  * group's items are `aria-pressed` buttons, which say "the others are off" rather than "this is
  * chosen".
+ *
+ * **The joined look belongs to the group, not to the rungs.** The group draws the one border, the one
+ * radius and the lines between (`divide-*`); a rung is a plain row inside it that owns no geometry at
+ * all. The previous build rounded each rung's outer corners by ordinal (`first:`/`last:`) and pulled
+ * every rung a pixel over its neighbour, which can only be right along one axis: stacked below `sm`
+ * those classes rounded the wrong sides, so the control arrived as three mismatched fragments — "the
+ * parts are not connecting". Nothing here is breakpoint-coupled except the axis itself, and both axes
+ * are drawn by the same two utilities.
+ *
+ * What went with it: a progress rail under the rungs, and a tint on every rung below the chosen one.
+ * The rail was `hidden` below `sm`, so at the width the ladder most needed something joining the rungs
+ * it drew nothing; and the tint claimed each rung is contained in the one above it, which is false at
+ * the first rung — Off is not part of Propose. Containment is a claim the sentences make, one rung at a
+ * time, and only where there is room to read them.
  *
  * Nothing here filters {@link REVIEW_TIER_ORDER} — every rung the vocabulary lists can be moved to.
  */
@@ -43,94 +61,79 @@ export function ReviewTierLadder({
 	className,
 }: ReviewTierLadderProps) {
 	const full = variant === "full";
-	const selectedIndex = REVIEW_TIER_ORDER.indexOf(value);
+	const rungIdPrefix = useId();
 
 	return (
-		<div className={cn("min-w-0", className)}>
-			<RadioGroup
-				aria-label={label}
-				value={value}
-				disabled={disabled}
-				onValueChange={(next) => {
-					const tier = next as ReviewTier;
-					// Re-selecting the rung already in force is a change to nothing that the server would
-					// still accept and record.
-					if (tier && tier !== value) onChange(tier);
-				}}
-				className={cn(
-					"flex w-full flex-col gap-1 sm:flex-row sm:gap-0",
-					full && "sm:gap-2",
-					muted && "opacity-70",
-				)}
-			>
-				{REVIEW_TIER_ORDER.map((tier, index) => {
-					const selected = tier === value;
-					const locked = disabled;
-					return (
-						// Base UI's Radio renders a span plus a hidden input beside it, so the rung is a label
-						// wrapping the control rather than one pointed at it by `htmlFor`: the id it would have
-						// to name belongs to the input, and Base UI generates that itself.
-						<Label
-							key={tier}
-							className={cn(
-								"flex min-w-0 flex-1 cursor-pointer items-start gap-2 border border-input bg-background p-2 font-normal transition-colors",
-								"first:rounded-t-md last:rounded-b-md sm:first:rounded-l-md sm:first:rounded-r-none sm:last:rounded-r-md sm:last:rounded-l-none",
-								"not-first:-mt-px sm:not-first:mt-0 sm:not-first:-ml-px",
-								// `flex-col` at every width, not scoped to `sm:`. Laid out as a row, the untruncatable
-								// description takes the space and squeezes the label's `truncate` down to one glyph
-								// — and the `aria-label` still carries the real word, so every role query and the
-								// axe gate pass over a visibly unreadable control.
-								full ? "flex-col gap-1.5 sm:rounded-md sm:not-first:ml-0" : "items-center",
-								selected && "z-10 border-primary bg-primary/5",
-								// Every rung below the chosen one is included in it, so the run is tinted rather
-								// than just the endpoint.
-								!selected && index < selectedIndex && "bg-muted/60",
-								locked && "cursor-not-allowed opacity-60",
-							)}
-						>
-							<span className="flex min-w-0 items-center gap-2">
-								{/* The name is exactly the visible word (WCAG 2.2 SC 2.5.3). */}
-								<RadioGroupItem
-									value={tier}
-									aria-label={REVIEW_TIER_LABELS[tier]}
-									disabled={locked}
-								/>
-								<span
-									className={cn("truncate text-sm", selected && "font-medium")}
-									aria-hidden="true"
-								>
-									{REVIEW_TIER_LABELS[tier]}
-								</span>
+		<RadioGroup
+			aria-label={label}
+			value={value}
+			disabled={disabled}
+			onValueChange={(next) => {
+				const tier = next as ReviewTier;
+				// Re-selecting the rung already in force is a change to nothing that the server would
+				// still accept and record.
+				if (tier && tier !== value) onChange(tier);
+			}}
+			className={cn(
+				"flex min-w-0 flex-col gap-0 divide-y overflow-hidden rounded-md border bg-background",
+				// Ascending autonomy runs left to right once there is room for it, which is the direction
+				// the surrounding copy points ("everything to its left"), and top to bottom when there is not.
+				"sm:flex-row sm:divide-x sm:divide-y-0",
+				muted && "opacity-70",
+				className,
+			)}
+		>
+			{REVIEW_TIER_ORDER.map((tier) => {
+				const titleId = `${rungIdPrefix}-${tier}`;
+				const addsId = `${rungIdPrefix}-${tier}-adds`;
+				const selected = tier === value;
+				return (
+					// Base UI's Radio renders a span plus a hidden input beside it, so the rung is a label
+					// wrapping the control rather than one pointed at it by `htmlFor`: the id it would have
+					// to name belongs to the input, and Base UI generates that itself. `FieldLabel` over a
+					// bare `Label` for the kit's own selected treatment — it reads the primitive's
+					// `data-checked`, so the tint is not a second copy of "which one is chosen".
+					<FieldLabel
+						key={tier}
+						className={cn(
+							"w-full min-w-0 cursor-pointer items-center gap-2 p-2 font-normal transition-colors sm:flex-1",
+							// Guarded on the primitive's own `data-unchecked` so hover cannot repaint the
+							// chosen rung in the colour of the ones beside it.
+							"has-data-unchecked:hover:bg-muted/50",
+							"has-data-disabled:cursor-not-allowed has-data-disabled:opacity-60",
+							// A column at every width, not scoped to `sm:`. Laid out as a row, the untruncatable
+							// sentence takes the space and squeezes the label's `truncate` down to one glyph —
+							// and the accessible name still carries the real word, so every role query and the
+							// axe gate pass over a visibly unreadable control.
+							full && "flex-col items-start gap-1.5 p-3",
+						)}
+					>
+						<span className="flex min-w-0 items-center gap-2">
+							{/*
+							  Named by the visible word alone (WCAG 2.2 SC 2.5.3), and described by the
+							  sentence rather than hidden from it: pointing at both beats the older
+							  `aria-label` + `aria-hidden` pair, which left a screen reader with the word and
+							  no idea what the rung does.
+							*/}
+							<RadioGroupItem
+								value={tier}
+								aria-labelledby={titleId}
+								aria-describedby={full ? addsId : undefined}
+							/>
+							<span id={titleId} className={cn("truncate text-sm", selected && "font-medium")}>
+								{REVIEW_TIER_LABELS[tier]}
 							</span>
-							{full && (
-								// `ps-6` aligns the sentence with the label above it rather than with the rung's own
-								// edge: the radio plus its gap is what the word is inset by.
-								<span className="ps-6 text-muted-foreground text-xs" aria-hidden="true">
-									{REVIEW_TIER_ADDS[tier]}
-								</span>
-							)}
-						</Label>
-					);
-				})}
-			</RadioGroup>
-			{full && <CumulativeRail selectedIndex={selectedIndex} />}
-		</div>
-	);
-}
-
-/**
- * Decoration, and `aria-hidden` on purpose: the radio group above already announces which tier is
- * chosen, and a screen reader reading "progress, 33%" over a setting that is not progress is worse
- * than silence.
- */
-function CumulativeRail({ selectedIndex }: { selectedIndex: number }) {
-	const filled = selectedIndex <= 0 ? 0 : (selectedIndex / (REVIEW_TIER_ORDER.length - 1)) * 100;
-	return (
-		<div aria-hidden="true" className="mt-2 hidden h-0.5 rounded-full bg-muted sm:block">
-			<div
-				className="h-full rounded-full bg-primary/60 transition-all"
-				style={{ width: `${filled}%` }}
-			/>
-		</div>
+						</span>
+						{full && (
+							// `ps-6` aligns the sentence with the word above it rather than with the rung's own
+							// edge: the radio plus its gap is what the word is inset by.
+							<span id={addsId} className="ps-6 text-muted-foreground text-xs">
+								{REVIEW_TIER_ADDS[tier]}
+							</span>
+						)}
+					</FieldLabel>
+				);
+			})}
+		</RadioGroup>
 	);
 }

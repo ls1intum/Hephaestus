@@ -81,7 +81,7 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 			<PageHeader
 				icon={<RadarIcon />}
 				title="Review activity"
-				description="Everything Hephaestus noticed about this workspace's work, and — for each piece of work — what every practice made of it. Including the practices that stayed quiet, and why."
+				description="Every piece of work recorded in this workspace, and what each practice observed about it — including the practices that stayed quiet, and why."
 			/>
 			<section aria-label="Recorded work" className="space-y-4">
 				<FilterToolbar
@@ -149,7 +149,7 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 							<EmptyDescription>
 								{hasFilter
 									? "Switch back to all work to see everything this workspace has recorded."
-									: "As soon as this workspace is connected to a repository or a chat, the pull requests, issues and threads it sees will appear here — including the ones no practice had anything to say about."}
+									: "As soon as this workspace is connected to a repository or a chat, its pull requests, issues and threads appear here as they sync — including the ones no practice had anything to say about."}
 							</EmptyDescription>
 						</EmptyHeader>
 					</Empty>

@@ -528,7 +528,9 @@ export const TierIsReadOnlyHere: Story = {
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await expect(canvas.queryByLabelText(/^How far Hephaestus may go on/)).not.toBeInTheDocument();
+		// Name-independent on purpose: the point is that no tier *control* exists here, and pinning the
+		// radiogroup's label would make this pass vacuously the next time that label is reworded.
+		await expect(canvas.queryByRole("radiogroup")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
 		const menu = within(await screen.findByRole("menu"));

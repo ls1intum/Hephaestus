@@ -5,7 +5,6 @@ import type { CreateReviewBackfillRunRequest, ReviewBackfillRun } from "@/api/ty
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Empty,
 	EmptyDescription,
@@ -106,7 +105,7 @@ export function PracticeReviewBackfill({
 	const history = runs.filter((run) => run.status === "COMPLETED" || run.status === "CANCELLED");
 
 	return (
-		<div className="space-y-6">
+		<div className="space-y-8">
 			{isError ? (
 				<Alert variant="destructive">
 					<AlertCircle />
@@ -121,24 +120,28 @@ export function PracticeReviewBackfill({
 			) : null}
 
 			{active ? (
-				<ActiveRunCard run={active} isUpdating={isUpdating} onCancel={onCancel} />
+				<ActiveRunSection run={active} isUpdating={isUpdating} onCancel={onCancel} />
 			) : pending ? (
-				<ConfirmationCard
+				<ConfirmationSection
 					run={pending}
 					isUpdating={isUpdating}
 					onConfirm={onConfirm}
 					onCancel={onCancel}
 				/>
 			) : (
-				<EstimateCard isLoading={isLoading} isEstimating={isEstimating} onEstimate={onEstimate} />
+				<EstimateSection
+					isLoading={isLoading}
+					isEstimating={isEstimating}
+					onEstimate={onEstimate}
+				/>
 			)}
 
-			<HistoryCard runs={history} isLoading={isLoading} />
+			<HistorySection runs={history} isLoading={isLoading} />
 		</div>
 	);
 }
 
-function EstimateCard({
+function EstimateSection({
 	isLoading,
 	isEstimating,
 	onEstimate,
@@ -157,78 +160,76 @@ function EstimateCard({
 	};
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Review past work</h2>
-				</CardTitle>
-				<CardDescription>
+		<section className="space-y-4" aria-labelledby="backfill-estimate-heading">
+			<div className="space-y-1">
+				<h2 id="backfill-estimate-heading" className="font-semibold text-lg">
+					Review past work
+				</h2>
+				<p className="text-muted-foreground text-sm">
 					Reviews normally start when work happens, so anything from before this workspace was set
 					up has never been measured. A backfill measures it once, as it stands today.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="backfill-kind">Kind of work</FieldLabel>
-						<FieldDescription>
-							One kind per backfill, so the estimate means one thing.
-						</FieldDescription>
-					</FieldContent>
-					<Select
-						items={WORK_KIND_ITEMS}
-						value={artifactKind}
-						onValueChange={(value) => {
-							if (value) {
-								setArtifactKind(value as CreateReviewBackfillRunRequest["artifactKind"]);
-							}
-						}}
-					>
-						<SelectTrigger id="backfill-kind" className="w-56">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{WORK_KIND_ITEMS.map((kind) => (
-								<SelectItem key={kind.value} value={kind.value}>
-									{kind.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</Field>
+				</p>
+			</div>
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="backfill-kind">Kind of work</FieldLabel>
+					<FieldDescription>
+						One kind per backfill, so the estimate means one thing.
+					</FieldDescription>
+				</FieldContent>
+				<Select
+					items={WORK_KIND_ITEMS}
+					value={artifactKind}
+					onValueChange={(value) => {
+						if (value) {
+							setArtifactKind(value as CreateReviewBackfillRunRequest["artifactKind"]);
+						}
+					}}
+				>
+					<SelectTrigger id="backfill-kind" className="w-56">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{WORK_KIND_ITEMS.map((kind) => (
+							<SelectItem key={kind.value} value={kind.value}>
+								{kind.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</Field>
 
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="backfill-window">How far back</FieldLabel>
-						<FieldDescription>Counted from when the work was opened.</FieldDescription>
-					</FieldContent>
-					<Select items={WINDOWS} value={days} onValueChange={(value) => setDays(value ?? days)}>
-						<SelectTrigger id="backfill-window" className="w-56">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{WINDOWS.map((window) => (
-								<SelectItem key={window.value} value={window.value}>
-									{window.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</Field>
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="backfill-window">How far back</FieldLabel>
+					<FieldDescription>Counted from when the work was opened.</FieldDescription>
+				</FieldContent>
+				<Select items={WINDOWS} value={days} onValueChange={(value) => setDays(value ?? days)}>
+					<SelectTrigger id="backfill-window" className="w-56">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent>
+						{WINDOWS.map((window) => (
+							<SelectItem key={window.value} value={window.value}>
+								{window.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</Field>
 
-				<div className="flex items-center gap-3">
-					<Button onClick={estimate} disabled={isEstimating || isLoading}>
-						{isEstimating ? <Spinner /> : null}
-						Estimate this backfill
-					</Button>
-					<p className="text-muted-foreground text-sm">Nothing is reviewed until you confirm.</p>
-				</div>
-			</CardContent>
-		</Card>
+			<div className="flex items-center gap-3">
+				<Button onClick={estimate} disabled={isEstimating || isLoading}>
+					{isEstimating ? <Spinner /> : null}
+					Estimate this backfill
+				</Button>
+				<p className="text-muted-foreground text-sm">Nothing is reviewed until you confirm.</p>
+			</div>
+		</section>
 	);
 }
 
-function ConfirmationCard({
+function ConfirmationSection({
 	run,
 	isUpdating,
 	onConfirm,
@@ -246,72 +247,69 @@ function ConfirmationCard({
 	const nothingToDo = run.estimatedArtifacts === 0;
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Confirm this backfill</h2>
-				</CardTitle>
-				<CardDescription>{formatWindow(run)}</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<div className="grid gap-4 sm:grid-cols-2">
-					<div>
-						<p className="text-muted-foreground text-sm">Work to review</p>
-						<p className="font-semibold text-2xl">
-							{countOf(run.estimatedArtifacts, run.artifactKind)}
-						</p>
-					</div>
-					<div>
-						<p className="text-muted-foreground text-sm">Estimated AI spend</p>
-						<p className="font-semibold text-2xl">{cost ?? "Unknown"}</p>
-						{cost ? null : (
-							<p className="text-muted-foreground text-sm">
-								This workspace has no priced reviews yet, so there is nothing to base an estimate
-								on.
-							</p>
-						)}
-					</div>
+		<section className="space-y-4" aria-labelledby="backfill-confirm-heading">
+			<div className="space-y-1">
+				<h2 id="backfill-confirm-heading" className="font-semibold text-lg">
+					Confirm this backfill
+				</h2>
+				<p className="text-muted-foreground text-sm">{formatWindow(run)}</p>
+			</div>
+			<div className="grid gap-4 sm:grid-cols-2">
+				<div>
+					<p className="text-muted-foreground text-sm">Work to review</p>
+					<p className="font-semibold text-2xl">
+						{countOf(run.estimatedArtifacts, run.artifactKind)}
+					</p>
 				</div>
-
-				<Alert>
-					<AlertCircle />
-					<AlertTitle>What a backfill does and does not do</AlertTitle>
-					<AlertDescription>
-						Each {noun} is measured once, as it stands now — there is no record of how it looked
-						while it was being worked on. Nothing is posted on the work itself and nobody is
-						notified: commenting on {plural} that are already finished would notify everyone
-						involved about work nobody can act on. The measurements are kept separate from your live
-						trends, because older work has been polished since and comparing the two would invent an
-						improvement nobody made.
-					</AlertDescription>
-				</Alert>
-
-				<div className="flex flex-wrap items-center gap-3">
-					<Button
-						onClick={() => onConfirm(run.id)}
-						disabled={isUpdating || nothingToDo}
-						aria-disabled={isUpdating || nothingToDo}
-					>
-						{isUpdating ? <Spinner /> : null}
-						{nothingToDo
-							? "Nothing to review"
-							: `Review ${countOf(run.estimatedArtifacts, run.artifactKind)}`}
-					</Button>
-					<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
-						Discard
-					</Button>
-					{nothingToDo ? (
+				<div>
+					<p className="text-muted-foreground text-sm">Estimated AI spend</p>
+					<p className="font-semibold text-2xl">{cost ?? "Unknown"}</p>
+					{cost ? null : (
 						<p className="text-muted-foreground text-sm">
-							Nothing was opened in that stretch. Discard this and try a longer one.
+							This workspace has no priced reviews yet, so there is nothing to base an estimate on.
 						</p>
-					) : null}
+					)}
 				</div>
-			</CardContent>
-		</Card>
+			</div>
+
+			<Alert>
+				<AlertCircle />
+				<AlertTitle>What a backfill does and does not do</AlertTitle>
+				<AlertDescription>
+					Each {noun} is measured once, as it stands now — there is no record of how it looked while
+					it was being worked on. Nothing is posted on the work itself and nobody is notified:
+					commenting on {plural} that are already finished would notify everyone involved about work
+					nobody can act on. The measurements are kept separate from your live trends, because older
+					work has been polished since and comparing the two would invent an improvement nobody
+					made.
+				</AlertDescription>
+			</Alert>
+
+			<div className="flex flex-wrap items-center gap-3">
+				<Button
+					onClick={() => onConfirm(run.id)}
+					disabled={isUpdating || nothingToDo}
+					aria-disabled={isUpdating || nothingToDo}
+				>
+					{isUpdating ? <Spinner /> : null}
+					{nothingToDo
+						? "Nothing to review"
+						: `Review ${countOf(run.estimatedArtifacts, run.artifactKind)}`}
+				</Button>
+				<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
+					Discard
+				</Button>
+				{nothingToDo ? (
+					<p className="text-muted-foreground text-sm">
+						Nothing was opened in that stretch. Discard this and try a longer one.
+					</p>
+				) : null}
+			</div>
+		</section>
 	);
 }
 
-function ActiveRunCard({
+function ActiveRunSection({
 	run,
 	isUpdating,
 	onCancel,
@@ -325,101 +323,99 @@ function ActiveRunCard({
 	const percent = total === 0 ? 100 : Math.round((walked / total) * 100);
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle className="flex items-center gap-2">
-					<h2>Backfill in progress</h2>
+		<section className="space-y-4" aria-labelledby="backfill-active-heading">
+			<div className="space-y-1">
+				<div className="flex items-center gap-2">
+					<h2 id="backfill-active-heading" className="font-semibold text-lg">
+						Backfill in progress
+					</h2>
 					<Badge variant={run.status === "PAUSED" ? "outline" : "secondary"}>
 						{run.status === "PAUSED" ? "Paused" : "Running"}
 					</Badge>
-				</CardTitle>
-				<CardDescription>{formatWindow(run)}</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<div className="space-y-2">
-					<Progress value={percent} aria-label="Backfill progress" />
-					<p className="text-muted-foreground text-sm">
-						{walked} of {countOf(total, run.artifactKind)} looked at — {run.submittedCount} sent for
-						review, {run.passedCount} already measured or outside your review rules.
-						{run.failedCount > 0
-							? ` ${run.failedCount} could not be read, and stay unmeasured.`
-							: ""}
-					</p>
 				</div>
+				<p className="text-muted-foreground text-sm">{formatWindow(run)}</p>
+			</div>
+			<div className="space-y-2">
+				<Progress value={percent} aria-label="Backfill progress" />
+				<p className="text-muted-foreground text-sm">
+					{walked} of {countOf(total, run.artifactKind)} looked at — {run.submittedCount} sent for
+					review, {run.passedCount} already measured or outside your review rules.
+					{run.failedCount > 0 ? ` ${run.failedCount} could not be read, and stay unmeasured.` : ""}
+				</p>
+			</div>
 
-				{run.status === "PAUSED" && run.pauseReason ? (
-					<Alert>
-						<AlertCircle />
-						<AlertTitle>Paused, not skipping</AlertTitle>
-						<AlertDescription>{PAUSE_EXPLANATIONS[run.pauseReason]}</AlertDescription>
-					</Alert>
-				) : null}
+			{run.status === "PAUSED" && run.pauseReason ? (
+				<Alert>
+					<AlertCircle />
+					<AlertTitle>Paused, not skipping</AlertTitle>
+					<AlertDescription>{PAUSE_EXPLANATIONS[run.pauseReason]}</AlertDescription>
+				</Alert>
+			) : null}
 
-				<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
-					{isUpdating ? <Spinner /> : null}
-					Stop this backfill
-				</Button>
-			</CardContent>
-		</Card>
+			<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
+				{isUpdating ? <Spinner /> : null}
+				Stop this backfill
+			</Button>
+		</section>
 	);
 }
 
-function HistoryCard({ runs, isLoading }: { runs: ReviewBackfillRun[]; isLoading: boolean }) {
+function HistorySection({ runs, isLoading }: { runs: ReviewBackfillRun[]; isLoading: boolean }) {
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Past backfills</h2>
-				</CardTitle>
-				<CardDescription>What has already been measured, and by whose decision.</CardDescription>
-			</CardHeader>
-			<CardContent>
-				{isLoading ? (
-					<div className="flex justify-center py-6">
-						<Spinner />
-					</div>
-				) : runs.length === 0 ? (
-					<Empty>
-						<EmptyHeader>
-							<EmptyMedia variant="icon">
-								<History />
-							</EmptyMedia>
-							<EmptyTitle>No backfills yet</EmptyTitle>
-							<EmptyDescription>
-								Past work has never been measured in this workspace.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<div className="space-y-2">
-						{runs.map((run) => (
-							<Item key={run.id} variant="outline">
-								<ItemContent>
-									<ItemTitle>
-										{artifactKindPluralLabel(run.artifactKind)}
-										{": "}
-										{formatWindow(run)}
-									</ItemTitle>
-									<ItemDescription>
-										{run.status === "CANCELLED"
-											? `Stopped after reviewing ${countOf(run.submittedCount, run.artifactKind)}.`
-											: `Reviewed ${countOf(run.submittedCount, run.artifactKind)}; ${run.passedCount} needed no new measurement.${
-													run.failedCount > 0
-														? ` ${run.failedCount} could not be read, and stay unmeasured.`
-														: ""
-												}`}
-									</ItemDescription>
-								</ItemContent>
-								<ItemActions>
-									<Badge variant={run.status === "CANCELLED" ? "outline" : "secondary"}>
-										{run.status === "CANCELLED" ? "Stopped" : "Finished"}
-									</Badge>
-								</ItemActions>
-							</Item>
-						))}
-					</div>
-				)}
-			</CardContent>
-		</Card>
+		<section className="space-y-4" aria-labelledby="backfill-history-heading">
+			<div className="space-y-1">
+				<h2 id="backfill-history-heading" className="font-semibold text-lg">
+					Past backfills
+				</h2>
+				<p className="text-muted-foreground text-sm">
+					What has already been measured, and by whose decision.
+				</p>
+			</div>
+			{isLoading ? (
+				<div className="flex justify-center py-6">
+					<Spinner />
+				</div>
+			) : runs.length === 0 ? (
+				<Empty>
+					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<History />
+						</EmptyMedia>
+						<EmptyTitle>No backfills yet</EmptyTitle>
+						<EmptyDescription>
+							Past work has never been measured in this workspace.
+						</EmptyDescription>
+					</EmptyHeader>
+				</Empty>
+			) : (
+				<div className="space-y-2">
+					{runs.map((run) => (
+						<Item key={run.id} variant="outline">
+							<ItemContent>
+								<ItemTitle>
+									{artifactKindPluralLabel(run.artifactKind)}
+									{": "}
+									{formatWindow(run)}
+								</ItemTitle>
+								<ItemDescription>
+									{run.status === "CANCELLED"
+										? `Stopped after reviewing ${countOf(run.submittedCount, run.artifactKind)}.`
+										: `Reviewed ${countOf(run.submittedCount, run.artifactKind)}; ${run.passedCount} needed no new measurement.${
+												run.failedCount > 0
+													? ` ${run.failedCount} could not be read, and stay unmeasured.`
+													: ""
+											}`}
+								</ItemDescription>
+							</ItemContent>
+							<ItemActions>
+								<Badge variant={run.status === "CANCELLED" ? "outline" : "secondary"}>
+									{run.status === "CANCELLED" ? "Stopped" : "Finished"}
+								</Badge>
+							</ItemActions>
+						</Item>
+					))}
+				</div>
+			)}
+		</section>
 	);
 }

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import {
@@ -62,7 +62,22 @@ function PracticeCatalogRoute() {
 			<PageHeader
 				icon={<ListChecks />}
 				title="Practices"
-				description="Choose the practices Hephaestus uses for new reviews in this workspace. Changes affect only this workspace."
+				description={
+					<>
+						Define practices and group them into areas. Changes apply to this workspace only. The
+						autonomy tier — whether each practice is reviewed, and how far its reviews go on their
+						own — is set on{" "}
+						<Link
+							to="/w/$workspaceSlug/admin/practices/review"
+							params={{ workspaceSlug }}
+							search={{}}
+							className="font-medium underline underline-offset-4 hover:text-foreground"
+						>
+							Review
+						</Link>
+						.
+					</>
+				}
 			/>
 			{areasQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
 				<div className="flex h-64 items-center justify-center">

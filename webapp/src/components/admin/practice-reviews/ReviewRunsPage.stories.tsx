@@ -82,7 +82,7 @@ export const WhatEachReviewProduced: Story = {
 			"1 delivered",
 			"2 withheld",
 			"0 failed to deliver",
-			"0 queued for conversation",
+			"0 prepared for conversation",
 		]) {
 			await expect(feedback).toHaveTextContent(pair);
 		}
