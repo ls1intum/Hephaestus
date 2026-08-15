@@ -88,15 +88,12 @@ class GitHubLabelMessageHandlerIntegrationTest extends BaseIntegrationTest {
 
 ## Controller integration tests
 
-Spring's own docs and battle-tested community guides (see [rieckpil.de](https://rieckpil.de/how-to-test-spring-boot-web-controller-the-right-way/) and [Baeldung](https://www.baeldung.com/spring-security-integration-tests)) emphasise two things:
-
-1. Test controllers at the HTTP boundary to catch security misconfigurations.
-2. Keep fixtures reusable so every new endpoint does not need bespoke bootstrapping.
-
-To make that concrete for Hephaestus:
+Two rules, and everything below follows from them: test a controller at the HTTP boundary, because
+that is where a security misconfiguration shows; and keep fixtures reusable, so a new endpoint needs
+no bespoke bootstrapping.
 
 - Extend `AbstractWorkspaceIntegrationTest` (or a service-specific base) so every controller IT automatically cleans the database, provides helper factories such as `persistUser`, and exposes `workspaceService` for setup.
-- Use `WebTestClient` instead of `MockMvc`. We already run the full Spring Boot context, which lets us verify access control rules (`401` unauthenticated vs `403` non-admin) exactly as delivered to the frontend.
+- Use `WebTestClient`. The full Spring Boot context is already running, so access-control rules (`401` unauthenticated vs `403` non-admin) are verified exactly as the frontend receives them.
 - Reach for the custom security annotations (`@WithAdminUser`, `@WithUser`) together with `TestAuthUtils.withCurrentUser()` so the generated JWT matches our resource-server configuration.
 - Assert on status code, payload shape, and repository side effects. A minimal test covers "happy path", "validation failure", and at least one access-control branch.
 - Keep factories close to the domain: prefer `createWorkspace("slug", "Display", ...)` over manually seeding repositories, which keeps each test focused on behaviour instead of boilerplate.

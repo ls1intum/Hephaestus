@@ -16,8 +16,7 @@ import org.jspecify.annotations.NonNull;
  *     as reviews that events triggered.
  * @param nextRunAt when the next sweep is due. Shown because it is the only way to tell a schedule that
  *     is working from one whose workspace has been skipping it.
- * @param lastRunAt when this schedule last actually opened a campaign; absent until the first one. Not
- *     "when it last came due": a tick that found nothing to review does not move it.
+ * @param lastRunAt not "when it last came due" — a tick that found nothing to review does not move it.
  */
 public record ReviewSweepScheduleDTO(
     @NonNull UUID id,

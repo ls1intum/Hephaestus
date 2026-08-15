@@ -46,10 +46,7 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
             assertThat(scope.admits("owner/repo", "feature/x")).isFalse();
         }
 
-        /**
-         * An issue has no target branch. Failing that axis closed would silently stop every issue review
-         * the moment a workspace named its trunk — a scope that quietly does more than it says.
-         */
+        /** An issue has no target branch; failing that axis closed would silently stop every issue review. */
         @Test
         void anArtifactWithNoBranchPassesTheBranchAxis() {
             WorkspaceReviewScope scope = new WorkspaceReviewScope(List.of("main"), List.of("owner/repo"));

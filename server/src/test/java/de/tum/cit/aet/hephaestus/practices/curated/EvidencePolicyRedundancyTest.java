@@ -20,17 +20,9 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
 
 /**
- * Facts the shipped evidence vocabulary asserts about itself, held as tests rather than as a paragraph
- * in a design note.
- *
- * <p>They are load-bearing: they are the argument for strictness living on the source contract rather
- * than on the practice. A design decision justified by "we looked and the data says X" decays the moment
- * somebody adds a source, and the decay is silent — one practice would want a stricter diff than another,
- * and nothing would say so until the refactor that assumed otherwise was already written.
- *
- * <p>If either of these fails, the correct response is <em>not</em> to relax the test. It is to decide
- * whether the new case is a genuine requirement — in which case the axis it needs must be reintroduced
- * deliberately — or an authoring slip that has just been caught.
+ * Facts the shipped evidence vocabulary asserts about itself, held as tests so a source added later
+ * cannot silently invalidate them. A failure here means deciding whether the new case is a genuine
+ * requirement to reintroduce deliberately, or an authoring slip just caught — not relaxing the test.
  */
 class EvidencePolicyRedundancyTest extends BaseUnitTest {
 
@@ -47,11 +39,8 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     );
 
     /**
-     * Every kind a practice can be authored against has at least one source that declares it applies.
-     *
-     * <p>The authorable-kind allow-list is derived, so a kind nothing supplies evidence for is authorable
-     * and refuses every review it triggers — at review time, where nobody is watching. Asking here makes
-     * it a build-time answer.
+     * Every kind a practice can be authored against has at least one source that declares it applies —
+     * checked at build time, because the alternative is discovering it at review time, unwatched.
      */
     @Test
     void everyAuthorableArtifactKindHasEvidenceThatAppliesToIt() {
@@ -67,14 +56,10 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
     }
 
     /**
-     * Which shipped practices claim something is <em>absent</em>, recorded here because it is a reading
-     * of each practice's criteria rather than anything the code can derive.
-     *
-     * <p>The list is deliberately short. A practice that reports a contradiction it can point at —
-     * {@code change-keeps-linked-docs-consistent} quoting a ticked box against an untouched doc — is not
-     * making an absence claim and does not need the whole capture. Nor are the review-quality practices,
-     * which judge the comments that are there. If another practice joins this list, that is a decision
-     * about what it may assert, and it should be made here rather than noticed in a diff.
+     * Which shipped practices claim something is <em>absent</em>, recorded here because it is a reading of
+     * each practice's criteria rather than anything the code can derive. Deliberately short: a practice
+     * that instead points at a contradiction it can quote does not need the whole capture. Adding to this
+     * list is a decision about what a practice may assert, made here rather than noticed in a diff.
      */
     @Test
     void onlyThePracticesThatAssertAnAbsenceDemandAWholeCapture() {

@@ -106,7 +106,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var in = List.of(vf(SLUG, Presence.ABSENT));
 
         assertThatCode(() -> filter.evaluate(job, in)).doesNotThrowAnyException();
-        assertThat(filter.evaluate(job, in).deliverable()).isEmpty(); // still suppressed despite the failed write
+        assertThat(filter.evaluate(job, in).deliverable()).isEmpty();
     }
 
     @Test
@@ -142,7 +142,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
-        assertThat(d.deliverable().get(0).reasoning()).isEqualTo("because reasons"); // unchanged
+        assertThat(d.deliverable().get(0).reasoning()).isEqualTo("because reasons");
     }
 
     @Test
@@ -220,6 +220,9 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         // locus withholds BOTH. Each must be ledgered against ITS OWN observation: indexing observations by
         // locus would record the first one twice and leave the sibling withheld with no row — the recorder
         // would then bind it PRIMARY to the DELIVERED unit, and it would read as feedback the developer saw.
+        // A shared recurrence key must be ledgered against EACH observation, not just the first one found —
+        // indexing by locus would leave the sibling withheld with no row, and the recorder would then bind it
+        // PRIMARY to the delivered unit, making it read as feedback the developer saw.
         Observation first = pf(CK, "occ-first");
         Observation second = pf(CK, "occ-second");
         List<Observation> persisted = List.of(first, second);
@@ -252,7 +255,6 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     }
 
     private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey) {
-        // Assessment mapping: PRESENT->GOOD (strength), ABSENT->BAD (gap), NA->null.
         Assessment assessment =
             presence == Presence.NOT_APPLICABLE
                 ? null

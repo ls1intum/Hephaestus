@@ -31,10 +31,8 @@ import org.springframework.stereotype.Component;
  * the first request. Gated to the application-server runtime role since worker pods
  * intentionally wire only a subset of SPI beans.
  *
- * <p>Also the single place the review contract is enforced. Capability wiring and
- * {@code ReviewContribution} are collected together before anything throws, so an operator sees every
- * declaration problem in one message rather than one per restart. The per-section rules live in
- * {@link ReviewContractValidator}.
+ * <p>Also the single place the review contract is enforced, via {@link ReviewContractValidator}; violations
+ * are collected before anything throws so an operator sees every problem in one message.
  */
 @Component
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -92,10 +90,8 @@ public class IntegrationFrameworkBootstrap {
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
             if (!manifest.enabled()) {
-                // A disabled integration wires none of the beans these rules look for, so running them
-                // would report the feature flag back as a wall of violations. The manifest stays
-                // registered anyway, and the skipped rules are enforced at build time — see
-                // IntegrationManifest#enabled().
+                // A disabled integration wires none of the required beans, so running these checks would
+                // just report the feature flag back as violations; see IntegrationManifest#enabled().
                 log.info("Integration {} is disabled; skipping its capability and provenance checks", kind);
                 continue;
             }

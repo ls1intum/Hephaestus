@@ -21,21 +21,18 @@ import org.springframework.stereotype.Component;
 /**
  * The pull/merge request as a reviewable artifact.
  *
- * <p>Declared here, in the shared SCM domain, rather than in either vendor package: {@code PullRequest}
- * is one entity that both processors write to, so there is exactly one notion of what a pull request is
- * and exactly one vocabulary for what happens to it. A vendor then declares which part of that
- * vocabulary it can actually deliver.
+ * <p>Declared here in the shared SCM domain rather than in either vendor package, so there is exactly
+ * one vocabulary for what happens to a pull request; each vendor then declares which part it can deliver.
  *
- * <p>Unconditional on purpose — the domain exists whether or not GitHub or GitLab is enabled, and a
- * descriptor that came and went with a feature flag would make the vocabulary itself configuration.
+ * <p>Unconditional on purpose — a descriptor that came and went with a feature flag would make the
+ * vocabulary itself configuration.
  */
 @Component
 public class PullRequestArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        // Recommended signals are the moments where work arrives to look at. A merge or a close is the
-        // end of the story rather than something to review, and a submitted review is about somebody
-        // else's conduct.
+        // Recommended signals are the moments where work arrives to look at — a merge or a close is the
+        // end of the story, and a submitted review is about somebody else's conduct.
         declareRecommended(ScmSignals.PULL_REQUEST_OPENED, "Opened", Set.of(GITHUB_PULL_REQUEST, GITLAB_MERGE_REQUEST)),
         declareRecommended(
             ScmSignals.PULL_REQUEST_READY,

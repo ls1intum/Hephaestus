@@ -23,11 +23,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Counts how many practices sit at each effective tier, per area and for the workspace.
  *
- * <p>Resolved in the JVM over one catalogue read rather than aggregated in SQL. A {@code COALESCE} in the
- * query would be a second expression of the inheritance chain, and the two would agree only until the next
- * change to either — a rollup that disagrees with the rows beneath it is worse than no rollup, because it
- * is the number an administrator trusts instead of counting. A workspace's catalogue is bounded by what its
- * own admin screen lists, so one read is not the cost worth being clever about.
+ * <p>Resolved in the JVM over one catalogue read rather than aggregated in SQL: a {@code COALESCE} in the
+ * query would re-express the inheritance chain and could drift from the resolver, and a workspace's
+ * catalogue is small enough that one read is not the cost worth being clever about.
  *
  * <p>Every tier appears as a key even at zero, so the client renders a stable set of chips rather than a
  * row whose columns move as practices are reconfigured.
@@ -46,7 +44,6 @@ public class ReviewTierRollupService {
         PracticeReviewTier workspaceDefault = defaults.defaultTier();
 
         Map<PracticeReviewTier, Integer> workspaceCounts = emptyCounts();
-        // Keyed by area id, with a null key for the practices that belong to no area at all.
         Map<Long, List<Practice>> byArea = new LinkedHashMap<>();
         for (Practice practice : practiceRepository.findAllForCatalog(workspaceId)) {
             PracticeArea area = practice.getArea();

@@ -59,9 +59,8 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         }
 
         /**
-         * The one ordering rule that cannot be got wrong. Configuration is read as it stands now while
-         * observations are history, so a practice measured last week and silenced yesterday must read as
-         * measured — otherwise turning a practice off would retroactively erase the evidence that it ran.
+         * Configuration is read as it stands now while observations are history, so turning a practice off
+         * must not retroactively erase the evidence that it ran.
          */
         @Test
         void letsPastMeasurementsOutrankATierTurnedOffSince() {
@@ -90,11 +89,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             assertThat(entry.observationCount()).isZero();
         }
 
-        /**
-         * Measured and deliberately quiet is the state the autonomy tiers exist to express, and it is only
-         * legible when the two axes stay apart: an outcome about the measurement, counts about the
-         * intervention.
-         */
         @Test
         void keepsMeasurementAndDeliveryOnSeparateAxes() {
             var entry = only(
@@ -261,7 +255,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             assertThat(failed.outcome()).isEqualTo(PracticeTraceOutcome.FAILED);
         }
 
-        /** A practice bound elsewhere must not inherit an unrelated occurrence's answer. */
         @Test
         void ignoresOccurrencesThePracticeDoesNotWatch() {
             var entry = only(
@@ -316,7 +309,6 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
         }
     }
 
-    /** A reader scanning the page must reach the practice that did something before the quiet ones. */
     @Test
     void ordersInformativeAnswersFirst() {
         var reviewed = new TracedPractice(1L, "b-reviewed", "B", PracticeReviewTier.DELIVER, List.of(READY), null);

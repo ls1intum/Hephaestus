@@ -169,15 +169,12 @@ public interface LlmUsageEventRepository extends JpaRepository<LlmUsageEvent, UU
     /**
      * Mean cost of one <em>review</em> of this job type, over reviews this window could price in full.
      *
-     * <p>Deliberately not derived from {@link #aggregateByJobType}: a row in this table is one
-     * <em>attempt</em>, not one review. Dividing spend by the attempt count under-quotes exactly the
-     * retry-heavy workspaces whose campaigns cost the most. Grouping by the source first makes the
-     * denominator "reviews" and puts each review's retries into its own cost, which is what a campaign
-     * will actually be billed.
+     * <p>Deliberately not derived from {@link #aggregateByJobType}: a row there is one <em>attempt</em>,
+     * not one review, so dividing spend by attempt count under-quotes exactly the retry-heavy workspaces
+     * whose campaigns cost the most. Grouping by source first makes "reviews" the denominator.
      *
-     * <p>A review with any unpriced attempt is dropped from numerator and denominator together, so an
-     * instance with a half-priced catalogue reports the mean of what it could price rather than a mean
-     * dragged toward zero by attempts it could not.
+     * <p>A review with any unpriced attempt is dropped from numerator and denominator together, so a
+     * half-priced catalogue reports the mean of what it could price rather than one dragged toward zero.
      */
     @Query(
         value = """

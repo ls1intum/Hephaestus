@@ -50,7 +50,6 @@ export const tracedArtifacts = [
 		reviewedSignalCount: 0,
 	},
 	{
-		// A written document is reviewable work this release ships, so it has to have a name here.
 		artifactKind: "docs.document",
 		artifactId: 512,
 		title: "Onboarding: your first week",
@@ -327,10 +326,7 @@ export const untouchedArtifactTrace = {
 	],
 } satisfies Wire<ArtifactTrace>;
 
-/**
- * A kind with no front door for asking: a document is reviewed when its source publishes it, and the
- * request endpoint refuses it — so this trace must not offer a button whose only outcome is an error.
- */
+/** A kind the request endpoint refuses, so its trace must not offer the button. */
 export const documentArtifactTrace = {
 	artifactKind: "docs.document",
 	artifactId: 512,

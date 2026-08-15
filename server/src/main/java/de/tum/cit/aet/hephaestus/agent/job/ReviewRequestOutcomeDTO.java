@@ -8,11 +8,10 @@ import org.jspecify.annotations.NonNull;
 /**
  * What came of asking for a review: the run it started, or the reason it started none.
  *
- * <p>A refusal is a 200 carrying this body, not a 4xx. Nearly every reason a requested review does not
- * run is a condition of the workspace the asker can neither see nor fix from where they stand — an
- * exhausted budget, a practice turned down to Off, a cooldown — and an error status would tell them the
- * button is broken when the ask was understood perfectly and something nameable stopped it. The one
- * answer that is a status code is a caller with no standing on the artifact, which is a 403.
+ * <p>A refusal is a 200 carrying this body, not a 4xx: nearly every reason a requested review does not
+ * run is a workspace condition the asker can neither see nor fix — an exhausted budget, a practice
+ * turned Off, a cooldown — so an error status would call the ask broken when something nameable simply
+ * stopped it. The one answer that is a status code is a caller with no standing on the artifact, a 403.
  */
 @Schema(description = "What came of asking for a review")
 public record ReviewRequestOutcomeDTO(

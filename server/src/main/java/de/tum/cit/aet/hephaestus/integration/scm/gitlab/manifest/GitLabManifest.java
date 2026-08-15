@@ -12,21 +12,16 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab integration manifest. {@code GitlabWebhookSignatureVerifier} runs dual-mode
- * (legacy plaintext {@code X-Gitlab-Token} + GitLab 19.0+ HMAC {@code whsec_*}).
+ * GitLab integration manifest.
  *
- * <p>Feedback-delivery / inline-finding / approval capabilities are gated on the
- * {@code hephaestus.integration.gitlab.enabled} flag — the underlying GraphQL provider and the
- * channel beans share that flag, and the bootstrap demands matching SPI beans for any
- * declared capability. GitLab is opt-in (default off), so the manifest reports {@link #enabled()}
- * from that flag and the bootstrap skips the bean checks when it is off. The manifest bean itself is
- * registered either way: what GitLab <em>could</em> raise is a fact about the build, and a workspace
- * has to be able to read it in order to be told that connecting GitLab would wake a dormant practice.
+ * <p>Feedback-delivery, inline-finding and approval capabilities are gated on
+ * {@code hephaestus.integration.gitlab.enabled}, the same flag the GraphQL provider and channel beans require —
+ * the bootstrap demands matching SPI beans for every declared capability. GitLab is opt-in (default off), but
+ * the manifest bean stays registered either way so a workspace can be told that connecting GitLab would wake a
+ * dormant practice.
  *
- * <p>No {@code RATE_LIMITED}: GitLab has no per-kind {@code RateLimitTracker} impl.
- * No {@code SCOPE_CHANGES}: GitLab has no install/uninstall/scope webhooks, so
- * {@code GitlabLifecycleListener.onScopeChanged} would never fire — declaring the
- * capability would lie to the UI's practice-gating check.
+ * <p>No {@code RATE_LIMITED}: no per-kind {@code RateLimitTracker}. No {@code SCOPE_CHANGES}: GitLab has no
+ * install/uninstall/scope webhooks to fire it.
  */
 @Component
 public class GitLabManifest implements IntegrationManifest {
@@ -56,7 +51,6 @@ public class GitLabManifest implements IntegrationManifest {
     public Set<Capability> declaredCapabilities() {
         EnumSet<Capability> capabilities = EnumSet.of(Capability.WEBHOOK_INGEST);
         if (gitlabStackEnabled) {
-            // GraphQL provider + channel beans only load when hephaestus.integration.gitlab.enabled=true.
             capabilities.add(Capability.FEEDBACK_DELIVERY);
             capabilities.add(Capability.INLINE_FINDINGS);
             capabilities.add(Capability.APPROVAL_WORKFLOW);
@@ -65,14 +59,12 @@ public class GitLabManifest implements IntegrationManifest {
     }
 
     /**
-     * {@code scm.pull_request.synchronized} is deliberately absent: a merge-request hook does fire on a
-     * push, but the processor derives no "new commits" transition from it, so a practice watching that
-     * signal cannot fire on GitLab. Leaving it out turns that into a dormant binding with a stated
-     * reason rather than a practice indistinguishable from a quiet week.
+     * {@code scm.pull_request.synchronized} is deliberately absent: a push does fire the merge-request hook, but
+     * the processor derives no "new commits" transition from it, so a practice watching that signal stays a
+     * dormant binding on GitLab rather than one indistinguishable from a quiet week.
      *
-     * <p>Delivery lanes track the same flag as the channel beans: claiming a lane whose
-     * {@code SummaryChannel} is not wired is caught at boot, which is the intended behaviour but a poor
-     * way to find out.
+     * <p>Delivery lanes track the same enablement flag as the channel beans; claiming a lane whose
+     * {@code SummaryChannel} is not wired fails at boot.
      */
     @Override
     public ReviewContribution reviewContribution() {

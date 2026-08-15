@@ -20,15 +20,10 @@ import { Separator } from "@/components/ui/separator";
 import { getInitials } from "@/lib/avatar";
 
 /**
- * The workspace's members are the only people who can be the subject of a review, and this is the
- * most the members endpoint will return in one page.
- *
- * <p>The endpoint takes `page` and `size` and nothing else — no query, no name filter — so the
- * search box in this popover filters what has already arrived and cannot reach anyone past the
- * hundredth. In a workspace larger than that, some people are unselectable *and* the search says
- * "No matches" for them, which reads as "that person does not exist here". Until the server can be
- * asked for a name, the popover states the limit rather than hiding it: a stated boundary sends the
- * reader somewhere else, an unstated one sends them to the wrong conclusion.
+ * The members endpoint takes `page` and `size` and nothing else — no query, no name filter — so the
+ * search box here filters what has already arrived and cannot reach anyone past this page. A larger
+ * workspace has people who are unselectable *and* whom the search answers "No matches" for, which
+ * reads as "that person does not exist here", so the popover states the limit rather than hiding it.
  */
 const MEMBER_PAGE_SIZE = 100;
 
@@ -45,30 +40,17 @@ export interface ReviewPersonFacetProps {
 	selected: number | undefined;
 	onChange: (userId: number | undefined) => void;
 	/**
-	 * The name of the person `selected` identifies, so a filter arrived at by link shows a name rather
-	 * than an id before the member list loads — and still shows one if the person has since left the
-	 * workspace.
-	 *
-	 * <p>Read only while `selected` is set, and it must name *that* person. A caller taking it from
-	 * the first row of the list it filters is correct only while the filter is on; off, the first row
-	 * is whoever sorts first, and passing their name here labels a different person's id.
+	 * The name of the person `selected` identifies, shown before the member list loads and for a
+	 * person who has since left the workspace. It must name *that* person: a caller reading it off the
+	 * first row of the list it filters is right only while the filter is on, and otherwise labels one
+	 * person's id with another's name.
 	 */
 	fallbackName?: string;
 }
 
 /**
- * Filter a review list down to one person.
- *
- * <p>Both list screens already understood a person filter: `subjectUserId` and `recipientUserId`
- * were in the search schema, the queries sent them, and an applied one rendered as a pill you could
- * clear. There was simply no control that could set one — the only way in was a link from somewhere
- * else, which meant "show me the delivery for one person" was a question the screen could answer and
- * an operator could not ask. Anything that can appear as an applied-filter pill has to be settable in
- * place; this is that control.
- *
- * <p>Single-select rather than multi, because the search schema carries one id and the API takes one.
- * A multi-select trigger that silently kept only the last choice would be a control that lies about
- * what it did.
+ * Single-select rather than multi, because the search schema carries one id and the API takes one: a
+ * multi-select trigger that silently kept only the last choice would lie about what it did.
  */
 export function ReviewPersonFacet({
 	workspaceSlug,

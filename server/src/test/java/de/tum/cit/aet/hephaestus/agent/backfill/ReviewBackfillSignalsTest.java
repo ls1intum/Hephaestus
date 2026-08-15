@@ -13,9 +13,8 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * A campaign measures each artifact at the state it is actually in, using the live signal vocabulary.
- * That reuse is what makes a backfill match the practices a workspace already bound, and what makes the
- * ledger de-duplicate an artifact the live path already measured.
+ * A campaign measures each artifact at the state it is actually in, reusing the live signal vocabulary —
+ * which is what lets the ledger de-duplicate an artifact the live path already measured.
  */
 @DisplayName("Backfill signal selection")
 class ReviewBackfillSignalsTest extends BaseUnitTest {

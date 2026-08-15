@@ -21,43 +21,32 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class ObservationVisibilityPolicyTest extends BaseUnitTest {
 
+    /**
+     * Currentness is the policy's own conjunct; the rest of the answer is whatever evidence authorization
+     * says, passed through unchanged in both directions.
+     */
     @ParameterizedTest
     @ValueSource(booleans = { true, false })
     void answersWhatEvidenceAuthorizationAnswersForACurrentObservation(boolean authorized) {
         EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
         Observation observation = observation("fingerprint", "fingerprint");
-        when(authorization.permits(7L, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)).thenReturn(
-            authorized
+        when(
+            authorization.permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
+        ).thenReturn(authorized ? Set.of(observation.getId()) : Set.<UUID>of());
+
+        Set<UUID> permitted = new ObservationVisibilityPolicy(authorization).permitsAll(
+            7L,
+            List.of(observation),
+            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
         );
 
-        assertThat(
-            new ObservationVisibilityPolicy(authorization).permits(
-                7L,
-                observation,
-                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-            )
-        ).isEqualTo(authorized);
-        verify(authorization).permits(7L, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
-    }
-
-    @Test
-    void rejectsStaleObservationWithoutCheckingSourceAuthorization() {
-        EvidenceAuthorization authorization = mock(EvidenceAuthorization.class);
-
-        assertThat(
-            new ObservationVisibilityPolicy(authorization).permits(
-                7L,
-                observation("old", "current"),
-                SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
-            )
-        ).isFalse();
-        verifyNoInteractions(authorization);
+        assertThat(permitted.contains(observation.getId())).isEqualTo(authorized);
+        verify(authorization).permitsAll(7L, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY);
     }
 
     /**
-     * The batched form must keep the currentness conjunct ahead of the authorization one, exactly as the
-     * per-row form does: a stale claim is refused without an evidence read, so it can never be admitted by
-     * an authorization answer given about the batch it was in.
+     * The currentness conjunct stays ahead of the authorization one: a stale claim is refused without an
+     * evidence read, so it can never be admitted by an authorization answer given about the batch it was in.
      */
     @Test
     void authorizesOnlyTheCurrentObservationsOfABatch() {

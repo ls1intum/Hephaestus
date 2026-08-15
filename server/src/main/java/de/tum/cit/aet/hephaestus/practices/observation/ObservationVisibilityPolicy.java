@@ -20,24 +20,21 @@ public class ObservationVisibilityPolicy {
         this.evidenceAuthorization = evidenceAuthorization;
     }
 
-    public boolean permits(long workspaceId, Observation observation, SourceUsePurpose purpose) {
-        return (
-            ReviewClaimCurrentness.of(observation.getPracticeRevision(), observation.getPractice()) ==
-                ReviewClaimCurrentness.CURRENT &&
-            evidenceAuthorization.permits(workspaceId, observation, purpose)
-        );
-    }
-
     /**
-     * The ids of the observations {@link #permits} would admit, for a whole list at once.
+     * The ids of the observations a caller may show or quote, out of the ones it hands in.
      *
-     * <p>Same two conjuncts in the same order, so a stale claim still costs no authorization read. The
-     * difference is that the surviving observations are authorized in one round trip rather than one each:
-     * a reflection dashboard authorizes every observation a developer has in the window, and the per-row
-     * form spent a query on each.
+     * <p>Two conjuncts in this order: the claim must have been measured against the practice's current
+     * review rules, and the evidence behind it must still be authorized for this purpose. Currentness is
+     * decided first and per observation, so a stale claim costs no authorization read at all.
      *
-     * <p>An id absent from the returned set is not permitted, whatever the reason — which is what the
-     * per-row {@code false} means too.
+     * <p>Every observation that clears currentness is authorized in one round trip rather than one each.
+     * The surfaces that ask this ask it about a whole page — a reflection dashboard authorizes every
+     * observation a developer has in the window — so a per-observation form made the round trips a
+     * function of how much work the developer did.
+     *
+     * <p>An id absent from the returned set is not permitted, whatever the reason. Callers never have to
+     * tell "refused" from "not asked about", and an unpersisted observation, having no id, is never
+     * permitted.
      */
     public Set<UUID> permitsAll(long workspaceId, Collection<Observation> observations, SourceUsePurpose purpose) {
         List<Observation> current = new ArrayList<>(observations.size());

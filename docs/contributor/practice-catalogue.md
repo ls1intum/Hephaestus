@@ -193,15 +193,15 @@ Evidence is declared per binding against the versioned
 [artifact-source contract](./artifact-source-contract) and the canonical
 [practice review glossary](./practice-review-glossary.mdx). Each entry names a source and a stance —
 `REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL` — and the practice's policy adds conservative skipping and
-known limitations. Requirements must not infer availability from a missing file. Author-defined
-requirements are not independent validation of automated review. They say nothing about whether a
-developer, peer, or human mentor can review the practice outside the governed integrations.
+known limitations. Requirements must not infer availability from a missing file. What an author declares
+is a declaration and nothing more — the product validates no policy independently, and every shipped
+policy carries the single status `AUTHOR_DECLARED` to say so. Requirements also say nothing about whether
+a developer, peer, or human mentor can review the practice outside the governed integrations.
 
 The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its *inputs* change rather
 than the rules, so a stored fingerprint is never compared against one computed from a different set of
-facts. The current scheme is `v3`, which dropped the named evidence profile — it was the set of sources
-that declare they apply to the artifact kind, which the kind already determines on its own. Earlier
-schemes retain their original meaning and never compare equal by accident.
+facts. Each scheme retains its original meaning, so two schemes never compare equal by accident. Bump the
+prefix in the same change that alters the input set.
 
 Architecture-wide qualities cannot be inferred from one change. A practice may review an observable
 act, such as recording a decision, without turning it into a claim about the whole system.
@@ -231,7 +231,7 @@ standard as an experiment or a convention as a proven outcome.
    artifact kind's default evidence. Reference any precompute script explicitly; a script must be named
    after the practice slug, and an unreferenced one fails validation.
 6. Add or update focused automated-review tests, including required-source skipping and valid-empty evidence.
-7. Review the admin presentation and a representative delivered message.
+7. Review the admin presentation and a representative piece of delivered feedback.
 
 Create workspace-specific practices through the admin UI or API so validation, ordering, revisions,
 and audit behavior remain intact.

@@ -67,11 +67,11 @@ in a diff rather than a measurement:
   `PracticeDetectionResultParser` reads. That is a prompt-and-parser contract with a model, not a name
   a reader ever sees.
 
-**The earlier exemption for the read APIs and the reviews UI is withdrawn.** It let the surfaces an
-operator actually reads carry the one word this page bans, which is worse than the cost of the rename it
-was avoiding. Those names are now `ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`,
-`observationId`, and `/practices/reviews/observations`. Nothing is grandfathered: a new *finding* outside
-the two bullets above is a bug.
+Everything else is an observation, including the read APIs and the reviews UI — the surfaces an operator
+actually reads are exactly where the banned word does the most damage. Those names are
+`ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`, `observationId`, and
+`/practices/reviews/observations`. Nothing is grandfathered: a *finding* outside the two bullets above is
+a bug.
 
 For how much a workspace lets the system do on its own about a practice — including whether it is
 reviewed at all — use **autonomy tier** and its three values **Off**, **Propose**, **Deliver**, as
@@ -80,8 +80,8 @@ the [practice review glossary](./practice-review-glossary.mdx#product-terms) def
 between silent measurement and unasked delivery. "Not reviewed at all" is the **Off** tier, not a separate
 concept. **Propose** reviews the work and records everything it sees and sends nothing; do not write that
 it prepares, drafts or previews feedback, because at that tier no feedback is ever composed. Do not write
-*loudness tier*: it named a ladder that mixed how much the system does with where it says it, and the
-second half is now **feedback reach**, a separate workspace setting.
+*loudness tier*: it mixes how much the system does with where it says it, and where it says it is
+**feedback reach**, a separate workspace setting.
 
 A tier is also rarely a fact about one practice alone. Most practices hold no tier and inherit their area's,
 and most areas inherit the workspace's, so write **effective tier** for the one in force and **override**

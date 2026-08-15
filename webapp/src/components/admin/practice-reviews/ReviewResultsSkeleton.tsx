@@ -3,19 +3,14 @@ import { Skeleton } from "@/components/ui/skeleton";
 export interface ReviewResultsSkeletonProps {
 	label: string;
 	/**
-	 * The page size the list is about to show. Required, and deliberately undefaulted: a skeleton
-	 * only earns its place by mimicking the layout it replaces (NN/g, "Skeleton Screens"), and any
-	 * default here is a row count that can silently disagree with its caller's page size — which
-	 * makes the arriving results push the pagination down the screen, the jump this exists to
-	 * prevent.
+	 * The page size the list is about to show. Deliberately undefaulted: any default is a row count
+	 * that can silently disagree with the caller's page size, and the results then arrive by pushing
+	 * the pagination up or down the screen — the jump a skeleton exists to prevent.
 	 */
 	rows: number;
 }
 
-/**
- * The shape of {@link ReviewRow}, before the rows exist: the same four regions in the same places —
- * the icon tile, a title bar, a meta line, and the chips on the right.
- */
+/** The shape of {@link ReviewRow}, before the rows exist. */
 export function ReviewResultsSkeleton({ label, rows }: ReviewResultsSkeletonProps) {
 	return (
 		<div className="divide-y rounded-lg border" role="status">

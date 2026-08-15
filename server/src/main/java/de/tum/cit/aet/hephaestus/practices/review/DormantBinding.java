@@ -6,11 +6,9 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * A practice that is switched on and can never fire here, with the reason attached.
- *
- * <p>The reason is the whole point. Dropping such a practice from a listing leaves it configured,
- * apparently healthy and permanently silent; failing the boot over it would break every workspace that
- * has simply not connected an integration yet.
+ * A practice that is switched on and can never fire here, with the reason attached — dropping it from a
+ * listing would leave it looking configured and healthy while permanently silent, and failing the boot
+ * over it would break every workspace that has simply not connected an integration yet.
  *
  * @param practiceId    the practice that cannot fire
  * @param signals       the signals it is bound to, none of which anything connected here raises
@@ -24,11 +22,7 @@ public record DormantBinding(Long practiceId, Set<SignalName> signals, Set<Integ
         raisedByAnyOf = Set.copyOf(raisedByAnyOf);
     }
 
-    /**
-     * A human-readable reason, phrased as the action that would end the dormancy. Read by a developer
-     * asking why nothing happened to their work, so the lists are joined by hand rather than left to
-     * {@code Collection.toString}.
-     */
+    /** Phrased as the action that would end the dormancy; joined by hand rather than {@code Collection.toString}. */
     public String reason() {
         String names = signals.stream().map(SignalName::value).sorted().collect(Collectors.joining(", "));
         if (raisedByAnyOf.isEmpty()) {

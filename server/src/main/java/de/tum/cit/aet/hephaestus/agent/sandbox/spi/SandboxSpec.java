@@ -16,15 +16,9 @@ import java.util.UUID;
  * output path after completion. The transfer mechanism is an implementation detail of the
  * underlying {@link SandboxManager}.
  *
- * @param jobId unique job identifier (used for labels, network naming, logging)
- * @param image Docker image to run (e.g. {@code ghcr.io/ls1intum/hephaestus/agent-pi:latest})
- * @param command container command + arguments
- * @param environment environment variables injected into the container
  * @param networkPolicy network access and LLM proxy configuration
  * @param resourceLimits CPU, memory, PID, and timeout constraints
- * @param securityProfile container hardening flags
  * @param inputFiles files to inject into /workspace (relative path → content)
- * @param inputFilesOnDisk files to inject into /workspace (relative path → host file), streamed
  * @param outputPath container path to collect results from after execution
  * @param volumeMounts host bind mounts (host path → container path); mounted read-only
  */
@@ -81,7 +75,6 @@ public record SandboxSpec(
         if (outputPath.isBlank()) {
             throw new IllegalArgumentException("outputPath must not be blank");
         }
-        // Default nullable collection fields to empty — avoids null-checking in consumers
         command = command != null ? command : List.of();
         environment = environment != null ? environment : Map.of();
         inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();

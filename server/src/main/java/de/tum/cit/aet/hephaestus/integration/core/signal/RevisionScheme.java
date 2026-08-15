@@ -1,15 +1,9 @@
 package de.tum.cit.aet.hephaestus.integration.core.signal;
 
 /**
- * How a signal's {@link SignalRevision} is derived — declared <em>per signal</em>, never per artifact
- * kind.
- *
- * <p>This is the distinction the whole ledger turns on. Editing a description moves no commit SHA, so
- * keying every signal of a kind on the head SHA would make a practice about the prose unmeasurable
- * after the author fixed it. Keying a push on the prose instead would re-review unchanged code.
- *
- * <p>The scheme is recoverable from a stored revision (each carries its scheme's prefix), so a
- * ledger row explains its own identity without consulting the catalog that produced it.
+ * How a signal's {@link SignalRevision} is derived — declared <em>per signal</em>, never per artifact kind,
+ * because a description edit moves no commit SHA and a push changes no prose. Recoverable from a stored
+ * revision, so a ledger row explains its own identity without consulting the catalog that produced it.
  */
 public enum RevisionScheme {
     /** The artifact's head commit. For signals whose subject is the code. */
@@ -31,8 +25,8 @@ public enum RevisionScheme {
     }
 
     /**
-     * The marker a revision of this scheme starts with. {@code '~'} rather than {@code ':'} because
-     * revisions travel inside colon-delimited idempotency keys.
+     * The marker a revision starts with; {@code '~'} because revisions travel inside colon-delimited
+     * idempotency keys.
      */
     public String prefix() {
         return prefix;

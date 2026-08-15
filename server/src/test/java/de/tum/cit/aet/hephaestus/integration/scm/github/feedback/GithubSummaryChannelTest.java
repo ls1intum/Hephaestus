@@ -340,8 +340,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void postSummary_forAnIssueSubject_resolvesViaIssueNodeId_notThePrResolver() {
-        // resolve() targets pullRequest and returns null for an issue, so an issue subject must route
-        // through resolveIssue or the whole delivery fails.
+        // resolve() targets pullRequest and returns null for an issue, so an issue subject must route through resolveIssue.
         FeedbackTarget target = new FeedbackTarget(
             new IntegrationRef(IntegrationKind.GITHUB, 1L, null),
             "owner/repo/issues/42",
@@ -384,9 +383,8 @@ class GithubSummaryChannelTest extends BaseUnitTest {
     }
 
     /**
-     * One page of a backwards (newest-end) walk. The forward pair is filled with the opposite values —
-     * {@code hasNextPage = !hasPreviousPage} and a cursor that is never a valid continuation — so a scan that
-     * reads {@code hasNextPage}/{@code endCursor} fails these tests instead of passing by coincidence.
+     * One page of a backwards (newest-end) walk. The forward pair is filled with opposite/invalid values
+     * so a scan that reads {@code hasNextPage}/{@code endCursor} fails these tests instead of passing by coincidence.
      */
     private ClientGraphQlResponse mockCommentsPageResponse(
         String commentsPath,
@@ -420,8 +418,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_pagesFromTheNewestEnd_neverForwards() {
-        // The just-posted marker is the newest comment; a forward walk would start at the oldest and can run
-        // out of budget before reaching it on a busy PR.
+        // The just-posted marker is newest; a forward walk could run out of budget before reaching it on a busy PR.
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse response = mockCommentsPageResponse(

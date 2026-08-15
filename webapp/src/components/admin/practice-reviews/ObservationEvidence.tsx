@@ -25,20 +25,15 @@ export interface ObservationEvidenceProps {
 const SECRET_SCANNER = "secret-diff-scanner";
 
 /**
- * What the review actually read, grouped under the source each passage came from.
+ * The source is named once per group, in words: the wire contract id means nothing to a reader who
+ * has never seen the source catalog.
  *
- * <p>The surface this replaces printed a row of `scm.pull-request.diff` badges, then repeated that
- * same string under every citation below it — a contract id, three times, for a reader who has never
- * seen the source catalog. Naming the source once, in words, is the whole change: a heading says
- * where these passages are from, and the passages under it say nothing about their filing.
- *
- * <p>Line numbers are shown for two source kinds and hidden for the other thirteen, which is not a
- * simplification but the truth. The server verifies a diff citation against the annotated unified
- * diff, so `path:12–18` names a real span of a real file. Everywhere else the range is an offset
- * into the serialised context artifact the quote was pulled from — line 40 of
- * `conversation_thread.json`, not the fortieth message — asserted by the model and checked only for
- * the quote appearing somewhere in the file. Printing that would be a coordinate into a file the
- * reader cannot open, dressed as a location in the work.
+ * <p>Line numbers are shown only for the source kinds whose locator is `code`. The server verifies a
+ * diff citation against the annotated unified diff, so its range names a real span of a real file.
+ * Everywhere else the range is an offset into the serialised context artifact the quote was pulled
+ * from — a line of `conversation_thread.json`, not a message of the thread — asserted by the model
+ * and checked only for the quote appearing somewhere in the file. Printing it would dress a
+ * coordinate into a file the reader cannot open as a location in the work.
  */
 export function ObservationEvidence({ evidence, detector }: ObservationEvidenceProps) {
 	const citations = evidence?.citations ?? [];
@@ -67,7 +62,6 @@ export function ObservationEvidence({ evidence, detector }: ObservationEvidenceP
 	);
 }
 
-/** Says how much there is to read before the reader starts, in the shape of a sentence. */
 function summaryLine(citations: number, sources: number): string {
 	const passages = citations === 1 ? "One passage" : `${citations} passages`;
 	if (sources === 1) return `${passages} from one source.`;
@@ -118,10 +112,6 @@ function EvidenceSourceSection({
 	);
 }
 
-/**
- * The one line that says where a passage came from — a file coordinate for code, the object's own
- * name for everything else.
- */
 function CitationHeader({
 	citation,
 	locator,
@@ -149,11 +139,9 @@ function CitationHeader({
 }
 
 /**
- * A passage the review read and was not allowed to keep.
- *
- * The server accepts a missing quote from exactly one detector, so when that is the one that ran,
- * the reason is knowable and saying it is better than a blank panel that reads as a citation of
- * nothing. When some other detector produced it the app does not know why, and says only that.
+ * The server accepts a missing quote from exactly one detector, so when that is the one that ran the
+ * reason is knowable and can be said. When some other detector produced it the app does not know
+ * why, and says only that.
  */
 function RedactedQuote({ fromSecretScanner }: { fromSecretScanner: boolean }) {
 	return (

@@ -12,13 +12,10 @@ import org.springframework.stereotype.Component;
  * eager-fetch graph its review path needs. Thin on purpose: it exists so {@link DevTriggerController} does
  * not depend on a {@code @Repository}, which the architecture rules forbid a controller to do.
  *
- * <p>The workspace is a parameter rather than an afterthought. The caller names an artifact by surrogate
- * id and a workspace separately, and nothing in the ids themselves relates the two — so loading the
- * artifact without the ownership check and then submitting it under the named workspace bills that
- * workspace's {@code agent_job} and LLM usage ledger for another one's work. That is not privilege
- * escalation, since only an instance admin gets this far, but the cost estimator for backfill campaigns
- * reads exactly that ledger, so the misattribution outlives the request and quietly skews what a
- * different workspace is later told a campaign will cost.
+ * <p>The workspace ownership check matters because nothing in a surrogate artifact id relates it to a
+ * workspace: without it, submitting an artifact under the wrong workspace would bill that workspace's
+ * {@code agent_job} and LLM usage ledger for another one's work, and quietly skew what a backfill campaign
+ * cost estimator later tells a different workspace.
  */
 @Component
 class ReviewableArtifactLoader {

@@ -28,33 +28,20 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Offers one already-existing artifact to the review path on a campaign's behalf.
+ * Offers one already-existing artifact to the review path on a campaign's behalf, running the same steps
+ * the live ingestion path runs — record the signal, ask the gate, submit.
  *
- * <p>Runs the same steps the live ingestion path runs — record the signal, ask the gate, submit — and
- * differs only in these deliberate ways:
+ * <p>The signal is recorded with the run's own {@link DiscoveredVia} (from
+ * {@link ReviewBackfillRun#getDiscoveredVia()}, mapped once in {@code SignalOrigins}), and the submission
+ * states its {@link ObservationOrigin} explicitly, so a hand-scoped campaign (BACKFILL) and a
+ * {@link ReviewSweepSchedule}'s recurring run (SWEEP) each stay filed against the population they measure
+ * rather than blending into the health metrics the event path watches.
  *
- * <ul>
- *   <li>The signal is recorded with the run's own {@link DiscoveredVia}, which is what lets it claim a
- *       row a first sync left undecided, and what keeps thousands of campaign rows out of the health
- *       measurement that watches how signals normally arrive.
- *   <li>The submission states its {@link ObservationOrigin} explicitly, so the measurement is filed
- *       against the population it belongs to no matter how many hops it takes to get submitted.
- * </ul>
- *
- * <p>Both come from {@link ReviewBackfillRun#getDiscoveredVia()} through the one mapping in
- * {@code SignalOrigins}, and neither is written here. A campaign an admin scoped by hand is BACKFILL and
- * measures a corpus somebody chose; a run a {@link ReviewSweepSchedule} opened is SWEEP and measures the
- * last few days, which is the population the event path measures. Hard-coding either would make this
- * class the place the two quietly became the same thing.
- *
- * <p>The gate is asked in {@link TriggerMode#MANUAL} mode, which is the honest reading: no event
- * occasioned this review, a person did. That means a workspace which has turned manual triggering off
- * cannot be backfilled, which is correct — that switch is how a workspace says reviews only happen when
- * work happens.
+ * <p>The gate is asked in {@link TriggerMode#MANUAL} mode — no event occasioned this review, a person
+ * did — so a workspace with manual triggering off cannot be backfilled.
  *
  * <p>Its own transaction per artifact, like {@code PullRequestSignalResubmitter}: one artifact's failure
- * must not unwind the batch around it, and the submission path's idempotency-race rollback has to stay
- * confined to the artifact that raced.
+ * must not unwind the batch around it.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -101,8 +88,7 @@ public class ReviewBackfillSubmitter {
     private Outcome offerPullRequest(ReviewBackfillRun run, long artifactId) {
         PullRequest pr = pullRequestRepository.findByIdWithAllForGate(artifactId).orElse(null);
         if (pr == null || pr.getHeadRefName() == null || pr.getHeadRefOid() == null || pr.getBaseRefName() == null) {
-            // No branch refs means nothing to clone or diff. Not a gap in the baseline: there was never a
-            // reviewable artifact here to leave one.
+            // No branch refs means nothing to clone or diff: there was never a reviewable artifact here.
             return Outcome.PASSED;
         }
         long workspaceId = run.getWorkspace().getId();
@@ -178,13 +164,10 @@ public class ReviewBackfillSubmitter {
     }
 
     /**
-     * Whether this campaign now owns the occurrence and may act on it.
-     *
-     * <p>This one call is the whole spend guard for a recurring sweep. The key comes from
-     * {@link ReviewBackfillSignals}, which derives the signal from the artifact's <em>current</em> state
-     * using the live revision derivation, so a second sweep over an artifact nobody touched produces the
-     * identical key, {@code uq_artifact_signal} refuses the insert, and this returns false. Mint a
-     * per-run revision instead and every sweep would re-review everything, forever.
+     * Whether this campaign now owns the occurrence and may act on it. This one call is the whole spend
+     * guard for a recurring sweep: {@link ReviewBackfillSignals} derives the key from the artifact's
+     * current state, so a second sweep over an untouched artifact produces the identical key,
+     * {@code uq_artifact_signal} refuses the insert, and this returns false.
      */
     private boolean claim(ReviewBackfillRun run, SignalKey key, Instant occurredAt) {
         return signalRecorder.record(key, occurredAt, run.getDiscoveredVia());

@@ -27,9 +27,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
 /**
- * How often a review may be asked for by hand. Both limits exist because the ones already in the system
- * do not reach a request: the workspace cooldown is keyed on an idempotency key whose phase segment is
- * the trigger signal, and a request carries none, so it lands in a lane of its own.
+ * How often a review may be asked for by hand. Both limits exist because the workspace cooldown already
+ * in the system is keyed on an idempotency key whose phase segment is the trigger signal, and a manual
+ * request carries none.
  */
 @Tag("unit")
 @DisplayName("Limits on asking for a review")
@@ -64,11 +64,7 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
         assertThat(refusalFrom(limits(15, 5))).contains(SignalStateReason.REQUEST_COOLDOWN_ACTIVE);
     }
 
-    /**
-     * The window is the workspace's own cooldown, and the workspace's override beats the fleet default:
-     * an operator who has already said how often this workspace re-reviews a piece of work has answered
-     * this question too, and a second knob would let the two disagree.
-     */
+    /** The workspace's cooldown override beats the fleet default; a second knob would let them disagree. */
     @Test
     void theArtifactWindowIsTheWorkspacesOwnCooldown() {
         workspace.getReviewSettings().applyPatch(null, null, 90);
@@ -104,11 +100,7 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
         assertThat(refusalFrom(limits(15, 5))).contains(SignalStateReason.REQUESTER_QUOTA_EXHAUSTED);
     }
 
-    /**
-     * The per-person limit is checked first. The other order would let somebody who is over their
-     * allowance be told about a cooldown instead — a sentence that invites them to try again shortly,
-     * which is exactly what the allowance is stopping.
-     */
+    /** Checked first: the other order would tell someone over their allowance to just try again shortly. */
     @Test
     void theCooldownIsNotEvenConsultedOnceTheAllowanceIsSpent() {
         when(signals.countRequestsBySince(anyLong(), any(), any())).thenReturn(5L);
@@ -136,8 +128,6 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
         assertThat(refusalFrom(limits(15, 0))).isEmpty();
         verify(signals, never()).countRequestsBySince(anyLong(), any(), any());
     }
-
-    // Fixtures
 
     private ManualReviewRateLimits limits(int cooldownMinutes, int allowance) {
         return new ManualReviewRateLimits(

@@ -11,14 +11,11 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * A conformance suite nobody is obliged to join is a suite the next integration skips.
- *
- * <p>Airbyte's acceptance tests and Terraform's provider tests work because a connector cannot ship
- * without them; ours would be optional by default, since a new manifest is just another {@code @Component}
- * and nothing would notice the missing subclass. This closes that: every shipped
- * {@code IntegrationManifest} must have a concrete {@code IntegrationManifestContractTest} subclass, and
- * the fixture manifest must be in the suite too — a fixture that is not itself held to the contract is
- * decoration.
+ * A conformance suite nobody is obliged to join is a suite the next integration skips: a new manifest is
+ * just another {@code @Component}, and nothing would notice a missing subclass. This closes that: every
+ * shipped {@code IntegrationManifest} must have a concrete {@code IntegrationManifestContractTest}
+ * subclass, and the fixture manifest must be in the suite too — a fixture that is not itself held to the
+ * contract is decoration.
  */
 @DisplayName("every integration manifest is held to the conformance contract")
 class IntegrationManifestConformanceCoverageTest extends HephaestusArchitectureTest {

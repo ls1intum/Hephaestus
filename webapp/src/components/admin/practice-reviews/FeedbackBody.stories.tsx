@@ -5,14 +5,6 @@ import { FeedbackBody } from "./FeedbackBody";
 const body =
 	"## What worked\n\nThe controller stays focused on HTTP concerns.\n\n[Read the guide](https://example.com/guide).";
 
-/**
- * The composed feedback, as the developer would read it or as it was actually written.
- *
- * The card used to carry its own five-case copy table for the delivery states, which is how it came
- * to say "Ready for a future conversation with Heph. It has not been delivered." — a sentence about
- * a queue, printed on a card about words. The narrative now lives in `DeliveryTrace`; the badge here
- * comes from the same registry every other status on these screens reads.
- */
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Feedback preview",
 	component: FeedbackBody,
@@ -27,9 +19,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The ordinary case wears no badge at all. Text that reached the developer needs no marking, and the
- * Delivery section of the page it sits on already says so — badging it here put "Delivered" on the
- * screen twice.
+ * The ordinary case wears no badge: text that reached the developer needs no marking, and the page
+ * this card sits on says so once already.
  */
 export const Delivered: Story = {
 	play: async ({ canvas }) => {
@@ -38,19 +29,10 @@ export const Delivered: Story = {
 	},
 };
 
-/**
- * The Markdown behind the rendering, on a switch in the card's own header.
- *
- * Tailwind Typography's default rhythm is sized for an article; in a card of a few hundred words its
- * `mt-8` above every heading left the gap the product owner measured as "almost doubling what you
- * would expect". The prose modifiers on this card tighten it to the length of the thing.
- */
 export const SwitchToSource: Story = {
 	play: async ({ canvas, canvasElement, userEvent }) => {
-		// One control on one thing: a toggle group holding the view, so exactly one of the two is
-		// pressed by construction rather than by two `onClick`s agreeing. The group is `role="group"`
-		// with no `aria-orientation` — the vendored wrapper drops the attribute the Base UI primitive
-		// would otherwise put on a role that ARIA does not allow it on.
+		// The group is `role="group"` with no `aria-orientation`: the vendored wrapper drops the
+		// attribute the Base UI primitive would otherwise put on a role ARIA does not allow it on.
 		const views = canvas.getByRole("group", { name: "How to show the feedback" });
 		await expect(views).not.toHaveAttribute("aria-orientation");
 		await expect(canvas.getByRole("button", { name: "Rendered" })).toHaveAttribute(
@@ -90,10 +72,7 @@ export const FailedToDeliver: Story = {
 	args: { feedback: { body, channel: "IN_CONTEXT", deliveryState: "FAILED" } },
 };
 
-/**
- * The one state the word "prepared" used to name. `PREPARED` only ever exists on the conversation
- * lane, so the badge names the queue it is in and what empties it.
- */
+/** `PREPARED` only ever exists on the conversation lane, so the badge can name the queue it is in. */
 export const QueuedForConversation: Story = {
 	args: { feedback: { body, channel: "CONVERSATION", deliveryState: "PREPARED" } },
 	play: async ({ canvas }) => {

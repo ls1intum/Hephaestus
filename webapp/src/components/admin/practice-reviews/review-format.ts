@@ -1,12 +1,9 @@
 import type { ReviewSubject } from "@/api/types.gen";
 
 /**
- * What is left of this module once every enum's words moved to `@/components/practice-vocabulary`:
- * two formatters over values that are not enums at all.
- *
- * <p>Nothing else belongs here. A label map, a badge variant or an icon for an enum value goes in
- * that enum's defs module, where the filter dropdown, the table badge and the detail header all read
- * the same entry — this file having held six of them is why those three disagreed.
+ * Formatters over values that are not enums. A label map, badge variant or icon for an enum value
+ * does not belong here: it goes in that enum's defs module under `@/components/practice-vocabulary`,
+ * so the filter dropdown, the row badge and the detail header all read one entry.
  */
 export function confidenceLabel(confidence: number | undefined): string {
 	if (confidence == null) return "—";

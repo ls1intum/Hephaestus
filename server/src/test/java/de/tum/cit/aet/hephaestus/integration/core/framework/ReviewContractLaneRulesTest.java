@@ -12,14 +12,11 @@ import org.junit.jupiter.api.Test;
 /**
  * Every {@link FeedbackLane} must carry an enforcement rule.
  *
- * <p>{@link ReviewContractValidator} checks a delivered lane against one of two collections: the
- * capability a vendor must own to claim it, or the set of lanes that are ours and that no integration
- * may claim at all. A lane added to the enum and to neither collection is not rejected — it is simply
- * never checked, so an integration declaring it would pass validation and then deliver nowhere.
- *
- * <p>Deliberately a test rather than a fail-fast in a static initializer: both collections and the enum
- * are compile-time constants, so class-init could only move the discovery from a build into a running
- * process — including the webhook pod, whose missed push events cannot be redelivered.
+ * <p>A lane added to the enum and to neither of {@link ReviewContractValidator}'s two collections is not
+ * rejected — it is simply never checked, so an integration declaring it would pass validation and then
+ * deliver nowhere. This is a test rather than a fail-fast in a static initializer because that would only
+ * move the discovery to runtime, including the webhook pod, whose missed push events cannot be
+ * redelivered.
  */
 class ReviewContractLaneRulesTest extends BaseUnitTest {
 

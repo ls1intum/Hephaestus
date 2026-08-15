@@ -64,8 +64,8 @@ export function practicePolicyErrorTarget(policy: PracticeAutomatedReviewPolicy)
 }
 
 /**
- * Only what holds however the review was occasioned: the level of support, and the claims this kind
- * of evidence can never make. What a review reads belongs to the occasion and is checked per binding.
+ * Only what holds however the review was occasioned. What a review reads belongs to the occasion and
+ * is checked per binding.
  */
 export function practicePolicyError(policy: PracticeAutomatedReviewPolicy) {
 	if (policy.automatedReview.mode === "NONE" && policy.knownLimitations.length > 0) {
@@ -98,10 +98,7 @@ export interface PracticeMentoringSupportEditorProps {
 	disabled?: boolean;
 }
 
-/**
- * Practice-wide on purpose: the occasions below say what each review reads, while this says whether a
- * review is attempted at all — an answer that cannot sensibly differ between occasions of one habit.
- */
+/** Practice-wide on purpose: whether a review is attempted cannot differ between its occasions. */
 export function PracticeMentoringSupportEditor({
 	value,
 	recommended,

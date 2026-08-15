@@ -30,10 +30,6 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * The dev trigger is dev-only, but the ledger it writes to is not: a gate refusal it dropped left the
- * artifact reading "recorded, no decision yet" long after the review had run and been paid for.
- */
 class DevTriggerControllerTest extends BaseUnitTest {
 
     private static final long WORKSPACE_ID = 1L;
@@ -79,7 +75,6 @@ class DevTriggerControllerTest extends BaseUnitTest {
     void shouldRecordAPullRequestGateRefusalAgainstItsSignal() {
         PullRequest pr = pullRequest();
         when(artifactLoader.findPullRequestForGate(WORKSPACE_ID, PR_ID)).thenReturn(Optional.of(pr));
-        // The live reproduction: a merge retrospective the gate declines because nobody is assigned.
         when(detectionGate.evaluate(any(), any(), any())).thenReturn(new GateDecision.Skip("no assignee"));
 
         String response = controller.triggerReview(PR_ID, null, WORKSPACE_ID, "scm.pull_request.merged");
@@ -98,8 +93,8 @@ class DevTriggerControllerTest extends BaseUnitTest {
 
         controller.triggerReview(PR_ID, null, WORKSPACE_ID, "scm.pull_request.merged");
 
-        // The named reason, not the default: SUBJECT_UNLINKED is retryable and GATE_SKIPPED is not, so
-        // flattening the two would retire a signal that linking an account would revive.
+        // SUBJECT_UNLINKED is retryable and GATE_SKIPPED is not; flattening the two would retire a
+        // signal that linking an account would revive.
         verify(signalRecorder).markRefused(expectedPullRequestKey(), SignalStateReason.SUBJECT_UNLINKED);
     }
 
@@ -132,8 +127,6 @@ class DevTriggerControllerTest extends BaseUnitTest {
         when(detectionGate.evaluate(any(), any(), any())).thenReturn(
             new GateDecision.Detect(new Workspace(), List.of())
         );
-        // Null request short-circuits before submission; what matters here is that a passing gate
-        // settles nothing, because the submission it hands off to owns that decision.
         when(agentJobService.buildReviewRequest(any(), any())).thenReturn(null);
 
         controller.triggerReview(PR_ID, null, WORKSPACE_ID, "scm.pull_request.merged");
@@ -143,8 +136,8 @@ class DevTriggerControllerTest extends BaseUnitTest {
 
     @Test
     void shouldSettleNothingWhenTheSignalHasNoStableIdentityYet() {
-        // A synchronization is keyed on the head commit, and the mirror has none. There is no ledger
-        // row this refusal belongs to, and minting one would assert an occurrence nobody observed.
+        // Keyed on the head commit; minting a ledger row without one would assert an occurrence
+        // nobody observed.
         PullRequest pr = pullRequest();
         pr.setHeadRefOid(null);
         when(artifactLoader.findPullRequestForGate(WORKSPACE_ID, PR_ID)).thenReturn(Optional.of(pr));

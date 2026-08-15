@@ -75,8 +75,6 @@ class ReactionServiceTest extends BaseUnitTest {
         return user;
     }
 
-    // Submit Reaction
-
     @Nested
     class SubmitReaction {
 
@@ -220,8 +218,6 @@ class ReactionServiceTest extends BaseUnitTest {
         }
     }
 
-    // Get Latest Reaction
-
     @Nested
     class GetLatestReaction {
 
@@ -283,8 +279,6 @@ class ReactionServiceTest extends BaseUnitTest {
             );
         }
     }
-
-    // Get Engagement
 
     @Nested
     class GetEngagement {

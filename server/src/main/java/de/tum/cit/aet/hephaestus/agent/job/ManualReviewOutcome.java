@@ -6,18 +6,12 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * What came of a review somebody asked for: the run it started, or the reason it started none.
+ * What came of a review somebody asked for: the run it started, or the reason it started none, refused
+ * rather than errored, with the reason exposed via {@link SignalStateReason#describe()} so every surface
+ * reports the same sentence.
  *
- * <p>A refusal is a first-class answer here rather than an error. Almost every reason a requested review
- * does not run is a condition of the workspace the requester can neither see nor fix from where they
- * stand — an exhausted budget, a cooldown, a practice turned down to Off — and answering those with a
- * failure would tell them the button is broken. It is not: the ask was understood, and something
- * nameable stopped it. The name travels out with {@link SignalStateReason#describe()} so every surface
- * says the same sentence.
- *
- * <p>{@link Status#FORBIDDEN} is the one answer that is not about the workspace's state. It is kept in
- * this vocabulary rather than thrown so that a caller which cannot raise an HTTP status — the SCM bot
- * command — has somewhere to put it.
+ * <p>{@link Status#FORBIDDEN} lives in this vocabulary instead of being thrown, since some callers — the
+ * SCM bot command — cannot raise an HTTP status.
  */
 public record ManualReviewOutcome(Status status, @Nullable UUID jobId, @Nullable SignalStateReason reason) {
     public enum Status {

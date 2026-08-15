@@ -248,9 +248,8 @@ function ReviewTimingCard({
 				</Field>
 				<Field orientation="horizontal">
 					<FieldContent>
-						{/* One switch, four doors. Naming only the comment command — which GitLab publishes and
-						    GitHub does not — promised a GitHub workspace something that cannot happen, and hid
-						    that turning this off silently stops backfills and recurring checks too. */}
+						{/* One switch, four doors — and only GitLab publishes the comment command, so the copy
+						    scopes it rather than promising it to every workspace. */}
 						<FieldLabel htmlFor="trigger-manual">Reviews somebody asks for</FieldLabel>
 						<FieldDescription>
 							The <strong>Review this now</strong> button, a backfill of past work, a recurring
@@ -399,11 +398,8 @@ function ProjectReviewRulesCard({ policy }: Pick<PracticeReviewSettingsProps, "p
 }
 
 /**
- * Which of a workspace's work is reviewed at all.
- *
- * Empty means "everything": a workspace that has never expressed an opinion must not silently review
- * nothing. Matches are exact — a wildcard language here would be a promise the gate cannot keep,
- * since it holds the pull request row and not the diff.
+ * Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
+ * holds the pull request row and not the diff.
  */
 function ReviewScopeCard({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
 	const scope = policy.settings.reviewScope;

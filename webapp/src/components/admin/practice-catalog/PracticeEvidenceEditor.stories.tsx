@@ -12,11 +12,6 @@ import {
 } from "@/mocks/fixtures/practice";
 import { PracticeEvidenceEditor } from "./PracticeEvidenceEditor";
 
-/**
- * The editor is controlled, so changing a source's role or ticking "use recommended" only shows if
- * something holds the answer. One story used to; in the rest a frozen `needs` sat behind `fn()`, so
- * every segment on the screen was decorative.
- */
 function ControlledEvidence(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
 	const [needs, setNeeds] = useState(args.needs);
 	return <PracticeEvidenceEditor {...args} needs={needs} onChange={setNeeds} />;
@@ -39,7 +34,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Closed, the answer is the chips: three required sources out of the eleven a pull request offers. */
 export const RecommendedEvidence: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Code changes")).toBeVisible();
@@ -47,11 +41,6 @@ export const RecommendedEvidence: Story = {
 	},
 };
 
-/**
- * A pull request offers eleven sources, and as one flat list they read as eleven equal questions.
- * Three headings turn that into three short decisions: what the change is, what it has to be read
- * against, and what this workspace already said to the person who wrote it.
- */
 export const SourcesAreGrouped: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
@@ -62,10 +51,6 @@ export const SourcesAreGrouped: Story = {
 	},
 };
 
-/**
- * Every choice is a visible segment rather than a menu, and the one thing EXHAUSTIVE adds to REQUIRED
- * is offered as that claim rather than as a fourth segment nobody could tell apart from Required.
- */
 export const EveryChoiceIsVisible: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
@@ -88,7 +73,6 @@ export const EveryChoiceIsVisible: Story = {
 	},
 };
 
-/** A source that is only optional context can never be the ground for saying something is not there. */
 export const AbsenceClaimNeedsARequiredSource: Story = {
 	render: (args) => <ControlledEvidence {...args} />,
 	play: async ({ canvas, userEvent }) => {
@@ -123,10 +107,6 @@ export const ReadsASourceExhaustively: Story = {
 	},
 };
 
-/**
- * A document offers three sources and no surroundings at all, so two of the three headings never
- * appear. The same component draws it — nothing here is special-cased per work type.
- */
 export const ADocumentOffersLess: Story = {
 	args: { options: mockDocumentWorkType, needs: mockDocumentBinding.needs },
 	play: async ({ canvas, userEvent }) => {
@@ -140,7 +120,6 @@ export const ADocumentOffersLess: Story = {
 	},
 };
 
-/** A conversation reads one thread, and the thread has to be captured whole or not read at all. */
 export const AConversationReadsOneThread: Story = {
 	args: { options: mockConversationWorkType, needs: mockConversationBinding.needs },
 	play: async ({ canvas, userEvent }) => {
@@ -150,7 +129,6 @@ export const AConversationReadsOneThread: Story = {
 	},
 };
 
-/** The state the form refuses to save, shown as the author would meet it. */
 export const NothingRequiredYet: Story = {
 	args: { needs: [], invalid: true },
 	play: async ({ canvas }) => {
@@ -162,10 +140,7 @@ export const NothingRequiredYet: Story = {
 	},
 };
 
-/**
- * Drives `invalid` from outside the way a form does — false while the author is writing, true from
- * the submit onwards — and can re-render without changing it, as every later keystroke does.
- */
+/** Drives `invalid` the way a form does, including re-rendering without changing it. */
 function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeEvidenceEditor>) {
 	const [invalid, setInvalid] = useState(false);
 	const [renders, setRenders] = useState(0);
@@ -183,9 +158,8 @@ function SubmittedIntoInvalid(args: React.ComponentProps<typeof PracticeEvidence
 }
 
 /**
- * Submitting a form already on screen has to open the panel on the *transition* rather than on the
- * flag: the flag stays true while the author fixes it, and an editor re-opening under the caret on
- * every keystroke would be unusable.
+ * `invalid` stays true while the author fixes it, so an editor keyed on the flag rather than on the
+ * transition into it would re-open under the caret on every keystroke.
  */
 export const SubmittingRevealsTheSources: Story = {
 	args: { needs: [] },
@@ -197,8 +171,7 @@ export const SubmittingRevealsTheSources: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Submit the form" }));
 		await expect(canvas.getByRole("radiogroup", sources)).toBeVisible();
 
-		// Closed again by the author, and it stays closed while the error stands — the panel opens on
-		// the transition into invalid, so re-opening it is the author's to undo.
+		// Closed again by the author, and it stays closed while the error stands.
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Type something else" }));
 		await expect(canvas.queryByRole("radiogroup", sources)).toBeNull();

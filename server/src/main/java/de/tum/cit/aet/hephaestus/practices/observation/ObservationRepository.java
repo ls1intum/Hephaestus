@@ -40,6 +40,25 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     Optional<Observation> findByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     /**
+     * The {@link #findByIdAndWorkspaceId} answer for a whole set of ids, in one round trip.
+     *
+     * <p>Same workspace predicate and the same entity graph as the single-id form. The graph is the point
+     * as much as the batching is: {@code ReviewClaimCurrentness} compares the evaluated
+     * {@code practiceRevision} against {@code practice.currentRevision}, so a batch that dropped it would
+     * trade one N+1 for a lazier one.
+     *
+     * <p>An id with no row in the result is an id the caller may not read — an observation that does not
+     * exist and one belonging to another workspace collapse into the same absence the single-id
+     * {@link Optional} reports empty. Callers guard an empty {@code ids}.
+     */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
+    @Query("SELECT f FROM Observation f JOIN f.practice p WHERE f.id IN :ids AND p.workspace.id = :workspaceId")
+    List<Observation> findAllByIdInAndWorkspaceId(
+        @Param("ids") Collection<UUID> ids,
+        @Param("workspaceId") Long workspaceId
+    );
+
+    /**
      * All findings a given agent job produced — the source set the feedback ledger recorder binds to.
      * Ordered by id so {@code get(0)} is deterministic across retries: the recorder derives the recipient,
      * artifact, and thread key from the first row, and an unordered read could re-source them differently on
@@ -176,10 +195,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * Hard-delete <em>every</em> {@code chat.conversation_thread} observation for a workspace — the whole-tenant erasure
      * the Slack module invokes through
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
-     * app-uninstall / workspace-purge. Workspace is scoped through the {@code Practice.workspace} relationship (this
-     * repo is {@code @WorkspaceAgnostic}); the {@code artifactKind} predicate keeps PR/ISSUE observations and other
-     * tenants' rows untouched. DB {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} /
-     * {@code reaction} children. Idempotent.
+     * app-uninstall / workspace-purge. Scoping and cascade behaviour match {@link #deleteObservationsOfKind}. Idempotent.
      *
      * @return the number of observations deleted
      */
@@ -207,11 +223,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * workspace's SCM mirror is erased on connection-disconnect or workspace-purge. The
      * {@code evidence} jsonb quotes mirrored diff/comment content verbatim and {@code artifact_id} is
      * a soft reference (no FK to {@code issue}/{@code pull_request}), so these rows would otherwise
-     * outlive the artifacts they describe. Workspace is scoped through the {@code Practice.workspace}
-     * relationship (this repo is {@code @WorkspaceAgnostic}); the {@code artifactKind} predicate keeps
-     * {@code chat.conversation_thread} observations and other tenants' rows untouched. DB
-     * {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} / {@code reaction}
-     * children. Idempotent.
+     * outlive the artifacts they describe. Scoping and cascade behaviour match
+     * {@link #deleteObservationsOfKind}. Idempotent.
      *
      * @return the number of observations deleted
      */
@@ -238,9 +251,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
      * account hard-delete, invoked through
      * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
-     * Workspace is scoped through {@code Practice.workspace}; the {@code artifactKind} + {@code aboutUserId}
-     * predicates keep another person's rows, PR/ISSUE observations, and other tenants' rows intact. DB
-     * {@code ON DELETE CASCADE} clears any bound {@code feedback_observation} / {@code reaction} children. Idempotent.
+     * Scoping and cascade behaviour match {@link #deleteObservationsOfKind}. Idempotent.
      *
      * @return the number of observations deleted
      */
@@ -264,7 +275,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         return deleteObservationsOfKindAboutUser(workspaceId, ArtifactKinds.CONVERSATION_THREAD, aboutUserId);
     }
 
-    // Read queries for the developer dashboard (Issue #896)
+    // Read queries for the developer dashboard.
 
     /**
      * Paginated findings for an about-user within a workspace, with optional filters.
@@ -381,9 +392,6 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("workspaceId") Long workspaceId
     );
 
-    /**
-     * All findings for a specific pull request within a workspace.
-     */
     @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         """
@@ -406,33 +414,23 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      *
      * <p>Re-review deduped (same grain as {@link #findSummaryByDeveloperAndWorkspace}): keeps only each
      * target's LATEST detection run, so a re-pushed PR's findings don't repeat across the list and the
-     * mentor doesn't see (and re-litigate) the same finding four times. Native because the latest-run
-     * selection needs {@code ORDER BY ... LIMIT 1} in a correlated subquery. The practice is loaded lazily
-     * per finding (bounded by the page size) rather than JOIN-fetched.
+     * mentor doesn't re-litigate the same finding on every re-push. Native because the latest-run selection
+     * needs {@code ORDER BY ... LIMIT 1} in a correlated subquery; the practice is loaded lazily per finding
+     * rather than JOIN-fetched.
      *
-     * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed. {@code NOT_APPLICABLE}
-     * dominates the list ("no change needed / awaiting review" rows) and would bury the actionable {@code BAD}
-     * problems and {@code GOOD} strengths within the page budget; {@code INCONCLUSIVE} is excluded because
-     * coaching on it would invite the mentor to invent a direction the measurement declined to take. Both
-     * totals still reach the mentor via the presence-count summary; this is the drill-down list only, and
-     * stays recency-ordered (NOT re-ordered by severity) to preserve its "what happened lately" purpose.
+     * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed: {@code NOT_APPLICABLE}
+     * would bury the actionable {@code BAD}/{@code GOOD} rows within the page budget, and coaching on
+     * {@code INCONCLUSIVE} would invite the mentor to invent a direction the measurement declined to take. Both
+     * totals still reach the mentor via the presence-count summary; this list stays recency-ordered, not
+     * re-ordered by severity, to preserve its "what happened lately" purpose.
      *
-     * <p><strong>Backfilled observations are included, partitioned by origin class.</strong> A campaign spends
-     * real money reviewing work that already existed, and a {@code BAD} it found on the developer's own pull
-     * request is exactly what "what should I work on" is asking for. Excluding it made the campaign produce
-     * something no developer could see anywhere. The latest-run correlation stays, but is evaluated
-     * <em>within</em> each origin class ({@code (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')}) rather
-     * than over the union, for two reasons:
-     * <ul>
-     *   <li>Dropping the outer predicate alone would be a no-op — the row must still equal the latest
-     *       <em>non-backfill</em> job id, which a backfilled row never does.</li>
-     *   <li>Making the correlation origin-blind would let a campaign <em>erase</em> already-delivered live
-     *       feedback from the dashboard, because the campaign's job would become "the latest run".</li>
-     * </ul>
-     * The two classes cannot in practice describe the same occasion: a campaign keys its ledger entry with the
-     * same revision derivation as the live path, so {@code uq_artifact_signal} makes it skip any artifact the
-     * live path already reviewed at that occasion. {@code ReflectionItemDTO.origin()} carries the class through
-     * so the surface can label a backfilled item rather than pass it off as live.
+     * <p><strong>Backfilled observations are included, partitioned by origin class</strong> — a campaign's
+     * {@code BAD} finding on a developer's own work is exactly what "what should I work on" is asking for,
+     * and excluding it made a campaign produce nothing any developer could see. The latest-run correlation is
+     * evaluated <em>within</em> each origin class ({@code (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')})
+     * rather than over the union: origin-blind, a campaign's job could become "the latest run" and erase
+     * already-delivered live feedback from the list. {@code ReflectionItemDTO.origin()} carries the class
+     * through so the surface can label a backfilled item rather than pass it off as live.
      *
      * <p>Aggregate policy deliberately DIVERGES from {@link #findSummaryByDeveloperAndWorkspace} here: the
      * summary is a per-practice good/bad ratio read as a trend, and a hindsight campaign is not a point on a
@@ -563,7 +561,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("since") Instant since
     );
 
-    // Cross-run trend read path (ADR 0021, A1) — the measurement substrate ObservationTrendService classifies.
+    // Cross-run trend read path (ADR 0021) — the measurement substrate ObservationTrendService classifies.
 
     /**
      * The runs (agent jobs) that produced ≥1 correlation-keyed finding for a target, newest first by the
@@ -793,17 +791,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
 
     /**
      * The raw tier columns of each observation's practice <em>and of that practice's area</em>, resolved in
-     * ONE query rather than by walking the lazy {@code Observation.practice} association.
+     * ONE query rather than by walking the lazy {@code Observation.practice} association: the conversational
+     * router receives observations that may already be detached, so a lazy proxy there would make the tier
+     * rule's correctness depend on whether the caller happens to hold a session.
      *
-     * <p>The association is deliberately not used: the conversational router receives observations that
-     * may already be detached, so traversing a lazy proxy there would make the tier rule's correctness
-     * depend on whether the caller happens to hold a session. A projection is session-independent.
-     *
-     * <p>Both levels are projected because either may be null, and null does not mean the same thing to the
-     * router as it does here: an unresolved lookup is admitted, while a practice that merely inherits its
-     * tier must be held to the tier it inherits. Projecting only the practice column would have made every
-     * inheriting practice look unresolved, and admitted it to the conversation whatever its area or its
-     * workspace had decided.
+     * <p>Both levels are projected because null means different things at each: an unresolved lookup is
+     * admitted, while a practice that merely inherits its tier must be held to the tier it inherits.
+     * Projecting only the practice column would have made every inheriting practice look unresolved and
+     * admitted it regardless of what its area or workspace had decided.
      */
     @Query(
         """

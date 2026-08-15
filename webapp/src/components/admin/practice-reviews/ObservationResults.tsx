@@ -27,12 +27,8 @@ import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
 import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 
 /**
- * The filtered empty state carries the way out of itself.
- *
- * A reader who over-filters "incorrectly assume[s] products don't exist when filters are simply too
- * restrictive" (Baymard, "How to Design Applied Filters"), and this screen's own advice — try
- * removing a filter — named no control that could do it. Making the callback part of the state
- * rather than an optional prop means a filtered empty state cannot be rendered without one.
+ * `onClearFilters` is part of the filtered-empty variant rather than an optional prop, so a filtered
+ * empty state cannot be rendered without the control that gets the reader out of it.
  */
 export type ObservationResultsState =
 	| { status: "loading" }
@@ -45,12 +41,6 @@ export interface ObservationResultsProps {
 	state: ObservationResultsState;
 }
 
-/**
- * The observations a filter selected, as one row each.
- *
- * <p>Replaces `FindingResults`, which rendered the same list twice — a four-column table above `xl`
- * and a card list below it — with different fields in each and a skeleton matching neither.
- */
 export function ObservationResults({ workspaceSlug, state }: ObservationResultsProps) {
 	if (state.status === "loading")
 		return <ReviewResultsSkeleton label="Loading observations" rows={REVIEW_PAGE_SIZE} />;
@@ -108,15 +98,8 @@ export interface ObservationRowProps {
 }
 
 /**
- * One observation: what it concluded, what it says, which practice and whose work.
- *
- * <p>The practice is a link into its definition with the prose behind it on hover, which is the one
- * thing a reader of an observation cannot otherwise get to — every review surface named a practice
- * and none of them reached one. The area's colour rides on that link rather than taking a line of
- * its own.
- *
- * <p>The feedback tally stays a sentence on the meta line rather than becoming badges. Five coloured
- * counts on every row would drown the two badges that mean something: a shortfall's severity, and an
+ * The feedback tally stays a sentence on the meta line rather than becoming badges: coloured counts
+ * on every row would drown the two badges that mean something — a shortfall's severity, and an
  * observation judged against a practice that has since changed.
  */
 export function ObservationRow({ workspaceSlug, observation, scope }: ObservationRowProps) {

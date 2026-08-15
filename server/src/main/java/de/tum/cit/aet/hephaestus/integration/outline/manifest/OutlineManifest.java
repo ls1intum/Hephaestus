@@ -43,9 +43,8 @@ public class OutlineManifest implements IntegrationManifest {
     }
 
     /**
-     * No delivery lanes: Outline's API would take a comment on a document, but no {@code SummaryChannel}
-     * for it exists, and a claimed lane no channel fills is a delivery promise nothing keeps. Feedback
-     * about a document lands on the Hephaestus surface instead.
+     * No delivery lanes: Outline's API could take a document comment, but no {@code SummaryChannel}
+     * implements it, so feedback lands on the Hephaestus surface instead.
      */
     @Override
     public ReviewContribution reviewContribution() {

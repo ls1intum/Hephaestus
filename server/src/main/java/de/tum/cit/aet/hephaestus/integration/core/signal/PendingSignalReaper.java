@@ -80,12 +80,10 @@ public class PendingSignalReaper {
 
         for (ArtifactSignal signal : due) {
             try {
-                // Parsing the stored kind can throw; inside the try so one unparseable row cannot abort
-                // the sweep for everything behind it.
+                // Inside the try: an unparseable kind must not abort the sweep for rows behind it.
                 PendingSignalResubmitter resubmitter = resubmitters.get(ArtifactKind.of(signal.getArtifactKind()));
                 if (resubmitter == null) {
-                    // Leave it to the lapse deadline: nothing in this deployment can act on the kind, which
-                    // is not a reason to burn the signal.
+                    // Leave it to the lapse deadline rather than burn a signal nothing here can act on.
                     log.debug("No resubmitter for pending signal kind, leaving it: kind={}", signal.getArtifactKind());
                     continue;
                 }

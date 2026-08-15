@@ -8,14 +8,11 @@ import java.util.Map;
  * Names artifacts for a surface that has only their ledger identity.
  *
  * <p>A port so the practices module can label what it traces without importing a mirror, a vendor, or
- * the integration framework. The answer is always total: a kind nobody resolves comes back named after
- * its kind rather than missing, because a trace whose rows vanish when a resolver is absent would
- * reintroduce the silence it exists to remove.
+ * the integration framework.
  */
 public interface ArtifactIdentities {
     /**
-     * @return an identity for every requested id, resolved where a resolver exists and
-     *         {@link ArtifactIdentity#unresolved} where one does not
+     * @return an identity for every requested id, {@link ArtifactIdentity#unresolved} where no resolver exists
      */
     Map<Long, ArtifactIdentity> resolve(long workspaceId, ArtifactKind kind, Collection<Long> artifactIds);
 }

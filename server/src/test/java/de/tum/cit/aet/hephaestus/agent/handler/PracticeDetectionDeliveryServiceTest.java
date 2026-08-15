@@ -156,8 +156,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         lenient().when(revision.getSlug()).thenReturn("pr-description-quality");
         lenient().when(revision.getPractice()).thenReturn(testPractice);
         lenient().when(revision.getAutomatedReviewPolicy()).thenReturn(testPractice.getAutomatedReviewPolicy());
-        // The bindings still decide what this practice may assert an ABSENCE over. They no longer decide
-        // what it may cite: every source that applies to the artifact is staged for every review.
+        // Bindings decide what this practice may assert an ABSENCE over; every source that applies to the
+        // artifact is staged for citation regardless.
         lenient().when(revision.getBindings()).thenReturn(testPractice.getBindings());
         lenient().when(practiceRevisionRepository.findById(11L)).thenReturn(Optional.of(revision));
         lenient()
@@ -324,9 +324,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         /**
          * Every source that applies to the artifact is staged for every review, so a quote from one this
-         * practice's bindings never named is a quote from bytes that were really there. Refusing it would
-         * throw away a finding for being observant — and the orchestrator prompt sends the model to the
-         * project inventory for cross-artifact judgement, which no shipped practice declares.
+         * practice's bindings never named is still a quote from bytes that were really there — refusing it
+         * would throw away a finding for being observant.
          */
         @Test
         @DisplayName("a citation to a staged source the practice's bindings did not name is accepted")
@@ -523,10 +522,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     }
 
     /**
-     * An ABSENT observation is a universal claim, and the delivery boundary — not just the in-sandbox
-     * normalizer — is where it has to earn one. The runner can crash, run an older image, or have its
-     * output rescued from raw text; each of those reaches delivery with nothing having validated the
-     * search, which is exactly why the citation rules are duplicated here too.
+     * An ABSENT observation is a universal claim, and the delivery boundary has to earn it too — not just
+     * the in-sandbox normalizer, which a crashed runner or a rescued text payload can bypass.
      */
     @Nested
     class RecordedSearch {
@@ -666,9 +663,8 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         /**
-         * The history is staged for every practice without any binding declaring it, so a practice must
-         * be able to cite it. This is what makes staging it as a declared source worth the catalog entry:
-         * an observation that says "we raised this before" is checkable rather than merely plausible.
+         * The history is staged for every practice without any binding declaring it, so a practice must be
+         * able to cite it — that's what makes "we raised this before" checkable rather than merely plausible.
          */
         @Test
         @DisplayName("a citation to the review history is in bounds although no binding declared it")
@@ -943,7 +939,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
     @Nested
     class SeverityCoherence {
 
-        /** Captures the severity (position 12) the native insert receives for one delivered finding. */
+        /** Captures the severity the native insert receives for one delivered finding. */
         private String capturedSeverityFor(ValidatedFinding finding) {
             service.deliver(testJob, List.of(finding));
             ArgumentCaptor<String> severityCaptor = ArgumentCaptor.forClass(String.class);
@@ -1146,9 +1142,7 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
 
         /**
          * A kind with no branch is named as such rather than falling through to the pull-request one,
-         * which would report it as a missing {@code pull_request_id} and send the reader after the wrong
-         * bug. {@code JobTypeReviewExecutionCatalog} keeps this unreachable in a shipped build; the throw
-         * is what makes an unshipped kind say so.
+         * which would report a missing {@code pull_request_id} and send the reader after the wrong bug.
          */
         @Test
         void refusesAKindWithNoDeliveryRoute() {

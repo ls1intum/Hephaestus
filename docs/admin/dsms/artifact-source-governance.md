@@ -46,8 +46,8 @@ defines the governance decision that permits collection, retention, processing, 
 
 A material change reopens the affected reviews. There is no deployment-level allowlist: the shipped, versioned
 source-use decisions are the only gate, and no runtime configuration waives them. A source whose decision is
-missing, refused, or expired is never read, whatever the deployment sets. Disabling a use therefore means
-shipping a contract version in which that decision no longer permits it.
+missing or expired is never read, whatever the deployment sets. Disabling a use therefore means shipping a
+contract version in which that decision no longer permits it.
 
 The runtime registry is
 [`source-use-decisions.json`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json).
@@ -80,6 +80,11 @@ blocks approval. The runtime and schemas use closed policy identifiers so a sour
 
 Store the complete record in the controller's approved governance system. The repository may contain a releasable
 summary and stable reference, but never participant data, private review notes, credentials, or sensitive samples.
+
+The statuses in this template belong to the controller's governance system and are not the runtime registry's
+vocabulary. The shipped registry expresses exactly one basis and one outcome — `ENGINEERING_BASELINE` with
+`ENGINEERING_APPROVED` — so a controller's refusal is recorded there, in the controller's system, and reaches
+the runtime as the absence of a permitting record rather than as a refusal the runtime can hold.
 
 ```yaml
 decisionId: SRC-YYYY-NNN
@@ -169,15 +174,15 @@ source/workspace/person erasure paths are implemented and tested.
 ## Approval renewal
 
 The shipped decisions expire on the date recorded in
-`contracts/artifact-source/1.0.0/source-use-decisions.json`. Every governed use fails closed after expiry. Instance
-operators should alert when
+`server/src/main/resources/contracts/artifact-source/1.0.0/source-use-decisions.json`. Every governed use fails
+closed after expiry. Instance operators should alert when
 `artifact_source_governance_expiry_seconds` falls below 30 days and assign the alert to the instance
 privacy/governance owner. The server logs a warning at startup inside the same window.
 
 Before the deadline, that owner must review the source scopes, processors, retention, erasure coverage, and DPIA
-record. Renewal creates a new contract version containing the new decision; published version directories are
-immutable. Migrate practice declarations and the runtime manifest reference to that version, run
-`pnpm run check:contracts`, and deploy. Never edit an existing version's dates. If renewal is denied or
+record. Renewal is not an operator setting: it takes a release. Published contract versions are immutable, so a
+renewed decision ships as a new contract version that the practice declarations are migrated onto, and an
+existing version's dates are never edited. If renewal is denied or
 incomplete, the expiry itself fails the use closed without any operator action: collection and disclosure stop,
 the source is captured as `NOT_COLLECTED` with reason `GOVERNANCE_NOT_EFFECTIVE`, and Hephaestus makes no
 automated review claim from it.
@@ -197,7 +202,8 @@ automated review claim from it.
 - [ ] Test every supported state, including valid empty evidence and applicable truncation or redaction.
 - [ ] Use low-cardinality health metrics without workspace, repository, person, URL, or digest labels.
 - [ ] Document the kill switch and operator remediation.
-- [ ] Mark affected automated-review validation and operator-audit claims stale.
+- [ ] Confirm the affected practices' review-rule fingerprints change, so their earlier claims derive as stale
+      rather than continuing to read as current. Nothing marks a claim stale by hand.
 - [ ] Link the approved decision from the source descriptor.
 
 The TUM deployment's current Art. 35 status and expansion restrictions are recorded in the

@@ -61,8 +61,8 @@ export const AwaitingConfirmation: Story = {
 };
 
 /**
- * A fresh workspace has no priced reviews to forecast from, so the cost must read as unknown — a
- * $0.00 here would invite exactly the unconsidered spend this screen exists to prevent.
+ * A workspace with no priced reviews yet has nothing to forecast from, and a $0.00 there would
+ * invite exactly the unconsidered spend this screen exists to prevent.
  */
 export const CostUnknown: Story = {
 	args: { runs: [run({ estimatedCostUsd: undefined })] },
@@ -72,10 +72,6 @@ export const CostUnknown: Story = {
 	},
 };
 
-/**
- * An estimate of nothing is a dead end unless the screen says how to get out of it: the disabled
- * button states what cannot happen, and the line beside it names the next move.
- */
 export const NothingInRange: Story = {
 	args: { runs: [run({ estimatedArtifacts: 0, estimatedCostUsd: 0 })] },
 	play: async ({ canvasElement }) => {
@@ -94,8 +90,8 @@ export const Running: Story = {
 };
 
 /**
- * An artifact the campaign could not read is not one it measured and found nothing in; folding the
- * two together would leave a baseline in which the two absences are indistinguishable.
+ * Work the campaign could not read is not work it measured and found nothing in; folding the two
+ * together would leave a baseline in which the two absences are indistinguishable.
  */
 export const SomeCouldNotBeRead: Story = {
 	args: {
@@ -116,7 +112,6 @@ export const SomeCouldNotBeRead: Story = {
 	},
 };
 
-/** The pause has to read as "still owed", never as "skipped". */
 export const PausedOnBudget: Story = {
 	args: {
 		runs: [
@@ -170,8 +165,8 @@ export const Loading: Story = {
 };
 
 /**
- * The failure is about this list, not about the campaign. Left at "couldn't be loaded", an admin reads
- * it as "stopped" and confirms a second backfill over the same stretch of history — twice the spend.
+ * The failure is about this list, not about the campaign. Read as "stopped", it costs a second
+ * backfill confirmed over the same stretch of history — twice the spend.
  */
 export const LoadFailed: Story = {
 	args: { isError: true },

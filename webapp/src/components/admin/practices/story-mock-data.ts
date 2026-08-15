@@ -14,10 +14,7 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 
-/**
- * What a workspace that has never been configured gets. Overrides are spread last, so a story names
- * only the one setting it is about and cannot drift from the defaults on the settings it is not.
- */
+/** What a workspace that has never been configured gets. */
 export function mockReviewSettings(
 	overrides: Partial<PracticeReviewSettings> = {},
 ): PracticeReviewSettings {
@@ -33,9 +30,8 @@ export function mockReviewSettings(
 }
 
 /**
- * A recurring check as the component receives it. These go straight to a prop rather than through
- * MSW, so the dates are real `Date`s: that is what the generated client's response transformer hands
- * a screen at runtime, and a fixture is only worth trusting if it is the shape production sends.
+ * Real `Date`s, not ISO strings: these go straight to a prop rather than through MSW, and a `Date`
+ * is what the generated client's response transformer hands a screen at runtime.
  */
 export function sweepSchedule(overrides: Partial<ReviewSweepSchedule> = {}): ReviewSweepSchedule {
 	return {
@@ -60,8 +56,6 @@ export function backfillRun(overrides: Partial<ReviewBackfillRun> = {}): ReviewB
 		fromAt: new Date("2026-07-08T00:00:00Z"),
 		toAt: new Date("2026-08-07T00:00:00Z"),
 		status: "AWAITING_CONFIRMATION",
-		// A campaign an admin scoped by hand. The other value, SWEEP, belongs to a run a recurring
-		// check opened, and those are shown by the schedule card rather than here.
 		discoveredVia: "BACKFILL",
 		estimatedArtifacts: 128,
 		estimatedCostUsd: 15.36,
@@ -74,27 +68,21 @@ export function backfillRun(overrides: Partial<ReviewBackfillRun> = {}): ReviewB
 	};
 }
 
-/**
- * The ordinary state of a practice nobody has configured: it holds no tier of its own and follows the
- * workspace default. Most fixtures want this, because a catalog full of overrides is not what an admin
- * opens the screen to.
- */
+/** A practice that holds no tier of its own, under an area that holds none either. */
 export function inheritedTier(effective: ReviewTier = "DELIVER"): ReviewTierAssignment {
 	return { effective, source: "WORKSPACE", inherited: true };
 }
 
 /**
- * A tier this practice inherits from its area, because the area holds one of its own.
- *
- * <p>Distinct from {@link inheritedTier} in the one field that decides what a row is allowed to say:
- * a practice under an area that holds no tier reports `WORKSPACE` and must be told about the
- * workspace, and only this shape may name the area.
+ * A tier inherited from the area, which holds one of its own. `source` is the field that decides
+ * what a row may say: only this shape may name the area, {@link inheritedTier} must name the
+ * workspace.
  */
 export function areaTier(effective: ReviewTier): ReviewTierAssignment {
 	return { effective, source: "AREA", inherited: true };
 }
 
-/** A tier somebody chose on this practice itself — the case a story is showing on purpose. */
+/** A tier somebody chose on this practice itself. */
 export function chosenTier(effective: ReviewTier): ReviewTierAssignment {
 	return { effective, override: effective, source: "PRACTICE", inherited: false };
 }

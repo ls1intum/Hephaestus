@@ -135,17 +135,15 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     /**
-     * Runs on the holder's own transaction-bound connection, so {@code pg_backend_pid()} names the
-     * backend holding the row and the wait is scoped to backends this transaction is blocking — a
-     * sibling test contending elsewhere in the shared container cannot end the wait early.
+     * Runs on the holder's own connection, so {@code pg_backend_pid()} names the blocked backend and the
+     * wait cannot be satisfied by a sibling test blocking elsewhere in the shared container.
      */
     private void awaitFollowerBlockedOnThisRow() {
         Integer holderPid = jdbcTemplate.queryForObject("SELECT pg_backend_pid()", Integer.class);
         long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(JOIN_TIMEOUT_SECONDS);
         while (System.nanoTime() < deadline) {
-            // pg_stat_activity is snapshotted on first read and held for the rest of the transaction, and
-            // this transaction is deliberately long-lived — without the clear, a follower whose backend
-            // was not yet connected at the first poll would never appear, however long we waited.
+            // pg_stat_activity snapshots on first read and holds for the whole (long-lived) transaction;
+            // the clear lets a backend that connects after that first poll still be seen.
             jdbcTemplate.execute("SELECT pg_stat_clear_snapshot()");
             Integer blocked = jdbcTemplate.queryForObject(
                 "SELECT count(*) FROM pg_stat_activity WHERE CAST(? AS integer) = ANY(pg_blocking_pids(pid))",

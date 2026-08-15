@@ -57,12 +57,10 @@ const CADENCES = [
 type Cadence = (typeof CADENCES)[number]["value"];
 
 /**
- * At most twice the cadence, never more than a week — the same ceiling the server enforces, offered
- * here so an admin picks from what is allowed instead of discovering the rule through a 400.
- *
- * <p>The ceiling is not a UI nicety. A sweep's observations are counted alongside reviews that the work
- * itself triggered, and that only holds while its window is "the last few days". Anything longer is a
- * stretch of history somebody chose, which is what the separate "review past work" backfill is for.
+ * The same ceiling the server enforces, offered here so an admin picks from what is allowed instead
+ * of discovering the rule through a 400. A sweep's observations are counted alongside reviews the
+ * work itself triggered, and that only holds while its window is "the last few days" — anything
+ * longer is a stretch of history somebody chose, which the backfill is for.
  */
 const LOOKBACK_CEILING: Record<Cadence, number> = { DAILY: 2, WEEKLY: 7 };
 
@@ -80,25 +78,15 @@ const describeCadence = (schedule: ReviewSweepSchedule) => {
 };
 
 /**
- * A moment as it reads mid-sentence: "Next check 15 Aug 2026, 03:00."
- *
  * `nextRunAt`/`lastRunAt` are typed `Date` but arrive as ISO strings, so they go through `asDate`.
- * The sentence is why `RelativeTime` does not fit: it renders a tooltip trigger, and this is one of
- * three clauses joined into a plain description.
+ * `RelativeTime` does not fit: it renders a tooltip trigger, and this is one clause of a plain
+ * sentence.
  */
 const formatMoment = (value: Date | undefined) => {
 	const date = asDate(value);
 	return date ? format(date, "d MMM yyyy, HH:mm") : undefined;
 };
 
-/**
- * Keeping new work reviewed even when nothing announced it.
- *
- * <p>Separate from the backfill card above it because the two answer different questions. A backfill
- * measures history once, on purpose, and its observations are kept out of the live trend. A sweep is the
- * standing safety net for work a missed webhook never told us about, and because its window is bounded
- * to the last few days, what it finds counts exactly like anything the work itself triggered.
- */
 export function PracticeReviewSweepSchedule({
 	schedules,
 	isLoading,
@@ -130,8 +118,6 @@ export function PracticeReviewSweepSchedule({
 						<AlertCircle />
 						<AlertTitle>Recurring checks couldn't be loaded</AlertTitle>
 						<AlertDescription>
-							{/* Says what did not happen, not what broke: any check already scheduled is still
-							    running, and an admin reading only the title would set a second one up. */}
 							<p>Whatever is scheduled is still running — this is only about showing it here.</p>
 							<Button variant="outline" size="sm" onClick={onRetry}>
 								Try again
@@ -199,8 +185,7 @@ function ScheduleRow({
 	const nextRun = formatMoment(schedule.nextRunAt);
 	const lastRun = formatMoment(schedule.lastRunAt);
 
-	// Joined rather than concatenated: an enabled schedule with no next run printed a double space, and
-	// a paused one that had never run promised a first run "within the hour" while nothing was running.
+	// A paused schedule must not promise a first check "within the hour".
 	const description = [
 		`${describeCadence(schedule)}.`,
 		schedule.enabled
@@ -221,8 +206,8 @@ function ScheduleRow({
 				<Badge variant={schedule.enabled ? "secondary" : "outline"}>
 					{schedule.enabled ? "On" : "Paused"}
 				</Badge>
-				{/* One row per kind, so every row would otherwise answer to the same three words. The visible
-				    word still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
+				{/* One row per kind, so every row would otherwise answer to the same word. The visible word
+				    still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
 				<Button
 					variant="outline"
 					size="sm"
@@ -263,8 +248,8 @@ function AddScheduleForm({
 	const [cadence, setCadence] = useState<Cadence>("DAILY");
 	const [lookbackDays, setLookbackDays] = useState("2");
 
-	// Switching to a tighter cadence can invalidate the chosen window, so the cadence owns it: pick the
-	// widest the new cadence allows rather than leaving a value the server would refuse.
+	// Switching to a tighter cadence can invalidate the chosen window, so the cadence owns it rather
+	// than leaving a value the server would refuse.
 	const changeCadence = (next: Cadence) => {
 		setCadence(next);
 		setLookbackDays(String(LOOKBACK_CEILING[next]));
@@ -357,8 +342,6 @@ function AddScheduleForm({
 			</Field>
 
 			<div className="flex flex-wrap items-center gap-3">
-				{/* The button names the work it commits to, not just the verb: this is the one control on
-				    the page that authorises spending again and again without being asked. */}
 				<Button
 					disabled={isSaving || isLoading}
 					onClick={() =>

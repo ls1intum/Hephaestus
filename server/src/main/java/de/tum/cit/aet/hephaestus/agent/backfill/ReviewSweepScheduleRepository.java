@@ -24,12 +24,9 @@ public interface ReviewSweepScheduleRepository extends JpaRepository<ReviewSweep
     /**
      * Due, enabled schedules, longest-overdue first, with the workspace fetched.
      *
-     * <p>The fetch is not an optimisation: the scheduler reads the workspace's status and feature flags
-     * outside any transaction of its own, and a lazy proxy there is a {@code LazyInitializationException}
-     * on the first tick after a restart rather than at review time.
-     *
-     * <p>Ordered by {@code nextRunAt} so a workspace whose sweep keeps being skipped cannot be starved
-     * behind one that is merely newer.
+     * <p>The fetch avoids a {@code LazyInitializationException}: the scheduler reads the workspace's status
+     * and feature flags outside any transaction of its own. Ordering by {@code nextRunAt} keeps a
+     * repeatedly-skipped workspace from starving behind one that is merely newer.
      */
     @Query(
         """

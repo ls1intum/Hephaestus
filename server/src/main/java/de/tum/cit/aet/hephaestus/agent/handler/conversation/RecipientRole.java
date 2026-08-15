@@ -7,8 +7,6 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
  * it, so the deferral is visible and testable.
  */
 public enum RecipientRole {
-    /** The author of the work artifact - the only role delivered conversationally today. */
     AUTHOR,
-    /** The reviewer - conversational delivery deferred behind ADR 0021 reviewer attribution. */
     REVIEWER,
 }

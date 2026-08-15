@@ -244,12 +244,10 @@ the one in `docs/contributor/practice-feedback-language.md` — the product's wo
 and not the one the screen used to use. The unit a review detects is an **observation**; the unit
 delivered to a developer is **feedback**. Neither is a "finding" or a "message".
 
-This is a rule because renaming the copy alone does not hold. `FeedbackMessage` kept the old noun in
-its filename, its symbol and its props type for a whole branch after every string it rendered said
-"feedback" — and a name that survives in the import list is the one the next component gets named
-after. When a concept is renamed, the sweep is: wire contract, route, component file, exported
-symbols, props type, story title, story export names, then copy. Stopping at copy leaves the old
-vocabulary somewhere a grep for the screen text will not find it.
+Renaming the copy alone does not hold: a name that survives in the import list is the one the next
+component gets named after. When a concept is renamed, the sweep is wire contract, route, component
+file, exported symbols, props type, story title, story export names, then copy — in that order.
+Stopping at copy leaves the old vocabulary somewhere a grep for the screen text will not find it.
 
 ## Component design rubric
 
@@ -276,13 +274,13 @@ not the file: `review-status-defs.ts` correctly holds two registries for two dif
 (`REVIEW_STATUS_DEFS`, `SUMMARY_POST_DEFS`). Each is `{ label, icon, badgeVariant, description }` per
 value, as a total `Record` over the generated wire union, so a value the server adds fails
 `typecheck:webapp` rather than rendering blank. Badges, facet options, select items and empty states
-all read that one entry. The rule exists because six label maps and two `switch`es returning badge
-variants were spread over four files, and the filter dropdown ended up as grey text beside a table of
-coloured tags. `icon` is required, not optional: WCAG 2.2 SC 1.4.1 is stronger than a contrast
-argument — *"if content relies on the user's ability to accurately perceive or differentiate a
-particular color an additional visual indicator will be required **regardless of the contrast
-ratio**"* — and within one enum no two entries may share an icon, because two values that look
-identical are one value.
+all read that one entry. A second copy of an enum's labels is how a filter dropdown ends up as grey
+text beside a table of coloured tags. `icon` is required, not optional. The normative rule is WCAG 2.2 SC 1.4.1: *"Color is not used as
+the only visual means of conveying information, indicating an action, prompting a response, or
+distinguishing a visual element."* Its Understanding page adds, informatively, that where content
+relies on differentiating a colour *"an additional visual indicator will be required regardless of
+the contrast ratio between those colors"* — so contrast is not the escape hatch. Within one enum no
+two entries may share an icon either, because two values that look identical are one value.
 <https://www.w3.org/WAI/WCAG22/Understanding/use-of-color.html>
 
 **3. Make impossible states unrepresentable: an async surface takes one discriminated-union `state`
@@ -299,15 +297,16 @@ exactly why `FeedbackResultsState` is **not** the exemplar to copy.
 of which you render two. `variant="compact" | "full"` reads at the call site; `compact` +
 `showHeader` does not, and grows a third boolean next quarter. When the flag makes the component do a
 different job, ship two components instead — a caller that must pass a literal `true` to pick the
-behaviour is asking for a different function. The exception is a flag a caller *derives* rather than
-types: <https://martinfowler.com/bliki/FlagArgument.html>,
-<https://nathanacurtis.substack.com/p/configuration-collapse>
+behaviour is asking for a different function. Boolean visibility props are where
+configuration collapses (<https://nathanacurtis.substack.com/p/configuration-collapse>). The one
+exception is a flag a caller *derives* rather than types — Fowler's own concession
+(<https://martinfowler.com/bliki/FlagArgument.html>).
 
 **5. The accessible name is part of the props type.** A component with no visible label must *require*
 `aria-label` or `aria-labelledby` in its props — not accept it, require it — so a caller cannot ship
 an unnamed control. The same goes for a name that has to disambiguate two instances on one screen:
 `OccasionLifecycle` takes the occasion because two occasions otherwise present two identically named
-groups. <https://react-spectrum.adobe.com/react-aria/quality.html>
+groups. <https://react-aria.adobe.com/quality>
 
 **6. `className`, the remaining DOM props and `ref` reach the root element, always.** A stability
 contract, not a configuration knob: a screen that needs one margin here must not have to fork the
@@ -328,9 +327,9 @@ its `ref`, (b) spread **every** prop it receives onto the real DOM node — drop
 `role`, `id` or the handlers is how a trigger stops announcing its popup — (c) render exactly one
 root element, never a fragment, and (d) stay the element type the primitive expects, since a `div`
 where a `button` was expected loses Enter/Space and the tab stop. Radix puts it plainly: *"it is your
-responsibility to ensure it remains accessible"*.
+responsibility to ensure it remains accessible and functional"*.
 <https://base-ui.com/react/handbook/composition>,
-<https://react-spectrum.adobe.com/react-aria/advanced.html>,
+<https://react-aria.adobe.com/customization>,
 <https://www.radix-ui.com/primitives/docs/guides/composition>
 
 **9. Pass JSX as `children` before reaching for a prop, and for a prop before reaching for context.**
@@ -344,9 +343,12 @@ The ladder runs primitives → composed parts → a configured component; move u
 second caller disagrees. The counterweight is honest: every step toward composition moves the
 accessibility work onto the consumer, and a kit of parts with no configured default is a kit where
 every screen re-derives the same aria wiring slightly differently. If it is a decision the product
-makes once, configure it. <https://atlassian.design/get-started/develop/composition/>,
-<https://nathanacurtis.substack.com/p/configuration-collapse>,
-<https://maecapozzi.com/blog/composition-vs-configuration/>
+makes once, configure it. Curtis names the target directly — *"Make the common configurable, make the
+uncommon composable"* (<https://nathanacurtis.substack.com/p/configuration-collapse>); Capozzi lists
+the accessibility burden as a cost of composition
+(<https://maecapozzi.com/blog/composition-vs-configuration/>), as does Atlassian, which reaches for a
+pre-built component before a primitive for exactly that reason
+(<https://atlassian.design/get-started/develop/composition/>).
 
 **11. Controlled or uncontrolled is a decision you state, not one you leave to the reader.** Default
 to **controlled** for anything whose value the URL, a form, or a server mutation also holds — which
@@ -380,8 +382,9 @@ does render still come from the registry — a count reading "not delivered" bes
 **14. A hover card carries supplementary content only, on a link whose destination is a superset of
 the card.** It must never hold the only copy of a fact, or the only control that reaches one: hover is
 unavailable on touch and awkward on keyboard. The normative rule is WCAG 2.2 SC 1.4.13 — content shown
-on hover or focus must be **dismissible** (*"a mechanism is available to dismiss the additional content
-without moving pointer hover or keyboard focus"*), **hoverable** (*"the pointer can be moved over the
+on hover or focus must be **dismissible** (*"A mechanism is available to dismiss the additional content
+without moving pointer hover or keyboard focus, unless the additional content communicates an input
+error or does not obscure or replace other content"*), **hoverable** (*"the pointer can be moved over the
 additional content without the additional content disappearing"*) and **persistent** (*"remains visible
 until the hover or focus trigger is removed, the user dismisses it, or its information is no longer
 valid"*). Everything in the card must also be on the page the link goes to.

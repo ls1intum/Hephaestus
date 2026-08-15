@@ -131,9 +131,8 @@ class DocumentContentSourceTest extends BaseUnitTest {
 
         var captured = source.capture(new ContextRequest.DocumentReviewRequest(job()), Set.of(SOURCE_KIND));
 
-        // The catalog lets this source claim COMPLETE, so staying silent here would let the manifest
-        // describe an unread document as one that said nothing — and a practice about what a document
-        // fails to say would then report the writer for the mirror's loss.
+        // The catalog lets this source claim COMPLETE, so staying silent here would misreport an unread
+        // document as one that said nothing.
         assertThat(captured.completeness()).isEmpty();
         assertThat(captured.files()).isEmpty();
         assertThat(captured.stateOverrides()).containsEntry(

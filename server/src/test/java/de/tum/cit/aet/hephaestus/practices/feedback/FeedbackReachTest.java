@@ -21,8 +21,8 @@ class FeedbackReachTest extends BaseUnitTest {
 
     /**
      * The mentor conversation is open at every reach. It is the narrowest place the system can speak, so a
-     * reach that closed it would leave nowhere at all — which is what the autonomy tier's {@code OFF} and
-     * {@code OBSERVE} are for, on the other axis.
+     * reach that closed it would leave nowhere at all — that is what the autonomy tier's {@code OFF} is for,
+     * on the other axis.
      */
     @ParameterizedTest
     @EnumSource(FeedbackReach.class)
@@ -31,11 +31,9 @@ class FeedbackReachTest extends BaseUnitTest {
     }
 
     /**
-     * PROFILE is a declared channel with no producer anywhere in {@code src/main} — nothing ever writes a
-     * PROFILE feedback unit. Reach is therefore documented and implemented as conversation-or-work rather
-     * than as "the quiet channels", because claiming a delivery the code cannot perform is the failure
-     * mode this contract exists to prevent. This test is the guard: when a PROFILE producer is built it
-     * fails, and whoever builds it decides deliberately which reaches include it.
+     * PROFILE is a declared channel with no producer anywhere in {@code src/main}. This is the guard: when
+     * a PROFILE producer is built, this fails, and whoever builds it decides deliberately which reaches
+     * include it — rather than a reach silently claiming a delivery the code cannot perform.
      */
     @ParameterizedTest
     @EnumSource(FeedbackReach.class)
@@ -51,10 +49,7 @@ class FeedbackReachTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * A workspace that has never chosen keeps doing what every practice already did. Reach was folded into
-     * the per-practice tier before this, and the shipped default reached the work.
-     */
+    /** A workspace that has never chosen keeps doing what every practice already did. */
     @Test
     void theFallbackIsWhatEveryWorkspaceAlreadyDid() {
         assertThat(FeedbackReach.DEFAULT).isEqualTo(FeedbackReach.ON_THE_WORK);

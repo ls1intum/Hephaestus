@@ -28,26 +28,22 @@ import org.springframework.transaction.annotation.Transactional;
  * {@link FeedbackChannel#IN_CONTEXT} channel: a finding is posted only if its practice's autonomy tier
  * admits the channel <em>and</em> the run's provenance does.
  *
- * <p>Runs strictly AFTER the findings are persisted and stamped with their observation keys, which is
- * the whole point of both rules — a {@code PROPOSE} practice and a backfill are measured and
- * recorded exactly like an engaged live run, and differ only in how far the result travels. Nothing here
- * can affect the behaviour time series; it only decides what is said.
+ * <p>Runs strictly after the findings are persisted and stamped with their observation keys — a
+ * {@code PROPOSE} practice and a backfill are measured and recorded exactly like an engaged live run, and
+ * differ only in how far the result travels. Nothing here touches the behaviour time series.
  *
- * <p>The provenance rule is what keeps a backfill campaign from commenting on merged pull requests:
- * every subscriber to a months-old pull request would be notified about work nobody can act on. It is
- * checked once for the whole job rather than per finding, because a job has exactly one origin.
+ * <p>The provenance rule keeps a backfill campaign from commenting on merged pull requests, where every
+ * subscriber would be notified about work nobody can act on; it's checked once per job since a job has
+ * exactly one origin.
  *
- * <p>Each withheld finding gets a SUPPRESSED ledger row — {@code PRACTICE_TIER_QUIET} or
- * {@code BACKFILL_QUIET}, whichever rule fired — rather than being dropped in silence, so a later
+ * <p>Each withheld finding gets a SUPPRESSED ledger row rather than being dropped in silence, so a later
  * evaluation can tell a deliberate quiet from a detection miss. Writing the row is best-effort: a ledger
  * failure never blocks the delivery of the findings that survived.
  *
- * <p><strong>A slug the catalogue read does not resolve is kept</strong> when only the tier would have
- * withheld it. It is never an unknown practice: {@code PracticeDetectionDeliveryService.deliver} refuses a
- * finding naming one, and it runs first. What is left is a practice renamed while its review ran — already
- * persisted as an observation under the revision's slug, so keeping it is traceable and dropping it would
- * cost a developer feedback over a rename. It is logged rather than passed over in silence. The provenance
- * rule has no such escape hatch — it needs no lookup.
+ * <p>A slug the catalogue read does not resolve is kept when only the tier would have withheld it — it is
+ * never an unknown practice ({@code PracticeDetectionDeliveryService.deliver} refuses those first), only a
+ * practice renamed mid-review. Dropping it would cost a developer feedback over a rename, so it is logged
+ * instead.
  */
 @Component
 class InContextDeliveryGate {
@@ -71,12 +67,7 @@ class InContextDeliveryGate {
         this.workspaceDefaults = workspaceDefaults;
     }
 
-    /**
-     * The subset of {@code findings} that may be placed on the artifact, in the order given.
-     *
-     * <p>Returns {@code findings} unchanged when the job has no workspace or everything is admitted —
-     * the overwhelmingly common case, which costs one catalogue read and no writes.
-     */
+    /** The subset of {@code findings} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
     List<ValidatedFinding> admitInContext(AgentJob job, List<ValidatedFinding> findings) {
         if (findings.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
@@ -84,8 +75,6 @@ class InContextDeliveryGate {
         }
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
-            // One decision for the whole job: a run has a single provenance, and no per-practice dial can
-            // make a retrospective finding actionable on the artifact it is about.
             log.info(
                 "Provenance withheld all {} finding(s) from the artifact: origin={}, jobId={}",
                 findings.size(),
@@ -96,14 +85,10 @@ class InContextDeliveryGate {
             return List.of();
         }
 
-        // Effective tiers, resolved through practice -> area -> workspace. The raw column is not the
-        // answer: a practice that holds no opinion of its own inherits one, and treating its NULL as an
-        // unresolved lookup would admit it whatever its area or its workspace had decided.
-        //
-        // Resolved from the workspace ID rather than off job.getWorkspace(). The job reaches this gate
-        // detached on some paths, so reading a lazy association here would make the delivery rule's
-        // correctness depend on whether the caller happens to hold a session — which is exactly the trap
-        // the conversational router's tier projection was written to avoid.
+        // Resolved from the workspace ID, not job.getWorkspace(): the job reaches this gate detached on some
+        // paths, so reading a lazy association here would depend on whether the caller holds a session.
+        // Tiers go through ReviewTierResolver rather than the raw column, since a practice with no opinion of
+        // its own must inherit its area's or workspace's rather than reading NULL as "admit anyway".
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
         Map<String, PracticeReviewTier> tierBySlug = new HashMap<>();
         for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {

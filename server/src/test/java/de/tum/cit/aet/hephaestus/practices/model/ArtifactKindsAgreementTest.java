@@ -38,9 +38,9 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
     @Test
     @DisplayName("the persisted spellings are pinned: changing one is a data migration, not an edit")
     void spellingsArePinned() {
-        // These strings are in observation.artifact_kind, feedback.artifact_kind, agent_job.artifact_kind
-        // and every signal name in every bundled practice's bindings. Re-spelling one without migrating
-        // orphans every row already written under the old spelling.
+        // These strings are persisted in observation, feedback and agent_job rows and in every bundled
+        // practice's bindings. Re-spelling one without migrating orphans every row already written under
+        // the old spelling.
         assertThat(
             Stream.of(
                 ArtifactKinds.PULL_REQUEST,
@@ -64,10 +64,8 @@ class ArtifactKindsAgreementTest extends BaseUnitTest {
     @DisplayName("the inline-lane shortcut says what the descriptors say")
     void inlineLaneAgreesWithTheDescriptors() {
         // The authority is the descriptor's FeedbackLane.IN_CONTEXT_INLINE; ArtifactKinds restates it
-        // because DeliveryComposer is static and has no registry to ask. A restated fact is a fork
-        // waiting to happen, so the two are held together here rather than by a comment promising they
-        // agree. Asked of every shipped descriptor, so a new kind cannot arrive with the shortcut
-        // silently wrong about it.
+        // because DeliveryComposer is static and has no registry to ask. Held together here, against
+        // every shipped descriptor, rather than by a comment promising they agree.
         for (ArtifactDescriptor descriptor : List.of(
             new PullRequestArtifactDescriptor(),
             new IssueArtifactDescriptor(),

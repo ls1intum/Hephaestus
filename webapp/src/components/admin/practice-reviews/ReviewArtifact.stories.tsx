@@ -11,11 +11,9 @@ import {
 } from "./story-mock-data";
 
 /**
- * Which piece of work a record is about, in one line.
- *
- * <p>The glyph is the forge, not the kind: the words already say `PR #1423` or `#engineering`, so a
+ * The glyph is the forge, not the kind: the words already say `PR #1423` or `#engineering`, so a
  * second pull-request icon would repeat them and leave a GitHub request indistinguishable from a
- * GitLab one. These are the same four brand marks the integrations console and the sidebar draw.
+ * GitLab one.
  */
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Reviewed work",
@@ -40,10 +38,8 @@ export const GitLabMergeRequest: Story = {
 };
 
 /**
- * An issue on the same forge as a pull request, told apart by its words rather than its mark.
- *
- * <p>Both wear GitHub's glyph, so `Issue #204` against `PR #1423` is the whole difference — which is
- * the case for keeping the wording in one place and rendering it here.
+ * An issue and a pull request on one forge wear the same glyph, so the wording is the whole
+ * difference between them.
  */
 export const GitHubIssue: Story = {
 	name: "GitHub issue",
@@ -58,11 +54,8 @@ export const SlackConversation: Story = { args: { artifact: slackConversation } 
 export const OutlineDocument: Story = { args: { artifact: outlineDocument } };
 
 /**
- * As a link out to the forge, with the affordance on the label alone.
- *
- * Hovering this used to underline the work's *title* as well, because the anchor wrapped both and
- * carried `hover:underline`. The anchor now contains the label and nothing else, and a caller that
- * wants the title renders it outside — which is what every detail screen does.
+ * The hover affordance is on the label alone. The title beside it is rendered by the caller, outside
+ * the anchor, so the underline can never reach text that is not the link's name.
  */
 export const ExternalLink: Story = {
 	render: (args) => (
@@ -78,7 +71,6 @@ export const ExternalLink: Story = {
 	},
 };
 
-/** A work item with no URL recorded is named, not linked — and never rendered as a dead anchor. */
 export const WithoutAUrl: Story = {
 	render: (args) => <ReviewArtifactLink {...args} />,
 	args: { artifact: { ...reviewArtifact, url: undefined } },

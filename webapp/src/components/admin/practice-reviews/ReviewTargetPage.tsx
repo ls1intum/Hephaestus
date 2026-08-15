@@ -25,12 +25,8 @@ export interface ReviewTargetPageProps {
 }
 
 /**
- * Everything the reviews have said about one piece of work.
- *
- * <p>No eyebrow and no sentence naming the page above the heading. What kind of work this is comes
- * out of the link's own mark and words — `ls1intum/Hephaestus · PR #1423` under a GitHub or GitLab
- * glyph — which is a fact about *this* work; a label for the page only restates the breadcrumb one
- * line above it.
+ * No eyebrow above the heading: the link's own mark and words say what kind of work this is, which
+ * is a fact about *this* work, while a label for the page restates the breadcrumb one line above it.
  */
 export function ReviewTargetPage({
 	workspaceSlug,

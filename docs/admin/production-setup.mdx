@@ -46,6 +46,14 @@ These variables exist only in the reference deployment, so they live here:
 | --- | --- |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
 | `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
+| `SPRINGDOC_API_DOCS_ENABLED` / `SPRINGDOC_SWAGGER_UI_ENABLED` | Publish the OpenAPI description at `/v3/api-docs` and the interactive Swagger UI. Both default to `false`. |
+
+:::danger The API description is unauthenticated wherever it is enabled
+`SPRINGDOC_API_DOCS_ENABLED` does not put the description behind a login — it decides whether the
+endpoint exists. Whenever springdoc registers, `/v3/api-docs/**` and `/swagger-ui/**` answer any
+request, so switching it on publishes the instance's complete route list, admin routes included, to
+anyone who asks. Leave both off in production; generate the spec at build time instead.
+:::
 
 :::caution Not everything the container reads is settable from `docker/.env`
 `LEGAL_PROFILE` is forwarded by the shipped Compose files, so setting it in `docker/.env` works.

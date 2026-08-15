@@ -5,11 +5,9 @@ import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewTargetPage } from "./ReviewTargetPage";
 import { reviewHandlers } from "./story-mock-server";
 
-/**
- * The mock endpoint filters by `artifactKind` and `artifactId`, so each story here only has to name
- * the work: what comes back is what the review endpoints would return for it. The stories used to
- * hand-pick the rows, which is how a document's page came to show a merge request's observation.
- */
+// The mock filters by `artifactKind` and `artifactId`, so a story only names the work and gets back
+// what the endpoints would return for it. Hand-picked rows can put one work's observation on
+// another's page.
 const meta = {
 	title: "Workspace admin/Practice reviews/Reviewed work",
 	component: ReviewTargetPage,
@@ -29,14 +27,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Everything the reviews have said about one pull request.
- *
- * <p>The header used to be a breadcrumb reading "Practice reviews / Reviewed work", a grey
- * "Reviewed work" eyebrow under it, the title, and then a sentence explaining what the page was —
- * four lines to say one thing. The work's own mark and label carry the kind now, which is a fact
- * about this work rather than a label for the page.
- */
 export const PullRequest: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" } },
 	play: async ({ canvas }) => {
@@ -44,9 +34,9 @@ export const PullRequest: Story = {
 			name: "Cache the workspace member lookup on the review path",
 			level: 2,
 		});
-		// The breadcrumb stops before repeating the heading, and the eyebrow is gone.
+		// Nothing labels the page as "Reviewed work": the breadcrumb stops before the heading, and the
+		// work names itself.
 		await expect(canvas.queryAllByText("Reviewed work")).toHaveLength(0);
-		// The header names the work once, and every row under it names it again in its meta line.
 		expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
 		await canvas.findByText(/2 issues to tighten in this change/);
 		await canvas.findByText("A cache miss and a permission failure come back as the same 404");
@@ -54,10 +44,6 @@ export const PullRequest: Story = {
 	},
 };
 
-/**
- * The same page for a merge request, where a wrong glyph would show: the words say
- * `platform/billing-service · MR !88` and the mark says GitLab.
- */
 export const MergeRequest: Story = {
 	args: { artifactId: 43 },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -70,10 +56,6 @@ export const MergeRequest: Story = {
 	},
 };
 
-/**
- * The same page for a chat thread, which is where the iconography has to hold up: the words say
- * `#engineering` and the mark says Slack.
- */
 export const Conversation: Story = {
 	args: { artifactKind: "chat.conversation_thread", artifactId: 81 },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -87,7 +69,7 @@ export const Conversation: Story = {
 	},
 };
 
-/** And for a document, whose label is its kind because it has no number to be known by. */
+/** A document's label is its kind, because it has no number to be known by. */
 export const Document: Story = {
 	args: { artifactKind: "docs.document", artifactId: 96 },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -100,7 +82,6 @@ export const Document: Story = {
 	},
 };
 
-/** Work nothing has reviewed says why that might be, rather than reporting an absence of output. */
 export const NothingReviewed: Story = {
 	args: { artifactId: 45 },
 	parameters: { chromatic: { viewports: [1440] } },

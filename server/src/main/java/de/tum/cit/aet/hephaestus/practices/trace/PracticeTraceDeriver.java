@@ -27,9 +27,8 @@ import org.jspecify.annotations.Nullable;
  * "you turned this off" beats "the cooldown was active" even when both are true.
  *
  * <p>Configuration is therefore current, not as-of-run: a tier or binding changed since a review is
- * matched as it reads now. Snapshotting the whole practice set onto every job was rejected as too
- * costly for a rarely-asked question, which is why the outcome is derived from what the run recorded
- * wherever a recording exists.
+ * matched as it reads now, and the outcome is derived from what the run recorded wherever a recording
+ * exists.
  */
 final class PracticeTraceDeriver {
 
@@ -102,9 +101,9 @@ final class PracticeTraceDeriver {
 
         // 1. It produced measurements. Nothing below can make that untrue.
         if (output.observations() > 0) {
-            // Name the occurrence that started the run the measurements came from, not the newest match:
-            // a practice assessed at open and signalled again since would otherwise be reported as
-            // assessed on a signal it was never run for.
+            // The occurrence that started the run the measurements came from, not the newest match — a
+            // practice assessed at open and signalled again since must not read as assessed on a signal
+            // it was never run for.
             SignalOccurrence occasion = matched
                 .stream()
                 .filter(occurrence -> Objects.equals(occurrence.reviewId(), output.latestReviewId()))
@@ -266,10 +265,8 @@ final class PracticeTraceDeriver {
     }
 
     /**
-     * A run that finished and never named this practice — three distinguishable facts. A run refused
-     * for evidence says so at the run level even without a per-practice decision. A run that recorded
-     * decisions for other practices and not this one did not admit it. A run that recorded no decisions
-     * at all supports neither claim, and says so rather than picking one.
+     * A run that finished and never named this practice — three distinguishable facts: refused for
+     * evidence, ran but did not admit this practice, or recorded no decisions at all.
      */
     private static PracticeTraceEntryDTO completed(
         TracedPractice practice,

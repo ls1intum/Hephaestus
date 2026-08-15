@@ -198,18 +198,14 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 - Separate cache tags per platform: `image:cache-linux-amd64`, `image:cache-linux-arm64`
 - Native builds: amd64 on x86 runners, arm64 on ARM runners (no QEMU emulation)
 
-**Benefits over GitHub Actions Cache:**
-
-- No 10GB size limit (registry is unlimited)
-- No eviction after 7 days
-- Works across branches (PRs benefit from main's cache)
-- Persistent (survives cache clearing)
+The registry cache is not size-capped or time-evicted the way the Actions cache is, and it is shared
+across branches, so a pull request reuses `main`'s layers.
 
 ### Registry Authentication
 
 Image builds log in to `ghcr.io` with the workflow's own `GITHUB_TOKEN`; there is no Docker Hub
-login step and no repository secret to configure. Base image metadata is resolved anonymously, which
-is occasionally rate-limited.
+login step and no repository secret to configure. Base image metadata is resolved anonymously and is
+therefore subject to the registry's anonymous rate limit.
 
 ### Parallel Execution
 

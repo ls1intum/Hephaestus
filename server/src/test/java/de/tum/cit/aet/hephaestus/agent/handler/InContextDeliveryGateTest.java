@@ -170,7 +170,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practice("measured", PracticeReviewTier.PROPOSE))
         );
-        // Built BEFORE the stubbing call: see observingAndProposingPracticesAreWithheldFromTheArtifact.
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
 
@@ -242,11 +241,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         return observation;
     }
 
-    /**
-     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
-     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
-     * the chain existed.
-     */
+    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

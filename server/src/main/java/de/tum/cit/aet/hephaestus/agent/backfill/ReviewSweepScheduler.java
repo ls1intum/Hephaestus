@@ -16,19 +16,15 @@ import org.springframework.stereotype.Component;
 /**
  * Opens a campaign for every sweep schedule that has come due.
  *
- * <p>The last way into the review path that needs nothing to have happened first. Every other one waits
- * for an event, a reconciliation, a person asking or an admin scoping a campaign — so an artifact that
- * nothing ever announced has no ledger row at all, and "we never looked at this" is indistinguishable
- * from "we looked and declined". This closes that: a workspace with a schedule has a row for every
- * artifact in the window either way.
+ * <p>Every other way into the review path waits for an event, a reconciliation, a person asking, or an
+ * admin scoping a campaign — so an artifact nothing ever announced would otherwise have no ledger row at
+ * all, making "we never looked" indistinguishable from "we looked and declined". A workspace with a
+ * schedule gets a row for every artifact in the window either way.
  *
- * <p>Deliberately thin. It selects due rows, hands each to {@link ReviewSweepCampaignOpener} and logs;
- * the pacing, the budget checks, the cursor and the per-artifact isolation are all
- * {@code ReviewBackfillDriver}'s, already written, already tested.
- *
- * <p>Under a lock like {@code PendingSignalReaper}, and for the same reason: two replicas that both
- * opened a run for the same due schedule would be settled by the campaign-under-way check, but only
- * after both had enumerated and priced a scope.
+ * <p>Deliberately thin: it selects due rows, hands each to {@link ReviewSweepCampaignOpener}, and logs.
+ * The pacing, budget checks, cursor and per-artifact isolation belong to {@code ReviewBackfillDriver}.
+ * Locked like {@code PendingSignalReaper} — two replicas opening the same due schedule would both
+ * enumerate and price a scope before the campaign-under-way check settled it.
  */
 @ConditionalOnServerRole
 @Component
@@ -38,11 +34,7 @@ public class ReviewSweepScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewSweepScheduler.class);
 
-    /**
-     * How many schedules one tick opens. Each becomes a campaign that the driver then paces, and the
-     * driver advances at most five campaigns per tick — so pulling more than this in would only build a
-     * queue of runs waiting on a driver that is already saturated.
-     */
+    /** Each schedule becomes a campaign the driver paces; pulling in more would just queue on a saturated driver. */
     private static final int MAX_SCHEDULES_PER_TICK = 20;
 
     private final ReviewSweepScheduleRepository scheduleRepository;
@@ -53,11 +45,7 @@ public class ReviewSweepScheduler {
         this.opener = opener;
     }
 
-    /**
-     * Every five minutes rather than nightly. The cadence a schedule keeps is its own
-     * {@code nextRunAt}; this only has to notice one has passed, and noticing within five minutes is what
-     * lets an admin who has just created a schedule watch it work.
-     */
+    /** The cadence a schedule keeps is its own {@code nextRunAt}; this only has to notice one has passed. */
     @Scheduled(fixedDelay = 5, initialDelay = 3, timeUnit = TimeUnit.MINUTES)
     @SchedulerLock(name = "review-sweep-scheduler", lockAtMostFor = "PT10M", lockAtLeastFor = "PT1M")
     public void tick() {
@@ -70,9 +58,8 @@ public class ReviewSweepScheduler {
                     log.debug("Review sweep skipped: scheduleId={}, outcome={}", schedule.getId(), outcome);
                 }
             } catch (RuntimeException e) {
-                // One workspace's sweep must not stop the rest, and it must not retry itself to death
-                // either: the failed transaction rolled its own advance back, so the schedule is still
-                // due and would be picked up again in five minutes, for ever.
+                // The failed transaction rolled its own advance back, so without deferAfterFailure the
+                // schedule stays due and would retry itself forever.
                 log.warn(
                     "Review sweep failed to open, deferring to the next occurrence: scheduleId={}",
                     schedule.getId(),

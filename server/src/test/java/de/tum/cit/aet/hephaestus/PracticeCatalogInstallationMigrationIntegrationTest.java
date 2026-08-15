@@ -68,9 +68,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             "UPDATE practice SET source_curated_slug = 'second-practice', " +
                 "source_curated_fingerprint = repeat('c', 64) WHERE id = 136302"
         );
-        // Asserted here rather than at the end of the chain: later change sets deliberately clear the
-        // review-rule fingerprint, so a stored one is no longer observable once they have run, and
-        // asserting the versioning afterwards would only ever prove the clearing.
+        // Asserted here, not at the end of the chain: later change sets deliberately clear the
+        // review-rule fingerprint, so a stored one is no longer observable once they have run.
         updateThrough("1785743133884-5");
         assertHistoricalFingerprintsVersioned();
         seedLegacyAuditVocabulary();
@@ -142,15 +141,12 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     /**
-     * After the whole chain: every stored review-rule fingerprint is gone, on purpose.
+     * Every stored review-rule fingerprint is gone after the whole chain, on purpose: each described a
+     * rule set in a spelling the vocabulary moves erased, so a stale digest would report every bundled
+     * practice as locally edited; clearing it hands recomputation to the boot-time backfill.
      *
-     * <p>The vocabulary moves rewrote the artifact kind and the bindings that the fingerprint digests, so
-     * each stored one described a rule set written in a spelling that no longer exists. Left in place the
-     * admin catalog would compare a stale digest against a freshly computed one and report every bundled
-     * practice as locally edited; cleared, the recomputation is handed to the backfill that runs at boot.
-     *
-     * <p>The provenance fingerprint is untouched by that: it identifies which bundled definition a copy
-     * came from, which no rename changes.
+     * <p>The provenance fingerprint is untouched — it identifies which bundled definition a copy came
+     * from, which no rename changes.
      */
     private static void assertHistoricalFingerprintsClearedForRecomputation() throws SQLException {
         assertThat(
@@ -343,8 +339,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             .hasMessageContaining("practice revisions are immutable");
 
         // Scoped to the current revision: the migration clears the fingerprint on every stored revision,
-        // so "whichever one is still null" names more than one row. The claim under test is that a
-        // fingerprint can be written once and then not again.
+        // so "whichever one is still null" would otherwise name more than one row.
         execute(
             """
             UPDATE practice_revision
@@ -482,9 +477,8 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
                   AND automated_review_policy #>> '{automatedReview,mode}' = 'LANGUAGE_MODEL'
                   AND automated_review_policy #>> '{automatedReview,evidenceSufficiency}' =
                       'SUFFICIENT_WHEN_REQUIREMENTS_MET'
-                  -- The sources a review reads live on the bindings now, because what a review needs
-                  -- depends on what occasioned it. Every spelling the policy ever carried them under is
-                  -- gone from it, and a re-applied chain must leave none behind.
+                  -- The sources a review reads live on the bindings now; every spelling the policy ever
+                  -- carried them under must be gone from it after a re-applied chain.
                   AND NOT automated_review_policy ? 'needs'
                   AND NOT automated_review_policy ? 'requiredEvidence'
                   AND NOT automated_review_policy ? 'optionalContext'

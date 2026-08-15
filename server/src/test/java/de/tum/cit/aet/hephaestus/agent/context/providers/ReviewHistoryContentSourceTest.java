@@ -98,10 +98,8 @@ class ReviewHistoryContentSourceTest {
     }
 
     /**
-     * Staged by every review without any practice declaring it — as every source now is. The history was
-     * the first source that had to escape the per-practice union, because a review's record of the person
-     * must not depend on 37 practice authors remembering to ask for it. That escape hatch is gone with
-     * the union it escaped.
+     * Staged by every review, independent of any practice declaring it: a review's record of the person
+     * must not depend on a practice author remembering to ask for it.
      */
     @Test
     void answersForBothHistoryKindsWithoutAnyPracticeDeclaringThem() {
@@ -149,7 +147,7 @@ class ReviewHistoryContentSourceTest {
     }
 
     /**
-     * The item-4 guarantee applied to history: a person with no record gets the files anyway.
+     * A person with no record still gets the files.
      *
      * <p>The content state must still read EMPTY. Deriving it from the staged file list — which is what
      * the manifest does by default — would answer NON_EMPTY here and tell the review that a first-time
@@ -278,11 +276,6 @@ class ReviewHistoryContentSourceTest {
         assertThat(provider.supports(prRequest())).isTrue();
     }
 
-    /**
-     * One kind per call, which is the only shape {@code WorkspaceContextBuilder} produces. Asking for
-     * both at once is a shape production never makes, and a collector tested that way can report a kind
-     * it was not asked about — a contribution the builder rejects, failing the whole review.
-     */
     private EvidenceContribution captureObservationHistory() {
         return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
     }

@@ -212,10 +212,7 @@ export const UnavailableMoveDestinationIsNamed: Story = {
 	},
 };
 
-/**
- * Owns the search term the story drives, so that filtering is a state transition rather than two
- * separate renders. Everything else still arrives as args, so the Controls panel stays live.
- */
+/** Owns the search term, so filtering is a state transition rather than two separate renders. */
 function FilterTransition(props: ComponentProps<typeof CuratedCatalog>) {
 	const [search, setSearch] = useState<CuratedCatalogSearch>({});
 	return <CuratedCatalog {...props} search={search} onSearchChange={setSearch} />;

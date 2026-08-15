@@ -7,9 +7,8 @@ export type Severity = NonNullable<ReviewObservation["severity"]>;
 /**
  * How much a missed practice costs, ordered worst first.
  *
- * `CRITICAL` and `MAJOR` share the destructive variant because they are both "fix this", and
- * inventing a sixth badge colour to separate them would put two reds next to each other that nobody
- * could rank. The icon is what ranks them: an octagon (a stop sign) outranks a triangle.
+ * `CRITICAL` and `MAJOR` share the destructive variant, so the icon is what ranks them: an octagon
+ * (a stop sign) outranks a triangle.
  */
 export const SEVERITY_DEFS: StatusDefs<Severity> = {
 	CRITICAL: {

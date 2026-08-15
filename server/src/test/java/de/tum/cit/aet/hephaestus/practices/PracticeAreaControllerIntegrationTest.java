@@ -526,11 +526,9 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
     // PATCH /{areaSlug}/review-tier — @RequireAtLeastWorkspaceAdmin
 
     /**
-     * The middle level of the practice → area → workspace chain, and the only one an administrator reaches
-     * to move a dozen practices at once. Two behaviours make it the middle level rather than a second copy
-     * of the practice endpoint: a null clears the area's own answer back to the workspace's, and re-sending
-     * the tier already in force does nothing at all — including to the audit ledger, which is what
-     * "nothing" has to mean for a decision that is recorded.
+     * The middle level of the practice → area → workspace chain. A null clears the area's own answer back
+     * to the workspace's, and re-sending the tier already in force does nothing at all — including to the
+     * audit ledger.
      */
     @Nested
     @DisplayName("PATCH /practice-areas/{areaSlug}/review-tier")
@@ -578,9 +576,8 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         }
 
         /**
-         * Every rung is settable on an area, and setting one is the area's own decision rather than an
-         * inheritance. PROPOSE is in the list on purpose: refusing the middle rung would leave OFF and
-         * DELIVER, an on/off switch, which is the defect the tier chain exists to remove.
+         * PROPOSE is included on purpose: refusing the middle rung would leave OFF/DELIVER, the on/off
+         * switch the tier chain exists to remove.
          */
         @ParameterizedTest
         @EnumSource(PracticeReviewTier.class)

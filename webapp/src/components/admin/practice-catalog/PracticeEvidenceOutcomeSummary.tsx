@@ -12,11 +12,9 @@ export interface PracticeEvidenceOutcomeSummaryProps {
 }
 
 /**
- * What these requirements cost in practice, as a bar rather than a sentence to parse.
- *
- * <p>The one number an operator is after is the share of reviews these requirements turned away, and
- * "skipped this practice in 5 of the last 12" makes that a reading exercise. The bar answers it before
- * the words are read; the words then say which source was missing.
+ * What these requirements cost in practice. The number an operator is after is the share of reviews
+ * they turned away, so the bar answers that before the words are read; the words then say which
+ * source was missing.
  */
 export function PracticeEvidenceOutcomeSummary({
 	outcome,

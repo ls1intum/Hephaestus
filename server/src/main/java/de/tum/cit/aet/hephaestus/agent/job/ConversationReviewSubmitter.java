@@ -19,23 +19,17 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * Turns one settled-thread occurrence into reviews, and settles its ledger row either way.
- *
- * <p>Two entry points onto the same body, for the same reason {@code DocumentReviewSubmitter} has two:
- * the sweep raises the occurrence, the reaper re-offers one that was refused for something an operator
- * can undo, and the second attempt has to reach exactly the decision the first would have.
+ * Turns one settled-thread occurrence into reviews, and settles its ledger row either way. Two entry
+ * points share this body: the sweep raises the occurrence, and the reaper re-offers one that was refused
+ * for something an operator can undo — the second attempt must reach exactly the decision the first would
+ * have.
  *
  * <h2>One row, several jobs</h2>
- * <p>A conversation review is filed per participant, because findings about how a person writes are
- * delivered to that person. The <em>signal</em> still happened once: the thread settled. So the ledger
- * gets one row and the fan-out gets none — the number of recipients is a delivery decision, and making
- * it a number of occurrences would put the participant count into every "how many occasions did this
- * instance see" answer.
- *
- * <p>The row is settled once, from the fan-out as a whole: triggered if any participant's review
- * started, otherwise refused with the first reason that stopped one. A partial fan-out counts as
- * triggered — a review did run on this occurrence — and the participants who missed out are visible as
- * the missing jobs rather than as a signal that claims nothing happened.
+ * <p>A review is filed per participant (findings about how a person writes go to that person), but the
+ * signal happened once — the thread settled — so the ledger gets one row regardless of fan-out width.
+ * That row settles as triggered if any participant's review started, otherwise refused with the first
+ * reason that stopped one; a partial fan-out still counts as triggered, and the participants who missed
+ * out are visible as missing jobs rather than as a signal claiming nothing happened.
  */
 @ConditionalOnServerRole
 @Component
@@ -66,11 +60,8 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     }
 
     /**
-     * Re-offer a settled-thread signal the reaper is holding open.
-     *
-     * <p>The thread is re-read rather than reconstructed from the ledger row, so consent is re-checked:
-     * a channel withdrawn since the signal was recorded stops producing reviews here, immediately, and
-     * the signal is retired rather than left to be re-offered against a conversation nobody agreed to.
+     * The thread is re-read rather than reconstructed from the ledger row, so consent is re-checked: a
+     * channel withdrawn since the signal was recorded stops producing reviews here, immediately.
      */
     @Override
     public void resubmit(ArtifactSignal signal) {
@@ -91,13 +82,10 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
     }
 
     /**
-     * Fan the occurrence out to its participants and settle its ledger row with what came of that.
+     * Not transactional: {@link AgentJobService#submit} states that callers must not wrap it, so the two
+     * settle calls open transactions of their own — {@code SignalRecorder} is {@code MANDATORY} and would
+     * otherwise throw at exactly the moment there is a decision to record.
      *
-     * <p><strong>Not transactional.</strong> {@link AgentJobService#submit} states that callers must not
-     * wrap it, so the two settle calls open transactions of their own — {@code SignalRecorder} is
-     * {@code MANDATORY} and would otherwise throw at exactly the moment there is a decision to record.
-     *
-     * @param key the row already recorded for this occurrence, which this call now owns
      * @return how many reviews started
      */
     public long submitAndSettle(ConversationThreadCandidate candidate, SignalKey key) {
@@ -113,9 +101,7 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
                     candidate.workspaceId(),
                     AgentJobType.CONVERSATION_REVIEW,
                     requestFor(candidate, participant),
-                    // Null on purpose: the ledger row belongs to the occurrence, not to any one
-                    // recipient, and letting each submission settle it would leave the row pointing at
-                    // whichever participant happened to be last.
+                    // Null: the ledger row belongs to the occurrence, not to any one recipient.
                     null
                 );
                 if (outcome.job() != null) {
@@ -139,9 +125,8 @@ public class ConversationReviewSubmitter implements PendingSignalResubmitter {
         if (firstJobId != null) {
             settleTriggered(key, firstJobId);
         } else {
-            // Nothing started and nothing named a reason: every participant threw, or the thread has no
-            // resolvable participant at all. Held open rather than retired — the people in it linking
-            // their accounts is precisely the operator-liftable condition the reaper exists for.
+            // No reason means every participant threw or none was resolvable; SUBJECT_UNLINKED holds the
+            // signal open for the reaper rather than retiring it.
             settleRefused(key, firstRefusal != null ? firstRefusal : SignalStateReason.SUBJECT_UNLINKED);
         }
         return started;

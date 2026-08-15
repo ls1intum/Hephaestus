@@ -437,7 +437,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
             );
             // A new practice states no tier of its own; the tier in force is the workspace's, which is
-            // DELIVER until the workspace says otherwise — the same loudness the old stored default had.
+            // DELIVER until the workspace says otherwise.
             assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
             assertThat(result.reviewTier().override()).isNull();
             assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);

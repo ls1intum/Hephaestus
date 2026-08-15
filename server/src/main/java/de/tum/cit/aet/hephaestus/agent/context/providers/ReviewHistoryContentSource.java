@@ -40,35 +40,24 @@ import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Stages what earlier reviews recorded about this person, and what they were already told.
+ * Stages what earlier reviews recorded about this person: the observations earlier runs filed against
+ * them, carrying the recurrence key that says which are about the same underlying problem, and the
+ * feedback already delivered, so a run can tell "this is new" from "we said this before".
  *
- * <p>A review occasioned by one event sees one event. That makes every such review a partial practice
- * review, and the partiality is not fixable by reading the event harder — the thing that is missing is
- * the other events. This source is how a run sees the ones before it: the observations earlier runs
- * filed about the same person, carrying the recurrence key that says which of them are about the same
- * underlying problem, and the feedback that was already delivered, so a run can tell "this is new" from
- * "we have said this twice already and they have not acted".
+ * <p>Both files are written even when a person has no history: an empty {@code observations.json} says
+ * the record was read and held nothing, distinct from a source that was never staged.
  *
- * <p>Both files are written on every run, including the run where a person has no history at all. An
- * empty {@code observations.json} is the sandbox saying the record was read and held nothing; a missing
- * one would be indistinguishable from a source that was never staged, and the difference between those
- * two is the whole basis on which a review is allowed to reason about what it did <em>not</em> find.
+ * <p>Never reported COMPLETE — the window is a bounded read of a record that keeps growing, so it can
+ * show that something recurred but never that it has never happened before.
  *
- * <p>Never reported COMPLETE. The window below is a bounded read of a record that keeps growing, so it
- * can support "this recurred" and can never support "this has never happened before".
+ * <p>Only what earlier reviews observed and delivered is staged, not how a contributor reacted to it
+ * (applied, dismissed, disputed): this class does not reach the reaction package (ADR 0021 F-9, pinned by
+ * {@code DetectionReactionFirewallTest}). Detection that knew a finding had been disputed would have a
+ * reason to stop reporting a true positive.
  *
- * <p><b>Scope note — the reaction firewall stands.</b> What is staged is what earlier reviews
- * <em>observed</em> and what was <em>delivered</em>. What a contributor did about it — applied,
- * dismissed, disputed — is deliberately not staged, and this class does not reach the reaction package
- * (ADR 0021 F-9, pinned by {@code DetectionReactionFirewallTest}). Detection that knew a finding had
- * been disputed would have a reason to stop reporting a true positive, and the accuracy measurement the
- * research rests on would no longer mean anything.
- *
- * <p>The residual risk this source does carry is anchoring: a model shown an earlier observation could
- * echo it instead of looking. That is bounded by the same rule as everything else — an observation about
- * this artifact must quote this artifact, and the history can be cited for whether something recurs but
- * never for whether something is present in the work under review. The prompt says so, and the delivery
- * boundary enforces the quote.
+ * <p>History can anchor a model into echoing an earlier observation instead of looking; the delivery
+ * boundary bounds that by requiring every observation to quote the artifact under review, so history may
+ * be cited for recurrence but never for what is present in the current work.
  */
 @Component
 @Order(500)
@@ -76,23 +65,13 @@ public class ReviewHistoryContentSource implements EvidenceSource {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewHistoryContentSource.class);
 
-    /** What earlier reviews recorded about the person whose work is under review. */
     static final SourceKind OBSERVATION_HISTORY = new SourceKind("hephaestus.observation-history");
-
-    /** What earlier reviews already said to that person, and through which channel. */
     static final SourceKind FEEDBACK_HISTORY = new SourceKind("hephaestus.feedback-history");
 
     static final String OBSERVATIONS_FILE = SandboxLayout.HISTORY_PREFIX + "observations.json";
     static final String FEEDBACK_FILE = SandboxLayout.HISTORY_PREFIX + "feedback.json";
 
-    /**
-     * How much of one named person's record may enter a prompt.
-     *
-     * <p>Exposure bounds, not cost bounds — a few dozen short rows are nothing beside a repository-tree
-     * capture. What these numbers decide is how far back a contributor's record follows them and how
-     * much of it is available to anchor a model that is supposed to be reading the work in front of it,
-     * which is the residual risk named at the top of this class. Widening either widens that risk.
-     */
+    /** Exposure bounds, not cost bounds — they cap how much of a contributor's record can anchor a model. */
     private static final int LOOKBACK_DAYS = 90;
 
     private static final int MAX_OBSERVATIONS = 50;
@@ -163,18 +142,13 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         long workspaceId = job.getWorkspace().getId();
         Long subjectUserId = resolveSubject(request, job);
         if (subjectUserId == null) {
-            // Not an empty history: nothing was read, because there is no person to read it for. Saying
-            // "empty" here would license a review to conclude a first-ever occurrence from a lookup that
-            // never happened.
+            // Unavailable, not empty: there is no person to read a history for, so nothing was read.
             return absent(selectedKinds, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
         }
         Instant since = Instant.now().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
 
-        // Both halves are answered only when both are asked for. The two kinds are captured
-        // independently — one call per kind — so reporting the other one's completeness or content
-        // state here is reporting a fact about a source this capture was not asked about, which the
-        // builder rejects outright. Guarding the queries too keeps an unselected half from costing a
-        // read nobody wanted.
+        // Each kind is queried and reported only when selected — the builder rejects completeness or
+        // content-state facts about a source that wasn't asked for.
         Map<String, byte[]> files = new LinkedHashMap<>();
         Map<SourceKind, SourceCompleteness> completeness = new LinkedHashMap<>();
         Map<SourceKind, SourceContentState> contentStates = new LinkedHashMap<>();
@@ -199,11 +173,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 .toList();
             observationCount = observations.size();
             files.put(OBSERVATIONS_FILE, serialize(observationsPayload(observations, since), OBSERVATIONS_FILE));
-            // A window over a growing record. It can show that something recurred; it can never show
-            // that something never happened, so COMPLETE is not a state this source may report.
             completeness.put(OBSERVATION_HISTORY, SourceCompleteness.PARTIAL);
-            // Reported rather than inferred from the staged file list: the file is always written, so
-            // "there is a file" would answer NON_EMPTY for a person with no history at all.
+            // Reported explicitly rather than inferred from file presence: the file is always written,
+            // so "there is a file" would wrongly answer NON_EMPTY for a person with no history.
             contentStates.put(
                 OBSERVATION_HISTORY,
                 observations.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY
@@ -247,8 +219,8 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("window", "observations recorded since " + since + ", newest first");
         root.put("count", observations.size());
-        // Stated in the file rather than left to the manifest, because the file is what the model reads
-        // first and this is the sentence that stops it reading "no rows" as "never happened".
+        // Stated in the file itself, which the model reads directly, so an empty list can't be read as
+        // "never happened".
         root.put(
             "completeness",
             "PARTIAL: the most recent " +
@@ -295,11 +267,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     }
 
     /**
-     * The person the review is about.
-     *
-     * <p>The author for work with an author, and the explicitly carried subject for the artifacts that
-     * have none to read — the same resolution delivery performs, because history staged for one person
-     * and observations filed against another would let a review cite somebody else's record.
+     * The person the review is about: the author for work with one, the explicitly carried subject
+     * otherwise — mirrors the resolution delivery performs, so history can't be staged for one person
+     * while observations are filed against another.
      */
     private Long resolveSubject(ContextRequest request, AgentJob job) {
         return switch (request) {

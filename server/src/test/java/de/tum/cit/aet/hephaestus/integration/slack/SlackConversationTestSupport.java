@@ -33,13 +33,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ul>
  *   <li>{@link #ensureUnmappedSlackThreadColumns()} — idempotent {@code IF NOT EXISTS} DDL for the
- *       {@code participant_member_ids bigint[]} + GIN index and {@code last_reviewed_ts VARCHAR(32)} column.
- *       {@code SlackThread} now maps both fields (changelog changesets -12/-13; see
- *       {@code SlackThread#participantMemberIds}/{@code #lastReviewedTs}), so the entity-derived integration
- *       profile's {@code ddl-auto: create} already builds them from the entity metadata — this method is a no-op
- *       there today. It stays as the single place that also lays down the GIN index (which entity mapping alone
- *       does not express) and as a defensive idempotent guard, so the two SPI ITs cannot drift from each other on
- *       this DDL. That the shape actually matches the production Liquibase migration is proven independently by
+ *       {@code participant_member_ids bigint[]} + GIN index and {@code last_reviewed_ts VARCHAR(32)} column,
+ *       so the two SPI ITs cannot drift from each other on this DDL. That the shape actually matches the
+ *       production Liquibase migration is proven independently by
  *       {@code SlackConversationSchemaContractIntegrationTest} against the real schema.</li>
  *   <li>{@link #seedChannel}/{@link #seedThread}/{@link #seedMessage} — the raw {@code INSERT}s the projector and
  *       detection scans read over. Superset signatures so both callers share one SQL string per table.</li>

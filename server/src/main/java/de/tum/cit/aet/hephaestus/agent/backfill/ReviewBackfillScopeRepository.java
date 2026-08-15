@@ -15,15 +15,13 @@ import org.springframework.stereotype.Repository;
  * pages to walk them.
  *
  * <p><strong>Every query discriminates on {@code TYPE}.</strong> {@code Issue} and {@code PullRequest}
- * share one table under {@code SINGLE_TABLE} inheritance, so a query written over {@code Issue} without
- * a type predicate silently includes every pull request and merge request as well. A backfill that got
- * that wrong would double-count the estimate the admin confirmed and submit issue reviews for pull
+ * share one table under {@code SINGLE_TABLE} inheritance, so a query without a type predicate silently
+ * includes pull/merge requests too — double-counting the estimate and submitting issue reviews for pull
  * requests.
  *
- * <p>Tombstoned rows ({@code deletedAt} set) are excluded here even though most read paths in the
- * codebase surface them. A campaign is choosing what to spend money reviewing, and paying an LLM to
- * review an artifact that no longer exists upstream is indefensible in a way that showing it in a
- * profile history is not.
+ * <p>Tombstoned rows ({@code deletedAt} set) are excluded here even though most read paths surface them:
+ * a campaign spends money reviewing artifacts, and reviewing one that no longer exists upstream is
+ * indefensible.
  */
 @Repository
 @WorkspaceAgnostic("Scope enumeration takes the workspace id as a parameter")

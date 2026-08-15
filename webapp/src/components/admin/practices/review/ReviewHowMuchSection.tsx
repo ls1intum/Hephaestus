@@ -17,22 +17,11 @@ import { type ReviewModelState, reviewModelRunnable } from "./review-readiness";
 
 export interface ReviewHowMuchSectionProps {
 	workspaceSlug: string;
-	/** The "only what was set by hand" filter, which lives in the URL so it can be linked to. */
 	overridesOnly: boolean;
 	onOverridesOnlyChange: (next: boolean) => void;
 }
 
-/**
- * How far Hephaestus may go, for the workspace and for anything that needs an exception.
- *
- * <p>Owns its own queries rather than taking them from the route. The three sections of this page are
- * tab panels, and an inactive panel is not rendered, so a section that fetches for itself is a
- * section whose requests do not fire until somebody opens it. On a workspace with a hundred practices
- * that is the difference between one screen's cost and three.
- *
- * <p>Three of the four here are its own; the model binding is already in flight for the header, which
- * needs it to say whether this workspace reviews anything, so asking again shares that cache entry.
- */
+/** Queries live here rather than on the route, so they do not fire until this tab is opened. */
 export function ReviewHowMuchSection({
 	workspaceSlug,
 	overridesOnly,
@@ -133,11 +122,8 @@ export function ReviewHowMuchSection({
 }
 
 /**
- * The model binding, read-only, above the ladder it is the precondition for.
- *
- * <p>Every tier on this section is a decision about what an AI model will do, and none of them means
- * anything until one is bound. It is read here and changed on AI models: that page owns the binding,
- * and a second editor for one field is exactly the defect this consolidation was opened to remove.
+ * The model binding, read-only: every tier below is a decision about what an AI model will do and
+ * means nothing until one is bound, but AI models owns the field and stays its only writer.
  */
 function ReviewModelNote({
 	workspaceSlug,

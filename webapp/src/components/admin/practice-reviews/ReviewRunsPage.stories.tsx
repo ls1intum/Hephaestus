@@ -22,7 +22,7 @@ const meta = {
 		search: {},
 		onSearchChange: fn(),
 	},
-	/** See `ObservationsListPage.stories`: a controlled screen needs somewhere to put its answer. */
+	// The screen is controlled: with a frozen `search` prop every facet reads as dead.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
@@ -36,16 +36,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Seven reviews across four kinds of work, at three different points in their life.
- *
- * <p>Each row is named after the work rather than after the review, because a review has no name an
- * operator knows — it has a UUID. What it produced sits underneath as two numeric strips, and only
- * when there is something true to count: a running review says results are still coming, and one
- * that stopped early says it produced nothing rather than drawing nine zeroes.
- *
- * <p>Five of the seven finished with output, which is what an ordinary week looks like. A set that
- * was all failures and empties — which is what this screen used to show — teaches the reader that
- * the product mostly does not work.
+ * Each row is named after the work rather than after the review, because a review has no name an
+ * operator knows — it has a UUID.
  */
 export const Default: Story = {
 	parameters: { viewport: { defaultViewport: "desktop" } },
@@ -62,26 +54,20 @@ export const Default: Story = {
 };
 
 /**
- * The nine numbers, every one of them drawn.
- *
- * <p>This row used to read "1 strength · 2 improvements" — a sentence with the zeroes dropped, so
- * the second number started at a different x on every row, "no shortfalls" looked the same as "we do
- * not show shortfalls here", and the whole line reflowed under the reader every five seconds while
- * the poll refreshed an active review. Each strip now draws all of its slots in a fixed grid, and
- * the zeroes are the point: this review withheld two pieces of feedback and failed to deliver none,
- * which the sentence could not say.
+ * A strip draws every slot including the zeroes. Dropping them would start the next number at a
+ * different x on each row and reflow the line under the reader whenever the poll refreshes an active
+ * review, and it would make "no shortfalls" read the same as "shortfalls are not shown here".
  */
 export const WhatEachReviewProduced: Story = {
 	parameters: { viewport: { defaultViewport: "desktop" }, chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("list", { name: /Practice reviews/ });
-		// The first review with any output at all is the webhook-retry one; the review above it is
-		// still running and so has no tally to show.
+		// A still-running review has no tally, so index 0 is the first review with output rather than
+		// the first row.
 		const observations = canvas.getAllByRole("list", { name: "Observations" })[0];
 		const feedback = canvas.getAllByRole("list", { name: "Feedback" })[0];
 
-		// Asserted on the strip rather than per cell: a count and its word are two elements, which is
-		// what lets the number carry its own weight and the word stay quiet.
+		// A count and its word are two elements, so each pair is asserted on the strip, not per cell.
 		for (const pair of [
 			"1 strength",
 			"2 improvements",
@@ -99,8 +85,6 @@ export const WhatEachReviewProduced: Story = {
 			await expect(feedback).toHaveTextContent(pair);
 		}
 
-		// Every row that has a tally draws the same nine slots, which is what puts each number at one
-		// x down the list.
 		for (const strip of canvas.getAllByRole("list", { name: "Observations" })) {
 			await expect(within(strip).getAllByRole("listitem")).toHaveLength(4);
 		}
@@ -110,12 +94,6 @@ export const WhatEachReviewProduced: Story = {
 	},
 };
 
-/**
- * The status filter, drawn as the tags the rows wear.
- *
- * It used to be plain grey text beside a list of coloured tags, so choosing a filter meant matching a
- * word to a tag from memory. Trigger and list now render the same `StatusBadge` the row does.
- */
 export const StatusFilter: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
@@ -124,11 +102,8 @@ export const StatusFilter: Story = {
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(within(listbox).getByRole("option", { name: /Failed/ }));
 		await expect(canvas.getByRole("combobox")).toHaveTextContent("Failed");
-		// And the list narrows to the one review that failed, rather than staying as it was.
 		await canvas.findByText("1 review matches your filters.");
 
-		// Narrow to a status nothing holds, and the empty state offers the way back rather than
-		// advising "try another status" with nothing to press.
 		await userEvent.click(canvas.getByRole("combobox"));
 		await userEvent.click(
 			within(await screen.findByRole("listbox")).getByRole("option", { name: /Cancelled/ }),
@@ -140,17 +115,9 @@ export const StatusFilter: Story = {
 };
 
 /**
- * Arriving on a filtered link: the two days the URL names, already narrowed, with rows.
- *
- * The row shows when a review was requested and nothing could filter by it — the list item carried a
- * date the toolbar could not act on, which is the case Baymard's "Have Filters for All Displayed
- * List Item Info" describes, and the two sibling lists on this screen had taken a range all along.
- *
- * The story is deliberately not "open the calendar and click two days": the interesting state is a
- * *populated* filtered list, and it also has to show that the range and the status intersect. The
- * window holds three reviews, two of them completed; the only failed review sits outside it. So
- * status alone would show five, the range alone shows three, and the two together show two — then
- * zero, which no single filter on this fixture can produce.
+ * The range arrives through `args` rather than through the calendar: the state worth pinning is a
+ * populated filtered list that then intersects with the status filter, which clicking two days on an
+ * empty toolbar does not reach.
  */
 export const FilterByRequestedDate: Story = {
 	args: { search: { from: "2026-07-28", to: "2026-07-29" } },
@@ -162,26 +129,22 @@ export const FilterByRequestedDate: Story = {
 		within(list).getByRole("link", {
 			name: "Cache the workspace member lookup on the review path",
 		});
-		// A review requested the day before the window is gone, not merely pushed down the list.
 		await expect(
 			within(list).queryByRole("link", {
 				name: /Move invoice numbering behind the billing boundary/,
 			}),
 		).not.toBeInTheDocument();
 
-		// The facet says which date it filters and wears the range it applied.
 		canvas.getByRole("button", { name: "Requested: Jul 28 – Jul 29, 2026" });
 
-		// Adding a status narrows what the range selected instead of replacing it: five reviews are
-		// completed, three are in the window, and two are both.
+		// Adding a status intersects with the range rather than replacing it.
 		await userEvent.click(canvas.getByRole("combobox"));
 		await userEvent.click(
 			within(await screen.findByRole("listbox")).getByRole("option", { name: /Completed/ }),
 		);
 		await canvas.findByText("2 reviews match your filters.");
 
-		// The one failed review was requested outside the window, so the intersection is empty — and
-		// the empty state says these are filters rather than blaming an untriggered practice.
+		// The failed review was requested outside the window, so this intersection is empty.
 		await userEvent.click(canvas.getByRole("combobox"));
 		await userEvent.click(
 			within(await screen.findByRole("listbox")).getByRole("option", { name: /Failed/ }),
@@ -189,7 +152,7 @@ export const FilterByRequestedDate: Story = {
 		await canvas.findByText("No reviews found");
 		canvas.getByText("No review matches these filters. Other reviews may exist outside them.");
 
-		// One button clears both filters, not just the status it used to know about.
+		// One button clears the range and the status together.
 		await userEvent.click(canvas.getByRole("button", { name: "Clear all filters" }));
 		await canvas.findByText("7 reviews.");
 	},
@@ -209,11 +172,9 @@ export const Mobile: Story = {
 };
 
 /**
- * The applied range at 320px.
- *
  * `DateRangeFacet` keeps its badge at every width, unlike `FacetMultiSelect`, which collapses to
- * "N selected" — that collapse is why the sibling lists carry a separate applied-pill row, and why
- * none of them puts the date range in it. Adding a pill here would print the same range twice.
+ * "N selected" — so the separate applied-pill row the sibling lists carry deliberately leaves the
+ * date range out, rather than printing the same range twice.
  */
 export const MobileAppliedDateRange: Story = {
 	args: { search: { from: "2026-07-28", to: "2026-07-29" } },
@@ -226,7 +187,6 @@ export const MobileAppliedDateRange: Story = {
 	},
 };
 
-/** A workspace whose practices have never been triggered, which is what a new one looks like. */
 export const NoReviewsYet: Story = {
 	parameters: {
 		chromatic: { viewports: [1440] },
@@ -244,8 +204,7 @@ export const NoReviewsYet: Story = {
 	},
 	play: async ({ canvas }) => {
 		await canvas.findByText("No reviews found");
-		// Nothing is filtered, so there is nothing to clear — the empty state says why the list is
-		// empty instead of offering an action that would change nothing.
+		// Nothing is filtered, so the empty state must not offer an action that would change nothing.
 		await expect(
 			canvas.queryByRole("button", { name: "Clear all filters" }),
 		).not.toBeInTheDocument();

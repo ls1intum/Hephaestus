@@ -39,11 +39,7 @@ class PracticeReviewTierTest extends BaseUnitTest {
             assertThat(PracticeReviewTier.DELIVER.deliversWithoutApproval()).isTrue();
         }
 
-        /**
-         * PROPOSE answers no here and must keep answering no once the approval queue ships: delivering
-         * something a person approved is a different act, recorded differently, and not this one. If this
-         * test is ever changed to make PROPOSE deliver on its own, the tier has silently become DELIVER.
-         */
+        /** If this ever flips to true, PROPOSE has silently become DELIVER. */
         @Test
         void proposeStillDoesNotDeliverOnItsOwnOnceApprovalExists() {
             assertThat(PracticeReviewTier.PROPOSE.deliversWithoutApproval()).isFalse();
@@ -55,13 +51,7 @@ class PracticeReviewTierTest extends BaseUnitTest {
     class LadderShape {
 
         /**
-         * Three modes, and an administrator may choose any of them. The ladder previously carried a fourth,
-         * OBSERVE, which sat beside PROPOSE at "runs, records, sends nothing"; the two were told apart only
-         * by whether feedback had been prepared, which nothing on the delivery path ever did. A rung nobody
-         * can tell from its neighbour is not a rung, and a rung nobody can select is not a ladder — with
-         * PROPOSE refused, OFF and DELIVER were an on/off switch wearing a ladder's clothes.
-         *
-         * <p>Pinned by exact value and order, so adding a rung or reordering one is a deliberate edit here
+         * Pinned by exact value and order, so adding a rung or reordering one is a deliberate edit here
          * rather than a silent change to what every screen renders.
          */
         @Test
@@ -86,12 +76,7 @@ class PracticeReviewTierTest extends BaseUnitTest {
             );
         }
 
-        /**
-         * The bottom of the practice → area → workspace chain. It is the loudest tier on purpose: that is
-         * what every practice did before the chain existed, and a migration must not change how loud a
-         * running system is. Turning it down is now one decision instead of forty — but it is a decision
-         * somebody makes, not one an upgrade makes for them.
-         */
+        /** Mirrors {@link PracticeReviewTier#DEFAULT}: a migration must not change how loud a running system is. */
         @Test
         void theFallbackIsWhatEveryPracticeAlreadyDid() {
             assertThat(PracticeReviewTier.DEFAULT).isEqualTo(PracticeReviewTier.DELIVER);

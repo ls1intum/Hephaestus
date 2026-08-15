@@ -24,17 +24,6 @@ import { reviewArtifactScopeLabel } from "./ReviewArtifact";
 import { ReviewPersonFacet } from "./ReviewPersonFacet";
 import { type FeedbackSearch, feedbackQuery, REVIEW_PAGE_SIZE } from "./review-search";
 
-/**
- * Three facets, none of them nested behind a "More filters" popover.
- *
- * Outcome, place and reason are the three questions this screen exists to answer, and a filter an
- * operator has to go looking for is one they do not know they have. The popover earned its keep when
- * the reason facet was fourteen sentences long; grouping those into four families is what made all
- * three fit on the toolbar, so the popover went with it.
- *
- * Each option carries the icon and tone of the badge it filters for, so the dropdown and the table
- * are recognisably about the same thing — they used to be plain grey text next to coloured tags.
- */
 const OUTCOME_OPTIONS = statusFacetOptions(DELIVERY_STATE_DEFS);
 // The one facet that offers a subset: a place nothing is ever written to would be a filter with no
 // rows behind it. Narrowing here rather than in `statusFacetOptions` keeps the registry total, so a

@@ -16,15 +16,11 @@ public enum ConversationRoutingDecision {
     ALREADY_DELIVERED_IN_CONTEXT,
     /** Reviewer-targeted - deferred (ADR 0021). */
     REVIEWER_DEFERRED,
-    /**
-     * The practice's autonomy tier does not admit the conversation channel - it is at OFF or PROPOSE, so it
-     * is measured and recorded but never raised in a mentor turn.
-     */
+    /** The practice's autonomy tier (OFF or PROPOSE) does not admit the conversation channel. */
     PRACTICE_TIER_QUIET,
     /**
-     * The observation came from a backfill campaign. Coaching a developer in a mentor turn about a
-     * decision they made months ago presents retrospective measurement as though it were today's work;
-     * a backfilled observation is measured and recorded, and raised nowhere.
+     * From a backfill campaign - coaching on a decision made months ago would present retrospective
+     * measurement as today's work, so it is recorded but raised nowhere.
      */
     BACKFILL_QUIET,
 }

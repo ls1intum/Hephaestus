@@ -3,22 +3,16 @@ import { ASSESSMENT_DEFS } from "./assessment-defs";
 import { PRESENCE_DEFS } from "./presence-defs";
 import type { StatusDef } from "./status-def";
 
-/** The two fields that between them decide what an observation concluded. */
 export type ObservationResultFacts = Pick<ReviewObservation, "presence" | "assessment">;
 
 /**
  * What one observation concluded, as a single registry entry.
  *
- * <p>Two enums answer two different questions — was the practice in play at all (`presence`), and if
- * so was it followed (`assessment`) — and a row has one leading icon and one badge. This is the rule
- * for collapsing them, written once so the icon, the badge and any future filter cannot disagree.
- *
- * <p>It takes the record rather than the two values because they are not independent: an assessment
- * without a presence is meaningless, and the two presences that end the question carry no assessment
- * at all. The old surface had a fourth case for "presence in play but no assessment" and rendered a
- * hand-written `No result` badge for it — a label from outside every registry, saying nothing, on a
- * row whose presence value already said "Observed" or "Expected but not observed". Falling back to
- * the presence entry says the true thing and adds no words.
+ * <p>Two enums answer two questions — was the practice in play (`presence`), and if so was it
+ * followed (`assessment`) — while a row has one icon and one badge. This is the single rule for
+ * collapsing them, so the icon, the badge and any future filter cannot disagree. `NOT_APPLICABLE`
+ * and `INCONCLUSIVE` end the question and carry no assessment; the other presences may lack one,
+ * and then the presence entry is the honest answer.
  */
 export function observationResult(observation: ObservationResultFacts): StatusDef {
 	const { presence, assessment } = observation;

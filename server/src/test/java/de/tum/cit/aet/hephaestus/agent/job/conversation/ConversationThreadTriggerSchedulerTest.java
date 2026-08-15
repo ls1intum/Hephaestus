@@ -154,8 +154,7 @@ class ConversationThreadTriggerSchedulerTest extends BaseUnitTest {
 
     /**
      * The occurrence reaches the ledger before anything is submitted, and the ledger's uniqueness — not a
-     * flag in memory — decides who acts on it. This is the whole point of the change: a conversation that
-     * was passed over used to leave nothing behind saying why.
+     * flag in memory — decides who acts on it, so a passed-over conversation still leaves a row saying why.
      */
     @Test
     void aThreadThatPassesTheGatesIsRecordedBeforeAnythingIsSubmitted() {

@@ -9,22 +9,13 @@ import java.util.Optional;
 
 /**
  * The one signal a backfilled artifact is measured against: the signal its <em>current</em> state would
- * have raised.
+ * have raised. No draft, edit, or thread-resolution history is retained anywhere in this system, so a
+ * campaign cannot replay history — only the artifact as it stands now, one occasion each.
  *
- * <p>A campaign cannot replay history and must not pretend to. No draft history, no edit history and no
- * thread-resolution timing is retained anywhere in this system, so there is no honest way to reconstruct
- * what a pull request looked like when it was opened, or what it looked like at review time. What the
- * mirror does hold is the artifact as it stands now, and that is exactly one occasion per artifact.
- *
- * <p>Reusing the live vocabulary rather than inventing a {@code backfilled} signal is what makes the rest
- * of the machinery work unchanged: practices bind {@code scm.pull_request.merged}, not
- * {@code scm.pull_request.backfilled}, so a campaign that named its own signal would match no practice
- * in any workspace and quietly review nothing. It also means the ledger's unique constraint does the
- * de-duplication for free — an artifact whose current-state signal was already recorded and settled is
- * one this campaign has nothing new to say about, and it is walked past rather than paid for twice.
- *
- * <p>The cost of that reuse, stated rather than hidden: a backfilled row and a live row for the same
- * occurrence are the same ledger identity, and only {@code discovered_via} tells them apart.
+ * <p>Reusing the live vocabulary rather than inventing a {@code backfilled} signal keeps practices binding
+ * {@code scm.pull_request.merged}, not a campaign-specific name, and lets the ledger's unique constraint
+ * de-duplicate for free. The cost: a backfilled row and a live row for the same occurrence share a ledger
+ * identity, and only {@code discovered_via} tells them apart.
  */
 final class ReviewBackfillSignals {
 
@@ -60,7 +51,6 @@ final class ReviewBackfillSignals {
         );
     }
 
-    /** The ledger identity for reviewing this issue as it stands. */
     static Optional<SignalKey> keyFor(long workspaceId, Issue issue) {
         SignalName signal = issue.getState() == Issue.State.CLOSED ? ScmSignals.ISSUE_CLOSED : ScmSignals.ISSUE_OPENED;
         return ScmSignals.issueKey(workspaceId, issue.getId(), signal, issue.getTitle(), issue.getBody(), null);

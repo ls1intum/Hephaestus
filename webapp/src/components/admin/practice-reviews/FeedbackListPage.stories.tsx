@@ -23,7 +23,7 @@ const meta = {
 		search: { deliveryState: undefined, withheldFamily: undefined, channel: undefined },
 		onSearchChange: fn(),
 	},
-	/** See `ObservationsListPage.stories`: a controlled screen needs somewhere to put its answer. */
+	// The screen is controlled: with a frozen `search` prop every facet reads as dead.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
@@ -37,12 +37,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Eleven pieces of feedback: delivered, queued, failed, replaced, and withheld under each of the
- * four reasons an operator can filter by.
- *
- * The withheld rows are the ones worth looking at together. Each carries its own precise sentence,
- * and no two of them say the same thing — a set where every withheld row read "the work was already
- * merged" is what made the reason column look like decoration.
+ * The withheld rows are what this set exists for: each carries its own precise sentence, and no two
+ * of them say the same thing, which is what keeps the reason from reading as decoration.
  */
 export const Default: Story = {
 	play: async ({ canvas }) => {
@@ -50,8 +46,7 @@ export const Default: Story = {
 		for (const name of ["Outcome", "Place", "Why withheld", "Recipient"]) {
 			canvas.getByRole("combobox", { name });
 		}
-		// The date facet says which date it filters. On this screen it is when the feedback was
-		// composed, which is neither when it was delivered nor when the observation was made.
+		// "Composed" is neither when the feedback was delivered nor when the observation was made.
 		canvas.getByRole("button", { name: "Composed" });
 		canvas.getByText("Nearly the same as other feedback from the same review.");
 		canvas.getByText("Found while reviewing past work, which is measured but never sent.");
@@ -61,11 +56,9 @@ export const Default: Story = {
 };
 
 /**
- * The long note, in the place it is hardest to show: a row two lines tall.
- *
- * The endpoint sends 320 characters of the stored Markdown, which on any real note lands inside a
- * fenced code block. The row flattens that to prose and marks the cut, so the title reads as the
- * opening of the feedback rather than as `**🔴 …** · \`File.java:118\` You wrote: ```java`.
+ * The endpoint sends a fixed-character cut of the stored Markdown, which on a real note ends inside
+ * a fenced code block. The row has to flatten that to prose and mark the cut, or the title reads as
+ * `**🔴 …** · \`File.java:118\` You wrote: ```java`.
  */
 export const LongFeedbackReadsAsProse: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
@@ -77,7 +70,6 @@ export const LongFeedbackReadsAsProse: Story = {
 	},
 };
 
-/** "Show me the delivery for one person" — the question the toolbar could not previously ask. */
 export const FilterToOneRecipient: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
@@ -93,8 +85,8 @@ export const FilterToOneRecipient: Story = {
 };
 
 /**
- * Four families instead of fourteen sentences, which is what let the reason filter onto the toolbar
- * at all. A row still shows its own precise sentence; the grouping simplifies the question.
+ * The facet offers families rather than every withholding reason, which is what fits it on the
+ * toolbar. A row still shows its own precise sentence; only the question is grouped.
  */
 export const WhyWithheldFacetOpen: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
@@ -115,13 +107,13 @@ export const FilterToOneWithholdingFamily: Story = {
 		await userEvent.click(trigger);
 		const listbox = await screen.findByRole("listbox", { name: "Why withheld options" });
 		await userEvent.click(await within(listbox).findByRole("option", { name: /Housekeeping/ }));
-		// Closed again: the popup stays open after a choice, and axe reads an open unnamed listbox as
-		// part of the story. See `ObservationsListPage.stories`.
+		// Closed again: these facets are multi-select and stay open after a choice, so the next facet
+		// would otherwise put a second listbox on screen.
 		await userEvent.click(trigger);
 		await canvas.findByText("1 piece of feedback matches your filters.");
 		canvas.getByText("Nearly the same as other feedback from the same review.");
 
-		// Add a place nothing under that family went to, and the empty state carries the way out.
+		// A place nothing under that family went to, so the two filters intersect to nothing.
 		await userEvent.click(canvas.getByRole("combobox", { name: "Place" }));
 		const places = await screen.findByRole("listbox", { name: "Place options" });
 		await userEvent.click(await within(places).findByRole("option", { name: /In conversation/ }));
@@ -131,11 +123,9 @@ export const FilterToOneWithholdingFamily: Story = {
 	},
 };
 
-/**
- * Sixty rows, opened at the second page. See `ObservationsListPage.stories` on why the page is set
- * rather than clicked.
- */
 export const MoreThanOnePage: Story = {
+	// The page is set rather than clicked: pagination is real links, so the page travels through the
+	// router, and Storybook mounts this screen under a single bare route.
 	args: {
 		search: {
 			page: 1,

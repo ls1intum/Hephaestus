@@ -195,10 +195,9 @@ export function ObservationDetailPage({
 										params={{ workspaceSlug, feedbackId: feedback.feedbackId }}
 										search={reviewScopeSearch(search)}
 									>
-										{/* Named by what it is to *this* observation, not by where it went. The
-										    row used to be titled with the delivery place, so a link to a piece
-										    of feedback read "On the work" — a title that says nothing about the
-										    thing it opens and repeats a fact shown beside it. */}
+										{/* Named by what it is to *this* observation. Titling it with the delivery
+										    place would say nothing about the thing the link opens, and repeat
+										    the fact the chip beside it already carries. */}
 										{feedback.role === "PRIMARY"
 											? "Feedback about this observation"
 											: "Feedback this observation supports"}
@@ -209,9 +208,8 @@ export function ObservationDetailPage({
 										<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
 									) : undefined
 								}
-								// Where it went is a tag, not a word on the meta line. It is one of a closed
-								// set of three, and the registry already gives each one a mark and a tone —
-								// as prose it was the one fact on the row a reader had to stop and parse.
+								// Where it went is a tag rather than prose: it is one of a closed set, and the
+								// registry already gives each value a mark and a tone to be recognised by.
 								chips={[
 									{
 										key: "place",

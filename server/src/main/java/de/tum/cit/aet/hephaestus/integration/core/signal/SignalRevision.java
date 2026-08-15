@@ -15,10 +15,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Together with the workspace, artifact and signal name this is the ledger's unique key, so a
  * revision that is too coarse loses reviews and one that is too fine repeats them. Which derivation
- * is right is a property of the signal, not of the artifact: see {@link RevisionScheme}.
- *
- * <p>Every factory prefixes its scheme, which both makes a stored revision self-describing and stops
- * two schemes from ever colliding on the same string.
+ * is right is a property of the signal, not of the artifact: see {@link RevisionScheme}. Every factory
+ * prefixes its scheme so two schemes can never collide on the same string.
  */
 public record SignalRevision(String value) {
     /** Fits {@code artifact_signal.revision}. */

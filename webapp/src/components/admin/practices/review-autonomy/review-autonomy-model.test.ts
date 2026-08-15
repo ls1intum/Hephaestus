@@ -94,8 +94,8 @@ describe("the overrides-only filter", () => {
 
 describe("isOverridden", () => {
 	it("reads the override, not the level that decided the tier", () => {
-		// An area that chose its own tier reports source AREA and inherited false. Deriving this from
-		// `source !== "PRACTICE"` would call it inherited and hide it from the filter above.
+		// An area that chose its own tier reports source AREA and inherited false; deriving it from
+		// `source` instead would call it inherited and hide it from the filter above.
 		const testing = fixture.rollup.areas[1].reviewTier;
 
 		expect(testing.source).toBe("AREA");
@@ -123,8 +123,7 @@ describe("reviewableByHephaestus", () => {
 
 describe("the workspace summary", () => {
 	it("drops the tiers the rollup sends at zero, and keeps ladder order", () => {
-		// The rollup sends every tier as a key even at zero, so a caller never has to gap-fill. A
-		// workspace with nothing at Propose should still not spend its summary line saying "0 propose".
+		// The rollup sends every tier as a key even at zero, so a caller never has to gap-fill.
 		expect(tierDistribution({ OFF: 3, PROPOSE: 0, DELIVER: 1 }).map(({ tier }) => tier)).toEqual([
 			"OFF",
 			"DELIVER",

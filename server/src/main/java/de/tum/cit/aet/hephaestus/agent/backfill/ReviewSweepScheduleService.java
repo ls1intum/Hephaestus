@@ -59,8 +59,8 @@ public class ReviewSweepScheduleService {
     @Transactional
     public ReviewSweepScheduleDTO create(WorkspaceContext context, CreateReviewSweepScheduleRequestDTO request) {
         ArtifactKind kind = request.artifactKind();
-        // Throws for a kind no campaign can enumerate, by name rather than by producing an empty scope
-        // that would read on screen as "there is nothing to review".
+        // Throws by name for a kind no campaign can enumerate, rather than an empty scope that would read
+        // on screen as "there is nothing to review".
         ReviewBackfillService.jobTypeFor(kind);
         validateLookback(request.cadence(), request.lookbackDays());
         if (scheduleRepository.existsByWorkspaceIdAndArtifactKind(context.id(), kind.value())) {
@@ -81,7 +81,6 @@ public class ReviewSweepScheduleService {
         schedule.setNextRunAt(ReviewSweepSchedule.firstRunAt(context.id(), Instant.now()));
         schedule.setCreatedByAccountId(
             SecurityUtils.getCurrentAccountId().orElseThrow(() ->
-                // Every run this schedule opens is attributed to this account for as long as it exists.
                 // A schedule nobody can be named for is a recurring spend nobody can be asked about.
                 new IllegalStateException("A sweep schedule must be attributable to an authenticated account.")
             )
@@ -118,8 +117,7 @@ public class ReviewSweepScheduleService {
             .orElseThrow(() -> new EntityNotFoundException("ReviewSweepSchedule", scheduleId.toString()));
         ReviewSweepScheduleSnapshot before = ReviewSweepScheduleSnapshot.of(schedule);
 
-        // The next occurrence keeps its phase: an admin narrowing a lookback has not asked for the sweep
-        // to happen at a different time of day, and re-deriving nextRunAt here would silently move it.
+        // Keep nextRunAt's phase: narrowing a lookback is not a request to move the sweep's time of day.
         schedule.setCadence(request.cadence());
         schedule.setLookbackDays(request.lookbackDays());
         schedule.setEnabled(request.enabled());
@@ -139,8 +137,8 @@ public class ReviewSweepScheduleService {
     }
 
     /**
-     * Delete a schedule. The campaigns it already opened keep their rows and their attribution — they
-     * describe money that was spent, which deleting the instruction does not undo.
+     * The campaigns this schedule already opened keep their rows and attribution — they describe money
+     * that was spent, which deleting the instruction does not undo.
      */
     @Transactional
     public void delete(WorkspaceContext context, UUID scheduleId) {
@@ -160,13 +158,9 @@ public class ReviewSweepScheduleService {
     }
 
     /**
-     * The rule that keeps a sweep's measurements admissible beside reviews that events triggered.
-     *
-     * <p>A window longer than twice the cadence is not a recurrence any more, it is a corpus chosen with
-     * hindsight — and a hindsight-selected corpus filed in the live population is how a trend line comes
-     * to show an improvement nobody made. Refused here, at the only place a schedule is written, and
-     * named in the message so the admin's alternative is obvious: a backfill campaign, which records
-     * itself as one.
+     * A window longer than twice the cadence is not a recurrence any more but a corpus chosen with
+     * hindsight — filed in the live population, that is how a trend line comes to show an improvement
+     * nobody made.
      */
     private static void validateLookback(ReviewSweepCadence cadence, int lookbackDays) {
         if (lookbackDays < 1) {

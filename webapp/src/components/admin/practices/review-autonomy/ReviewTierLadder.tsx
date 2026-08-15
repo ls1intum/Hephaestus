@@ -10,41 +10,28 @@ import { cn } from "@/lib/utils";
 
 export interface ReviewTierLadderProps {
 	/**
-	 * Names the group for a screen reader. A `role="radiogroup"` takes no name from a surrounding
-	 * legend or table cell, and at twenty-five areas on one screen "Off, Propose, Deliver" repeated
-	 * with no owner is the difference between a usable list and an unnavigable one.
+	 * Required, because a `role="radiogroup"` takes no accessible name from a surrounding legend or
+	 * table cell, and a screen renders one of these per area and per practice — an unnamed group is
+	 * "Off, Propose, Deliver" with no subject.
 	 */
 	label: string;
 	value: ReviewTier;
 	onChange: (tier: ReviewTier) => void;
 	disabled?: boolean;
-	/**
-	 * `full` spells out what each rung adds and draws the cumulative rail; `compact` is the row-level
-	 * read-out, where the same sentences twenty-nine times over would bury the list they annotate.
-	 */
+	/** `full` spells out what each rung adds and draws the cumulative rail. */
 	variant?: "full" | "compact";
-	/** Inherited values are shown, not hidden — but they are somebody else's decision, so they recede. */
+	/** Marks the value as inherited: shown, but somebody else's decision, so it recedes. */
 	muted?: boolean;
 	className?: string;
 }
 
 /**
- * The autonomy tier as the ordered axis it is.
+ * Radio semantics rather than a toggle group: the rungs are mutually exclusive states of one setting,
+ * which is what `role="radiogroup"` means, and it carries arrow-key movement along the axis. A toggle
+ * group's items are `aria-pressed` buttons, which say "the others are off" rather than "this is
+ * chosen".
  *
- * <p>A dropdown presents unrelated options and hides all but one until you open it; this is one
- * axis where every stop contains the one before it, and the whole point of the screen is that an admin
- * can see where their workspace sits on it. So: a segmented control, laid out left to right in
- * {@link REVIEW_TIER_ORDER}.
- *
- * <p>Real radio semantics rather than a toggle group. The rungs are mutually exclusive states of one
- * setting, which is what `role="radiogroup"` means; a toggle group's items are `aria-pressed` buttons,
- * which says "the others are off" rather than "this one is chosen". It also buys arrow-key movement
- * along the axis for free, which is the interaction the shape is promising.
- *
- * <p>Every rung can be moved to. Propose was once rendered disabled, which left the control offering one
- * reachable choice either side of a rung nobody could take; with the ladder down to three that would be
- * an on/off switch drawn as an axis. Nothing here filters the order — what the vocabulary lists, the
- * control offers.
+ * Nothing here filters {@link REVIEW_TIER_ORDER} — every rung the vocabulary lists can be moved to.
  */
 export function ReviewTierLadder({
 	label,
@@ -66,8 +53,8 @@ export function ReviewTierLadder({
 				disabled={disabled}
 				onValueChange={(next) => {
 					const tier = next as ReviewTier;
-					// Re-selecting the rung already in force is a no-op the server would accept and record
-					// as a change to nothing; dropping it here keeps a stray click from spending a request.
+					// Re-selecting the rung already in force is a change to nothing that the server would
+					// still accept and record.
 					if (tier && tier !== value) onChange(tier);
 				}}
 				className={cn(
@@ -89,24 +76,20 @@ export function ReviewTierLadder({
 								"flex min-w-0 flex-1 cursor-pointer items-start gap-2 border border-input bg-background p-2 font-normal transition-colors",
 								"first:rounded-t-md last:rounded-b-md sm:first:rounded-l-md sm:first:rounded-r-none sm:last:rounded-r-md sm:last:rounded-l-none",
 								"not-first:-mt-px sm:not-first:mt-0 sm:not-first:-ml-px",
-								// `flex-col` at every width, not from `sm` up. Scoped to `sm:` it left the rung a
-								// row below 640px, where the description — untruncatable, and the longer of the
-								// two — took the space and squeezed the label's `truncate` down to a single
-								// glyph: at 320px the three rungs of the primary control on this screen read
-								// "O…", "P…", "D…". The `aria-label` carried the real word, so every test and
-								// the axe gate passed while the visible control was unreadable.
+								// `flex-col` at every width, not scoped to `sm:`. Laid out as a row, the untruncatable
+								// description takes the space and squeezes the label's `truncate` down to one glyph
+								// — and the `aria-label` still carries the real word, so every role query and the
+								// axe gate pass over a visibly unreadable control.
 								full ? "flex-col gap-1.5 sm:rounded-md sm:not-first:ml-0" : "items-center",
 								selected && "z-10 border-primary bg-primary/5",
-								// Everything at or below the chosen rung is included in it. Tinting the run rather
-								// than only the endpoint is what makes "each adds to the previous" visible without a
-								// second widget to read.
+								// Every rung below the chosen one is included in it, so the run is tinted rather
+								// than just the endpoint.
 								!selected && index < selectedIndex && "bg-muted/60",
 								locked && "cursor-not-allowed opacity-60",
 							)}
 						>
 							<span className="flex min-w-0 items-center gap-2">
-								{/* The name is the visible word, exactly — a voice-control user says "Propose" and
-								    means this rung (WCAG 2.2 SC 2.5.3). */}
+								{/* The name is exactly the visible word (WCAG 2.2 SC 2.5.3). */}
 								<RadioGroupItem
 									value={tier}
 									aria-label={REVIEW_TIER_LABELS[tier]}
@@ -120,9 +103,8 @@ export function ReviewTierLadder({
 								</span>
 							</span>
 							{full && (
-								// Indented to the label's left edge, not the rung's: the radio is `size-4` and the
-								// gap is `2`, so the word above starts 1.5rem in. Without this the sentence hangs
-								// a quarter-inch left of the term it explains.
+								// `ps-6` aligns the sentence with the label above it rather than with the rung's own
+								// edge: the radio plus its gap is what the word is inset by.
 								<span className="ps-6 text-muted-foreground text-xs" aria-hidden="true">
 									{REVIEW_TIER_ADDS[tier]}
 								</span>
@@ -137,19 +119,13 @@ export function ReviewTierLadder({
 }
 
 /**
- * A rail filled from the left edge to the rung in force.
- *
- * <p>Decoration, and marked as such: the radio group above already says which tier is chosen, and a
- * screen reader reading "progress, 33%" over a setting that is not progress would be worse than
- * silence. What it adds for a sighted reader is the direction of the axis — Off leaves it empty, which
- * is the honest picture of a workspace that reviews nothing.
+ * Decoration, and `aria-hidden` on purpose: the radio group above already announces which tier is
+ * chosen, and a screen reader reading "progress, 33%" over a setting that is not progress is worse
+ * than silence.
  */
 function CumulativeRail({ selectedIndex }: { selectedIndex: number }) {
 	const filled = selectedIndex <= 0 ? 0 : (selectedIndex / (REVIEW_TIER_ORDER.length - 1)) * 100;
 	return (
-		// Thin and tinted rather than 4px of solid `primary`. At Deliver the fill is 100%, so the rail
-		// became a full-width near-black slab under the widest control on the screen — the loudest thing
-		// on the page, for the one element here that carries no information the rungs do not already.
 		<div aria-hidden="true" className="mt-2 hidden h-0.5 rounded-full bg-muted sm:block">
 			<div
 				className="h-full rounded-full bg-primary/60 transition-all"

@@ -14,9 +14,8 @@ import org.springframework.validation.annotation.Validated;
  * Configuration for the PostgreSQL-backed agent job queue: the {@code agent_job} table itself, claimed
  * by {@link AgentJobExecutor}'s poll loop with {@code FOR UPDATE SKIP LOCKED}.
  *
- * @param enabled           whether the agent job executor is active
  * @param pollInterval      how long the poll loop sleeps when a poll claimed nothing
- * @param claimBatchSize    max candidate QUEUED jobs considered per poll iteration
+ * @param claimBatchSize    max QUEUED jobs considered per poll iteration
  * @param maxRetries        orphan-requeue attempts before a job whose owning worker was lost is failed
  *                          instead; the authoritative counter is {@code agent_job.retry_count}
  * @param heartbeatInterval interval between {@code worker_registry} liveness heartbeats
@@ -42,16 +41,10 @@ public record AgentProperties(
     /** Floor for {@link #heartbeatInterval}: below this the liveness signal floods {@code worker_registry}. */
     public static final Duration MIN_HEARTBEAT_INTERVAL = Duration.ofSeconds(1);
 
-    /**
-     * A worker whose last {@code worker_registry} heartbeat is older than this is judged dead and its
-     * RUNNING jobs are requeued to a sibling.
-     */
+    /** A worker with no heartbeat this recent is judged dead; its RUNNING jobs are requeued to a sibling. */
     public static final Duration WORKER_LEASE_TTL = Duration.ofSeconds(60);
 
-    /**
-     * Ceiling for {@link #heartbeatInterval}. Half the lease, so a worker survives losing one beat; a
-     * heartbeat slower than the lease would have every worker orphan its own running jobs.
-     */
+    /** Ceiling for {@link #heartbeatInterval} — half the lease, so a worker survives losing one beat. */
     public static final Duration MAX_HEARTBEAT_INTERVAL = WORKER_LEASE_TTL.dividedBy(2);
 
     /** Bean Validation has no duration-comparison constraint, so the {@link Duration} bounds are checked here. */

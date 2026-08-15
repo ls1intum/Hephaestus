@@ -15,14 +15,6 @@ export type SummaryPostStatus = NonNullable<AgentJob["deliveryStatus"]>;
 /**
  * Whether a review *ran*. Nothing here says anything about what it found or who heard about it —
  * those are `assessment-defs` and `delivery-outcome-defs`.
- *
- * <p>Moved here from the AI console's `job-utils`. The Reviews screen was importing its status
- * vocabulary from a module about agent jobs, so the same status wore a solid primary badge on one
- * screen and plain text in the filter beside it. It is a review status wherever it is shown, so it
- * lives with the other review vocabulary and the agent console can import it back if it grows a use.
- *
- * <p>`COMPLETED` is `success` rather than the primary fill it used to have: primary is the app's
- * action colour, and a finished review is not an action.
  */
 export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 	QUEUED: {
@@ -65,11 +57,8 @@ export const REVIEW_STATUS_DEFS: StatusDefs<ReviewStatus> = {
 
 /**
  * Whether the review's own summary comment made it onto the work — a different thing from a piece of
- * feedback being delivered, and named differently on purpose.
- *
- * The wire calls all three of these "delivery" too, which is how a review detail screen ended up
- * showing "Delivered" twice about two unrelated things. Every label here says "summary", so the
- * badge is unambiguous standing on its own next to a run status.
+ * feedback being delivered, though the wire calls both "delivery". Every label here has to say
+ * "summary", or a detail screen shows "Delivered" twice about two unrelated things.
  */
 export const SUMMARY_POST_DEFS: StatusDefs<SummaryPostStatus> = {
 	DELIVERED: {

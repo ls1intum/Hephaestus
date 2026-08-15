@@ -18,19 +18,17 @@ import org.springframework.stereotype.Component;
  * What can happen to a written document, and which of those a practice may be reviewed on.
  *
  * <p>Registered unconditionally, not gated on {@code hephaestus.integration.outline.enabled}: what a
- * document is, is a fact about the domain, while whether this deployment has Outline switched on is a
- * fact about the deployment. Gating the descriptor on the flag would make the vocabulary itself
- * configuration, and a practice bound to a document would stop parsing when an operator turned the
- * integration off.
+ * document is, is a fact about the domain, not the deployment — gating it on the flag would make the
+ * vocabulary itself configuration, and a practice bound to a document would stop parsing when an
+ * operator turned the integration off.
  */
 @Component
 public class DocumentArtifactDescriptor implements ArtifactDescriptor {
 
     /**
-     * Every Outline event collapses onto this one key, so it — not the Outline event name — is the unit
-     * of provenance the framework can check a handler for. Which event raises which signal is stated
-     * only in {@link DocsSignals#forOutlineEvent(String)}, next to the names the sync path already
-     * switches on, rather than duplicated here as a second mapping that could drift.
+     * Every Outline event collapses onto this one key, so it — not the Outline event name — is the
+     * provenance unit the framework checks a handler for. Which event raises which signal is stated only
+     * in {@link DocsSignals#forOutlineEvent(String)}, to avoid a second mapping here that could drift.
      */
     private static final EventTypeKey OUTLINE_DOCUMENT = new EventTypeKey(
         IntegrationKind.OUTLINE,

@@ -8,22 +8,19 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Submission request for {@code DOCUMENT_REVIEW} jobs: one
- * mirrored wiki document, and the member the observations are filed against.
+ * Submission request for {@code DOCUMENT_REVIEW} jobs: one mirrored wiki document, and the member the
+ * observations are filed against.
  *
- * <p>The subject is carried explicitly rather than resolved at delivery, the same way a conversation
- * review carries its participant. A document's author lives behind the linked-account chain, and a
- * submission that cannot name a subject must be refused <em>before</em> a model call rather than after
- * one — an unresolvable author is an operator-fixable fact (somebody has not linked their identity), not
- * a delivery failure.
+ * <p>The subject is carried explicitly rather than resolved at delivery: a document's author lives behind
+ * the linked-account chain, and a submission that cannot name one must be refused before a model call — an
+ * unresolvable author is an operator-fixable fact, not a delivery failure.
  *
  * @param documentId the mirror row's primary key — the same identity the signal ledger recorded
  * @param title the document's title, for the run list; third-party text, never trusted as instruction
  * @param collectionName the collection the document sits in, when the mirror captured a name for it
- * @param aboutUserId the workspace member the document is attributed to (its author)
  * @param signal the signal that occasioned this review, e.g. {@code docs.document.published}
  * @param revision the ledger revision of that occurrence — the disposable freshness segment of the
- *     idempotency key, and colon-free by {@link SignalRevision}'s own grammar
+ *     idempotency key
  * @param observationOrigin the population these measurements belong to
  */
 public record DocumentReviewSubmissionRequest(

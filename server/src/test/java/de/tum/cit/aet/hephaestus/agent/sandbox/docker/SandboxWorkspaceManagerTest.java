@@ -140,7 +140,7 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         @DisplayName("stages an input far past the removed 50 MB ceiling")
         void shouldStageInputsBeyondTheFormerCeiling(@TempDir Path tempDir) throws Exception {
             // The archive is written to a temp file and on-disk entries stream through a fixed buffer,
-            // so total staged size is bounded by disk, not by heap. 64 MB would have been rejected before.
+            // so total staged size is bounded by disk, not by heap.
             Path large = tempDir.resolve("large.bin");
             byte[] chunk = new byte[1024 * 1024];
             java.util.Arrays.fill(chunk, (byte) 'x');
@@ -249,8 +249,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
                 SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
             );
 
-            byte[] largeContent = new byte[800]; // 800 bytes
-            byte[] secondContent = new byte[500]; // 500 bytes — total 1300 > 1024
+            byte[] largeContent = new byte[800];
+            byte[] secondContent = new byte[500];
 
             byte[] tarBytes = createTestTar(Map.of("out/first.bin", largeContent, "out/second.bin", secondContent));
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
@@ -274,7 +274,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
-            // Only the safe file should be collected; the traversal path should be skipped
             assertThat(output).hasSize(1);
             assertThat(output).containsKey("safe.txt");
             assertThat(output).doesNotContainKey("../../../etc/passwd");
@@ -316,8 +315,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
                 SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
             );
 
-            byte[] smallContent = "small".getBytes(); // 5 bytes — under limit
-            byte[] oversizedContent = "this is way too big".getBytes(); // 19 bytes — over 10-byte limit
+            byte[] smallContent = "small".getBytes();
+            byte[] oversizedContent = "this is way too big".getBytes();
 
             byte[] tarBytes = createTestTar(Map.of("out/small.txt", smallContent, "out/toobig.txt", oversizedContent));
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
@@ -326,7 +325,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
 
-            // Only the small file should be collected — the oversized one is skipped
             assertThat(output).containsKey("small.txt");
             assertThat(output).doesNotContainKey("toobig.txt");
         }
@@ -447,8 +445,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         void shouldHaveReasonableEntryCountLimit() {
             assertThat(SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES).isEqualTo(500_000);
         }
-
-        // Validation tests (from main)
 
         @Test
         void shouldSkipWhenDirectoryMountsNull() {

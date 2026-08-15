@@ -138,13 +138,9 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * The work-type finder narrows by kind of work and by nothing else.
-         *
-         * <p>Its predecessor pushed {@code review_tier <> 'OFF'} into SQL, which was only ever correct
-         * while the column could not be null: {@code NULL <> 'OFF'} is UNKNOWN, so the moment a practice
-         * was allowed to hold no tier and inherit one, every inheriting practice would have vanished from
-         * the reviewer's catalogue without a single row changing. The tier is resolved in the JVM instead,
-         * so this query has to hand back the silenced and the inheriting ones alike.
+         * The work-type finder narrows by kind of work and by nothing else — tier resolution happens in
+         * the JVM, not SQL. A {@code review_tier <> 'OFF'} predicate here would silently drop every
+         * inheriting (NULL) practice, since {@code NULL <> 'OFF'} is UNKNOWN in SQL.
          */
         @Test
         @DisplayName("findByWorkspaceIdAndArtifactKind returns every tier, including the inheriting NULL")
@@ -155,7 +151,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             observed.setReviewTier(PracticeReviewTier.PROPOSE);
             Practice silent = createPractice("silent", "Silent");
             silent.setReviewTier(PracticeReviewTier.OFF);
-            // Holds no tier of its own: the row the deleted <> 'OFF' predicate silently dropped.
+            // Holds no tier of its own — the inheriting case a `<> 'OFF'` predicate would silently drop.
             Practice inheriting = createPractice("inheriting", "Inheriting");
             practiceRepository.saveAll(List.of(loud, observed, silent, inheriting));
 

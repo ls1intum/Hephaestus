@@ -24,11 +24,10 @@ import org.junit.jupiter.api.Test;
  * The <em>logic</em> of the boot-time coverage check: which disagreements between the two sets it
  * reports, and which it deliberately tolerates.
  *
- * <p>It cannot establish that the shipped build has no gap, and must not be read as doing so. The
- * {@link SignalCoverage} below is constructed here from the very options it is then compared against, so
- * the violation predicate is unsatisfiable by construction and these tests would all pass with every
- * shipped manifest declaring it raises nothing. {@code PracticeSignalCoverageIntegrationTest} is where
- * the two sides come from the container independently, and is the only place the fact is checked.
+ * <p>This cannot establish that the shipped build has no gap: the {@link SignalCoverage} below is built
+ * from the very options it is compared against, so the violation predicate is unsatisfiable by
+ * construction. {@code PracticeSignalCoverageIntegrationTest}, where the two sides come from the
+ * container independently, is the only place that fact is actually checked.
  */
 class PracticeSignalCoverageTest extends BaseUnitTest {
 
@@ -62,9 +61,8 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     @Test
     @DisplayName("a signal raised from inside Hephaestus is not held to integration coverage")
     void aSignalNoIngestedEventCarriesIsNotAGap() {
-        // A settled conversation and a review somebody asked for by hand are raised by a scheduler and
-        // by a person. Demanding an integration behind them would fail the boot for telling the truth,
-        // which is the failure mode this check exists to prevent, inverted.
+        // Raised by a scheduler and by a person, not an integration; demanding one behind them would
+        // fail the boot for telling the truth.
         Set<SignalName> covered = everyIngestedSignal();
         assertThat(covered).doesNotContain(
             ChatSignals.CONVERSATION_THREAD_SETTLED,

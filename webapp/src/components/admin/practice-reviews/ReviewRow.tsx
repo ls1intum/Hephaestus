@@ -4,65 +4,43 @@ import { statusToneClass } from "@/components/practice-vocabulary/status-def";
 import { cn } from "@/lib/utils";
 
 export interface ReviewRowProps {
-	/**
-	 * What this row is, as one registry entry: the leading icon and its tone both come from it.
-	 * A whole entry rather than an icon and a colour, so a row cannot wear a green tick in the
-	 * destructive tone — see rule 1 of the component rubric.
-	 */
+	/** A whole registry entry rather than an icon and a colour, so a row cannot wear a green tick in
+	 * the destructive tone. */
 	status: StatusDef;
 	/**
-	 * The row's name, containing exactly one link. That link becomes the row's click target: it is
-	 * stretched over the whole row by the CSS below, so the pointer target is the card while the
-	 * accessibility tree still sees a single link with the title as its name.
+	 * The row's name, which must contain exactly one link: that link's hit area is stretched over the
+	 * whole row by the CSS below, so the pointer target is the card while the accessibility tree still
+	 * sees a single link named by the title.
 	 */
 	title: ReactNode;
-	/** The facts that place the row — practice, work, who, when. One or two lines, no controls. */
+	/** Facts that place the row. No controls — the title's hit area covers this area. */
 	meta?: ReactNode;
-	/**
-	 * Status badges and the person, in fixed slots: right-aligned on a wide screen, wrapped under on a
-	 * narrow one. See {@link ReviewRowChip} for why this is a list of reserved slots and not a fragment.
-	 */
+	/** See {@link ReviewRowChip}: reserved slots, not a fragment. */
 	chips?: ReviewRowChip[];
 }
 
 /**
- * One reserved position in a row's chip group.
+ * One reserved position in a row's chip group. A slot keeps its width when its `node` is absent, so
+ * a conditional badge does not shift the badge after it and the column holds down the list — the
+ * alignment a table gives for free, on a list that is not a table.
  *
- * <p>The chips used to be a fragment in a `flex-wrap` box, so a row with no severity and a row with
- * one put their next badge at different x, and the eye had to re-find the column on every line. Two
- * of the four things an observation row shows are conditional, which means *most* rows differed.
- * A slot keeps its width when its `node` is absent, so the badge that follows it does not move —
- * the alignment a table gives for free (NN/g, "Data Tables"), on a list that is not a table.
- *
- * <p>The width is the caller's because it belongs to the list, not to the row: every row of one
- * list passes the same slots in the same order, and that is what makes the column constant. The
- * widths are `lg:`-prefixed, so below that the chips wrap as they always did and an empty slot
- * collapses: reserving four columns' worth of space needs a screen wide enough to hold the whole
- * strip, and forcing it on a tablet would push the row wider than the page.
+ * The width is the caller's because it belongs to the list: the column is only constant if every row
+ * of one list passes the same slots in the same order. Reserving the space needs a screen wide
+ * enough for the whole strip, so widths are `lg:`-prefixed and below that the chips simply wrap.
  */
 export interface ReviewRowChip {
 	key: string;
 	/** Reserved width from `lg` up, e.g. `"lg:w-28"`. Constant across every row of one list. */
 	width: string;
-	/** What sits in the slot. Absent keeps the space and shows nothing. */
+	/** Absent keeps the space and shows nothing. */
 	node?: ReactNode;
 }
 
 /**
- * One row of a practice-review list, in the one shape all three lists use.
- *
- * <p>Each of these lists used to ship twice: a `<table>` behind `xl:` and an `ItemGroup` of cards
- * behind `xl:hidden`, with different fields, different order and different words in each. Two
- * renderings of a 25-row list where a single cell carries the meaning is two things to keep in step
- * and one of them always drifts — which is how the observations table grew a "Developer and reviewed
- * work" column that the card version split in two, and how the skeleton came to match neither.
- *
- * <p>A table earns its keep when a reader compares the same cell down a column, and the row's name —
- * a sentence of prose, of any length — is not comparable in that way. So this is one row that
- * reflows, and the tables are gone. What *is* comparable down the list keeps a column anyway: the
- * chips sit in fixed slots (see {@link ReviewRowChip}) and a tally is drawn as a fixed grid (see
- * `ReviewCountStrip`), so a badge and a number each land at one x on every row without a `<table>`
- * around them.
+ * One reflowing row rather than a `<table>`: a table earns its keep when a reader compares the same
+ * cell down a column, and the row's name is a sentence of prose of any length. What *is* comparable
+ * keeps a column anyway — chips sit in fixed slots (see {@link ReviewRowChip}) and a tally is drawn
+ * as a fixed grid (see `ReviewCountStrip`).
  *
  * <h4>Why the whole row is not a link</h4>
  * The obvious construction — `<Item render={<Link/>}>` — makes the row itself an anchor, and then a
@@ -124,12 +102,9 @@ export function ReviewRowList({ label, children }: ReviewRowListProps) {
 }
 
 /**
- * One meta line, dot-separated.
- *
  * Takes the pieces rather than pre-joined children so the separators are placed here: a caller that
- * writes its own `·` between optional pieces leaves a dangling one the day a piece is absent, which
- * is how a row ends up reading "Thin controllers · · observed 3 days ago". Falsy entries drop out,
- * so a caller can pass a conditional straight in.
+ * writes its own `·` between optional pieces leaves a dangling one the day a piece is absent. Falsy
+ * entries drop out, so a caller can pass a conditional straight in.
  */
 export function ReviewRowMeta({ items }: { items: ReactNode[] }) {
 	const shown = items.filter(Boolean);

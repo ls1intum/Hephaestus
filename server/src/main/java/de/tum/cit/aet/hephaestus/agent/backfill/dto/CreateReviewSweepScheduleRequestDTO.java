@@ -18,9 +18,8 @@ import org.jspecify.annotations.NonNull;
  * workspace's review scope and whose work is reviewed is the practice-review role; both already apply to
  * every review this workspace runs, a sweep included.
  *
- * @param lookbackDays how far back each sweep reaches. At most twice the cadence, and never more than
- *     seven days — past that the corpus is one somebody chose in hindsight, which is a backfill campaign
- *     and records itself as one.
+ * @param lookbackDays at most twice the cadence, and never more than seven days — past that the corpus
+ *     is one somebody chose in hindsight, which is a backfill campaign and records itself as one.
  */
 public record CreateReviewSweepScheduleRequestDTO(
     @NonNull

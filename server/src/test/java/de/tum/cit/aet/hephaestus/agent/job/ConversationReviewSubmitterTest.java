@@ -33,10 +33,7 @@ import org.mockito.Mock;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/**
- * One settled thread, several recipients, one ledger row. Before this class, the conversation path
- * submitted with no signal key at all, so a thread nothing happened to left nothing saying why.
- */
+/** One settled thread, several recipients, one ledger row. */
 @Tag("unit")
 @DisplayName("A settled conversation thread's review")
 class ConversationReviewSubmitterTest extends BaseUnitTest {

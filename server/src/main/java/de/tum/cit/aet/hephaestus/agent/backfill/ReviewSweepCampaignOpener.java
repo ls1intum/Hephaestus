@@ -21,19 +21,17 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Turns one due {@link ReviewSweepSchedule} into one {@link ReviewBackfillRun}.
  *
- * <p>Kept apart from {@code ReviewBackfillService}, whose whole promise is that it can be called without
- * a review ever running: every method there ends at {@code AWAITING_CONFIRMATION} and waits for a human.
- * This one starts a campaign outright, and that difference is worth a class boundary rather than a
- * parameter.
+ * <p>Kept apart from {@code ReviewBackfillService}, whose whole promise is that it can be called without a
+ * review ever running: every method there ends at {@code AWAITING_CONFIRMATION} and waits for a human. This
+ * one starts a campaign outright, which is worth a class boundary rather than a parameter.
  *
  * <p>The run is created directly in {@code RUNNING} and confirmed by the account that created the
- * schedule. Making a nightly sweep wait for a confirmation click would mean a queue of unconfirmed runs
- * nobody clears, and the schedule row already is the standing decision — it names the cadence, the
- * window and the account that authorised them.
+ * schedule: the schedule row already is the standing decision — it names the cadence, the window and the
+ * account that authorised them — so waiting for a confirmation click would just queue up unconfirmed runs
+ * nobody clears.
  *
- * <p>Everything after this point is the campaign machinery unchanged: {@code ReviewBackfillDriver} paces
- * the walk, pauses on an exhausted budget or a disabled binding, keeps the cursor, and isolates each
- * artifact. Nothing here re-implements any of it.
+ * <p>Everything after opening is unchanged campaign machinery: {@code ReviewBackfillDriver} paces the
+ * walk, pauses on an exhausted budget or a disabled binding, and isolates each artifact.
  */
 @Service
 @WorkspaceAgnostic("Opens campaigns for whichever workspace's schedule came due")
@@ -73,12 +71,10 @@ public class ReviewSweepCampaignOpener {
     /**
      * Open this schedule's sweep, and move it on to its next occurrence either way.
      *
-     * <p>Both writes share one transaction on purpose. They touch the same optimistically-locked row, so
-     * splitting them would have the second write lose to the first every time; and a run that committed
-     * while its schedule stayed due would be re-opened on the following tick, which the campaign-under-way
-     * check would then absorb silently rather than reporting.
+     * <p>Both writes share one transaction: they touch the same optimistically-locked row, and a run that
+     * committed while its schedule stayed due would be re-opened on the following tick.
      *
-     * <p>{@code lastRunAt} moves only when a campaign was actually opened. It anchors the next window, so
+     * <p>{@code lastRunAt} moves only when a campaign was actually opened — it anchors the next window, so
      * moving it after a tick that looked at nothing would declare the days in between already covered.
      */
     @Transactional
@@ -98,12 +94,9 @@ public class ReviewSweepCampaignOpener {
     }
 
     /**
-     * Move a schedule past its due time without opening anything, after its turn threw.
-     *
-     * <p>Its own transaction because the failed one has already rolled back. Without it a schedule whose
-     * sweep fails deterministically — an unreachable estimator, a scope query that trips over bad data —
-     * would come due again on every tick for ever, and each attempt would fail in the same way at the
-     * same cost.
+     * Move a schedule past its due time without opening anything, after its turn threw. Its own transaction
+     * because the failed one has already rolled back — otherwise a schedule that fails deterministically
+     * would come due again on every tick forever.
      */
     @Transactional
     public void deferAfterFailure(UUID scheduleId, Instant now) {
@@ -124,9 +117,8 @@ public class ReviewSweepCampaignOpener {
             workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE ||
             !Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())
         ) {
-            // The driver would pause such a run on its first tick anyway. Not opening it keeps a
-            // suspended workspace from accumulating one paused campaign per night, each of which would
-            // block the next and none of which would ever run.
+            // The driver would pause such a run on its first tick anyway; not opening it keeps a
+            // suspended workspace from accumulating one blocked, never-running campaign per night.
             return ReviewSweepOutcome.SKIPPED_WORKSPACE_UNAVAILABLE;
         }
         if (runRepository.existsByWorkspaceIdAndStatusIn(workspace.getId(), UNDER_WAY)) {

@@ -8,19 +8,12 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
- * Per-kind capability declaration validated at application-server startup.
+ * Per-kind capability declaration validated at application-server startup: every declared {@link Capability}
+ * must have a matching SPI bean for the same {@link IntegrationKind}, or {@code IntegrationFrameworkBootstrap}
+ * fails fast.
  *
- * <p>Each {@link Capability} declared MUST have a matching bean of the corresponding
- * SPI registered for the same {@link IntegrationKind}. {@code IntegrationFrameworkBootstrap}
- * iterates all manifests on startup and fail-fasts if any declared capability lacks
- * its wiring.
- *
- * <p>Capabilities describe plumbing — whether webhooks arrive, whether tokens refresh. They say nothing
- * about what the integration contributes to a practice review, which is why {@link #reviewContribution()}
- * exists as a second, separate section of the same declaration. It is deliberately not a free-standing
- * registration mechanism: an integration has one manifest, and everything true of it is stated there.
- *
- * <p>Manifests live in vendor packages ({@code integration/<kind>/manifest/...}).
+ * <p>Capabilities describe plumbing — whether webhooks arrive, whether tokens refresh — and say nothing about
+ * what the integration contributes to a practice review; that is the separate {@link #reviewContribution()}.
  */
 public interface IntegrationManifest {
     IntegrationKind kind();
@@ -30,46 +23,31 @@ public interface IntegrationManifest {
     Set<Capability> declaredCapabilities();
 
     /**
-     * Whether this deployment has the integration switched on.
-     *
-     * <p>A manifest must be registered whether or not its vendor is enabled, and so must never gate
-     * itself with {@code @ConditionalOnProperty}: what an integration <em>could</em> raise is a fact
-     * about the build, and if the flag deleted the bean then every signal only that vendor raises would
-     * read as a signal nothing in the build can raise.
-     *
-     * <p>The flag governs the <em>wiring</em>: a disabled integration has no credential provider, no
-     * subject parser and no message handlers, so the bootstrap's per-capability bean checks and the
-     * provenance half of the review contract are skipped for it. Those rules stay enforced at build
-     * time instead — {@code IntegrationManifestContractTest} runs the real validator against every
-     * shipped manifest, and an ArchUnit rule fails the build if a manifest has no such test.
+     * Must never be gated with {@code @ConditionalOnProperty}: a manifest is registered whether or not its
+     * vendor is enabled, so removing the bean would make that vendor's signals read as signals nothing in
+     * the build can raise. The flag instead governs only the wiring — credential provider, subject parser,
+     * message handlers.
      */
     default boolean enabled() {
         return true;
     }
 
     /**
-     * What this integration contributes to practice review. Intentionally has no default: an integration
-     * that contributes nothing must say {@link ReviewContribution#none()} out loud, because the
-     * alternative — inheriting silence — is exactly how an integration ends up ingesting events that can
-     * never trigger anything without anyone noticing.
+     * What this integration contributes to practice review. Has no default on purpose: an integration that
+     * contributes nothing must say {@link ReviewContribution#none()} explicitly, since inheriting silence
+     * is how an integration ends up ingesting events that never trigger anything.
      */
     ReviewContribution reviewContribution();
 
     /**
-     * The practice-review section of a manifest.
+     * The practice-review section of a manifest. {@link #raises()} is deliberately a subset of what the
+     * artifact's {@link ArtifactDescriptor} declares — the descriptor states what the domain can express,
+     * this states what one vendor delivers of it — so the gap reads as a dormant binding rather than a
+     * practice that quietly never fires for that vendor's workspaces.
      *
-     * <p>{@link #raises()} is deliberately a <em>subset</em> of what the artifact's
-     * {@link ArtifactDescriptor} declares: the descriptor states what the domain can express, this
-     * states what one vendor delivers of it. A vendor whose ingest carries no event for a signal
-     * therefore says so, and the gap is readable as a dormant binding instead of a practice that
-     * quietly never fires for the workspaces on that vendor.
-     *
-     * @param observes the artifact kinds this integration writes to at all
-     * @param raises   per kind, the signals this integration can actually raise; every entry must be
-     *                 declared by that kind's descriptor and must be backed by an ingested event of this
-     *                 integration
-     * @param delivers per kind, the feedback lanes this integration will put feedback in; each lane is
-     *                 held to the {@link Capability} that carries it
+     * @param raises   every entry must be declared by that kind's descriptor and backed by an ingested
+     *                 event of this integration
+     * @param delivers each lane is held to the {@link Capability} that carries it
      */
     record ReviewContribution(
         Set<ArtifactKind> observes,

@@ -19,19 +19,16 @@ export interface BulkProgress {
 }
 
 /**
- * The writes the autonomy screen makes that the catalogue does not: an area's tier, and the same
- * practice tier applied to a selection.
- *
- * <p>Every one of them invalidates the rollup and the practice list rather than patching them. The
- * inheritance chain is resolved server-side on purpose, so a client that predicted what an area tier
- * does to forty inheriting practices would be a second implementation of it, drifting on the first
- * change. The area response carries the area and nothing else.
+ * Every write here invalidates the rollup and the practice list rather than patching them: the
+ * inheritance chain is resolved server-side, and a client predicting what an area tier does to the
+ * practices inheriting it would be a second implementation of that chain. The area response carries
+ * the area and nothing else.
  */
 export function useReviewAutonomyMutations(workspaceSlug: string) {
 	const queryClient = useQueryClient();
 	const [bulk, setBulk] = useState<BulkProgress | null>(null);
-	// A ref rather than the state above, because the mutation's own callbacks close over the render
-	// that created them and would keep reading `null` for the whole run.
+	// A ref rather than the state above: the mutation's callbacks close over the render that created
+	// them and would keep reading `null` for the whole run.
 	const bulkRunning = useRef(false);
 	const areaMutationKey = ["review-autonomy", workspaceSlug, "areas"] as const;
 	const practiceMutationKey = ["review-autonomy", workspaceSlug, "practices"] as const;
@@ -72,23 +69,20 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 		...filedUnder(practiceMutationKey, setReviewTierMutation()),
 		onError: (error) =>
 			toast.error("Couldn't change the practice", { description: problemDetailOf(error) }),
-		// One write, one refetch — except inside a bulk run, which settles once at the end. Otherwise
-		// setting a hundred practices marks the practice list and the rollup stale a hundred times over
-		// and refetches both after every single PATCH, so the screen spends the whole run redrawing rows
-		// that are about to change again.
+		// One write, one refetch — except inside a bulk run, which settles once at the end rather than
+		// refetching the list and the rollup after every PATCH in it.
 		onSettled: () => {
 			if (!bulkRunning.current) invalidateResolved();
 		},
 	});
 
 	/**
-	 * One request per practice, in order, because there is no bulk endpoint — and each write takes the
-	 * same workspace lock, so firing forty at once would queue on the server anyway while making the
-	 * failures arrive interleaved and unattributable.
+	 * One request per practice, in order: there is no bulk endpoint, and each write takes the same
+	 * workspace lock, so firing them in parallel queues on the server anyway while making the failures
+	 * arrive interleaved and unattributable.
 	 *
-	 * <p>Partial failure is reported rather than rolled back: the practices that did change stay
-	 * changed, which is what the admin asked for and what a refetch will show either way. A practice
-	 * Hephaestus cannot review is refused above Off, and that refusal is the common one here.
+	 * Partial failure is reported, not rolled back — the practices that did change stay changed, which
+	 * is what a refetch will show either way.
 	 */
 	const setManyPracticeTiers = async (
 		practiceSlugs: readonly string[],

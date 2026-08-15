@@ -13,14 +13,13 @@ import org.jspecify.annotations.Nullable;
  * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
  *
- * <p>Every field is <strong>nullable</strong> on purpose: {@code null} means "this workspace has not
- * decided". For the scalars that resolves to the fleet default ({@code hephaestus.practice-review.*}) — read
- * them via the {@code resolveX(fallback)} accessors, passing the property default as the fallback. For
- * {@link #reviewScope}, {@link #defaultReviewTier} and {@link #feedbackReach} there is no fleet default to
- * inherit and null resolves to a constant instead; each says so at the field.
+ * <p>Every field is nullable on purpose: {@code null} means "this workspace has not decided". Scalars
+ * resolve to the fleet default ({@code hephaestus.practice-review.*}) via the {@code resolveX(fallback)}
+ * accessors; {@link #reviewScope}, {@link #defaultReviewTier} and {@link #feedbackReach} have no fleet
+ * default and resolve {@code null} to a constant instead, documented at each field.
  *
- * <p>PATCH {@code null} means "no change"; to reset a previously-set field back to inherit, name it
- * in the PATCH {@code reset} set (see {@link #reset(java.util.Set)}).
+ * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
+ * {@code reset} set (see {@link #reset(java.util.Set)}).
  */
 @Embeddable
 @Getter
@@ -32,12 +31,7 @@ public class PracticeReviewSettings {
     @Nullable
     private Boolean runForAllUsers;
 
-    /**
-     * Nothing reads this: whether a draft occasions a review is a property of the practice's binding,
-     * because a fleet-wide veto cannot express a practice whose subject <em>is</em> the draft hand-over.
-     * The column stays for one release under deprecate-then-remove, and the mapping with it, so the
-     * schema and the entity do not disagree in the meantime.
-     */
+    /** Unused; kept one release under deprecate-then-remove so schema and entity agree meanwhile. */
     @Deprecated(forRemoval = true)
     @Column(name = "practice_skip_drafts")
     @Nullable
@@ -54,11 +48,8 @@ public class PracticeReviewSettings {
     private Integer cooldownMinutes;
 
     /**
-     * Which of the workspace's work is reviewed at all — ANDed onto every practice binding.
-     *
-     * <p>Unlike the fields above this has no fleet default to inherit: a trunk name is a fact about ONE
-     * deployment, so there is nothing sensible for an instance-wide setting to say. {@code null} means
-     * unrestricted.
+     * Which of the workspace's work is reviewed at all — ANDed onto every practice binding. No fleet
+     * default to inherit (a trunk name is a fact about one deployment); {@code null} means unrestricted.
      *
      * @see WorkspaceReviewScope
      */
@@ -68,19 +59,14 @@ public class PracticeReviewSettings {
     private WorkspaceReviewScope reviewScope;
 
     /**
-     * How much autonomy the system has over every practice in this workspace that holds no opinion, and
-     * whose area holds none either — the one decision an administrator makes to start. A
-     * {@code PracticeReviewTier} name, or {@code null} to mean that tier's own default.
+     * Autonomy tier for every practice in this workspace that holds no opinion (and whose area holds
+     * none either). A {@code PracticeReviewTier} name, or {@code null} for that tier's own default; no
+     * fleet default to inherit.
      *
-     * <p><b>Why a String and not the enum.</b> {@code PracticeReviewTier} belongs to the practices module,
-     * which already depends on this one; naming it here would close a module cycle that
-     * {@code ModulithVerificationTest} rejects. The column is the storage, the practices module owns the
-     * vocabulary, and the two are held together from three sides: the DB CHECK
-     * {@code chk_workspace_default_review_tier}, the converter that is the only thing which reads this
-     * field, and a test that pins every constant round-tripping through it.
-     *
-     * <p>Like {@link #reviewScope} it has no fleet default to inherit: how a team wants to be spoken to is a
-     * fact about that team, so there is nothing useful for an instance-wide setting to say.
+     * <p>Stored as a String, not the enum: {@code PracticeReviewTier} belongs to the practices module,
+     * which already depends on this one, so naming it here would close a cycle {@code
+     * ModulithVerificationTest} rejects. Held to the vocabulary by the DB CHECK
+     * {@code chk_workspace_default_review_tier}.
      */
     @Column(name = "practice_default_review_tier", length = 16)
     @Nullable
@@ -88,12 +74,9 @@ public class PracticeReviewSettings {
 
     /**
      * Where this workspace's practice feedback may go at all: the mentor conversation only, or also on the
-     * work itself. A {@code FeedbackReach} name, or {@code null} for that enum's default.
-     *
-     * <p>One decision per workspace rather than per practice, because reach is a statement about how this
-     * team uses the system and almost nobody wants a different answer for practice 71 than for practice 12.
-     * ANDed with the resolved tier at every delivery site. Stored as a name for the same module-boundary
-     * reason as {@link #defaultReviewTier}, and constrained by {@code chk_workspace_feedback_reach}.
+     * work itself. A {@code FeedbackReach} name, or {@code null} for that enum's default; ANDed with the
+     * resolved tier at every delivery site. Stored as a name for the same module-boundary reason as
+     * {@link #defaultReviewTier}, constrained by {@code chk_workspace_feedback_reach}.
      */
     @Column(name = "practice_feedback_reach", length = 16)
     @Nullable
@@ -137,10 +120,9 @@ public class PracticeReviewSettings {
     }
 
     /**
-     * PATCH semantics, same as the scalars: null leaves the current value alone. Clearing the workspace
-     * default back to the tier vocabulary's own default is a
+     * PATCH semantics, same as the scalars. Clearing back to the tier vocabulary's own default is a
      * {@link PracticeReviewField#DEFAULT_REVIEW_TIER} reset, not a null here — otherwise a client that
-     * simply did not send the field would silently reset it.
+     * simply omitted the field would silently reset it.
      */
     public void applyDefaultReviewTier(@Nullable String tierName) {
         if (tierName != null) {
@@ -161,16 +143,14 @@ public class PracticeReviewSettings {
             return;
         }
         for (PracticeReviewField field : fields) {
-            // Switch EXPRESSION (not statement) so the compiler forces every PracticeReviewField constant to
-            // be handled here — a statement switch would silently no-op an unhandled field. The yielded value
-            // is unused; the exhaustiveness check is the point.
+            // Switch EXPRESSION, not statement: the compiler then forces every constant to be handled
+            // here. The yielded value is unused; the exhaustiveness check is the point.
             boolean ignored = switch (field) {
                 case RUN_FOR_ALL_USERS -> {
                     this.runForAllUsers = null;
                     yield true;
                 }
-                // Retired with the field it clears. The constant stays until the column goes, so a
-                // reset request from an older client is still understood rather than rejected.
+                // Kept so a reset request naming this field from an older client is still understood.
                 case SKIP_DRAFTS -> {
                     this.skipDrafts = null;
                     yield true;

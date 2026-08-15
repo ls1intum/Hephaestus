@@ -80,19 +80,16 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        // Writing nothing would be read downstream as "this pull request received no review
-        // comments", which is a claim about the work rather than about the collection.
+        // Writing nothing would be misread downstream as "no review comments", a claim about the
+        // work rather than the collection — so a missing pull_request_id must throw instead.
         assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
             .isInstanceOf(EvidenceCollectionException.class)
             .hasRootCauseMessage("Review-comment collection has no pull_request_id");
     }
 
     /**
-     * A pull request nobody commented on stages the file anyway, holding an empty list.
-     *
-     * <p>The file is the review's record that it read the comments. Omitting it leaves the model unable to
-     * tell "there were no comments" from "the comments were never staged", and only the first of those is
-     * something an observation may be built on.
+     * A pull request nobody commented on still stages the file, holding an empty list — omitting it would leave
+     * the model unable to tell "no comments" from "comments never staged".
      */
     @Test
     void contribute_noComments_stagesAnEmptyCommentList() throws Exception {
@@ -152,7 +149,6 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // The Hephaestus marker comment is dropped; only the human reviewer comment survives.
         assertThat(out.get("count").asInt()).isEqualTo(1);
         assertThat(out.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-b");
     }
@@ -168,8 +164,8 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
-        // Only the bot's own comment was present. The file is still staged, holding nothing: reviewer-craft
-        // keeps its empty-context abstention from the empty list rather than from a file that is not there.
+        // Still staged holding nothing: reviewer-craft's empty-context abstention must come from the empty
+        // list, not from the file being absent.
         assertThat(files).containsKey(FILE_KEY);
     }
 
@@ -266,17 +262,15 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // The blank-body comment is dropped; only the substantive comment survives.
         assertThat(out.get("count").asInt()).isEqualTo(1);
         assertThat(out.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-b");
     }
 
     @Test
     void contribute_hyphenFormDiffNoteMarker_isNotExcluded() throws Exception {
-        // HEPHAESTUS_MARKER is the colon form `<!-- hephaestus:` only. The hyphen-form diff-note marker
-        // `<!-- hephaestus-diff-note -->` is NOT matched here — and correctly so: diff notes are stored as
-        // PullRequestReviewComment, never IssueComment, so this provider (IssueComment-only) never sees them.
-        // This test pins that storage-split boundary so a marker-narrowing regression is caught.
+        // The hyphen-form diff-note marker is NOT matched by HEPHAESTUS_MARKER (colon form only) — correctly
+        // so, since diff notes are stored as PullRequestReviewComment, which this IssueComment-only provider
+        // never sees.
         when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment(

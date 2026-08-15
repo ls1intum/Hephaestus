@@ -101,8 +101,7 @@ interface PracticeDefinitionFormBaseProps {
 	/**
 	 * Return a promise that rejects when the save failed: the unsaved-changes guard then stays down
 	 * from submit until it hears otherwise, so a caller navigating straight after an awaited save is
-	 * not asked to discard the changes it just saved. A caller returning nothing leaves the guard as
-	 * it is.
+	 * not asked to discard what it just saved. Returning nothing leaves the guard as it is.
 	 */
 	onSubmit: (value: PracticeDefinitionValue) => void | Promise<void>;
 	definitionOptions: PracticeDefinitionOptions;
@@ -304,9 +303,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		});
 	};
 
-	// Evidence is forbidden outright while no review runs and mandatory as soon as one does, so the
-	// support choice has to reach into every occasion rather than leave the author to be refused on
-	// save.
+	// Evidence is forbidden while no review runs and mandatory as soon as one does, so the support
+	// choice has to reach into every occasion rather than leave the author to be refused on save.
 	const updatePolicy = (automatedReviewPolicy: PracticeAutomatedReviewPolicy) => {
 		setForm((previous) => {
 			const nowGuidanceOnly = automatedReviewPolicy.automatedReview.mode === "NONE";

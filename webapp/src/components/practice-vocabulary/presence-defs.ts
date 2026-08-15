@@ -6,13 +6,11 @@ export type Presence = ReviewObservation["presence"];
 
 /**
  * Whether the practice was found in the work at all — the question *before* "was it done well",
- * which is `assessment-defs`.
+ * which is `assessment-defs`. No value here is good or bad on its own, so none of them is coloured:
+ * an absent practice is not a failure, it is a practice the work gave no occasion to show.
  *
- * None of the four is good or bad on its own, so none of them is coloured: an absent practice is not
- * a failure, it is a practice the work gave no occasion to show. The two negatives stay apart on
- * purpose. `NOT_APPLICABLE` says the practice did not apply here; `INCONCLUSIVE` says it did apply,
- * the evidence was read, and it did not settle the question. Collapsing them would claim nothing
- * here was worth looking at.
+ * <p>`NOT_APPLICABLE` and `INCONCLUSIVE` are not interchangeable: the first says the practice did
+ * not apply, the second that it did and the evidence did not settle it.
  */
 export const PRESENCE_DEFS: StatusDefs<Presence> = {
 	PRESENT: {

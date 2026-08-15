@@ -14,35 +14,15 @@ import org.springframework.stereotype.Component;
 /**
  * Who may ask for a review of a given artifact, right now.
  *
- * <p>A review is not a read. It spends the workspace's LLM budget, and — the part that makes this an
- * authorization question rather than a rate-limiting one — its feedback is delivered to the artifact's
- * <em>author</em>, not to whoever asked. So an unchecked request path lets anyone who can reach the
- * artifact aim coaching at a colleague, repeatedly, and the colleague sees only that Hephaestus has
- * opinions about their work today.
+ * <p>Feedback is delivered to the artifact's author, not to whoever asked, so an unchecked request path
+ * would let anyone who can reach the artifact aim coaching at a colleague. The requester must therefore
+ * have standing — be the artifact's author or an assignee — or be a workspace admin; ordinary membership
+ * alone is not enough. Shared by every front door onto a hand-requested review (SCM bot command, REST
+ * endpoint) so the rule stays true in one place.
  *
- * <p>The rule is therefore about standing on the artifact, not about reaching it: the requester must be
- * someone the review is <em>about</em> — its author or one of its assignees — or a workspace admin, who
- * already decides what this workspace reviews and pays for it. Everyone else is refused, including
- * ordinary workspace members: membership says you may see the work, not that you may commission
- * coaching about it for somebody else.
- *
- * <p>Shared by every front door onto a hand-requested review — the SCM bot command and the REST
- * endpoint — because a second copy of this rule is a second thing to keep true, and the copy that is
- * forgotten is the hole.
- *
- * <h2>Identity: one person, several SCM rows</h2>
- * <p>An SCM {@link User} row is one vendor identity, and a Hephaestus account may link several of them
- * (ADR 0017). So the question is asked of a <em>set</em> of identities and answered yes if any one of
- * them has standing — otherwise a workspace admin who is an admin under their GitLab login but signed
- * in through GitHub is refused for being two people.
- *
- * <p>Which door was used decides how much of that set is known, and the difference is deliberate. A
- * request authenticated as a Hephaestus account arrives with every linked identity, resolved by
- * {@code CurrentAccountUsers}. A merge-request comment arrives with exactly one — the identity that
- * wrote it — because a comment carries no account, and inferring one from a login would let a matching
- * login under another provider vote on this workspace's spending. The bot path therefore fails closed
- * for a multi-identity admin, and that person can still ask through the front door they are signed in
- * on.
+ * <p>A Hephaestus account may link several SCM identities (ADR 0017), so standing is checked against a set
+ * of identities. A bot command only knows the single identity that wrote the comment, so a multi-identity
+ * admin fails closed there unless that identity is the admin one, and must use the REST front door instead.
  */
 @Component
 public class ReviewRequestAuthority {
@@ -56,28 +36,19 @@ public class ReviewRequestAuthority {
     }
 
     /**
-     * Whether this person may occasion a review of this artifact in this workspace.
-     *
      * @param artifact the artifact, with its author and assignees already fetched — a lazy collection
      *     read here would decide the question on whatever the session happened to have loaded
      * @param requester the SCM identity that asked, or {@code null} when the request could not be
-     *     attributed to one at all, which is itself a refusal: an unattributable ask cannot be shown to
-     *     be an authorized one
+     *     attributed to one — itself a refusal
      */
     public boolean mayRequest(long workspaceId, Issue artifact, @Nullable User requester) {
         return standingOf(workspaceId, artifact, requester == null ? List.of() : List.of(requester)).isPresent();
     }
 
     /**
-     * Which of these identities gives this person standing to ask, if any does.
-     *
-     * <p>Returns the identity rather than a boolean because the answer is needed twice: once to allow
-     * the request and once to attribute it, and the ledger row must name a person the rule actually
-     * accepted. Deriving the attribution separately is how a row comes to name someone who was refused.
-     *
-     * <p>The order of {@code candidates} decides which identity a request is filed under when more than
-     * one qualifies. Callers pass the account's links in their own order and nothing downstream depends
-     * on the choice — the hourly allowance counts every identity in the set together.
+     * Returns the identity rather than a boolean because the ledger row must name the person the rule
+     * accepted. The first qualifying candidate in {@code candidates} order is used to attribute the
+     * request.
      */
     public Optional<User> standingOf(long workspaceId, Issue artifact, Collection<User> candidates) {
         return candidates
@@ -89,7 +60,6 @@ public class ReviewRequestAuthority {
             .findFirst();
     }
 
-    /** The people a review of this artifact is about: whoever wrote it and whoever it is assigned to. */
     private boolean isActorOn(Issue artifact, Long requesterId) {
         User author = artifact.getAuthor();
         if (author != null && requesterId.equals(author.getId())) {

@@ -18,15 +18,10 @@ import org.junit.jupiter.api.Test;
 /**
  * Pins the orchestrator prompt's workspace inventory against the paths collectors actually write.
  *
- * <p>The prompt is a contract with the model, and a wrong path in it is the same class of defect as a
- * missing collector: the model is told to read a file, reads nothing, and reports what it did not find as
- * a fact about a developer. It has failed in both directions. It named
- * {@code inputs/context/project_inventory.json} — under a MANDATORY heading, no less — while the evidence
- * plan selected that source for none of the 37 shipped practices, so the file was never staged. And it
- * never named {@code general_comments.json}, which every pull-request review does stage, so the
- * conversation on a pull request was there to be read by a model that had not been told it existed.
- *
- * <p>Neither direction is caught by a test of the collectors, or of the prompt, on its own.
+ * <p>A wrong path in the prompt is the same class of defect as a missing collector: the model is told to
+ * read a file, reads nothing, and reports what it did not find as a fact about a developer. Neither a
+ * test of the collectors alone nor of the prompt alone catches this — a path can be named but never
+ * staged, or staged but never named.
  */
 class OrchestratorPromptWorkspaceTest extends BaseUnitTest {
 

@@ -56,10 +56,7 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
         return Map.of("artifactKind", "scm.pull_request", "fromAt", FROM.toString(), "toAt", TO.toString());
     }
 
-    /**
-     * The property the whole design rests on: asking what a backfill would cost creates a decision to
-     * make, not a campaign in progress.
-     */
+    /** Asking what a backfill would cost creates a decision to make, not a campaign in progress. */
     @Test
     @WithAdminUser
     void aPreflightReturnsARunAwaitingConfirmationAndAuthorisesNothing() {
@@ -81,7 +78,6 @@ class ReviewBackfillControllerIntegrationTest extends AbstractWorkspaceIntegrati
             .isEqualTo(0)
             .jsonPath("$.submittedCount")
             .isEqualTo(0)
-            // Nobody has authorised a spend yet, so nobody is recorded as having done so.
             .jsonPath("$.confirmedByAccountId")
             .doesNotExist()
             .jsonPath("$.startedAt")

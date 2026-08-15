@@ -22,15 +22,12 @@ import type { StatusDef } from "./status-def";
 /**
  * Where a citation's line numbers point, which decides whether a surface may show them.
  *
- * <p>`code` — the range is a real span of a real file, and the server proved it: only diff
- * citations are checked against the annotated unified diff, and only diff and repository-tree
- * citations are treated as code anywhere downstream. A `path:12–18` locator is true here.
+ * <p>`code` — a real span of a real file, verified by the server against the annotated unified diff.
  *
- * <p>`object` — the range is an offset inside the serialised context artifact the quote was pulled
- * from: a line of `conversation_thread.json`, not a position in the Slack thread. The schema demands
- * a number ≥ 1 so one is always present, but nothing verifies it points at the quote. Rendering it
- * would be a precise-looking coordinate into a file the reader cannot open, so these citations show
- * their `path` as the label it is — the name of the comment, message or document — and no numbers.
+ * <p>`object` — an offset inside the serialised context artifact the quote was pulled from: a line
+ * of `conversation_thread.json`, not a position in the Slack thread. The schema demands a number
+ * ≥ 1 so one is always present, but nothing verifies it points at the quote, so these citations
+ * render their `path` as a name and no numbers.
  */
 export type EvidenceLocator = "code" | "object";
 
@@ -41,15 +38,9 @@ export interface EvidenceSourceDef extends StatusDef {
 /**
  * The registered inputs a review may quote from, in operator-facing words.
  *
- * <p>`sourceKind` is a `string` on the wire, but it is not free-form: the server admits a citation
- * only when its kind is in the shipped artifact-source catalog *and* was staged for that job, so the
- * registry below is every value that can be written today. It is keyed by the constant and
- * never shows it — `scm.pull-request.diff` is a contract id, and a screen that prints one has asked
- * its reader to learn the pipeline's filing system in order to read a quote.
- *
- * <p>Not a `StatusDefs` record, and not a total one over a union, because the wire type is `string`:
- * an unknown kind falls back rather than failing a lookup. {@link evidenceSourceDef} is the only way
- * in, so a surface cannot forget the fallback.
+ * <p>Not a total `StatusDefs` over a union, because `sourceKind` is a `string` on the wire: an
+ * unknown kind has to fall back rather than fail a lookup. {@link evidenceSourceDef} is the only
+ * way in, so a surface cannot forget the fallback.
  */
 const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 	"scm.pull-request.core": {
@@ -143,9 +134,6 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 		description: "Team documentation the reviewed work links to, such as a guideline.",
 		locator: "object",
 	},
-	// Keyed by `hephaestus.*` on the wire; the words never say so. The product's name in a source
-	// label would tell an operator which service wrote the row, which is not the question a piece of
-	// evidence answers.
 	"hephaestus.observation-history": {
 		label: "Earlier observations",
 		icon: HistoryIcon,
@@ -162,12 +150,7 @@ const EVIDENCE_SOURCE_DEFS: Record<string, EvidenceSourceDef> = {
 	},
 };
 
-/**
- * The words for one source kind, or a neutral entry naming the unknown kind verbatim.
- *
- * A kind the server adds ships ahead of the words for it, and a citation rendering as a blank
- * heading is worse than one rendering its raw id: the id is at least searchable.
- */
+/** The words for one source kind, or a neutral entry naming the unknown kind verbatim. */
 export function evidenceSourceDef(sourceKind: string): EvidenceSourceDef {
 	return (
 		EVIDENCE_SOURCE_DEFS[sourceKind] ?? {
@@ -180,17 +163,13 @@ export function evidenceSourceDef(sourceKind: string): EvidenceSourceDef {
 	);
 }
 
-/** Every kind the app has words for, for a story that walks them all. */
 export function knownEvidenceSourceKinds(): string[] {
 	return Object.keys(EVIDENCE_SOURCE_DEFS);
 }
 
 /**
- * Which side of the diff a passage was read from — a question only the diff can be asked.
- *
- * The server enforces the biconditional: `side` is set exactly when the kind is the diff, and is
- * absent on all fourteen others. So this is never a general citation field, and the surface only
- * looks for it inside a code locator.
+ * Which side of the diff a passage was read from. The server sets `side` exactly when the source
+ * kind is the diff and on no other kind, so a surface only looks for it inside a code locator.
  */
 export const DIFF_SIDE_LABELS = {
 	OLD: "before",
@@ -200,13 +179,9 @@ export const DIFF_SIDE_LABELS = {
 /**
  * A place in a file, as the coordinate a developer would paste: `path:12–18`.
  *
- * One spelling for two surfaces that both name a span of source — the citation an observation rests
- * on, and the line an inline note was anchored to — because a reader comparing the two is comparing
- * the same coordinate and a second formatter is a second en dash to get wrong.
- *
- * <p>A single line prints as one number rather than as `12–12`: the citation wire type defaults
- * `endLine` to `startLine`, and a placement leaves it absent. The diff side stays out of the string —
- * it is not part of a file coordinate, and it renders beside this as its own tag.
+ * <p>`endLine` is optional because the two callers disagree: a citation always carries one (the
+ * server defaults it to `startLine`), while an inline placement's anchor may have none. Either way
+ * a single line prints as one number rather than `12–12`.
  */
 export function codeCitationLocator(span: {
 	path: string;
@@ -219,13 +194,7 @@ export function codeCitationLocator(span: {
 		: `${path}:${startLine}`;
 }
 
-/**
- * Citations gathered under the source they came from, in the order the sources first appear.
- *
- * The old surface listed every citation flat and repeated its source kind on each one, having
- * already printed the same set of kinds as a row of badges above — the same string three times for
- * a finding with two diff quotes. Grouping says it once, where it explains the quotes under it.
- */
+/** Citations gathered under the source they came from, in the order the sources first appear. */
 export interface EvidenceSourceGroup {
 	sourceKind: string;
 	def: EvidenceSourceDef;

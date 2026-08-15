@@ -64,10 +64,8 @@ const ARTIFACT_KIND_ICONS: Record<KnownArtifactKind, LucideIcon> = {
 };
 
 /**
- * One map, so a kind cannot show as a pull request on one screen and a chat bubble on another.
- *
- * <p>A kind this build has never heard of gets the neutral page icon rather than a hole — and, just
- * as importantly, never borrows the icon of a kind it is not.
+ * A kind this build has never heard of gets the neutral page icon rather than a hole, and never
+ * borrows the icon of a kind it is not.
  */
 export function artifactKindIcon(kind: string | undefined): LucideIcon {
 	return kind && isKnownArtifactKind(kind) ? ARTIFACT_KIND_ICONS[kind] : FileTextIcon;

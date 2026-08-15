@@ -90,6 +90,11 @@ your old path is left where it is, no longer read and no longer swept.
 `GIT_STORAGE_PATH` had, then remove `GIT_STORAGE_PATH`. The directory layout beneath the root is
 unchanged, so the existing contents are picked up as they are and nothing has to be re-fetched.
 
+Set it where the container will actually read it. The shipped Compose files pin
+`HEPHAESTUS_FABRIC_ROOT: /data/git-repos` literally on the server and worker services, so a value in
+`docker/.env` is ignored — edit those `environment:` blocks, or set it wherever your own orchestration
+passes environment to those two roles.
+
 #### 🔴 The evidence-cache retention window must be at least one day
 
 **Affected**: deployments that set `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS`

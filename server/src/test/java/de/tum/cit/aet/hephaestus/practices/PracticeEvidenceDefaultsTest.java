@@ -19,17 +19,11 @@ import tools.jackson.databind.json.JsonMapper;
 @Tag("unit")
 class PracticeEvidenceDefaultsTest {
 
-    /**
-     * The default splits in two because the practice does: the frame it reviews under sits on the
-     * policy, and what it reads sits on each binding. A default that still returned one object would
-     * have to put evidence somewhere it cannot depend on the occasion.
-     */
     @ParameterizedTest
     @MethodSource("baselines")
     void shouldCreateTheArtifactBaseline(ArtifactKind artifact, List<String> required) {
-        // Declaration order, not alphabetical: this is the list an authoring UI shows as the starting
-        // point, and it reads best-established-first. Canonical order is the binding's business — it
-        // sorts what it is handed, because that list is what the fingerprint is taken over.
+        // Declaration order, not alphabetical — this is the list an authoring UI shows first. Sorting is
+        // the binding's business, since that list is what the fingerprint is taken over.
         JsonMapper mapper = JsonMapper.builder().build();
         var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC());
         var defaults = new PracticeEvidenceDefaults(catalogs, PracticeSignalOptionsFixture.catalog());
@@ -49,10 +43,6 @@ class PracticeEvidenceDefaultsTest {
         assertThat(policy.knownLimitations()).isNotEmpty();
     }
 
-    /**
-     * An unknown kind throws rather than borrowing a pull request's evidence: a silently borrowed
-     * default would demand a diff of something that has none and refuse every review it triggered.
-     */
     @Test
     void shouldRefuseAKindItHasNoDefaultFor() {
         JsonMapper mapper = JsonMapper.builder().build();
@@ -61,9 +51,8 @@ class PracticeEvidenceDefaultsTest {
             PracticeSignalOptionsFixture.catalog()
         );
 
-        // A kind no source contract and no descriptor declares. Deliberately spelled like a plausible
-        // future domain rather than as gibberish: the case that matters is the one where a kind is real
-        // to the person writing it and unknown to this build.
+        // Spelled like a plausible future domain, not gibberish: the case that matters is a kind real to
+        // the person writing it and unknown to this build.
         ArtifactKind undeclared = ArtifactKind.of("scm.deployment");
 
         assertThatThrownBy(() -> defaults.needsFor(undeclared)).isInstanceOf(IllegalArgumentException.class);
@@ -72,17 +61,16 @@ class PracticeEvidenceDefaultsTest {
 
     private static Stream<Arguments> baselines() {
         return Stream.of(
-            // Comments are REQUIRED, not contextual: that is what keeps "there were no comments"
-            // distinguishable from "we failed to collect the comments".
+            // REQUIRED, not contextual: keeps "there were no comments" distinguishable from "we failed
+            // to collect the comments".
             Arguments.of(
                 ArtifactKinds.PULL_REQUEST,
                 List.of("scm.pull-request.core", "scm.pull-request.diff", "scm.pull-request.comments")
             ),
             Arguments.of(ArtifactKinds.ISSUE, List.of("scm.issue.core", "scm.issue.comments")),
             Arguments.of(ArtifactKinds.CONVERSATION_THREAD, List.of("slack.conversation.thread")),
-            // A kind this module knows nothing about. It reaches a baseline through the source contract's
-            // own `defaultRequirement` and a limitation list through the descriptor, which is the whole
-            // claim of the contract.
+            // A kind this module knows nothing about, reaching a baseline via the source contract's own
+            // defaultRequirement — the whole claim of the contract.
             Arguments.of(ArtifactKind.of("docs.document"), List.of("docs.document.core"))
         );
     }

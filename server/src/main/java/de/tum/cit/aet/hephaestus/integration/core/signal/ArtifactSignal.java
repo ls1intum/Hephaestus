@@ -109,8 +109,8 @@ public class ArtifactSignal {
      *
      * <p>A raw id rather than an association: this module owns the ledger and must not depend on the SCM
      * domain to write a row (ADR 0017 keeps that edge one-way). It is also what the per-person request
-     * limit counts, so it is written by the recorder in the same statement as the row it attributes,
-     * never patched in afterwards — a limit whose input can be absent for a moment is not a limit.
+     * limit counts, so it must be written in the same statement as the row it attributes, never patched in
+     * afterwards.
      */
     @Nullable
     @Column(name = "requested_by_user_id")

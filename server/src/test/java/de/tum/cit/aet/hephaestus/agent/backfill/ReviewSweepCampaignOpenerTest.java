@@ -28,9 +28,9 @@ import org.mockito.Mockito;
 /**
  * One due schedule's turn.
  *
- * <p>What matters here is what is <em>not</em> created. A sweep that opened a campaign on every tick
- * regardless would stack a paused run per night against a suspended workspace, block the workspace's one
- * campaign slot, and pay to price a scope nobody can review.
+ * <p>What matters here is what is <em>not</em> created: a sweep that opened a campaign on every tick
+ * regardless would stack a paused run per night against a suspended workspace and price scopes nobody
+ * can review.
  */
 @DisplayName("Review sweep campaign opener")
 class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
@@ -73,12 +73,7 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * The whole feature in one assertion: a due schedule produces a campaign that is already RUNNING,
-     * says a schedule opened it, and is attributed to the account that set the schedule up. Directly
-     * RUNNING because creating the schedule was the confirmation — a nightly sweep that waited for a
-     * click would be a queue of unconfirmed runs nobody clears.
-     */
+    /** Directly RUNNING, not queued for confirmation: creating the schedule already was the confirmation. */
     @Test
     void aDueScheduleOpensARunningCampaignStampedAsASweep() {
         ReviewSweepSchedule schedule = schedule();
@@ -100,7 +95,6 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
         verify(configAudit).record(any(ConfigAuditEntry.class));
     }
 
-    /** Opening a campaign is what {@code lastRunAt} records, and the occurrence moves on either way. */
     @Test
     void openingACampaignRecordsItAndMovesToTheNextOccurrence() {
         ReviewSweepSchedule schedule = schedule();
@@ -116,9 +110,8 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
     }
 
     /**
-     * {@code lastRunAt} is the only thing that tells a working schedule from one whose every turn has
-     * been skipped for a month. A tick that opened nothing must leave it alone, or that distinction is
-     * unreadable on the screen where an admin would notice.
+     * {@code lastRunAt} is the only signal telling a working schedule from one skipped for a month; a
+     * no-op tick must leave it alone or that distinction vanishes from the admin's screen.
      */
     @Test
     void aTickThatOpenedNothingDoesNotClaimToHaveRun() {
@@ -134,8 +127,8 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
     }
 
     /**
-     * One campaign per workspace at a time, as for a hand-scoped backfill. Two overlapping runs would
-     * each read the other's ledger rows as already covered, so neither would cover its own scope.
+     * One campaign per workspace at a time: two overlapping runs would each read the other's ledger rows
+     * as already covered, so neither would cover its own scope.
      */
     @Test
     void aWorkspaceStillWorkingThroughACampaignDoesNotGetASecond() {
@@ -171,9 +164,8 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
     }
 
     /**
-     * A workspace that produced more work in two days than a whole hand-confirmed campaign may cover has
-     * a broken mirror, and a nightly sweep is the wrong place to find that out by spending a month's
-     * budget on it.
+     * A workspace producing more work in two days than a whole hand-confirmed campaign may cover has a
+     * broken mirror; a nightly sweep is the wrong place to spend a month's budget finding that out.
      */
     @Test
     void anImplausibleScopeIsRefusedRatherThanPaidFor() {
@@ -198,8 +190,8 @@ class ReviewSweepCampaignOpenerTest extends BaseUnitTest {
     }
 
     /**
-     * The deferral exists so a deterministically failing sweep does not come due every five minutes for
-     * ever, failing in the same way at the same cost each time.
+     * The deferral exists so a deterministically failing sweep does not come due again immediately,
+     * failing the same way at the same cost each tick.
      */
     @Test
     void aFailedTurnIsDeferredToTheNextOccurrenceWithoutOpeningAnything() {

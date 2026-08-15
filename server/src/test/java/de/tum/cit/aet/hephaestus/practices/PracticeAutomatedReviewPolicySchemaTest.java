@@ -18,14 +18,12 @@ import tools.jackson.databind.json.JsonMapper;
 /**
  * The published policy schema still describes the record it is published for.
  *
- * <p>Nothing in the server reads this schema — it is the contract an authoring tool, a reviewer, or a
- * future version of us reads instead of the Java. That is exactly why it rots: a published contract
- * with no enforcement is documentation, and the record can gain and lose components with the schema
- * still describing an older shape and nothing turning red.
+ * <p>Nothing in the server reads this schema — it is the contract an authoring tool or a future version
+ * of us reads instead of the Java, so with no enforcement it rots silently as the record's shape drifts.
  *
- * <p>Only the shape is pinned here. Whether the schema <em>enforces</em> what it declares is exercised
- * by {@code scripts/validate-artifact-source-contracts.mjs}, which has a JSON Schema validator; this
- * has a compiler and a record, so it checks what only a compiler and a record can see.
+ * <p>Only the shape is pinned here. Whether the schema enforces what it declares is exercised by
+ * {@code scripts/validate-artifact-source-contracts.mjs}'s JSON Schema validator; this has a compiler and
+ * a record, so it checks what only those can see.
  */
 class PracticeAutomatedReviewPolicySchemaTest extends BaseUnitTest {
 
@@ -41,10 +39,7 @@ class PracticeAutomatedReviewPolicySchemaTest extends BaseUnitTest {
         assertThat(declared).isEqualTo(componentNames());
     }
 
-    /**
-     * A component the record cannot be built without is a property the schema must require. Anything
-     * nullable is optional, and the schema says when it may appear.
-     */
+    /** A component the record cannot be built without must be a required schema property; nullable ones are optional. */
     @Test
     void shouldRequireEveryFieldThePolicyCannotBeBuiltWithout() throws IOException {
         JsonNode required = objectMapper.readTree(read()).path("required");

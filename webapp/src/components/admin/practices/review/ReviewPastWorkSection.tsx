@@ -10,22 +10,12 @@ import type { CreateReviewBackfillRunRequest } from "@/api/types.gen";
 import { PracticeReviewBackfill } from "@/components/admin/practices/PracticeReviewBackfill";
 import { problemDetailOf } from "@/lib/problem-detail";
 
-/** Polled only while a campaign is live: a settled list is not worth refetching forever. */
 const ACTIVE_POLL_MS = 15_000;
 
 export interface ReviewPastWorkSectionProps {
 	workspaceSlug: string;
 }
 
-/**
- * The one-off campaign over history, and nothing else.
- *
- * <p>The recurring check moved out, to the triggers it belongs with. What is left is the single thing
- * this section was ever about: a bounded, priced, explicitly confirmed pass over work that predates
- * the connection, whose observations are deliberately kept out of the live trend.
- *
- * <p>Also the one section that polls, and only while a campaign is actually running.
- */
 export function ReviewPastWorkSection({ workspaceSlug }: ReviewPastWorkSectionProps) {
 	const queryClient = useQueryClient();
 	const runsQueryKey = listBackfillRunsQueryKey({ path: { workspaceSlug } });

@@ -38,12 +38,9 @@ public class SlackManifest implements IntegrationManifest {
     }
 
     /**
-     * Nothing, and stated rather than assumed.
-     *
-     * <p>Conversations do get reviewed, but the artifact is a thread projected in the agent module out
-     * of ingested messages, and its descriptor is declared there rather than here. Its one signal is
-     * raised by a scheduler reading quiescence, not by any ingested Slack event, so there is no vendor
-     * provenance for Slack to claim — declaring it would be an aspiration the contract cannot check.
+     * Conversations do get reviewed, but the descriptor lives with the agent module that projects the
+     * thread, and the review is triggered by a scheduler reading quiescence, not by any ingested Slack
+     * event — there is no vendor provenance here for Slack to claim.
      */
     @Override
     public ReviewContribution reviewContribution() {

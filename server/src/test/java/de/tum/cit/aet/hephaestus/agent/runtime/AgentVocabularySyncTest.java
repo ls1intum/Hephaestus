@@ -25,16 +25,10 @@ import org.junit.jupiter.api.Test;
  * as a Java enum the server persists, once as a JavaScript literal the in-sandbox runner validates
  * against — and nothing but this test holds the two spellings together.
  *
- * <p>Written because they drifted. {@code INCONCLUSIVE} was added to {@link Presence}, to the DB CHECK,
- * to the DTOs and to the web UI, while the runner's list stayed at three values. The orchestrator prompt
- * asked for {@code INCONCLUSIVE} in seventeen places; the tool call was rejected back to the model,
- * which refiled the same observation as {@code NOT_APPLICABLE} — turning "I read the evidence and could
- * not call it" into "there was nothing here to see" in a permanent record of how a person works. That is
- * the precise laundering the value was introduced to prevent, and the whole suite stayed green through it,
- * because no test could see both sides at once.
- *
- * <p>The failure mode is silent by construction, so the guard has to be structural: a value added on one
- * side and not the other fails here, in the same change.
+ * <p>A value the server accepts but the runner rejects gets refiled by the model under whatever value the
+ * runner does accept — silently turning one presence into another in a permanent record of how a person
+ * works. That failure mode is silent by construction, so the guard has to be structural: a value added on
+ * one side and not the other fails here, in the same change.
  */
 class AgentVocabularySyncTest extends BaseUnitTest {
 
@@ -95,8 +89,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     @DisplayName("the runner single-sources its vocabularies instead of re-declaring them")
     void runnerImportsTheVocabulary() throws IOException {
         // The tool schema the model sees and the normalizer that validates the result must be generated
-        // from ONE list. When they were two lists, the SDK boundary rejected a value the prompt asked
-        // for, which is invisible from either file alone.
+        // from ONE list, or a value rejected by one and not the other is invisible from either file alone.
         String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(body)

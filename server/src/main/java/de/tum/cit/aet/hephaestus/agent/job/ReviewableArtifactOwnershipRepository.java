@@ -10,15 +10,13 @@ import org.springframework.stereotype.Repository;
 /**
  * Whether a workspace may act on a mirrored SCM artifact named by its surrogate id.
  *
- * <p>An artifact carries no workspace column: a repository belongs to a workspace through a
- * {@code RepositoryToMonitor} mapping, so ownership is a join and cannot be read off the row. That join
- * lives here rather than on the SCM repositories, which are deliberately workspace-agnostic and whose
- * contract puts monitor joins in the consuming package.
+ * <p>An artifact carries no workspace column, so ownership is a join through
+ * {@code RepositoryToMonitor} rather than a column read off the row; that join lives here rather than on
+ * the deliberately workspace-agnostic SCM repositories.
  *
- * <p>Kept separate from the gate loader's fetch queries instead of folded into them. Those queries carry
- * the eager graph the review path needs and are exercised by the production listeners; ownership is one
- * boolean, and an extra round trip on a dev-only route is cheaper than a second copy of a five-way
- * {@code JOIN FETCH} that could drift from the one under test.
+ * <p>Kept separate from the gate loader's fetch queries rather than folded into them: those carry the
+ * eager graph the review path needs, while ownership is one boolean not worth a second copy of a
+ * five-way {@code JOIN FETCH} that could drift from the one under test.
  *
  * <p>{@code TYPE} discriminates in both queries: {@code Issue} and {@code PullRequest} share one table
  * under {@code SINGLE_TABLE} inheritance, so an id lookup without it would answer for the wrong kind.

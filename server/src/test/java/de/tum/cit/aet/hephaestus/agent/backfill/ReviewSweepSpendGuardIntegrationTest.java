@@ -53,14 +53,10 @@ import org.springframework.test.context.DynamicPropertySource;
  *
  * <p>A recurring sweep re-offers the same corpus every night, so nothing about it is safe unless
  * "already measured at this state" is decided by the database rather than by anything the sweep
- * remembers. That is what {@code ReviewBackfillSignals} buys by deriving the signal from the artifact's
- * <em>current</em> state through the live revision derivation: an unchanged artifact produces a byte for
- * byte identical {@code SignalKey}, {@code uq_artifact_signal} refuses the second insert, and the sweep
- * walks past. Had it minted a per-run revision instead, every night would re-review everything, for ever,
- * and the trend line would be made of repeats.
- *
- * <p>Deliberately end to end against a real database. The constraint is the guard; a mocked recorder
- * would assert only that this test knows what it wants the recorder to say.
+ * remembers. {@code ReviewBackfillSignals} derives the signal from the artifact's <em>current</em> state,
+ * so an unchanged artifact produces the identical {@code SignalKey} and {@code uq_artifact_signal} refuses
+ * the second insert. Deliberately end to end against a real database: the constraint is the guard, and a
+ * mocked recorder would assert only that this test knows what it wants the recorder to say.
  */
 @DisplayName("Review sweep spend guard")
 class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
@@ -186,17 +182,9 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * The acceptance test for the feature.
-     *
-     * <p>Two consecutive nights. Their windows overlap by design — the lookback is twice the cadence, so
-     * that an artifact a paused campaign never reached gets another turn — which means the second sweep
-     * walks the same, untouched pull request the first one did. It must pay for nothing.
-     *
-     * <p>Everything rests on the second sweep reaching that conclusion from the database rather than
-     * from anything it remembers: {@code ReviewBackfillSignals} derives the signal from the artifact's
-     * current state through the live revision derivation, so an unchanged artifact yields the identical
-     * {@code SignalKey} and {@code uq_artifact_signal} refuses the insert. The assertion is therefore on
-     * the job table and on the ledger, not on a counter the campaign kept.
+     * The acceptance test for the feature: two consecutive nights whose windows overlap by design (the
+     * lookback is twice the cadence), so the second sweep walks the same untouched pull request the first
+     * one did — and must pay for nothing.
      */
     @Test
     void twoConsecutiveSweepsOverAnUnchangedArtifactSubmitExactlyOneReview() {
@@ -276,9 +264,7 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         schedule.setWorkspace(workspace);
         schedule.setArtifactKind(ArtifactKinds.PULL_REQUEST.value());
         schedule.setCadence(ReviewSweepCadence.DAILY);
-        // Two days for a daily cadence: consecutive windows overlap, which is what gives an artifact a
-        // paused campaign never reached another turn — and what makes this test's second sweep cover the
-        // same pull request as the first.
+        // Twice the cadence, so consecutive windows overlap.
         schedule.setLookbackDays(2);
         schedule.setEnabled(true);
         schedule.setNextRunAt(Instant.now().minus(Duration.ofMinutes(1)));

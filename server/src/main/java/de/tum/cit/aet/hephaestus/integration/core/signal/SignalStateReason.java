@@ -1,50 +1,37 @@
 package de.tum.cit.aet.hephaestus.integration.core.signal;
 
 /**
- * Why a recorded signal ended up in the state it did.
+ * Why a recorded signal ended up in the state it did — a controlled vocabulary rather than free text so
+ * that "how many reviews did this instance not run last week, and why" is a {@code GROUP BY}.
  *
- * <p>A controlled vocabulary rather than free text so that "how many reviews did this instance not
- * run last week, and why" is a {@code GROUP BY}. Each reason also decides its own resulting state,
- * which keeps the retryable/terminal judgement in one place instead of at every refusal site: a
- * reason is retryable exactly when an operator can lift it without the artifact changing.
+ * <p>Each reason decides its own resulting state, so the retryable/terminal judgement lives here rather
+ * than at every refusal site: a reason is retryable exactly when an operator can lift it without the
+ * artifact changing. The sentence a reader sees lives in {@link #describe()}.
  */
 public enum SignalStateReason {
-    /** The workspace's own gate declined; its detail is logged, and the class of answer is stable. */
     GATE_SKIPPED(SignalState.SUPPRESSED),
 
-    /** Rate limiting, not correctness. Retrying later would defeat the limit the workspace asked for. */
+    /** Terminal: retrying later would defeat the limit the workspace asked for. */
     COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
 
     /**
-     * The workspace's cooldown, applied to asking rather than to running: somebody already asked for a
-     * review of this artifact inside the window.
-     *
-     * <p>Its own reason rather than {@link #COOLDOWN_ACTIVE} because the two are true at different
-     * times and send the reader to different places. {@code COOLDOWN_ACTIVE} says a review <em>ran</em>
-     * recently, so waiting produces one about newer work; this one says an <em>ask</em> was made
-     * recently, and that ask may itself have been refused — telling the asker a review ran would send
-     * them looking for feedback that does not exist.
+     * Not {@link #COOLDOWN_ACTIVE}: that one says a review <em>ran</em> recently, this one says an
+     * <em>ask</em> was made recently and may itself have been refused. Collapsing them would send the
+     * asker looking for feedback that does not exist.
      */
     REQUEST_COOLDOWN_ACTIVE(SignalState.SUPPRESSED),
 
     /**
-     * The person asking has spent their hour's allowance of hand-requested reviews.
-     *
-     * <p>The one limit here that is about a person rather than an artifact. Every other rate limit is
-     * keyed on the work, so asking for one review each of twenty colleagues' merge requests passes all
-     * of them while being precisely the pattern that turns a coaching tool into a way to nag a team.
+     * The one limit keyed on a person rather than on the work; every other one passes twenty single
+     * requests against twenty colleagues' merge requests.
      */
     REQUESTER_QUOTA_EXHAUSTED(SignalState.SUPPRESSED),
 
-    /** Another submission for the same subject won the idempotency race; it carries the review. */
     CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
 
     /**
-     * The artifact falls outside the workspace's review scope — the wrong target branch, or a repository
-     * the workspace syncs but does not review.
-     *
-     * <p>Terminal rather than pending, unlike the tier reasons: it turns on facts that belong to the
-     * artifact and cannot change, so widening the scope alters what happens next, not what already did.
+     * Terminal rather than pending, unlike the tier reasons: it turns on facts belonging to the artifact
+     * that cannot change, so widening the scope alters what happens next, not what already did.
      */
     OUT_OF_REVIEW_SCOPE(SignalState.SUPPRESSED),
 
@@ -54,44 +41,26 @@ public enum SignalStateReason {
 
     NO_ACTIVE_PRACTICE(SignalState.PENDING),
 
-    /**
-     * The workspace has no enabled AI model bound to practice review, or it lost that binding between
-     * discovery and submission.
-     *
-     * <p>Named for the model rather than the practice because that is what an operator has to go and
-     * fix: this is Administration &rarr; AI models, not the practice catalogue. A name built around the
-     * binding reads as a fact about a practice binding and sends the reader to the wrong screen.
-     */
     REVIEW_MODEL_UNBOUND(SignalState.PENDING),
 
     /**
-     * A practice is bound to this signal and every one that is sits at loudness tier {@code OFF}.
-     *
-     * <p>Separate from {@link #NO_ACTIVE_PRACTICE} on purpose: collapsing them would make "we are
+     * Separate from {@link #NO_ACTIVE_PRACTICE} on purpose: collapsing them would make "we are
      * deliberately not reviewing this" indistinguishable from "nobody ever set this up".
      */
     PRACTICE_TIER_OFF(SignalState.PENDING),
 
-    /** The purse funding this binding is exhausted; it refills. */
     BUDGET_EXHAUSTED(SignalState.PENDING),
 
     /**
-     * The artifact exists but nobody it could be attributed to resolves to a workspace member — the
-     * author has not linked the account this vendor knows them by.
-     *
-     * <p>Its own reason rather than a gate skip because it is retryable: the person can link the account
-     * afterwards, and everything of theirs that was passed over then becomes reviewable without anything
-     * upstream happening again. {@link #GATE_SKIPPED} would make it terminal and lose that silently.
+     * Its own reason rather than a gate skip because it is retryable: linking the account afterwards makes
+     * everything passed over reviewable again, and {@link #GATE_SKIPPED} would make it terminal silently.
      */
     SUBJECT_UNLINKED(SignalState.PENDING),
 
-    /** The bound model left the catalog. An admin re-pointing the binding revives every pending signal. */
     MODEL_UNAVAILABLE(SignalState.PENDING),
 
-    /** Pending for longer than the ledger keeps offering it. */
     PENDING_DEADLINE_EXCEEDED(SignalState.LAPSED),
 
-    /** The artifact was deleted while its signal waited, so there is nothing left to review. */
     ARTIFACT_GONE(SignalState.LAPSED);
 
     private final SignalState resultingState;
@@ -104,22 +73,16 @@ public enum SignalStateReason {
         return resultingState;
     }
 
-    /**
-     * Whether this reason leaves the signal open for the reaper to re-offer — a restatement of
-     * {@link #resultingState()}, not a second source of truth. The reaper selects on the stored state.
-     */
+    /** A restatement of {@link #resultingState()}, not a second source of truth: the reaper selects on the
+     * stored state. */
     public boolean isRetryable() {
         return resultingState == SignalState.PENDING;
     }
 
     /**
-     * One sentence, in the reader's words, for every surface that has to explain a silence.
-     *
-     * <p>Beside the reason rather than at each surface that renders it, for the same argument the
-     * vocabulary itself rests on: a reason and the sentence explaining it are one fact, and a second
-     * copy of it is a second thing to keep true. A hand-written second copy is how a refusal that was
-     * a cooldown came to be reported as an exhausted budget — which sends an operator to raise a cap
-     * that was never set.
+     * One sentence per reason, for every surface that has to explain a silence. It lives beside the reason
+     * because a second hand-written copy is how a cooldown comes to be reported as an exhausted budget,
+     * sending an operator to raise a cap that was never set.
      */
     public String describe() {
         return switch (this) {

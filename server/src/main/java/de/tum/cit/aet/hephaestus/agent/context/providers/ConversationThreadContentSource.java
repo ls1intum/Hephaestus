@@ -45,11 +45,7 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 public class ConversationThreadContentSource implements EvidenceSource, ReviewContextBuilder {
 
-    /**
-     * The declared proof that a conversation review context can be assembled. The integration framework
-     * checks this against every descriptor that calls itself reviewable, so the kind cannot be opened for
-     * practices before anything can materialise its subject.
-     */
+    /** Declares that this artifact kind is reviewable, gating whether practices may target it. */
     @Override
     public ArtifactKind artifactKind() {
         return ChatSignals.CONVERSATION_THREAD;
@@ -69,7 +65,6 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadContentSource.class);
 
-    /** The single context file this provider emits. */
     static final String OUTPUT_KEY = OUTPUT_PREFIX + "conversation_thread.json";
 
     private final ObjectMapper objectMapper;
@@ -130,9 +125,8 @@ public class ConversationThreadContentSource implements EvidenceSource, ReviewCo
         int messageCount = payload.path("messageCount").asInt();
         Instant effectiveTime = projection.sourceEffectiveAt(metadata.path("slack_last_ts").asString(null));
         Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
-        // An empty payload has three causes, and only one of them is a thread with no messages. A
-        // channel whose consent is paused or withdrawn, and a thread that no longer exists, must not
-        // be reported as a conversation the developer did not have.
+        // An empty payload isn't necessarily a thread with no messages — a paused/withdrawn consent or a
+        // deleted thread must not be misreported as a conversation the developer did not have.
         Map<SourceKind, SourceCaptureState> stateOverrides =
             messageCount == 0
                 ? absenceOf(

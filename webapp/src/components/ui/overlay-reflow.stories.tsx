@@ -45,16 +45,16 @@ import { expectNoPageOverflow, expectOverlayFollowsTrigger } from "@/test/reflow
  * Base UI positions with `position: absolute` by default: the positioner is laid out in the
  * document at `left: 0` and moved into place by a transform. Its box is shrink-to-fit, so it only
  * grows to the width of its containing block once the popup asks for the whole viewport — and then
- * the collision shift, which wants 5px of padding on each side, has nowhere to put it and clamps it
- * flush left, 5px past the right edge *of the document*. Measured at a 320px viewport with the
- * overlay open: `documentElement.scrollWidth` 325 against a `clientWidth` of 320. Five pixels is
- * enough to drag the whole page sideways, which is WCAG 2.2 SC 1.4.10 (Reflow).
+ * the collision shift, which wants padding on each side, has nowhere to put it and clamps the popup
+ * flush left, spilling past the right edge *of the document*. A few pixels of `scrollWidth` over
+ * `clientWidth` is enough to drag the whole page sideways: WCAG 2.2 SC 1.4.10 (Reflow).
  *
- * Four of the six reach that width in this app — a tooltip's own `max-w-xs` is exactly 320px, and
- * popovers, hover cards and menus are handed `w-80` or a label carrying somebody's name — so those
- * four position against the viewport instead. `Select` and `Combobox` size their popup from the
- * anchor, which is itself laid out inside the page and so can never be wider than it; they keep
- * Base UI's default, and are covered here so that a caller who changes that finds out.
+ * Tooltips, popovers, hover cards and menus reach that width in this app — a tooltip's own
+ * `max-w-xs` is the narrowest viewport exactly, and the others are handed `w-80` or a label carrying
+ * somebody's name — so those four carry `positionMethod="fixed"` and position against the viewport.
+ * `Select` and `Combobox` size their popup from the anchor, which is itself laid out inside the page
+ * and so can never be wider than it; they keep Base UI's default, and are covered here so that a
+ * caller who changes that finds out.
  *
  * Each story renders its overlay at the widest shape the app asks for and *opens* it before
  * measuring: the closed state never overflowed, which is exactly why this shipped.

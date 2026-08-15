@@ -8,12 +8,16 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.PreparedConversationFact;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -72,6 +76,16 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             );
 
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
+        // The facts carry no evidence, so each one has to be read back and authorized before it may be
+        // quoted at the mentor. Both reads are batched: the per-fact form spent a fetch plus an
+        // authorization round trip on every row, and the fetch was itself lazy about the practice revision
+        // the currentness test compares.
+        Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+            workspaceId,
+            observations.values(),
+            SourceUsePurpose.CONVERSATIONAL_MENTORING
+        );
 
         ObjectNode root = objectMapper.createObjectNode();
 
@@ -79,11 +93,10 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
 
         ArrayNode arr = root.putArray("preparedConversationFeedback");
         for (PreparedConversationFact fact : prepared) {
-            var observation = observationRepository.findById(fact.getObservationId()).orElse(null);
-            if (
-                observation == null ||
-                !visibilityPolicy.permits(workspaceId, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)
-            ) {
+            // Membership is the whole answer, and it covers both refusals the per-fact form made: an
+            // observation this workspace could not read never entered the batch, so it can never be in the
+            // permitted set either.
+            if (!visible.contains(fact.getObservationId())) {
                 continue;
             }
             if (
@@ -119,6 +132,28 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize prepared conversation feedback context", e);
         }
+    }
+
+    /**
+     * The observations behind {@code facts} that this workspace may read, keyed by id. Scoped to the
+     * workspace rather than fetched by bare id: the facts are already recipient- and workspace-filtered, so
+     * this changes no answer, and it means an observation and the feedback unit citing it can never be read
+     * from different tenants.
+     */
+    private Map<UUID, Observation> observationsById(long workspaceId, List<PreparedConversationFact> facts) {
+        Set<UUID> ids = new LinkedHashSet<>();
+        for (PreparedConversationFact fact : facts) {
+            ids.add(fact.getObservationId());
+        }
+        if (ids.isEmpty()) {
+            return Map.of();
+        }
+        List<Observation> rows = observationRepository.findAllByIdInAndWorkspaceId(ids, workspaceId);
+        Map<UUID, Observation> byId = new HashMap<>(rows.size());
+        for (Observation observation : rows) {
+            byId.put(observation.getId(), observation);
+        }
+        return byId;
     }
 
     private static List<Long> conversationThreadIds(List<PreparedConversationFact> facts) {

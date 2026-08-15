@@ -708,11 +708,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
-     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
-     * the chain existed.
-     */
+    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

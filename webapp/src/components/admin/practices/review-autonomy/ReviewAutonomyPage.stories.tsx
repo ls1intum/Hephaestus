@@ -1,16 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { expect, fn, screen, within } from "storybook/test";
 import { withWidePage } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewAutonomyPage } from "./ReviewAutonomyPage";
 import { type AutonomyFixture, buildAutonomyFixture, scaleFixture } from "./story-mock-data";
 
-/**
- * A fixture supplies three of the page's args and nothing else; the rest come from the meta. Named
- * here rather than inline so the fixtures read as a set and a story can be about the one field it
- * changes.
- */
 const from = ({ settings, rollup, practices }: AutonomyFixture) => ({
 	settings,
 	rollup,
@@ -105,7 +101,7 @@ const oneUnreviewablePractice = buildAutonomyFixture({
 	],
 });
 
-/** Built once: three stories render the same hundred rows, and building it is not free. */
+/** Built once and shared: resolving the whole inheritance chain over this many rows is not free. */
 const atScale = scaleFixture();
 
 const idle = {
@@ -144,16 +140,10 @@ const meta = {
 	decorators: [withWidePage],
 	tags: ["autodocs"],
 	/**
-	 * The scope filter is controlled, and behind `fn()` alone it could not be switched: "Only what was
-	 * set by hand" left all four areas on screen. It is held here so the filter works.
-	 *
-	 * <p>The tier setters stay spies, deliberately. Every fixture on this page is *derived* from a spec
-	 * by {@link buildAutonomyFixture}, which resolves the whole three-level inheritance chain the way
-	 * the server does — so applying one tier locally would need the same resolution done again by hand,
-	 * and the first time the two disagreed the page would be showing a rollup its own rows contradict.
-	 * That is the state this fixture exists to make unwritable. A story asserting the emitted call is
-	 * asserting the thing the page is actually responsible for; the ladder's own behaviour when it
-	 * moves is covered where it lives, in `ReviewTierLadder.stories`.
+	 * Only the scope filter is held in state; the tier setters stay spies. {@link buildAutonomyFixture}
+	 * resolves the three-level inheritance chain the way the server does, so applying a tier locally
+	 * would mean resolving it a second time by hand — and the page would show a rollup its own rows
+	 * contradict the first time the two disagreed.
 	 */
 	render: (args) => (
 		<Stateful initial={args.overridesOnly}>
@@ -174,10 +164,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A workspace that has never expressed an opinion. The default reads Deliver because that is what an
- * unset chain resolves to, and the line under it says so rather than pretending somebody chose it.
- */
 export const WorkspaceDefaultUnset: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Not chosen yet, so Deliver applies.")).toBeVisible();
@@ -209,10 +195,6 @@ export const WorkspaceDefaultSet: Story = {
 	},
 };
 
-/**
- * An area that decided for itself. Its rung is not muted, its heading counts the practices it now
- * governs, and the summary above still answers for the whole workspace.
- */
 export const AreaOverride: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const testing = canvas.getByRole("radiogroup", {
@@ -238,8 +220,8 @@ export const PracticeOverrideWithReset: Story = {
 		const row = canvas.getByText("Links the issue it closes").closest("li");
 		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
 
-		// The status and its reset are one line now. `getByText` matches an element's own text nodes, so
-		// this is the paragraph — the button inside it is asserted by role below, which is the pair.
+		// `getByText` matches an element's own text nodes, so this is the paragraph and not the button
+		// inside it; the button is asserted by role below.
 		await expect(within(row).getByText("Set here.")).toBeVisible();
 		await expect(
 			within(row).getByRole("radiogroup", {
@@ -261,17 +243,9 @@ export const PracticeOverrideWithReset: Story = {
 };
 
 /**
- * What a row says about the practice it is deciding for, and what it keeps one gesture away.
- *
- * A name and a control cannot be acted on: "Explains the trade-off" tells an admin nothing about what
- * Hephaestus would say to their team, or how often. The kind of work stays on the row, because it is what
- * makes Deliver cheap or expensive and it has to be readable without a pointer. The catalogue's sentence
- * on why the practice exists moves to a preview card on the name: it is worth reading, it is not what the
- * row is deciding, and under a hundred rows it was what made the list unscannable.
- *
- * The card is optional in both directions — it opens on hover and on focus, and a practice carrying no
- * prose does not get one at all, because an empty popup appearing under the pointer is worse than none.
- * A locally written practice usually carries none, which is the second row here.
+ * A practice carrying no prose gets no preview card at all, rather than an empty popup appearing
+ * under the pointer. Locally written practices usually carry none, so this is a state production
+ * reaches routinely.
  */
 export const PracticeContext: Story = {
 	args: from(oneDescribedAndOneBare),
@@ -280,25 +254,17 @@ export const PracticeContext: Story = {
 
 		const described = canvas.getByText("Explains the trade-off it chose").closest("li");
 		if (!(described instanceof HTMLElement)) throw new Error("Practice row not rendered");
-		// The kind of work is named in the vocabulary the practice catalogue uses, not the raw id.
 		await expect(within(described).getByText("Document")).toBeVisible();
-		// The prose is off the row, so a hundred of these stay scannable.
 		await expect(
 			within(described).queryByText(/reads as arbitrary six months later/),
 		).not.toBeInTheDocument();
 
-		// Hover the name — the card is portalled, so it is found on the screen and not in the row.
+		// The card is portalled, so it is found on the screen and not in the row.
 		await userEvent.hover(
 			within(described).getByRole("link", { name: "Explains the trade-off it chose" }),
 		);
-		// Re-queried on each poll rather than found once and asserted: the popup mounts at `opacity: 0`
-		// and fades in, so a single `findByText` resolves on an element that is not yet visible.
-		await waitFor(() =>
-			expect(screen.getByText(/reads as arbitrary six months later/)).toBeVisible(),
-		);
+		await expectSettledVisible(await screen.findByText(/reads as arbitrary six months later/));
 
-		// A practice carrying no prose still reads as a row — and gets no card, because there is nothing
-		// to put in one. The kind of work is always known; the sentence is not.
 		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
 		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
 		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
@@ -312,16 +278,9 @@ export const PracticeContext: Story = {
 };
 
 /**
- * The card is reachable without a mouse.
- *
- * The reason this is a preview card and not a tooltip on a help icon: Base UI's opens on
- * focus-visible as well as on hover, so the tab stop the row already has — the practice's own link — is
- * the keyboard path, and no row grows a second one. Radix's hover card does not do this, which is why
- * its documentation says a hover card may not carry content that matters; this assertion is what keeps
- * that difference from being a claim in a comment.
- *
- * Touch has neither hover nor a focus ring, so the card never opens there. That is why it hangs off
- * the link: the tap goes to the practice, where the same sentence is a field on the form.
+ * The card hangs off the practice's own link rather than a help icon, so the tab stop the row already
+ * has is the keyboard path and no row grows a second one. This story is what keeps that a fact rather
+ * than a claim: Base UI's hover card opens on focus-visible, Radix's does not.
  */
 export const PracticeDetailOnKeyboardFocus: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
@@ -337,22 +296,16 @@ export const PracticeDetailOnKeyboardFocus: Story = {
 			await userEvent.tab();
 		}
 		await expect(link).toHaveFocus();
-		await waitFor(() =>
-			expect(screen.getByText(/reads as arbitrary six months later/)).toBeVisible(),
-		);
+		await expectSettledVisible(await screen.findByText(/reads as arbitrary six months later/));
 	},
 };
 
-/**
- * The highest-value control on a hundred-row page: what is left is the handful somebody changed —
- * including an area whose own tier was set even though none of its practices were.
- */
+/** An area whose own tier was set survives the filter even though none of its practices were. */
 export const OverridesOnly: Story = {
 	args: { overridesOnly: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Links the issue it closes")).toBeVisible();
 		await expect(canvas.queryByText("States the motivation")).not.toBeInTheDocument();
-		// Testing set its own tier, so it stays — with a line saying why its rows are not listed.
 		await expect(canvas.getByRole("button", { name: /^Testing/ })).toBeVisible();
 		await expect(canvas.getByText("No practices here were set by hand.")).toBeVisible();
 		await expect(canvas.queryByText("Handles the error state")).not.toBeInTheDocument();
@@ -415,20 +368,13 @@ export const BulkInFlight: Story = {
 };
 
 /**
- * A hundred practices across twenty-five areas — the size the old one-row-at-a-time screen could not
- * be used at, and the case nobody tests.
- *
- * The assertions here are about scale rather than about any one row: the summary answers without
- * scrolling and comes from the rollup rather than from counting the rows on screen, and a shut area
- * renders none of its practices, so the page carries twenty-five tier controls rather than a hundred
- * and twenty-five.
+ * The summary comes from the server's rollup, not from counting the rendered rows, so it stays
+ * correct when a shut area renders none of its practices — which is what the radiogroup count below
+ * pins.
  */
 export const AtScale: Story = {
 	args: from(atScale),
 	play: async ({ canvas }) => {
-		// The summary is one visible sentence now rather than a middot-separated line with a second,
-		// `sr-only` copy of itself spoken beside it. This assertion used to pass against the hidden copy;
-		// it now pins the line an admin actually reads, including the count of exceptions.
 		await expect(
 			canvas.getByText(
 				/^100 practices: 6 off, 89 propose and 5 deliver\. \d+ practices and \d+ areas set by hand\.$/,
@@ -441,22 +387,17 @@ export const AtScale: Story = {
 };
 
 /**
- * Every decision on the page sits in one column.
- *
- * This is a layout assertion because the bug was invisible to every other kind. An area's ladder used
- * to be laid out after a content-width accordion header, so its left edge moved with the length of the
- * area's name — 285px under "Documentation", 416px under "Pull request hygiene" — and the practice rows
- * below pinned theirs to the right edge instead. Twenty-five areas meant twenty-five left edges. Nothing
- * about the DOM, the roles or the text changed when that happened, so nothing caught it.
+ * A geometry assertion, because a ladder laid out after a content-width header takes its left edge
+ * from the length of the area's name — and nothing about the DOM, the roles or the text changes when
+ * that happens, so no other kind of assertion catches it.
  */
 export const DecisionsShareOneColumn: Story = {
 	args: from(atScale),
 	globals: { viewport: { value: "desktop" } },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		// The two-track layout only exists from `sm` up; below it every ladder is full width and shares a
-		// left edge whatever the bug is doing. Asserted, so a runner that ignored the viewport would fail
-		// here rather than pass the story for the wrong reason.
+		// Below `sm` every ladder is full width and shares a left edge regardless, so a runner that
+		// ignored the viewport would pass this story for the wrong reason.
 		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
 
 		await userEvent.click(canvas.getByRole("button", { name: /^Pull request hygiene/ }));
@@ -474,15 +415,12 @@ export const DecisionsShareOneColumn: Story = {
 export const AtScaleOverridesOnly: Story = {
 	args: { overridesOnly: true, ...from(atScale) },
 	play: async ({ canvas }) => {
-		// Two areas set their own tier, three practices did (one of them because Hephaestus cannot
-		// review it). Out of a hundred rows, that is the list.
 		await expect(canvas.getAllByRole("checkbox", { name: /^Select / })).toHaveLength(3);
 		await expect(canvas.getByText(/^Observability: keeps the change/)).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
 
-/** A practice Hephaestus cannot review is pinned to Off, and says why rather than failing on click. */
 export const NotReviewable: Story = {
 	args: from(oneUnreviewablePractice),
 	play: async ({ canvas, userEvent }) => {

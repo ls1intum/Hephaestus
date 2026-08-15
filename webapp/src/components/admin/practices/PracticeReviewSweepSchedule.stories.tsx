@@ -35,7 +35,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Nothing scheduled: the empty state has to say what the absence costs, not just that it is empty. */
 export const NothingScheduled: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
@@ -46,8 +45,6 @@ export const NothingScheduled: Story = {
 		canvas.getByText(/nothing is checked on a schedule/i);
 		await expectClosedSelectShows(canvas, /Kind of work/, "Pull or merge requests");
 		await expectClosedSelectShows(canvas, /How often/, "Every day");
-		// The one control that authorises spending again and again names the work it commits to, and
-		// the sentence beside it says the commitment outlives the first check.
 		canvas.getByRole("button", { name: "Start checking pull or merge requests" });
 		canvas.getByText(/not just the first/i);
 		await expectNoPageOverflow();
@@ -55,15 +52,13 @@ export const NothingScheduled: Story = {
 };
 
 /**
- * The window offered must never exceed what the server accepts — twice the cadence, capped at a week —
- * or the admin's first attempt is a 400 explaining a rule the form should have expressed.
+ * The window offered must never exceed what the server accepts, or the admin's first attempt is a
+ * 400 explaining a rule the form should have expressed.
  */
 export const WeeklyOffersAFullWeek: Story = {
 	play: async ({ canvasElement, userEvent }) => {
 		const canvas = within(canvasElement);
 		await userEvent.click(canvas.getByRole("combobox", { name: /How often/ }));
-		// Base UI renders the popup in a portal outside the canvas, so the option is looked up on the
-		// document rather than within the story's own subtree.
 		await userEvent.click(await screen.findByRole("option", { name: "Every week" }));
 
 		await expectClosedSelectShows(canvas, /How far back/, "The last 7 days");
@@ -79,20 +74,12 @@ export const Running: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		canvas.getByText(/every day, covering the last 2 days/i);
-		// The row's own kind is inside the accessible name: with a schedule per kind, three buttons
-		// reading "Pause" would leave a voice-control or screen-reader user guessing which row they
-		// stopped (WCAG 2.2 SC 2.5.3, SC 2.4.6).
 		canvas.getByRole("button", { name: "Pause checking pull or merge requests" });
 		canvas.getByRole("button", { name: "Remove the recurring check on pull or merge requests" });
 		await expectNoPageOverflow();
 	},
 };
 
-/**
- * A schedule that has never opened a campaign is not the same as one that is working, and the copy has
- * to say which — a row that looked identical either way would hide a workspace whose every turn is
- * being skipped.
- */
 export const NotRunYet: Story = {
 	args: { schedules: [schedule({ lastRunAt: undefined })] },
 	play: async ({ canvasElement }) => {
@@ -111,12 +98,8 @@ export const Paused: Story = {
 };
 
 /**
- * Paused before it ever ran — the one combination whose copy used to contradict itself, promising a
- * first check "within the hour" on a schedule that was doing nothing at all.
- *
- * Neither half of the sentence is new: `Paused` shows the first clause with a last run beside it and
- * `NotRunYet` shows the second while the schedule is still running. Only their meeting is, so the
- * whole line is written out rather than matched a clause at a time.
+ * The combination that can contradict itself: a paused schedule must not promise a first check
+ * "within the hour", so the whole line is written out rather than matched a clause at a time.
  */
 export const PausedBeforeItEverRan: Story = {
 	args: { schedules: [schedule({ enabled: false, lastRunAt: undefined })] },
@@ -130,7 +113,6 @@ export const PausedBeforeItEverRan: Story = {
 	},
 };
 
-/** Both kinds scheduled: there is nothing left to add, so the form goes away rather than failing. */
 export const EveryKindScheduled: Story = {
 	args: {
 		schedules: [
@@ -154,8 +136,8 @@ export const CouldNotLoad: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		canvas.getByText(/recurring checks couldn't be loaded/i);
-		// The failure is about this screen, not about the workspace: without saying so, an admin reads
-		// "couldn't be loaded" as "stopped" and schedules a second check over the same work.
+		// The failure is about this screen, not the workspace: read as "stopped", it costs a second
+		// check scheduled over the same work.
 		canvas.getByText(/still running/i);
 		canvas.getByRole("button", { name: "Try again" });
 	},

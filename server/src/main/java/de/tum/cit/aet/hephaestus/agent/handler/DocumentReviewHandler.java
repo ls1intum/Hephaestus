@@ -36,11 +36,10 @@ import tools.jackson.databind.node.ObjectNode;
  * no {@code inputs/sources/scm/} mount. The case context is one mirrored document — its prose, its
  * collection and its authorship — at {@code inputs/context/document.md}.
  *
- * <p><b>Delivery records observations and stops there.</b> The descriptor gives {@code docs.document} one
- * lane, {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane#PROFILE}, and no channel writes
- * to it, so a document review is a measurement rather than an intervention. Publishing a delivery event no
- * listener acts on would look like feedback in every surface we have and reach nobody; a delivery step
- * belongs here only once a channel and the descriptor's lanes gain one in the same commit.
+ * <p><b>Delivery records observations and stops there.</b> {@code docs.document} has one lane,
+ * {@link de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane#PROFILE}, and no channel writes to
+ * it, so publishing a delivery event would look like feedback and reach nobody; add a delivery step only
+ * alongside a channel for that lane.
  */
 public class DocumentReviewHandler implements JobTypeHandler {
 
@@ -92,11 +91,9 @@ public class DocumentReviewHandler implements JobTypeHandler {
         metadata.put("about_user_id", r.aboutUserId());
         metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, r.signal().value());
 
-        // Trailing segment is the disposable freshness (the ledger revision, a content digest or a
-        // terminal state): AgentJobService.extractCooldownKeyPrefix strips only it, so cooldown scopes on
-        // (document, subject, signal) and a burst of edits does not become a burst of reviews. Permanent
-        // dedup is the ledger's uq_artifact_signal, not this key. SignalRevision's grammar forbids ':',
-        // so the segment boundaries here are unambiguous.
+        // The trailing segment is disposable freshness; AgentJobService.extractCooldownKeyPrefix strips
+        // only it, so cooldown scopes on (document, subject, signal) and a burst of edits does not
+        // become a burst of reviews. Permanent dedup is the ledger's uq_artifact_signal, not this key.
         String idempotencyKey =
             "document_review:" +
             r.documentId() +
@@ -150,9 +147,8 @@ public class DocumentReviewHandler implements JobTypeHandler {
             );
         }
         if (practices.isEmpty()) {
-            // The common shape here is a document whose body the mirror evicted under its size cap: the
-            // subject source reports itself unavailable and every practice that requires it is refused,
-            // with a reason an operator can act on rather than a review that read nothing.
+            // A common cause: a document body the mirror evicted under its size cap, reported so an
+            // operator can act rather than a review that read nothing.
             throw new InsufficientEvidenceException(
                 "No practice has sufficient evidence: jobId=" + job.getId(),
                 new PreparedJobInputs(
@@ -179,9 +175,8 @@ public class DocumentReviewHandler implements JobTypeHandler {
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
         long documentId = metadata.path(DocumentContentSource.DOCUMENT_ID_METADATA_KEY).asLong(0L);
-        // Reuse the artifact-agnostic PracticeReview task kind; the number/repo hints are placeholders the
-        // runner ignores. The document's own title is deliberately NOT interpolated into the prompt — it
-        // is third-party text, and it already rides inside the quarantine banner in document.md.
+        // The document's own title is deliberately NOT interpolated into the prompt: it is third-party
+        // text, already carried inside the quarantine banner in document.md.
         Task task = new Task.PracticeReview(buildPrompt(job), 1, "docs-document:" + documentId);
         return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
     }

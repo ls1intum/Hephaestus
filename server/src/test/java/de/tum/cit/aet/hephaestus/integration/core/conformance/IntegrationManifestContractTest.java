@@ -25,21 +25,18 @@ import org.junit.jupiter.api.Test;
 /**
  * The acceptance suite every {@link IntegrationManifest} must pass.
  *
- * <p>Boot validation proves the beans a manifest promises exist. It cannot prove that a manifest is
- * internally coherent, because it only ever sees the manifests a particular configuration happened to
- * enable — GitLab's declaration goes unchecked on an instance with GitLab switched off, which is most of
- * them, including CI until something breaks in production. Every mature plugin ecosystem closes this the
- * same way: Airbyte runs every connector through one acceptance suite, Terraform providers ship
- * acceptance tests, an OpenTelemetry component must pass {@code Validate()}. This is ours.
+ * <p>Boot validation proves the beans a manifest promises exist. It cannot prove a manifest is internally
+ * coherent, because it only ever sees the manifests a particular configuration happened to enable —
+ * GitLab's declaration goes unchecked on an instance with GitLab switched off, which is most of them,
+ * including CI until something breaks in production.
  *
  * <p>A subclass supplies its manifest and the descriptors for the kinds it observes; the assertions are
  * inherited and cannot be opted out of. {@code IntegrationManifestConformanceCoverageTest} fails the
- * build if a manifest ever ships without a subclass here, so the suite cannot be skipped by omission.
+ * build if a manifest ever ships without a subclass here.
  *
  * <p>The rules the real {@link ReviewContractValidator} already owns are checked by <em>running</em> it
  * rather than by restating them, so the suite and the boot check cannot drift into disagreeing about
- * what a valid manifest is. What the subclasses add on top are the properties the validator cannot see
- * from inside one running configuration.
+ * what a valid manifest is.
  */
 abstract class IntegrationManifestContractTest extends BaseUnitTest {
 
@@ -76,9 +73,8 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
 
     @Test
     void spendsEveryDeliveryCapabilityItDeclares() {
-        // The mirror of the bootstrap's rule that a claimed lane needs its capability. Together the two
-        // make capability and lane agree in both directions, which is what stops a channel bean being
-        // wired, advertised to the UI, and never actually given anywhere to put anything.
+        // The mirror of the bootstrap's rule that a claimed lane needs its capability, so capability and
+        // lane must agree in both directions.
         IntegrationManifest manifest = manifest();
         Set<FeedbackLane> lanes = manifest
             .reviewContribution()
@@ -102,9 +98,8 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
 
     /**
      * A validator wired with a handler for every event any supplied descriptor names, and a context
-     * builder and a job type for every reviewable kind. Those are properties of the running application
-     * rather than of the manifest, and the real bootstrap checks them for real; supplying them here keeps
-     * this suite about the declaration.
+     * builder and a job type for every reviewable kind — properties of the running application rather
+     * than of the manifest, supplied here so this suite stays about the declaration.
      */
     private ReviewContractValidator validator() {
         List<ArtifactDescriptor> descriptors = descriptors();

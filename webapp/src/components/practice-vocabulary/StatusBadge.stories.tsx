@@ -11,16 +11,11 @@ import { WITHHOLDING_FAMILY_DEFS } from "./withholding-defs";
 
 /**
  * Every status on the practice-review screens renders through this one badge, reading an entry from
- * the registry for its enum.
+ * the registry for its enum. Nothing else may hold words, a colour or an icon for an enum value.
  *
- * Nothing else may hold words, a colour or an icon for an enum value: the filter dropdown, the table
- * cell, the detail header and the empty state all read the same entry, which is what stops the
- * dropdown showing plain grey text beside a table of coloured tags.
- *
- * Two rules the entries themselves keep, visible in the galleries below. Colour is never the only
- * channel — the variants collapse (two severities are `destructive`, several statuses are `outline`)
- * and the icon is what still separates those under greyscale or colour-vision deficiency. And within
- * one enum no two entries share an icon, because two values that look identical are one value.
+ * The galleries below are where the two registry rules are checkable by eye: badge variants
+ * collapse, so the icon is the channel left when colour is unavailable, and within one enum no two
+ * entries may share an icon.
  */
 const meta = {
 	title: "Shared/Practice vocabulary/Status badge",
@@ -33,7 +28,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** One entry, driven by the Controls panel. */
 export const Default: Story = {};
 
 function Gallery<TValue extends string>({
@@ -60,10 +54,7 @@ function Gallery<TValue extends string>({
 	);
 }
 
-/**
- * Every registry at once — the page to read before adding a badge anywhere, and the page that shows
- * when a new entry has picked an icon another entry already uses.
- */
+/** Every registry at once — where a new entry reusing another's icon becomes visible. */
 export const EveryRegistry: Story = {
 	render: (args: { def: StatusDef }) => (
 		<div className="space-y-6">
@@ -82,17 +73,13 @@ export const EveryRegistry: Story = {
 		</div>
 	),
 	play: async ({ canvas }) => {
-		// The words the delivery model turns on: neither the stored constant nor the old copy.
 		canvas.getByText("Queued for conversation");
 		canvas.getByText("Withheld");
 		canvas.getByText("On the work");
 	},
 };
 
-/**
- * A registry entry's label is prose, not a code point, so it can be long. The badge truncates rather
- * than pushing a table column open — the description beside it carries the full sentence.
- */
+/** A label is prose, so it can be long: the badge truncates rather than opening a table column. */
 export const LongLabelTruncates: Story = {
 	args: { def: DELIVERY_STATE_DEFS.PREPARED },
 	render: (args: { def: StatusDef }) => (

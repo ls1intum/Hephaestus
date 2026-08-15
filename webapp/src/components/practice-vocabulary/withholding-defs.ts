@@ -6,15 +6,9 @@ export type WithholdingReason = NonNullable<ReviewFeedback["suppressionReason"]>
 export type WithholdingFamily = "WORK_MOVED_ON" | "POLICY" | "DEVELOPER_CHOICE" | "HOUSEKEEPING";
 
 /**
- * Fourteen reasons is a filter nobody reads. Four families is a question somebody can answer.
- *
- * Each family answers "who decided", which is the only cut an operator acts on differently: the work
- * moving on is nobody's decision and needs no follow-up; policy is a setting they own and can change;
- * the developer's choice is one they must not override; housekeeping is the pipeline's own doing and
- * only matters if a family suddenly grows.
- *
- * <p>The families are for *filtering*. A row still shows its own precise sentence from
- * `WITHHOLDING_REASON_DEFS` — the grouping simplifies the question, not the answer.
+ * The filter grain over the withholding reasons. Each family answers "who decided", which is the cut
+ * an operator acts on differently — so that, and not the shape of the pipeline, is what a new reason
+ * is filed under.
  */
 export const WITHHOLDING_FAMILY_DEFS: StatusDefs<WithholdingFamily> = {
 	WORK_MOVED_ON: {
@@ -44,12 +38,10 @@ export const WITHHOLDING_FAMILY_DEFS: StatusDefs<WithholdingFamily> = {
 };
 
 /**
- * Every reason, and the family it filters under. `Record` over the wire union, so a reason the
- * server adds cannot slip through unfiled — it fails the typecheck here.
+ * Every reason, and the family it filters under.
  *
  * <p>`ARTIFACT_DRAFT` is filed but dead: the server marks the constant `@Deprecated` and nothing
- * writes it. The words stay because the wire union still carries the value and a row rendering blank
- * is worse than a row rendering an explanation nobody will see.
+ * writes it. It keeps its words because the wire union still carries the value.
  */
 const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
 	ARTIFACT_GONE: "WORK_MOVED_ON",
@@ -69,12 +61,8 @@ const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
 };
 
 /**
- * The precise sentence for one reason, shown on the row that has it.
- *
- * Written for somebody who has never read the pipeline: no constant is echoed, no stage is named,
- * and each one says what happened rather than which check rejected it. They are also third person —
- * anyone with access can open these screens and the work is usually somebody else's, so "you were
- * over your limit" would tell the wrong person off.
+ * The precise sentence for one reason, shown on the row that has it. Third person throughout:
+ * anyone with access can open these screens and the work is usually somebody else's.
  */
 export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 	ARTIFACT_GONE: "The work no longer exists.",
@@ -82,9 +70,9 @@ export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 	ARTIFACT_MERGED: "The work was already merged, so a note on it would arrive too late.",
 	ARTIFACT_DRAFT: "The work was still a draft.",
 	VOLUME_CAPPED: "Over the limit on how much feedback one person gets from a single review.",
-	// Names the effect, not the check. The server records this reason for *any* in-context feedback
-	// the admission gate turns away, which includes a workspace whose reach is set to conversation
-	// only — so wording it as "the practice's tier blocked it" would be wrong about half the rows.
+	// The server records this reason for *any* in-context feedback the admission gate turns away,
+	// including a workspace whose reach is set to conversation only — so naming the practice's tier
+	// as the cause would be wrong about a good share of the rows.
 	PRACTICE_TIER_QUIET: "This practice is set to measure quietly rather than to speak up.",
 	BACKFILL_QUIET: "Found while reviewing past work, which is measured but never sent.",
 	INSTANCE_SILENCED: "Silent mode was switched on for the whole instance.",
@@ -104,11 +92,6 @@ export function withholdingReasonSentence(reason: WithholdingReason): string {
 	return WITHHOLDING_REASON_DEFS[reason];
 }
 
-/**
- * The reasons each family covers, derived from the one table above rather than written twice — a
- * family filter has to expand to exactly the reasons the row filter would have matched, and two
- * hand-kept lists is how that stops being true.
- */
 const WITHHOLDING_FAMILY_REASONS: Record<WithholdingFamily, WithholdingReason[]> = Object.entries(
 	REASON_FAMILY,
 ).reduce(
@@ -124,7 +107,6 @@ const WITHHOLDING_FAMILY_REASONS: Record<WithholdingFamily, WithholdingReason[]>
 	} as Record<WithholdingFamily, WithholdingReason[]>,
 );
 
-/** Every reason the named families cover, for the query a family filter turns into. */
 export function reasonsInFamilies(families: readonly WithholdingFamily[]): WithholdingReason[] {
 	return families.flatMap((family) => WITHHOLDING_FAMILY_REASONS[family]);
 }

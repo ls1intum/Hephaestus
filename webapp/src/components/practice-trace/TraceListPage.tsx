@@ -51,10 +51,7 @@ export interface TraceListPageProps {
 	onSearchChange: (patch: Partial<TraceSearch>) => void;
 }
 
-/**
- * Every piece of work this workspace has recorded anything about — including work no practice had a
- * word to say about, which is exactly what "why did nobody say anything?" needs to show.
- */
+/** Every piece of work this workspace recorded anything about, including the unreviewed. */
 export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceListPageProps) {
 	const page = search.page ?? 0;
 	const query = useQuery({

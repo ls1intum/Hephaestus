@@ -25,11 +25,9 @@ import org.mockito.Mock;
 /**
  * What a workspace is allowed to ask a recurring sweep to do.
  *
- * <p>One rule carries the whole design and is therefore tested at the boundary rather than in the middle:
- * a sweep may look back at most twice its cadence, and never more than a week. Its observations are filed
- * in the same population as reviews that events triggered, and that is only true while its corpus is
- * "what happened recently". A month-long window filed as live work is a trend line showing an improvement
- * nobody made.
+ * <p>One rule carries the whole design: a sweep may look back at most twice its cadence, never more than
+ * a week, since a longer window filed in the same population as live-triggered reviews would show a
+ * trend line improving for no reason.
  */
 @DisplayName("Review sweep schedule service")
 class ReviewSweepScheduleServiceTest extends BaseUnitTest {
@@ -69,8 +67,7 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
     void aWindowWithinTheCeilingGetsPastValidation(String cadence, int lookbackDays) {
         when(scheduleRepository.existsByWorkspaceIdAndArtifactKind(anyLong(), anyString())).thenReturn(true);
 
-        // Refused for a reason that comes strictly after the window check, which is what proves the
-        // window was accepted. Stopping here keeps the test off the static security lookup that follows.
+        // A conflict exception, raised strictly after the window check, is what proves the window passed.
         assertThatThrownBy(() ->
             service().create(
                 context(),
@@ -80,8 +77,8 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
     }
 
     /**
-     * A conversation thread has no mirrored corpus a campaign could walk, so a schedule for one would be
-     * an instruction that quietly swept nothing. Refused by name.
+     * A conversation thread has no mirrored corpus a campaign could walk, so a schedule for one would
+     * quietly sweep nothing.
      */
     @Test
     void aKindNoCampaignCanEnumerateIsRefusedByName() {

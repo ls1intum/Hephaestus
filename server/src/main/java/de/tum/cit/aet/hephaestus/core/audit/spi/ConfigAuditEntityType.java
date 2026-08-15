@@ -19,10 +19,9 @@ public enum ConfigAuditEntityType {
     /** Historical only — an earlier spelling of {@link #AGENT_BINDING}. */
     AI_CONFIG_BINDING,
     /**
-     * A member's role or roster visibility: admin-initiated grants, changes and removals, plus role
-     * changes applied by org sync (actor {@code SYSTEM}). Memberships created or removed by org sync
-     * itself are deliberately excluded — that is upstream roster churn, at a volume that would bury the
-     * admin-initiated rows this trail exists to surface.
+     * A member's role or roster visibility: admin-initiated changes, plus role changes org sync applies
+     * (actor {@code SYSTEM}). Memberships org sync itself creates or removes are excluded as roster churn
+     * that would bury the admin-initiated rows.
      */
     WORKSPACE_ROLE,
     WORKSPACE_FEATURES,
@@ -33,7 +32,6 @@ public enum ConfigAuditEntityType {
 
     /** Historical only — the earlier spelling of {@link #PRACTICE_USAGE}. */
     PRACTICE_ACTIVE,
-    /** Whether a practice is used in new reviews. */
     PRACTICE_USAGE,
     /** A practice's review definition, excluding its active state and catalog placement. */
     PRACTICE_DEFINITION,
@@ -51,19 +49,12 @@ public enum ConfigAuditEntityType {
     WORKSPACE_BYO_LLM_BUDGET,
 
     /**
-     * A campaign to review work that already existed, and the decision to let it spend. On this trail
-     * rather than treated as ordinary activity because a backfill is the one action a workspace admin
-     * can take that commits a month's LLM budget in a single request, so "who authorised reviewing the
-     * last six months, and what were they told it would cost?" must be answerable from the record.
+     * A backfill campaign, which can commit a month's LLM budget in a single request; who authorised it
+     * must be answerable from the record.
      */
     REVIEW_BACKFILL_RUN,
 
-    /**
-     * A standing instruction to review recent work on a cadence. On this trail because, unlike a
-     * campaign, it is authorised once and spends every night afterwards — so the decision that matters
-     * is the one recorded here, and "who set this workspace sweeping, on what terms, and when did the
-     * terms change?" has to be answerable long after the person who did it has moved on.
-     */
+    /** A standing instruction to review recent work on a cadence — authorised once, spends every night. */
     REVIEW_SWEEP_SCHEDULE,
 
     WORKSPACE_LLM_CONNECTION,

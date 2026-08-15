@@ -1,15 +1,8 @@
 import { z } from "zod";
 
 /**
- * The three questions "how does review behave here" splits into.
- *
- * <p>One page, because they were three, and an admin answering "why did this not get reviewed" had
- * to hold all three in their head while the sidebar presented them as unrelated destinations. They
- * are still three sections, because they are genuinely three decisions — how far the system may go,
- * when and where it may act, and what to do about work that predates any of it.
- *
- * <p>The ids are in the URL, so they are part of the contract with anyone's bookmarks and with the
- * redirects from the three pages this replaced. Renaming one is a breaking change to a link.
+ * The ids are in the URL, so they are part of the contract with anyone's bookmarks and with the
+ * redirects that point here. Renaming one is a breaking change to a link.
  */
 export const REVIEW_SECTIONS = [
 	{
@@ -38,8 +31,7 @@ export const DEFAULT_REVIEW_SECTION: ReviewSectionId = "how-much";
 
 /**
  * `catch` rather than a hard failure: a stale bookmark naming a section that no longer exists should
- * open the page, not a router error. Same for the overrides filter, which the autonomy screen owns
- * and which travels here from the URL it used to live at.
+ * open the page, not a router error.
  */
 export const reviewSearchSchema = z.object({
 	section: z

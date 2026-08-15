@@ -160,8 +160,6 @@ class RepositoryTreeStagingLiveTest {
             onDisk.put(SandboxLayout.REPO_MOUNT_RELATIVE + "many/file" + i + ".txt", file);
         }
 
-        // The agent reports back what it can actually see, so the assertions below describe the
-        // container's view of the evidence rather than the host's intent to send it.
         String script =
             "set -e\n" +
             "repo=/workspace/" +

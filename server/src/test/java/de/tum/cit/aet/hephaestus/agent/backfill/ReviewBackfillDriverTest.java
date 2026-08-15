@@ -26,10 +26,8 @@ import org.mockito.Mock;
 import org.mockito.Mockito;
 
 /**
- * The campaign walk, and the one property the whole design rests on: a run that cannot afford to
- * continue <em>stops</em>, leaving the artifacts it has not reached still owed. A run that thinned
- * itself instead would leave a baseline where "not reviewed" and "reviewed, nothing found" are the same
- * absence.
+ * The campaign walk: a run that cannot afford to continue stops rather than thinning itself, so
+ * "not reviewed" and "reviewed, nothing found" stay distinguishable.
  */
 @DisplayName("Review backfill driver")
 class ReviewBackfillDriverTest extends BaseUnitTest {
@@ -86,7 +84,6 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
         assertThat(run.getStatus()).isEqualTo(ReviewBackfillStatus.RUNNING);
     }
 
-    /** An artifact already measured at its current state, or refused by the gate, is not a gap. */
     @Test
     void anArtifactWalkedPastIsCountedRatherThanForgotten() {
         ReviewBackfillRun run = running();
@@ -103,11 +100,6 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
         assertThat(run.getPassedCount()).isEqualTo(1);
     }
 
-    /**
-     * The core guarantee. The purse is checked before the batch, and when it is empty nothing is offered
-     * and the cursor does not move — so every artifact past it is still owed and will be reviewed when
-     * the budget returns.
-     */
     @Test
     void anExhaustedBudgetPausesTheRunWithoutMovingTheCursor() {
         ReviewBackfillRun run = running();
@@ -137,7 +129,6 @@ class ReviewBackfillDriverTest extends BaseUnitTest {
         assertThat(run.getPauseReason()).isEqualTo(ReviewBackfillPauseReason.REVIEW_MODEL_UNBOUND);
     }
 
-    /** No re-confirmation: the estimate the admin approved covered the whole scope, and pausing did not change it. */
     @Test
     void aPausedRunResumesByItselfOnceTheBudgetReturns() {
         ReviewBackfillRun run = running();

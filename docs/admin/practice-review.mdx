@@ -61,19 +61,37 @@ quiet until both are done.
 
 ### Deployment
 
+The **In `.env`?** column says whether the shipped Compose files forward the variable from `docker/.env`.
+Where it says no, setting it in `docker/.env` does nothing — add it to the service's own `environment:`
+block instead.
+
+| Variable | Default | In `.env`? | What it does |
+| --- | --- | --- | --- |
+| `AGENT_ENABLED` | `false` | yes | Enables the PostgreSQL-backed job queue: submission on the server, claiming and execution on the worker. Must be `true` on **both** roles |
+| `GIT_CHECKOUT_ENABLED` | `false` | server only | Enables the local repository checkout that supplies the repository-tree evidence |
+| `PRACTICE_REVIEW_FOR_ALL` | `false` | yes | Enables the feature flag and the review gate for all users |
+| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | `false` | yes | Instance default for posting after merge; a workspace may override it |
+| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | `15` | yes | Instance default for the minimum gap between reviews of the same work; a workspace may override it |
+| `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | `30` | yes | Age after which replay directories and unreferenced evidence blobs become collectable |
+| `PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` | `5` | no | The per-person hourly allowance in the table above. Keyed on the person, not the work, so it is the one limit that catches somebody asking for a review on twenty colleagues' merge requests. `0` removes it |
+| `PRACTICE_REVIEW_PROGRESS_FOOTER` | `false` | no | Appends the run-to-run progress footer and the re-review reply. Renders nothing until a target has been reviewed twice |
+| `PRACTICE_REVIEW_REACTION_SUPPRESSION` | `false` | no | Stops re-raising a point the author already disputed or marked not applicable |
+
+Fleet-wide guard rails on campaigns over past work and on the occurrence ledger. None is forwarded from
+`docker/.env`; the defaults are the supported configuration and are worth changing only to make a campaign
+cheaper or an over-large instance quieter.
+
 | Variable | Default | What it does |
 | --- | --- | --- |
-| `AGENT_ENABLED` | `false` | Enables the PostgreSQL-backed job queue: submission on the server, claiming and execution on the worker. Must be `true` on **both** roles |
-| `GIT_CHECKOUT_ENABLED` | `false` | Enables the local repository checkout that supplies the repository-tree evidence |
-| `PRACTICE_REVIEW_FOR_ALL` | `false` | Enables the feature flag and the review gate for all users |
-| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | `false` | Instance default for posting after merge; a workspace may override it |
-| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | `15` | Instance default for the minimum gap between reviews of the same work; a workspace may override it |
-| `PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` | `5` | The per-person hourly allowance in the table above. Keyed on the person, not the work, so it is the one limit that catches somebody asking for a review on twenty colleagues' merge requests. `0` removes it |
-| `PRACTICE_REVIEW_PROGRESS_FOOTER` | `false` | Appends the run-to-run progress footer and the re-review reply. Renders nothing until a target has been reviewed twice |
-| `PRACTICE_REVIEW_REACTION_SUPPRESSION` | `false` | Stops re-raising a point the author already disputed or marked not applicable |
-| `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | `30` | Age after which replay directories and unreferenced evidence blobs become collectable |
+| `PRACTICE_REVIEW_BACKFILL_MAX_WINDOW` | `400d` | Widest lookback any campaign may request. A campaign over this is refused at the estimate, before anything is confirmed and before anything is paid for |
+| `PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS` | `5000` | Most pieces of work any one campaign may cover. Refused the same way |
+| `PRACTICE_REVIEW_BACKFILL_BATCH_SIZE` | `25` | How many pieces of work one driver tick offers. Bounds how far a campaign can overshoot a budget cap it crosses mid-batch |
+| `PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW` | `90d` | How far back the estimate looks for completed reviews to price a campaign from |
+| `SIGNAL_LEDGER_PENDING_RETRY_AFTER` | `1h` | How often a refused-but-retryable occurrence is offered again. The blockers are operator actions, so retrying faster only multiplies the refusal |
+| `SIGNAL_LEDGER_PENDING_LAPSE_AFTER` | `7d` | How long an occurrence keeps being re-offered before it is retired |
+| `SIGNAL_LEDGER_SWEEP_BATCH_SIZE` | `200` | How many pending occurrences one sweep re-offers |
 
-:::caution Two of these do not behave the way the variable name suggests
+:::caution Two variables do not behave the way their name suggests
 
 - **`PRACTICE_REVIEW_RUN_FOR_ALL` is inert in the shipped Compose files.** The `application-server`
   service pins the underlying setting to `PRACTICE_REVIEW_FOR_ALL`, so setting the other name in
@@ -97,20 +115,13 @@ narrow them. A source a workspace has not connected is simply never captured. Se
 
 ### Per workspace, in screen order
 
-:::note Three screens became one
-
-*Review autonomy*, *Review settings* and *Review past work* are now the **How much**, **When and where**
-and **Past work** sections of a single **Review** page, because all three answer the same question and an
-admin chasing it should not have to know which of them holds the answer. The recurring check moved with
-the change: it is a standing policy about recent work, so it sits with the other triggers under *When and
-where* rather than under *Past work*. Old bookmarks redirect to the right section.
-
-:::
+One **Review** page holds three sections: **How much** the system does on its own, **When and where** it
+runs, and campaigns over **Past work**. A recurring check over recent work is a standing policy rather than
+a campaign, so it sits under *When and where* beside the other things that start a review.
 
 1. **Administration → AI models.** On the **Practice reviews** card, bind a model. A workspace with no
-   model bound runs no reviews at all — this is the expected state immediately after upgrading from named
-   agent configurations, where everything is carried over switched off. The card's readiness indicator also
-   tells you whether the bound model is still usable.
+   model bound runs no reviews at all. The card's readiness indicator also tells you whether the bound
+   model is still usable.
 2. **Administration → Practices → Review → When and where → Practice review status.** Turn on
    **Start practice reviews**. The same card repeats the review model's readiness, so you can confirm step 1
    without leaving the page, and the banner at the top of Review says in one line whether this workspace is
@@ -138,10 +149,10 @@ Three independent settings, and confusing them is the most common misconfigurati
 
 - **How much the system does on its own** — `Off`, `Propose`, `Deliver`. Only `Off` stops the review.
   `Propose` runs it and records every observation exactly as `Deliver` does, and sends nothing to anybody.
-  Turning a noisy practice down therefore does not put a hole in the measurement, which is the entire
-  reason this is a dial and not a checkbox. What a `Propose` practice held back is not lost: **Review
-  activity** shows it as reviewed, with the measurements it took, nothing delivered, and the tier named as
-  the reason. Raise the practice to `Deliver` when you want it heard.
+  Turning a noisy practice down therefore does not put a hole in the measurement; turning it `Off` does.
+  What a `Propose` practice held back is not lost: **Review activity** shows it as reviewed, with the
+  measurements it took, nothing delivered, and the tier named as the reason. Raise the practice to
+  `Deliver` when you want it heard.
 - **Where feedback goes** — *In the mentor conversation only*, or *Also on the work itself* (pull-request
   summaries, inline notes, issue comments). One choice for the whole workspace. It can only ever narrow
   where feedback lands; it never gives a practice more autonomy than its own tier allows.
@@ -157,19 +168,13 @@ say otherwise. An area can override the workspace, and a practice can override i
 > practice → its area → the workspace
 
 Anything you have not decided shows as **inherited**, with the level it came from, and can be reset back to
-inheriting at any time. That is the point: with a hundred practices across twenty-five areas, a setting you
-have to apply per row is a setting nobody applies, so the shipped default becomes the only configuration
-anyone ever runs. Start with the two workspace answers, then override the handful of areas where they are
-wrong.
+inheriting at any time. Start with the two workspace answers, then override the handful of areas where they
+are wrong; a workspace runs dozens of practices across a dozen areas, and a setting you have to apply per
+row is a setting nobody applies.
 
-The **Review → How much** section shows, above the list, how many practices currently sit at each setting
-— for the workspace and per area. Read that line before changing anything; it is the fastest way to see whether
-an override you made years ago is still doing what you think.
-
-Upgrading from the earlier per-practice on/off switch needs no decision from you: a practice that was used
-in new reviews now sits at `Deliver`, one that was not sits at `Off`, and nothing got louder or quieter.
-`Propose` is new ground — it is the setting the old boolean could not express, and no practice lands there
-unless somebody puts it there.
+The **Review → How much** section shows, above the list, how many practices sit at each setting — for the
+workspace and per area. Read that line before changing anything; it is the fastest way to see whether an
+override somebody made long ago is still doing what you think.
 
 Both are defined in full, with their refusal semantics, in the
 [practice review glossary](/contributor/practice-review-glossary). Do not re-derive them from this page.
@@ -203,7 +208,7 @@ Full budget mechanics, including what an unverifiable month does, are on
 ## Reviewing past work
 
 Two instruments, and the difference between them is the difference between a purchase and a standing
-order — which is why they no longer share a screen. The campaign is on
+order. The campaign is on
 **Administration → Practices → Review → Past work**; the recurring check is on the same page's
 **When and where** section, beside the other things that start a review.
 
@@ -229,12 +234,12 @@ twice.
 
 Observations from either instrument are **measured and never delivered**. Backfill observations are entitled
 only to a delivery channel that has no producer, so they land in the read models and on Review activity and
-nowhere else. That is by construction, not a setting you can change — and it is the right default, because
-nobody wants a comment on a pull request from four months ago.
+nowhere else. That is by construction, not a setting you can change: a campaign changes what you can read
+back about past work, and never posts anything on it.
 
 ## When a workspace goes quiet
 
-Work down this list. Step 0 is new and usually ends the investigation; steps 1 to 4 are per workspace and
+Work down this list. Step 0 usually ends the investigation; steps 1 to 4 are per workspace and
 5 to 7 are instance-wide, so if several workspaces went quiet at once, start at the bottom.
 
 **0. Open Review activity and read the trace.** **Review activity** in the workspace sidebar lists every
@@ -324,22 +329,21 @@ the deployment's approved retention policy, and treat the fabric root volume as 
 
 ## Limits you should know about
 
-These are current, deliberate, and none of them is configurable from `docker/.env`.
+Each of these is deliberate, and none is configurable from `docker/.env`.
 
 - **Three background cadences are fixed in code.** The recurring-sweep opener runs every 5 minutes, the
   campaign driver every 2 minutes, and the re-offer reaper every 15 minutes. Only their *thresholds* are
   properties; the cadences are not, so you cannot slow them down under load.
-- **A refused-but-retryable occurrence is retried for seven days and then retired.** The retry interval
-  (`hephaestus.signal-ledger.pending-retry-after`, default one hour) and the deadline
-  (`pending-lapse-after`, default seven days) are properties with no environment wiring in the shipped
-  Compose files. A workspace left misconfigured accumulates a week of retries and then goes quiet again
-  with nothing new to see.
+- **A refused-but-retryable occurrence is retried for seven days and then retired.** A workspace left
+  misconfigured accumulates a week of retries and then goes quiet again with nothing new to see. Both the
+  interval and the deadline are settable — `SIGNAL_LEDGER_PENDING_RETRY_AFTER` and
+  `SIGNAL_LEDGER_PENDING_LAPSE_AFTER` above — but not from `docker/.env`.
 - **Nothing is ever deleted from the occurrence ledger**, in any state, including retired rows. It is the
   record of what was *not* done, and it only grows. Size it accordingly on a busy instance.
 - **The repository-tree capture is bounded**, by file count, total size, and per-file size
-  (`hephaestus.git.tree-max-files`, `tree-max-total-size`, `tree-max-file-size`). When a bound bites, the
+  (`GIT_TREE_MAX_FILES`, `GIT_TREE_MAX_TOTAL_SIZE`, `GIT_TREE_MAX_FILE_SIZE`). When a bound bites, the
   capture reports itself **partial** and names which bound it hit rather than silently truncating. The
-  current values are the ones declared in the artifact-source catalog's selection scope for that source —
+  values in force are the ones declared in the artifact-source catalog's selection scope for that source —
   read them there rather than from a copy. None of the three is forwarded by the shipped Compose files.
 - **Linked Outline documents are retrieval-limited, and the mentor and review paths do not agree.** A
   review resolves documents *linked from* the work first and only tops up a small number by search; the

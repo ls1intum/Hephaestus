@@ -29,39 +29,14 @@ import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Composes delivery content (mrNote + diffNotes) from structured findings.
+ * Composes delivery content (mrNote + diffNotes) from structured findings — server-side "step 2": the
+ * agent produces findings, this renders them into a human-readable MR/PR comment for students.
  *
- * <p>Server-side "step 2" of the two-step architecture: agent produces findings,
- * server renders them into a human-readable MR/PR comment for students.
- *
- * <p>Design principles:
- * <ul>
- *   <li>Inline-first: every finding with a file location becomes a diff note</li>
- *   <li>MR summary only has non-inlinable findings (e.g. MR description quality, commit discipline)
- *       plus a compact overview of what was posted inline</li>
- *   <li>Natural, conversational tone — reads like a human code reviewer</li>
- *   <li>No bracket severity labels — emoji conveys urgency</li>
- * </ul>
- *
- * <p><b>Authored-text contract (the upstream detector owns these, this renderer prints them verbatim).</b>
- * The {@code reasoning} and {@code guidance} on a finding are written by the detector, not by this class;
- * this renderer only sanitises and lays them out. Three quality invariants the authored text must satisfy,
- * documented here so the rendering layout never works against them:
- * <ul>
- *   <li><b>M1 — acknowledge the co-occurring good signal.</b> A single BAD finding fires on one defect, but
- *       the change often did something right on the same move (a correct {@code Closes #36} link beside a
- *       thin definition-of-done). The authored {@code reasoning} may open with a one-clause acknowledgement
- *       of that adjacent good signal before the corrective — the single-finding / max-severity contract is
- *       NOT licence to structurally censor all praise. This renderer never strips such an opening clause.</li>
- *   <li><b>M2 — thread-aware, state-neutral guidance.</b> When the disposition comment, rationale, or
- *       ready-state already exists, the authored {@code guidance} must acknowledge it rather than prescribe
- *       the already-satisfied action, and avoid gate-like phrasing ("before marking the PR as ready") in
- *       favour of state-neutral feed-forward.</li>
- *   <li><b>M3 — no fabricated specifics.</b> The authored text must not invent criteria, tools, roles, or
- *       deliverables not named in the artifact (use bare {@code <criterion 1>} placeholders or quote only
- *       phrases that appear in the work), and must not attach generic future-tense advice to a
- *       PRESENT/GOOD strength.</li>
- * </ul>
+ * <p><b>Authored-text contract.</b> {@code reasoning} and {@code guidance} on a finding are written by the
+ * upstream detector, not this class, which only sanitises and lays them out. The detector's text must:
+ * acknowledge an adjacent good signal rather than structurally censor all praise (this renderer never
+ * strips such an opening clause); stay thread-aware and state-neutral rather than prescribe an
+ * already-satisfied action; and never fabricate criteria, tools, or deliverables not named in the artifact.
  */
 class DeliveryComposer {
 
@@ -69,9 +44,8 @@ class DeliveryComposer {
     static final int MAX_IMPROVEMENT_SUGGESTIONS = 3;
 
     /**
-     * Author-side process practices whose finding critiques the PR as a whole (its description, its commit
-     * series) rather than any single changed line — they have no meaningful diff anchor and must be delivered
-     * in the summary, never as an inline note.
+     * Author-side process practices with no meaningful diff anchor (they critique the PR as a whole, not a
+     * single changed line) — must be delivered in the summary, never as an inline note.
      */
     static final Set<String> NON_INLINABLE_PRACTICES = Set.of(
         "describe-what-and-why",
@@ -80,10 +54,10 @@ class DeliveryComposer {
     );
 
     /**
-     * The "is this single issue well-formed?" near-duplicate pair — scoped-to-one-concern and
-     * has-a-checkable-outcome critique the SAME framing, so when both fire as a gap (ABSENT, BAD) we keep only the
-     * highest-severity one. {@code breaks-large-work-into-trackable-subtasks} is excluded on purpose:
-     * "decompose this epic" is a distinct, independently-actionable lesson that must survive on its own.
+     * The "is this single issue well-formed?" near-duplicate pair: scoped-to-one-concern and
+     * has-a-checkable-outcome critique the SAME framing, so when both fire as a gap we keep only the
+     * highest-severity one. {@code breaks-large-work-into-trackable-subtasks} is excluded: "decompose this
+     * epic" is a distinct, independently-actionable lesson.
      */
     private static final Set<String> EPIC_STRUCTURE_PRACTICES = Set.of(
         "issue-scoped-to-single-concern",
@@ -91,28 +65,19 @@ class DeliveryComposer {
     );
 
     /**
-     * Co-occurrence pairs (W4): two practices that, when both fire as a gap (BAD), deliver the SAME
-     * underlying fact and so must collapse to ONE finding rather than pile on as two separate blocking
-     * items. Each entry is {@code redundant-slug → preferred-slug}: when BOTH are present, the redundant
-     * one is dropped and the preferred (more-actionable, anchored-on-the-change) one is kept. The set is
-     * deliberately small and explicit so distinct lessons are never merged.
-     *
-     * <ul>
-     *   <li>{@code ready-and-traceable-handoff → ships-tests-with-the-change}: a DoD checkbox claiming "all
-     *       tests pass" when no tests changed is the no-tests fact, which ships-tests owns more actionably
-     *       (it anchors on the missing test, not on a checkbox).</li>
-     * </ul>
+     * Practice pairs that, when both fire as a gap, deliver the SAME underlying fact and must collapse to
+     * ONE finding. {@code redundant-slug → preferred-slug}: when both are present the redundant one is
+     * dropped, keeping the more-actionable, change-anchored one. E.g. a DoD checkbox claiming "all tests
+     * pass" is the same fact {@code ships-tests-with-the-change} already owns more actionably.
      */
     private static final Map<String, String> CO_OCCURRENCE_REDUNDANT_TO_PREFERRED = Map.ofEntries(
         Map.entry("ready-and-traceable-handoff", "ships-tests-with-the-change")
     );
 
     /**
-     * Curated short, task-level strength phrases keyed by practice slug. A GOOD finding whose slug has an
-     * entry here renders as a concrete "Worth keeping: you're <gerund>." line; a GOOD finding without one
-     * falls back to a generic, grammatical acknowledgement (see {@link #composeSubordinatePositive}). Every
-     * phrase names what the WORK does, never grades the author — the no-self-praise / process-not-person
-     * rules still govern the subordinate line.
+     * Curated short, task-level strength phrases keyed by practice slug, rendered as "Worth keeping: you're
+     * <gerund>."; a slug without one falls back to a generic acknowledgement (see
+     * {@link #composeSubordinatePositive}). Names what the WORK does, never the author.
      */
     private static final Map<String, String> SUBORDINATE_STRENGTH_PHRASES = Map.ofEntries(
         Map.entry("engaging-with-inline-review-comments", "engaging with the review feedback"),
@@ -137,12 +102,10 @@ class DeliveryComposer {
         return path.startsWith(REPO_MOUNT_RELATIVE) ? path.substring(REPO_MOUNT_RELATIVE.length()) : path;
     }
 
-    /** A finding is a problem when its detector-resolved assessment is {@link Assessment#BAD} (ADR 0022). */
     private static boolean isProblem(ValidatedFinding f) {
         return f.assessment() == Assessment.BAD;
     }
 
-    /** A finding is a strength when its detector-resolved assessment is {@link Assessment#GOOD} (ADR 0022). */
     private static boolean isStrength(ValidatedFinding f) {
         return f.assessment() == Assessment.GOOD;
     }
@@ -155,8 +118,7 @@ class DeliveryComposer {
 
     /**
      * Compose feedback for a specific artifact. The blocking call-to-action is artifact-aware: a PR
-     * reads "to fix before merging", an ISSUE simply "to fix" (issues are not merged). "Is this finding a
-     * problem vs a strength?" is decided per finding by its {@code assessment} (ADR 0022).
+     * reads "to fix before merging", an ISSUE simply "to fix".
      */
     @Nullable
     static DeliveryContent compose(List<ValidatedFinding> findings, ArtifactKind artifact) {
@@ -164,11 +126,9 @@ class DeliveryComposer {
     }
 
     /**
-     * Compose with the catalogue-authored transferable principle ({@code whyBySlug}, keyed by practice
-     * slug from {@code Practice.whyItMatters}) surfaced on substantive critiques. The principle is the
-     * feed-forward layer the model is deliberately told NOT to write itself (so it cannot fabricate or
-     * drift it); the server supplies it verbatim here. An empty map omits the principle line, leaving the
-     * rest of the delivery unchanged.
+     * Compose with the catalogue-authored transferable principle ({@code whyBySlug}, from
+     * {@code Practice.whyItMatters}) surfaced on substantive critiques — supplied by the server verbatim
+     * because the model is deliberately told not to write it itself. An empty map omits the principle line.
      */
     @Nullable
     static DeliveryContent compose(
@@ -176,20 +136,16 @@ class DeliveryComposer {
         ArtifactKind artifact,
         Map<String, String> whyBySlug
     ) {
-        // First-pass compose: inline notes have not been posted yet, so NO finding is known-delivered.
-        // An empty delivered-key set makes every inlinable finding render its full summary line — the
-        // safe pre-delivery state, and the permanent fallback for any finding whose inline note never lands.
+        // Pre-delivery: no finding is known-delivered yet, so every inlinable finding keeps its full line.
         return compose(findings, artifact, whyBySlug, Set.of());
     }
 
     /**
-     * Compose with a server-side GROUNDING GUARD (M1): the last line of defence before a hallucinated locus
-     * lands on a student as a confidently-anchored inline note. {@code unifiedDiff} is the raw two-ref diff
-     * of the change under review; any inline anchor whose file is not in that diff's changed-file set, AND
-     * whose evidence snippet is not substring-present in that file's hunk, has its inline anchor DROPPED —
-     * the finding still delivers in full via the summary, only the ungrounded file:line is withheld. Passing
-     * a blank diff (or using an overload without one) disables the guard — a strict no-op, preserving the
-     * existing delivery layout for callers that cannot supply the diff.
+     * Compose with a server-side grounding guard: the last line of defence before a hallucinated locus
+     * lands on a student as a confidently-anchored inline note. {@code unifiedDiff} is the raw diff of the
+     * change under review; an inline anchor whose file is not in the diff's changed-file set, or whose
+     * evidence snippet is not present in that file's hunk, is dropped — the finding still delivers in full
+     * via the summary. A blank diff disables the guard (a strict no-op).
      */
     @Nullable
     static DeliveryContent compose(
@@ -203,11 +159,9 @@ class DeliveryComposer {
 
     /**
      * Recomposes ONLY the MR summary body after inline notes have been posted, demoting every inlinable
-     * finding whose inline comment actually landed (its {@code findingFingerprint} is in {@code deliveredKeys})
-     * to a one-line "see inline comments" pointer, while a finding whose inline note FAILED keeps its full
-     * summary line as the fallback. Re-runs the identical partition pipeline as {@link #compose} so the
-     * recomposed summary cannot drift from the first pass — only the inline section reacts to the signals.
-     * Returns {@code null} when there is nothing to summarise (mirrors {@link #compose}).
+     * finding whose inline comment landed (its key is in {@code deliveredKeys}) to a one-line pointer, while
+     * a finding whose inline note failed keeps its full summary line. Re-runs the identical pipeline as
+     * {@link #compose} so the recomposed summary cannot drift from the first pass.
      */
     @Nullable
     static String recomposeMrNote(
@@ -241,11 +195,10 @@ class DeliveryComposer {
         if (findings == null || findings.isEmpty()) {
             return null;
         }
-        // One transferable principle per practice per delivery — shared across the summary and the inline
-        // diff notes so a slug's "Why this matters" lands exactly once, wherever that finding renders in full.
+        // Shared across the summary and inline notes so a slug's "Why this matters" lands exactly once.
         Set<String> emittedWhy = new HashSet<>();
 
-        // Dropped findings, reported on the DeliveryContent so the ledger marks them SUPPRESSED, not DELIVERED.
+        // Reported on the DeliveryContent so the ledger marks these SUPPRESSED, not DELIVERED.
         List<ValidatedFinding> dedupDropped = new ArrayList<>();
         List<ValidatedFinding> capDropped = new ArrayList<>();
 
@@ -255,39 +208,21 @@ class DeliveryComposer {
             .sorted(Comparator.comparingInt(f -> f.severity().ordinal()))
             .toList();
 
-        // On an ISSUE the two "is this single issue well-formed?" detectors (scoped + checkable) say the
-        // same thing about the same framing, so collapse them to the single highest-severity one — one clear
-        // lesson, not two stacked near-duplicate bullets. breaks-large-work is NOT in the set (it is a
-        // distinct "decompose this epic" lesson that must always survive — see EPIC_STRUCTURE_PRACTICES).
-        // Severity-sorted above (CRITICAL ordinal 0 first), so the first epic-structure finding seen is
-        // the lead we keep; later ones are the redundant siblings we drop. Conservative: ISSUE-only,
-        // and only within EPIC_STRUCTURE_PRACTICES, so distinct lessons are never merged.
         if (ArtifactKinds.ISSUE.equals(artifact)) {
             List<ValidatedFinding> before = negatives;
             negatives = dedupEpicStructure(negatives);
             dedupDropped.addAll(identityDiff(before, negatives));
         }
 
-        // Co-occurrence dedup (W4): two findings sometimes deliver the SAME underlying fact as separate
-        // blocking items (most often the no-tests fact: ready-and-traceable-handoff flags a DoD checkbox that
-        // claims "all tests pass" while ships-tests-with-the-change flags the absent tests). A student
-        // shouldn't read one root cause as two stacked MAJORs, so the pair collapses to ONE — the more
-        // actionable member (the one anchored on the change itself). Defined conservatively as an explicit,
-        // small pair set so distinct lessons (e.g. breaks-large-work vs scope) are never merged.
         {
             List<ValidatedFinding> before = negatives;
             negatives = dedupCoOccurringNegatives(negatives);
             dedupDropped.addAll(identityDiff(before, negatives));
         }
 
-        // PRIORITISE + CAP THE LONG TAIL. Detection legitimately fires many low-value MINOR/INFO nudges;
-        // surfacing all of them buries the 1-3 highest-leverage lessons under a pile-on. Keep EVERY
-        // blocking (CRITICAL/MAJOR) finding — those must never be silently dropped — then keep only the
-        // top MAX_IMPROVEMENT_SUGGESTIONS non-blocking ones (already severity-sorted; ties broken by
-        // confidence so the most-certain nudge wins), and remember how many we collapsed so the opening
-        // can own it honestly with a "+N more minor suggestions" line. The capped list — not the raw one —
-        // is what flows into the inline/summary partition and the diff notes below, so a dropped nudge
-        // leaves no inline comment either.
+        // Every blocking (CRITICAL/MAJOR) finding is kept; only the non-blocking tail is capped (see
+        // capImprovementTail). The capped list, not the raw one, flows into the partition and diff notes
+        // below, so a dropped nudge leaves no inline comment either.
         int improvementOverflow = 0;
         long blockingTotal = negatives
             .stream()
@@ -301,22 +236,18 @@ class DeliveryComposer {
             improvementOverflow = (int) (improvementTotal - MAX_IMPROVEMENT_SUGGESTIONS);
         }
 
-        // No problems → an observation note over the strength findings (see composeNoIssuesNote).
         if (negatives.isEmpty()) {
             List<ValidatedFinding> observed = findings.stream().filter(DeliveryComposer::isStrength).toList();
             if (observed.isEmpty()) {
-                // Nothing decided either way (every finding NOT_APPLICABLE or INCONCLUSIVE): the artifact
-                // was not actually assessed against any active practice, so deliver nothing rather than a
-                // misleading "nothing to change here" all-clear on work that was never actually evaluated.
+                // Every finding NOT_APPLICABLE or INCONCLUSIVE: nothing was actually assessed, so deliver
+                // nothing rather than a misleading "nothing to change here" all-clear.
                 return null;
             }
             return new DeliveryContent(composeNoIssuesNote(observed, whyBySlug, emittedWhy), List.of(), List.of());
         }
 
-        // Partition negatives: inlinable (a diff note) vs non-inlinable (expanded in the summary).
-        // Issues carry no diff, so a positional note can never be posted on them — every issue finding
-        // must be expanded in full in the issue note itself rather than demoted to a diff note that
-        // silently vanishes, leaving the student a bare title with no reasoning or guidance.
+        // Issues carry no diff, so every issue finding must expand in full in the note itself rather than
+        // demote to a diff note that silently vanishes.
         boolean inlineSupported = ArtifactKinds.hasInlineLane(artifact);
         List<ValidatedFinding> inlinable = new ArrayList<>();
         List<ValidatedFinding> nonInlinable = new ArrayList<>();
@@ -328,13 +259,8 @@ class DeliveryComposer {
             }
         }
 
-        // Strength findings the same job produced — surfaced as a brief strengths line before the
-        // critiques so the note acknowledges effort (task-level, not person-level praise).
         List<ValidatedFinding> positives = findings.stream().filter(DeliveryComposer::isStrength).toList();
 
-        // MR summary note: opening + non-inlinable findings expanded + brief inline overview. The inline
-        // overview is signal-driven (deliveredKeys): a finding whose inline comment landed collapses to a
-        // pointer, one whose note failed keeps its full line as the summary fallback.
         String mrNote = composeMrNote(
             positives,
             negatives,
@@ -346,7 +272,6 @@ class DeliveryComposer {
             emittedWhy
         );
 
-        // Diff notes: ALL inlinable negatives get inline comments (grounding guard drops ungrounded anchors)
         List<DiffNote> diffNotes = collectDiffNotes(inlinable, whyBySlug, emittedWhy, grounding);
 
         return new DeliveryContent(mrNote, diffNotes, withheldFindings(dedupDropped, capDropped));
@@ -373,9 +298,8 @@ class DeliveryComposer {
 
     /**
      * The dropped findings as ledger-reportable {@link WithheldFinding}s. Addressed by {@code occurrenceKey}
-     * (the identity of a single observation) rather than {@code recurrenceKey} (a locus several observations
-     * share), so withholding one finding can never mark a delivered sibling at the same locus as suppressed.
-     * An unstamped finding — an unknown slug, never persisted — has no observation to point at and is skipped.
+     * (a single observation) rather than {@code recurrenceKey} (a locus several observations share), so
+     * withholding one finding can never mark a delivered sibling at the same locus as suppressed.
      */
     private static List<PracticeDetectionResultParser.WithheldFinding> withheldFindings(
         List<ValidatedFinding> dedupDropped,
@@ -398,10 +322,8 @@ class DeliveryComposer {
     }
 
     /**
-     * Collapses overlapping epic issue-structure gap (BAD) findings. Keeps the FIRST
-     * {@link #EPIC_STRUCTURE_PRACTICES} finding encountered (the list is severity-sorted, so that is the
-     * highest-severity lead) and drops the rest; every non-epic-structure finding passes through
-     * untouched and in order. No-op when fewer than two epic-structure findings are present.
+     * Keeps the FIRST {@link #EPIC_STRUCTURE_PRACTICES} finding (the list is severity-sorted, so that is
+     * the highest-severity lead) and drops the rest. No-op when fewer than two are present.
      */
     private static List<ValidatedFinding> dedupEpicStructure(List<ValidatedFinding> negatives) {
         long epicCount = negatives
@@ -416,7 +338,7 @@ class DeliveryComposer {
         for (ValidatedFinding f : negatives) {
             if (EPIC_STRUCTURE_PRACTICES.contains(f.practiceSlug())) {
                 if (epicKept) {
-                    continue; // redundant sibling — same epic-structure lesson as the lead already kept
+                    continue;
                 }
                 epicKept = true;
             }
@@ -426,16 +348,11 @@ class DeliveryComposer {
     }
 
     /**
-     * Collapses {@link #CO_OCCURRENCE_REDUNDANT_TO_PREFERRED} pairs whose two members deliver the SAME
-     * underlying fact (W4). For each entry, when BOTH the redundant and the preferred slug are present as
-     * gap (BAD) findings, the redundant one is dropped so the student sees the lesson once via the more
-     * actionable preferred finding. Every other finding passes through untouched and in order; a pair with
-     * only one member present is left alone (no over-merge). Order-preserving over the incoming
-     * severity-sorted list.
+     * Collapses {@link #CO_OCCURRENCE_REDUNDANT_TO_PREFERRED} pairs: when both members are present as gap
+     * findings, the redundant one is dropped. A pair with only one member present is left alone.
      */
     private static List<ValidatedFinding> dedupCoOccurringNegatives(List<ValidatedFinding> negatives) {
         Set<String> present = negatives.stream().map(ValidatedFinding::practiceSlug).collect(Collectors.toSet());
-        // Drop a redundant slug only when its preferred partner is also present in THIS delivery.
         Set<String> toDrop = CO_OCCURRENCE_REDUNDANT_TO_PREFERRED.entrySet()
             .stream()
             .filter(e -> present.contains(e.getKey()) && present.contains(e.getValue()))
@@ -451,12 +368,9 @@ class DeliveryComposer {
     }
 
     /**
-     * Caps the non-blocking (MINOR/INFO) improvement tail to {@link #MAX_IMPROVEMENT_SUGGESTIONS}. EVERY
-     * blocking (CRITICAL/MAJOR) finding is kept — blocking is never capped. Among the non-blocking
-     * findings the kept ones are the highest-severity, then highest-confidence (most certain nudge wins a
-     * tie); the rest are collapsed into the overflow count the caller renders. The returned list preserves
-     * the incoming severity ordering so the existing lead-with-blocking layout is untouched. Caller only
-     * invokes this when the non-blocking count actually exceeds the cap.
+     * Caps the non-blocking (MINOR/INFO) improvement tail to {@link #MAX_IMPROVEMENT_SUGGESTIONS}, keeping
+     * the highest-severity then highest-confidence ones; every blocking finding survives uncapped. Preserves
+     * incoming severity ordering.
      */
     private static List<ValidatedFinding> capImprovementTail(List<ValidatedFinding> negatives) {
         List<ValidatedFinding> blocking = new ArrayList<>();
@@ -468,11 +382,8 @@ class DeliveryComposer {
                 improvements.add(f);
             }
         }
-        // Pick the few highest-leverage improvements: severity (MINOR before INFO) then confidence desc.
-        // Collect by reference IDENTITY (not value-equality): ValidatedFinding is a record, so two findings
-        // with identical content are equal — a value-set would collapse them into one slot, letting the
-        // order-preserving re-emit below match BOTH and overshoot the cap. Identity keeps exactly the
-        // limit()-selected instances.
+        // Identity, not value-equality: ValidatedFinding is a record, so a value-set would collapse two
+        // equal findings into one slot and the re-emit below would match both, overshooting the cap.
         Set<ValidatedFinding> keptImprovements = improvements
             .stream()
             .sorted(
@@ -483,7 +394,6 @@ class DeliveryComposer {
             .limit(MAX_IMPROVEMENT_SUGGESTIONS)
             .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
 
-        // Re-emit in the original (severity-sorted) order, dropping the improvements that did not survive.
         List<ValidatedFinding> kept = new ArrayList<>(blocking.size() + keptImprovements.size());
         for (ValidatedFinding f : negatives) {
             if (blocking.contains(f) || keptImprovements.contains(f)) {
@@ -501,21 +411,16 @@ class DeliveryComposer {
 
     /**
      * Compose the note posted when no issues were found — reports what was reviewed and, where the agent
-     * recorded reasoning, what it observed against each practice. Carries NO self-level praise: feedback stays
-     * at the task/process level, never person-directed.
-     *
-     * <p>W7 — the catalogue-authored transferable principle ({@code whyBySlug}) is surfaced on the all-GOOD
-     * path too, on the lead strength bullet, so an above-bar student hears the standard affirmed rather than
-     * silence. It is the same verbatim "Why this matters" line the critique path uses (the feed-up layer),
-     * and it lands at most once per delivery via the shared {@code emittedWhy} ledger.
+     * recorded reasoning, what it observed against each practice. Carries no self-level praise: task/process
+     * level only. Also surfaces the catalogue-authored principle ({@code whyBySlug}) on the lead bullet, so
+     * an above-bar student hears the standard affirmed rather than silence.
      */
     private static String composeNoIssuesNote(
         List<ValidatedFinding> observed,
         Map<String, String> whyBySlug,
         Set<String> emittedWhy
     ) {
-        // Findings whose reasoning lets us cite a concrete observation, ranked most-certain first so the
-        // highest-confidence reinforcements survive the cap.
+        // Ranked most-certain first so the highest-confidence reinforcements survive the cap.
         List<ValidatedFinding> withReasoning = observed
             .stream()
             .filter(f -> f.reasoning() != null && !f.reasoning().isBlank())
@@ -531,17 +436,15 @@ class DeliveryComposer {
         boolean principleShown = false;
         for (ValidatedFinding f : withReasoning) {
             if (shown >= MAX_STRENGTH_REINFORCEMENTS) break;
-            // Whole-sentence budget clamp: never clip a multi-clause observation mid-enumeration.
             String summary = clampToSentenceBudget(sanitizeStudentText(f.reasoning()).strip(), STRENGTH_BUDGET);
             if (summary.isBlank()) {
-                // The reasoning was entirely grading-meta and scrubbed to nothing — skip it rather than
-                // emit a bare "- **Practice:** " bullet with no observation behind it.
+                // Reasoning was entirely grading-meta and scrubbed to nothing — skip rather than emit a
+                // bare bullet with no observation behind it.
                 continue;
             }
             String label = capitalize(f.practiceSlug().replace('-', ' '));
             bullets.append("- **").append(label).append(":** ").append(summary);
-            // Feed-forward: append the grounded guidance (transferable principle + one forward prompt). Bare,
-            // empty, or "No change needed." guidance degrades gracefully to just the observation.
+            // Bare, empty, or "No change needed." guidance degrades gracefully to just the observation.
             String forward = clampToSentenceBudget(
                 sanitizeStudentText(f.guidance() == null ? "" : f.guidance()).strip(),
                 STRENGTH_BUDGET
@@ -550,7 +453,6 @@ class DeliveryComposer {
                 bullets.append(' ').append(forward);
             }
             bullets.append("\n");
-            // W7: feed-up \u2014 append the catalogue "Why this matters" on the lead bullet that has one, once.
             if (!principleShown) {
                 String why = strengthPrincipleText(f, whyBySlug, emittedWhy);
                 if (!why.isBlank()) {
@@ -563,16 +465,13 @@ class DeliveryComposer {
         if (shown == 0) {
             return "Reviewed against the active practices \u2014 nothing to change here.\n";
         }
-        // Build-on framing (mentoring, not audit) \u2014 task/process level, never person-level praise.
         return "What's working well here, and how to keep building on it:\n\n" + bullets + "\n";
     }
 
     /**
-     * The catalogue "Why this matters" line for a STRENGTH finding on the all-GOOD path (W7), or {@code ""}
-     * when there is none to surface (no authored principle, or one already emitted this delivery). Unlike
-     * {@link #principleText}, it does NOT skip on INFO severity \u2014 a strength finding carries INFO by
-     * construction, yet the affirmed standard is exactly what an above-bar student should hear. Still deduped
-     * once-per-delivery via the shared {@code emittedWhy} ledger so the same slug never repeats its principle.
+     * The catalogue "Why this matters" line for a STRENGTH finding, or {@code ""} when there is none to
+     * surface. Unlike {@link #principleText}, does not skip on INFO severity \u2014 a strength finding carries
+     * INFO by construction. Deduped once-per-delivery via the shared {@code emittedWhy} ledger.
      */
     private static String strengthPrincipleText(
         ValidatedFinding f,
@@ -623,11 +522,8 @@ class DeliveryComposer {
         return out.toString().strip();
     }
 
-    /**
-     * Short, task-level strength phrases keyed by practice slug — used to acknowledge what the work
-     * already does well before listing improvements. Task/process-level by design (never person-level
-     * praise). Unknown slugs (custom practices) fall back to a humanised practice name.
-     */
+    /** Short, task-level strength phrases keyed by practice slug, used to acknowledge what the work already
+     * does well before listing improvements. */
     private static final Map<String, String> STRENGTH_PHRASES = Map.ofEntries(
         Map.entry("scope-one-reviewable-change", "keeping the change focused and reviewable"),
         Map.entry("describe-what-and-why", "explaining what changed"),
@@ -640,18 +536,16 @@ class DeliveryComposer {
     );
 
     /**
-     * Builds a one-sentence strengths acknowledgement from up to two GOOD (strength) findings, e.g.
-     * "Nice work keeping the change focused and reviewable and linking the change to its issue — a
-     * couple of things to tighten:". Returns "" when there are no positives. Strictly task-level: it
-     * names what the work does, never grades the author.
+     * Builds a one-sentence strengths acknowledgement from up to two GOOD findings, e.g. "Nice work keeping
+     * the change focused and reviewable and linking the change to its issue — a couple of things to
+     * tighten:". Returns "" when there are no positives.
      */
     static String composeAcknowledgement(List<ValidatedFinding> positives, int improvementCount) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
-        // Curated gerund phrases ONLY — a non-curated slug humanised to raw text ("triages the issue …")
-        // breaks the "Nice work keeping X and [Ying]" grammar, so an un-phrased strength is simply not
-        // named in the opener rather than dumped verbatim.
+        // Curated gerund phrases only — a raw slug ("triages the issue …") breaks the "Nice work keeping X
+        // and [Ying]" grammar, so an un-phrased strength is simply not named in the opener.
         List<String> phrases = positives
             .stream()
             .map(f -> STRENGTH_PHRASES.get(f.practiceSlug()))
@@ -659,14 +553,12 @@ class DeliveryComposer {
             .distinct()
             .limit(2)
             .toList();
-        // The lead-in counts the IMPROVEMENTS that follow, not the strengths named — otherwise a single
-        // strength in front of two suggestions reads "one thing to tighten:" above a list of two.
+        // Counts the IMPROVEMENTS that follow, not the strengths named — a single strength in front of two
+        // suggestions must not read "one thing to tighten:" above a list of two.
         String tail = improvementCount > 1 ? " — a couple of things to tighten:" : " — one thing to tighten:";
         if (phrases.isEmpty()) {
-            // C2: a real GOOD strength exists but none has a curated gerund phrase. Acknowledge it
-            // GENERICALLY rather than (a) silently dropping the whole opener — a real positive then vanishes —
-            // or (b) dumping an ungrammatical raw slug into the "Nice work <gerund>" frame. "Nice work here"
-            // is grammatical and never drops the acknowledgement.
+            // A real GOOD strength exists but none has a curated phrase — acknowledge generically rather
+            // than drop the opener or dump the raw slug into the "Nice work <gerund>" frame.
             return "Nice work here" + tail;
         }
         String strengths = phrases.size() == 1 ? phrases.get(0) : phrases.get(0) + " and " + phrases.get(1);
@@ -674,17 +566,10 @@ class DeliveryComposer {
     }
 
     /**
-     * Builds the single earned strength line allowed alongside blocking issues (W1). Formative feedback
-     * REQUIRES naming what to keep doing, so even under a blocking finding the note opens its body with ONE
-     * brief, genuine acknowledgement of the run's HIGHEST-CONFIDENCE GOOD finding — any practice, not only
-     * process ones — before the corrective lands. This is NOT a feedback sandwich that buries the critique:
-     * it is a single subordinate line ("Worth keeping: …") rendered after the issue count, and the
-     * no-self-praise / process-not-person rules still govern it (it names what the WORK does).
-     *
-     * <p>A GOOD finding whose slug has a curated phrase renders it concretely; a GOOD finding without one
-     * is acknowledged generically ("Worth keeping: there's solid work here to build on.") rather than (a)
-     * dropped — a real strength then vanishes — or (b) dumped as a raw ungrammatical slug. Returns "" only
-     * when there is genuinely no GOOD finding to surface.
+     * The single earned strength line allowed alongside blocking issues: one brief acknowledgement of the
+     * run's highest-confidence GOOD finding, rendered after the issue count — not a feedback sandwich that
+     * buries the critique. A slug without a curated phrase falls back to a generic line rather than
+     * dropping the acknowledgement or dumping a raw slug.
      */
     static String composeSubordinatePositive(List<ValidatedFinding> positives) {
         if (positives == null || positives.isEmpty()) {
@@ -705,22 +590,19 @@ class DeliveryComposer {
         if (phrase != null && !phrase.isBlank()) {
             return "Worth keeping: you're " + phrase + ".";
         }
-        // C2 (subordinate): a real GOOD strength with no curated gerund — acknowledge generically and
-        // grammatically rather than drop it or dump the raw slug into the "you're <gerund>" frame.
         return "Worth keeping: there's solid work here to build on.";
     }
 
     /**
-     * Matches the whitespace run that separates two sentences (a sentence-ending [.!?] then whitespace).
-     * Used to tokenise student text while preserving the original separator, so Markdown lists and
-     * headings (whose items end in '.') keep their newlines instead of being folded onto one line.
+     * Matches the whitespace run that separates two sentences. Used to tokenise student text while
+     * preserving the original separator, so Markdown lists and headings keep their newlines instead of
+     * being folded onto one line.
      */
     private static final Pattern SENTENCE_SEPARATOR = Pattern.compile("(?<=[.!?])\\s+");
 
     /**
      * Strips internal grading vocabulary from student-facing text. Delegates to the shared
-     * {@link StudentTextSanitizer} so the SCM composer, the reflective dashboard, and the mentor context files
-     * all run the SAME scrub (audit firewall gap #1). Kept as a package-visible seam for the composer tests.
+     * {@link StudentTextSanitizer} so every composer runs the same scrub. Package-visible for the tests.
      */
     static String sanitizeStudentText(@Nullable String text) {
         return StudentTextSanitizer.sanitize(text);
@@ -759,11 +641,8 @@ class DeliveryComposer {
         return Character.toUpperCase(s.charAt(0)) + s.substring(1);
     }
 
-    /**
-     * Check whether a finding is non-inlinable (belongs in MR summary, not a diff note).
-     * Non-inlinable if: practice is inherently non-inlinable, OR finding has neither a
-     * usable evidence location nor an agent-supplied {@code suggestedDiffNote}.
-     */
+    /** Non-inlinable if the practice is inherently so, or the finding has neither a usable evidence
+     * location nor an agent-supplied {@code suggestedDiffNote}. */
     private static boolean isNonInlinable(ValidatedFinding f) {
         if (NON_INLINABLE_PRACTICES.contains(f.practiceSlug())) {
             return true;
@@ -776,16 +655,10 @@ class DeliveryComposer {
     }
 
     /**
-     * Compose the MR note. Structure:
-     * 1. Opening issue/suggestion counts (evidence-anchored, no praise)
-     * 2. Non-inlinable findings (full detail, with separators)
-     * 3. Brief overview of inline findings — signal-driven by {@code deliveredKeys}
-     *
-     * <p>Pure: the inline overview reacts only to the injected {@code deliveredKeys} set (no I/O). An
-     * inlinable finding whose inline comment actually landed (its correlation key is in the set) collapses
-     * to a single "see inline comments" pointer — the detail already lives on the diff. A finding whose
-     * inline note did NOT land keeps its full summary line, so a delivery failure still reaches the student
-     * somewhere. An empty set means "nothing delivered yet" → every inlinable finding keeps its full line.
+     * Compose the MR note: opening counts, non-inlinable findings in full, then a brief overview of inline
+     * findings. Pure — the inline overview reacts only to the injected {@code deliveredKeys} set. A finding
+     * whose inline comment landed collapses to a "see inline comments" pointer; one whose note did not land
+     * keeps its full summary line, so a delivery failure still reaches the student somewhere.
      */
     static String composeMrNote(
         List<ValidatedFinding> positives,
@@ -799,11 +672,8 @@ class DeliveryComposer {
     ) {
         var sb = new StringBuilder(4096);
 
-        // Strengths first: name 1-2 things the work already does well (task-level acknowledgement)
-        // before the critiques, so a suggestions-only note is never deficit-only when the job also
-        // found strengths. Suppressed when there is a blocking (CRITICAL/MAJOR) issue: front-loading
-        // praise ahead of a serious problem reads as a hollow "feedback sandwich" and dilutes the
-        // message. Task/process-level only — never person-level praise.
+        // Suppressed when there is a blocking issue: front-loading praise ahead of a serious problem
+        // reads as a hollow "feedback sandwich".
         boolean hasBlocking = allNegatives
             .stream()
             .anyMatch(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR);
@@ -814,16 +684,10 @@ class DeliveryComposer {
             }
         }
 
-        // Opening: evidence-anchored issue summary (no self-level praise). The overflow count is owned
-        // here so the student is told honestly that lower-value nudges were collapsed, not hidden.
         composeOpening(sb, allNegatives, improvementOverflow);
 
-        // When blocking issues exist the cheerful multi-strength opener is suppressed (anti-feedback-sandwich),
-        // but a single EARNED acknowledgement must still land (W1): formative feedback requires naming what to
-        // keep doing, and the run already detected it. Surface AT MOST ONE, subordinate — a short single line
-        // AFTER the issue count, never a sandwich opener — picking the highest-confidence GOOD finding of the
-        // run (any practice). This is bounded to one line and stays task-level, so the corrective is never
-        // buried and no self-praise leaks in.
+        // The multi-strength opener above is suppressed when blocking, but one earned acknowledgement
+        // still lands, subordinate, after the issue count rather than as a sandwich opener.
         if (hasBlocking) {
             String reinforcement = composeSubordinatePositive(positives);
             if (!reinforcement.isEmpty()) {
@@ -831,7 +695,6 @@ class DeliveryComposer {
             }
         }
 
-        // Non-inlinable findings (full detail) — these only exist in the summary
         for (int i = 0; i < nonInlinable.size(); i++) {
             composeFinding(sb, nonInlinable.get(i), whyBySlug, emittedWhy);
             if (i < nonInlinable.size() - 1 || !inlinable.isEmpty()) {
@@ -839,16 +702,11 @@ class DeliveryComposer {
             }
         }
 
-        // Inline findings — signal-driven. The label is emitted whenever the list is non-empty (gating it on
-        // nonInlinable would leave a clean PR with only inline findings showing an UNLABELED wall of duplicated
-        // headers right after the count opener). A finding whose inline comment LANDED (its correlation key
-        // is in deliveredKeys) is not re-listed here — its full detail already lives on the diff, so the
-        // summary only points at it. A finding whose inline note did NOT land keeps its full header line so
-        // the lesson still reaches the student in the summary (the delivery-failure fallback). With an empty
-        // deliveredKeys set (pre-delivery / no signals) every inlinable finding keeps its full line.
+        // The label is emitted whenever the list is non-empty, not gated on nonInlinable, so a PR with
+        // only inline findings doesn't show an unlabeled wall of headers.
         if (!inlinable.isEmpty()) {
-            // A null/blank correlation key can never match a delivered key (and Set.of().contains(null)
-            // throws), so a keyless finding is always treated as undelivered → keeps its full summary line.
+            // A null/blank correlation key can never match a delivered key (Set.of().contains(null) also
+            // throws), so a keyless finding is always treated as undelivered.
             List<ValidatedFinding> undelivered = inlinable
                 .stream()
                 .filter(f -> f.recurrenceKey() == null || !deliveredKeys.contains(f.recurrenceKey()))
@@ -874,22 +732,15 @@ class DeliveryComposer {
     }
 
     private static void composeOpening(StringBuilder sb, List<ValidatedFinding> negatives, int improvementOverflow) {
-        // Hephaestus is a NON-BLOCKING, feedback-first mentor — it never gates a merge. "to fix before
-        // merging" is gatekeeping language that is wrong on every PR (and absurd on an already-merged one),
-        // so the call-to-action is state-neutral feed-forward: name what is worth tightening, not a gate to
-        // clear. Issues are not merged either, so they share the same "to tighten" framing. Merge-state is
-        // not plumbed into the composer; the non-blocking reframe is correct regardless of state, so no
-        // brittle state dependency is added just for this line.
+        // Hephaestus never gates a merge, so the call-to-action is state-neutral feed-forward ("to tighten"),
+        // not "to fix before merging"; merge-state is not plumbed into the composer.
         String blockingCta = " to tighten";
         long blockingCount = negatives
             .stream()
             .filter(f -> f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR)
             .count();
-        // negatives is the CAPPED list, so this is the count we actually expand below. The collapsed
-        // remainder is carried separately in improvementOverflow and disclosed via the overflow tail.
+        // negatives is the CAPPED list; the collapsed remainder is disclosed via improvementOverflow.
         long improvementCount = negatives.size() - blockingCount;
-        // "+N more minor suggestions" — honest disclosure that lower-value nudges were folded away so the
-        // student is never silently shorted, while the note still leads with the few that matter.
         String overflowTail =
             improvementOverflow > 0
                 ? " (+" + improvementOverflow + " more minor suggestion" + (improvementOverflow == 1 ? "" : "s") + ")"
@@ -907,8 +758,6 @@ class DeliveryComposer {
                 .append(overflowTail)
                 .append(":\n\n");
         } else if (blockingCount > 0) {
-            // Blocking-only opener: overflow can't reach this branch — it always co-occurs with surviving
-            // improvements (the branch above), since the cap keeps MAX_IMPROVEMENT_SUGGESTIONS when it collapses any.
             sb
                 .append(blockingCount)
                 .append(blockingCount == 1 ? " issue" : " issues")
@@ -950,32 +799,25 @@ class DeliveryComposer {
         String location = extractPrimaryLocation(f);
         String lang = detectLanguage(f);
 
-        // For CRITICAL/MAJOR: "You wrote:" → reasoning → "Instead:" with fix
         if (f.severity() == Severity.CRITICAL || f.severity() == Severity.MAJOR) {
             String snippet = extractPrimarySnippet(f);
-            // A "You wrote:" quote is meant to echo the STUDENT's artifact. When the agent instead drops its
-            // own pipeline plumbing / rubric mechanics into the evidence field ("diff_stat.txt lists 28 …
-            // material disagreement; trusting the diff"), the verbatim quote would leak it past the
-            // reasoning sanitizer — so suppress the quote entirely when it carries grader mechanics.
+            // Suppress the "You wrote:" quote when it carries grader mechanics instead of the student's
+            // own artifact (the agent sometimes drops pipeline plumbing into the evidence field).
             if (snippet != null && !containsGraderMechanics(snippet)) {
                 boolean hasCodeLocation = location != null;
                 if (hasCodeLocation) {
-                    // Real code reference → fenced code block. This echo is high-value (shows the offending line).
                     sb.append("You wrote:\n");
                     sb.append("```").append(lang).append("\n").append(snippet).append("\n```\n\n");
                 }
-                // Metadata-field findings (title/body spans, draft/WIP flags) intentionally do NOT echo a
-                // "You wrote: …" quote. The agent's metadata span is frequently a truncated heading, a single
-                // token, a title==body echo, or a serialized boolean ("[Feat", "false", "Analysis Object Model
-                // (AOM)", a mid-sentence body cut) that reads as broken output and leaks raw fields to the
-                // student; it added no value the reasoning + guidance don't already carry.
+                // Metadata-field findings (title/body spans, flags) do not echo a quote: the agent's
+                // metadata span is frequently a truncated heading or serialized boolean that reads as
+                // broken output.
             }
 
             appendStudentText(sb, f.reasoning());
             appendPrinciple(sb, f, whyBySlug, emittedWhy);
             appendStudentText(sb, f.guidance());
         } else {
-            // MINOR/INFO: combine reasoning + guidance naturally
             appendStudentText(sb, f.reasoning());
             appendPrinciple(sb, f, whyBySlug, emittedWhy);
             appendStudentText(sb, f.guidance());
@@ -983,20 +825,12 @@ class DeliveryComposer {
     }
 
     /**
-     * Surfaces the catalogue-authored transferable principle ({@code Practice.whyItMatters}) as a single
-     * "Why this matters" line between the grounded observation and the forward step — completing Hattie's
-     * formative loop (feed-back → principle → feed-forward) that a task-level critique otherwise lacks.
-     *
-     * <p>Pulled VERBATIM from the catalogue (never model-generated), so it cannot fabricate or drift and
-     * carries no rubric vocabulary. Emitted at most once per practice slug per delivery (shared
-     * {@code emittedWhy}) so a multi-finding note never repeats it, and never on an INFO nudge.
-     *
-     * <p>Cognitive-load budget: a BLOCKING (CRITICAL/MAJOR) critique each keeps its principle — the stakes
-     * justify the why and the developer cannot simply ignore it. But ADVISORY (MINOR) critiques get at most
-     * ONE principle line across the whole delivery: a craft-heavy note (several suggestions) lands a single
-     * teaching moment rather than a wall of rationale that reads as preachy and dilutes the lesson (Shute
-     * 2008 "as simple as possible"; reactance to repeated unsolicited justification). An absent/blank entry
-     * (e.g. the empty default map) is a no-op, so a slug without an authored principle changes nothing.
+     * Surfaces the catalogue-authored transferable principle ({@code Practice.whyItMatters}) as a "Why this
+     * matters" line between the observation and the forward step. Pulled verbatim from the catalogue, never
+     * model-generated, so it cannot fabricate or drift. Emitted at most once per practice slug per delivery,
+     * and never on an INFO nudge. A blocking (CRITICAL/MAJOR) critique keeps its principle every time;
+     * advisory (MINOR) critiques get at most one across the whole delivery, so a craft-heavy note lands a
+     * single teaching moment rather than a wall of rationale.
      */
     private static void appendPrinciple(
         StringBuilder sb,
@@ -1137,11 +971,8 @@ class DeliveryComposer {
     }
 
     /**
-     * Collect inline diff notes from BAD (problem) findings.
-     *
-     * <p>Prefer the agent's per-finding {@code suggestedDiffNotes} (richer, explicit lines/body).
-     * Fall back to a synthesized note from the first evidence location + composed body when the
-     * agent did not supply one.
+     * Collect inline diff notes from BAD findings. Prefers the agent's {@code suggestedDiffNotes}, falling
+     * back to a synthesized note from the first evidence location when the agent did not supply one.
      */
     private static List<DiffNote> collectDiffNotes(
         List<ValidatedFinding> negatives,
@@ -1154,36 +985,22 @@ class DeliveryComposer {
         for (ValidatedFinding f : negatives) {
             if (notes.size() >= PracticeDetectionResultParser.MAX_DELIVERY_DIFF_NOTES) break;
 
-            // Prefer the agent's suggestedDiffNotes — but at most ONE per finding (its primary anchor). A
-            // single lesson split across several near-identical inline notes reads as nagging; the summary
-            // already lists the finding once, so one inline note carries the detail without the pile-on.
+            // At most ONE inline note per finding (its primary anchor) — several near-identical notes for
+            // the same lesson reads as nagging.
             if (!f.suggestedDiffNotes().isEmpty()) {
-                // Prefer the agent's note, but run its body through the same student-text sanitizer the
-                // synthesized branch uses: the agent body is raw model output and can echo grading-meta that
-                // the student must never see (the synthesized path scrubs via appendStudentText, this one did
-                // not). Carry the finding's correlation key so the inline channel can match the delivered
-                // placement back to its persisted finding (ADR 0021).
+                // Sanitize even the agent's own note: its body is raw model output and can echo grading-meta.
                 DiffNote suggested = f.suggestedDiffNotes().get(0);
-                // GROUNDING GUARD (M1): drop the inline ANCHOR if it is ungrounded — a path absent from the
-                // diff's changed-file set whose finding-evidence snippet is not substring-present in that
-                // file's hunk. The finding is not lost: with no inline note it keeps its full summary line.
                 if (!grounding.anchorIsGrounded(suggested.filePath(), extractPrimarySnippet(f))) {
                     continue;
                 }
                 String clean = sanitizeStudentText(suggested.body());
                 if (clean.isBlank()) continue;
-                // Append the transferable principle so an inline note (the primary surface for an inlinable
-                // finding — its summary line collapses to a pointer once delivered) still completes the
-                // formative loop rather than landing as a bare terse fix.
                 String principle = principleText(f, whyBySlug, emittedWhy);
                 String body = principle.isEmpty() ? clean : clean + "\n\n" + principle.strip();
                 notes.add(
                     new DiffNote(
-                        // Repo-relativise the anchor path so the inline note targets the same file path the
-                        // summary line shows. The agent's suggested path can carry the raw repo-mount prefix
-                        // (inputs/sources/scm/repo/…); the downstream poster anchors on a repo-relative diff
-                        // path, so a raw-prefixed anchor mis-anchors or is dropped while the summary still
-                        // names the finding.
+                        // The agent's suggested path can carry the raw repo-mount prefix; the downstream
+                        // poster anchors on a repo-relative path, so a raw-prefixed anchor mis-anchors.
                         repoRelative(suggested.filePath()),
                         suggested.startLine(),
                         suggested.endLine(),
@@ -1220,9 +1037,6 @@ class DeliveryComposer {
 
             String body = composeDiffNoteBody(f, whyBySlug, emittedWhy);
             if (body != null && !body.isBlank()) {
-                // Synthesized note inherits the finding's correlation key, same as the suggested-note branch.
-                // Repo-relativise the anchor path (mirrors extractPrimaryLocation and the grounding guard) so
-                // the inline note targets the same repo-relative path the summary shows.
                 notes.add(new DiffNote(repoRelative(pathNode.asString()), startLine, endLine, body, f.recurrenceKey()));
             }
         }
@@ -1230,10 +1044,7 @@ class DeliveryComposer {
         return notes;
     }
 
-    /**
-     * Compose a diff note body — the full finding content placed inline on the diff.
-     * Since the MR summary only has a compact list, the diff note carries the full detail.
-     */
+    /** Compose a diff note body — the full finding content placed inline on the diff. */
     @Nullable
     private static String composeDiffNoteBody(
         ValidatedFinding f,
@@ -1256,20 +1067,14 @@ class DeliveryComposer {
     }
 
     /**
-     * Server-side grounding context for the inline-anchor guard. Built from the raw two-ref diff of the
-     * change under review, it answers one question: is a finding's proposed inline anchor real, or a
-     * hallucinated locus that would land a confident file:line note on a student about code that isn't there?
+     * Server-side grounding context for the inline-anchor guard: is a finding's proposed inline anchor
+     * real, or a hallucinated locus that would land a confident file:line note about code that isn't there?
+     * An anchor is grounded when its file is in the diff's changed-file set and the finding's evidence
+     * snippet is present in that file's hunk text.
      *
-     * <p>An anchor is grounded when its file is in the diff's changed-file set AND the finding's evidence
-     * snippet is substring-present in that file's hunk text. With {@code forceNoLocus} — issues, which have
-     * no file path at all — every anchor is ungrounded. With {@code active} false, no diff was supplied and
-     * the guard is a strict no-op: every anchor passes, so the delivery layout is unchanged for callers that
-     * cannot produce the diff.
-     *
-     * @param active        whether the guard runs at all (false ⇒ no-op pass-through)
-     * @param forceNoLocus  whether to reject every anchor regardless of the diff (issues have no file locus)
-     * @param hunkByFile    changed file path → concatenated added/context hunk text (new-side), for the
-     *                      snippet substring check
+     * @param active       whether the guard runs at all (false ⇒ no-op pass-through, no diff was supplied)
+     * @param forceNoLocus reject every anchor regardless of the diff (issues have no file locus)
+     * @param hunkByFile   changed file path → concatenated added/context hunk text (new-side)
      */
     record GroundingContext(boolean active, boolean forceNoLocus, Map<String, String> hunkByFile) {
         /** The no-op context: the guard does not run and every anchor is admitted unchanged. */
@@ -1278,11 +1083,9 @@ class DeliveryComposer {
         }
 
         /**
-         * Build the guard from an artifact + its raw unified diff. ISSUE ⇒ force-no-locus (issue findings
-         * carry no file anchor). PR with a non-blank diff ⇒ an active snippet/changed-file guard. PR with no
-         * diff ⇒ inactive (no-op): without the diff we cannot tell grounded from hallucinated, and silently
-         * dropping every anchor would be worse than the status quo, so we fall back to the pre-existing
-         * downstream {@code DiffHunkValidator} line check.
+         * ISSUE ⇒ force-no-locus. PR with a diff ⇒ active guard. PR with no diff ⇒ inactive: without the
+         * diff we cannot tell grounded from hallucinated, so we fall back to the downstream
+         * {@code DiffHunkValidator} line check rather than silently drop every anchor.
          */
         static GroundingContext fromDiff(ArtifactKind artifact, @Nullable String unifiedDiff) {
             if (ArtifactKinds.ISSUE.equals(artifact)) {
@@ -1295,11 +1098,9 @@ class DeliveryComposer {
         }
 
         /**
-         * Is {@code path}'s inline anchor grounded? A no-op context admits everything; a force-no-locus
-         * context (issue) rejects everything. Otherwise the path must be a changed file, and — when a
-         * non-blank {@code snippet} is given — that snippet (whitespace-normalised) must appear in the file's
-         * hunk text. A blank/absent snippet falls back to changed-file membership alone (we have nothing to
-         * substring-match, so the path being in the diff is the strongest signal available).
+         * A no-op context admits everything; force-no-locus (issue) rejects everything. Otherwise the path
+         * must be a changed file, and a non-blank snippet must appear (whitespace-normalised) in that
+         * file's hunk text; a blank snippet falls back to changed-file membership alone.
          */
         boolean anchorIsGrounded(@Nullable String path, @Nullable String snippet) {
             if (!active) return true;
@@ -1308,21 +1109,18 @@ class DeliveryComposer {
             String key = repoRelative(path);
             String hunk = hunkByFile.get(key);
             if (hunk == null) {
-                // Path is not in the diff's changed-file set ⇒ hallucinated locus.
                 return false;
             }
             if (snippet == null || snippet.isBlank()) {
-                // No snippet to verify against — the changed-file membership is the grounding we have.
                 return true;
             }
             return hunk.contains(normalizeForMatch(snippet));
         }
 
         /**
-         * Parse a unified diff into {@code newPath → concatenated new-side hunk text} (added + context
-         * lines), whitespace-normalised for a tolerant substring check. Mirrors
-         * {@link DiffHunkValidator#parseValidLines}'s header handling: tolerates the {@code [L<n>]} annotated
-         * form and resolves the file from the {@code diff --git a/… b/<path>} header.
+         * Parse a unified diff into {@code newPath → concatenated new-side hunk text}. Mirrors
+         * {@link DiffHunkValidator#parseValidLines}'s header handling: tolerates the {@code [L<n>]}
+         * annotated form and resolves the file from the {@code diff --git a/… b/<path>} header.
          */
         private static Map<String, String> parseHunksByFile(String diff) {
             Map<String, StringBuilder> acc = new HashMap<>();
@@ -1339,8 +1137,7 @@ class DeliveryComposer {
                     continue;
                 }
                 if (currentFile == null) continue;
-                // Collect new-side content: added (+) and context ( ) lines. Skip hunk headers, ---/+++ file
-                // markers, and deletions (not present in the new file the student is reading).
+                // New-side only: skip hunk headers, file markers, and deletions.
                 if (line.startsWith("@@") || line.startsWith("+++") || line.startsWith("---")) continue;
                 if (line.startsWith("+") || line.startsWith(" ")) {
                     acc.get(currentFile).append(normalizeForMatch(line.substring(1))).append('\n');

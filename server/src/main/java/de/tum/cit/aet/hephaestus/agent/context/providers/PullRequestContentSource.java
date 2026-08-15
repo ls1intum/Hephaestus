@@ -56,11 +56,7 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
     private static final SourceKind DIFF = new SourceKind("scm.pull-request.diff");
     private static final SourceKind COMMENTS = new SourceKind("scm.pull-request.comments");
 
-    /**
-     * The declared proof that pull request review context can be assembled. The integration framework checks
-     * this against every descriptor that calls itself reviewable, so a kind cannot be opened for
-     * practices before anything can materialise its subject.
-     */
+    /** Checked by the integration framework against every descriptor that calls itself reviewable. */
     @Override
     public ArtifactKind artifactKind() {
         return ScmSignals.PULL_REQUEST;
@@ -379,8 +375,8 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
         for (var comment : comments) {
             var commentNode = objectMapper.createObjectNode();
             commentNode.put("path", comment.getPath());
-            // line is a primitive int; a file-level / general review comment has no anchored line and reports 0.
-            // Omit the key in that case so an absent anchor reads as absent, not as a literal line-0 anchor.
+            // line is a primitive int; a file-level comment has no anchor and reports 0. Omit the key then,
+            // so an absent anchor reads as absent rather than as a literal line-0 anchor.
             if (comment.getLine() > 0) {
                 commentNode.put("line", comment.getLine());
             }
@@ -430,10 +426,9 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
             }
             String diffStat = gitDiffOperations.diffStat(repoPath, range[0], range[1]);
             String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
-            // A null diff denotes a failed read: an unresolved object, an I/O error, or the size
-            // cap. It must not be stored as an empty diff. The contract does not permit PARTIAL for
-            // this source, so an unreadable diff is reported as a collection error; storing zero
-            // bytes would report AVAILABLE, EMPTY and COMPLETE for a change that was never read.
+            // A null diff denotes a failed read (unresolved object, I/O error, or the size cap), never an
+            // empty diff: storing zero bytes would report a change that was never read as AVAILABLE,
+            // EMPTY and COMPLETE.
             if (diff == null) {
                 throw new JobPreparationException(
                     "Diff could not be read for range=" +
@@ -536,9 +531,8 @@ public class PullRequestContentSource implements EvidenceSource, ReviewContextBu
                 .append(" |\n");
         }
 
-        // Deliberately an index and nothing more. Appending each file's diff here would repeat the whole
-        // of diff.patch, putting a large change into the model's context twice — and this copy carries no
-        // [L<n>] line markers, making it the worse of the two to quote from.
+        // Deliberately an index, not the diffs themselves: this copy carries no [L<n>] line markers, so
+        // appending them here would put the change in context twice and leave the worse copy to quote from.
         summary.append("\nThe change itself is in `diff.patch`, annotated with line numbers for citation.\n");
 
         byte[] summaryBytes = summary.toString().getBytes(StandardCharsets.UTF_8);

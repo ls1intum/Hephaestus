@@ -11,16 +11,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * What a campaign is likely to cost, derived from what this workspace's reviews have actually cost.
+ * What a campaign is likely to cost, derived from this workspace's own recent review costs rather than a
+ * fleet-wide constant — price depends on the model bound, diff size and how many practices are on.
  *
- * <p>Derived rather than configured because a fleet-wide "cost per review" constant would be wrong for
- * every workspace at once: the price depends on the model the workspace bound, the size of its diffs and
- * how many practices it has turned on. The workspace's own recent reviews of the same artifact kind are
- * the closest available predictor.
- *
- * <p>Deliberately returns {@code null}, not zero, when there is nothing to derive from. A fresh workspace
- * — the one most likely to want a backfill — has no history at all, and a zero on the confirmation
- * screen reads as "this is free".
+ * <p>Returns {@code null}, not zero, when there is nothing to derive from: a zero on a fresh workspace's
+ * confirmation screen would read as "this is free".
  */
 @Component
 public class ReviewBackfillCostEstimator {
@@ -34,19 +29,14 @@ public class ReviewBackfillCostEstimator {
     }
 
     /**
-     * The mean priced cost of one review of this job type in this workspace, or {@code null} when none of
-     * its recent reviews carried a resolvable price.
+     * The mean priced cost of one review of this job type in this workspace, or {@code null} when none of its
+     * recent reviews carried a resolvable price.
      *
-     * <p>Both purses are summed here, which a budget decision must never do: a forecast of "what will
-     * this campaign cost" is about the work, not about who pays. Unpriced runs are excluded from the
-     * denominator as well as the numerator, so an
-     * instance with a half-priced catalogue reports the mean of what it could price rather than a mean
-     * dragged toward zero by rows it could not.
-     *
-     * <p>The denominator is reviews, not usage rows. A usage row is one attempt, and a review that
-     * retried twice writes three of them — so dividing by rows would quote a third of the real price to
-     * the workspaces most likely to retry. This is the number an admin confirms a spend against, so its
-     * error must not be in the cheap direction.
+     * <p>Sums both cost purses — a budget decision must never do that — because a forecast of what a campaign
+     * will cost is about the work, not who pays; unpriced runs are excluded from both the numerator and the
+     * denominator so a half-priced catalogue is not dragged toward zero. The denominator counts reviews, not
+     * usage rows, since a retried review writes multiple rows and this is the number an admin confirms a spend
+     * against.
      */
     @Transactional(readOnly = true)
     public @Nullable BigDecimal meanCostPerReviewUsd(Long workspaceId, AgentJobType jobType) {

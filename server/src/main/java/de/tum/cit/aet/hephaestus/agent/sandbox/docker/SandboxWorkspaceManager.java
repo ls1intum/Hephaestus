@@ -88,17 +88,15 @@ public class SandboxWorkspaceManager {
     /**
      * Inject files into a container via {@code docker cp}, from memory and from disk.
      *
-     * <p>The archive is written to a temporary file rather than a {@link ByteArrayOutputStream}, and
-     * on-disk entries are streamed through a fixed buffer. Heap use is therefore independent of how
-     * much content is staged: a collector that has already materialised a repository checkout hands
-     * over paths, and those bytes travel disk-to-socket without ever being held by this process.
+     * <p>The archive is written to a temporary file rather than held in memory, so heap use is
+     * independent of how much content is staged — on-disk entries travel disk-to-socket without this
+     * process ever holding their bytes.
      *
      * @param containerId the target container (must be created but can be stopped)
      * @param files map of relative paths to file contents held in memory
      * @param filesOnDisk map of relative paths to host files, streamed rather than read
-     * @implNote The archive stream handed to {@code copyArchiveToContainer} is valid only for the
-     *     duration of that call — it is closed and its backing temp file deleted before this method
-     *     returns. Callers and test doubles must consume it eagerly rather than retaining it.
+     * @implNote The archive stream is valid only for the duration of the {@code copyArchiveToContainer}
+     *     call; callers and test doubles must consume it eagerly rather than retain it.
      */
     public void injectFiles(String containerId, Map<String, byte[]> files, Map<String, Path> filesOnDisk) {
         Map<String, byte[]> inMemory = files == null ? Map.of() : files;
@@ -426,8 +424,6 @@ public class SandboxWorkspaceManager {
                 long fileSize = Files.size(source);
                 TarArchiveEntry tarEntry = newInputEntry(validatePath(entry.getKey()), fileSize);
                 tar.putArchiveEntry(tarEntry);
-                // Stream EXACTLY the declared number of bytes so a source file mutated between the stat
-                // above and this read fails with a clear diagnostic rather than an opaque tar mismatch.
                 long written = copyExactly(source, tar, fileSize);
                 if (written != fileSize) {
                     throw new SandboxException(
@@ -446,7 +442,6 @@ public class SandboxWorkspaceManager {
         }
     }
 
-    /** A tar entry owned by the container's agent user (uid 1000), which must read and write these files. */
     private static TarArchiveEntry newInputEntry(String safePath, long size) {
         TarArchiveEntry entry = new TarArchiveEntry(safePath);
         entry.setSize(size);

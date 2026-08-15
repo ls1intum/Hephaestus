@@ -13,7 +13,7 @@ export interface ReviewBreadcrumbsProps {
 	workspaceSlug: string;
 	/**
 	 * The list this record belongs to, and the trail's last step. Omitted on a screen that hangs off
-	 * no list — reviewed work is reached from any of the three.
+	 * no list — reviewed work is reached from any of the sections.
 	 */
 	section?: {
 		label: string;
@@ -22,14 +22,10 @@ export interface ReviewBreadcrumbsProps {
 }
 
 /**
- * The trail to a practice-review detail screen. It stops at the section.
- *
- * <p>No leaf for the record itself: the heading three lines below is the record's name, and a
- * generic leaf above it — `Delivery / Feedback` over `Feedback for Ada Lovelace` — says it worse.
- *
- * <p>The section stays a link rather than becoming a `BreadcrumbPage`, because it is the way back to
- * the list with its filters intact — a trail whose last step is dead is a trail that lost the only
- * navigation it had.
+ * The trail stops at the section: the heading below is the record's own name, and a generic leaf
+ * above it says the same thing worse. The section therefore stays a link rather than becoming a
+ * `BreadcrumbPage` — it is the way back to the list with its filters intact, and a trail whose last
+ * step is dead has lost the only navigation it had.
  */
 export function ReviewBreadcrumbs({ workspaceSlug, section }: ReviewBreadcrumbsProps) {
 	return (

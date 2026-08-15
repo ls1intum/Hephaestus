@@ -76,7 +76,6 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         User owner = persistUser("request-owner");
         workspace = createWorkspace("request-ws", "Request WS", "request-org", AccountType.ORG, owner);
         ensureAdminMembership(workspace);
-        // "testuser" is the login @WithUser signs in as, and it authors the pull request under test.
         author = persistUser("testuser");
         ensureWorkspaceMembership(workspace, author, WorkspaceRole.MEMBER);
         colleague = persistUser("mentor");
@@ -293,7 +292,6 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         workspaceRepository.save(stored);
     }
 
-    /** The colleague, now able to ask about anybody's work in this workspace. */
     private void promoteColleagueToAdmin() {
         workspaceMembershipRepository
             .findByWorkspace_IdAndUser_Id(workspace.getId(), colleague.getId())

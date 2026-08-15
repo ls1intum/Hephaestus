@@ -13,19 +13,9 @@ import type {
 	WorkspaceMembership,
 } from "@/api/types.gen";
 
-/**
- * One workspace's worth of review output, written as a spec and derived into the wire shapes.
- *
- * The old fixture wrote every record out by hand, and the counts in them drifted from the records
- * they counted: an observation claimed one delivered piece of feedback while the only feedback
- * linked to it was withheld, and a run's tally was a third hand-kept list. A story asserting against
- * that is asserting against a state the server cannot produce.
- *
- * So the only thing written here is {@link REVIEW_FIXTURE} — seven reviews, each with its
- * observations and the feedback they drove. Every count, every preview, every truncation flag and
- * every summary is computed from it by the derivations below, which follow the server's own rules.
- * An inconsistent fixture is not something you can write; it is something that stops compiling.
- */
+// The only thing written by hand is REVIEW_FIXTURE: reviews, their observations and the feedback
+// those drove. Every count, preview, truncation flag and summary is computed from it below, so a
+// fixture whose tallies contradict the records they count is not something you can write.
 
 // ---------------------------------------------------------------------------------------------
 // People
@@ -49,16 +39,8 @@ export const workspaceMembers: WorkspaceMembership[] = [
 // The work under review
 // ---------------------------------------------------------------------------------------------
 
-/**
- * The work under review, on the providers it really comes from.
- *
- * Every list row and every detail header draws its glyph from the provider and its words from the
- * kind, so a fixture of seven GitHub pull requests would let a wrong mark or a missing label ship.
- * Five of the seven reviewed here are pull or merge requests because that is the shape of a real
- * workspace — the point is that the thread and the document sit beside them and read as the same
- * language. The eighth, {@link trackerIssue}, is reviewed by nothing and exists only so the fourth
- * kind is rendered somewhere.
- */
+// Every list row and every detail header draws its glyph from the provider and its words from the
+// kind, so a fixture on a single provider would let a wrong mark or a missing label ship.
 export const reviewArtifact: ReviewArtifact = {
 	id: 42,
 	type: "scm.pull_request",
@@ -97,12 +79,8 @@ export const outlineDocument: ReviewArtifact = {
 };
 
 /**
- * An issue, which no review in the fixture reaches but every list row can be asked to name.
- *
- * `scm.issue` is one of the four kinds this build has copy and a glyph for, and it was the only one
- * no story rendered — so `Issue #204` and its `CircleDotIcon` shipped a whole branch without once
- * being looked at. It is a fixture rather than a seventh review because an issue review is not
- * something this workspace's practices do yet; the label still has to be right the day it is.
+ * No review in the fixture reaches an issue, but `scm.issue` is a kind this build has copy and a
+ * glyph for, so something has to render it.
  */
 export const trackerIssue: ReviewArtifact = {
 	id: 204,
@@ -170,12 +148,9 @@ export const practiceAreas = (Object.keys(areaNames) as AreaSlug[]).map((slug, i
 }));
 
 /**
- * A practice as the catalogue holds it, with only the fields a fixture varies spelled out.
- *
- * The wire type carries a dozen governance fields that no review surface reads; repeating them in
- * every fixture would bury the three that matter here. `whyItMatters` and `whatGoodLooksLike` are the
- * prose `PracticeDetailHoverCard` shows, and a fixture without them renders the bare link — the story
- * would pass while proving nothing.
+ * Fills in the governance fields no review surface reads, so a fixture spells out only what it
+ * varies. `whyItMatters` and `whatGoodLooksLike` are the prose `PracticeDetailHoverCard` shows: a
+ * fixture without them renders a bare link and its story passes while proving nothing.
  */
 function practiceFixture(
 	practice: Pick<
@@ -297,10 +272,8 @@ export const workspacePractices: Practice[] = [
 
 interface FeedbackSpec {
 	id: string;
-	/**
-	 * The composed body exactly as the server stores it: Markdown, headings and all. The preview the
-	 * list shows and the truncation flag beside it are derived from this, never written by hand.
-	 */
+	/** The composed body exactly as the server stores it: Markdown, headings and all. The list's
+	 * preview and truncation flag are derived from it. */
 	body?: string;
 	channel: ReviewFeedback["channel"];
 	outcome: ReviewFeedback["deliveryState"];
@@ -370,13 +343,10 @@ const cited = (sourceKind: string, path: string, quote: string, line = 1): Evide
 });
 
 /**
- * The one long body in the set, because "does long feedback survive the screen" is a question no
- * fixture of one-sentence previews can answer.
- *
  * Shaped the way `DeliveryComposer` shapes a real note: a lead line, bold finding headings with an
  * inline-code locator, a fenced quote of the code, an italic why-this-matters, and a rule between
- * findings. At roughly 1,700 characters it is a middling real note, not an outlier — and it is over
- * five times the 320 characters the list preview gets.
+ * findings. Long enough that the server's preview cut lands inside the first fence, which is the
+ * case a fixture of one-sentence previews never reaches.
  */
 const LONG_BODY = [
 	"2 issues to tighten in this change, plus one thing worth keeping.",
@@ -419,13 +389,9 @@ const LONG_BODY = [
 ].join("\n");
 
 /**
- * Seven reviews of five people's work, spanning every conclusion a review can reach and every
- * outcome a piece of feedback can have.
- *
- * <p>Withheld feedback appears once under each of the four families an operator can filter by, so
- * the reason column is never one sentence repeated. The set is deliberately ordinary: most of it was
- * delivered, one review is still running and one failed, which is roughly what a workspace looks
- * like on a Tuesday.
+ * Spans every conclusion a review can reach and every outcome a piece of feedback can have, with a
+ * withheld piece under each family an operator can filter by. Deliberately ordinary otherwise: a set
+ * that is mostly failures and empties teaches a reader that the product mostly does not work.
  */
 export const REVIEW_FIXTURE: RunSpec[] = [
 	{
@@ -896,15 +862,8 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 // Derivations
 // ---------------------------------------------------------------------------------------------
 
-/**
- * What the server puts in `bodyPreview` and `bodyTruncated`: the leading 320 characters of the
- * stored body, and whether there was more.
- *
- * Written out here rather than hand-typed onto each record, because the previous fixture set
- * `bodyTruncated: false` on every row and gave each one a tidy one-sentence preview. Real bodies are
- * Markdown a couple of thousand characters long, so the row never met the case it exists to show —
- * which is how "what about longer feedback?" went unanswered for a whole review round.
- */
+/** The cut the server applies to `bodyPreview`, mirrored here so `bodyTruncated` cannot claim
+ * something the preview beside it contradicts. */
 const BODY_PREVIEW_LENGTH = 320;
 
 function preview(body: string | undefined) {
@@ -983,21 +942,18 @@ function toFeedback(run: RunSpec, spec: FeedbackSpec): ReviewFeedback {
 	};
 }
 
-/** Twelve observations, newest first, as the list endpoint returns them. */
+/** Newest first, as the list endpoint returns them. */
 export const reviewObservations: ReviewObservation[] = allObservationSpecs
 	.map(({ run, observation }) => toObservation(run, observation))
 	.sort((a, b) => b.observedAt.getTime() - a.observedAt.getTime());
 
-/** Eleven pieces of feedback, newest first, as the list endpoint returns them. */
+/** Newest first, as the list endpoint returns them. */
 export const reviewFeedback: ReviewFeedback[] = allFeedbackSpecs
 	.map(({ run, item }) => toFeedback(run, item))
 	.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
-/**
- * The run summaries, with both tallies counted from the records they summarise.
- *
- * A run card that says "3 problems" beside a list of two is the drift this derivation removes.
- */
+/** Both tallies counted from the records they summarise, so a run card cannot claim a number the
+ * list under it contradicts. */
 export const reviewRuns: ReviewRunSummary[] = allRuns
 	.map((run) => ({
 		id: run.id,
@@ -1028,12 +984,9 @@ const JOB_TYPE_BY_ARTIFACT: Record<string, AgentJob["jobType"]> = {
 };
 
 /**
- * The job record behind one review, for the screen that reports how the review itself went.
- *
- * The review detail page takes its heading from the *job's* target and its rows from the review
- * endpoints. Its stories used to take the job from the agent fixtures and the rows from these, so
- * the header named one pull request while every row underneath named another — on the one screen
- * whose job is to show a single review whole.
+ * The job record behind one review, derived from the same spec as its rows. A review detail page
+ * takes its heading from the *job's* target and its rows from the review endpoints, so a job served
+ * from an unrelated fixture makes the header name one pull request and every row underneath another.
  */
 export function reviewJob(runId: string): AgentJob {
 	const run = allRuns.find((entry) => entry.id === runId);
@@ -1070,13 +1023,11 @@ export function reviewJob(runId: string): AgentJob {
 	};
 }
 
-/** The full record behind one observation, including the evidence and the feedback it drove. */
 export function observationDetail(observationId: string): ReviewObservationDetail {
 	const found = allObservationSpecs.find(({ observation }) => observation.id === observationId);
 	if (!found) throw new Error(`No observation ${observationId} in the fixture`);
 	const { run, observation } = found;
-	// The detail carries the same fields as the list row minus the tally, which it replaces with the
-	// feedback records the tally was counting.
+	// The detail replaces the tally with the feedback records the tally was counting.
 	const { feedbackDisposition: _tally, ...shared } = toObservation(run, observation);
 	return {
 		...shared,
@@ -1095,7 +1046,6 @@ export function observationDetail(observationId: string): ReviewObservationDetai
 	};
 }
 
-/** The full record behind one piece of feedback, including its body and its source observations. */
 export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 	const found = allFeedbackSpecs.find(({ item }) => item.id === feedbackId);
 	if (!found) throw new Error(`No feedback ${feedbackId} in the fixture`);
@@ -1127,9 +1077,8 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 				title: source.title,
 			};
 		}),
-		// Only feedback that reached the work has a placement, and an inline one carries the anchor the
-		// detail page prints as `path:12–18`. Deriving it from the outcome keeps a withheld record from
-		// claiming a place it never occupied.
+		// Only feedback that reached the work has a placement. Deriving it from the outcome keeps a
+		// withheld record from claiming a place it never occupied.
 		placements:
 			item.outcome !== "DELIVERED" || item.channel !== "IN_CONTEXT"
 				? []
@@ -1159,7 +1108,7 @@ export const reviewFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"dddddddd-2222-2222-2222-222222222222",
 );
 
-/** The long, multi-observation note — the one that answers "what happens to longer feedback?". */
+/** The long, multi-observation note. */
 export const longFeedbackDetail: ReviewFeedbackDetail = feedbackDetail(
 	"44444444-4444-4444-4444-444444444444",
 );
@@ -1174,11 +1123,9 @@ export const reviewObservationDetail: ReviewObservationDetail = observationDetai
 // ---------------------------------------------------------------------------------------------
 
 /**
- * The same twelve observations restated across as many days as it takes to fill `count` rows.
- *
- * A screen with a page size of 25 has no pagination until it has more than 25 rows, and a filter is
- * hard to believe on a list short enough to check by eye. Cycling the real specs keeps every row a
- * record the server could have produced, unlike a generated `Observation #17`.
+ * The fixture's observations restated across as many days as it takes to fill `count` rows. Cycling
+ * the real specs keeps every row a record the server could have produced, unlike a generated
+ * `Observation #17`.
  */
 export function manyObservations(count: number): ReviewObservation[] {
 	const base = reviewObservations;
@@ -1195,12 +1142,8 @@ export function manyObservations(count: number): ReviewObservation[] {
 }
 
 /**
- * A workspace with more people in it than the members endpoint returns in one page.
- *
- * The person facet asks for 100 and filters what came back in the browser, because the endpoint
- * takes no name. At exactly this size the facet has to say so — a search box that answers "No
- * matches" for a colleague who is simply the 140th member is a screen telling an operator something
- * untrue about their own workspace.
+ * A workspace large enough that the person facet, which filters one fetched page in the browser
+ * because the endpoint takes no name, cannot reach everybody.
  */
 export function manyMembers(count: number): WorkspaceMembership[] {
 	return Array.from({ length: count }, (_, index) => {

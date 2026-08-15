@@ -12,17 +12,14 @@ import java.util.Set;
 import org.springframework.stereotype.Component;
 
 /**
- * The settled chat thread as a reviewable artifact.
+ * The settled chat thread as a reviewable artifact. Unconditional on purpose, unlike {@code SlackManifest}:
+ * a descriptor is the domain's ceiling — what the kind <em>is</em> — while a manifest is one vendor's
+ * contribution to it. Gating this on Slack being enabled would make the bundled conversation practices
+ * unauthorable, and then unloadable, on every instance that has not connected Slack.
  *
- * <p>Unconditional on purpose, unlike {@code SlackManifest}: a descriptor is the domain's ceiling — what
- * the kind <em>is</em> — while a manifest is one vendor's contribution to it. Gating this on Slack being
- * enabled would make the bundled conversation practices unauthorable, and then unloadable, on every
- * instance that has not connected Slack.
- *
- * <p>Its single signal has no {@code producedBy}, which is the honest declaration: no ingested event
- * says a discussion has finished. {@code ConversationThreadTriggerScheduler} decides it from quiescence,
- * depth and growth, and the contract has no way to name a scheduler as a producer — an empty set says
- * "raised from somewhere other than ingestion", which is exactly true.
+ * <p>Its single signal has no {@code producedBy}: no ingested event says a discussion has finished —
+ * {@code ConversationThreadTriggerScheduler} decides it from quiescence, depth and growth — and an empty
+ * set is the honest way to say "raised from somewhere other than ingestion".
  */
 @Component
 public class ConversationThreadArtifactDescriptor implements ArtifactDescriptor {

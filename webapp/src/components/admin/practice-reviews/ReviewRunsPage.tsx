@@ -59,12 +59,8 @@ function isReviewStatus(value: string | null): value is ReviewStatus {
 }
 
 /**
- * A status in the filter is drawn as the same tag the rows wear, in the closed trigger and in the
- * open list alike.
- *
- * The dropdown was plain grey text beside a table of coloured tags, so choosing a filter meant
- * matching a word to a tag from memory; a first pass gave it the icon and the tone but left the
- * shape different. It is the badge itself now — one component, so the two cannot come apart again.
+ * Renders the row's own `StatusBadge` rather than a lookalike, so choosing a filter never means
+ * matching a word to a tag from memory.
  */
 function StatusItemLabel({ value }: { value: string }) {
 	if (!isReviewStatus(value)) return <span className="text-muted-foreground">All statuses</span>;
@@ -94,8 +90,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 	const reviews = query.data?.content ?? [];
 	const hasFilter = Boolean(search.status || search.from || search.to);
 	const totalPages = query.data?.page?.totalPages;
-	/** Every filter this toolbar can set, cleared at once — the toolbar's Reset and the empty state's
-	    button are the same action and were two drifting copies of it. */
+	// The toolbar's Reset and the empty state's button are one action, not two copies of it.
 	const reset = () =>
 		onSearchChange({ status: undefined, from: undefined, to: undefined, page: 0 });
 
@@ -140,10 +135,9 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						</SelectContent>
 					</Select>
 				</Field>
-				{/* "Requested" rather than "Date", and not "Started": the timestamp the rows show is the
-				    review's `createdAt`, which is when it was enqueued. A review can sit queued before a
-				    worker claims it, so "Started" would name a moment neither the row nor this filter
-				    uses. See `DateRangeFacet`, which requires the title for exactly this reason. */}
+				{/* "Requested", not "Started": the timestamp the rows show and this filters is the review's
+				    `createdAt`, which is when it was enqueued, and a review can sit queued before a worker
+				    claims it. */}
 				<DateRangeFacet
 					title="Requested"
 					value={toDateRange(search)}
@@ -166,9 +160,8 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						</EmptyMedia>
 						<EmptyTitle>No reviews found</EmptyTitle>
 						<EmptyDescription>
-							{/* A date range narrows this list too now, so "never triggered" is no longer the
-							    only reason it can be empty — saying so to someone who has just picked a
-							    window would be false. */}
+							{/* A range can empty this list too, so "never triggered" is not the only reason and
+							    must not be said to a reader who has just picked a window. */}
 							{!hasFilter
 								? "Reviews appear when an enabled practice is triggered or a contributor requests one."
 								: search.status && !search.from && !search.to
@@ -178,8 +171,6 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 					</EmptyHeader>
 					{hasFilter && (
 						<EmptyContent>
-							{/* The advice used to be "Try another status" with nothing to press. See
-							    `ObservationResultsState`. */}
 							<Button variant="outline" size="sm" onClick={reset}>
 								Clear all filters
 							</Button>
@@ -222,14 +213,7 @@ export interface ReviewRunRowProps {
 	search: RunsSearch;
 }
 
-/**
- * One review: the work it read, and what it produced.
- *
- * <p>The row is named after the work rather than after the review, because a review has no name an
- * operator knows — it has a UUID. The two tallies sit under it as a numeric strip, and only when
- * there is something true to count: a review that has not finished says so, and one that ended
- * without output says that instead of drawing nine zeroes.
- */
+/** Named after the work, because a review has no name an operator knows — it has a UUID. */
 export function ReviewRunRow({ workspaceSlug, review, search }: ReviewRunRowProps) {
 	return (
 		<ReviewRow
@@ -279,15 +263,9 @@ function hasFeedbackOutput(review: ReviewRunSummary) {
 }
 
 /**
- * What the review produced, or why there is nothing to show.
- *
- * <p>A run that is still going has an empty tally that means "not yet", and one that failed has an
- * empty tally that means "never". Printing nine zeroes for both would make the first look like a
- * finished review that found nothing.
- *
- * <p>Once there *is* a tally it is drawn as two strips rather than two sentences, because these nine
- * numbers are the row's dominant content and they are read down the list, not along the row. See
- * `ReviewCountStrip` for why the zeroes are drawn rather than dropped.
+ * A run still going has an empty tally that means "not yet", and one that stopped has an empty tally
+ * that means "never". A strip of zeroes for both would make the first read as a finished review that
+ * found nothing, so neither gets one.
  */
 function RunOutputSummary({ review }: { review: ReviewRunSummary }) {
 	if (review.status === "COMPLETED" || hasObservationOutput(review) || hasFeedbackOutput(review)) {

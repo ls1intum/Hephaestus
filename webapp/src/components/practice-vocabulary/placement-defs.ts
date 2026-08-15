@@ -7,7 +7,7 @@ export type PlacementType = ReviewPlacement["placementType"];
 
 /**
  * The exact spot a delivered piece of feedback landed — a finer grain of the same "where" axis as
- * `DELIVERY_PLACE_DEFS`, and only ever known once something was actually posted.
+ * `DELIVERY_PLACE_DEFS`, and only ever known once something was posted.
  */
 export const PLACEMENT_DEFS: StatusDefs<PlacementType> = {
 	SUMMARY: {
@@ -31,12 +31,8 @@ export const PLACEMENT_DEFS: StatusDefs<PlacementType> = {
 };
 
 /**
- * The most precise "where" the record supports, in one phrase.
- *
- * With a placement it names the actual spot ("As an inline note on the work"), which is what the
- * detail screens should say — an operator chasing a delivery wants the shape of the thing that was
- * posted, not the lane it travelled down. Without one it falls back to the lane, which is all a
- * withheld or still-queued piece of feedback has.
+ * The most precise "where" the record supports, in one phrase: the spot with a placement, and the
+ * lane without one, which is all a withheld or still-queued piece of feedback has.
  */
 export function placementLabel(place: DeliveryPlace, placementType?: PlacementType): string {
 	const placeLabel = DELIVERY_PLACE_DEFS[place].label;

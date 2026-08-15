@@ -236,8 +236,7 @@ public class ContextManifestBuilder {
      * <p>There is no per-run selection to apply on top. A source that applies to the kind is attempted;
      * what comes back — available, withheld for want of a use decision, unavailable for want of a
      * collector, or a collection error — is recorded per source in the manifest and is the model's to
-     * read. The one thing that never happens any more is a source being dropped because no practice
-     * asked for it.
+     * read. No source is dropped because no practice asked for it.
      */
     Set<SourceKind> stagedSources(EvidencePlan plan) {
         return catalogs.requireSourcesFor(plan.contractVersion(), plan.artifactKind().value());

@@ -69,15 +69,9 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
     }
 
     /**
-     * Reports the truncation the payload already records, and reads emptiness out of the payload.
-     *
-     * <p>The default capture leaves completeness to the catalog, which permits COMPLETE for this source —
-     * so a pull request past the comment limit would be described as holding all of them.
-     *
-     * <p>Emptiness cannot come from the staged file list here, because the file is written whether or not
-     * there were comments: a pull request nobody commented on stages {@code {"comments": []}}, which is the
-     * review reporting that it read the comments and there were none. Left to the default, the presence of
-     * that file would answer NON_EMPTY and quietly turn "no comments" into "comments exist".
+     * Derives completeness/emptiness from the payload itself rather than the default: the file is
+     * always written, even with zero comments, so the default's file-presence check would report
+     * NON_EMPTY on an empty result and COMPLETE past the truncation cap.
      */
     @Override
     public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
@@ -106,8 +100,8 @@ public class GeneralReviewCommentContentSource implements EvidenceSource {
         try {
             AgentJob job = pr.job();
             JsonNode m = job.getMetadata();
-            // As in ReviewThreadContentSource: a missing key is a malformed job, and "no review
-            // comments" is a claim the model would otherwise take as established.
+            // A missing key is a malformed job; failing loud avoids silently telling the model there
+            // were no comments (as ReviewThreadContentSource does for its own metadata key).
             if (m == null || m.isNull() || m.isMissingNode()) {
                 throw new EvidenceCollectionException("Review-comment collection has no job metadata", null);
             }

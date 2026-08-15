@@ -14,12 +14,9 @@ import {
 } from "@/mocks/fixtures/practice";
 
 /**
- * Fixtures that resolve the inheritance chain the way the server does.
- *
- * <p>Hand-written rows drift: a story showing a practice at Propose under an area at Off, with a
- * rollup counting it as Deliver, would look plausible and would be testing a state the API cannot
- * produce. Everything here is derived from the overrides a story declares, so a fixture is either a
- * state the server can reach or a compile error.
+ * Fixtures that resolve the inheritance chain the way the server does, so a fixture is either a state
+ * the server can reach or a compile error. Hand-written rows drift: a practice at Propose under an
+ * area at Off, counted by the rollup as Deliver, looks plausible and cannot happen.
  */
 
 export interface PracticeSpec {
@@ -28,12 +25,9 @@ export interface PracticeSpec {
 	override?: ReviewTier;
 	/** False for a practice Hephaestus cannot review — the server pins those to Off. */
 	reviewable?: boolean;
-	/**
-	 * The catalogue's own sentence on why the practice exists. Optional on the API and optional here:
-	 * a locally written practice need not carry one, and the row has to read without it.
-	 */
+	/** Optional on the API: a locally written practice carries none, and the row has to read without it. */
 	whyItMatters?: string;
-	/** Defaults to a pull request. Set it to prove the row names the kind it is deciding about. */
+	/** Defaults to a pull request. */
 	artifactKind?: string;
 }
 
@@ -60,7 +54,7 @@ function assignment(
 	source: ReviewTierAssignment["source"],
 ): ReviewTierAssignment {
 	// `inherited` follows the override, never the source: an area that chose its own tier reports
-	// source AREA and inherited false, and conflating the two is the bug this fixture must not hide.
+	// source AREA and inherited false.
 	return { effective, override, source, inherited: override == null };
 }
 
@@ -193,12 +187,9 @@ const SCALE_PRACTICE_NAMES = [
 ];
 
 /**
- * Twenty-five areas, four practices each — the size at which editing rows one at a time stops being
- * possible and the screen has to earn its keep.
- *
- * <p>Deliberately lopsided: most of it inherits, a handful of areas and practices were changed by
- * hand, and one practice cannot be reviewed at all. A fixture where everything is set says nothing
- * about whether the inherited case recedes.
+ * Deliberately lopsided: most of it inherits, a handful of areas and practices were changed by hand,
+ * and one practice cannot be reviewed at all. A fixture where everything is set says nothing about
+ * whether the inherited case recedes.
  */
 export function scaleFixture(): AutonomyFixture {
 	return buildAutonomyFixture({

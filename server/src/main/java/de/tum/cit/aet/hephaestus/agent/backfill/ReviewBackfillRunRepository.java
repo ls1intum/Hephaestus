@@ -13,11 +13,10 @@ import org.springframework.stereotype.Repository;
 /**
  * Campaign rows.
  *
- * <p>There is deliberately no optimistic-claim dance around the driver's batch. Two drivers that raced
- * would each try to record the same signals, and {@code uq_artifact_signal} settles that in the
- * database: the loser gets {@code false} from the recorder and submits nothing. The worst outcome of a
- * race is a double-counted {@code passed_count}, which is a display artefact, not a duplicated review or
- * a duplicated charge.
+ * <p>Deliberately no optimistic-claim dance around the driver's batch: two racing drivers would each try
+ * to record the same signals, and {@code uq_artifact_signal} settles that in the database — the loser
+ * submits nothing. The worst outcome of a race is a double-counted {@code passed_count}, a display
+ * artefact, not a duplicated review or charge.
  */
 @Repository
 @WorkspaceAgnostic("The driver sweeps active campaigns for every workspace on the instance")
@@ -27,11 +26,8 @@ public interface ReviewBackfillRunRepository extends JpaRepository<ReviewBackfil
     Optional<ReviewBackfillRun> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
     /**
-     * Whether this workspace already has a campaign that is not finished.
-     *
-     * <p>One at a time. Two concurrent campaigns over overlapping scopes would each see the other's
-     * ledger rows as "already covered", so neither would cover the scope it was costed for and the
-     * estimate the admin confirmed would describe neither run.
+     * One at a time: two concurrent campaigns over overlapping scopes would each see the other's ledger
+     * rows as "already covered", so neither would cover the scope the admin's confirmed estimate was for.
      */
     boolean existsByWorkspaceIdAndStatusIn(Long workspaceId, Collection<ReviewBackfillStatus> statuses);
 

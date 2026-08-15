@@ -4,16 +4,10 @@ import { PageLayout } from "@/components/core/PageLayout";
 import { withStandardPage } from "@/stories/decorators";
 import { PracticeReviewsHeader } from "./PracticeReviewsLayout";
 
-/**
- * The three review views, and which one you are in.
- *
- * <p>Worth knowing when changing this: `aria-current` is what draws the selected tab, and TanStack's
- * `Link` also sets it on any link it considers active — `...isActive && { "aria-current": "page" }`
- * is spread *after* the caller's props in `link.js`, so an explicit `aria-current={undefined}` here
- * cannot turn it off. Two mechanisms therefore decide the same attribute, and every story below
- * asserts the count rather than the identity of the current tab, so a second highlighted tab fails
- * the suite instead of being noticed in a screenshot.
- */
+// `aria-current` draws the selected tab, and TanStack's `Link` also sets it on any link it considers
+// active — `...isActive && { "aria-current": "page" }` is spread *after* the caller's props in
+// `link.js`, so an explicit `aria-current={undefined}` cannot turn it off. Two mechanisms decide one
+// attribute, so the stories below assert the *count* of current tabs, not which one it is.
 const meta = {
 	title: "Workspace admin/Practice reviews/Navigation",
 	component: PracticeReviewsHeader,
@@ -40,7 +34,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Exactly one tab is current, and it is the one named. */
 async function expectOnlyCurrent(canvasElement: HTMLElement, name: string) {
 	const nav = within(canvasElement).getByRole("navigation", {
 		name: "Practice review sections",
@@ -70,10 +63,8 @@ export const Delivery: Story = {
 };
 
 /**
- * Reviewed work is reached from any of the three, so it claims none of them.
- *
- * Marking one would tell the reader they had navigated somewhere they had not, and the back link
- * they want is the breadcrumb rather than a tab.
+ * Reviewed work is reached from any of the three sections, so it claims none of them: marking one
+ * would tell the reader they had navigated somewhere they had not.
  */
 export const ReviewedWork: Story = {
 	args: { activeSection: undefined },

@@ -22,19 +22,18 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 /**
  * The admin front door for a recurring sweep.
  *
- * <p>Two things are worth more here than the happy path. A schedule authorises a spend that repeats
- * without anyone looking again, so only a workspace admin may create one. And the window ceiling has to
- * be refused at the boundary rather than trusted from the client, because a longer window is not a bigger
- * sweep — it is a differently-selected population wearing a sweep's clothes.
+ * <p>Two things are worth more here than the happy path: only a workspace admin may authorise a spend
+ * that repeats unattended, and the window ceiling is refused at the boundary rather than trusted from the
+ * client, because a longer window is a differently-selected population, not a bigger sweep.
  */
 class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final String SCHEDULES = "/workspaces/{slug}/practices/sweep-schedules";
 
     /**
-     * A numeric JWT {@code sub}, which is what {@code SecurityUtils.getCurrentAccountId()} reads.
-     * {@code @WithAdminUser}'s token carries a non-numeric subject, and a schedule refuses to be created
-     * without an account to attribute the recurring spend to.
+     * A numeric JWT {@code sub}, which is what {@code SecurityUtils.getCurrentAccountId()} reads —
+     * {@code @WithAdminUser}'s token carries a non-numeric one, and a schedule needs an account to
+     * attribute the spend to.
      */
     private static final String ADMIN_ACCOUNT_TOKEN = "mock-jwt-sub-1";
 
@@ -65,10 +64,7 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
             .isForbidden();
     }
 
-    /**
-     * Membership is not authority to commit the workspace's budget every night. The role check is the
-     * whole difference between this and the review a developer may ask for about their own work.
-     */
+    /** Membership is not authority to commit the workspace's budget every night. */
     @Test
     @WithMentorUser
     void refusesAnOrdinaryMember() {
@@ -101,15 +97,13 @@ class ReviewSweepScheduleControllerIntegrationTest extends AbstractWorkspaceInte
             .doesNotExist();
 
         ReviewSweepSchedule saved = scheduleRepository.findAll().getFirst();
-        // Within the hour, so an admin who has just described a sweep can watch one happen rather than
-        // take it on faith for a day.
+        // So an admin who has just described a sweep can watch one happen rather than take it on faith.
         assertThat(saved.getNextRunAt()).isBefore(Instant.now().plus(Duration.ofHours(1)));
     }
 
     /**
-     * The rule the whole design rests on, enforced where a client cannot route around it. A month-long
-     * window is a hindsight-selected corpus, and this feature files its observations in the population
-     * that is supposed to be free of those.
+     * The rule the whole design rests on, enforced where a client cannot route around it: a month-long
+     * window is a hindsight-selected corpus, not the unbiased population this feature is meant to sample.
      */
     @Test
     void refusesAWindowLongerThanTheCadenceAllows() {

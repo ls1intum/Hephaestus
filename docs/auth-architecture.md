@@ -60,10 +60,10 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
   cookie carrying a 15-minute ES256 JWT. OAuth-flow state rides AES-GCM cookies, not a
   session — so login works across pods without sticky sessions.
 - **We are our own issuer.** After federating to the upstream IdP, we mint *our* JWT. Claim
-  shape is a strict OIDC subset (`iss/sub/aud/jti/iat/exp/scope/act`) so a future Spring
-  Authorization Server can take over issuance without touching resource-server code.
-  The public signing keys are published at `/.well-known/jwks.json` (a full OIDC discovery
-  document is deferred until a relying party actually needs it).
+  shape is standard OIDC plus a small set of Hephaestus claims — the exact list is in
+  [the auth glossary](./auth-glossary.md#jwt-claim-shape), written in one place,
+  `HephaestusJwtIssuer`. The public signing keys are published at `/.well-known/jwks.json`; there is
+  no full OIDC discovery document.
 - **Revocation is real.** Every issued JWT has a `jti` row in `issued_jwt`. Logout /
   refresh / sign-out-everywhere / account-delete set `revoked_at`; `RevocationAwareJwtDecoder`
   re-checks `issued_jwt(jti)` on every request, so revocation takes effect on every pod within
@@ -71,22 +71,23 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
   replay load — no cross-pod protocol (NATS push is a tracked follow-up, not shipped).
 - **Account lookup is `(provider, subject)`, never email.** This is the structural defence
   against the nOAuth (Descope 2023) account-takeover class. `IdentityLinkRepository` has no
-  `findByEmail`; ArchUnit forbids any email-based auth lookup.
-- **Login providers are instance-scoped (Stage B-2; supersedes the per-workspace OIDC model).**
+  `findByEmail`. The ban is by construction — the repository does not offer the method — not by an
+  ArchUnit rule.
+- **Login providers are instance-scoped.**
   A sign-in option — GitHub, GitLab.com, or a self-hosted GitLab — is a row in the instance
   `login_provider` table (`core.auth.provider`), **one per SCM instance** (`UNIQUE(type, base_url)`),
   env-seeded on first boot and managed at runtime by an instance admin. The client secret is sealed
   by `EncryptedStringConverter` (AES-256-GCM). This is **authentication** only; a workspace's SCM
-  data source is a separate per-workspace `Connection` + group token/PAT. (The earlier design rode
-  `Connection` rows of `kind=OIDC_LOGIN_*`; that was removed — see ADR 0017's Stage B-2 update.)
-- **Impersonation = `act`-claim reissuance.** No `SwitchUserFilter` (session-bound; we have
-  no session). An app admin mints a target-scoped JWT carrying `act={operatorId}` (RFC 8693).
+  data source is a separate per-workspace `Connection` + group token/PAT. ADR 0017 records why the
+  two are separate.
+- **Impersonation = `act`-claim reissuance.** There is no server-side session to switch, so an
+  app admin mints a target-scoped JWT carrying `act={operatorId}` (RFC 8693).
   `ImpersonationGuard` makes such sessions read-only unless the operator sends an explicit
   confirm-writes header. Every begin/exit is audited.
 - **GDPR.** `auth_event` is an append-only, monthly RANGE-partitioned (self-managed in-app by
   `pg_partman`, 12-month retention; see ADR 0018)
   audit log. Account deletion is a 48-hour soft-delete cooldown → hard cascade +
-  `ExternalActor` pseudonymization (Art. 17(3) — preserves activity-graph integrity on
+  pseudonymization of the git-provider mirror (Art. 17(3) — preserves activity-graph integrity on
   other users' work).
 
 ## Module layout
@@ -105,14 +106,14 @@ How Hephaestus authenticates users after the Keycloak removal (ADR 0017). Compan
 | `ratelimit/` | `AuthRateLimitFilter`, `BucketResolver`, config |
 | `web/` | `/user`, `/auth/*`, `/user/sessions`, `/user/exports`, `/admin/users`, `/admin/login-providers`, `/admin/audit`, `/.well-known/*`, `/identity-providers` controllers |
 | `config/` | `AuthJwtConfig`, `AuthSecurityConfig` |
-| `spi/` | `AccountRepository` (cross-module handle) |
+| `spi/` | Cross-module read handles — `AccountIdentityQuery`, `AccountRoleQuery`, `AccountWorkspaceMembershipQuery`, `GitProviderRegistry`, and the audit ports |
 
 Login `ClientRegistration`s are built from the `login_provider` store by
 `LoginProviderClientRegistrationRepository` in `core.auth.provider` (it depends only on the store +
 Spring Security — integration may not reach into `core.auth.provider`). The integration side keeps
-`RegistrationToGitProviderResolver` (maps a registration to its `GitProvider` row via the
+`RegistrationToGitProviderResolver` (maps a registration to its provider record via the
 `GitProviderRegistry` SPI) and the reusable `IssuerDiscoveryProbe`; `ImpersonationGuard` lives in
 `core.security`.
 
-Boundaries: `workspace` / `gitprovider` / `notification` depend on `core.auth` (read model
-+ events), never the reverse. ArchUnit forbids any `org.keycloak.*` or `com.auth0.jwt.*` import.
+Boundaries: `workspace` / `integration.scm` / `notification` depend on `core.auth` (read model
++ events), never the reverse. ArchUnit forbids any `org.keycloak.*` import.

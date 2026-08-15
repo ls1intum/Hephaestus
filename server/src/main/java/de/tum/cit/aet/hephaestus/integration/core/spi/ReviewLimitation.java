@@ -5,13 +5,8 @@ import java.util.Objects;
 /**
  * A claim that evidence about an artifact kind can never support, however completely it is captured.
  *
- * <p>Stated by the kind's {@link ArtifactDescriptor} because it is a fact about the domain, not about
- * any one practice: no amount of repository evidence establishes what a deployed service did at
- * runtime. Declared per kind rather than as a switch inside the practices module, so a new kind states
- * its own limit instead of finding a switch that throws.
- *
- * <p>It travels with the review: the model is told what its evidence cannot settle, so it declines
- * rather than guesses, and a report shows which questions were out of reach by construction.
+ * <p>Stated per kind by {@link ArtifactDescriptor} rather than as a switch in the practices module, so a
+ * new kind states its own limit instead of finding a switch that throws.
  *
  * @param code        a stable, queryable identifier, {@code SCREAMING_SNAKE_CASE}
  * @param description one sentence a person reads, saying what the evidence does not establish

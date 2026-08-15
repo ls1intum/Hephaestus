@@ -137,8 +137,8 @@ public class IssueAgentJobEventListener {
                 return;
             }
 
-            // A history replay would otherwise fire a retrospective review for every issue the
-            // repository ever closed. The row it leaves behind still records that we saw it.
+            // A history replay would otherwise fire a retrospective review for every issue ever closed;
+            // the signal row above still records that we saw it.
             if (context.isSync()) {
                 return;
             }
@@ -171,10 +171,10 @@ public class IssueAgentJobEventListener {
     }
 
     /**
-     * The ledger identity of this event. An issue carries no commit, so its signals key on what the
-     * author wrote — which is also what the issue-focused practices are about, so an edit is a fresh
-     * occurrence and gets re-measured. A labelling keys on the label as well, because three labels
-     * applied in one update are three occurrences and share every other part of the payload.
+     * The ledger identity of this event. An issue carries no commit, so its signal keys on what the
+     * author wrote — an edit becomes a fresh occurrence and gets re-measured; a labelling also keys on
+     * the label, since three labels in one update are three occurrences with an otherwise-identical
+     * payload.
      */
     private @Nullable SignalKey signalKeyFor(
         ScmEventPayload.IssueData issueData,

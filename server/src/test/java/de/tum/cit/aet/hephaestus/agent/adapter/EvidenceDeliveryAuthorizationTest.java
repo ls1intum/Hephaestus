@@ -106,14 +106,12 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     }
 
     /**
-     * The batched answer must be the per-row answer, decided against the same set. Both directions of
-     * disagreement are defects and only one of them is visible in a UI: a batch that admits what the row
-     * form denied publishes evidence nobody may cite, and no surface would show that it had.
+     * The batched answer must equal the per-row answer: a batch admitting what the row form denies would
+     * publish evidence nobody may cite, invisibly to any UI.
      *
-     * <p>The set is mixed on purpose, and includes the two ways a contract version can fail to arrive —
-     * no row for the run at all, and a row whose snapshot recorded none. The single-row form collapses
-     * both into an empty {@link Optional}; a batch that mapped a missing key to anything but "denied"
-     * would pass every same-shaped test and fail exactly here.
+     * <p>The set mixes both ways a contract version can fail to arrive — no row for the run, and a row
+     * whose snapshot recorded none — since the single-row form collapses both into an empty
+     * {@link Optional} and a batch that mapped a missing key to anything but "denied" would only fail here.
      */
     @Test
     void batchedAuthorizationDecidesEveryObservationTheWayTheSingleRowFormDoes() {
@@ -165,9 +163,9 @@ class EvidenceDeliveryAuthorizationTest extends BaseUnitTest {
     }
 
     /**
-     * An observation the caller never persisted has no id to hand back, so membership cannot express
-     * "permitted" for it. Denying is the safe direction, and it is what every read surface already
-     * assumes — they authorize rows they loaded.
+     * An observation never persisted has no id to hand back, so membership cannot say "permitted" for
+     * it; denying is the safe direction, matching every read surface's own assumption that it authorizes
+     * rows it loaded.
      */
     @Test
     void deniesAnObservationThatWasNeverPersisted() {

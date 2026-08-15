@@ -6,11 +6,8 @@ export interface ResultCountProps {
 }
 
 /**
- * How many rows are below, and whether that number is the whole set or what survived the filters.
- *
- * The verb agrees with the count as well as the noun. It previously did not — one row under a filter
- * read "1 piece of feedback match your filters", and every list on the admin console can reach that
- * state by narrowing far enough, so it was the sentence an operator saw at the end of every search.
+ * How many rows are below, and whether that is the whole set or what survived the filters. The verb
+ * agrees with the count as well as the noun — every list here can be narrowed to one row.
  */
 export function ResultCount({ total, noun, hasFilter = false }: ResultCountProps) {
 	if (total === undefined) return null;

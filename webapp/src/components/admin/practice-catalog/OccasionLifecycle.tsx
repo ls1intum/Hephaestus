@@ -25,32 +25,24 @@ import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 /**
- * Which occasion this is. The id prefix that keeps occasion 2's checkboxes off occasion 1's, the id a
- * form-level error sends focus to, and the words that tell a reader which of two identical groups
- * they are in were four separate scalars, and they are four spellings of one fact: the occasion's
- * position in the practice. They are derived from it here instead, so no caller can spell one of them
- * differently from the rest.
+ * Which occasion this is. Control ids, the focus target for a form-level error and the words naming
+ * the group are all derived from the position, so no caller can spell one of them differently.
  */
 export interface OccasionIdentity {
 	/** The occasion's position among the practice's occasions, from zero. */
 	index: number;
 	/**
-	 * The id of the message describing what is wrong — passed only while *this* occasion is the one
-	 * failing validation, which is also what draws the moments in the invalid state. One field rather
-	 * than an `invalid` flag beside an id, because "invalid with nothing to point at" and "an error to
-	 * point at that nobody is showing" are both states the screen has no rendering for.
+	 * The id of the message describing what is wrong, passed only while *this* occasion is the one
+	 * failing validation; its presence is also what draws the moments in the invalid state. One field
+	 * rather than an `invalid` flag beside an id, so neither can be set without the other.
 	 */
 	errorId?: string;
 }
 
 export interface OccasionLifecycleProps {
-	/**
-	 * The work type whole, not its `signals` alone: the strip has to know the artifact kind to decide
-	 * whether drafts are a state this work can even be in.
-	 */
+	/** The whole work type, not its `signals`: the artifact kind decides whether drafts can occur. */
 	workType: PracticeWorkTypeDefinitionOptions;
 	occasion: OccasionIdentity;
-	/** The moments this occasion reviews on. */
 	selected: readonly string[];
 	/** Moment id to the occasion number already holding it, since the server refuses a moment bound twice. */
 	heldElsewhere?: ReadonlyMap<string, number>;
@@ -62,16 +54,7 @@ export interface OccasionLifecycleProps {
 
 /**
  * The moments of one occasion, drawn as the life of the work rather than as a list of checkboxes.
- *
- * <p>An occasion is a point on an artifact's lifecycle, and the previous two-column checkbox grid hid
- * exactly that: "Opened", "Merged" and "Closed without merging" sat side by side as peers, so nothing
- * on screen said that the first happens once at the top, the middle two are alternatives, and the
- * moments in between repeat. The strip says all three without a sentence.
- *
- * <p>The bands are derived from the moments the work type actually offers, so this renders a pull
- * request's six, an issue's three, a document's three and a conversation's single one from the same
- * code. A kind this build has never met still draws — its moments land in the middle band under a
- * neutral glyph.
+ * Bands come from the moments the work type offers, so every kind renders from the same code.
  */
 export function OccasionLifecycle({
 	workType,
@@ -89,8 +72,7 @@ export function OccasionLifecycle({
 	const draftsId = `${idPrefix}-on-drafts`;
 	const draftsHintId = `${draftsId}-hint`;
 	const chosen = new Set(selected);
-	// A moment that is not on the lifecycle is not on the strip — with one exception: a practice saved
-	// before this screen stopped offering the hand-asked review still holds it, and hiding it would
+	// Off-lifecycle moments are not offered, but an already-saved one is still drawn: hiding it would
 	// leave a moment nobody can see and nobody can remove.
 	const offLifecycle = manualRequestSignal(workType.signals);
 	const strays = offLifecycle && chosen.has(offLifecycle.signal) ? [offLifecycle] : [];
@@ -129,12 +111,11 @@ export function OccasionLifecycle({
 							))}
 						</div>
 					);
-					// A work type with one band has nothing to tell apart, so it gets no heading — and
-					// with no heading there is nothing for a group to be named by.
+					// A single band has nothing to tell apart, so no heading — and so nothing to name a
+					// group by.
 					if (bands.length === 1) return <div key={band.phase}>{rail}</div>;
-					// Named groups rather than loose headings: a reader who cannot see the bands would
-					// otherwise meet six checkboxes in a row with three stray words between them, and lose
-					// the one thing the strip is drawn to say.
+					// Named groups rather than loose headings: a reader who cannot see the bands would meet
+					// one run of checkboxes with stray words between them.
 					const headingId = `${idPrefix}-band-${band.phase}`;
 					return (
 						<div key={band.phase} role="group" aria-labelledby={headingId}>
@@ -159,12 +140,9 @@ export function OccasionLifecycle({
 						onCheckedChange={onDraftsChange}
 						aria-describedby={draftsHintId}
 					/>
-					{/* Label and description are siblings inside `FieldContent`, which is the anatomy the
-					    kit is built for. Nesting the description inside the label instead put a `<p>` inside
-					    a `<label>`, whose content model is phrasing content only, and — worse — handed the
-					    switch an accessible name of "Include drafts Off by default: read the work once it is
-					    offered as finished". A name is what the control *is*; the sentence explaining the
-					    default belongs to `aria-describedby`, which is what the switch points at above. */}
+					{/* Label and description are siblings, never nested: a `<label>` takes phrasing content
+					    only, and a description inside it joins the switch's accessible name. A name is what
+					    the control *is*; the sentence explaining the default is `aria-describedby`. */}
 					<FieldContent>
 						<FieldLabel htmlFor={draftsId} className="font-normal">
 							Include drafts
@@ -193,11 +171,9 @@ interface MomentNodeProps {
 }
 
 /**
- * One point on the strip: a real checkbox with a label, drawn as a node on a rail.
- *
- * <p>The checkbox is clipped rather than replaced. Nothing here reimplements checkbox behaviour — the
- * label is bound to the control with `htmlFor`, so a click, a Space press, and the accessible name all
- * come from the platform, and the focus ring is drawn on the node because that is what a reader sees.
+ * One point on the strip: a real checkbox with a label, drawn as a node on a rail. Nothing here
+ * reimplements checkbox behaviour — `htmlFor` leaves the click, the Space press and the accessible
+ * name to the platform, and only the focus ring is moved onto the node a reader actually sees.
  */
 function MomentNode({
 	moment,
@@ -218,8 +194,8 @@ function MomentNode({
 			className={cn(
 				"group/moment relative flex w-24 shrink-0 flex-col items-center gap-1 px-1 pt-1 pb-0.5 text-center",
 				// The rail: a hairline spanning circle edge to circle edge. Every node is the same width
-				// with its circle centred, so -50% of the node plus half a circle lands exactly on the
-				// previous one. Hidden on the first node of a band, so the line never dangles.
+				// with its circle centred, so -50% of the node plus half a circle lands on the previous
+				// one. Hidden on the first node of a band, so the line never dangles.
 				railed &&
 					"before:absolute before:top-5 before:-left-1/2 before:right-1/2 before:mr-4 before:ml-4 before:h-px before:bg-border first:before:hidden",
 				"rounded-md has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",

@@ -32,12 +32,10 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The general discussion the reviewer-craft practices read, against a real schema.
  *
- * <p>{@code GeneralReviewCommentContentSourceTest} mocks the repository, so it can only prove what the
- * in-memory pass does with rows it was handed — including rows the JPQL cannot emit. What has to hold in
- * Postgres is what this covers: the exclusions live in the query (a Hephaestus-authored comment must never
- * be read back as human discussion, whatever the Java pass would also catch), the {@code LEFT JOIN FETCH}
- * really initialises the lazy author before the session closes, and the {@code issue.id} filter resolves
- * against the Issue/PullRequest id space they share without leaking a neighbouring artifact's thread.
+ * <p>{@code GeneralReviewCommentContentSourceTest} mocks the repository, so it can only prove the
+ * in-memory pass against rows it was handed. This covers what only Postgres can prove: the query itself
+ * excludes Hephaestus-authored comments, the {@code LEFT JOIN FETCH} initialises the lazy author before
+ * the session closes, and the {@code issue.id} filter does not leak a neighbouring artifact's thread.
  */
 class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTest {
 
@@ -123,8 +121,6 @@ class GeneralReviewCommentContentSourceIntegrationTest extends BaseIntegrationTe
 
         assertThat(staged.get("count").asInt()).isEqualTo(2);
         assertThat(staged.get("comments").get(0).get("body").asString()).isEqualTo("this branch is always taken");
-        // The author login is only readable here if the LEFT JOIN FETCH initialised it: the entities are
-        // detached by the time the provider serialises them.
         assertThat(staged.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-a");
         assertThat(staged.get("comments").get(1).get("author").asString()).isEqualTo("contributor-b");
     }

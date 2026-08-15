@@ -28,8 +28,7 @@ public record PracticeDefinition(
     public PracticeDefinition {
         Objects.requireNonNull(name, "name");
         bindings = List.copyOf(Objects.requireNonNull(bindings, "bindings"));
-        // Refused rather than defaulted: with no binding there is no artifact kind to read off, so a
-        // practice that names none is not an unbound practice but an unanswerable one.
+        // Refused rather than defaulted: with no binding there is no artifact kind to read off.
         PracticeBinding.artifactKindOf(bindings);
         rejectDuplicateSignals(bindings);
         Objects.requireNonNull(criteria, "criteria");
@@ -40,8 +39,7 @@ public record PracticeDefinition(
             if (automatedReviewDisabled && !binding.needs().isEmpty()) {
                 throw new IllegalArgumentException("A practice without automated review cannot declare evidence");
             }
-            // Contextual sources alone would let a review start having read nothing it must read, and
-            // every verdict it then produced would be about evidence it never established it had.
+            // Contextual sources alone would let a review run having read nothing it must read.
             if (!automatedReviewDisabled && binding.needs().stream().noneMatch(PracticeEvidenceRequirement::refuses)) {
                 throw new IllegalArgumentException(
                     "Automated review requires at least one required evidence source per binding"
@@ -66,7 +64,6 @@ public record PracticeDefinition(
         );
     }
 
-    /** The kind of artifact this practice reviews, read off its bindings. */
     public ArtifactKind artifactKind() {
         return PracticeBinding.artifactKindOf(bindings);
     }

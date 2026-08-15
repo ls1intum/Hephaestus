@@ -118,13 +118,10 @@ public class AgentJobService {
      * called inside the caller's open session/transaction and the resulting request submitted OUTSIDE it
      * via {@link #submitPrepared}. Null when the branch refs needed to clone/diff are absent.
      *
-     * <p>The origin is {@link ObservationOrigin#MANUAL} on both of these builders and not negotiable,
-     * because the only caller is the dev trigger and every run it starts is one an admin picked an
-     * artifact for. The trigger signal it replays does not change that: naming
-     * {@code scm.pull_request.merged} makes the run <em>reproduce</em> what a merge would have
-     * occasioned, but the corpus is still one artifact somebody chose. Left to the submission request's
-     * default — LIVE whenever a trigger signal is present — a handful of hand-picked replays would be
-     * read as part of the population the behavioural trend line is drawn from.
+     * <p>The origin is {@link ObservationOrigin#MANUAL} on both of these builders and not negotiable: the
+     * only caller is the dev trigger, and the submission request's default — LIVE whenever a trigger
+     * signal is present — would otherwise fold a hand-picked replay into the population the behavioural
+     * trend line is drawn from.
      */
     @Nullable
     PullRequestReviewSubmissionRequest buildReviewRequest(PullRequest pr, @Nullable SignalName triggerSignal) {
@@ -167,7 +164,6 @@ public class AgentJobService {
     /**
      * Submit a prepared dev request and render the result message. Call only after the build
      * transaction commits.
-     *
      */
     public String submitPrepared(
         Long workspaceId,
@@ -191,9 +187,8 @@ public class AgentJobService {
      * transaction, the same race would poison the caller's whole unit of work.
      *
      * @param signalKey the ledger entry this submission answers, already won by the caller. Every
-     *     refusal below is recorded against it, which is what allows a review refused for a reason an
-     *     operator can lift to happen later instead of being lost. Null for the paths that cannot name
-     *     a signal yet, which then keep the older in-flight-only deduplication.
+     *     refusal is recorded against it, so a review refused for a liftable reason can happen later
+     *     instead of being lost. Null for paths that cannot name a signal yet.
      * @return the created (or existing, deduplicated) job; empty when the workspace has no enabled
      *     practice-review binding, or the cap funding it is reached
      */
@@ -286,8 +281,8 @@ public class AgentJobService {
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
             }
             // Resolved, not filtered in SQL: a practice that inherits its tier stores NULL, and
-            // `review_tier <> 'OFF'` answers UNKNOWN for it — which would refuse the review of every
-            // workspace that had left its practices to inherit, i.e. all of them after this release.
+            // `review_tier <> 'OFF'` answers UNKNOWN for it, which would refuse review for every
+            // workspace that left a practice to inherit.
             if (!hasReviewablePractice(currentWorkspace, artifactKindFor(jobType))) {
                 log.debug(
                     "Skipping practice review with no active practice for its work type: workspaceId={}, jobType={}",
@@ -391,8 +386,6 @@ public class AgentJobService {
                 // the occurrence free to be recorded again rather than consumed by a job that never was.
                 log.info("Idempotency constraint caught concurrent duplicate: key={}", detectionKey);
                 status.setRollbackOnly();
-                // Named but NOT recorded: the rollback unwinds this signal's ledger row, and the
-                // submission that won carries the review and its own settlement.
                 return SubmissionOutcome.refused(SignalStateReason.CONCURRENT_DUPLICATE);
             }
 
@@ -409,8 +402,7 @@ public class AgentJobService {
 
             return SubmissionOutcome.of(job);
         });
-        // Only a callback returning null could produce null here, and every branch above returns an
-        // outcome; a null would be a silence with no reason, which is the one thing this must not do.
+        // Every branch above returns an outcome; a null here would be a refusal with no reason.
         return Objects.requireNonNull(outcome, "submission outcome");
     }
 
@@ -422,10 +414,6 @@ public class AgentJobService {
         return SubmissionOutcome.refused(reason);
     }
 
-    /**
-     * The artifact a job of this type is about. The single mapping for both the job row and the
-     * observations filed against it — a second one drifts, and the same artifact ends up with two names.
-     */
     /** Whether any practice of this work type resolves to a tier that admits a review. */
     private boolean hasReviewablePractice(Workspace workspace, ArtifactKind artifactKind) {
         PracticeReviewTier workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultTier();
@@ -440,6 +428,10 @@ public class AgentJobService {
             );
     }
 
+    /**
+     * The artifact a job of this type is about. The single mapping for both the job row and the
+     * observations filed against it — a second one drifts, and the same artifact ends up with two names.
+     */
     public static ArtifactKind artifactKindFor(AgentJobType jobType) {
         return switch (jobType) {
             case PULL_REQUEST_REVIEW -> ArtifactKinds.PULL_REQUEST;

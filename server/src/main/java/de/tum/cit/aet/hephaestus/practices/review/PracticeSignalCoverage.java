@@ -20,12 +20,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Whether a practice binding can ever fire, and if not, why.
- *
- * <p>Two questions with deliberately different consequences. A signal <em>no</em> integration declares
- * is a mistake in the build, the same on every deployment, and fails the boot. A signal only an
- * unconnected integration raises is a workspace halfway through onboarding — the normal case — and is
- * reported as dormancy, which is why that half is asked per workspace.
+ * Whether a practice binding can ever fire, and if not, why. A signal <em>no</em> integration declares is a
+ * mistake in the build and fails the boot; a signal only an unconnected integration raises is a workspace
+ * halfway through onboarding and is reported per-workspace as dormancy.
  *
  * <p>Answered through {@link SignalCoverage} and the registered artifact descriptors, so the practices
  * module never learns which integrations exist and a new domain becomes bindable without an edit here.
@@ -53,15 +50,13 @@ public class PracticeSignalCoverage {
     }
 
     /**
-     * Asserts that the authoring vocabulary offers no signal nothing can raise.
+     * Asserts that the authoring vocabulary offers no signal nothing can raise. Checks the offered
+     * vocabulary rather than the stored practices, since what an author is offered is compiled in and
+     * identical on every deployment.
      *
-     * <p>Checks the offered vocabulary rather than the stored practices: what an author is offered is
-     * compiled in and identical on every deployment.
-     *
-     * <p><strong>The two sets must stay independently derived</strong> or the comparison means nothing.
-     * The offered side comes from the registered artifact descriptors, the compiled side from what the
-     * manifests declare through {@link SignalCoverage}. Anything computing one from the other —
-     * including a test fixture — turns this into a tautology that passes with every manifest empty.
+     * <p>The offered side and the compiled side (from {@link SignalCoverage}) must stay independently
+     * derived — computing one from the other, including in a test fixture, turns this into a tautology
+     * that passes with every manifest empty.
      */
     void validateAuthoringVocabulary() {
         List<String> violations = new ArrayList<>();
@@ -116,7 +111,6 @@ public class PracticeSignalCoverage {
         return List.copyOf(dormant);
     }
 
-    /** The signals one practice is bound to. */
     public Set<SignalName> signalsOf(Practice practice) {
         return new LinkedHashSet<>(PracticeBinding.signalsOf(practice.getBindings()));
     }

@@ -147,8 +147,8 @@ public class WorkspaceContextBuilder {
 
     private BuildResult buildLocked(ContextRequest request, @Nullable EvidencePlan evidencePlan) {
         // Every source the contract says applies to this artifact kind — not a subset chosen for the
-        // practices in scope. What a practice needs before it may be reviewed is a separate question,
-        // asked later by the readiness check; this one is only "what can the model see".
+        // practices in scope. What a practice needs before it may be reviewed is asked later, by the
+        // readiness check; this one is only "what can the model see".
         Set<SourceKind> stagedSources = Set.of();
         if (evidencePlan != null) {
             if (manifestBuilder == null) {
@@ -341,13 +341,10 @@ public class WorkspaceContextBuilder {
             try {
                 contribution = source.capture(request, Set.of(kind));
             } catch (RuntimeException e) {
-                // Sources are captured independently so that one failing collector costs only its
-                // own source. Recording a collection error remains conservative: review readiness
-                // skips any practice that required this source. Allowing the exception to propagate
-                // would instead discard every source already captured for this job.
-                //
-                // Only failures raised by the collector are absorbed here. The checks below validate
-                // the contribution against its contract and must continue to propagate.
+                // Sources are captured independently so one failing collector costs only its own source;
+                // letting the exception propagate would instead discard every source already captured
+                // for this job. Only failures raised by the collector are absorbed here — the checks
+                // below still propagate.
                 stateOverrides.put(kind, new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE));
                 meterRegistry.counter(METRIC_REQUIRED_FAILURE, Tags.of("provider", providerName)).increment();
                 log.warn(

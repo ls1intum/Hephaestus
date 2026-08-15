@@ -67,26 +67,19 @@ import {
 /**
  * The width of the decision column, shared by an area's ladder and its practices'.
  *
- * <p>They are the same control at two levels of one chain, so they belong in one column, and a stated
- * width is the only thing that puts them there. An area's ladder laid out after a content-width
- * accordion header instead starts at a different x under every area name on the page — which is a
- * column only by accident, and never on a page with more than one area.
+ * An area's ladder and its practices' are the same control at two levels of one chain, so they have
+ * to share a left edge. A stated width is what puts them there; laid out after a content-width
+ * accordion header instead, an area's ladder starts at a different x under every area name.
+ * `DecisionsShareOneColumn` in the stories is the assertion.
  */
 const DECISION_COLUMN = "sm:w-80";
 
-/** An area header: everything it says, then the decision. */
 const AREA_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
 
 /**
- * A practice row: its checkbox, everything it says, then the decision.
- *
- * <p>A track more than the area header above it, and still one column — the decision track is a fixed
- * 20rem at the end of both grids, and both grids are laid out across the same width, so the extra
- * leading track changes where the *name* starts and not where the ladder does.
- *
- * <p>The checkbox keeps its own track below `sm` too, where the ladder drops to a full-width row
- * beneath. Two tracks rather than one: a single-column stack would give the checkbox a line of its own
- * above the name it selects.
+ * The decision track is a fixed 20rem at the end of this grid and of {@link AREA_GRID}, and both are
+ * laid out across the same width, so the row's extra leading track for the checkbox moves where the
+ * practice *name* starts and not where the ladder does.
  */
 const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
 
@@ -94,7 +87,6 @@ export interface ReviewAutonomyPendingState {
 	workspace: boolean;
 	areaSlugs: ReadonlySet<string>;
 	practiceSlugs: ReadonlySet<string>;
-	/** Non-null while a bulk change is running, so the bar can say how far it has got. */
 	bulk: { done: number; total: number } | null;
 }
 
@@ -119,14 +111,6 @@ export interface ReviewAutonomyPageProps {
 	onBulkSetTier: (practiceSlugs: string[], tier: ReviewTier | null) => void;
 }
 
-/**
- * One screen for the decision that used to take a hundred edits.
- *
- * <p>Ordered by how much reach a decision has, because that is the order an admin should try them in:
- * the workspace default first, then an area, then one practice. Every level below the first is an
- * exception, and the screen says so — inherited rows recede, overridden rows are marked and carry the
- * way back.
- */
 export function ReviewAutonomyPage({
 	workspaceSlug,
 	settings,
@@ -161,8 +145,7 @@ export function ReviewAutonomyPage({
 				.map((practice) => practice.slug),
 		),
 	);
-	// A selection survives the filter being switched on, and the rows it named may now be hidden;
-	// acting on what is no longer on screen is how a bulk change surprises somebody.
+	// A selection survives the filter being switched on, so it can name rows that are now hidden.
 	const actionable = [...selected].filter((slug) => selectableSlugs.has(slug));
 
 	const toggle = (slug: string, checked: boolean) => {
@@ -185,9 +168,8 @@ export function ReviewAutonomyPage({
 				onClearFeedbackReach={onClearFeedbackReach}
 			/>
 
-			{/* Sticky, because a selection made at the eightieth row has to be actionable without scrolling
-			    back to the top. No horizontal padding: the strip's contents line up with the card above and
-			    the areas below, and at 320px a strip wider than its parent drags the whole page sideways. */}
+			{/* No horizontal padding: at the narrowest viewport a strip wider than its parent drags the
+			    whole page sideways, which `expectNoPageOverflow` in the stories is what catches. */}
 			<div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<TierSummary counts={rollup.counts} overrides={overrides} />
@@ -250,9 +232,6 @@ export function ReviewAutonomyPage({
 	);
 }
 
-/**
- * The one decision that replaces a hundred, at the top of the screen where it is the first thing read.
- */
 function WorkspaceDecisionCard({
 	settings,
 	saving,
@@ -324,9 +303,9 @@ function WorkspaceDecisionCard({
 						}}
 						className="gap-3"
 					>
-						{/* The dot leads, as it does on every rung of the ladder above — and a control whose
-						    24px hit area is a `::after` box hanging 12px past its edge drags the page sideways
-						    when it sits flush against the right margin. */}
+						{/* The dot leads rather than trails: its hit area is an `::after` box hanging past the
+						    control's own edge, which drags the page sideways when it sits against the right
+						    margin. */}
 						{FEEDBACK_REACH_ORDER.map((reach) => (
 							<FieldLabel key={reach}>
 								<Field orientation="horizontal">
@@ -356,10 +335,8 @@ function WorkspaceDecisionCard({
 }
 
 /**
- * What the workspace is doing right now, in one line that stays on screen.
- *
- * <p>Read straight off the rollup. Counting a hundred practice rows in the browser would put a second
- * implementation of the inheritance chain here, and it would answer for the rows that happen to be
+ * Read straight off the server's rollup. Counting the rendered rows instead would put a second
+ * implementation of the inheritance chain here, and would answer for the rows that happen to be
  * loaded rather than for the workspace.
  */
 function TierSummary({
@@ -376,12 +353,6 @@ function TierSummary({
 	);
 }
 
-/**
- * How many of them somebody decided personally, or nothing when nobody has.
- *
- * <p>A second sentence in the summary rather than a second line under it, because it is the same
- * answer: what the workspace is doing, and how much of that was chosen one row at a time.
- */
 function byHandSentence(overrides: { practices: number; areas: number }): string {
 	const parts: string[] = [];
 	if (overrides.practices > 0) {
@@ -394,21 +365,14 @@ function byHandSentence(overrides: { practices: number; areas: number }): string
 }
 
 /**
- * Which practices the list is showing — all of them, or the exceptions.
- *
- * <p>A toggle group, because Practice setup filters its list with one and this is the same act on the
- * same practices; a reader who has learned that page should not have to learn a second control here.
- * It was a `Switch` inside a `Field`, which is the shape this screen uses for the two settings it
- * *writes* — an admin had no way to tell from the control that this one changes nothing.
- *
- * <p>Both states are named on screen rather than one being the unlabelled absence of the other, which
- * is the other thing a switch could not do: "Only what was set by hand", off, does not say that what
- * you are looking at is everything.
+ * A toggle group rather than a switch, because this control only narrows the list while every other
+ * control on the screen writes a setting — and because both states are then named on screen, rather
+ * than one being the unlabelled absence of the other.
  */
 function ScopeFilter({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
 	return (
-		// `role="toolbar"`, as on Practice setup: `ToggleGroup` emits `aria-orientation`, which ARIA
-		// allows on toolbar but not on group, and the items are `aria-pressed` buttons rather than radios.
+		// `role="toolbar"`: `ToggleGroup` emits `aria-orientation`, which ARIA allows on toolbar but not
+		// on group, and the items are `aria-pressed` buttons rather than radios.
 		<ToggleGroup
 			role="toolbar"
 			variant="outline"
@@ -424,11 +388,8 @@ function ScopeFilter({ value, onChange }: { value: boolean; onChange: (next: boo
 }
 
 /**
- * Moving an area's worth in one action, which is the task the screen exists for.
- *
- * <p>A menu rather than a ladder here: the selection holds practices at different tiers, so there is no
- * current value for a segmented control to show, and a control that displayed one would be lying about
- * three quarters of the rows it is about to change.
+ * A menu rather than the ladder the rows use: a selection can hold practices at different tiers, so
+ * there is no current value for a segmented control to show without misreporting most of them.
  */
 function BulkActionBar({
 	count,
@@ -452,9 +413,6 @@ function BulkActionBar({
 						: `${count} ${count === 1 ? "practice" : "practices"} selected`}
 				</ItemTitle>
 			</ItemContent>
-			{/* Welded, because they are one decision taken two ways — act on the selection, or drop it.
-			    Two free-floating buttons of different variants at slightly different widths were the
-			    ragged right edge of this strip. */}
 			<ItemActions>
 				<ButtonGroup>
 					<DropdownMenu>
@@ -467,7 +425,7 @@ function BulkActionBar({
 						/>
 						<DropdownMenuContent align="end">
 							{/* The label has to live inside a group: it renders Base UI's `Menu.GroupLabel`,
-							    which needs a `Menu.Group` above it and takes the whole popup down without one. */}
+							    which throws without a `Menu.Group` ancestor and takes the whole popup down. */}
 							<DropdownMenuGroup>
 								<DropdownMenuLabel>Set every selected practice to</DropdownMenuLabel>
 								{REVIEW_TIER_ORDER.map((tier) => (
@@ -523,17 +481,14 @@ function AreaGroup({
 		selectableSlugs.length > 0 && selectableSlugs.every((slug) => selected.has(slug));
 
 	return (
-		// One box per area, as on Practice setup — twenty-five sections inside a single border read as one
-		// very long thing rather than as twenty-five. `scroll-mt-24` clears the sticky strip: tabbing to an
-		// area's trigger scrolls it into view, and `scroll-margin` is what that scroll respects; without it
-		// the heading a keyboard user just moved to landed under the strip, which covers y 0–93 at 320px.
+		// `scroll-mt-24` clears the sticky strip above: tabbing to an area's trigger scrolls it into view,
+		// and `scroll-margin` is what that scroll respects — without it the heading a keyboard user just
+		// moved to lands underneath the strip.
 		<AccordionItem value={group.key} className="scroll-mt-24 rounded-lg border bg-card px-3">
-			{/* A grid, not a flex row: the ladder sits in a track of a stated width, so it starts at the
-			    same x under a short area name and a long one. */}
 			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", AREA_GRID)}>
 				<AccordionTrigger>
 					{/* Spans, not `ItemTitle`/`ItemDescription`: this is inside a `<button>`, which may only
-					    contain phrasing content, and those render `<div>`s. */}
+					    contain phrasing content, and those primitives render `<div>`s. */}
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="flex flex-wrap items-center gap-2">
 							<span className="break-words">{group.name}</span>
@@ -547,8 +502,8 @@ function AreaGroup({
 					</span>
 				</AccordionTrigger>
 				{areaSlug === null ? (
-					// The no-area bucket is not a row in any table, so it has nothing to hold a decision.
-					// Its practices inherit the workspace default directly.
+					// The no-area bucket is not an area, so there is nothing for a tier to be stored against;
+					// its practices inherit the workspace default directly.
 					<span className={cn("min-w-0 text-muted-foreground text-xs", DECISION_COLUMN)}>
 						Follows the workspace default
 					</span>
@@ -590,10 +545,8 @@ function AreaGroup({
 								{allSelected ? "Deselect" : "Select"} all {selectableSlugs.length}
 							</Button>
 						)}
-						{/* Ruled, not boxed. A bordered card here drew a second box inside the area's own, and
-						    its border plus the rows' padding inset the practice ladders 14px from the area
-						    ladder directly above them — near enough to look like a mistake rather than a
-						    nesting. Rules separate the rows and the decision column runs straight. */}
+						{/* Ruled, not boxed: a bordered card here would inset the practice ladders from the
+						    area ladder above them, breaking the shared decision column. */}
 						<ul className="mt-2 divide-y border-t">
 							{group.practices.map((practice) => (
 								<PracticeAutonomyRow
@@ -643,14 +596,9 @@ function PracticeAutonomyRow({
 			render={<li />}
 			variant="default"
 			// `px-0`: the row's grid tracks have to end where the area header's tracks end, or the two
-			// ladders do not share a column. Vertical padding stays — the rhythm is the row's, not the
-			// list's.
+			// ladders do not share a column.
 			className={cn("grid items-start gap-2 rounded-none px-0 py-3 sm:gap-4", ROW_GRID)}
 		>
-			{/* `ItemMedia` rather than a bare checkbox: it is the leading slot of a row, and it already
-			    drops to the first line's cap height when the row carries a description — which is where a
-			    reader expects a control that belongs to the title beside it, and what a hand-set `mt-0.5`
-			    was approximating. */}
 			<ItemMedia>
 				<Checkbox
 					checked={selected}
@@ -661,10 +609,6 @@ function PracticeAutonomyRow({
 			</ItemMedia>
 			<ItemContent className="min-w-0 gap-0.5">
 				<ItemTitle className="w-full min-w-0 line-clamp-none">
-					{/* Why the practice exists is a hover card on its name, not a third line under it. The
-					    sentence is the only human-written prose a practice carries and it is worth reading —
-					    but under a hundred rows it is what makes the list unscannable, and it is not what
-					    this row is deciding. Same card on Practice setup, so one gesture learns both. */}
 					<PracticeDetailHoverCard practice={practice}>
 						<Link
 							to="/w/$workspaceSlug/admin/practices/$practiceSlug"
@@ -675,17 +619,13 @@ function PracticeAutonomyRow({
 						</Link>
 					</PracticeDetailHoverCard>
 				</ItemTitle>
-				{/* The kind of work, because it is the one fact that changes what this decision costs:
-				    Deliver on a pull-request practice writes on every PR the team opens, and Deliver on a
-				    document practice may never fire at all. Same line, same vocabulary and same spacing as
-				    the catalogue's row, so the two screens describe a practice identically. */}
+				{/* The kind of work is what changes the cost of this decision: Deliver on a pull-request
+				    practice writes on every PR the team opens, on a document practice it may never fire. */}
 				<ItemDescription className="flex flex-wrap items-center gap-1.5">
 					<span>{artifactKindLabel(practice.artifactKind)}</span>
 					{limitation && <Badge variant="warning">{limitation}</Badge>}
 				</ItemDescription>
 			</ItemContent>
-			{/* `col-span-2` below `sm`: the decision gets a full-width row under the name rather than being
-			    squeezed into the narrow track the checkbox sits in. */}
 			<ItemActions
 				className={cn(
 					"col-span-2 min-w-0 flex-col items-stretch gap-1 sm:col-span-1",
@@ -726,9 +666,9 @@ export interface DecisionNoteProps {
 	 */
 	follows: string | null;
 	/**
-	 * The reset's accessible name. It opens with the visible words, so a voice-control user can say
-	 * what they read (WCAG 2.2 SC 2.5.3), and names the thing it resets, because this screen renders
-	 * one of these per area and one per practice — "Use the default" alone identifies none of them.
+	 * The reset's accessible name. It has to open with the visible words (WCAG 2.2 SC 2.5.3) and name
+	 * what it resets: the screen renders one of these per area and one per practice, so "Use the
+	 * default" alone identifies none of them.
 	 */
 	resetLabel: string;
 	disabled: boolean;
@@ -736,16 +676,8 @@ export interface DecisionNoteProps {
 }
 
 /**
- * What decided this setting, and the way back — one line, in one shape, at all four levels.
- *
- * <p>Where the value came from is named rather than badged with the level's name: "Follows Code
- * review" tells an admin where to go and change it once, which "AREA" does not.
- *
- * <p>One paragraph rather than a flex row holding a span and a button. `Field` stretches every child
- * to its full width, so each of the four sites had wrapped its reset in a `div` to stop a link-styled
- * button spanning the card — and each had then re-derived an inline button by undoing `size="sm"`
- * with `h-auto p-0 text-xs`. A button that belongs in a sentence goes in the sentence, at
- * `size="inline"`, which inherits the type around it.
+ * One paragraph rather than a flex row holding a span and a button: `Field` stretches every child to
+ * its full width, so a link-styled button laid out beside the sentence spans the whole card.
  */
 function DecisionNote({ follows, resetLabel, disabled, onClear }: DecisionNoteProps) {
 	return (

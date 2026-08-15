@@ -11,13 +11,8 @@ public record PracticeEvidenceSourceOptionDTO(
     @NonNull String displayName,
     @NonNull String description,
     /**
-     * How much of the source one capture takes, and the bound past which it stops being whole.
-     *
-     * <p>Distinct from {@code description}, which says what the source <em>is</em>. This says what a
-     * capture of it holds — "up to the 500 most recent inline comments, beyond that the capture is
-     * reported as PARTIAL". That is the fact an author is missing at the moment they decide whether a
-     * practice may rest a claim about what is absent on this source, and it is fixed by the contract
-     * rather than by anything they can configure.
+     * Distinct from {@code description}, which says what the source <em>is</em>: this is fixed by the
+     * source contract rather than anything a practice author can configure.
      */
     @NonNull
     @Schema(description = "How much of the source one capture takes, and the bound past which it is no longer whole")
@@ -27,12 +22,8 @@ public record PracticeEvidenceSourceOptionDTO(
     @Schema(description = "What requiring this source demands of its capture; fixed by the source contract")
     RequiredCaptureQuality requiredQuality,
     /**
-     * Whether {@code EXHAUSTIVE} may be taken towards
-     * this source.
-     *
-     * <p>Not derivable from {@code requiredQuality}: two sources at the same floor can differ on whether
-     * a complete capture is reachable at all. Unpublished, an authoring surface would offer "and nothing
-     * is missing" for a source the validator then refuses.
+     * Not derivable from {@code requiredQuality}: two sources at the same floor can differ on whether a
+     * complete capture is reachable at all.
      */
     @Schema(
         description = "Whether this source can be captured whole, and so whether a practice may rest a claim about what is absent from it on the capture",

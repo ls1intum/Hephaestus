@@ -33,15 +33,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
- * {@code GET /workspaces/{slug}/practices/review-tiers} — the one read the whole management screen is
- * built on. Every area heading and the workspace's own summary line come from this response, so a rollup
- * that disagrees with the practices beneath it is worse than no rollup at all: it is the number an
- * administrator trusts <em>instead of</em> counting.
- *
- * <p>{@link ReviewTierResolverTest} pins the chain as a function. This pins what the endpoint does with
- * it over real rows — which is where the two could come apart, because the counts are resolved in the JVM
- * over one catalogue read and nothing but these assertions stops that from drifting into a
- * {@code COALESCE} in SQL that agrees only until the next change.
+ * {@code GET /workspaces/{slug}/practices/review-tiers} — the read the practice management screen is
+ * built on. {@link ReviewTierResolverTest} pins the resolution chain as a function; this pins what the
+ * endpoint does with it over real rows, where the counts are resolved in the JVM rather than in SQL.
  */
 @DisplayName("Review tier rollup")
 class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -124,11 +118,9 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     /**
      * One workspace covering every branch of the chain at once, so a single fetch can be asserted from
-     * several angles without each test rebuilding a catalogue.
-     *
-     * <p>The workspace default is deliberately {@code OBSERVE} rather than {@link PracticeReviewTier#DEFAULT}.
-     * A rollup that ignored the workspace level and fell back to the constant would still produce plausible
-     * numbers against a workspace that had never chosen; against this one it cannot.
+     * several angles without each test rebuilding a catalogue. The workspace default is deliberately
+     * {@code PROPOSE} rather than {@link PracticeReviewTier#DEFAULT}, so a rollup that silently fell back
+     * to the constant instead of reading the workspace level would be caught.
      */
     @Nested
     @DisplayName("over a catalogue that uses every level of the chain")
@@ -153,12 +145,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             persistPractice("unfiled", null, null);
         }
 
-        /**
-         * The client renders a fixed set of chips. If a tier vanished from the map whenever nothing sat at
-         * it, the row's columns would move as practices are reconfigured. The map's keys are the ladder
-         * itself, so a tier added or retired shows up here rather than as a chip that quietly stops being
-         * rendered.
-         */
         @Test
         @WithAdminUser
         @DisplayName("every tier is a key, even the ones at zero")
@@ -172,11 +158,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 .allSatisfy(area -> assertThat(area.counts()).containsOnlyKeys(PracticeReviewTier.values()));
         }
 
-        /**
-         * The heart of it. Exactly ONE of the four practices stores a tier of its own, yet all four are
-         * counted at the tier actually in force — one from its area, two from the workspace, one from
-         * itself. A rollup that counted the stored column would report three practices at no tier at all.
-         */
         @Test
         @WithAdminUser
         @DisplayName("counts the effective tier after the chain, not the stored override")
@@ -198,7 +179,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(rollup.counts().values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(4);
         }
 
-        /** Each area counts only its own practices, resolved the same way. */
         @Test
         @WithAdminUser
         @DisplayName("an area counts its own practices at their effective tier")
@@ -214,10 +194,9 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         /**
-         * {@code overriddenCount} answers "how many of these decided for themselves", which is what tells
-         * an administrator whether changing the area's tier will actually move anything. It counts the
-         * practice's own column and nothing else: {@code alpha} holds a tier itself, but that makes the
-         * area the decider for the practices under it, not the practices overridden.
+         * {@code overriddenCount} counts only the practice's own stored tier: {@code alpha} area holds a
+         * tier itself, but that makes the area the decider for the practices under it, not a practice that
+         * overrode the area.
          */
         @Test
         @WithAdminUser
@@ -231,7 +210,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(areaNamed(rollup, null).overriddenCount()).isZero();
         }
 
-        /** An empty area is still a heading on the screen, so it is still a group in the response. */
         @Test
         @WithAdminUser
         @DisplayName("an area with no practices is reported at all zeroes rather than omitted")
@@ -244,11 +222,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(gamma.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
         }
 
-        /**
-         * The practices belonging to no area are a group, not an area. It sorts after every real area
-         * because it is the remainder rather than a peer, and it can hold no decision of its own — there is
-         * no row to set a tier on — so it always reports the workspace as the source.
-         */
+        /** No row exists to set a tier on the no-area group, so it always reports the workspace as the source. */
         @Test
         @WithAdminUser
         @DisplayName("the no-area group sorts last, is named by two nulls, and can hold no decision")
@@ -272,7 +246,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(ungrouped.counts()).containsEntry(PracticeReviewTier.PROPOSE, 1);
         }
 
-        /** An area that decided reports itself as the decider; one that did not points at the workspace. */
         @Test
         @WithAdminUser
         @DisplayName("each area reports whether the tier is its own or the workspace's")
@@ -292,10 +265,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(beta.reviewTier().inherited()).isTrue();
         }
 
-        /**
-         * Reach is the other half of the delivery gate and is carried here so the screen can say "these
-         * practices deliver, but only into the mentor conversation" without a second request.
-         */
         @Test
         @WithAdminUser
         @DisplayName("carries the workspace's feedback reach alongside the counts")
@@ -347,11 +316,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(rollup.counts()).containsEntry(PracticeReviewTier.DELIVER, 1);
         }
 
-        /**
-         * At the workspace level "inherited" means "nobody chose, so the vocabulary's default applies" —
-         * the same reading as one level down, which is why the raw column is reported and not just the
-         * resolved value.
-         */
+        /** The raw column is reported alongside the resolved value so a caller can tell "chose OFF" from "inherited". */
         @Test
         @WithAdminUser
         @DisplayName("a workspace that chose reports its own decision, and every unopinionated practice moves")
@@ -369,7 +334,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(rollup.counts()).containsEntry(PracticeReviewTier.DELIVER, 0);
         }
 
-        /** An empty catalogue still answers, with every tier at zero and no area groups. */
         @Test
         @WithAdminUser
         @DisplayName("an empty catalogue answers with every tier at zero and no groups")
@@ -384,10 +348,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
     }
 
-    /**
-     * The rollup is the number an administrator reads instead of counting, so a neighbouring workspace's
-     * practices leaking into it would be invisible until the totals were reconciled by hand.
-     */
+    /** A leak from another workspace would be invisible in the totals until reconciled by hand. */
     @Test
     @WithAdminUser
     @DisplayName("counts only this workspace's practices")

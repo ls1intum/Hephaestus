@@ -12,11 +12,8 @@ const FAILED_RUN = "bbbbbbbb-8888-8888-8888-888888888888";
 
 const sorted = { requireObservationSort: "ACTIONABILITY" };
 
-/**
- * The job and the rows come from one fixture, so the heading and the list under it describe the same
- * review. They used to come from two: the job from the agent fixtures and the rows from the review
- * ones, so this screen showed a header naming one pull request above rows naming another.
- */
+// The heading comes from the job endpoint and the rows from the review ones, so both are served from
+// one fixture — otherwise the header can name one pull request above rows naming another.
 const meta = {
 	title: "Workspace admin/Practice reviews/Review details",
 	component: ReviewRunDetailPage,
@@ -37,15 +34,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A finished review of a pull request: one strength, three things to tighten, and four pieces of
- * feedback that between them were delivered, replaced and withheld.
- *
- * <p>How the run went is on the same page rather than in a drawer: the model and the token counts are
- * what an operator checks when a review costs more than it should or answers worse than it used to.
- * The configuration snapshot is never rendered — it is a machine artefact, so the useful action on it
- * is putting it where a machine can read it.
- */
 export const CompletedWithMixedOutput: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -63,7 +51,6 @@ export const CompletedWithMixedOutput: Story = {
 	},
 };
 
-/** More observations than the five this screen previews, so it offers the way to the rest. */
 export const MoreObservationsThanItShows: Story = {
 	parameters: {
 		chromatic: { viewports: [1440] },
@@ -116,7 +103,6 @@ export const DeclinedForInsufficientEvidence: Story = {
 	},
 };
 
-/** A review still going, which says results are coming rather than reporting an absence. */
 export const InProgressWithoutOutput: Story = {
 	args: { jobId: RUNNING_RUN },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -143,15 +129,13 @@ export const FailedWithoutOutput: Story = {
 		await expect(
 			await canvas.findByText("This review ended before it produced observations or feedback."),
 		).toBeVisible();
-		// The failure text is on the page. It used to be inside a collapsed "Technical details"
-		// accordion, together with the model and token counts — so the one screen that could say why a
-		// review produced nothing hid the answer behind a drawer labelled for technicians.
+		// The failure text is on the page rather than behind a disclosure: this is the only screen that
+		// can say why a review produced nothing.
 		await canvas.findByText(/Cannot compute diff/);
 		await expect(canvas.queryByText("Technical details")).not.toBeInTheDocument();
 	},
 };
 
-/** A review that stopped after recording something, which is worth showing rather than discarding. */
 export const FailedWithPartialOutput: Story = {
 	args: { jobId: FAILED_RUN },
 	parameters: {
@@ -179,7 +163,6 @@ export const FailedWithPartialOutput: Story = {
 	},
 };
 
-/** A review of a chat thread, so the same screen can be judged across kinds of work. */
 export const ReviewOfAConversation: Story = {
 	args: { jobId: "33333333-3333-3333-3333-333333333333" },
 	parameters: { chromatic: { viewports: [1440] } },

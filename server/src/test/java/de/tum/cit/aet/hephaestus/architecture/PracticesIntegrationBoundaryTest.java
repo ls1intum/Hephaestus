@@ -13,12 +13,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 /**
- * The practices module may know the integration <em>contract</em> and nothing about who implements it.
- *
- * <p>This is the boundary the whole review contract exists to establish. While practices depends on
- * {@code integration.scm}, making a new domain reviewable means editing practices; once the only
- * permitted imports are the vendor-neutral ports, a domain becomes bindable by shipping a descriptor and
- * a manifest, with no edit here at all.
+ * The practices module may know the integration <em>contract</em> and nothing about who implements it. Once
+ * the only permitted imports are the vendor-neutral ports, a new domain becomes bindable by shipping a
+ * descriptor and a manifest, with no edit here.
  *
  * <p>The boundary is not yet clean, so the rule freezes what exists rather than failing the build.
  * {@link #FROZEN_VIOLATIONS} may only shrink: {@link #frozenViolationsHaveNotGrown()} fails on a new
@@ -46,21 +43,14 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
 
     /**
      * Every dependency from {@code practices} into an integration package outside {@link #ALLOWED_PACKAGES},
-     * as {@code <practices class> -> <integration class>}.
+     * as {@code <practices class> -> <integration class>}. What removes each: the {@code User}/
+     * {@code UserRepository} entries need a {@code practices.spi} port for "who is the current developer"
+     * (the same shape as {@code UserRoleChecker}); the detection-gate entries need a gate that takes a
+     * recorded signal and a workspace rather than an entity.
      *
-     * <p>What removes each:
-     * <ul>
-     *   <li>{@code User}/{@code UserRepository} — a {@code practices.spi} port for "who is the current
-     *       developer", implemented in the SCM domain, the same shape as {@code UserRoleChecker}.
-     *   <li>{@code PullRequest}/{@code Issue}/{@code Repository}/{@code IdentityProvider} in the detection
-     *       gate — a gate that takes a recorded signal and a workspace rather than an entity, and walks
-     *       nothing. That is also what would let the conformance fixture drive the gate.
-     * </ul>
-     *
-     * <p>One known blind spot, stated because a silent one would be worse: ArchUnit reads bytecode, and
-     * javac inlines {@code String} constants, so a practices-side use of a constant such as
-     * {@code ScmDomainEvent.TriggerEventNames} leaves no dependency for this rule to see. Do not read its
-     * silence as proof that none exists.
+     * <p>ArchUnit reads bytecode, and javac inlines {@code String} constants, so a practices-side use of a
+     * constant such as {@code ScmDomainEvent.TriggerEventNames} leaves no dependency for this rule to see —
+     * do not read its silence as proof that none exists.
      */
     private static final Set<String> FROZEN_VIOLATIONS = Set.of(
         "de.tum.cit.aet.hephaestus.practices.observation.ObservationService -> de.tum.cit.aet.hephaestus.integration.scm.domain.user.User",
@@ -78,8 +68,7 @@ class PracticesIntegrationBoundaryTest extends HephaestusArchitectureTest {
 
     @Test
     void practicesNeverNamesAVendor() {
-        // No freeze here: a vendor package is the hard line. The frozen list covers the shared SCM domain
-        // and the event vocabulary; naming GitHub, GitLab, Slack or Outline from practices is never right.
+        // No freeze here: a vendor package is the hard line, unlike the shared SCM domain FROZEN_VIOLATIONS covers.
         ArchRule rule = noClasses()
             .that()
             .resideInAPackage(PRACTICES)

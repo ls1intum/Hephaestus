@@ -21,11 +21,7 @@ const meta = {
 		),
 	],
 	tags: ["autodocs"],
-	/**
-	 * The rung a story starts on is `args.value`; clicking another moves it. With only `fn()` behind
-	 * `onChange` the ladder could not be operated at all — every rung stayed where the args put it,
-	 * which is the one thing a ladder has to be able to do.
-	 */
+	/** Held in state, so the ladder can be moved; `fn()` alone pins every rung to `args.value`. */
 	render: (args) => (
 		<Stateful initial={args.value}>
 			{(value, setValue) => (
@@ -70,7 +66,6 @@ export const Compact: Story = {
 	args: { variant: "compact", value: "PROPOSE" },
 };
 
-/** How an inherited row is drawn: readable, and visibly somebody else's decision. */
 export const Inherited: Story = {
 	args: { variant: "compact", value: "PROPOSE", muted: true },
 };

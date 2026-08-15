@@ -34,13 +34,10 @@ type Story = StoryObj<typeof meta>;
 export const NotDelivered: Story = {
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
-		// Withheld text is badged where it is shown *and* traced under Delivery, and the trace is the
-		// only place the reason sentence appears.
 		// Twice, and deliberately: once on the card around the text — so a body that never reached
 		// anybody cannot be quoted as though it had — and once as the trace's terminal step.
 		await expect(await canvas.findAllByText("Withheld")).toHaveLength(2);
 		canvas.getByRole("link", { name: "See everything reviewed on this work" });
-		// The parent review is a link in the line under the title, not a UUID in a drawer.
 		canvas.getByRole("link", { name: "in a review" });
 		await expect(canvas.queryByText("Technical details")).not.toBeInTheDocument();
 		canvas.getByText("Policy kept it quiet");
@@ -57,31 +54,23 @@ export const Delivered: Story = {
 		// because reaching the developer is the ordinary case.
 		await expect(await canvas.findAllByText("Delivered")).toHaveLength(1);
 		canvas.getByText(/As an inline note on the work/);
-		// An inline note names the lines it is attached to, which is the one identifier on this page
-		// that is a coordinate somebody can act on rather than an internal id.
 		canvas.getByText("server/src/main/resources/application.yml:118–120");
 	},
 };
 
 /**
- * A note of the length the composer really produces: two observations and a strength, seventeen
- * hundred characters, with headings, a fenced code quote and a rule between the observations.
- *
- * <p>Nothing on this page truncates it. The 320-character cut an operator sees in the delivery list
- * is a list preview and stops here — which is the answer to "what about longer feedback?". What the
- * page does have to do is set a rhythm that suits a comment rather than an article: Tailwind
- * Typography's `mt-8` above every heading is what made the spacing look almost doubled.
+ * A note of the length the composer really produces. Nothing on this page truncates it: the cut an
+ * operator sees in the delivery list is a list preview and stops there.
  */
 export const LongFeedback: Story = {
 	args: { feedbackId: longFeedbackDetail.id },
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText(/2 issues to tighten in this change/);
-		// The end of the note is on the page too, so nothing between them was dropped.
+		// The end of the note as well as its opening, so nothing between them was dropped — including
+		// the quoted code, which is the part a preview cannot carry.
 		canvas.getByText(/without HTTP\./);
-		// And the quoted code in the middle of it, which is the part a preview cannot carry.
 		canvas.getByText(/repository\.findVisible/);
-		// It draws on two observations, and each is named by its role in the note.
 		canvas.getByRole("link", {
 			name: "A cache miss and a permission failure come back as the same 404",
 		});
@@ -94,7 +83,6 @@ export const LongFeedback: Story = {
 	},
 };
 
-/** Feedback held for a conversation that has not happened, on a chat thread rather than on code. */
 export const QueuedForConversation: Story = {
 	args: { feedbackId: "11111111-4444-4444-4444-444444444444" },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -104,13 +92,6 @@ export const QueuedForConversation: Story = {
 	},
 };
 
-/**
- * The composed text and the Markdown it was written in, as two views of one thing rather than as a
- * card and a "View Markdown source" accordion below it, which would show the same words twice.
- *
- * This is also the note that took the place of an earlier one, which is a link on the page rather
- * than a UUID in a drawer.
- */
 export const RenderedAndSource: Story = {
 	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
 	parameters: { chromatic: { viewports: [1440] } },

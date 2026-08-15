@@ -147,10 +147,6 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
     @MockitoBean
     private AgentJobService agentJobService;
 
-    /**
-     * The sweep now records the occurrence and hands the fan-out to this collaborator, so the assertion
-     * that both participants are covered moves one level up: the candidate it is given carries them.
-     */
     @MockitoSpyBean
     private ConversationReviewSubmitter conversationReviewSubmitter;
 

@@ -6,21 +6,16 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * Identifier of a family of reviewable artifacts, e.g. {@code scm.pull_request}.
- *
- * <p>Core owns the grammar and the enforcement; the domain-owning module owns the meaning. Kinds are
- * vendor-neutral, so nothing about a provider may leak into the identifier — that is what lets one
- * practice hold across every provider of a domain.
- *
- * <p>It is also the <em>only</em> name for what a practice observes, what an agent job is about, and
- * what an observation is filed against. A second, per-module vocabulary would drift, and the switch
- * translating between the two becomes the place every new domain has to be registered twice.
+ * Identifier of a family of reviewable artifacts, e.g. {@code scm.pull_request}. Core owns the grammar
+ * and enforcement; the domain-owning module owns the meaning. Kinds are vendor-neutral so one practice
+ * holds across every provider of a domain, and are the only name for what a practice observes, what an
+ * agent job is about, and what an observation is filed against — a second per-module vocabulary would
+ * drift.
  *
  * <p>The grammar is narrower than "any string" because these values are persisted and outlive the code
- * that wrote them: whatever the parser accepts it must keep accepting. In particular {@code ':'} can
- * never appear — agent-job idempotency keys are colon-delimited and
- * {@link de.tum.cit.aet.hephaestus.agent.job.AgentJobService} splits them on the last colon, so a kind
- * carrying one would silently re-scope every cooldown derived from it.
+ * that wrote them. In particular {@code ':'} can never appear: agent-job idempotency keys are
+ * colon-delimited and {@link de.tum.cit.aet.hephaestus.agent.job.AgentJobService} splits them on the last
+ * colon, so a kind carrying one would silently re-scope every cooldown derived from it.
  */
 public record ArtifactKind(String value) {
     /** Fits {@code artifact_signal.artifact_kind} and every other {@code artifact_kind} column. */
@@ -45,10 +40,7 @@ public record ArtifactKind(String value) {
         return new ArtifactKind(value);
     }
 
-    /**
-     * The wire and storage form: a bare string, never an object wrapping one, so a payload, a row and a
-     * log line all spell a kind the same way.
-     */
+    /** The wire and storage form: a bare string, never a wrapper object. */
     @Override
     @JsonValue
     public String value() {

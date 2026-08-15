@@ -56,8 +56,7 @@ public class RepositoryTreeContentSource implements EvidenceSource {
 
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
-        // The tree is staged by reference; a caller that only understands byte[] would have to read it
-        // all into heap, which is the cost this source exists to avoid.
+        // Staged by reference, not byte[] — a caller here would have to read the whole tree into heap.
         throw new UnsupportedOperationException("Repository-tree capture stages files from disk; use capture()");
     }
 
@@ -66,8 +65,7 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         if (!selectedKinds.contains(KIND)) {
             return new EvidenceContribution(Map.of(), Map.of());
         }
-        // A deployment with no working copy is a supported configuration, not a fault: throwing would
-        // record a provider failure and warn on every run of one.
+        // No working copy is a supported deployment, not a fault — throwing would warn on every run of one.
         SourceCaptureState absence = absenceOrNull(request);
         if (absence != null) {
             return absent(absence);
@@ -75,10 +73,8 @@ public class RepositoryTreeContentSource implements EvidenceSource {
         GitRepositoryManager.GitTreeSnapshot snapshot = snapshot(request);
         Map<String, java.nio.file.Path> onDisk = new java.util.LinkedHashMap<>();
         snapshot.files().forEach((path, file) -> onDisk.put(SandboxLayout.REPO_MOUNT_RELATIVE + path, file));
-        // A tree the walk stopped short of, or excluded anything from, is PARTIAL — and says which
-        // bound or exclusion did it. Reporting COMPLETE for a truncated tree is the failure this
-        // guards: a practice that asserts something is absent from the repository would then be
-        // answered from a fragment that merely does not happen to contain it.
+        // A truncated tree must report PARTIAL, not COMPLETE — otherwise a practice asserting something is
+        // absent from the repository gets answered from a fragment that merely doesn't happen to contain it.
         SourceCompleteness completeness = snapshot.complete()
             ? SourceCompleteness.COMPLETE
             : SourceCompleteness.PARTIAL;

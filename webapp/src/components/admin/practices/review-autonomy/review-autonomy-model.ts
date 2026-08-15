@@ -16,21 +16,17 @@ export interface AutonomyGroup {
 	/** The area's own tier. For the no-area group this is the workspace's answer, which is not editable here. */
 	reviewTier: ReviewTierAssignment;
 	counts: Record<string, number>;
-	/** How many practices in this group hold a tier of their own. Server-counted, over the whole group. */
+	/** Practices in this group holding a tier of their own — server-counted, over the whole group. */
 	overriddenCount: number;
-	/** The rows to render — already narrowed by the active filter. */
 	practices: Practice[];
 	/** Practices in the group before filtering, so a narrowed group can say what it is hiding. */
 	totalPractices: number;
 }
 
 /**
- * Mirrors the server's `canAttemptAutomatedReview`.
- *
- * <p>Duplicated rather than inferred from the tier, because the two say different things: a practice
- * the system cannot review is written to Off and refused above it, and a control that offered Propose
- * there would fail after the click with a message about a policy the admin is not looking at. The
- * server owns the rule; this only decides whether to offer the choice.
+ * Mirrors the server's `canAttemptAutomatedReview`, which owns the rule; this only decides whether to
+ * offer the choice. Not inferable from the tier: a practice the system cannot review is written to
+ * Off and refused above it, so offering Propose would fail after the click.
  */
 export function reviewableByHephaestus(policy: PracticeAutomatedReviewPolicy): boolean {
 	return (
@@ -40,34 +36,27 @@ export function reviewableByHephaestus(policy: PracticeAutomatedReviewPolicy): b
 }
 
 /**
- * True when this row is somebody's deliberate decision rather than a value flowing down the chain.
- *
- * <p>Read off `inherited`, never off `source`. An area that set its own tier reports
- * `source: "AREA"` *and* `inherited: false`; deriving "inherited" from `source !== "PRACTICE"` marks
- * every such area as untouched and hides it from the overrides filter, which is the one view an admin
- * opens to find what they changed.
+ * Read off `inherited`, never off `source`: an area that set its own tier reports `source: "AREA"`
+ * *and* `inherited: false`, so deriving this from `source` marks every such area as untouched and
+ * hides it from the overrides filter.
  */
 export function isOverridden(assignment: ReviewTierAssignment): boolean {
 	return !assignment.inherited;
 }
 
 export interface GroupOptions {
-	/** Keep only the rows somebody deliberately set — the handful, out of a hundred. */
+	/** Keep only the rows somebody deliberately set. */
 	overridesOnly?: boolean;
 }
 
 /**
- * The rollup's areas, in the server's catalogue order, each carrying its own practices.
+ * Driven by the rollup rather than by the practice list: the counts and the catalogue ordering are the
+ * server's, and recomputing them here would be a second implementation of the inheritance chain. The
+ * practice list only supplies the rows.
  *
- * <p>Driven by the rollup rather than by the practice list: the counts and the ordering are the
- * server's, and recomputing them here would be a second implementation of the inheritance chain that
- * drifts on the first change. The practice list only supplies the rows.
- *
- * <p>Areas the rollup lists with no practices are kept — an empty area is still a place to park a
- * decision, and dropping it would make the area's own tier control unreachable. Practices whose area
- * the rollup does not know are kept too, in a trailing group of their own: the two queries can be a
- * moment out of step after a write, and a row that quietly disappears is worse than a row under a
- * heading that looks odd for one render.
+ * An area the rollup lists with no practices is kept, or its own tier control would be unreachable.
+ * A practice whose area the rollup does not know is kept too, in a trailing group: the two queries can
+ * be a moment out of step after a write, and a row that silently disappears is the worse failure.
  */
 export function groupPracticesByArea(
 	rollup: ReviewTierRollup,
@@ -114,8 +103,8 @@ export function groupPracticesByArea(
 
 	if (!overridesOnly) return groups;
 
-	// An area that made its own decision stays even when none of its practices did: that decision is
-	// exactly what the filter was opened to find, and its rows are the ones it applies to.
+	// An area that made its own decision stays even when none of its practices did — that decision is
+	// what the filter was opened to find.
 	return groups
 		.map((group) => ({
 			...group,
@@ -138,15 +127,10 @@ function countByTier(practices: readonly Practice[]): Record<string, number> {
 }
 
 /**
- * How many decisions this workspace holds of its own, across both levels.
+ * Areas and practices are counted separately because `overriddenCount` is per area and counts
+ * practices only — an admin who set area tiers and nothing else would otherwise read "0 set by hand".
  *
- * <p>`overriddenCount` is per area and counts practices only, so an admin who set three area tiers and
- * nothing else would read "0 set their own" and conclude the screen was broken.
- *
- * <p>Taken from the rollup rather than from the grouped rows: the rollup already counts every practice
- * in the workspace, while the groups carry only the ones a filter left standing — and asking the
- * groups would mean grouping a hundred practices a second time on every render just to add up two
- * numbers the server already sent.
+ * Taken from the rollup, not from the grouped rows: the groups carry only what a filter left standing.
  */
 export function countOverrides(rollup: ReviewTierRollup): {
 	practices: number;

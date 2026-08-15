@@ -13,11 +13,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * The trigger is named after the date it filters, not after dates in general.
- *
- * Four screens send four different timestamps through this control, and all four used to say
- * "Date" — so the toolbar could not tell an operator whether they were narrowing by when the work
- * was observed or by when the feedback went out.
+ * The trigger is named after the date it filters, not after dates in general: several screens send
+ * different timestamps through this control, and "Date" on all of them tells an operator nothing.
  */
 export const Empty: Story = {
 	play: async ({ canvas }) => {
@@ -54,11 +51,8 @@ export const OpenedCalendar: Story = {
 };
 
 /**
- * A picked range can be given back.
- *
- * Every other facet in the toolbar ends with "Clear selection" and this one did not: a range could
- * be replaced by picking another, never removed, so an operator who narrowed to one week had no way
- * back to the whole set short of the toolbar's blanket Reset.
+ * Without "Clear selection" a range can be replaced by picking another but never removed, leaving an
+ * operator who narrowed to one week no way back short of the toolbar's blanket Reset.
  */
 export const ClearAPickedRange: Story = {
 	args: { value: { from: new Date(2026, 6, 1), to: new Date(2026, 6, 24) } },
@@ -69,7 +63,6 @@ export const ClearAPickedRange: Story = {
 	},
 };
 
-/** Nothing picked, nothing to clear: the popover offers only the calendar. */
 export const NothingToClear: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {

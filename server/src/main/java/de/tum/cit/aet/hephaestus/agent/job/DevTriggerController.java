@@ -27,35 +27,19 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Dev-only REST endpoint for manually triggering PR/issue reviews.
- * Enabled by setting hephaestus.dev.trigger-enabled=true.
+ * Dev-only REST endpoint for manually triggering PR/issue reviews. Enabled by
+ * {@code hephaestus.dev.trigger-enabled=true}; gated additionally by {@code app_admin} since the property
+ * only makes the endpoint exist, not an access control, and this route spends real LLM budget.
  *
- * <p><strong>Instance admins only.</strong> The property is the switch that makes the endpoint exist;
- * it is not an access control. This route spends real LLM budget, so the property gates whether it is
- * mounted and {@code app_admin} gates who may call it — anything less and enabling the flag on a
- * reachable deployment hands unauthenticated callers a spend button bounded only by the monthly cap.
+ * <p>Two modes: <b>bypass</b> (no {@code signal}) submits directly, skipping the detection gate;
+ * <b>gate-routed</b> (with {@code signal}) runs {@link PracticeReviewDetectionGate} first, exactly what the
+ * production listener would do — the only way to validate RETROSPECTIVE (merged/closed) detection on a
+ * SYNCED mirror, since real merge/close webhooks never arrive there.
  *
- * <p>The artifact is loaded <em>through</em> the named workspace via {@link ReviewableArtifactLoader},
- * never by surrogate id alone — see that class for why the two request parameters must be joined.
+ * <p>{@link AgentJobService#submit} must not run inside an outer transaction, so the session-bound work is
+ * confined to an explicit {@link TransactionTemplate} block and {@link AgentJobService#submitPrepared} runs
+ * only after it commits.
  *
- * <p>Two modes:
- * <ul>
- *   <li><b>Bypass</b> (no {@code signal}): submits a review directly, skipping the detection gate.
- *       Use to force a review regardless of practice trigger config.</li>
- *   <li><b>Gate-routed</b> (with {@code signal}): loads the artifact and runs
- *       {@link PracticeReviewDetectionGate} with the given event name (e.g. {@code PullRequestMerged},
- *       {@code IssueClosed}) before submitting — exactly what the production listener would do. This is
- *       the ONLY way to validate RETROSPECTIVE (merged/closed) detection on a SYNCED mirror, where real
- *       merge/close webhooks never arrive and any sync-discovered terminal state is sync-skipped by the
- *       listeners.</li>
- * </ul>
- *
- * <p><strong>Transaction boundary:</strong> {@link AgentJobService#submit} must NOT run inside an outer
- * transaction, so the session-bound work (loading the artifact, the gate's lazy associations, building
- * the detached request) is confined to an explicit {@link TransactionTemplate} block and
- * {@link AgentJobService#submitPrepared} runs only after it commits.
- *
- * Usage:
  * <pre>
  *   POST /api/dev/trigger-review?prId=...&amp;workspaceId=...                              (bypass)
  *   POST /api/dev/trigger-review?prId=...&amp;workspaceId=...&amp;signal=scm.pull_request.merged  (gate)
@@ -91,10 +75,7 @@ public class DevTriggerController {
     /**
      * Outcome of the session-bound prep phase: a request ready to submit, or a terminal message.
      *
-     * @param signalKey the ledger identity this run is recorded under. Present for the gate-bypass mode,
-     *     where the run has no signal of its own and is exactly what the manual-request vocabulary is
-     *     for; null in gate-routed mode, where the caller named a real signal and
-     *     {@code preparePullRequest} already keyed the ledger on it.
+     * @param signalKey the ledger identity this run is recorded under; present only in bypass mode
      */
     private record Prepared(
         @Nullable AgentJobType jobType,
@@ -137,9 +118,6 @@ public class DevTriggerController {
         if (prepared == null || prepared.request() == null) {
             return prepared == null ? "No submission prepared" : prepared.message();
         }
-        // The bypass mode carries the kind's manual-request key, so the run this endpoint starts leaves
-        // the same trace any other requested review does — and the artifact trace can answer "why did a
-        // review run here" instead of showing a job with no occasion behind it.
         return agentJobService.submitPrepared(
             workspaceId,
             prepared.jobType(),
@@ -149,8 +127,6 @@ public class DevTriggerController {
     }
 
     private Prepared preparePullRequest(Long workspaceId, Long prId, @Nullable String signal) {
-        // One answer for "no such PR" and "not this workspace's PR". Submitting it anyway would bill this
-        // workspace's job and usage ledger for another one's artifact.
         PullRequest pr = artifactLoader.findPullRequestForGate(workspaceId, prId).orElse(null);
         if (pr == null) {
             return Prepared.done("PR not found in workspace " + workspaceId + ": " + prId);
@@ -219,11 +195,8 @@ public class DevTriggerController {
     }
 
     /**
-     * Open a ledger entry for a run this endpoint occasioned itself, and hand back its key.
-     *
-     * <p>A fresh run id per call, which is the whole point of the {@code RUN_ID} scheme: an ask is its
-     * own occasion, so two of them are two rows rather than one deduplicated against the other, and
-     * neither consumes the entry an ordinary lifecycle event was going to use.
+     * Opens a ledger entry for a run this endpoint occasioned itself, and hands back its key. A fresh run id
+     * per call: an ask is its own occasion, not deduplicated against another one.
      */
     private SignalKey recordManualRequest(long workspaceId, long artifactId, SignalName requestSignal) {
         SignalKey key = ScmSignals.manualKey(workspaceId, artifactId, requestSignal, UUID.randomUUID());
@@ -232,17 +205,8 @@ public class DevTriggerController {
     }
 
     /**
-     * Settle the ledger the way the production listener does, so a gate-routed trigger leaves the same
-     * trace a real delivery would.
-     *
-     * <p>Without this the artifact keeps a signal that says only "recorded", and the trace answers a
-     * reader with "no decision has been taken yet" for a review that ran, finished and was paid for —
-     * telling them to wait for something already over. Recorded rather than the response alone
-     * because the response is gone as soon as it is read.
-     *
-     * <p>Null key when the signal has nothing stable to be keyed on (a pull request whose head commit
-     * the mirror does not have yet). There is then no ledger row this refusal belongs to, and inventing
-     * one would assert an occurrence nobody observed.
+     * Settles the ledger the way the production listener does, so a gate-routed trigger leaves the same trace
+     * a real delivery would. Null key when the signal has nothing stable to be keyed on yet.
      */
     private void recordRefusal(@Nullable SignalKey key, GateDecision.Skip skip) {
         if (key == null) {

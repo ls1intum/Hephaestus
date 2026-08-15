@@ -31,23 +31,18 @@ import org.springframework.stereotype.Component;
  * <p>Produces violation strings rather than throwing, so {@link IntegrationFrameworkBootstrap} can
  * report every problem in one message instead of one per restart.
  *
- * <p>The rules, and what each of them stops:
+ * <p>The rules:
  * <ul>
- *   <li><b>Subset.</b> A raised signal must be declared by the kind's descriptor. Otherwise the
- *       descriptor stops being the definition of the domain and every vendor invents its own vocabulary.
- *   <li><b>Provenance.</b> A raised signal must name an ingested event of that same vendor, and that
- *       event must have a registered handler — otherwise a manifest can claim a signal nothing
- *       delivers, which reads as "configured and quiet" on every surface.
+ *   <li><b>Subset.</b> A raised signal must be declared by the kind's descriptor.
+ *   <li><b>Provenance.</b> A raised signal must name an ingested event of that same vendor with a
+ *       registered handler.
  *   <li><b>Reviewability.</b> A kind declared reviewable must have a {@link ReviewContextBuilder}, at
- *       least one role to attribute to, and at least one lane to speak on — a review with no subject,
- *       no addressee, or nowhere to land is a job that can only fail after we have paid for it.
+ *       least one role to attribute to, and at least one lane to speak on.
  *   <li><b>Executability.</b> A kind declared reviewable must be one this build can <em>run</em> a
- *       review of, per {@link ReviewExecutionCatalog}. Every rule above checks one declaration against
- *       another, all of which a kind with no job type, no handler and no submitter can satisfy while
- *       being unable to fire. This is the rule that falsifies that.
+ *       review of, per {@link ReviewExecutionCatalog} — the other rules can all pass for a kind with no
+ *       job type, handler, or submitter that is unable to fire.
  *   <li><b>Lanes.</b> A delivered lane must be one the descriptor allows and one the manifest holds the
- *       matching {@link Capability} for, so a claim to post inline notes cannot outlive the bean that
- *       posts them.
+ *       matching {@link Capability} for.
  * </ul>
  */
 @Component
@@ -55,8 +50,7 @@ public class ReviewContractValidator {
 
     /**
      * Which capability a vendor must own to claim a lane. {@link FeedbackLane#PROFILE} maps to no
-     * capability because it is ours: the reflection surface lives inside Hephaestus, and an integration
-     * claiming to deliver there is claiming a surface it cannot reach.
+     * capability because it is ours — no integration can reach it.
      */
     static final Map<FeedbackLane, Capability> LANE_CAPABILITIES = new EnumMap<>(
         Map.of(
@@ -73,9 +67,8 @@ public class ReviewContractValidator {
      * Lanes that exist but that no integration can reach, because the surface is ours.
      *
      * <p>Together with {@link #LANE_CAPABILITIES} this must classify every {@link FeedbackLane}; a lane
-     * with no rule in either would be enforced only once some vendor happened to declare it. All three
-     * are compile-time constants, so {@code ReviewContractLaneRulesTest} asserts the exhaustiveness and
-     * a gap costs a red build rather than a crash-looping process.
+     * missing from both would go unenforced until some vendor declared it. {@code ReviewContractLaneRulesTest}
+     * asserts the exhaustiveness.
      */
     static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.PROFILE);
 
@@ -95,8 +88,6 @@ public class ReviewContractValidator {
         this.contextBuilders = contextBuilders
             .stream()
             .collect(Collectors.groupingBy(ReviewContextBuilder::artifactKind));
-        // Required, not optional: an absent catalog would switch the executability rule off in exactly
-        // the deployment where nothing runs reviews.
         this.executionCatalog = executionCatalog;
     }
 
@@ -139,9 +130,6 @@ public class ReviewContractValidator {
                 if (descriptor.lanes().isEmpty()) {
                     violations.add(kind + " is declared reviewable but declares no lane to deliver feedback on");
                 }
-                // Checked here rather than at catalog load: a new domain that declares itself reviewable
-                // and names no limitation should fail against the descriptor that omitted it, not much
-                // later with an error about practices.
                 if (descriptor.reviewLimitations().isEmpty()) {
                     violations.add(
                         kind +
@@ -159,22 +147,9 @@ public class ReviewContractValidator {
     }
 
     /**
-     * A kind that says it can be reviewed on demand has to be able to record the ask.
-     *
-     * <p>Three ways that fails silently rather than loudly, which is why each is checked at startup.
-     *
-     * <p><b>Two request signals.</b> The manual path has to resolve one signal for the kind; with two, which
-     * one it picks is an accident of declaration order, and the ledger identity of a request would depend on
-     * it.
-     *
-     * <p><b>A scheme other than {@code RUN_ID}.</b> Two people asking about the same unchanged artifact would
-     * derive the same revision, so the second ask would be deduplicated against the first by
-     * {@code uq_artifact_signal} and simply vanish — and worse, a hand-requested review would consume the
-     * ledger entry an ordinary event was going to use, so the event's own review would never run.
-     *
-     * <p><b>A non-empty provenance.</b> A request is raised inside Hephaestus. Claiming an ingested event
-     * raises it would put it back under the coverage and dormancy checks, which would then report a healthy
-     * workspace as having a broken producer for a signal no producer was ever meant to have.
+     * A kind that says it can be reviewed on demand has to be able to record the ask, unambiguously. A scheme
+     * other than {@code RUN_ID} would let a second person's request dedupe against the first (or against an
+     * event's) under {@code uq_artifact_signal}.
      */
     private void validateManualRequestSignal(
         ArtifactDescriptor descriptor,

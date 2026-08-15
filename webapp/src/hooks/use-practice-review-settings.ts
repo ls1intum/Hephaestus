@@ -15,13 +15,10 @@ export type PracticeReviewSettingsField = NonNullable<
 >[number];
 
 /**
- * The workspace's practice-review policy, with one place that knows what a write to it invalidates.
- *
- * <p>Both the review-settings screen and the autonomy screen write this resource, and the workspace
- * default tier is the bottom of the practice → area → workspace chain: changing it changes the tier in
- * force on every practice and area that holds none of its own, and none of that is in the response.
- * A caller that only refreshed this resource would leave a hundred rows showing the tier they had
- * before the decision that was meant to move all of them.
+ * One place that knows what a write to this resource invalidates, because two screens write it. The
+ * workspace default sits at the bottom of the practice → area → workspace chain, so changing it
+ * changes the tier in force on everything holding none of its own — and none of that is in the
+ * response.
  */
 export function usePracticeReviewSettingsMutation(
 	workspaceSlug: string,
@@ -70,10 +67,10 @@ export function usePracticeReviewSettingsMutation(
 
 /**
  * The optimistic echo of a PATCH: every field the request set becomes both the effective value and the
- * raw override, because setting a value here is what "this workspace has chosen" means.
+ * raw override.
  *
- * <p>Resets are deliberately not echoed — clearing an override resolves against the fleet default,
- * which only the server knows. The caller skips this function entirely when `reset` is non-empty.
+ * Resets are not echoed — clearing an override resolves against the fleet default, which only the
+ * server knows, so the caller skips this entirely when `reset` is non-empty.
  */
 export function patchReviewSettings(
 	settings: PracticeReviewSettings,

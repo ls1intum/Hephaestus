@@ -8,12 +8,12 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * Renders the cross-run progress-delta footer (ADR 0021) — the ONLY surface that makes behavior
- * change visible to its subject (the research question's dependent variable). Appended, collapsed, at the
- * bottom of the persistent summary so it never competes with the lead blocking-issue count.
+ * change visible to its subject. Appended, collapsed, at the bottom of the persistent summary so it
+ * never competes with the lead blocking-issue count.
  *
  * <p>Renders nothing unless the run actually moved (something resolved, appeared, or slipped back): a
- * re-review that re-flags the exact same loci is not progress and stays silent. Positive reinforcement of
- * the act of fixing (the "Resolved" wins) leads; backslides ("Slipped back") follow as the actionable part.
+ * re-review that re-flags the exact same loci is not progress and stays silent. Resolved items are listed
+ * before regressions so the win leads.
  */
 final class ProgressFooterRenderer {
 

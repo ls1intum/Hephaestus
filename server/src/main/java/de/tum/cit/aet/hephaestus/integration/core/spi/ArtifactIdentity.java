@@ -8,20 +8,14 @@ import org.jspecify.annotations.Nullable;
 /**
  * How a person recognises one artifact: the number they typed, the title they read, where it lives.
  *
- * <p>The signal ledger stores nothing but {@code (kind, id)} — deliberately, because a ledger that
- * copied titles would have to keep them in step with the mirror forever. That is enough to decide
- * whether to review something and useless for telling somebody what was reviewed, so this record is
- * the one thing core asks a domain module to translate.
+ * <p>The signal ledger stores nothing but {@code (kind, id)}, so this is the one thing core asks a
+ * domain module to translate for display.
  *
- * <p>Deliberately not the same type as {@code ReviewRunTargetLookup.Target}, which answers the adjacent
- * question "what was this <em>job</em> about" by decoding the metadata the job carries. That answer
- * cannot exist for an artifact no job ran on — precisely the case a trace exists to explain.
+ * <p>Deliberately not the same type as {@code ReviewRunTargetLookup.Target}, which decodes a job's own
+ * metadata and so cannot answer for an artifact no job ran on.
  *
- * @param kind      the family the artifact belongs to
- * @param id        the mirror's identifier, as the ledger stores it
  * @param number    the number the provider shows, when the kind has one; a document does not
  * @param title     a human label; never blank, so a caller never has to invent one
- * @param container the repository, collection or channel it sits in, when the kind has one
  * @param url       where to open it upstream, when we can build a whole one
  */
 public record ArtifactIdentity(

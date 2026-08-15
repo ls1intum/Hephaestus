@@ -160,8 +160,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void escapeSlashCommands_leavesMidLineCommandsUntouched() {
-        // The ^...MULTILINE anchoring means only a LINE-START slash command is an action; a mid-line
-        // "/approve" is ordinary text and must be left alone. This pins the anchoring against a regex edit.
+        // MULTILINE anchors ^ to line-start, so only a line-start "/approve" is an action; mid-line text is untouched.
         assertThat(GitlabSummaryChannel.escapeSlashCommands("Please ask them to /approve it")).isEqualTo(
             "Please ask them to /approve it"
         );
@@ -170,10 +169,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void slashCommandPattern_matchesTheCanonicalPullRequestPosterLiteral() {
-        // GitlabSummaryChannel.GITLAB_SLASH_COMMAND is a deliberate duplicate of
-        // PullRequestCommentPoster.GITLAB_SLASH_COMMAND (which is private). Pin the channel's copy against the
-        // canonical literal so editing one copy without the other fails CI rather than silently degrading the
-        // belt-and-suspenders guarantee.
+        // GitlabSummaryChannel.GITLAB_SLASH_COMMAND deliberately duplicates PullRequestCommentPoster's private
+        // constant; this pins the copy against the canonical literal so the two cannot silently drift apart.
         String canonical =
             "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +
             "milestone|estimate|spend|award|subscribe|unsubscribe|todo|done|wip|draft|ready|" +
@@ -192,8 +189,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void postSummaryWrapsTransportErrorAsFeedbackDeliveryException() {
-        // Must surface as the channel's typed exception so PullRequestCommentPoster's
-        // catch(FeedbackDeliveryException) wraps it uniformly instead of a raw RuntimeException bypassing that wrap.
+        // Must surface as FeedbackDeliveryException so PullRequestCommentPoster's catch-wrap stays uniform.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(
@@ -362,9 +358,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     }
 
     /**
-     * A deleted note has no {@code updateNote} payload at all — GitLab reports it as a TOP-LEVEL GraphQL error
-     * (the global id resolves to nothing). This orphaned-summary case MUST classify as GONE so the caller
-     * re-posts a fresh summary rather than silently dropping it.
+     * A deleted note has no {@code updateNote} payload — GitLab reports it as a top-level GraphQL error. This
+     * orphaned-summary case must classify as GONE so the caller re-posts rather than silently dropping it.
      */
     @Test
     void updateSummaryReturnsGoneOnTopLevelNotFoundError() {
@@ -545,8 +540,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_topLevelGraphQlError_isUnknown_notAbsent() {
-        // The page itself is a complete, match-free, fully-scanned body — the error alone must stop this from
-        // reading as a confirmed absence.
+        // A fully-scanned, match-free page plus a top-level error must not read as confirmed absence.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ResponseError error = mock(ResponseError.class);
@@ -565,9 +559,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
     }
 
     /**
-     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes. A lookup that only knew the
-     * merge-request document would answer a permanent {@code UNKNOWN} and never find the summary the
-     * channel had itself posted on an issue.
+     * An ISSUE subject ({@code path#iid}) must reach the issue's own notes; a lookup that only knew the
+     * merge-request document would answer a permanent {@code UNKNOWN} and never find a summary posted on an issue.
      */
     @Test
     void findExistingSummary_issueSubject_scansIssueNotes_isFound() {
@@ -598,8 +591,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void findExistingSummary_issueSubject_noMatch_isAbsent() {
-        // Fail-closed is only correct when absence is UNPROVEN. A fully scanned issue thread with no marker
-        // is a proven absence and must license the caller to post — otherwise the issue summary never lands.
+        // Fail-closed applies only while absence is unproven; a fully-scanned thread with no marker is proven absence.
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         HttpGraphQlClient.RequestSpec spec = mockRequestChain();
         ClientGraphQlResponse page = mockNotesPage(
@@ -683,8 +675,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
     @Test
     void postSummarySurfacesTopLevelError() {
-        // A read-only GitLab instance returns NO createNote payload, only a top-level GraphQL error. The
-        // channel must surface that reason — not a generic "No note ID" — so the failure is diagnosable.
+        // A read-only GitLab instance returns no createNote payload, only a top-level error the channel must surface.
         FeedbackTarget target = gitlabTarget();
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(false);
         when(mrResolver.resolve(1L, "group/project", 42)).thenReturn(

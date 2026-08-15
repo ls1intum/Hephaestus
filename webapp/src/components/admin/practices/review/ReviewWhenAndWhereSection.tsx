@@ -32,14 +32,6 @@ export interface ReviewWhenAndWhereSectionProps {
 	workspaceSlug: string;
 }
 
-/**
- * What starts a review, how often, and over which repositories and branches.
- *
- * <p>The recurring check lives here rather than with the backfill it used to sit beside. It is not a
- * campaign over history: it is a standing policy about *recent* work, the safety net for a change a
- * missed webhook never told us about — which makes it one of the triggers, and it belongs next to
- * them. Filing it under "past work" put a permanent setting behind a heading that reads as one-off.
- */
 export function ReviewWhenAndWhereSection({ workspaceSlug }: ReviewWhenAndWhereSectionProps) {
 	const queryClient = useQueryClient();
 
@@ -88,9 +80,9 @@ export function ReviewWhenAndWhereSection({ workspaceSlug }: ReviewWhenAndWhereS
 		onError: scheduleError("remove"),
 	});
 
-	// The bindings query is deliberately not part of this gate. Its state is passed into the form,
-	// which renders model readiness as one card among four — blocking the whole section on it would
-	// hide four working settings behind one slow request.
+	// The bindings query is deliberately not part of this gate: its state is passed into the form,
+	// which renders model readiness as one card of its own, so blocking on it would hide every
+	// working setting behind one slow request.
 	const isLoading = reviewSettingsQuery.isPending || workspaceQuery.isPending;
 	const error = reviewSettingsQuery.error ?? workspaceQuery.error;
 
@@ -148,10 +140,9 @@ export function ReviewWhenAndWhereSection({ workspaceSlug }: ReviewWhenAndWhereS
 	return (
 		<div className="max-w-3xl space-y-6">
 			{settingsForm}
-			{/* Outside the gate above, and deliberately. The recurring check is a separate resource with
+			{/* Outside the gate above, and deliberately: the recurring check is a separate resource with
 			    its own request and its own error handling, and it is a standing authorisation to spend —
-			    so a failed review-settings load must not be what stops an admin pausing a runaway one.
-			    It rendered unconditionally on the page it came from; the move must not cost it that. */}
+			    so a failed review-settings load must not be what stops an admin pausing a runaway one. */}
 			<PracticeReviewSweepSchedule
 				schedules={schedulesQuery.data ?? []}
 				isLoading={schedulesQuery.isLoading}

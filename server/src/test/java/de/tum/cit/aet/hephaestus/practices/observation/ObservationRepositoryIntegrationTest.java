@@ -858,10 +858,8 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     /**
-     * A confirmed campaign spends real money. Before this, nine {@code origin <> 'BACKFILL'} predicates kept
-     * every one of its observations off every developer read surface, so it produced something nobody could
-     * see. The reflective surface admits them; the per-practice summary, which is read as a trend, still does
-     * not.
+     * A confirmed campaign spends real money and must produce something visible. The reflective surface
+     * admits its observations; the per-practice summary, which is read as a trend, still does not.
      */
     @Nested
     class BackfillVisibilityTests {

@@ -12,11 +12,8 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The rules that need to see a practice whole.
- *
- * <p>The sources sit on the bindings and the review mode sits on the policy, so only the definition can
- * see both — and it enforces the two evidence rules per binding: a practice that reads nothing it must
- * read when a change merges is not saved by reading something when the change was opened.
+ * The rules that need to see a practice whole: the sources sit on the bindings and the review mode sits
+ * on the policy, so only the definition can enforce the evidence rules across both.
  */
 class PracticeDefinitionTest extends BaseUnitTest {
 
@@ -32,11 +29,7 @@ class PracticeDefinitionTest extends BaseUnitTest {
             .hasMessageContaining("without automated review");
     }
 
-    /**
-     * Contextual sources alone are not evidence a review may start on: nothing in the list would ever
-     * refuse the run, so the review would proceed having established nothing about what it could see and
-     * would still deliver a verdict about a developer.
-     */
+    /** Contextual sources alone never refuse the run, so the review would deliver a verdict having read nothing. */
     @Test
     void shouldRejectAnOccasionWithNothingTheReviewMustRead() {
         assertThatThrownBy(() ->
@@ -54,7 +47,6 @@ class PracticeDefinitionTest extends BaseUnitTest {
             .hasMessageContaining("at least one required evidence source");
     }
 
-    /** Asked of every binding, so a second occasion cannot arrive reading nothing it must read. */
     @Test
     void shouldRejectASecondOccasionWithNothingTheReviewMustRead() {
         assertThatThrownBy(() ->
@@ -70,10 +62,6 @@ class PracticeDefinitionTest extends BaseUnitTest {
             .hasMessageContaining("at least one required evidence source");
     }
 
-    /**
-     * Two bindings on one signal would have to be merged by whoever read them, and the two candidate
-     * merges — union the evidence, or take the first — are not the same review.
-     */
     @Test
     void shouldRejectASignalBoundTwice() {
         assertThatThrownBy(() ->

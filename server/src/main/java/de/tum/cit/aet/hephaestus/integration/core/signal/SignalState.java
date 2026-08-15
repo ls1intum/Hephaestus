@@ -3,12 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.core.signal;
 /**
  * What became of a recorded signal.
  *
- * <p>Deliberately a machine rather than a {@code triggered} boolean. Submission can be refused
- * <em>after</em> the signal is recorded — the workspace went inactive, the binding was disabled, the
- * budget ran out — and with a boolean such a signal is consumed forever while the unique constraint
- * guarantees nothing ever retries it. That is a review lost permanently and silently.
- * {@link #PENDING} plus the reaper is the repair, and every other value exists so that "why did
- * nothing happen?" has an answer that can be queried instead of guessed.
+ * <p>Deliberately a state machine rather than a {@code triggered} boolean: submission can be refused
+ * after recording (workspace inactive, binding disabled, budget exhausted), which a boolean would
+ * consume forever with no retry. {@link #PENDING} plus the reaper is the repair, and every other value
+ * exists so "why did nothing happen?" has a queryable answer.
  */
 public enum SignalState {
     /** Observed. No decision has been taken — either none was due, or one is still owed. */

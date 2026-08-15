@@ -19,19 +19,16 @@ import org.springframework.stereotype.Component;
 /**
  * The issue as a reviewable artifact.
  *
- * <p>Deliberately not a pull request with fewer fields. An issue has no diff, so it has no inline lane
- * and no reviewer relation to attribute anything to; everything a practice can say about it is about
- * what a person wrote, which is also why every one of its signals keys on a content digest rather than
- * a commit.
+ * <p>An issue has no diff, so it has no inline lane or reviewer relation; every signal keys on a
+ * content digest rather than a commit.
  */
 @Component
 public class IssueArtifactDescriptor implements ArtifactDescriptor {
 
     private static final List<Signal> SIGNALS = List.of(
-        // Opening and labelling are where an issue's text arrives or changes meaning; closing ends it.
         declareRecommended(ScmSignals.ISSUE_OPENED, "Opened", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
-        // GitLab is named here even though it has no native "labeled" action: its issue processor derives
-        // one per newly added label off the update event, so the provenance is real.
+        // GitLab has no native "labeled" action; its issue processor derives one per newly added
+        // label off the update event, so the provenance is real.
         declareRecommended(ScmSignals.ISSUE_LABELED, "Labeled", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         declare(ScmSignals.ISSUE_CLOSED, "Closed", Set.of(GITHUB_ISSUES, GITLAB_ISSUE)),
         declareManualRequest(ScmSignals.ISSUE_MANUAL_REVIEW, "Review requested by hand")

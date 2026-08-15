@@ -18,13 +18,11 @@ import org.springframework.beans.factory.annotation.Autowired;
  * The check that "an authorable signal no shipped integration raises" cannot ship — run over the real
  * wiring, which is the only place it means anything.
  *
- * <p>The unit test beside this one supplies a {@link SignalCoverage} the test itself constructs, which is
- * the right way to prove the method's <em>logic</em> and useless for proving the <em>fact</em>: a fake
- * derived from the options can only ever agree with them. Here both sides come from the container — the
- * offered vocabulary from every registered {@code ArtifactDescriptor} bean, the compiled coverage from
- * what {@code GitHubManifest}, {@code GitLabManifest}, {@code OutlineManifest} and {@code SlackManifest}
- * actually declare in their review contributions. A new descriptor, or a manifest that stops raising
- * something, changes the answer here and nowhere else.
+ * <p>The unit test beside this one supplies a {@link SignalCoverage} it constructs itself, which proves
+ * the method's <em>logic</em> but nothing about the <em>fact</em> — a fake derived from the options can
+ * only ever agree with them. Here both sides come from the container: the offered vocabulary from every
+ * registered {@code ArtifactDescriptor} bean, the compiled coverage from what the shipped manifests
+ * actually declare.
  */
 class PracticeSignalCoverageIntegrationTest extends BaseIntegrationTest {
 
@@ -46,10 +44,8 @@ class PracticeSignalCoverageIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("the two sides of the comparison are really independent")
     void neitherSideOfTheComparisonIsDerivedFromTheOther() {
-        // Guards the test above from going quietly vacuous. If the manifests ever declared nothing, or no
-        // descriptor were registered, the check would pass for the same reason an empty AND is true.
-        // Overlap in both directions is the cheapest evidence that two independently built sets are
-        // being compared.
+        // Guards the test above from going vacuously true: if the manifests declared nothing, or no
+        // descriptor were registered, an empty comparison would still pass.
         Set<SignalName> offered = new LinkedHashSet<>();
         for (ArtifactKind kind : options.authorableKinds()) {
             offered.addAll(options.eligibleFor(kind));

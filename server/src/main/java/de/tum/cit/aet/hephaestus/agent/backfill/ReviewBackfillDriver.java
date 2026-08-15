@@ -22,18 +22,11 @@ import org.springframework.stereotype.Component;
 /**
  * Walks each confirmed campaign through its scope, one bounded batch per tick.
  *
- * <p>A campaign that finds its purse exhausted pauses with the cursor exactly where it was, rather than
- * carrying on and letting each submission be refused. Skipping would leave a baseline in which "not
- * reviewed" and "reviewed, nothing found" are the same absence; a truncated baseline is legible, a
- * gap-toothed one is not.
- *
- * <p>For the batch that crosses the cap part-way, a submission refused for budget lands in a PENDING
- * ledger state that {@code PendingSignalReaper} re-offers later. The pause bounds the overshoot; the
- * ledger catches what the overshoot touched.
- *
- * <p>A paused campaign is retried on every tick and returns to RUNNING as soon as the reason clears.
- * Nothing has to be re-confirmed: the estimate the admin approved covers the whole scope and pausing
- * did not change it.
+ * <p>A campaign whose budget runs out pauses with its cursor unchanged rather than let each submission be
+ * refused, so the resulting baseline stays truncated instead of gap-toothed; anything that still crosses
+ * the cap mid-batch lands in a PENDING ledger state that {@code PendingSignalReaper} re-offers later. A
+ * paused campaign resumes automatically once the blocking reason clears — the admin-approved estimate
+ * already covers the whole scope.
  */
 @ConditionalOnServerRole
 @Component
@@ -43,7 +36,7 @@ public class ReviewBackfillDriver {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewBackfillDriver.class);
 
-    /** How many campaigns one tick advances. Each gets one batch, so no run monopolises the driver. */
+    /** Bounds how many campaigns share one tick, so no single run monopolises the driver. */
     private static final int MAX_RUNS_PER_TICK = 5;
 
     private final ReviewBackfillRunRepository runRepository;
@@ -81,22 +74,18 @@ public class ReviewBackfillDriver {
             try {
                 advance(run);
             } catch (RuntimeException e) {
-                // One campaign's failure must not stop the others. What lands here is a whole-run failure
-                // (the scope query, or a losing optimistic-lock write), not a single artifact's. The run
-                // keeps its persisted cursor, so the next tick resumes from the last batch that
-                // committed; the ledger's unique key is what keeps re-offering from re-reviewing.
+                // A run's own failure — the scope query, or a losing optimistic-lock write — must not stop the
+                // others. The run keeps its persisted cursor, so the next tick resumes from the last committed
+                // batch, and the ledger's unique key stops that resume from re-reviewing what already ran.
                 log.warn("Review backfill batch failed: runId={}", run.getId(), e);
             }
         }
     }
 
     /**
-     * Advance one campaign by at most one batch.
-     *
-     * <p>Deliberately holds no transaction of its own. Each artifact's turn opens one
-     * ({@link ReviewBackfillSubmitter#offer} is {@code REQUIRES_NEW}) so a single failure cannot unwind
-     * the batch around it, and the run's own progress is a single-row write that needs no wider scope.
-     * The run arrives with its workspace already fetched, so no lazy association is touched here.
+     * Deliberately holds no transaction of its own: each artifact's turn opens one via
+     * {@link ReviewBackfillSubmitter#offer} ({@code REQUIRES_NEW}), so a single failure cannot unwind the
+     * batch around it.
      */
     void advance(ReviewBackfillRun run) {
         if (!run.getStatus().isActive()) {
@@ -141,11 +130,10 @@ public class ReviewBackfillDriver {
             try {
                 outcome = submitter.offer(run, artifactId);
             } catch (RuntimeException e) {
-                // The cursor advances past a failure on purpose: aborting the batch here would leave the
-                // cursor unwritten, and a deterministically failing artifact would then freeze the
-                // campaign for good. The failure is counted, never folded into the passes — that would
-                // let submitted + passed reach the estimate and report COMPLETED over a baseline with a
-                // hole in it.
+                // The cursor advances past a failure on purpose: aborting here would leave it unwritten and let a
+                // deterministically failing artifact freeze the campaign forever. The failure is counted
+                // separately from passes, so it can never let submitted + passed reach the estimate and report
+                // COMPLETED over a baseline with a hole in it.
                 log.warn(
                     "Review backfill artifact failed, walking past it: runId={}, artifactId={}",
                     run.getId(),
@@ -180,9 +168,8 @@ public class ReviewBackfillDriver {
     /**
      * Why this workspace cannot be spent against right now, or {@code null} if it can.
      *
-     * <p>Checked once per batch rather than per artifact. The usage ledger only gains a row when a job
-     * ends, so a per-artifact check would not be meaningfully fresher — it would cost one aggregate query
-     * per artifact to learn the same thing. The batch size is what bounds the resulting overshoot.
+     * <p>Checked once per batch, not per artifact: the usage ledger only gains a row when a job ends, so a
+     * per-artifact check would cost an extra query without being any fresher.
      */
     private @Nullable ReviewBackfillPauseReason blockingReason(Workspace workspace) {
         if (workspace.getStatus() != Workspace.WorkspaceStatus.ACTIVE) {

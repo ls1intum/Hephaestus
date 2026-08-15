@@ -11,14 +11,12 @@ import org.jspecify.annotations.Nullable;
 
 /**
  * The signal vocabulary of the documentation domain, and the per-signal rule for what counts as a new
- * occurrence.
+ * occurrence. Names are vendor-neutral: a second documentation tool would raise the same signals against
+ * the same practices rather than arriving with a vocabulary of its own.
  *
- * <p>Names are vendor-neutral: a second documentation tool would raise the same signals against the
- * same practices rather than arriving with a vocabulary of its own.
- *
- * <p>Content signals digest the document rather than keying on anything version-shaped, because a
- * document has no commits. Archiving is terminal: an archived document can be restored, but the
- * archiving itself happened once, which is what makes a redelivered webhook inert.
+ * <p>Content signals digest the document rather than keying on anything version-shaped, since a document
+ * has no commits. Archiving is terminal — an archived document can be restored, but the archiving itself
+ * happened once, which is what makes a redelivered webhook inert.
  */
 public final class DocsSignals {
 

@@ -21,19 +21,10 @@ class FeedbackAdmissionTest extends BaseUnitTest {
     class Provenance {
 
         /**
-         * Written as a derivation rather than as a constant.
-         *
-         * <p>A backfilled observation is entitled to PROFILE and to nothing else, and PROFILE has no
-         * producer anywhere in {@code src/main} — so a backfill is measured and delivered nowhere.
-         * Asserting "backfills produce no feedback" directly would state a decision; asserting it this
-         * way makes it a consequence of two facts that are each independently true and independently
-         * tested.
-         *
-         * <p><strong>This test fails the day a PROFILE producer appears.</strong> It cannot appear
-         * without {@code FeedbackReach.reaches(PROFILE)} becoming true for some reach, which trips
-         * {@code FeedbackReachTest.noReachClaimsTheUnwrittenProfileChannel} first. Whoever builds that
-         * surface then has to decide deliberately whether a retrospective measurement belongs on it —
-         * which is the decision this pins open rather than answers.
+         * Written as a derivation rather than as a constant: a backfilled observation is entitled to
+         * PROFILE and to nothing else, and PROFILE has no producer anywhere in {@code src/main} — so a
+         * backfill is measured and delivered nowhere. This fails the day a PROFILE producer appears,
+         * forcing a deliberate decision rather than silently inheriting the old answer.
          */
         @Test
         void aBackfilledObservationReachesNoChannelThatAnyoneCanWriteToToday() {
@@ -108,10 +99,8 @@ class FeedbackAdmissionTest extends BaseUnitTest {
         }
 
         /**
-         * The two configurable axes are genuinely independent, which is the point of splitting them.
-         * Narrowing reach must not silence a channel the tier still owns, and lowering the tier must not be
-         * undoable by widening reach — the old single ladder could express neither, which is why its middle
-         * rungs had no order.
+         * The two configurable axes are genuinely independent: narrowing reach must not silence a channel
+         * the tier still owns, and lowering the tier must not be undoable by widening reach.
          */
         @Test
         void reachCannotMakeAQuietPracticeSpeakAndTheTierCannotChooseWhere() {
@@ -157,9 +146,8 @@ class FeedbackAdmissionTest extends BaseUnitTest {
                     FeedbackChannel.IN_CONTEXT
                 )
             ).isFalse();
-            // Reach has no escape hatch either: it is a workspace-level fact, known without a per-practice
-            // lookup, so a failed tier lookup cannot put a comment on the work of a workspace that asked us
-            // never to comment on work.
+            // Reach has no escape hatch either: a failed tier lookup must not put a comment on the work of
+            // a workspace that asked us never to comment on work.
             assertThat(
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,

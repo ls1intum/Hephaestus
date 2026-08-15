@@ -8,6 +8,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -40,9 +41,11 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPoli
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -90,21 +93,31 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private WorkspaceReviewDefaultsProvider workspaceReviewDefaults;
 
+    /**
+     * Unless a case says otherwise, every linked id resolves to a readable, authorized observation. Both
+     * defaults answer <em>from the argument</em> rather than with a fixed row: the reconciler keys its batch
+     * by each observation's own id, so a stub that handed back an unrelated row would hide a mis-keyed
+     * lookup — the batch would look like it worked while admitting the wrong observation.
+     */
     @BeforeEach
     void authorizeEvidenceDelivery() {
-        Observation observation = problem(null, null);
         lenient()
-            .when(
-                visibilityPolicy.permits(
-                    anyLong(),
-                    any(Observation.class),
-                    eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)
-                )
-            )
-            .thenReturn(true);
+            .when(observationRepository.findAllByIdInAndWorkspaceId(any(), anyLong()))
+            .thenAnswer(invocation -> {
+                Collection<UUID> ids = invocation.getArgument(0);
+                // Real instances, not mocks: building a mock inside an Answer would stub one mock from
+                // inside another's invocation, which is how Mockito's ongoing-stubbing state gets corrupted.
+                return ids
+                    .stream()
+                    .map(id -> Observation.builder().id(id).build())
+                    .toList();
+            });
         lenient()
-            .when(observationRepository.findByIdAndWorkspaceId(any(), anyLong()))
-            .thenReturn(Optional.of(observation));
+            .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+            .thenAnswer(invocation -> {
+                Collection<Observation> observations = invocation.getArgument(1);
+                return observations.stream().map(Observation::getId).collect(Collectors.toSet());
+            });
     }
 
     private FeedbackChannelRouter router() {
@@ -253,7 +266,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
 
     @Test
     void preparerFailsLoud_ratherThanOverflowItsOrdinalBand() {
-        // Every admitted observation takes a slot now, so a pathological job could run the band into the next
+        // Every admitted observation takes a slot, so a pathological job could run the band into the next
         // one — where the (agent_job_id, position) guard would read a foreign row as "already recorded" and
         // drop the write. That is the silent drop this whole ledger exists to prevent, so it must be loud.
         UUID job = UUID.randomUUID();
@@ -346,12 +359,15 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void reconcilerWithholdsPreparedFeedbackAfterAuthorizationWithdrawal() {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        Observation observation = problem(null, null);
+        Observation observation = problem(null, null, 0.9f, observationId);
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
         ).thenReturn(List.of(feedbackId));
-        when(observationRepository.findByIdAndWorkspaceId(observationId, WS)).thenReturn(Optional.of(observation));
-        when(visibilityPolicy.permits(WS, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(false);
+        doReturn(List.of(observation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        // Withheld = absent from the permitted set. Nothing else in the batch says so.
+        doReturn(Set.of())
+            .when(visibilityPolicy)
+            .permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
 
         int flips = reconciler().reconcile(WS, RECIPIENT, UUID.randomUUID(), List.of(observationId));
 
@@ -385,8 +401,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
         ).thenReturn(List.of(fidA));
-        Observation obs = problem(null, "rk-delivered");
-        when(observationRepository.findByIdAndWorkspaceId(a, WS)).thenReturn(Optional.of(obs));
+        Observation obs = problem(null, "rk-delivered", 0.9f, a);
+        doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-delivered")).thenReturn(
             true
         );
@@ -404,8 +420,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
         ).thenReturn(List.of(fidA));
-        Observation obs = problem(null, "rk-fresh");
-        when(observationRepository.findByIdAndWorkspaceId(a, WS)).thenReturn(Optional.of(obs));
+        Observation obs = problem(null, "rk-fresh", 0.9f, a);
+        doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-fresh")).thenReturn(false);
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
         when(feedbackRepository.getReferenceById(fidA)).thenReturn(mock(Feedback.class));
@@ -496,8 +512,12 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     private Observation problem(ObjectNode evidence, String recurrenceKey, float confidence) {
+        return problem(evidence, recurrenceKey, confidence, UUID.randomUUID());
+    }
+
+    private Observation problem(ObjectNode evidence, String recurrenceKey, float confidence, UUID id) {
         Observation o = mock(Observation.class);
-        lenient().when(o.getId()).thenReturn(UUID.randomUUID());
+        lenient().when(o.getId()).thenReturn(id);
         lenient().when(o.getPresence()).thenReturn(Presence.ABSENT);
         lenient().when(o.getAssessment()).thenReturn(Assessment.BAD);
         lenient().when(o.getSeverity()).thenReturn(Severity.MAJOR);

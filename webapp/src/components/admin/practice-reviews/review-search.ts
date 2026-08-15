@@ -15,33 +15,20 @@ import { dayAfterInstant, dayStartInstant, fromDayParam } from "@/lib/date-range
 import { multiValue, narrowToEnum } from "@/lib/search-params";
 
 /**
- * One page size for every practice-review list, and for the skeleton that stands in for one.
- *
- * The three lists ran on 25, 25 and 20, and every skeleton drew five rows — so arriving results
- * pushed the pagination down the screen by four rows' worth on two screens and fifteen on the third,
- * which is the jump the skeleton exists to prevent (NN/g, "Skeleton Screens": a skeleton mimics the
- * layout of the page it replaces). One constant, read by the query and by the skeleton, is what
- * stops the two from disagreeing again.
+ * Read by the query and by the skeleton that stands in for the results, so a skeleton cannot draw a
+ * different number of rows than the page it replaces and shift the pagination when results arrive.
  */
 export const REVIEW_PAGE_SIZE = 25;
 
 /**
- * How often the reviews list and a review's own page re-ask while a review is queued or running.
- *
- * Both screens watch the same resource move through the same states, so one cadence — two constants
- * are two answers to "how stale may a running review look", and they drift the first time one is
- * tuned. Applied through TanStack Query's `refetchInterval`, which stops on its own once the review
- * reaches a terminal status.
+ * How often a queued or running review is re-asked for, on every screen that watches one. Applied
+ * through TanStack Query's `refetchInterval`, which stops on its own at a terminal status.
  */
 export const ACTIVE_REVIEW_POLL_MS = 5_000;
 
 /**
- * How the observations list is ordered, as the server names it.
- *
- * `ACTIONABILITY` puts shortfalls first, worst severity down to informational, then strengths, then
- * the observations that judged nothing. The endpoint has understood it all along and no screen ever
- * asked: "show me the worst thing first" is the question this list exists for, and it was the one
- * question an operator could not put to it.
+ * Ordering names the server understands. `ACTIONABILITY` puts shortfalls first, worst severity down
+ * to informational, then strengths, then the observations that judged nothing.
  */
 export const OBSERVATION_SORTS = ["NEWEST", "ACTIONABILITY"] as const;
 export type ObservationSort = (typeof OBSERVATION_SORTS)[number];
@@ -51,14 +38,13 @@ const positiveId = z.coerce.number().int().positive().optional().catch(undefined
 const page = z.coerce.number().int().min(0).optional().catch(undefined);
 const day = z.iso.date().optional().catch(undefined);
 /**
- * Every allowlist below is the status registry's own key set, so a URL filter and the dropdown that
- * offers it cannot come apart — and a value the server adds shows up in both at once.
+ * Every allowlist below is a status registry's own key set, so a URL filter and the dropdown that
+ * offers it cannot come apart.
  *
- * <p>Place narrows to `FILTERABLE_PLACES` rather than the whole wire union, so a hand-typed
- * `channel=PROFILE` is dropped at the door. Accepting it would apply a filter the toolbar cannot
- * show — no chip, no count, an empty page for no visible reason — and the next tick of any place
- * would silently discard it, because a facet emits only the options it was given. A parser must not
- * admit a value the control it feeds has no way to display or clear.
+ * <p>A parser must not admit a value the control it feeds has no way to display or clear: `channel`
+ * narrows to `FILTERABLE_PLACES` rather than the whole wire union, because a hand-typed place the
+ * toolbar cannot offer would apply an invisible filter that the next tick of any place then discards
+ * without saying so — a facet emits only the options it was given.
  */
 const enumValues = <T extends string>(allowed: readonly T[]) =>
 	multiValue.transform((values): T[] | undefined => narrowToEnum(values, allowed));
@@ -101,28 +87,18 @@ export const observationsSearchSchema = z
 		assessment: enumValues(statusValues(ASSESSMENT_DEFS)),
 		severity: enumValues(statusValues(SEVERITY_DEFS)),
 		subjectUserId: positiveId,
-		// In the URL like every filter, so an ordering is part of what a bookmarked or pasted link
-		// carries. `NEWEST` is the server's default and is left out rather than written down.
-		//
-		// Spelled `order` rather than `sort`, which is what the endpoint calls it: two other routes
-		// already put a `sort` in the URL with entirely different values, and TanStack's search params
-		// are one namespace — a third meaning of the word makes `search={(previous) => previous}`, the
-		// idiom every link on this screen uses to carry the reader's filters forward, stop compiling.
+		// Spelled `order`, not `sort`, which is what the endpoint calls it: other routes already put a
+		// `sort` in the URL with entirely different values, and TanStack's search params are one
+		// namespace — another meaning of the word makes `search={(previous) => previous}`, the idiom
+		// every link on this screen uses to carry the reader's filters forward, stop compiling.
 		order: z.enum(OBSERVATION_SORTS).optional().catch(undefined),
 	})
 	.transform(canonicalDateRange);
 
 /**
- * The reviews list carries a window over when each review was *requested*, alongside the status.
- *
- * A row shows that timestamp, and every piece of information a list item displays is important
- * enough that someone will look for a way to filter by it — finding none, they search the toolbar
- * again rather than concluding it is absent (Baymard, "Have Filters for All Displayed List Item
- * Info"). The two sibling lists on this screen took a range all along; this one did not.
- *
- * Only `from`/`to` are borrowed from `scope`, not the whole object: a review *is* the job, so
- * `agentJobId` would be a self-reference and the artifact pair belongs to the lists of what a review
- * produced, not to the list of reviews.
+ * `from`/`to` window when a review was *requested*. Only those two are borrowed from `scope`, not
+ * the whole object: a review *is* the job, so `agentJobId` would be a self-reference, and the
+ * artifact pair belongs to the lists of what a review produced rather than to the list of reviews.
  */
 export const runsSearchSchema = z
 	.object({
@@ -158,9 +134,6 @@ export function reviewScopeSearch(search: ReviewScopeSearch): ReviewScopeSearch 
 /**
  * A picked pair of days becomes the half-open instant window the API takes: midnight on `from`, and
  * midnight on the day *after* `to`, so the day the reader picked last is included whole.
- *
- * Shared by all three lists rather than written out per list — the rule is the one thing the URL and
- * the endpoint have to agree on, and `review-search.test.ts` pins it once.
  */
 function dateWindowQuery(search: { from?: string; to?: string }) {
 	const from = fromDayParam(search.from);
@@ -195,8 +168,6 @@ export function feedbackQuery(search: FeedbackSearch, size: number) {
 		page: search.page ?? 0,
 		size,
 		deliveryState: search.deliveryState,
-		// A family expands to exactly the reasons it covers, so the rows that come back are the rows
-		// whose own sentence sits under that family heading.
 		suppressionReason: search.withheldFamily?.length
 			? reasonsInFamilies(search.withheldFamily)
 			: undefined,

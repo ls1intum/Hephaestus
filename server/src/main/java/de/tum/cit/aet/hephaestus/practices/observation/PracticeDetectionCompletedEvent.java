@@ -6,14 +6,8 @@ import java.util.UUID;
 /**
  * Published after practice observations are persisted for a completed agent job.
  *
- * @param agentJobId      the agent job that produced these observations
- * @param workspaceId     the workspace context
- * @param artifactKind      the target entity type, e.g. {@code scm.pull_request}
- * @param artifactId        the target entity ID
- * @param developerId   the user the observations are about (ADR-0022 {@code aboutUserId})
- * @param findingsInserted number of new observations persisted
+ * @param developerId the user the observations are about (ADR-0022 {@code aboutUserId})
  * @param findingsDiscarded number of observations discarded (unknown slug, over cap, duplicate)
- * @param hasNegative     whether any BAD (assessment=BAD) observation was present in agent output
  */
 public record PracticeDetectionCompletedEvent(
     UUID agentJobId,

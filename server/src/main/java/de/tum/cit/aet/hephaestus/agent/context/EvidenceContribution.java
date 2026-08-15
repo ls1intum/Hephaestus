@@ -143,7 +143,7 @@ public record EvidenceContribution(
             .collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey, e -> List.copyOf(e.getValue())));
     }
 
-    /** The nine-argument shape, for a collector that stages files on disk but reports no limitation. */
+    /** For a collector that stages files on disk but reports no limitation. */
     public EvidenceContribution(
         Map<String, byte[]> files,
         Map<SourceKind, SourceCompleteness> completeness,

@@ -17,19 +17,14 @@ public enum ReviewSweepOutcome {
     /** The workspace is suspended, or has practices switched off. */
     SKIPPED_WORKSPACE_UNAVAILABLE,
 
-    /**
-     * The workspace still has an unfinished campaign. One at a time, exactly as for a hand-scoped
-     * backfill: two overlapping runs would each read the other's ledger rows as already covered.
-     */
+    /** One campaign at a time: two overlapping runs would each read the other's ledger rows as covered. */
     SKIPPED_CAMPAIGN_UNDER_WAY,
 
-    /** Nothing was created in the window. There is nothing to review and nothing to record. */
     SKIPPED_EMPTY_SCOPE,
 
     /**
-     * More artifacts in a few days than a whole hand-confirmed campaign may cover. Refused rather than
-     * paid for: a workspace that produced thousands of pull requests overnight has a broken mirror, and
-     * a nightly sweep is the wrong place to discover that by spending a month's budget on it.
+     * More artifacts in a few days than a whole hand-confirmed campaign may cover — refused rather than
+     * paid for, since that scale means a broken mirror, not a sweep to spend a month's budget on.
      */
     SKIPPED_SCOPE_TOO_LARGE,
 }

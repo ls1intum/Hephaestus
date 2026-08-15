@@ -16,24 +16,13 @@ export interface ReviewPracticeLinkProps {
 }
 
 /**
- * The practice an observation is about: its area's colour, its name, a link to its definition, and
- * the prose behind it on hover.
+ * The review read models carry a practice's slug and name but not its prose, so the workspace's
+ * practice list is the join the hover card needs. Querying it per row is not the waste it looks:
+ * TanStack Query deduplicates by key, so one request serves every row on the page.
  *
- * <p>This replaces `ReviewPracticeLabel`, which was inert text beside an icon. An operator reading an
- * observation is being told a practice was or was not followed, and had no way from here to find out
- * what the practice asks for — the definition was three navigations away, through a catalogue they
- * would have to search by name. Every review surface named a practice and none of them linked one.
- *
- * <p>The card itself is not new and is not reinvented here: `PracticeDetailHoverCard` is the
- * catalogue's, it opens on focus as well as hover because this kit is Base UI, and it renders the
- * bare link when a practice carries no prose. The gap was that nothing outside the catalogue used
- * it. What this adds is the lookup — the review read models carry a practice's slug and name but not
- * its prose, so the workspace's practice list is the join. One query serves every row on the page;
- * TanStack Query deduplicates it by key.
- *
- * <p>Nothing here is load-bearing (rubric rule 6): the practice's name and area are on the row
- * itself, and everything in the card is a field on the page the link goes to. A reader on a
- * touchscreen, who gets no card, loses nothing — their tap goes to the definition.
+ * <p>Nothing the card shows is load-bearing — the practice's name and area are on the row, and the
+ * rest is a field on the page the link goes to — so a reader on a touchscreen, who gets no card,
+ * loses nothing.
  */
 export function ReviewPracticeLink({
 	workspaceSlug,
@@ -68,12 +57,9 @@ export function ReviewPracticeLink({
 }
 
 /**
- * The area's colour and glyph, at the size of a word.
- *
- * The area's *name* does not appear beside it. It used to, on a second line under the practice, and
- * on a row that already names the practice, the person, the work and the time it is one fact too
- * many — the colour is what an operator scans an area by, and the name is in the card and on the
- * page the link goes to.
+ * The colour is what an operator scans an area by, so the name is carried by the `title` and the
+ * screen-reader text rather than taking visible space on a row that already names the practice, the
+ * person, the work and the time.
  */
 function PracticeAreaMark({ area }: { area: ReviewPracticeArea | undefined }) {
 	if (!area) return null;

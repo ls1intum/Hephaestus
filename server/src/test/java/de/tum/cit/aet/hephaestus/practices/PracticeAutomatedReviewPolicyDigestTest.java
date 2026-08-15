@@ -8,11 +8,9 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
- * The digest of the review frame.
- *
- * <p>The frame is the contract version, whether a model runs, what happens when the evidence does not
- * pass, and the claims the practice can never support. What a review <em>reads</em> lives on the
- * bindings and is digested by {@code ReviewRuleFingerprint}.
+ * The digest of the review frame (contract version, review mode, insufficient-evidence handling, and
+ * limitations) — not of what a review reads, which lives on the bindings and is digested by
+ * {@code ReviewRuleFingerprint}.
  */
 class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
@@ -20,10 +18,9 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
 
     @Test
     void shouldPinACanonicalDigestForAKnownPolicy() {
-        // Fingerprints computed by earlier releases are stored and compared against, so the digest is
-        // a wire format. Reordering the fields inside it, or changing how they are framed, silently
-        // invalidates every stored fingerprint and marks every past review claim stale — with a green
-        // suite, because the other tests here only compare digests to each other. This pins the value.
+        // Earlier releases' stored fingerprints are compared against this value, so it is a wire
+        // format: reordering or reframing its fields silently invalidates every one, undetected by the
+        // other tests here since they only compare digests to each other.
         String digest = PracticeAutomatedReviewPolicyDigest.digest(policy());
 
         assertThat(digest).isEqualTo(PINNED_DIGEST);

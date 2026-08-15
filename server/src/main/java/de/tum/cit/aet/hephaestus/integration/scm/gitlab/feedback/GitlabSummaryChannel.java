@@ -31,12 +31,9 @@ import org.springframework.stereotype.Component;
  * {@link GitlabMrResolver} before issuing the mutation.
  *
  * <p>Defensively backtick-escapes GitLab slash commands ({@code /approve}, {@code /merge},
- * {@code /close}, etc.) so untrusted content can't accidentally execute an action. The
- * agent layer already sanitises in {@code PullRequestCommentPoster.sanitize} before
- * calling here — this is belt-and-suspenders for callers that might bypass that path.
- *
- * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
- * {@link GitLabGraphQlClientProvider}.
+ * {@code /close}, etc.) so untrusted content can't accidentally execute an action, even though the
+ * agent layer already sanitises in {@code PullRequestCommentPoster.sanitize} — a caller bypassing
+ * that path must not be able to trigger a GitLab action.
  */
 @Component
 @OutboundEgressGateway
@@ -46,11 +43,8 @@ public class GitlabSummaryChannel implements SummaryChannel {
     private static final Logger log = LoggerFactory.getLogger(GitlabSummaryChannel.class);
 
     /**
-     * Matches GitLab slash commands at line start. Backtick-escaped so they render as
-     * inline code rather than being executed. Mirrors
-     * {@code PullRequestCommentPoster.GITLAB_SLASH_COMMAND} — duplicated rather than
-     * shared because the agent layer is the wrong module to hold a GitLab-specific
-     * helper, and this adapter must be safe on its own.
+     * Matches GitLab slash commands at line start. Mirrors {@code PullRequestCommentPoster.GITLAB_SLASH_COMMAND}
+     * — duplicated, not shared, so this adapter is safe on its own regardless of the agent layer.
      */
     static final Pattern GITLAB_SLASH_COMMAND = Pattern.compile(
         "^(\\s*/(?:approve|merge|close|reopen|assign|unassign|label|unlabel|lock|unlock|" +
@@ -131,9 +125,7 @@ public class GitlabSummaryChannel implements SummaryChannel {
         }
 
         // Surface TOP-LEVEL GraphQL errors with their real reason — createNote returns no payload at all when
-        // the instance is read-only ("You cannot perform write operations on a read-only instance"), the gid is
-        // unresolvable, or permission is denied. Without this the caller only saw a generic "No note ID",
-        // which hid a transient read-only window behind what looked like a hard failure.
+        // the instance is read-only, the gid is unresolvable, or permission is denied.
         List<String> topLevelErrors = response
             .getErrors()
             .stream()
@@ -158,22 +150,19 @@ public class GitlabSummaryChannel implements SummaryChannel {
     }
 
     /**
-     * Edit an existing MR/issue note in place via the {@code updateNote} mutation (ADR 0021 re-review UX).
-     * No noteable resolution is needed — the note's own global id ({@code externalId}, e.g.
-     * {@code gid://gitlab/Note/123}) addresses it directly. Returns a typed {@link UpdateOutcome}: a
-     * confirmed-deleted note is {@code GONE} (the caller re-posts); a rate-limit / transport / unknown error
-     * is {@code TRANSIENT} (the caller keeps the prior summary and does NOT re-post, so a flaky update never
-     * double-posts). Only a blank external id — a data bug — throws {@link FeedbackDeliveryException}.
+     * Edit an existing MR/issue note in place via the {@code updateNote} mutation. No noteable resolution is
+     * needed — the note's own global id ({@code externalId}, e.g. {@code gid://gitlab/Note/123}) addresses it
+     * directly. Returns a typed {@link UpdateOutcome}: a confirmed-deleted note is {@code GONE} (caller
+     * re-posts); a rate-limit / transport / unknown error is {@code TRANSIENT} (caller keeps the prior summary,
+     * does not re-post, so a flaky update never double-posts). Only a blank external id throws
+     * {@link FeedbackDeliveryException}.
      */
     @Override
     public UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
         long scopeId = target.ref().workspaceId();
-        // A blank id is a ledger/data bug, never recoverable by re-posting — keep it a hard error.
         if (externalId == null || externalId.isBlank()) {
             throw new FeedbackDeliveryException("Cannot edit a GitLab note in place: external note id is missing");
         }
-        // Rate-limit / network / unknown errors are TRANSIENT: keep the prior summary, do NOT re-post (a flaky
-        // update must not double-post a second summary). Only a confirmed-deleted note is GONE.
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             return UpdateOutcome.transientFailure("GitLab rate limit critical for scope " + scopeId);
         }
@@ -200,9 +189,8 @@ public class GitlabSummaryChannel implements SummaryChannel {
         }
 
         // A DELETED note surfaces as a TOP-LEVEL GraphQL error (the global id resolves to nothing), NOT a
-        // mutation-payload error — GitLab returns no `updateNote` object at all. Without this check the
-        // deleted-note case falls through to the no-id branch below and is mis-read as TRANSIENT, so an
-        // orphaned summary (e.g. after a mirror re-import wipes the old note) never gets re-posted.
+        // mutation-payload error — GitLab returns no `updateNote` object at all. Left unchecked, that falls
+        // through to the no-id branch below and is mis-read as TRANSIENT, so an orphaned summary never re-posts.
         List<String> topLevelErrors = response
             .getErrors()
             .stream()
@@ -242,8 +230,8 @@ public class GitlabSummaryChannel implements SummaryChannel {
      * from its newest end — the summary a crashed delivery already posted is the newest note.
      *
      * <p>Reads the noteable's <em>flat</em> {@code notes} connection rather than {@code discussions { notes }}:
-     * the nested form pages notes at a fixed {@code first: 100} inside each discussion with no cursor of its
-     * own, so an over-long thread would hide notes no cursor can reach.
+     * the nested form pages notes at a fixed size inside each discussion with no cursor of its own, so an
+     * over-long thread would hide notes no cursor can reach.
      */
     @Override
     public ExistingSummaryLookup findExistingSummary(FeedbackTarget target, String marker) {

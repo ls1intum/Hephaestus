@@ -25,12 +25,8 @@ public interface RepositoryToMonitorRepository extends JpaRepository<RepositoryT
     Optional<RepositoryToMonitor> findByNameWithOwner(String nameWithOwner);
 
     /**
-     * The same lookup, with the workspace itself rather than a proxy of it.
-     *
-     * <p>{@link RepositoryToMonitor#getWorkspace()} is lazy, so {@link WorkspaceResolver} — whose only
-     * job is to hand back a workspace — returns an uninitialized proxy that throws the moment a caller
-     * outside a session reads a field off it. Every caller that resolves a workspace goes on to read
-     * one, so fetching it is not speculative: it is what the resolver was asked for.
+     * The same lookup, but with the workspace fetched eagerly rather than as a lazy proxy — needed by
+     * {@link WorkspaceResolver}, whose callers read the workspace outside the loading session.
      */
     @Query("SELECT m FROM RepositoryToMonitor m JOIN FETCH m.workspace WHERE m.nameWithOwner = :nameWithOwner")
     Optional<RepositoryToMonitor> findWithWorkspaceByNameWithOwner(@Param("nameWithOwner") String nameWithOwner);

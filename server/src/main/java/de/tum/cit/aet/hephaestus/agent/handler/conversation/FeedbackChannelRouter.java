@@ -74,11 +74,10 @@ public class FeedbackChannelRouter {
      *
      * @param tier the <em>effective</em> tier of the observation's practice, already resolved through the
      *     practice → area → workspace chain, or {@code null} when it could not be resolved. Passed in rather
-     *     than read off {@code observation.getPractice()} on purpose: that association is lazy, so reading
-     *     it here would make the routing rule depend on whether the caller happens to hold a session —
-     *     correct inside the delivery listener's transaction and broken for every other caller. A null tier
-     *     lets the remaining rules decide, because refusing on a failed lookup would silently withhold
-     *     coaching the developer was owed.
+     *     than read off {@code observation.getPractice()} on purpose: that association is lazy, so reading it
+     *     here would make the routing rule depend on whether the caller happens to hold a session. A null
+     *     tier lets the remaining rules decide rather than silently withholding coaching the developer was
+     *     owed.
      * @param reach where this workspace lets feedback go at all
      */
     public ConversationRoutingDecision route(
@@ -89,9 +88,7 @@ public class FeedbackChannelRouter {
         RoutingContext context
     ) {
         // Provenance, tier and reach in one predicate, so this path and the in-context one cannot drift on
-        // what "may we say this here" means. Asked first because none of the three needs anything but the
-        // observation in hand, and each is decisive: a PROPOSE practice has nothing to say on ANY channel,
-        // and a workspace whose reach stops at the work never opens a conversation at all.
+        // what "may we say this here" means.
         if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, reach, FeedbackChannel.CONVERSATION)) {
             return observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)
                 ? ConversationRoutingDecision.PRACTICE_TIER_QUIET

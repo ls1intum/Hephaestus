@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
@@ -40,13 +41,7 @@ const practices = [
 	},
 ];
 
-/**
- * Eight areas of four practices, which is the size a workspace installs the shipped catalogue at.
- *
- * <p>Derived from one practice rather than written out, because what changes with scale is the count
- * of rows and of per-row controls, not what any one of them says — and a hand-written thirty-two
- * would be thirty-two chances to disagree with the shape the API sends.
- */
+/** The size a workspace installs the shipped catalogue at. */
 const scaleAreas = [
 	"Submitting review-ready work",
 	"Writing issues a maintainer can act on",
@@ -122,15 +117,6 @@ const meta = {
 		),
 	],
 	tags: ["autodocs"],
-	/**
-	 * The work-type filter and each area's icon, colour and dashboard visibility are props this screen
-	 * renders from, and its container writes back after the server accepts the change. Behind `fn()`
-	 * alone none of them moved: choosing "Issues" left every practice on screen, and picking a colour
-	 * left the area the colour it started as.
-	 *
-	 * The three area edits are applied here optimistically, which is what the container does while its
-	 * mutation is in flight — so this is the state the screen really passes through, not a shortcut.
-	 */
 	render: (args) => (
 		<StatefulPatch initial={{ focusFilter: args.focusFilter, areas: args.areas }}>
 			{(view, patch) => (
@@ -172,28 +158,22 @@ export const Populated: Story = {
 };
 
 /**
- * The catalogue at the size it ships: eight areas, thirty-two practices, every one of them a row
- * with its own reorder handle and actions menu.
- *
- * <p>Three practices over two areas is the size at which nothing on this screen can go wrong. What
- * grows here is the per-row control count and the move menu, which lists every area in the workspace
- * — the one control whose height is a function of the catalogue rather than of the row it belongs
- * to, and the reason this story runs at 320px like the rest of the file.
+ * The move menu lists every area in the workspace, so it is the one control whose height grows with
+ * the catalogue rather than with the row it belongs to — which is what the narrow viewport here is
+ * watching.
  */
 export const AtScale: Story = {
 	args: { areas: scaleAreas, practices: scalePractices },
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
-		// Every practice is a row, and every row is reorderable: an area that failed to expand, or a
-		// bucket that dropped its contents, shows up here as a count and not as a broken screenshot.
 		await expect(canvas.getAllByRole("button", { name: /^Reorder / })).toHaveLength(40);
 		await expectNoPageOverflow();
 	},
 };
 
 /**
- * The second row here carries no prose and gets no card: a locally written practice usually will
- * not, and a popup that appears empty under the pointer is worse than no popup.
+ * A locally written practice usually carries no prose, and a popup that appears empty under the
+ * pointer is worse than no popup.
  */
 export const PracticeDetailOnHover: Story = {
 	args: {
@@ -206,8 +186,8 @@ export const PracticeDetailOnHover: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await expect(screen.queryByText(/reverse-engineering the diff/)).not.toBeInTheDocument();
 
-		// A practice with nothing to say is not a trigger at all — asserted on the element rather than by
-		// hovering it and waiting for nothing, which would pass just as well if the card were merely slow.
+		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
+		// as well if the card were merely slow.
 		await expect(
 			canvas.getByRole("link", { name: mockUnassignedPractice.name }),
 		).not.toHaveAttribute("data-slot", "hover-card-trigger");
@@ -215,9 +195,7 @@ export const PracticeDetailOnHover: Story = {
 		const trigger = canvas.getByRole("link", { name: mockPractices[0].name });
 		await expect(trigger).toHaveAttribute("data-slot", "hover-card-trigger");
 		await userEvent.hover(trigger);
-		// Re-queried on each poll: the popup mounts at `opacity: 0` and fades in, so a single find would
-		// resolve on an element that is not visible yet.
-		await waitFor(() => expect(screen.getByText(/reverse-engineering the diff/)).toBeVisible());
+		await expectSettledVisible(await screen.findByText(/reverse-engineering the diff/));
 		await expect(screen.getByText(/lists the exact steps a reviewer ran/)).toBeVisible();
 	},
 };
@@ -491,13 +469,6 @@ export const BlockedDestinationDrag: Story = {
 	},
 };
 
-/**
- * The tier, and the level that decided it, on rows that differ only in where the answer came from.
- *
- * All three read the same tier out. What separates them is the sentence beside it: an admin who
- * sees "Off" needs to know whether this practice was singled out or whether every practice in the
- * workspace is off, because those have different fixes and only one of them is on this row.
- */
 export const AutonomyTiers: Story = {
 	args: {
 		areas: mockAreas,
@@ -523,15 +494,11 @@ export const AutonomyTiers: Story = {
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
 	play: async ({ canvas }) => {
-		// Scoped row by row. Asserting that all three sentences exist somewhere on the page would pass
-		// just as well if every row carried the same one, which is the mix-up this story is about — and
-		// an area holding no tier of its own must send the reader to the workspace, not to the area.
+		// Scoped row by row: asserting that all three sentences exist somewhere on the page would pass
+		// just as well if every row carried the same one, which is the mix-up this story is about.
 		const expected = [
 			["Nobody has touched this one", "Deliver", "Follows the workspace default"],
 			["Its area decided", "Propose", `Follows ${mockAreas[0].name}`],
-			// Every tier is read out, Deliver included. The badge used to hide there, which was
-			// defensible while a picker beside it always said the tier; as the only read-out, a hidden
-			// one would leave the rows an admin is least likely to question saying nothing.
 			["Singled out", "Off", "Set for this practice"],
 		];
 
@@ -555,9 +522,9 @@ export const TierIsReadOnlyHere: Story = {
 	},
 	parameters: {
 		chromatic: { disableSnapshot: true },
-		// The actions menu is taller than 568px — it holds every area in the workspace — so Base UI caps
-		// it at the available height and the a11y check rejects the scrollable region that makes. That
-		// is a property of the menu, not of the link this story is about.
+		// The actions menu holds every area in the workspace, so on a short viewport Base UI caps it at
+		// the available height and the a11y check rejects the scrollable region that makes — a property
+		// of the menu, not of the link this story is about.
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
@@ -569,7 +536,6 @@ export const TierIsReadOnlyHere: Story = {
 			"href",
 			"/w/demo/admin/practices/review",
 		);
-		// The way off an override left with the picker, so nothing here may still offer it.
 		await expect(menu.queryByRole("menuitem", { name: "Use the default" })).not.toBeInTheDocument();
 	},
 };

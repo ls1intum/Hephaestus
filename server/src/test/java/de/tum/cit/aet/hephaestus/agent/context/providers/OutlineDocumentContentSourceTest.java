@@ -597,8 +597,7 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest(body), files);
 
-        // Exactly the one linked document is materialised — never the whole corpus. The index beside it
-        // names what was staged, and is written whether or not anything was.
+        // Exactly the one linked document is materialised — never the whole corpus.
         assertThat(files.keySet()).containsExactlyInAnyOrder(
             "inputs/context/outline/engineering/onboarding-guide.md",
             OutlineDocumentContentSource.REVIEW_INDEX_KEY
@@ -693,11 +692,9 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
     }
 
     /**
-     * No linked or retrieved documentation still stages the index, holding an empty list.
-     *
-     * <p>Several practices turn on whether a change is documented. "The documentation directory is not
-     * there" and "the documentation was searched and nothing bore on this change" license opposite
-     * conclusions, and only the index makes them distinguishable.
+     * No linked or retrieved documentation still stages the index, holding an empty list: "no
+     * documentation directory" and "searched, nothing bore on this change" license opposite conclusions,
+     * and only the index makes them distinguishable.
      */
     @Test
     void reviewPathStagesAnEmptyIndexWhenArtifactHasNoOutlineLinks() throws Exception {
@@ -805,7 +802,6 @@ class OutlineDocumentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new LinkedHashMap<>();
         provider.contribute(prRequest(body), files);
 
-        // Three documents plus the index that names them.
         assertThat(files).hasSize(4);
         verify(projection, never()).searchDocuments(anyLong(), anyString(), anyInt());
     }

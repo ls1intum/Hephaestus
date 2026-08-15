@@ -34,7 +34,7 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Known limitation** | A claim the evidence cannot support even when every requirement passes. | blind spot, caveat |
 | **When evidence is insufficient** | The required behavior when evidence requirements are not met. Contract `1.0.0` always skips automated review. | fallback, error handling |
 | **Skip automated review** | Make no practice claim because the requirements are not met or the mode is unsupported. | not applicable, decline judgment, failure |
-| **Automated review validation** | Status and provenance for evaluating exact review rules with an exact evaluator procedure. | certification, approval |
+| **Automated review validation** | Who stands behind a practice's automated-review policy, bound to the exact review-rule fingerprint. Its only status is `AUTHOR_DECLARED`. | certification, approval |
 | **Source authorization** | Instance governance permits a source for an explicit product use. | enabled, available |
 | **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
 | **Audience / recipient** | Who may receive or inspect evidence. | purpose |
@@ -45,7 +45,9 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Review scope** | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories. | filter, path filter, include pattern |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
-review is accurate. Independent validation records provenance separately.
+review is accurate, and the product says so rather than implying otherwise: every shipped policy is its
+author's declaration, and `AUTHOR_DECLARED` is the only status the API can return. Nothing validates a policy
+independently, so no surface may suggest something did.
 
 “Mentoring” describes the product goal, not an anthropomorphic claim. Hephaestus does not know a developer's
 intent, private conversations, runtime conditions, or learning needs unless an authorized source explicitly
@@ -63,10 +65,12 @@ label a practice as universally observable or unobservable.
 | **Peer** | A peer review may be possible from team context; Hephaestus does not collect it. |
 | **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it. |
 
-A future human-review feature needs its own consent, provenance, retention, access, rubric, and validation
-model. It must record who reviewed and in what relationship to the author. Human reviews
-may use different rubrics and evidence, and disagreement remains multiple provenance-bearing reviews rather
-than one ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an automated review.
+Human review is outside the product: none of the three human reviewers above has consent, provenance,
+retention, access, a rubric or a validation model here, and a human review would need all six plus a record of
+who reviewed and in what relationship to the author. Human reviews may use different rubrics and evidence, and
+disagreement between two of them is two provenance-bearing reviews, not a contradiction to resolve into one
+ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an
+automated review.
 
 ## How a review was occasioned
 
@@ -114,18 +118,10 @@ differ only in what the system may do next. That is the point of the tier: turni
 does not put a hole in the behaviour series. `DELIVER` is what a practice, area or workspace that has
 expressed no opinion resolves to.
 
-**Three tiers, not four.** An earlier ladder split the middle into `OBSERVE` (runs, records, prepares
-nothing) and `PROPOSE` (runs, records, prepares feedback for someone to approve). Both sent nothing, and no
-screen that showed them could tell them apart, so the boundary between them was unpickable in exactly the
-way the reach ladder below was. One middle rung, `PROPOSE`, carries the whole of "runs, records, says
-nothing". Semgrep (*Monitor / Comment / Block*), Kyverno (*Audit / Enforce*) and ESLint (*off / warn /
-error*) all draw the line in the same place.
-
-**The tier is autonomy, not reach.** It says how far the system may act alone. *Where* feedback may go is a
-separate, workspace-level decision — see [Feedback reach](#feedback-reach). The two were once one ladder,
-which did not order: a mentor chat is not obviously quieter or louder than one review comment, so the
-boundary between the middle tiers was unpickable. Autonomy does order, and it is the adoption ladder a team
-actually walks.
+**The tier is autonomy, not reach.** It says how far the system may act alone, which orders: `OFF` does less
+than `PROPOSE`, which does less than `DELIVER`. *Where* feedback may go — the mentor conversation only, or
+also on the work itself — does not order, and is a separate workspace-level decision. See
+[Feedback reach](#feedback-reach). Do not merge the two axes into one ladder.
 
 **Nothing is composed or stored at `PROPOSE`.** A withheld observation is filtered out before the feedback
 body is built, and the ledger row it leaves behind carries no body, so there is no draft anywhere: no surface
@@ -139,10 +135,9 @@ so "we saw it and chose to stay quiet" reads differently from "we missed it" in 
 the artifact's practice trace the same fact reads as outcome `REVIEWED` with `observationCount > 0`,
 `deliveredCount = 0`, and `PRACTICE_TIER_QUIET` among the `withheldReasons`. There is no approval queue and
 nobody approves an individual observation: what is held is released by raising the practice's effective tier to
-`DELIVER`. Should an approval step ever be built, do not reuse `FeedbackDeliveryState.PREPARED` for it —
-that state is an auto-advancing mentor-conversation slot with a 14-day TTL, flipped to `DELIVERED` by the
-next chat turn that links the feedback, so parking approvals there would deliver them without anybody
-approving anything.
+`DELIVER`. `FeedbackDeliveryState.PREPARED` is not a holding state and must not be used as one: it is an
+auto-advancing mentor-conversation slot with a 14-day TTL, flipped to `DELIVERED` by the next chat turn that
+links the feedback, so anything parked there is delivered by the parking.
 
 ## Tier inheritance
 
@@ -157,10 +152,10 @@ effective tier = practice.review_tier ?? area.review_tier ?? workspace default ?
 client that resolved it would be a second implementation, drifting on the first change. Nothing pushes the
 chain into SQL either, for the same reason.
 
-Null exists because a NOT NULL column cannot say "I have not decided", so every practice shipped holding an
-opinion nobody expressed and turning the system down meant editing every row. Every API that reports a tier
-therefore reports four things: the effective tier, the raw override (null = inheriting), the level that
-decided it (`ReviewTierSource`: `PRACTICE`, `AREA`, `WORKSPACE`), and an `inherited` flag.
+Null exists because a NOT NULL column cannot say "I have not decided", which would make every practice hold
+an opinion nobody expressed. Every API that reports a tier therefore reports four things: the effective
+tier, the raw override (null = inheriting), the level that decided it (`ReviewTierSource`: `PRACTICE`,
+`AREA`, `WORKSPACE`), and an `inherited` flag.
 
 Setting a tier is `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier` or
 `PATCH /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier`, both with body
@@ -180,9 +175,8 @@ about the practice rather than a preference, which is why it is stored rather th
 mentor conversation and nowhere else) or `ON_THE_WORK` (also pull-request summaries, inline notes and issue
 comments). Unset resolves to `ON_THE_WORK`.
 
-One decision per workspace, not per practice. Reach multiplied by tier per practice is two hundred decisions
-at a hundred practices, which is why nobody made any of them and the shipped default was the only setting
-that ever ran. Reach is a statement about how a team uses the system, and one statement is enough.
+One decision per workspace, not per practice. Reach is a statement about how a team uses the system — may it
+speak on the work, or only in the mentor conversation — and one statement is enough.
 
 Reach is **ANDed** with the resolved tier at every delivery site, so it can only ever close a channel, never
 give a practice more autonomy than its own tier allows. `FeedbackAdmission.delivers(origin, tier, reach, channel)` is the single
@@ -212,12 +206,13 @@ settings resource as `reviewScope` (`GET`/`PATCH /workspaces/{workspaceSlug}/pra
 and a `PATCH` replaces it wholesale rather than merging, because the lists *are* the setting and a merge
 could only ever add.
 
-Three limits are deliberate, not gaps waiting to be filled:
+Three things the scope deliberately does not do, each for a reason that outlives the current shape:
 
 - **No path scope.** The detection gate holds the `PullRequest` row, not the diff. Changed paths do not
   exist until the evidence stage, by which point the review has already been admitted and paid for, so a
   path predicate here would quietly never narrow anything.
-- **No patterns.** Exact names only. Adding globs later stays backward compatible; taking them away would not.
+- **No patterns.** Exact names only. Widening the matcher to globs stays backward compatible; narrowing it
+  back would not.
 - **A branch scope cannot narrow issue review.** An issue has no target branch, so a null branch passes
   the branch axis rather than failing it. Only `repositories` narrows issue review.
 
@@ -302,8 +297,8 @@ series as "nothing to see". A refusal is a fact about the instrument, is deliber
 a `Presence` value, and is what lets the whole observation table be read as behaviour.
 
 **`NOT_APPLICABLE` must state its ground.** It is the only presence whose citation proves nothing — any
-quote from the change is equally consistent with the practice applying — so it was the cheapest answer
-available and uncertainty drained into it. A `NOT_APPLICABLE` observation therefore carries
+quote from the change is equally consistent with the practice applying — which makes it the cheapest place
+for a detector's uncertainty to drain into. A `NOT_APPLICABLE` observation therefore carries
 `evidence.inapplicability`: `consulted` (source kinds read, each of which this run must have staged),
 `subject` (what the practice looks for) and `ruledOutBy` (the fact about *this* work that means the subject
 cannot occur). Enforced at both boundaries the citation and recorded-search rules already use — the
@@ -323,8 +318,8 @@ it has found one it could not call, and the answer is `INCONCLUSIVE`.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
 10. Observations retain the exact practice revision, source contract, and evidence provenance.
-11. Practice or source-contract changes can mark earlier claims stale.
-12. Automated review validation remains separate from source authorization, autonomy tier, feedback reach, and per-run readiness.
+11. Practice or source-contract changes move the review-rule fingerprint, so earlier claims derive as stale. Nothing marks a claim stale by hand.
+12. Automated review validation — always `AUTHOR_DECLARED` — is separate from source authorization, autonomy tier, feedback reach, and per-run readiness.
 
 ## Writing rules
 
@@ -338,6 +333,5 @@ it has found one it could not call, and the answer is `INCONCLUSIVE`.
 8. Never write bare **binding**. Two unrelated things carry the word — a *practice binding* (an occasion
    a practice is reviewed on, `PracticeBinding`) and a *model binding* (a workspace's AI model for a
    purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,
-   label, or javadoc that says only "binding" has already lost that distinction; `REVIEW_MODEL_UNBOUND`
-   exists because `BINDING_DISABLED` did exactly that and sent readers to the practice catalogue to fix
-   a missing AI model.
+   label, or javadoc that says only "binding" has already lost that distinction, which is why the reason
+   code for a missing AI model is `REVIEW_MODEL_UNBOUND` and names the thing it means.

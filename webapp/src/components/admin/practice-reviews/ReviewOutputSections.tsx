@@ -17,11 +17,9 @@ import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRowList } from "./ReviewRow";
 
 /**
- * How many of each a scoped section shows before it links to the full list.
- *
- * Exported because both screens that render these sections have to *request* this many, and the
- * skeleton has to draw this many: three numbers that were separately written down (5, 5 and 2) for
- * one quantity, so the section grew by three rows the moment the answer arrived.
+ * How many of each a scoped section shows before it links to the full list. Exported because the
+ * caller's query has to *request* this many and the skeleton has to draw this many; three separate
+ * numbers would resize the section the moment the answer arrived.
  */
 export const REVIEW_PREVIEW_SIZE = 5;
 
@@ -32,11 +30,8 @@ export type ReviewSectionState<T> =
 	| { status: "ready"; items: T[]; total: number };
 
 /**
- * Says what a review declined to do, in place of what it found.
- *
  * Deliberately not "nothing was found": the review never got as far as looking, so reading its empty
- * result as a clean bill of health would be exactly backwards. The product's name is not in it —
- * an operator wants to know what happened to the work, not which service shrugged.
+ * result as a clean bill of health would be exactly backwards.
  */
 const INSUFFICIENT_EVIDENCE_EXPLANATION =
 	"The review stopped before it assessed anything, because the material it needed was missing, unreadable, out of date, or not something it was allowed to read. No practice was judged — this is not a review that looked and found nothing.";
@@ -61,14 +56,9 @@ export interface ReviewOutputSectionsProps {
 }
 
 /**
- * What one review, or one piece of work, produced — the same two sections in the same order on both
- * screens that show them.
- *
- * <p>Each section renders the very rows the corresponding list renders. They used to be a third and
- * fourth hand-built row layout, with their own titles, their own field order and no severity on an
- * observation, so the same record looked like a different kind of thing depending on which screen
- * had reached it. The `context` prop that decided whether to print a timestamp is gone with them:
- * both screens show one, because a row without a date is a row you cannot place.
+ * Each section renders the very rows its full list renders, rather than a layout of its own: a
+ * record that looks like a different kind of thing depending on which screen reached it is the cost
+ * of the alternative.
  */
 export function ReviewOutputSections({
 	workspaceSlug,

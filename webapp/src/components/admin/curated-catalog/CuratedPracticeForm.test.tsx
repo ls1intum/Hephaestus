@@ -94,8 +94,7 @@ describe("CuratedPracticeForm", () => {
 			"/admin/catalog/new",
 		);
 
-		// Pull requests lead the picker even though the server sorts the work types alphabetically:
-		// which kind an author most often writes is presentation, and it lives in the webapp.
+		// The server sorts work types alphabetically; which kind leads the picker is presentation.
 		expect(
 			screen.getByRole("radio", { name: /Pull or merge request/ }).getAttribute("aria-checked"),
 		).toBe("true");
@@ -195,8 +194,7 @@ describe("CuratedPracticeForm", () => {
 		await renderForm({}, onSubmit);
 
 		await user.click(screen.getByRole("button", { name: "Add occasion" }));
-		// The recommended moments are taken, so the second occasion starts on the first free one, and
-		// starts on it *checked* — an occasion with nothing to start it cannot be saved.
+		// Checked, not merely offered: an occasion with nothing to start it cannot be saved.
 		expect(
 			occasion(2)
 				.getByRole("checkbox", { name: /^Review submitted/ })
@@ -238,19 +236,15 @@ describe("CuratedPracticeForm", () => {
 
 		await user.click(screen.getByRole("button", { name: "Add occasion" }));
 
-		// The server rejects a signal bound twice outright, and the rejection arrives after a save. The
-		// checkbox is the only place it can be explained before the author spends the round trip.
 		// `aria-disabled`, not `data-disabled`: Base UI renders the checkbox as a non-native element,
-		// so `data-disabled` is only the hook its CSS uses while `aria-disabled` is what the
-		// accessibility tree exposes. A regression that kept the styling and dropped the semantics
-		// leaves the first in place, and this is the assertion that notices.
+		// so `data-disabled` is only the CSS hook while `aria-disabled` is what the accessibility tree
+		// exposes. A regression that keeps the styling and drops the semantics leaves the first alone.
 		expect(
 			occasion(2)
 				.getByRole("checkbox", { name: /^Opened/ })
 				.getAttribute("aria-disabled"),
 		).toBe("true");
-		// One hint per moment occasion 1 claims, on the moment itself rather than as a banner, and it
-		// names the occasion holding it rather than leaving the author to hunt for the card.
+		// The hint names the occasion holding the moment, rather than leaving the author to hunt.
 		expect(occasion(2).getAllByText("in occasion 1")).toHaveLength(3);
 	});
 
@@ -424,8 +418,7 @@ describe("CuratedPracticeForm", () => {
 
 		await user.click(screen.getByRole("radio", { name: /^Issue/ }));
 
-		// An issue can never be a draft, and a control for a state that cannot occur is worse than no
-		// control.
+		// An issue can never be a draft, so the control for that state is gone rather than inert.
 		expect(screen.queryByRole("switch", { name: /^Include drafts/ })).toBeNull();
 	});
 });

@@ -116,10 +116,9 @@ class PendingSignalReaperTest extends BaseUnitTest {
 
     @Test
     void shouldClaimTheWholeBatchBeforeReOfferingAnyOfIt() {
-        // Ordering is the whole content of the claim. Stamping the rows afterwards would leave a batch
-        // that throws — or a sweep that dies mid-batch — unclaimed and back at the head of the next
-        // sweep, which is the starvation the claim exists to prevent. Without the InOrder assertion this
-        // test passes with the claim deleted outright.
+        // Stamping the rows after resubmitting would leave a batch that throws mid-sweep unclaimed and
+        // back at the head of the next sweep — the starvation the claim exists to prevent. Without the
+        // InOrder assertion this test passes with the claim deleted outright.
         PendingSignalResubmitter resubmitter = resubmitterFor("scm.pull_request");
         ArtifactSignal signal = pendingSignal("scm.pull_request", "scm.pull_request.ready");
         when(repository.findRetryablePending(any(), any(Pageable.class))).thenReturn(List.of(signal));

@@ -45,15 +45,9 @@ const PROVIDER_ICONS = {
 } satisfies Record<NonNullable<ReviewArtifactData["provider"]>, ArtifactGlyph>;
 
 /**
- * The glyph for one piece of reviewed work: the forge it lives on, or its kind when nothing recorded
- * a provider.
- *
- * <p>The label beside it already carries the kind — `PR #1423`, `MR !88`, `Issue #204`, `#deploys` —
- * so a second pull-request glyph would say the same thing twice and leave the reader no way to tell a
- * GitHub request from a GitLab one. The brand mark answers the question the words do not. The kind
- * icon remains the fallback rather than a blank, and both maps are shared: `artifactKindIcon` is the
- * one used by the artifact trace, and these are the same four brand marks the integrations console
- * and the sidebar draw.
+ * The provider's mark, falling back to the kind's. The label beside it already carries the kind
+ * (`PR #1423`, `MR !88`), so a kind glyph there would say the same thing twice and leave the reader
+ * no way to tell a GitHub request from a GitLab one.
  */
 export function reviewArtifactIcon(artifact: ReviewArtifactDisplay): ArtifactGlyph {
 	return artifact.provider ? PROVIDER_ICONS[artifact.provider] : artifactKindIcon(artifact.type);
@@ -108,12 +102,8 @@ export interface ReviewArtifactProps {
 }
 
 /**
- * Which piece of work this is, inline and unlinked: a mark and `repo · PR #1423`.
- *
- * <p>Never its title. The title is long, and every surface that shows one already has somewhere
- * better to put it — the run row uses it as the row's own name, the detail pages as the heading. The
- * old component carried it as an optional second line behind a `variant` prop, which is how it came
- * to be rendered inside a hover-underlined anchor.
+ * Never the work's title: it is long, and every surface that shows one already has somewhere better
+ * to put it — the run row uses it as the row's own name, the detail pages as the heading.
  */
 export function ReviewArtifactLabel({ artifact, className }: ReviewArtifactProps) {
 	if (!artifact) {
@@ -129,12 +119,8 @@ export function ReviewArtifactLabel({ artifact, className }: ReviewArtifactProps
 }
 
 /**
- * The same, as a link out to the forge — and only the label is underlined.
- *
- * <p>The product owner flagged twice that hovering this underlined the work's title as well. It did:
- * the anchor wrapped both the label and the title and carried `hover:underline`, so the affordance
- * covered text that was not the link's name. Now the anchor contains the label and nothing else, and
- * a caller that wants the title renders it outside.
+ * The anchor contains the label and nothing else, so a hover affordance can never reach text that is
+ * not the link's name. A caller that wants the work's title renders it outside.
  */
 export function ReviewArtifactLink({ artifact, className }: ReviewArtifactProps) {
 	if (!artifact?.url) {

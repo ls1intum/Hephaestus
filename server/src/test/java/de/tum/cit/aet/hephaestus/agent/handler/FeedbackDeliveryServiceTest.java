@@ -540,11 +540,8 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             assertThat(body.getValue()).contains("Fix stuff.");
         }
 
-        /**
-         * A draft is not a reason to withhold. Whether a draft occasions a review is decided once, by the
-         * practice's binding, before the job is ever submitted; suppressing here as well meant the review
-         * that the binding deliberately asked for ran and told nobody.
-         */
+        // A draft is not a reason to withhold: the binding already decided this was worth reviewing before
+        // the job was submitted, so suppressing here would silently drop feedback it asked for.
         @Test
         void deliversToADraftBecauseTheBindingAlreadyDecidedItWasWorthReviewing() {
             AgentJob job = createJob();

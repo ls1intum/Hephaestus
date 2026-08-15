@@ -26,17 +26,13 @@ flowchart TB
 Read that as a funnel with four exits, not a pipe with one. Most reviews that produce nothing exited
 somewhere above the last box, and which box it was is the only thing that tells you what to fix.
 
-:::note "Act 1–4" is not the name of anything
-Design conversations around this pipeline used "Act 1" through "Act 4" as shorthand. Do not carry it into
-code, commits, or docs: it means nothing to a reader who was not in the room, cannot be grepped for, and
-invites a fifth act. The stages are Occasion, Capture, Observation, Delivery.
-:::
+The stages are named Occasion, Capture, Observation and Delivery in code, in commits and on screen. Any other
+name for one of them — an act number, a phase letter, a sprint label — is ungreppable and invites a fifth.
 
 ## Refusal is the point
 
-The most consequential mistake this codebase has made, repeatedly, is answering a question from one stage
-with a vocabulary from another. **Each stage owns exactly one refusal vocabulary, and they are not
-interchangeable.**
+**Each stage owns exactly one refusal vocabulary, and they are not interchangeable.** Answering a question
+from one stage in another stage's words is the failure this table exists to prevent.
 
 | Stage | Refusal vocabulary | Lands in | Means |
 | --- | --- | --- | --- |
@@ -137,18 +133,11 @@ sentence.
 
 Every occurrence also records **how we came to know about it** — `DiscoveredVia` — which is a free health
 measurement rather than a routing decision. `SignalOrigins` maps it once onto `ObservationOrigin`, which is
-what later reads use to keep populations apart:
+what later reads use to keep populations apart. The glossary holds that mapping and the operator-facing
+label for each door: [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
 
-| `DiscoveredVia` | `ObservationOrigin` | Notes |
-| --- | --- | --- |
-| `EVENT` | `LIVE` | A provider told us as it happened |
-| `SYNC` | `LIVE` | Found while reconciling; see the caveat below |
-| `MANUAL` | `MANUAL` | A human asked. Self-selected, so never a trend against `LIVE` |
-| `BACKFILL` | `BACKFILL` | A confirmed campaign over work that already existed |
-| `SWEEP` | `LIVE` | A recurring schedule looking again at recent work |
-
-Five constants, but they do not line up one-to-one with the doors an operator sees, and assuming they do
-is a mistake the enum will not stop you making:
+Two things about it are facts about the code rather than about the vocabulary, so they live here. Neither
+is visible from the enum, and assuming otherwise is a mistake the enum will not stop you making:
 
 - **Three doors collapse into `MANUAL`.** `ManualReviewRequests` is the single recording site for both the
   `/hephaestus review` comment command (via `BotCommandProcessor`) and the *Review this now* button (via
@@ -181,25 +170,21 @@ valence, an assessment. `PracticeDetectionResultParser` force-nulls the assessme
 observation, so a detector that hedges and still attaches a strength cannot slip an unearned one into the
 series.
 
-`INCONCLUSIVE` means the evidence the practice needs *was* present and *was* read and does not settle the
-question. It is not "we could not look" — a missing, errored or governance-blocked source produces a
-readiness decision and **no observation at all**.
-
-The two valence-free presences are held to different costs on purpose. `NOT_APPLICABLE` is a claim about the
-work, so it must carry `evidence.inapplicability`: the sources read, what the practice looks for, and the
-fact about *this* change that rules it out. Without that it was the cheapest answer available — its citation
-proves nothing, unlike `PRESENT`'s — and uncertainty drained into it, which writes "nothing to see" into a
-person's record on a change where there was something to see. The rule is enforced twice, in the in-sandbox
-normalizer and again at server-side delivery, for the same reason the citation and recorded-search rules are:
-the sandbox guard runs inside the thing it is checking.
+The glossary defines what each presence claims and what `NOT_APPLICABLE` has to carry to be allowed to claim
+it — see [Outcome states](./practice-review-glossary.mdx#outcome-states). Two facts belong to this stage
+rather than to that vocabulary. `INCONCLUSIVE` is not "we could not look": a missing, errored or
+governance-blocked source produces a readiness decision in the Capture stage and **no observation at all**.
+And the `NOT_APPLICABLE` grounding rule is enforced twice, in the in-sandbox normalizer and again at
+server-side delivery, for the same reason the citation and recorded-search rules are — the sandbox guard runs
+inside the thing it is checking.
 
 Identity is assigned at persistence, not by the detector: an occurrence key dedupes within a run
 (`insertIfAbsent`, `ON CONFLICT DO NOTHING`), and a recurrence key hashes the locus so the same observation
 is recognisable across runs.
 
 **Guidance is authored inline by the detector, and Delivery is not where wording is decided.**
-`DeliveryComposer`'s own contract says so: *"The `reasoning` and `guidance` on a finding are written by the
-detector, not by this class; this renderer only sanitises and lays them out."* The composer reads
+`DeliveryComposer`'s own contract says so: an observation's reasoning and guidance are written by the
+detector, and the renderer only sanitises and lays them out. The composer reads
 `guidance()` and never writes one. There is exactly one delivery-time-authored layer — the catalogue's
 transferable principle (`Practice.whyItMatters`), which the server supplies verbatim precisely because the
 model is told not to write it and so cannot fabricate or drift it. If feedback reads badly, the prompt and
@@ -212,7 +197,27 @@ sent. A withheld observation is written to the ledger as `SUPPRESSED` with a rea
 saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation.
 
 Three gates decide admission, and they are ANDed. `FeedbackAdmission.delivers(origin, tier, reach, channel)`
-is the single place they meet, so a new channel, tier, reach or origin has one place to be reasoned about:
+is the single place they meet, so a new channel, tier, reach or origin has one place to be reasoned about.
+Note where the resolution happens: only the tier is inherited, and it is resolved before the conjunction,
+never inside it.
+
+```mermaid
+flowchart LR
+    P["practice.review_tier"] -->|null| A["area.review_tier"]
+    A -->|null| W["workspace default"]
+    W -->|null| D["DELIVER"]
+    P --> T{{"effective tier"}}
+    A --> T
+    W --> T
+    D --> T
+    T --> AND{"all three say yes?"}
+    R["workspace feedback reach"] --> AND
+    O["observation origin"] --> AND
+    AND -->|no| Q["SUPPRESSED, with the reason"]
+    AND -->|yes| S["composed and sent"]
+```
+
+
 
 - **`PracticeReviewTier`** — how much autonomy the system has over this practice: `OFF`, `PROPOSE`,
   `DELIVER`. Only `DELIVER` delivers. `PROPOSE` runs the review and records every observation, and those
@@ -231,7 +236,7 @@ unit, and an ArchUnit rule (`ProfileChannelUnwrittenArchTest`) keeps it that way
 classes permitted to name the constant. The consequence is the one worth remembering: a backfill
 observation is entitled only to a channel with no producer, so it is measured and never delivered — by
 construction, not by configuration. `BACKFILL_QUIET` is deliberately distinct from `PRACTICE_TIER_QUIET`
-because a tier is a dial an admin can turn and this one lifts only when a profile surface ships.
+because a tier is a dial an admin can turn and this is not one.
 
 The full suppression vocabulary lives on `FeedbackSuppressionReason`, which also carries one deprecated
 constant (`ARTIFACT_DRAFT`) kept only so old rows still read back.

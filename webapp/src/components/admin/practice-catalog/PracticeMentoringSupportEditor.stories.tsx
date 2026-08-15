@@ -17,11 +17,6 @@ const meta = {
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	/**
-	 * The editor is controlled, so with only `fn()` behind `onChange` none of it could be operated:
-	 * picking a mode, typing the reason human review is needed, or adding a limitation all left the
-	 * form exactly as the args set it.
-	 */
 	render: (args) => (
 		<Stateful initial={args.value}>
 			{(value, setValue) => (
@@ -43,10 +38,6 @@ type Story = StoryObj<typeof meta>;
 
 export const AiSupported: Story = {};
 
-/**
- * The reason a practice needs a human is its own field, not the first known limitation, so both are
- * editable at once and the limitation list is complete.
- */
 export const HumanReviewReasonIsNotALimitation: Story = {
 	args: {
 		value: {
@@ -87,7 +78,7 @@ export const GuidanceOnly: Story = {
 	},
 };
 
-/** AI review unavailable on this instance: the choice is disabled, not silently reinterpreted. */
+/** The choice is disabled rather than silently reinterpreted as one the instance supports. */
 export const AiReviewUnavailable: Story = {
 	args: { supportedAutomatedReviewModes: [] },
 	play: async ({ canvas }) => {

@@ -187,8 +187,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     /**
      * Beans that must wire <em>unconditionally</em> (no {@code @ConditionalOnProperty}): mentoring
      * is always-on; per-workspace enablement lives in the DB ({@code WorkspaceFeatures.mentor_enabled}),
-     * not in a capability flag. These previously carried a (now-removed) {@code hephaestus.sandbox.enabled}
-     * gate — see the group-1 config-cohesion change.
+     * not in a capability flag.
      */
     private static final List<String> UNCONDITIONAL_MENTOR_BEANS = List.of(
         "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatService",

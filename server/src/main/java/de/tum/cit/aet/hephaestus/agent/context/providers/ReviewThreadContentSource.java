@@ -87,9 +87,8 @@ public class ReviewThreadContentSource implements EvidenceSource {
         try {
             AgentJob job = pr.job();
             JsonNode m = job.getMetadata();
-            // A job routed here without its keying identifier is malformed, not a pull request that
-            // happens to have no review threads. Reporting the second lets the model read a
-            // collection gap as an established fact.
+            // Missing metadata is a malformed job, not a PR with no review threads — the two must not
+            // collapse into the same "collection found nothing" fact.
             if (m == null || m.isNull() || m.isMissingNode()) {
                 throw new EvidenceCollectionException("Review-thread collection has no job metadata", null);
             }

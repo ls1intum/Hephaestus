@@ -45,7 +45,6 @@ describe("paging a filtered list", () => {
 	it("leaves the first page out of the URL rather than writing page=0", async () => {
 		await renderAtPage(1);
 
-		// A `page=0` in a shared link is noise, and the schema's default already means the first page.
 		expect((await screen.findByRole("link", { name: "Go to page 1" })).getAttribute("href")).toBe(
 			"/w/demo/reviews?kind=scm.issue",
 		);

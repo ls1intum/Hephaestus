@@ -41,8 +41,8 @@ const EVIDENCE_ROLE_OPTIONS = [
 		label: "Context",
 		selected: "bg-secondary text-secondary-foreground hover:bg-secondary",
 	},
-	// Off is the answer on most of a work type's sources, and a filled black pill on every one of
-	// them shouts the baseline and hides the two or three that are on. It is marked, not shouted.
+	// Off is the answer on most sources, so it is marked rather than shouted: a filled pill on the
+	// majority would hide the few that are on.
 	{ value: "NOT_USED", label: "Off", selected: "bg-muted text-foreground hover:bg-muted" },
 ] satisfies Array<{
 	value: Exclude<EvidenceRole, "EXHAUSTIVE">;
@@ -61,24 +61,14 @@ export interface PracticeEvidenceEditorProps {
 	onChange: (needs: PracticeEvidenceRequirement[]) => void;
 	/** Prefix for control ids, so a form-level error can send focus into the right occasion. */
 	idPrefix: string;
-	/**
-	 * Appended to every group's accessible name. Repeated occasions otherwise present identically
-	 * named groups, and a screen-reader user cannot tell which one they are in.
-	 */
+	/** Appended to every group's accessible name, since occasions present identically named groups. */
 	occasionLabel: string;
 	disabled?: boolean;
 	invalid?: boolean;
 	errorId?: string;
 }
 
-/**
- * What one occasion reads, as chips over a grouped set of one-line choices.
- *
- * <p>The panel used to open on a flat list of eleven cards, each carrying a title, a badge, a sentence
- * of prose and three radios — a wall of text for a decision that is one word per source. The words are
- * still all here; they are just not all shouting at once. Collapsed, the answer is the chips. Open, a
- * source is a line: its name, what it is, and a three-way switch.
- */
+/** What one occasion reads: collapsed, the answer is the chips; open, a source is one line. */
 export function PracticeEvidenceEditor({
 	options,
 	needs,
@@ -92,8 +82,8 @@ export function PracticeEvidenceEditor({
 	// Open from the start when this occasion is already invalid: such a form never crosses the
 	// transition below, and the fix is not reachable from the collapsed summary.
 	const [open, setOpen] = useState(invalid);
-	// Reveal it on the transition into invalid rather than on the flag, which stays true while the
-	// author fixes it — an editor re-opening under the caret on every keystroke would be unusable.
+	// On the transition into invalid, not on the flag, which stays true while the author fixes it —
+	// an editor re-opening under the caret on every keystroke would be unusable.
 	// https://react.dev/learn/you-might-not-need-an-effect
 	const [lastInvalid, setLastInvalid] = useState(invalid);
 	if (invalid !== lastInvalid) {
@@ -233,8 +223,7 @@ function SourceRow({
 		<li className={cn("flex flex-wrap items-start gap-x-4 gap-y-2 p-2.5", inUse && "bg-muted/40")}>
 			<div className="min-w-0 flex-1 basis-56">
 				<p className="text-sm font-medium">{source.displayName}</p>
-				{/* Two lines is enough for every source the catalogue ships and bounds the height of a
-				    list that is otherwise eleven paragraphs long. */}
+				{/* Clamped: the list is one line per source, and a source's own prose is not. */}
 				<p className="line-clamp-2 text-xs text-muted-foreground">{source.description}</p>
 				{inUse && quality && <p className="mt-0.5 text-xs text-muted-foreground">{quality}</p>}
 				<AbsenceClaim
@@ -245,11 +234,9 @@ function SourceRow({
 					onRoleChange={onRoleChange}
 				/>
 			</div>
-			{/* A segmented control drawn on radios rather than on the toggle group, on semantics alone:
-			    the three roles are mutually exclusive and exactly one always holds, which is what a radio
-			    group *means*. A toggle group is a set of independently pressed buttons that this screen
-			    would then have to stop from all being off at once, and a reader would hear three
-			    pressable things rather than one choice with three answers. */}
+			{/* Radios, not the toggle group, on semantics: the roles are mutually exclusive and exactly
+			    one always holds, which is what a radio group means. A toggle group is independently
+			    pressed buttons, which this would then have to stop from all being off at once. */}
 			<RadioGroup
 				className="flex w-fit shrink-0 gap-0 overflow-hidden rounded-lg border"
 				disabled={disabled}
@@ -271,8 +258,7 @@ function SourceRow({
 							disabled && "cursor-not-allowed opacity-70",
 						)}
 					>
-						{/* Clipped, not replaced: the radio keeps its role, its arrow-key navigation and its
-						    accessible name, and the label it is bound to is what a reader clicks. */}
+						{/* Clipped, not replaced: the radio keeps its role, arrow-key navigation and name. */}
 						<span className="sr-only">
 							<RadioGroupItem
 								id={`${controlId}-${option.value}`}
@@ -315,10 +301,8 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
 				aria-describedby={claimed ? consequenceId : undefined}
 			/>
-			{/* Label and description as siblings inside `FieldContent`, the kit's own anatomy. Nested, the
-			    description put a `<p>` inside a `<label>` — invalid, its content model is phrasing content
-			    — and ran into the checkbox's accessible name, so the box announced itself as the claim
-			    plus the paragraph explaining what the claim costs. The consequence is a description. */}
+			{/* Label and description are siblings, never nested: a `<label>` takes phrasing content only,
+			    and a description inside it joins the checkbox's accessible name. */}
 			<FieldContent>
 				<FieldLabel htmlFor={checkboxId} className="text-xs font-normal">
 					Can say what is missing from {source.displayName}

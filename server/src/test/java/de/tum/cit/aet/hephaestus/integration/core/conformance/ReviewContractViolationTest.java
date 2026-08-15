@@ -33,10 +33,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Deliberately broken integrations, one per rule, each asserted by the words it fails with.
  *
- * <p>A validator nobody has watched fail is a validator that might not run. These fixtures also pin the
- * <em>messages</em>, not just the throw: an operator reading a refused boot has to be told which
- * declaration is wrong and what would fix it, and a message that degrades to "validation failed" is a
- * regression even though every assertion on the exception type would still pass.
+ * <p>These fixtures pin the <em>messages</em>, not just the throw: an operator reading a refused boot has
+ * to be told which declaration is wrong and what would fix it.
  */
 class ReviewContractViolationTest extends BaseUnitTest {
 
@@ -58,8 +56,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
 
         @Test
         void claimingASignalNoEventOfYoursProducesIsRefused() {
-            // The aspirational-signal check. The descriptor declares the signal, but only some other
-            // vendor's event raises it, so this integration claiming it would be a promise it cannot keep.
+            // The descriptor declares the signal, but only some other vendor's event raises it.
             ArtifactDescriptor foreign = FixtureIntegration.descriptor(
                 List.of(
                     new Signal(
@@ -168,8 +165,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
 
         @Test
         void anUnreviewableKindWithLanesIsRefused() {
-            // A content source is a legitimate thing to be; a content source with a feedback lane is a
-            // declaration nothing would ever act on.
+            // A content source with a feedback lane is a declaration nothing would ever act on.
             assertThat(
                 validateDescriptors(
                     FixtureIntegration.descriptor(
@@ -187,9 +183,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
         @Test
         @DisplayName("a reviewable kind nothing can run a review of is refused")
         void aReviewableKindWithNoWayToExecuteIsRefused() {
-            // The one shape every other check here passes: a descriptor, a context builder, a role, a
-            // lane, its limitations — and no job type, no handler, no submitter. A practice bound to such
-            // a kind reads as live in the catalog and fires never.
+            // A practice bound to such a kind would read as live in the catalog and fire never.
             ReviewContractValidator validator = new ReviewContractValidator(
                 new ArtifactDescriptorRegistry(List.of(FixtureIntegration.descriptor())),
                 new IntegrationMessageHandlerRegistry(List.of()),
@@ -228,11 +222,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * A kind that admits a review somebody asks for by hand has to be able to record the ask. Each rule here
-     * stops a failure that would otherwise be silent — a vanished request, a consumed event occasion, or a
-     * healthy workspace reported as having a broken producer.
-     */
+    /** A kind that admits a review somebody asks for by hand has to be able to record the ask. */
     @Nested
     class RequestSignalsMustBeRecordable {
 
@@ -374,8 +364,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
 
     @Test
     void theBootstrapRefusesToStartAndNamesTheOffendingDeclaration() {
-        // End to end: the review contract is enforced by the same fail-fast the capability checks use, so a
-        // bad contribution stops a boot rather than being reported somewhere nobody reads.
+        // End to end: a bad contribution stops a boot rather than being reported somewhere nobody reads.
         IntegrationFrameworkBootstrap bootstrap = new IntegrationFrameworkBootstrap(
             new IntegrationManifestRegistry(
                 List.of(

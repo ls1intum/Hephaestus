@@ -29,33 +29,18 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ul>
  *   <li><b>Quiescence</b> — no new message for {@value #QUIESCENCE_MINUTES} minutes (the thread has settled).</li>
  *   <li><b>Depth</b> — at least {@value #MIN_HUMAN_TURNS} non-tombstoned turns (a real exchange, not a one-liner).</li>
- *   <li><b>Growth</b> — at least {@value #MIN_GROWTH} new non-tombstoned turns since {@code slack_thread.last_reviewed_ts}
- *       (the watermark), so a re-sweep with no fresh human turn past the watermark enqueues nothing.</li>
+ *   <li><b>Growth</b> — at least {@value #MIN_GROWTH} new non-tombstoned turns since
+ *       {@code slack_thread.last_reviewed_ts} (the watermark), so a re-sweep with no fresh human turn past
+ *       the watermark enqueues nothing.</li>
  * </ul>
  *
- * <p>The watermark is advanced to the thread's newest {@code ts} only <em>after</em> a job is enqueued. Cooldown
- * is keyed on the thread + subject alone (via the idempotency-key prefix, freshness stripped by
- * {@code AgentJobService#extractCooldownKeyPrefix}), NOT on {@code threadId + lastTs}, so a late reply does not
- * immediately re-fire — only genuine growth past the watermark does.
+ * <p>Cooldown is keyed on the thread + subject alone, NOT on {@code threadId + lastTs}, so a late reply does
+ * not immediately re-fire — only genuine growth past the watermark does. The gates stay in front of the
+ * ledger rather than being replaced by the occurrence's identity: identity moves on a single new turn but
+ * {@link #MIN_GROWTH} requires two, so dedup alone would quietly raise how often conversations get reviewed.
  *
- * <h2>Every decision reaches the ledger</h2>
- * <p>A thread that passes the gates is recorded as one {@code chat.conversation_thread.settled} occurrence
- * before anything is submitted, and {@link ConversationReviewSubmitter} settles that row with what came of
- * it. Submitting with no signal key would put conversations outside everything the ledger provides: no row
- * for the artifact trace to explain a silence with, no reaper coverage for a thread refused because a
- * budget was exhausted, and nothing in the "how many reviews did this instance not run, and why" answer.
- *
- * <p>The three gates stay <em>in front of</em> the ledger rather than being replaced by the occurrence's
- * identity. They are not the same rule: the identity moves on a single new turn and {@link #MIN_GROWTH}
- * requires two, so recording every gate-passing candidate and letting the digest dedup would quietly
- * raise how often conversations are reviewed — a step in the rate that is indistinguishable, later, from
- * a change in how teams talk. Recording only what the gates admit also keeps the ledger a record of
- * occasions rather than of every sweep tick.
- *
- * <p><b>Tenancy &amp; ownership.</b> The scheduler owns none of the Slack schema: candidate scan, turn counts,
- * and watermark advance go through the agent-owned {@link ConversationCandidateSource} SPI implemented by
- * {@code integration.slack}, keeping the edge one-way (no bounded-context cycle) and raw {@code slack_*} SQL
- * out of the agent.
+ * <p>A thread that passes the gates is recorded as one {@code chat.conversation_thread.settled} occurrence,
+ * so a thread passed over leaves a reason behind instead of silent nothing.
  */
 @ConditionalOnServerRole
 @Component
@@ -69,13 +54,10 @@ public class ConversationThreadTriggerScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadTriggerScheduler.class);
 
-    /** Quiescence window: a thread is a candidate only once it has been silent this long. */
     static final int QUIESCENCE_MINUTES = 10;
 
-    /** Minimum non-tombstoned turns for a thread to be worth reviewing at all. */
     static final int MIN_HUMAN_TURNS = 4;
 
-    /** Minimum NEW non-tombstoned turns since the watermark for a re-review to fire. */
     static final int MIN_GROWTH = 2;
 
     private final ConversationCandidateSource candidateSource;
@@ -84,10 +66,8 @@ public class ConversationThreadTriggerScheduler {
     private final TransactionTemplate transactionTemplate;
 
     /**
-     * Capability flag, available by default. When {@code false} the sweep no-ops, keeping the conversation-detection
-     * subsystem dormant in lockstep with
-     * {@link de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService}'s channel-ingest gate. Bound from
-     * {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+     * When {@code false} the sweep no-ops, keeping conversation detection dormant in lockstep with
+     * {@link de.tum.cit.aet.hephaestus.integration.slack.events.SlackIngestService}'s channel-ingest gate.
      */
     private final boolean conversationIngestEnabled;
 
@@ -136,10 +116,7 @@ public class ConversationThreadTriggerScheduler {
                 continue;
             }
             // The occurrence goes into the ledger BEFORE anything is submitted, and the ledger's own
-            // uniqueness decides whether this sweep is the one that acts on it. That is what makes a
-            // conversation review explainable at all: until now this path submitted with no signal key,
-            // so a thread that was passed over left nothing behind saying why, and the artifact trace —
-            // whose whole job is that silence always has a reason — could not see chat at all.
+            // uniqueness decides whether this sweep is the one that acts on it.
             SignalKey key = ChatSignals.threadSettledKey(
                 c.workspaceId(),
                 c.threadId(),
@@ -149,9 +126,8 @@ public class ConversationThreadTriggerScheduler {
             );
             boolean ours = transactionTemplate.execute(status -> signalRecorder.record(key, now, DiscoveredVia.SYNC));
             if (!Boolean.TRUE.equals(ours)) {
-                // Another sweep already decided this exact occurrence. Not a race guard bolted on: the
-                // gates above run on counts read a moment ago, so two overlapping sweeps genuinely can
-                // agree that the same thread is ready.
+                // Another sweep already decided this exact occurrence — the gates run on counts read a
+                // moment ago, so two overlapping sweeps genuinely can agree the same thread is ready.
                 continue;
             }
             long started = submitter.submitAndSettle(c, key);
@@ -172,11 +148,7 @@ public class ConversationThreadTriggerScheduler {
         return enqueued;
     }
 
-    /**
-     * Pure gate predicate (unit-tested directly). A thread is ready when it has settled ({@code quiescenceMinutes}
-     * of silence past its newest {@code ts}), has at least {@code minHumanTurns} live turns, and has grown by at
-     * least {@code minGrowth} live turns since the watermark.
-     */
+    /** Pure gate predicate, unit-tested directly. */
     static boolean passesGates(
         Instant now,
         @Nullable String lastTs,

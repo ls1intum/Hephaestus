@@ -29,9 +29,8 @@ const WORKSPACE_URL = "*/workspaces/:workspaceSlug";
 const AGENTS_URL = "*/workspaces/:workspaceSlug/agents";
 
 /**
- * Every request all three sections can make. Listed once, because the tabs are the point: a story
- * that only stubbed the open section would pass for the wrong reason the moment a panel stopped
- * unmounting.
+ * Every request all three sections can make: stubbing only the open section would pass for the
+ * wrong reason the moment a panel stopped unmounting.
  */
 const handlers = (overrides: { workspace?: object; agents?: unknown[] } = {}) => [
 	http.get(WORKSPACE_URL, () => HttpResponse.json({ ...workspace, ...overrides.workspace })),
@@ -64,12 +63,8 @@ const meta = {
 		overridesOnly: false,
 		onOverridesOnlyChange: fn(),
 	},
-	/**
-	 * The tabs and the scope switch are controlled — the route puts both in the URL. With `fn()` behind
-	 * them and a fixed `section`, clicking another tab never changed panel, so the one thing this
-	 * screen is (three sections behind three tabs) could not be seen in any story but the one that
-	 * named each section in its args.
-	 */
+	// The tab and the scope switch are controlled by the route's URL state, so a story has to write
+	// the change back for either of them to move.
 	render: (args) => (
 		<StatefulPatch initial={{ section: args.section, overridesOnly: args.overridesOnly }}>
 			{(view, patch) => (
@@ -94,10 +89,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The model binding is read out above the ladder because it is the precondition for every tier below
- * it — and read-only, because AI models owns it.
- */
 export const HowMuch: Story = {
 	play: async ({ canvas }) => {
 		await expect(
@@ -125,14 +116,12 @@ export const WhenAndWhere: Story = {
 		await expect(
 			await canvas.findByRole("heading", { name: "Practice review status" }, { timeout: 5000 }),
 		).toBeVisible();
-		// Moved out of "past work": a standing check over recent work is a trigger, not a campaign
-		// over history, and filing it under past work put a permanent setting behind a one-off heading.
+		// A standing check over recent work is a trigger, not a campaign over history.
 		await expect(canvas.getByRole("heading", { name: "Keep checking new work" })).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
 
-/** The one-off campaign, alone — the recurring check that used to share this page has moved. */
 export const PastWork: Story = {
 	args: { section: "past-work" },
 	play: async ({ canvas }) => {
@@ -146,10 +135,6 @@ export const PastWork: Story = {
 	},
 };
 
-/**
- * Every section below is a plausible-looking set of controls that does nothing while the workspace
- * switch is off, and each of them looks like it is working. The header is where that is said once.
- */
 export const ReviewsAreOff: Story = {
 	parameters: { msw: { handlers: handlers({ workspace: { practicesEnabled: false } }) } },
 	play: async ({ canvas }) => {
@@ -163,7 +148,6 @@ export const ReviewsAreOff: Story = {
 	},
 };
 
-/** On, but with nothing to run on — the other half of "is this workspace reviewing anything". */
 export const NoModelIsReady: Story = {
 	parameters: { msw: { handlers: handlers({ agents: [] }) } },
 	play: async ({ canvas }) => {
@@ -182,12 +166,9 @@ export const NoModelIsReady: Story = {
 };
 
 /**
- * Real tab semantics, not three links dressed as tabs.
- *
- * `role="tablist"` is what buys a screen reader "tab 1 of 3" and the whole list as one arrow-key
- * stop instead of three tab stops — and each panel is named by the tab that opens it, so the reader
- * who follows one knows where they landed. Every accessible name is the visible label exactly, which
- * is what lets a voice-control user say "When and where" and mean this control (WCAG 2.5.3).
+ * `role="tablist"` is what buys a screen reader the position announcement and the whole list as one
+ * arrow-key stop instead of a tab stop each. Every accessible name is the visible label exactly,
+ * which is what lets a voice-control user say "When and where" and mean this control (WCAG 2.5.3).
  */
 export const SectionsAreRealTabs: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
@@ -199,7 +180,7 @@ export const SectionsAreRealTabs: Story = {
 				.getAllByRole("tab")
 				.map((tab) => tab.textContent),
 		).toEqual(["How much", "When and where", "Past work"]);
-		// Only the open section is in the document, which is what keeps the other two sections' queries
+		// Only the open section is in the document, which is what keeps the other sections' queries
 		// from firing and the autonomy strip from sticking over a panel nobody opened.
 		await expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
 

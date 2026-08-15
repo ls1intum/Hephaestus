@@ -9,13 +9,9 @@ import org.jspecify.annotations.Nullable;
 /**
  * Audit snapshot of a campaign.
  *
- * <p>Carries the estimate as well as the scope on purpose: the question this trail has to answer is not
- * only "what did they authorise" but "what were they told it would cost when they authorised it". An
- * estimate that only lives on the confirmation screen is not evidence of anything afterwards.
- *
- * <p>And the discovery mode, because a nightly sweep and a hand-scoped campaign are the same row type
- * with the same estimate and very different accountability: one was authorised tonight, the other once,
- * months ago, by whoever created the schedule.
+ * <p>Carries the estimate alongside the scope so the trail records not just what was authorised but what
+ * it was estimated to cost when authorised, and the discovery mode because a nightly sweep and a
+ * hand-scoped campaign share this row shape but carry different accountability.
  */
 record ReviewBackfillSnapshot(
     String artifactKind,

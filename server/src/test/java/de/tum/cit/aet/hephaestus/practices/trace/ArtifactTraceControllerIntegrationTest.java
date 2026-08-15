@@ -113,11 +113,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
                 .isOk();
         }
 
-        /**
-         * The ledger, not the mirror, decides what a workspace may see. Another tenant's artifact id has
-         * no row here, so it is indistinguishable from work nothing was ever recorded about — which is
-         * both the safe answer and the true one.
-         */
+        /** The ledger, not the mirror, decides visibility: another tenant's artifact id has no row here. */
         @Test
         @WithUser
         void hidesAnArtifactOnlyAnotherWorkspaceRecorded() {
@@ -140,13 +136,9 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
     class Answers {
 
         /**
-         * Four practices, four different answers, on a workspace with no SCM connection registered — the
-         * state a half-onboarded workspace is really in.
-         *
-         * <p>{@code dormant} watches something no connected integration raises and that has never arrived,
-         * so it is reported as waiting. {@code not-admitted} watches the very signal in the ledger, so it
-         * is <em>not</em> reported as waiting even though coverage would say so: the recorded occurrence
-         * refutes the claim.
+         * {@code dormant} watches a signal no connected integration raises, so it is reported as waiting.
+         * {@code not-admitted} watches the very signal in the ledger, so it is <em>not</em> reported as
+         * waiting even though coverage would say so: the recorded occurrence refutes the claim.
          */
         @Test
         @WithMentorUser

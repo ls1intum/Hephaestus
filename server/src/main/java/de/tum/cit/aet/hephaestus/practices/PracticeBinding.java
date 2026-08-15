@@ -21,17 +21,15 @@ import org.jspecify.annotations.Nullable;
 /**
  * One occasion on which a practice is reviewed, and the evidence a review occasioned that way needs.
  *
- * <p>Evidence sits on the occasion rather than on the practice because <em>what a review needs is a
- * function of what occasioned it</em>: reviewed at merge, a practice may have to establish that no
- * decision was ever recorded; reviewed at open, the same practice only reads what is in front of it.
- * It is also the only shape in which one practice can watch both sides of a question, with a binding
- * and its own evidence on each side. Evidence named once and shared across practices was rejected: it
- * made adding a source to one practice a mutation invisible in that practice's diff.
+ * <p>Evidence sits on the occasion rather than on the practice because what a review needs is a
+ * function of what occasioned it: reviewed at merge, a practice may have to establish that no decision
+ * was ever recorded; reviewed at open, the same practice only reads what is in front of it. Evidence
+ * named once and shared across practices was rejected: it made adding a source to one practice a
+ * mutation invisible in that practice's diff.
  *
  * @param signals  the signals that occasion this review; at least one, and all of one artifact kind
- * @param needs    the sources a review occasioned this way reads, with the stance it takes to each
- * @param onDrafts whether an artifact still marked draft occasions this review; defaults to false,
- *                 because most practices judge work that has been handed over
+ * @param onDrafts whether a draft artifact occasions this review; defaults to false since most
+ *                 practices judge work that has been handed over
  */
 @Schema(description = "An occasion that starts a review, and the evidence that review reads")
 public record PracticeBinding(
@@ -48,11 +46,8 @@ public record PracticeBinding(
     boolean onDrafts
 ) {
     /**
-     * Reads a binding that does not mention drafts at all.
-     *
-     * <p>The component is a primitive, and Jackson will not default a primitive from an absent key.
-     * Without this, every binding in the catalog and every posted binding would have to spell out
-     * {@code "onDrafts": false}.
+     * Reads a binding that omits {@code onDrafts}: Jackson will not default a primitive from an absent
+     * key, so without this every binding would have to spell out {@code "onDrafts": false}.
      */
     @JsonCreator
     static PracticeBinding fromJson(
@@ -64,8 +59,8 @@ public record PracticeBinding(
     }
 
     public PracticeBinding {
-        // Sorted and de-duplicated, as the needs list below is: both are digested into the review-rule
-        // fingerprint, so the same binding written in a different order must not read as a second rule.
+        // Sorted and de-duplicated: both lists are digested into the review-rule fingerprint, so the
+        // same binding written in a different order must not read as a second rule.
         signals = List.copyOf(
             new LinkedHashSet<>(
                 Objects.requireNonNull(signals, "signals")
@@ -118,11 +113,9 @@ public record PracticeBinding(
     }
 
     /**
-     * Whether this binding is about this kind of work at all, whatever occasioned the review.
-     *
-     * <p>The question a review somebody asked for by hand asks. Such a request names no narrower occasion —
-     * it is "look at this now" — so matching it against the binding's signals would find nothing, because no
-     * practice binds a request signal and none should have to.
+     * Whether this binding is about this kind of work at all, whatever occasioned the review. Used for a
+     * manually requested review: it names no narrower occasion, so matching its signal would find
+     * nothing.
      */
     public boolean appliesTo(ArtifactKind kind) {
         return artifactKind().equals(kind);
@@ -137,11 +130,9 @@ public record PracticeBinding(
     }
 
     /**
-     * The evidence a review of these practices occasioned by {@code signal} reads.
-     *
-     * <p>A {@code null} signal means nobody named an occasion (an explicit ask, or a replay with no
-     * ledger row). Every binding then contributes: narrowing silently to one binding's evidence would
-     * answer a narrower question than the one asked.
+     * The evidence a review of these practices occasioned by {@code signal} reads. A {@code null} signal
+     * means nobody named an occasion (an explicit ask, or a replay with no ledger row), so every binding
+     * contributes.
      */
     public static List<PracticeEvidenceRequirement> needsFor(
         List<PracticeBinding> bindings,

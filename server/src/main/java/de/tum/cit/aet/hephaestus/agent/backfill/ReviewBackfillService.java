@@ -175,10 +175,9 @@ public class ReviewBackfillService {
      * gave it. A paused run is confirmable again, which is how an admin restarts one that stopped on an
      * exhausted budget without waiting for the driver's own retry.
      *
-     * <p>Retried on an optimistic-lock failure rather than reported. The only contender is the driver's
-     * own save mid-batch; that transaction has already rolled back, so a retry re-reads a settled row
-     * and decides against current state. Reporting the conflict instead would fail the cancel button
-     * exactly while a campaign is spending — the one moment it has to work.
+     * <p>Retried on an optimistic-lock failure rather than reported: the only contender is the driver's own
+     * save mid-batch, and reporting that conflict would fail the cancel button exactly while a campaign is
+     * spending — the one moment it has to work.
      */
     @Retryable(includes = { OptimisticLockingFailureException.class }, maxRetries = 3, delay = 50)
     @Transactional

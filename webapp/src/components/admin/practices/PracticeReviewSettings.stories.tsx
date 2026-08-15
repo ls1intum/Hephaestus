@@ -118,10 +118,6 @@ export const ReviewRoleOnly: Story = {
 	},
 };
 
-/**
- * Both ways in switched off is the state where practice reviews are "on" and nothing can ever start
- * one. The status line has to say that outright, or the page reads as working.
- */
 export const TriggersOff: Story = {
 	args: {
 		workspace: { ...workspace, autoTriggerEnabled: false, manualTriggerEnabled: false },
@@ -131,10 +127,6 @@ export const TriggersOff: Story = {
 	},
 };
 
-/**
- * One switch, four doors. Naming only `/hephaestus review` promised a GitHub workspace a command
- * only GitLab publishes, and hid that the same switch stops backfills and recurring checks.
- */
 export const RequestedReviewsNamesEveryDoor: Story = {
 	play: async ({ canvas }) => {
 		const requested = canvas.getByRole("switch", { name: "Reviews somebody asks for" });
@@ -144,7 +136,7 @@ export const RequestedReviewsNamesEveryDoor: Story = {
 		await expect(description).toHaveTextContent("Review this now");
 		await expect(description).toHaveTextContent("backfill of past work");
 		await expect(description).toHaveTextContent("recurring check");
-		// Scoped to the provider that publishes the comment event, not promised to every workspace.
+		// Only GitLab publishes the comment event, so the copy must not promise it everywhere.
 		await expect(description).toHaveTextContent("GitLab merge request comment");
 	},
 };
@@ -201,7 +193,6 @@ export const AddingATargetBranch: Story = {
 	},
 };
 
-/** Enter is how a list like this is filled, so it must add the entry without using the button. */
 export const EnterAddsTheEntry: Story = {
 	args: { policy: { ...policy, onUpdate: fn() } },
 	play: async ({ args, canvas }) => {
@@ -213,10 +204,7 @@ export const EnterAddsTheEntry: Story = {
 	},
 };
 
-/**
- * A repeated entry cannot be added, and saying so has to reach the input itself: the Add button
- * greying out announces nothing.
- */
+/** Saying so has to reach the input itself: the Add button greying out announces nothing. */
 export const RefusingADuplicate: Story = {
 	args: {
 		policy: {
@@ -233,7 +221,6 @@ export const RefusingADuplicate: Story = {
 		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
 		await expect(canvas.getByRole("button", { name: "Add to target branches" })).toBeDisabled();
 
-		// Enter is refused on the same terms rather than sending a duplicate the server would reject.
 		await userEvent.type(input, "{Enter}");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
@@ -259,10 +246,7 @@ export const RemovingATargetBranch: Story = {
 	},
 };
 
-/**
- * Widening back to everything is a reset rather than an empty save, and the words on the control open
- * its accessible name so a voice-control user can activate what they can read (WCAG 2.2 SC 2.5.3).
- */
+/** Widening back to everything is a reset rather than an empty save. */
 export const WideningTheScopeAgain: Story = {
 	args: {
 		policy: {
@@ -282,10 +266,6 @@ export const WideningTheScopeAgain: Story = {
 	},
 };
 
-/**
- * The cooldown is saved on the way out of the field rather than on every keystroke, so leaving it
- * alone has to be silent and leaving it changed has to save.
- */
 export const ChangingTheTimeBetweenReviews: Story = {
 	args: { policy: { ...policy, onUpdate: fn() } },
 	play: async ({ args, canvas }) => {
@@ -305,8 +285,8 @@ export const ChangingTheTimeBetweenReviews: Story = {
 };
 
 /**
- * A number outside the range stays in the field. `aria-invalid` says only *that* something is wrong,
- * so the field also points at the sentence that says what would be right (WCAG 2.2 SC 3.3.1).
+ * `aria-invalid` says only *that* something is wrong, so the field also points at the sentence that
+ * says what would be right (WCAG 2.2 SC 3.3.1).
  */
 export const RefusingATimeOutsideTheRange: Story = {
 	args: { policy: { ...policy, onUpdate: fn() } },

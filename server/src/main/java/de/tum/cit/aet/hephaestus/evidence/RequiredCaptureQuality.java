@@ -4,16 +4,12 @@ package de.tum.cit.aet.hephaestus.evidence;
  * What a practice is asking for when it requires this source — a fact about the source, not about the
  * practice that names it.
  *
- * <p>Stated once per source rather than once per practice that names it. Every shipped practice agrees
- * on the answer for a given source, and {@code EvidencePolicyRedundancyTest} measures that uniformity
- * rather than assuming it — which is what makes one axis here a simplification and not a loss of
- * expressiveness. If a practice ever genuinely needs a stricter capture than its neighbours, that is a
- * per-practice axis being rediscovered, and it must be reintroduced deliberately.
+ * <p>Stated once per source, not once per practice: {@code EvidencePolicyRedundancyTest} measures that every
+ * shipped practice agrees on the answer for a given source, rather than assuming it.
  *
- * <p>One ordered enum rather than two independent booleans: the three values are a ladder, and the
- * fourth cell of the cross-product — "non-empty but possibly partial" — asserts something no source can
- * support. A partial capture that happens to contain something cannot rule out that what it omitted was
- * the part that mattered.
+ * <p>One ordered enum, not two independent booleans: the fourth cell of the cross-product — "non-empty but
+ * possibly partial" — asserts something no source can support, since a partial capture that contains
+ * something cannot rule out that what it omitted was the part that mattered.
  */
 public enum RequiredCaptureQuality {
     /** The capture must have succeeded. Whatever it holds, including nothing, is reviewable. */

@@ -21,10 +21,9 @@ public interface ReviewOutcomeLookup {
 
     /**
      * @param insufficientEvidence the run completed without any model executing because the evidence it
-     *                             needed was not readable. Distinct from failure: nothing broke
-     * @param readinessByPracticeSlug what the run decided about each practice it <em>considered</em>. A
-     *                             practice absent here was never considered, which is a different fact
-     *                             from having been considered and refused, and the only record of it
+     *                             needed was not readable — distinct from failure, since nothing broke
+     * @param readinessByPracticeSlug what the run decided about each practice it <em>considered</em>; a
+     *                             practice absent here was never considered, not considered and refused
      */
     record ReviewOutcome(
         @NonNull ReviewRunState state,

@@ -6,11 +6,8 @@ import { ObservationDetailPage } from "./ObservationDetailPage";
 import { reviewObservationDetail } from "./story-mock-data";
 import { reviewHandlers } from "./story-mock-server";
 
-/**
- * Every story here opens a record that exists in the fixture, by id, through the same mock endpoint
- * the list screens use. Hand-patched copies of one detail — `{...detail, claimCurrentness: "STALE"}` —
- * were how a story came to show a stale observation whose own review had never produced one.
- */
+// Every story opens a record that exists in the fixture, by id. A hand-patched copy of one detail
+// — `{...detail, claimCurrentness: "STALE"}` — can describe a record no review could have produced.
 const meta = {
 	title: "Workspace admin/Practice reviews/Observation details",
 	component: ObservationDetailPage,
@@ -36,41 +33,22 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The page an operator reaches when they want to know whether an observation is fair.
- *
- * <p>Everything it used to hide is on it. The review that produced this was a UUID at the bottom of a
- * collapsed "Technical details" drawer and is now a link in the line under the title; the evidence was
- * rendered once as citations and again, immediately below, as `JSON.stringify` of the same object; and
- * an alert announced "AI-generated observation" on a screen where every observation is one.
- */
 export const Default: Story = {
 	play: async ({ canvas, canvasElement }) => {
-		// The page fetches, so the first query has to wait; everything after it is already rendered.
 		await canvas.findByRole("heading", {
 			name: "A cache miss and a permission failure come back as the same 404",
 			level: 2,
 		});
 		canvas.getByRole("link", { name: "in a review" });
-		// The title says what was seen; the reasoning says why it was raised. Neither restates the
-		// other — a fixture whose title was its first sentence is what made them look duplicated.
 		canvas.getByRole("heading", { name: "Why this was raised", level: 3 });
 		await expect(canvas.queryByText(/Hephaestus review/)).not.toBeInTheDocument();
 		await expect(canvas.queryByText("AI-generated observation")).not.toBeInTheDocument();
-		// No accordion basement, and no second rendering of the evidence as raw JSON.
 		await expect(canvas.queryByText("Technical details")).not.toBeInTheDocument();
 		await expect(canvasElement.querySelector("code")?.textContent).not.toContain("citations");
 		await expectNoPageOverflow();
 	},
 };
 
-/**
- * The evidence, named once per source in words rather than as a contract id under every quote.
- *
- * The diff citation gets a file coordinate because the server verifies it against the annotated
- * diff; so does the unchanged repository file. The human review thread does not — its line number is
- * an offset into the serialised context file the quote came from, and nothing checks it points at it.
- */
 export const EvidenceAcrossSources: Story = {
 	play: async ({ canvas }) => {
 		await canvas.findByText("3 passages from 3 sources.");
@@ -82,13 +60,8 @@ export const EvidenceAcrossSources: Story = {
 };
 
 /**
- * Two pieces of feedback lead with this observation: the note that went out, and the earlier one it
- * replaced. Each is named by what it is to the observation, not by where it went — the row used to be
- * titled with the delivery place, so a link to a piece of feedback read "On the work".
- *
- * <p>Where it went is still on the row, as the tag beside the outcome. Two tags, because they answer
- * two questions: *where* it was placed, and *what became of it*. It was a word on the meta line until
- * a reader had to parse a sentence to sort a list by the one fact these rows differ in.
+ * A row is named by what the feedback is to the observation, and wears two tags because they answer
+ * two questions: *where* it was placed, and *what became of it*.
  */
 export const LinkedFeedback: Story = {
 	play: async ({ canvas }) => {
@@ -99,15 +72,10 @@ export const LinkedFeedback: Story = {
 			expect.stringContaining("/admin/practices/reviews/delivery/"),
 		);
 		canvas.getByText("Replaced by newer");
-		// The place, as a tag with the registry's own mark and tone — not prose.
 		await expect(await canvas.findAllByText("On the work")).toHaveLength(2);
 	},
 };
 
-/**
- * An observation that reinforced somebody else's point rather than leading one of its own — the
- * supporting half of a two-observation note, which no story had ever shown.
- */
 export const SupportsAnotherObservation: Story = {
 	args: { observationId: "77777777-7777-7777-7777-777777777777" },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -117,8 +85,7 @@ export const SupportsAnotherObservation: Story = {
 };
 
 /**
- * A real shortfall whose feedback was withheld, with the reason on the row that was stopped — and
- * judged against a version of the practice that has since been edited, which the page has to say so
+ * Judged against a version of the practice that has since been edited, which the page has to say so
  * a reader does not measure today's rules against yesterday's answer.
  */
 export const FeedbackWasWithheld: Story = {
@@ -131,7 +98,6 @@ export const FeedbackWasWithheld: Story = {
 	},
 };
 
-/** An observation nothing was said about states that, rather than showing an empty panel. */
 export const NoFeedbackComposed: Story = {
 	args: { observationId: "cccccccc-2222-2222-2222-222222222222" },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -141,8 +107,8 @@ export const NoFeedbackComposed: Story = {
 };
 
 /**
- * The case the product owner found hardest to read: the review cannot tell whether the rules it used
- * are still the current ones, because the work it read is a chat thread with no revision to compare.
+ * The review cannot tell whether the rules it used are still the current ones, because the work it
+ * read is a chat thread with no revision to compare.
  */
 export const CannotTellWhichRulesApplied: Story = {
 	args: { observationId: "eeeeeeee-3333-3333-3333-333333333333" },

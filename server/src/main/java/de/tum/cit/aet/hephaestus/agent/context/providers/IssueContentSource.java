@@ -53,11 +53,7 @@ public class IssueContentSource implements EvidenceSource, ReviewContextBuilder 
     private static final SourceKind CORE = new SourceKind("scm.issue.core");
     private static final SourceKind COMMENTS = new SourceKind("scm.issue.comments");
 
-    /**
-     * The declared proof that issue review context can be assembled. The integration framework checks
-     * this against every descriptor that calls itself reviewable, so a kind cannot be opened for
-     * practices before anything can materialise its subject.
-     */
+    /** Checked by the integration framework against every descriptor that calls itself reviewable. */
     @Override
     public ArtifactKind artifactKind() {
         return ScmSignals.ISSUE;

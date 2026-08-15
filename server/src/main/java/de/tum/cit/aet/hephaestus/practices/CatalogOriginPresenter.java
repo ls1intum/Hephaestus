@@ -16,10 +16,8 @@ import org.springframework.stereotype.Component;
  * Turns practices and areas into their response shapes, adding the two things neither entity knows on its
  * own: where it came from in the instance catalogue, and what tier is actually in force for it.
  *
- * <p>Every method takes the workspace id because the tier a practice reports is the <em>effective</em> one,
- * and the bottom of that chain is a workspace decision. Resolved once per response rather than per row —
- * the list endpoints are the ones that matter and they would otherwise ask the same question a hundred
- * times.
+ * <p>Every method takes the workspace id because the tier reported is the <em>effective</em> one, resolved
+ * once per response rather than once per row.
  */
 @Component
 @RequiredArgsConstructor

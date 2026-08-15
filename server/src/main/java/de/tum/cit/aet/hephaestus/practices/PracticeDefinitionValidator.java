@@ -41,14 +41,12 @@ public final class PracticeDefinitionValidator {
     }
 
     /**
-     * A practice may only bind to signals a registered domain declares.
+     * A practice may only bind to signals a registered domain declares — the boot cross-check that keeps
+     * a derived artifact kind honest, since a misspelled signal would otherwise invent a kind nothing can
+     * raise and the practice would sit in the catalog looking configured and never fire.
      *
-     * <p>This is the boot cross-check that keeps a derived artifact kind honest: the kind is read off a
-     * signal's prefix, so a misspelled signal would otherwise invent a kind nothing can raise and the
-     * practice would sit in the catalog looking configured and never fire.
-     *
-     * <p>A practice only a human reviews is checked the same way and must still name an occasion: that
-     * is where its artifact kind comes from.
+     * <p>A human-only practice is checked the same way: it must still name an occasion, which is where
+     * its artifact kind comes from.
      */
     private void validateBindings(List<PracticeBinding> bindings) {
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
@@ -74,11 +72,8 @@ public final class PracticeDefinitionValidator {
     }
 
     /**
-     * A practice may only read evidence that could exist for the kind of thing it reviews.
-     *
-     * <p>The allow-list is the sources that declare they apply to this artifact kind, asked of the
-     * catalog each time rather than stored as a named profile. What each source demands of its capture
-     * is the source contract's business, not checked here.
+     * A practice may only read evidence that could exist for the kind of thing it reviews. What each
+     * source demands of its capture is the source contract's business, not checked here.
      */
     private void validateEvidence(ArtifactKind artifactKind, PracticeDefinition definition) {
         var version = definition.automatedReviewPolicy().sourceContractVersion();

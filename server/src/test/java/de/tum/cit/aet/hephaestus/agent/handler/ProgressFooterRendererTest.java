@@ -53,10 +53,8 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test
     void render_newPlusBadToGoodPersisted_doesNotCountSatisfiedLocusAsStillOpen() {
-        // A BAD→GOOD improvement is carried as PERSISTED with currentAssessment=GOOD (the locus recurs
-        // but is now satisfied). With a co-occurring NEW problem the footer renders, but the now-satisfied
-        // locus must NOT be folded into the "still open" count (C10) — only genuinely-open (BAD) persisted
-        // loci are still open.
+        // A BAD→GOOD improvement is PERSISTED with currentAssessment=GOOD (satisfied, not open); only
+        // genuinely-open (BAD) persisted loci count as "still open".
         LocusTransition newProblem = new LocusTransition(
             "k-new",
             TransitionStatus.NEW,

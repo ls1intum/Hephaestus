@@ -403,8 +403,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
                    (9406, 'legacy-fanout',    'ORG', 'Fan-out',   'legacy-fanout',    'ACTIVE', false),
                    (9407, 'legacy-paused',    'ORG', 'Paused',    'legacy-paused',    'ACTIVE', false)
             """,
-            // The startup seeder's shape is 9501: enabled, BOTH pointers left NULL. Only an explicit UI
-            // action ever wrote a pointer, so this — not 9502 — is what a default install looks like.
+            // 9501 is the startup seeder's shape: enabled, both pointers left NULL — a default install,
+            // not a config an admin ever pointed at.
             """
             INSERT INTO agent_config (id, workspace_id, name, enabled, model_name, llm_api_key, llm_base_url,
                                       llm_provider, credential_mode, timeout_seconds, max_concurrent_jobs,
@@ -428,9 +428,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
                    (9509, 9407, 'Live mentor', true, 'gpt-4o', 'encrypted-mentor-key',
                     'https://mentor.example.invalid/v1', 'OPENAI', 'PROXY', 720, 9, true, now())
             """,
-            // Only two workspaces ever had a pointer written: one naming a live config for both purposes,
-            // one naming a DISABLED config for detection alone (which paused it, while the mentor fell
-            // through to the oldest enabled config).
             "UPDATE workspace SET practice_config_id = 9502, mentor_config_id = 9502 WHERE id = 9402",
             "UPDATE workspace SET practice_config_id = 9508 WHERE id = 9407",
             // A completed job with recorded spend, and a suppressed finding hanging off it so the FK

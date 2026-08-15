@@ -15,11 +15,6 @@ import {
 } from "@/mocks/fixtures/practice";
 import { OccasionLifecycle } from "./OccasionLifecycle";
 
-/**
- * Ticking a moment and flipping the drafts switch have to change what is on screen, so the harness
- * holds both. Only one story used to go through it; the rest paired a frozen `selected` with `fn()`,
- * so clicking a node did nothing at all — the single most important thing this strip does.
- */
 function ControlledLifecycle(args: React.ComponentProps<typeof OccasionLifecycle>) {
 	const [selected, setSelected] = useState<string[]>([...args.selected]);
 	const [onDrafts, setOnDrafts] = useState(args.onDrafts);
@@ -65,7 +60,6 @@ export const PullRequest: Story = {
 	},
 };
 
-/** One moment, so no bands to name and no rail to draw. The strip still reads as the same object. */
 export const Conversation: Story = {
 	args: { workType: mockConversationWorkType, selected: mockConversationBinding.signals },
 	play: async ({ canvas }) => {
@@ -83,11 +77,7 @@ const ALL_WORK_TYPES: Array<{
 	{ workType: mockConversationWorkType, selected: mockConversationBinding.signals },
 ];
 
-/**
- * The four lifecycles side by side, which is the only way to judge whether one visual language holds
- * across them. It has to: a pull request's six moments in three bands, an issue's three, a document's
- * three under entirely different words, and a conversation's single one — none of them special-cased.
- */
+/** Side by side, which is the only way to judge whether one visual language holds across them. */
 export const EveryWorkType: Story = {
 	render: (args) => (
 		<div className="space-y-8">
@@ -106,10 +96,7 @@ export const EveryWorkType: Story = {
 	),
 };
 
-/**
- * A moment already held by another occasion cannot be taken: the server refuses a moment bound twice,
- * and discovering that on save would cost the author the whole form.
- */
+/** The server refuses a moment bound twice, and discovering that on save costs the whole form. */
 export const MomentsHeldByAnotherOccasion: Story = {
 	args: {
 		selected: ["scm.pull_request.merged"],
@@ -129,7 +116,7 @@ export const MomentsHeldByAnotherOccasion: Story = {
 	},
 };
 
-/** The fault is on the strip, not only in the message: an occasion with no moment shows it. */
+/** The fault is drawn on the strip, not only in the message. */
 export const NoMomentChosen: Story = {
 	args: { selected: [], occasion: { index: 0, errorId: "practice-bindings-error" } },
 };
@@ -154,14 +141,12 @@ export const TogglingMoments: Story = {
 };
 
 /**
- * The switch is named by its label and *described* by the sentence under it. The description used to
- * sit inside the label, so the switch announced itself as "Include drafts Off by default: read the
- * work once it is offered as finished" — a name is what a control is, not the paragraph arguing for
- * its default — and it put a `<p>` inside a `<label>`, which no content model allows.
+ * A description nested inside the label joins the switch's accessible name and puts a `<p>` inside a
+ * `<label>`, which no content model allows.
  */
 export const DraftsSwitchIsNamedByItsLabelAlone: Story = {
 	play: async ({ canvas }) => {
-		// Exact string, not a prefix: a prefix match is what let the run-on name through before.
+		// Exact string: a prefix match would pass against a name the description had run on to.
 		const drafts = canvas.getByRole("switch", { name: "Include drafts" });
 		const hint = canvas.getByText(/Off by default/);
 		await expect(drafts).toHaveAccessibleName("Include drafts");

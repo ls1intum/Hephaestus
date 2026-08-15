@@ -18,12 +18,9 @@ import tools.jackson.databind.JsonNode;
  * Reads back the readiness report a run wrote, for whoever has to explain the run.
  *
  * <p>Read <em>defensively</em>, node by node, rather than by deserializing
- * {@code AutomatedReviewReadinessReport}. That record validates hard in its constructor — a digest
- * must be 64 hex characters, every decision must share the report's timestamp, {@code ready} must
- * agree with the checks — and rightly so on the way in. On the way out those rules would turn a row
- * written by an older build into a 500 on a page whose entire purpose is to answer a question when
- * something has gone wrong. A field this parser cannot read degrades to a less specific sentence; the
- * page still renders.
+ * {@code AutomatedReviewReadinessReport}: that record validates hard in its constructor, which is right
+ * on the way in but would turn a row written by an older build into a 500 on a page whose only job is to
+ * explain what went wrong — a field this parser can't read just degrades to a less specific sentence.
  */
 @Component
 @RequiredArgsConstructor

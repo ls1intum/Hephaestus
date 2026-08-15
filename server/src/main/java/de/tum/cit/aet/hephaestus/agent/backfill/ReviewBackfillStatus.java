@@ -26,12 +26,10 @@ public enum ReviewBackfillStatus {
     /** Stopped on purpose. The remainder of the scope will not be reviewed by this run. */
     CANCELLED;
 
-    /** Whether the driver should still be doing work for a run in this state. */
     public boolean isActive() {
         return this == RUNNING || this == PAUSED;
     }
 
-    /** Whether a run in this state can still be confirmed into {@link #RUNNING}. */
     public boolean isConfirmable() {
         return this == AWAITING_CONFIRMATION || this == PAUSED;
     }

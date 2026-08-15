@@ -15,23 +15,15 @@ export interface ReviewPageProps {
 	workspaceSlug: string;
 	section: ReviewSectionId;
 	onSectionChange: (section: ReviewSectionId) => void;
-	/** The autonomy screen's "only what was set by hand" filter, kept in the URL. */
+	/** The "only what was set by hand" filter, which lives in the URL so it can be linked to. */
 	overridesOnly: boolean;
 	onOverridesOnlyChange: (next: boolean) => void;
 }
 
 /**
- * How review behaves in this workspace, in one place.
- *
- * <p>Three sidebar entries before this — autonomy, settings, and past work — which meant an admin
- * asking one question ("why did this not get reviewed?") had to visit three destinations that never
- * announced they were related. They are one page and three sections now, because they are three
- * decisions and not one.
- *
- * <p>Tabs, not a stack: the sections are alternatives, and each is long. It also buys the thing the
- * stack could not — an inactive Base UI panel is not rendered, so a section's queries do not run
- * until somebody opens it, and the autonomy screen's sticky summary strip cannot hang over the
- * settings below it.
+ * Tabs, not a stack: an inactive Base UI panel is not rendered, so a section's queries do not run
+ * until somebody opens it, and the autonomy section's sticky summary strip cannot hang over another
+ * section's settings.
  */
 export function ReviewPage({
 	workspaceSlug,
@@ -51,7 +43,7 @@ export function ReviewPage({
 				onValueChange={(next) => onSectionChange(next as ReviewSectionId)}
 				className="gap-6"
 			>
-				{/* `h-auto` and wrapping: three labels do not fit on one 320px line, and a tab list that
+				{/* `h-auto` and wrapping: the labels do not fit on one narrow line, and a tab list that
 				    overflows drags the whole page sideways rather than scrolling. */}
 				<TabsList className="h-auto w-full flex-wrap justify-start sm:w-fit">
 					{REVIEW_SECTIONS.map((candidate) => (
@@ -78,11 +70,7 @@ export function ReviewPage({
 	);
 }
 
-/**
- * The two states that stop reviews are the two the alert is allowed to colour. "Running" and
- * "still checking" are not warnings, and a page whose header is always tinted teaches an admin to
- * stop reading it.
- */
+/** Only the states that stop reviews are coloured: a header that is always tinted stops being read. */
 const TONE_VARIANTS: Record<ReviewRunningTone, "default" | "warning"> = {
 	running: "default",
 	unknown: "default",
@@ -91,19 +79,13 @@ const TONE_VARIANTS: Record<ReviewRunningTone, "default" | "warning"> = {
 };
 
 /**
- * The one fact all three sections need, in the header they share.
- *
- * <p>Every section below is a set of controls that does nothing at all on a workspace where practice
- * reviews are switched off or no model is bound — and each of them looks like it is working. An admin
- * can spend a long time on target branches and autonomy tiers before finding that out.
- *
- * <p>`role="status"`, not `alert`: this is the standing state of the page rather than a response to
+ * `role="status"`, not `alert`: this is the standing state of the page rather than a response to
  * anything the reader just did, and an assertive announcement on every visit would interrupt them
  * mid-sentence.
  */
 function ReviewRunningBanner({ workspaceSlug }: { workspaceSlug: string }) {
-	// Both queries are shared with the sections, on the same keys, so this costs no extra request —
-	// and the header stays correct the moment a section's toggle writes to either of them.
+	// Both queries are shared with the sections, on the same keys, so this costs no extra request and
+	// stays correct the moment a section's toggle writes to either of them.
 	const workspaceQuery = useQuery({ ...getWorkspaceOptions({ path: { workspaceSlug } }) });
 	const bindingsQuery = useQuery({ ...listAgentsOptions({ path: { workspaceSlug } }) });
 

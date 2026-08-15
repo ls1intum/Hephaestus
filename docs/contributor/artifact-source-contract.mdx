@@ -9,8 +9,7 @@ description: Versioned evidence sources, explicit absence states, per-binding ev
 
 Hephaestus may review work against a practice only from evidence with explicit semantics. Contract `1.0.0` defines the
 logical source catalog, its capture states, and how well each source must be captured. A capture manifest records
-what was supplied to one run; it does not prove that a practice is empirically observable. Independent
-validation of automated review has separate provenance and status.
+what was supplied to one run; it does not prove that a practice is empirically observable.
 
 > If any required evidence clause is unsatisfied, record insufficient evidence and make no practice claim.
 > Missing evidence is never `NOT_APPLICABLE`, a strength, or evidence that desired behaviour is absent.
@@ -85,7 +84,6 @@ Privacy class describes risk; it does not authorize collection, disclosure, or m
 
 | Class | Scope | Minimum treatment |
 | --- | --- | --- |
-| `PUBLIC` | Content verified as intentionally public within the approved scope | Integrity and purpose controls |
 | `INTERNAL` | Non-public project or workspace content without person-level review observations | Workspace authorization and purpose-bound retention |
 | `PERSONAL` | User-linked project content, authorship, reviews, comments, or activity | Personal-data access, export, and erasure coverage |
 | `SENSITIVE_PERSONAL` | Private conversations or derived person-level review observations | Restricted audience and stricter disclosure and retention controls |
@@ -132,8 +130,8 @@ scope. It is not controller or DPO approval and cannot cover an expanded source,
 retention policy, or collection scope. It is also the only basis the contract can express, and the only outcome:
 a use nobody approved carries no decision rather than a recorded refusal, so no entry here can read as a
 controller sign-off. The controller's own record remains separate. Approval is the gate that runtime
-configuration cannot waive: a source whose decision is missing,
-refused, or expired is never read, whatever the deployment sets. Within that boundary, connecting a workspace
+configuration cannot waive: a source whose decision is missing or expired is never read, whatever the
+deployment sets. Within that boundary, connecting a workspace
 integration and enabling a practice is what authorizes the everyday code sources the product exists to read, so a
 default deployment reviews pull requests, issues and conversations without further configuration. Privacy
 class does not gate collection — it records what treatment a source needs.
@@ -288,9 +286,9 @@ the governed integrations. It does not claim that a practice is universally obse
 `mode` is `LANGUAGE_MODEL` or `NONE`. `evidenceSufficiency` says whether passing every requirement is
 enough, the declared sources cannot support review, or automated review is not configured. These are author-defined
 settings, not empirical validation. `automatedReviewValidation` is bound to the exact automated-review
-policy and review-rule fingerprint. An `AUTHOR_DECLARED` status carries no evaluator provenance and the type
-refuses to hold any. An `INDEPENDENTLY_VALIDATED` status must identify the exact evaluator procedure — model,
-prompt, tools, and preprocessing — and never certifies a future observation.
+policy and review-rule fingerprint. Its only status is `AUTHOR_DECLARED`: nothing in the product validates a
+policy independently, so the status carries no evaluator provenance and the type refuses to hold any. A
+status the API can never return would describe a system other than this one.
 
 Only `LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET` runs a model. These skip:
 
@@ -304,11 +302,11 @@ source-quality reasons — `SOURCE_NOT_AVAILABLE`, `SOURCE_INCOMPLETE`, `SOURCE_
 limitations are never misreported as defective sources. Missing evidence never becomes a fabricated
 `NOT_APPLICABLE` observation.
 
-Human review is outside this contract. A future self-review, peer-review, or human-mentor channel needs its
-own review target, reviewer relationship, rubric, evidence provenance, consent, access, retention, result
-vocabulary, and validation status. Merely declaring that a person could observe a practice neither collects a human
-review nor makes an automated review ready to run. If a human review later becomes automated-review
-input, it needs a governed source kind and purpose authorization.
+Human review is outside this contract. A self-review, peer-review, or human-mentor channel carries its own
+review target, reviewer relationship, rubric, evidence provenance, consent, access, retention, result
+vocabulary, and validation status, none of which this contract supplies. Declaring that a person could observe
+a practice neither collects a human review nor makes an automated review ready to run, and a human review read
+back as automated-review input needs a governed source kind and purpose authorization of its own.
 
 ## What runs before evidence
 

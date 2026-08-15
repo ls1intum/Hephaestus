@@ -150,24 +150,20 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put("commit_sha", submissionRequest.headRefOid());
         metadata.put("source_branch", submissionRequest.headRefName());
         metadata.put("target_branch", submissionRequest.baseRefName());
-        // The MR title + description are the sole inputs for the communication/process practices
-        // (describe-what-and-why, commit-subjects-explain-each-change) — their precompute scripts read
-        // metadata.title / metadata.body. Without these the practices silently can't evaluate.
+        // The sole inputs for the communication/process practices (describe-what-and-why,
+        // commit-subjects-explain-each-change) — their precompute scripts read metadata.title / .body.
         metadata.put("title", pullRequestData.title());
         metadata.put("body", pullRequestData.body());
-        // The signal that occasioned this job. When present, the catalog injector materialises ONLY the
-        // practices bound to it, reading only what those bindings read — so an authoring practice is not
-        // re-litigated on a fixup push and a retrospective practice runs only at merge. Null = run the
-        // full focus set (the gate-bypass dev path / bot command).
+        // When present, the catalog injector materialises ONLY the practices bound to this signal, so an
+        // authoring practice is not re-litigated on a fixup push. Null = run the full focus set.
         if (submissionRequest.triggerSignal() != null) {
             metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, submissionRequest.triggerSignal().value());
         }
 
-        // The occasion is part of the key: an authoring review (opened/ready), a push re-scan
-        // (synchronized), a reviewer pass (reviewed) and a retrospective (merged) of the SAME head SHA are
-        // DIFFERENT reviews over different practice sets — a retrospective must never be deduped or
-        // cooled down against an earlier authoring job for the same commit. It sits BEFORE the SHA so
-        // extractCooldownKeyPrefix scopes cooldown per (pr, occasion).
+        // The occasion is part of the key: an authoring review, a push re-scan, a reviewer pass and a
+        // retrospective of the SAME head SHA are DIFFERENT reviews over different practice sets, so a
+        // retrospective must never be deduped against an earlier authoring job for the same commit. It
+        // sits BEFORE the SHA so extractCooldownKeyPrefix scopes cooldown per (pr, occasion).
         String phase = submissionRequest.triggerSignal() != null ? submissionRequest.triggerSignal().value() : "manual";
         String idempotencyKey =
             "pr_review:" +
@@ -209,8 +205,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         List<Practice> eligible = practices;
         practices = readiness.readyPractices();
         // A practice skipped for insufficient evidence leaves no trace in the delivered review, so a
-        // reader cannot distinguish it from a practice that was assessed and produced no findings.
-        // The readiness report records the same list for the administration surface.
+        // reader cannot distinguish it from one that was assessed and produced no findings; the readiness
+        // report records the same list for the administration surface.
         if (practices.size() < eligible.size()) {
             log.info(
                 "Skipping {} of {} practice(s) for insufficient evidence: jobId={}, skipped={}",
@@ -325,9 +321,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             : List.of();
 
         // A run that decided nothing at all over a non-empty diff is the stale-diff signature. Both
-        // valence-free presences count here: a model handed an empty diff abstains as NOT_APPLICABLE, and a
-        // model handed a truncated one says INCONCLUSIVE — the harness fault is identical either way, and
-        // treating INCONCLUSIVE as a real verdict would let the newer value walk straight through the guard.
+        // valence-free presences count here: an empty diff yields NOT_APPLICABLE, a truncated one yields
+        // INCONCLUSIVE, and the harness fault is identical either way.
         boolean nothingDecided = parsed
             .validFindings()
             .stream()
@@ -395,10 +390,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             );
         }
 
-        // Coherence coercion: keep (observation, severity) coherent regardless of what the
-        // weak model emitted. A defect-detector practice's GOOD assessment becomes NOT_APPLICABLE (no false strength
-        // ships to the student), and severity is pinned to the INFO sentinel except on a BAD finding.
-        // Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the posted comment.
+        // Coherence coercion: a defect-detector practice's GOOD assessment becomes NOT_APPLICABLE (no false
+        // strength ships to the student), and severity is pinned to the INFO sentinel except on a BAD
+        // finding. Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the
+        // posted comment.
         scopedFindings = new ArrayList<>(
             PracticeDetectionResultParser.coerceCoherence(scopedFindings, defectDetectorSlugs)
         );
@@ -418,30 +413,25 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        // Stamp each finding with the EXACT keys deliver() persisted, by identity, so downstream
-        // stages address the stored observation without recomputing a key that could drift. Done BEFORE the
-        // reaction filter so an escalated copy inherits them.
+        // Stamp each finding with the exact keys deliver() persisted, by identity, so downstream stages
+        // address the stored observation without recomputing a key that could drift.
         Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
         for (int i = 0; i < scopedFindings.size(); i++) {
             scopedFindings.set(i, scopedFindings.get(i).withKeys(keysByFinding.get(scopedFindings.get(i))));
         }
 
-        // Reaction-aware re-nag suppression (ADR 0021): drop a locus the student already DISPUTED /
-        // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an ADDRESSED-but-recurring
-        // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
-        // deliver() because recurrence_key is persisted there; before compose() so the drop reaches both the
-        // summary and the inline notes.
-        // Loudness tier BEFORE the reaction filter: the workspace's standing policy on how loud a practice
-        // may be settles first, so a finding the workspace already chose not to place on the artifact is
-        // never also charged to the developer's own per-locus reaction history.
+        // Loudness tier BEFORE the reaction filter (ADR 0021): the workspace's standing policy on how loud
+        // a practice may be settles first, so a finding it already chose not to place on the artifact is
+        // never also charged to the developer's own per-locus reaction history. Runs AFTER deliver()
+        // because recurrence_key is persisted there; before compose() so the drop reaches both the summary
+        // and the inline notes.
         List<PracticeDetectionResultParser.ValidatedFinding> loudEnough = inContextDeliveryGate.admitInContext(
             job,
             scopedFindings
         );
         if (loudEnough.isEmpty() && !scopedFindings.isEmpty()) {
-            // Every practice that had something to say is measuring quietly. The observations are persisted
-            // and the SUPPRESSED rows are written; there is nothing left to post, and posting an empty
-            // summary would be the noise the tier was turned down to avoid.
+            // The observations are persisted and the SUPPRESSED rows are written; posting an empty summary
+            // would be the noise the tier was turned down to avoid.
             log.info("All {} findings withheld by loudness tier: jobId={}", scopedFindings.size(), job.getId());
             return;
         }
@@ -449,19 +439,16 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, loudEnough);
         List<PracticeDetectionResultParser.ValidatedFinding> deliverable = reactions.deliverable();
         if (deliverable.isEmpty() && !scopedFindings.isEmpty()) {
-            // Everything this run was already reacted away — a SUCCESS (the student told us to stop nagging),
-            // not a delivery failure. The SUPPRESSED ledger rows are written; the prior edit-in-place summary
-            // stays as-is. Nothing new to post.
+            // A SUCCESS (the student told us to stop nagging), not a delivery failure: the SUPPRESSED
+            // ledger rows are written, and the prior edit-in-place summary stays as-is.
             log.info("All {} findings suppressed by prior reactions: jobId={}", scopedFindings.size(), job.getId());
             return;
         }
 
-        // Silent-clean-on-stale-diff signal: the NOT_APPLICABLE guard above only fires when EVERY finding
-        // is NA. A weak model that instead reads a stale/empty diff as "all clean" — emitting only
-        // ABSENT/GOOD strengths (no BAD) — slips past that guard and composes an all-clear over an artifact
-        // that was effectively never diffed. We do NOT throw (a genuinely clean PR over a non-empty diff is
-        // legitimate strengths-only), but a strengths-only delivery while diffFiles is EMPTY is the stale-diff
-        // fingerprint — surface it so the case is observable rather than silent.
+        // The NOT_APPLICABLE guard above only fires when EVERY finding is NA. A weak model that instead
+        // reads a stale/empty diff as "all clean" (only ABSENT/GOOD, no BAD) slips past it and composes an
+        // all-clear over an artifact that was effectively never diffed. Not thrown — a genuinely clean PR
+        // is legitimate strengths-only — but surfaced so the case is observable rather than silent.
         boolean hasGap = deliverable.stream().anyMatch(f -> f.assessment() == Assessment.BAD);
         if (!hasGap && diffFiles.isEmpty()) {
             log.warn(
@@ -476,9 +463,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
-        // unifiedDiff (computed once at the top of deliver()) is the substrate for BOTH the M1 grounding
-        // guard (drop a hallucinated inline anchor before it lands on a student) and the downstream
-        // line-position validator below.
+        // unifiedDiff is the substrate for both the grounding guard (drop a hallucinated inline anchor
+        // before it lands on a student) and the line-position validator below.
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
             ArtifactKinds.PULL_REQUEST,
@@ -504,9 +490,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         }
 
         // Recompose hook: after the inline notes post, the summary's inline section is demoted to a pointer
-        // for every finding whose comment actually landed (its detail then lives on the diff). Binding the
-        // findings + work artifact here keeps FeedbackDeliveryService free of the composition inputs — it only
-        // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
+        // for every finding whose comment actually landed. Keeps FeedbackDeliveryService free of the
+        // composition inputs — it only hands back the delivered keys.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
             DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, whyBySlug, deliveredKeys)
         );

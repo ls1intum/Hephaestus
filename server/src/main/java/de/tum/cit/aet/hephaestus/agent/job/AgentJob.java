@@ -217,11 +217,9 @@ public class AgentJob {
     private JsonNode evidenceSnapshot;
 
     /**
-     * The readiness decisions, kept out of {@link #evidenceSnapshot} because they are read in bulk.
-     *
-     * <p>A snapshot carries one entry per staged file, so a repository-tree capture makes it megabytes.
-     * Postgres has no partial read for a TOASTed jsonb, so reading one key out of a page of snapshots
-     * detoasts every one of them in full — minutes of I/O for a few kilobytes of answer.
+     * The readiness decisions, kept out of {@link #evidenceSnapshot} because they are read in bulk. A
+     * snapshot carries one entry per staged file and can reach megabytes; Postgres has no partial read
+     * for a TOASTed jsonb, so reading one key out of a page of snapshots would detoast every one in full.
      */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "review_readiness", columnDefinition = "jsonb")

@@ -23,11 +23,8 @@ export function evidenceSourceLabel(
 }
 
 /**
- * How good a capture of this source has to be, or null where the answer is the norm.
- *
- * The source contract answers this, not the practice: completeness is a property of the source. Most
- * sources take any capture at all, so naming that on every row would colour the baseline and hide the
- * two or three rows that genuinely demand more.
+ * How good a capture of this source has to be, or null where the answer is the norm. The source
+ * contract answers this, not the practice: completeness is a property of the source.
  */
 export function evidenceQualityRequirement(
 	quality: PracticeEvidenceSourceOption["requiredQuality"] | undefined,
@@ -43,11 +40,8 @@ export function evidenceQualityRequirement(
 }
 
 /**
- * Which part of the picture a source belongs to.
- *
- * A work type's sources as one flat list read as a row of equal questions. They are not equal: some
- * are the change itself, some are the surroundings it has to be read against, and some are what this
- * workspace already said to this person. Grouping is what turns a wall into three short decisions.
+ * Which part of the picture a source belongs to: the change itself, the surroundings it has to be
+ * read against, or what this workspace already said to the person who wrote it.
  */
 export type EvidenceSourceFamily = "work" | "around" | "history" | "other";
 
@@ -96,7 +90,7 @@ const FAMILY_ORDER: EvidenceSourceFamily[] = ["work", "around", "history", "othe
 
 /**
  * The work type's sources in family order, keeping the catalogue's order within each family and
- * dropping families this work type has no source for — a document offers two of the four.
+ * dropping families this work type has no source for.
  */
 export function groupEvidenceSources(
 	sources: readonly PracticeEvidenceSourceOption[],

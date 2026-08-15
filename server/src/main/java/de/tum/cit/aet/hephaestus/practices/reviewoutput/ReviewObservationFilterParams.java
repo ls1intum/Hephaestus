@@ -40,9 +40,9 @@ public record ReviewObservationFilterParams(
     Long artifactId,
     @RequestParam(required = false) @Positive @Nullable Long subjectUserId,
     /**
-     * What occasioned the measurement. Without it this surface cannot separate a campaign's observations
-     * from live ones — a population-mixing hazard in exactly the place an operator judges whether a campaign was
-     * worth what it cost.
+     * Without it this surface cannot separate a campaign's observations from live ones — a
+     * population-mixing hazard in exactly the place an operator judges whether a campaign was worth what
+     * it cost.
      */
     @Parameter(description = "What occasioned the measurement: LIVE, MANUAL or BACKFILL")
     @RequestParam(required = false)

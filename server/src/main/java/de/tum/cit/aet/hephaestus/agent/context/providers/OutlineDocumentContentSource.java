@@ -451,16 +451,11 @@ public class OutlineDocumentContentSource implements EvidenceSource {
     /**
      * The extracted references that did NOT resolve to a mirrored document, in extraction order.
      *
-     * <p>{@link DocumentProjection#documentsByReference} takes the whole reference set in one batch and hands
-     * back a flat list of matches — it does not report which individual reference produced which document, and
-     * this source deliberately stays vendor-blind to the link grammar (that parsing is the projection impl's
-     * knowledge, not ours). So resolution is checked with a generic, conservative containment test: a reference
-     * counts as resolved the moment ANY returned document's {@code slug}/{@code collectionSlug} appears
-     * (case-insensitively) inside it — true for the common {@code .../<slug>-<shortId>} link shape without this
-     * source having to know that shape. The bias is deliberately one-sided: worst case this under-reports (a
-     * reference that happens to textually contain another resolved doc's slug is missed), never over-reports —
-     * this file exists to stop a false "negligence" read, so a false negative here is harmless while a false
-     * positive would itself be a nag.
+     * <p>{@link DocumentProjection#documentsByReference} does not report which reference produced which
+     * document, and this source stays vendor-blind to the link grammar, so resolution is checked with a
+     * generic, conservative containment test: a reference counts as resolved the moment ANY returned
+     * document's {@code slug}/{@code collectionSlug} appears inside it. The bias is deliberately
+     * one-sided — a false negative here is harmless, a false positive would itself be a nag.
      */
     private static Set<String> unresolvedReferences(Set<String> references, List<ProjectedDocument> documents) {
         if (documents.isEmpty()) {
@@ -552,14 +547,9 @@ public class OutlineDocumentContentSource implements EvidenceSource {
     }
 
     /**
-     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. Opens with the
-     * collection's human-facing name (when captured — the model needs a way to label the doc group, not
-     * just see an opaque directory slug); a resolved member id (linked account) is appended so the
-     * reviewer can attribute the doc to a workspace developer; the last-editor line only appears when it
-     * differs from the creator; contributors show resolved display info only ("+N more" for the rest) —
-     * raw subject UUIDs are machine noise and never render in the human-facing byline. "Last updated"
-     * carries the upstream clock so the reviewer can weigh the doc's freshness; a trailing archived-status
-     * line marks a document that is still live-linkable but archived (soft, recoverable) in the wiki.
+     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. Contributors
+     * show resolved display info only — raw subject UUIDs are machine noise and never render in the
+     * human-facing byline.
      */
     private static String renderByline(ProjectedDocument doc) {
         StringBuilder byline = new StringBuilder();

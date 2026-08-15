@@ -32,11 +32,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Every practice that ships is its author's declaration, and the badge says so rather than leaving a
- * reader to assume somebody checked.
- *
- * The two digests stay beside it: they are what an author compares when a review claim is disputed,
- * and they name the exact policy and rules the declaration is about.
+ * The digests are what an author compares when a review claim is disputed, so they name the exact
+ * policy and rules the declaration was made about.
  */
 export const AuthorDeclared: Story = {
 	play: async ({ canvas }) => {

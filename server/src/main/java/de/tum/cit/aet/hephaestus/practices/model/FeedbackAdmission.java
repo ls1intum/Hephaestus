@@ -11,17 +11,13 @@ import org.jspecify.annotations.Nullable;
  *
  * <ul>
  *   <li>{@link PracticeReviewTier#deliversWithoutApproval} — how much autonomy this practice has. A
- *       deliberate configuration choice, changeable at any time, and resolved through the practice → area →
- *       workspace chain before it gets here.
+ *       deliberate configuration choice, resolved through the practice → area → workspace chain before
+ *       it gets here.
  *   <li>{@link FeedbackReach#reaches} — where this workspace lets feedback go at all. Also a deliberate
  *       choice, but one the workspace makes once rather than per practice.
- *   <li>{@link ObservationOrigin#delivers} — a fact about how the measurement was taken. Not configurable,
- *       because it is not an opinion: a finding about a pull request merged last quarter does not become
- *       actionable by turning a dial.
+ *   <li>{@link ObservationOrigin#delivers} — a fact about how the measurement was taken, not an opinion,
+ *       so it is not configurable.
  * </ul>
- *
- * <p>Conjoined here rather than at each delivery site, so a new channel, tier, reach or origin has one place
- * to be reasoned about and a test can enumerate the whole product.
  */
 public final class FeedbackAdmission {
 
@@ -31,18 +27,10 @@ public final class FeedbackAdmission {
      * Whether an observation of this provenance, for a practice at this effective tier, may be delivered on
      * this channel in a workspace with this reach.
      *
-     * @param tier the practice's <em>effective</em> tier, already resolved through the practice → area →
-     *     workspace chain, or {@code null} when the caller could not resolve one — a failed lookup, not an
-     *     unknown practice. An unknown practice slug does not get this far:
-     *     {@code PracticeDetectionDeliveryService#deliver} runs ahead of the in-context gate at both review
-     *     handlers and refuses any finding whose slug is not among the job's admitted revisions, and a
-     *     practice's slug is written once at creation, so the slug a caller looks up is the slug the
-     *     revision carries. What does arrive null is a caller that resolves tiers per observation and holds
-     *     no entry for one of them, as the conversational router does. Admitted on this axis either way,
-     *     because the measurement is already recorded by the time anyone asks — the only question left is
-     *     whether to say it out loud, and withholding feedback a developer was owed on the strength of a
-     *     lookup miss is the worse failure. The other two axes still apply: both are known without any
-     *     per-practice lookup at all.
+     * @param tier the practice's <em>effective</em> tier, or {@code null} when the caller could not resolve
+     *     one (a failed lookup, not an unknown practice — those never get this far). Admitted either way:
+     *     withholding feedback on the strength of a lookup miss is the worse failure, and the other two
+     *     axes still apply.
      */
     public static boolean delivers(
         ObservationOrigin origin,

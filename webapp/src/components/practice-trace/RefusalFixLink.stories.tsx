@@ -6,12 +6,9 @@ import { REFUSAL_FIXES, SIGNAL_STATE_REASON_LABELS, type SignalStateReason } fro
 const REASONS = Object.keys(SIGNAL_STATE_REASON_LABELS) as SignalStateReason[];
 
 /**
- * Where each fix lands, written out rather than recomputed.
- *
- * Deriving the expectation from `REFUSAL_FIXES` — branching on `section` the way the component
- * does — makes a wrong component and a wrong test agree. These are the eight URLs a reader should
- * be able to check against the router by eye. `how-much` is the Review page's default section and
- * so carries no search param; the other two sections do.
+ * Written out rather than derived from `REFUSAL_FIXES`: branching on `section` the way the component
+ * does would make a wrong component and a wrong test agree. `how-much` is the Review page's default
+ * section, so it carries no search param.
  */
 const EXPECTED_HREFS: Partial<Record<SignalStateReason, string>> = {
 	GATE_SKIPPED: "/w/demo/admin/practices/review?section=when-and-where",
@@ -25,14 +22,8 @@ const EXPECTED_HREFS: Partial<Record<SignalStateReason, string>> = {
 };
 
 /**
- * The whole refusal vocabulary at once, each reason beside the fix it does or does not offer.
- *
- * Rendered as one list rather than a story per reason because the interesting property is the
- * *shape of the table*: which refusals hand over a destination and which deliberately do not. A
- * reader checking whether a new reason was wired up is comparing it against its neighbours.
- *
- * Takes the component's own props and overrides only `reason`, so the Controls panel still drives
- * every other input on the stories that render this overview.
+ * The whole refusal vocabulary at once. Takes the component's own props and overrides only
+ * `reason`, so the Controls panel still drives every other input.
  */
 function RefusalCatalogue(props: RefusalFixLinkProps) {
 	return (
@@ -58,7 +49,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** One refusal, one door: the shape every other story here is a survey of. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("link", { name: "Set up a review model" })).toHaveAttribute(
@@ -68,10 +58,7 @@ export const Default: Story = {
 	},
 };
 
-/**
- * The other of the two shapes a fix has: a section of the Review page, which is one route plus a
- * search param rather than a route of its own.
- */
+/** The second shape a fix has: one route plus a search param rather than a route of its own. */
 export const ASectionOfTheReviewPage: Story = {
 	args: { reason: "GATE_SKIPPED" },
 	play: async ({ canvas }) => {
@@ -82,7 +69,7 @@ export const ASectionOfTheReviewPage: Story = {
 	},
 };
 
-/** A cooldown expires on its own, so there is nothing to send an admin to — and nothing renders. */
+/** A cooldown expires on its own, so there is nothing to send an admin to. */
 export const NoFixForThisReason: Story = {
 	args: { reason: "COOLDOWN_ACTIVE" },
 	play: async ({ canvasElement }) => {
@@ -90,33 +77,20 @@ export const NoFixForThisReason: Story = {
 	},
 };
 
-/**
- * Every reason an admin can act on, and every one they cannot.
- *
- * The gaps are as deliberate as the links. A cooldown expires, an allowance refills, a duplicate
- * is already running, deleted work stays deleted — none of those has a setting behind it, and a link
- * offered anyway would teach an admin to change something to make a non-fault stop.
- */
+/** Every reason an admin can act on, and every one they cannot: the gaps are as deliberate. */
 export const EveryReason: Story = {
 	render: (args) => <RefusalCatalogue {...args} />,
 	play: async ({ canvas }) => {
 		const links = canvas.getAllByRole("link");
 		await expect(links).toHaveLength(Object.keys(EXPECTED_HREFS).length);
-		// Each accessible name names where it goes: a link is read out of its sentence, so "here" or
-		// "fix this" identifies nothing (WCAG 2.4.4).
+		// A link is read out of its sentence, so its name has to name the destination (WCAG 2.4.4).
 		for (const link of links) {
 			await expect(link).toHaveAccessibleName(/^(Open|Set up) \S/);
 		}
 	},
 };
 
-/**
- * The reasons a workspace admin can undo, one destination each.
- *
- * Three of them share the Review page's *When and where* section and two share AI models — the
- * same screen reached by different sentences, which is why a label names the section it lands on
- * rather than repeating the reason it came from.
- */
+/** Several reasons reach one screen, which is why a label names its destination, not its reason. */
 export const WhereEachFixLives: Story = {
 	render: (args) => <RefusalCatalogue {...args} />,
 	parameters: { chromatic: { disableSnapshot: true } },

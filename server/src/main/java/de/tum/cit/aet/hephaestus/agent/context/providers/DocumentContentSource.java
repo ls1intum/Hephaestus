@@ -27,28 +27,23 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Materialises the {@code docs.document} review context under {@code inputs/context/} as one quarantined
- * {@code document.md}: the document's prose, with its title, collection, author and upstream timestamps
- * in a front-matter block, inside the untrusted-content envelope.
+ * {@code document.md}: the document's prose, with its title, collection, author and upstream timestamps in
+ * a front-matter block.
  *
- * <p>The repo-less, diff-less counterpart of {@link IssueContentSource}, and deliberately <em>not</em>
- * the same thing as {@link OutlineDocumentContentSource}: that one collects the documents a change
- * happens to reference, as supporting evidence about something else. Here the document is the subject.
- * The two therefore carry different source kinds, different selection scopes and different completeness
- * claims — retrieval can never prove it found every relevant document, but the one document a review was
- * occasioned by is a complete capture of its own subject.
+ * <p>The repo-less, diff-less counterpart of {@link IssueContentSource}, and deliberately <em>not</em> the
+ * same thing as {@link OutlineDocumentContentSource}: that one collects documents a change happens to
+ * reference as supporting evidence, so retrieval there can never prove it found every relevant one. Here
+ * the document is the subject, so the one document a review was occasioned by is a complete capture of it.
  *
- * <p>Reads the mirror through the agent-owned {@link DocumentProjection} SPI, which the vendor module
- * owning the schema implements, so the coupling runs one way and this class names no vendor.
+ * <p>Reads the mirror through the agent-owned {@link DocumentProjection} SPI, implemented by the vendor
+ * module owning the schema, so the dependency runs one way and this class names no vendor.
  */
 @Component
 public class DocumentContentSource implements EvidenceSource, ReviewContextBuilder {
 
     /**
-     * The declared proof that a document review context can be assembled.
-     *
-     * <p>{@code ReviewContractValidator} refuses to start the application if a descriptor calls itself
-     * reviewable and no builder claims its kind — so this bean, and not the descriptor's own optimism,
-     * is what opens {@code docs.document} for practice authoring.
+     * {@code ReviewContractValidator} refuses to start if a descriptor calls itself reviewable and no builder
+     * claims its kind — this bean is what opens {@code docs.document} for practice authoring.
      */
     @Override
     public ArtifactKind artifactKind() {
@@ -56,9 +51,8 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
     }
 
     /**
-     * Restated rather than imported: {@code agent} may not depend on a vendor module, and the kind is
-     * declared in {@code integration.outline}. Held to the descriptor's spelling by
-     * {@code DocumentContentSourceTest}.
+     * Restated rather than imported: {@code agent} may not depend on a vendor module. Held to the
+     * descriptor's spelling by {@code DocumentContentSourceTest}.
      */
     private static final ArtifactKind DOCUMENT = ArtifactKind.of("docs.document");
 
@@ -110,14 +104,10 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
     }
 
     /**
-     * Says for itself whether the document was captured whole, and when it was not, why.
-     *
-     * <p>The inherited default would let the catalog answer: {@code docs.document.core} declares
-     * {@code supportsComplete}, so a capture that emitted nothing would be described as a complete
-     * reading of a document that said nothing — and a practice about what a document fails to say would
-     * then report a writer for a document the mirror had merely lost. There is no partial reading of a
-     * document here: it is one row, rendered whole, so the only honest states are COMPLETE and an
-     * absence with a reason.
+     * Overridden rather than left to the catalog default: {@code docs.document.core} declares
+     * {@code supportsComplete}, so an empty capture there would read as a complete reading of a document
+     * that said nothing rather than one the mirror had lost. One row, rendered whole, so the only honest
+     * states are COMPLETE or an absence with a reason.
      */
     @Override
     @Transactional(readOnly = true)
@@ -148,12 +138,7 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
         );
     }
 
-    /**
-     * The rendered document, or the reason there is none.
-     *
-     * @param body    the rendered bytes, empty when there is no readable document to render
-     * @param absence why, meaningful only when {@code body} is empty
-     */
+    /** @param absence why, meaningful only when {@code body} is empty */
     private record Subject(Optional<byte[]> body, SourceAbsenceReason absence) {
         static Subject of(byte[] body) {
             return new Subject(Optional.of(body), SourceAbsenceReason.NOT_FOUND);
@@ -178,9 +163,6 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
 
         Optional<DocumentProjection.ProjectedDocument> found = projection.documentById(workspaceId, documentId);
         if (found.isEmpty()) {
-            // Emitting nothing is the right answer, and the evidence layer reports it as an unavailable
-            // required source — which refuses the review with a reason — rather than handing the model a
-            // document-shaped file with no document in it.
             log.info("Document context: subject not found, documentId={}, jobId={}", documentId, job.getId());
             return Subject.absent(SourceAbsenceReason.NOT_FOUND);
         }
@@ -190,9 +172,8 @@ public class DocumentContentSource implements EvidenceSource, ReviewContextBuild
             return Subject.absent(SourceAbsenceReason.NOT_FOUND);
         }
         if (document.bodyMarkdown() == null) {
-            // The row is here and the body is not: the mirror evicted it under its size cap. Distinct
-            // from NOT_FOUND on purpose — this one is a fact about our storage, and an operator reading
-            // the refusal should be told to raise the cap rather than to look for a deleted document.
+            // Row present, body evicted under the mirror's size cap: distinct from NOT_FOUND, so an operator is
+            // told to raise the cap rather than look for a deleted document.
             log.info(
                 "Document context: subject has no mirrored body, documentId={}, jobId={}",
                 documentId,

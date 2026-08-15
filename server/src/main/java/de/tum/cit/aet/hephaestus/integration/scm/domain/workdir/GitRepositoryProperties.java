@@ -10,19 +10,16 @@ import org.springframework.validation.annotation.Validated;
 /**
  * Configuration for local repository clones and for the commit trees read out of them.
  *
- * <p>The three tree bounds are the numbers the shipped source contract already promises for {@code
- * scm.repository.tree} ("up to 20,000 files and 32 MiB. Files above 10 MiB … are excluded"). They are
- * settings rather than constants because the ceiling that keeps one deployment's reviews affordable is
- * not the ceiling another one wants, and because a bound nobody can raise is a bound operators route
+ * <p>The three tree bounds mirror what the shipped {@code scm.repository.tree} source contract already
+ * promises. They are settings rather than constants because the ceiling that keeps one deployment's
+ * reviews affordable is not the ceiling another wants, and a bound nobody can raise is one operators route
  * around by turning the source off entirely.
  *
- * <p>Raising them costs money and context window; lowering them costs completeness. Neither direction
- * costs correctness: a tree the bounds truncate is reported {@code PARTIAL} with the limitation that
- * truncated it, and every practice that asserts an absence is refused rather than answered from a
- * fragment.
+ * <p>Raising them costs money and context window; lowering them costs completeness, never correctness — a
+ * truncated tree is reported {@code PARTIAL} with the limitation that truncated it, and any practice
+ * asserting an absence is refused rather than answered from a fragment.
  *
- * @param enabled         whether repositories are cloned at all; false disables the tree source
- * @param treeMaxFiles    files a single tree snapshot may stage before the walk stops
+ * @param treeMaxFiles     files a single tree snapshot may stage before the walk stops
  * @param treeMaxTotalSize bytes a single tree snapshot may stage before the walk stops
  * @param treeMaxFileSize  size at which one file is skipped and the rest of the tree is still read
  */

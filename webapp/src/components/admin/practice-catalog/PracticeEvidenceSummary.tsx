@@ -30,11 +30,8 @@ interface OccasionSummaryProps {
 }
 
 /**
- * Listed per occasion rather than merged into one set: a merged list would say the practice reads the
- * review threads whole without saying that only the review at the merge does.
- *
- * <p>The moments wear the same glyphs the editor's lifecycle strip draws, so an operator who set this
- * up recognises it here without translating.
+ * Listed per occasion rather than merged into one set: a merged list would claim every review reads
+ * everything any one of them does.
  */
 function OccasionSummary({ binding, sources, signals }: OccasionSummaryProps) {
 	const required = binding.needs.filter((need) => need.stance !== "CONTEXTUAL");
@@ -107,9 +104,7 @@ export function PracticeAutomatedReviewValidationSummary({
 	return (
 		<div className="space-y-1 text-sm">
 			<Badge variant={def.variant}>{def.label}</Badge>
-			{/* The digests answer one question — which exact rules produced this verdict — so they
-			    belong beside the verdict, not in a disclosure of their own. Small and monospaced:
-			    nobody reads a hash, they compare one. */}
+			{/* Monospaced and breakable: nobody reads a digest, they compare one against another. */}
 			<p className="text-muted-foreground text-xs">
 				Rules <code className="break-all">{validation.reviewRuleFingerprint}</code> · policy{" "}
 				<code className="break-all">{validation.policyDigest}</code>
@@ -129,10 +124,6 @@ export function PracticeEvidenceSummary({
 }: PracticeEvidenceSummaryProps) {
 	return (
 		<dl className={cn("grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2", className)}>
-			{/* The work it applies to, and the contract version its evidence is written against, are
-			    facts an operator comparing two versions of a practice reads first. They spent this
-			    branch inside a "Technical details" triangle next to three digests, which is where a
-			    fact goes to be missed. */}
 			<div>
 				<dt className="font-medium">Work it reviews</dt>
 				<dd className="text-muted-foreground">

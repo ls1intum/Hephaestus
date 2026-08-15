@@ -21,10 +21,8 @@ describe("groupEvidenceSources", () => {
 		expect(orphans).toEqual([]);
 	});
 
-	// The catalogue fixture above is one workspace's sources; this is every kind the app has words
-	// for. The two tables are edited in different directories, and a kind added to the vocabulary but
-	// not to a family degrades quietly — it keeps its own label and files itself under "Other
-	// sources", which reads as a deliberate answer rather than as a gap.
+	// The vocabulary and the family table live in different directories, and a kind added to one and
+	// not the other degrades quietly: it files itself under "Other sources", which reads as an answer.
 	it("gives every kind the vocabulary knows a family, not just the ones this catalogue ships", () => {
 		const unfiled = knownEvidenceSourceKinds().filter(
 			(sourceKind) =>
@@ -44,11 +42,8 @@ describe("groupEvidenceSources", () => {
 		expect(unfiled).toEqual([]);
 	});
 
-	// Grouping is a partition, and both ways it can stop being one are silent: a source filed under no
-	// family disappears from the screen entirely, and a family emitted in source order buries "the
-	// work itself" under "this person's history". Asserted against the input's own keys rather than
-	// against a count, so adding a source to the catalogue does not have to be retyped here — a count
-	// that has to be retyped is a count that gets retyped without being read.
+	// Both ways grouping can stop being a partition are silent: a source filed under no family
+	// disappears from the screen, and families emitted in source order bury the work itself.
 	it("partitions a pull request's sources, the work itself first and history last", () => {
 		const groups = groupEvidenceSources(mockPullRequestWorkType.allowedSources);
 		const filed = groups.flatMap((group) => group.sources.map((source) => source.sourceKind));

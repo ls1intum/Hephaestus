@@ -33,20 +33,16 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * The front door a developer uses to ask for a review of a piece of work, now.
  *
  * <p>Thin by design: {@link ManualReviewRequests} owns the whole sequence — standing, rate limits,
- * ledger, gate, submission — because the merge-request bot command has to perform the identical one.
+ * ledger, gate, submission — because the merge-request bot command performs the identical one.
  *
- * <h2>Why a refusal is a 200</h2>
- * <p>Almost every reason a requested review does not run is a condition of the workspace the asker can
- * neither see nor fix: an exhausted budget, a practice at Off, a cooldown. Answering those with a 4xx
- * would tell the person the button is broken, when in fact the ask was understood and something
- * nameable stopped it. The body carries the reason and the sentence explaining it, and the web app
- * prints that sentence verbatim. The exceptions are the two things that really are wrong with the
- * request: an artifact this workspace does not monitor (404) and a caller with no standing on it (403).
+ * <p>Refusal is a 200, not a 4xx: almost every reason a review doesn't run is a workspace condition the
+ * asker can neither see nor fix, and a 4xx would say the button itself is broken. 404/403 are reserved
+ * for the two things actually wrong with the request: an artifact this workspace doesn't monitor, and a
+ * caller with no standing on it.
  *
- * <h2>Membership is checked, and is not sufficient</h2>
- * <p>{@code isMember()} is here because {@code WorkspaceContextFilter} admits an anonymous caller on a
- * publicly viewable workspace, and a spend button must not be one of the things public visibility
- * grants. It is only the outer fence; {@link ReviewRequestAuthority} owns the rule that decides standing.
+ * <p>{@code isMember()} is checked because {@code WorkspaceContextFilter} admits an anonymous caller on a
+ * publicly viewable workspace, and a spend button must not be part of what public visibility grants; it
+ * is only the outer fence — {@link ReviewRequestAuthority} owns the rule that decides standing.
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/review-requests")
@@ -102,14 +98,13 @@ public class PracticeReviewRequestController {
         @Valid @RequestBody CreateReviewRequestDTO request
     ) {
         Workspace workspace = workspaceContextResolver.requireWorkspace(workspaceContext);
-        // Every identity of the account, not the one this session signed in with: workspace membership
-        // is keyed on the SCM user, so a person who is an admin under their GitLab login and is here on
-        // their GitHub one would otherwise be refused for being two people.
+        // Every identity of the account, not just the session's: membership is keyed on the SCM user, so
+        // an admin on GitLab who signed in via GitHub would otherwise be refused as "two people".
         List<User> requesters = currentAccountUsers.resolve();
         ManualReviewOutcome outcome = requestFor(workspace, request, requesters);
         if (outcome.status() == ManualReviewOutcome.Status.FORBIDDEN) {
-            // Deliberately the same sentence whether the artifact has no such requester or the requester
-            // has no such standing: distinguishing them would let a caller enumerate who is on a team.
+            // Same sentence whether there's no such requester or the requester lacks standing: telling
+            // them apart would let a caller enumerate who is on a team.
             throw new AccessForbiddenException(
                 "Only the work's author or assignees, or a workspace admin, can ask for a review of it."
             );
@@ -118,12 +113,9 @@ public class PracticeReviewRequestController {
     }
 
     /**
-     * Load the artifact through this workspace and hand it to the one manual-request path.
-     *
-     * <p>The kind decides which loader answers, and the loaders join the artifact to the workspace
-     * rather than trusting the id: nothing in an artifact id relates it to a workspace, so loading by id
-     * alone would let one workspace spend its budget reviewing another's work — see
-     * {@link ReviewableArtifactLoader}.
+     * The loaders join the artifact to the workspace rather than trusting the id: nothing in an artifact
+     * id relates it to a workspace, so loading by id alone would let one workspace spend its budget
+     * reviewing another's work — see {@link ReviewableArtifactLoader}.
      */
     private ManualReviewOutcome requestFor(Workspace workspace, CreateReviewRequestDTO request, List<User> requesters) {
         ArtifactKind kind = parseKind(request.artifactKind());
@@ -139,12 +131,11 @@ public class PracticeReviewRequestController {
                 .orElseThrow(() -> notFound(request));
             return manualReviewRequests.requestIssueReview(workspace, issue, requesters);
         }
-        // A kind that exists but has no front door here — a chat thread or a document is reviewed on the
-        // occasion its source produces, and there is nothing for a person to point at and ask about.
+        // A kind that exists but has no front door here: a chat thread or document is reviewed on the
+        // occasion its source produces, with nothing for a person to point at and ask about.
         throw new IllegalArgumentException("Reviews cannot be asked for on artifacts of kind " + kind.value());
     }
 
-    /** A malformed kind and an unknown one are the same answer: this endpoint cannot act on it. */
     private static ArtifactKind parseKind(String raw) {
         try {
             return ArtifactKind.of(raw);
@@ -154,8 +145,8 @@ public class PracticeReviewRequestController {
     }
 
     /**
-     * One answer for "no such artifact" and "not this workspace's artifact". Telling them apart would
-     * turn this endpoint into a way to probe which work another workspace monitors.
+     * Same answer for "no such artifact" and "not this workspace's artifact", so this endpoint can't be
+     * used to probe which work another workspace monitors.
      */
     private static EntityNotFoundException notFound(CreateReviewRequestDTO request) {
         return new EntityNotFoundException(request.artifactKind(), request.artifactId());

@@ -31,13 +31,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * One bounded, attributable campaign to review work that already existed.
  *
- * <p>A workspace adopting Hephaestus wants a baseline — "review the pull requests of the last 30 days" —
- * and the ingestion path deliberately refuses to give it one: a first sync records thousands of signals
- * and triggers none of them, precisely so adoption does not fire thousands of reviews. This row is how
- * that refusal is lifted, once, on purpose, for a named range.
+ * <p>A first sync deliberately triggers no reviews, so adoption does not fire thousands of them at once;
+ * this row is how that refusal is lifted, once, on purpose, for a named range.
  *
- * <p>Not to be confused with {@code RepositoryToMonitor}'s backfill checkpoints, which are about
- * <em>fetching</em> history from a provider. This is about <em>reviewing</em> history already mirrored.
+ * <p>Not to be confused with {@code RepositoryToMonitor}'s backfill checkpoints, which fetch history from
+ * a provider rather than review history already mirrored.
  */
 @Entity
 @Table(
@@ -60,10 +58,9 @@ public class ReviewBackfillRun {
     private UUID id;
 
     /**
-     * The driver writes a run back detached, which is a {@code merge} — a full-column copy-back of the
-     * status and counters as they were when the batch started. Without this lock an admin's mid-batch
-     * cancel would be overwritten with {@code RUNNING} and the campaign would keep spending; with it the
-     * losing write throws, the batch's progress is discarded, and the next tick re-reads the cancel.
+     * The driver writes a run back detached (a full-column {@code merge}), so without this lock an
+     * admin's mid-batch cancel would be overwritten with {@code RUNNING} and the campaign would keep
+     * spending.
      */
     @Version
     @ColumnDefault("0")
@@ -87,15 +84,10 @@ public class ReviewBackfillRun {
     private String artifactKind;
 
     /**
-     * How the signals this run records came to be known — {@link DiscoveredVia#BACKFILL} for a campaign
-     * an admin scoped and confirmed by hand, {@link DiscoveredVia#SWEEP} for one a
-     * {@link ReviewSweepSchedule} opened over recent work.
-     *
-     * <p>Carried on the run rather than decided at the submitter, because by the time an artifact is
-     * offered nothing else remembers which of the two this was, and the answer decides both the ledger's
-     * discovery mode and — through {@code SignalOrigins} — the population every resulting measurement is
-     * filed in. A submitter that hard-coded BACKFILL would file a nightly sweep as a hindsight-selected
-     * corpus, and the reflection read model would hide every finding it produced.
+     * How the signals this run records came to be known — {@link DiscoveredVia#BACKFILL} for a campaign an
+     * admin scoped and confirmed by hand, {@link DiscoveredVia#SWEEP} for one a {@link ReviewSweepSchedule}
+     * opened over recent work. Carried on the run rather than decided at the submitter, since by the time
+     * an artifact is offered nothing else remembers which of the two this was.
      */
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -104,25 +96,18 @@ public class ReviewBackfillRun {
     private DiscoveredVia discoveredVia = DiscoveredVia.BACKFILL;
 
     /**
-     * The schedule that opened this run, or null for a campaign an admin scoped by hand.
-     *
-     * <p>A plain column rather than an association, and deliberately without a foreign key. The driver
-     * never navigates to the schedule, so a lazy association here would only be a proxy waiting to be
-     * touched outside the transaction that loaded it. And a constraint would force a choice between
-     * refusing to delete a schedule and nulling this column when one is deleted — the second of which
-     * erases, from a row describing money that was spent, the record of what authorised spending it.
-     * A soft reference that may name something gone is the honest shape for history.
+     * The schedule that opened this run, or null for a campaign an admin scoped by hand. Deliberately no
+     * foreign key: a constraint would null this column when its schedule is deleted, erasing the record of
+     * what authorised the spend — a soft reference that may name something gone is the honest shape for
+     * history.
      */
     @Nullable
     @Column(name = "sweep_schedule_id", updatable = false, columnDefinition = "UUID")
     private UUID sweepScheduleId;
 
     /**
-     * Window start, inclusive, over the artifact's creation time.
-     *
-     * <p>Creation rather than last-update on purpose: an update timestamp moves while the campaign runs,
-     * so a row could enter or leave the scope mid-walk and the run would no longer be reviewing the set
-     * it was costed against.
+     * Window start, inclusive, over the artifact's creation time — not last-update, which moves while the
+     * campaign runs and would let a row enter or leave the scope mid-walk.
      */
     @NotNull
     @Column(name = "from_at", nullable = false, updatable = false)
@@ -144,27 +129,27 @@ public class ReviewBackfillRun {
     @Column(name = "pause_reason", length = 32)
     private ReviewBackfillPauseReason pauseReason;
 
-    /** How many artifacts the preflight found in scope. What the admin was shown before confirming. */
+    /** How many artifacts the preflight found in scope — what the admin was shown before confirming. */
     @NotNull
     @Column(name = "estimated_artifacts", nullable = false, updatable = false)
     private Integer estimatedArtifacts = 0;
 
     /**
      * What the preflight thought the campaign would cost, in USD. Null when the workspace has no priced
-     * review history to derive a per-review cost from, and must be rendered as unknown rather than as
-     * zero — an unknown cost shown as free invites a confirmation nobody meant to give.
+     * review history to derive a cost from; render that as unknown, not zero — an unknown cost shown as
+     * free invites a confirmation nobody meant to give.
      */
     @Nullable
     @Column(name = "estimated_cost_usd", precision = 12, scale = 4, updatable = false)
     private BigDecimal estimatedCostUsd;
 
     /**
-     * The highest artifact id already walked. Null before the first batch. The walk is ordered by id
-     * ascending, which is a stable total order independent of any timestamp the mirror may rewrite.
+     * The highest artifact id already walked, ordered ascending so the walk is stable independent of any
+     * timestamp the mirror may rewrite. Null before the first batch.
      *
-     * <p>A run that pauses must NOT advance this past artifacts it did not submit. A gap-toothed
-     * baseline is worse than a truncated one: nothing downstream can tell "not reviewed" from
-     * "reviewed, nothing found".
+     * <p>A run that pauses must NOT advance this past artifacts it did not submit — a gap-toothed baseline
+     * is worse than a truncated one, since nothing downstream can tell "not reviewed" from "reviewed,
+     * nothing found".
      */
     @Nullable
     @Column(name = "cursor_artifact_id")
@@ -176,23 +161,16 @@ public class ReviewBackfillRun {
     @Column(name = "submitted_count", nullable = false)
     private Integer submittedCount = 0;
 
-    /**
-     * Artifacts the campaign walked past without creating a job: already recorded at this state, refused
-     * by the gate, or outside the workspace review scope. Counted rather than dropped so the run's own
-     * arithmetic adds up on screen.
-     */
+    /** Artifacts the campaign walked past without creating a job: already recorded, gated, or out of scope. */
     @NotNull
     @ColumnDefault("0")
     @Column(name = "passed_count", nullable = false)
     private Integer passedCount = 0;
 
     /**
-     * Artifacts whose submission threw, and which therefore have no ledger row, no observation and no
-     * decision recorded anywhere.
-     *
-     * <p>Its own counter rather than folded into {@link #passedCount}: a pass means the campaign looked
-     * and decided, a failure means it never got an answer. Counting failures as passes would let
-     * {@code submitted + passed} reach the estimate and report COMPLETED over a baseline with holes.
+     * Artifacts whose submission threw, with no ledger row, observation, or decision recorded anywhere.
+     * Kept separate from {@link #passedCount}: folding it in would let {@code submitted + passed} reach
+     * the estimate and report COMPLETED over a baseline with holes.
      */
     @NotNull
     @ColumnDefault("0")

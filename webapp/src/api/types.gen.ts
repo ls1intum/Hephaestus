@@ -46,12 +46,9 @@ export type WorkspaceTeamRepositorySettings = {
 
 /**
  * The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
- *
- * <p>It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
- * what</em>. A trunk is named <code>main</code> here, <code>master</code> there and <code>develop</code> somewhere
- * else; that is a deployment fact about one workspace, so a centrally curated catalogue cannot carry it
- * and a practice that tried would be wrong for most installations. Dependabot draws the same line with
- * <code>target-branch</code>.
+ * It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
+ * what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
+ * about one workspace that a centrally curated catalogue cannot carry.
  *
  * <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
  * axis".
@@ -59,17 +56,15 @@ export type WorkspaceTeamRepositorySettings = {
  * <h2>What this cannot express, and why</h2>
  *
  * <ul>
- * <li><strong>Changed paths.</strong> Not decidable where the decision is made: the detection gate
- * holds the <code>PullRequest</code> row, not the diff, and changed paths do not exist until the
- * evidence stage, by which point the review has been admitted and paid for. A path axis here
- * would be a predicate that quietly never narrows anything, which is worse than its absence.
- * <li><strong>Branch patterns.</strong> Exact names only. A glob is a small language, and a small
- * language is the thing that grows; adding patterns later stays backward compatible, whereas
- * taking them away would not.
+ * <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
+ * <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
+ * by which point the review has been admitted and paid for. A path axis here would be a predicate
+ * that quietly never narrows anything.
+ * <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
+ * compatible, taking them away would not.
  * <li><strong>Any third key.</strong> The vocabulary is closed at the column
- * (<code>chk_workspace_review_scope</code>), not by this type, because the column outlives any one
- * version of the code that reads it and because a reader configured to ignore unknown fields
- * would drop the key in silence, leaving a workspace believing a restriction was in force.
+ * (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
+ * fields would drop the key in silence, leaving a workspace believing a restriction was in force.
  * </ul>
  */
 export type WorkspaceReviewScope = {
@@ -5228,9 +5223,8 @@ export type ConnectionDetail = {
 /**
  * Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
  *
- * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
- * to <code>Connection</code> that we don't
- * want to serialize on every response.
+ * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference to
+ * <code>Connection</code> that this DTO omits.
  */
 export type ConnectionAuditEntry = {
     actorKind?: string;

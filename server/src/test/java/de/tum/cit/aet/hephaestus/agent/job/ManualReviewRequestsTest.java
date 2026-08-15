@@ -44,9 +44,8 @@ import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The single path every hand-requested review takes. Three of these tests exist because the bot command
- * got each of them wrong in the same direction: it named an occasion that never happened, it filed the
- * measurement into the live population, and it left no ledger row at all.
+ * The single path every hand-requested review takes: the gate is asked about the request signal itself,
+ * the run is filed as a self-selected sample, and every ask leaves a ledger row.
  */
 @Tag("unit")
 @DisplayName("A review somebody asked for")
@@ -121,9 +120,8 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     }
 
     /**
-     * The gate is asked about the occasion that actually happened. Naming a lifecycle event instead —
-     * the bot command used to name {@code scm.pull_request.opened} — puts an untruth in the artifact
-     * trace, which renders the signal as the reason the review ran.
+     * The gate is asked about the occasion that actually happened — naming a lifecycle event instead
+     * puts an untruth in the artifact trace, which renders the signal as the reason the review ran.
      */
     @Test
     void theGateIsAskedAboutTheRequest_notAboutALifecycleEventThatDidNotHappen() {

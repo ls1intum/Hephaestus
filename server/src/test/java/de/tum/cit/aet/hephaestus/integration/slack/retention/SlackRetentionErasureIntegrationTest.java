@@ -119,11 +119,11 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
     )
     void retentionErasesAgedThreadDerivedDataAndDropsAggregate() {
         Instant now = Instant.now();
-        // No Slack Connection → DEFAULT_RETENTION_DAYS (30d). Aged thread is 60d cold; fresh thread is current.
+        // No Slack Connection → falls back to the default retention window. The aged thread is well past
+        // it; the fresh thread is current.
         long agedThreadId = insertThread("C1", "aged-root", tsOf(now.minus(Duration.ofDays(60))));
         long freshThreadId = insertThread("C1", "fresh-root", tsOf(now));
 
-        // Derived CONVERSATION rows anchored to each thread id (the erasure targets one, spares the other).
         UUID agedObs = seedBoundConversation(agedThreadId);
         UUID agedFb = lastFeedbackId;
         UUID freshObs = seedBoundConversation(freshThreadId);
@@ -138,20 +138,16 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
 
         slackRetentionSweeper.sweepNow();
 
-        // Aged thread aggregate dropped; its derived CONVERSATION rows erased.
         assertThat(slackThreadRepository.findById(agedThreadId)).isEmpty();
         assertThat(observationRepository.findById(agedObs)).isEmpty();
         assertThat(feedbackRepository.findById(agedFb)).isEmpty();
 
-        // Fresh thread aggregate and its derived rows survive.
         assertThat(slackThreadRepository.findById(freshThreadId)).isPresent();
         assertThat(observationRepository.findById(freshObs)).isPresent();
         assertThat(feedbackRepository.findById(freshFb)).isPresent();
 
-        // The unrelated PR observation survives.
         assertThat(observationRepository.findById(prObs)).isPresent();
 
-        // Message-grain: the aged message is gone, the fresh one remains.
         assertThat(
             jdbcTemplate.queryForObject("SELECT count(*) FROM slack_message WHERE slack_ts = 'agedmsg.1'", Long.class)
         ).isZero();
@@ -176,8 +172,6 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
         // Idempotent: removing a member no thread references is a no-op.
         assertThat(slackThreadRepository.pruneParticipant(workspace.getId(), 999L)).isZero();
     }
-
-    // --- fixtures ---
 
     private UUID lastFeedbackId;
 

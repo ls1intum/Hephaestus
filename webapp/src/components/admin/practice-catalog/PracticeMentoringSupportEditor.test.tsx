@@ -123,11 +123,9 @@ describe("PracticeMentoringSupportEditor", () => {
 			"/admin/practices/new",
 		);
 
-		// `aria-disabled`, not `data-disabled`. Base UI renders a radio as a `<span role="radio">`, so
-		// there is no native `disabled` to read; `data-disabled` is the hook its CSS uses, while
-		// `aria-disabled` is what the accessibility tree exposes and what actually tells a reader the
-		// choice is unavailable. A regression that kept the styling and dropped the semantics leaves
-		// the first attribute in place and this assertion is the one that notices.
+		// `aria-disabled`, not `data-disabled`: Base UI renders a radio as a `<span role="radio">`, so
+		// there is no native `disabled`, and `data-disabled` is only the CSS hook. A regression that
+		// keeps the styling and drops the semantics leaves that one alone.
 		expect(
 			screen.getByRole("radio", { name: /AI-supported mentoring/ }).getAttribute("aria-disabled"),
 		).toBe("true");

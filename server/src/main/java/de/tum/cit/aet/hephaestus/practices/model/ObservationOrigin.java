@@ -3,22 +3,16 @@ package de.tum.cit.aet.hephaestus.practices.model;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 
 /**
- * How a measurement came to be taken — the provenance axis a trend line must never mix.
+ * How a measurement came to be taken — the provenance axis a trend line must never mix. Reading a live
+ * series and a backfilled one as one series manufactures change nobody made: a workspace that backfills its
+ * history on adoption day would show a dramatic day-one improvement that is really just when the two
+ * populations were sampled.
  *
- * <p>Reading a live series and a backfilled one as one series manufactures change nobody made: a
- * workspace that backfills its history on the day it adopts Hephaestus would show a dramatic day-one
- * improvement that is entirely an artefact of when the two populations were sampled.
- *
- * <p>Recorded per observation rather than per job so the exclusion survives every later read: the
- * aggregate queries do not join job metadata, and a column that must be joined to be honoured will be
- * forgotten.
+ * <p>Recorded per observation rather than per job so the exclusion survives every later read without
+ * requiring aggregate queries to join job metadata.
  */
 public enum ObservationOrigin {
-    /**
-     * Taken by a review that ran in response to the work itself. The only origin whose population is
-     * defined by what developers did rather than by what an operator selected, and therefore the default
-     * for every behavioural read.
-     */
+    /** Taken by a review that ran in response to the work itself. The default for every behavioural read. */
     LIVE,
     /**
      * Taken because somebody asked for this review by hand. Real measurement, but a self-selected
@@ -32,17 +26,13 @@ public enum ObservationOrigin {
     BACKFILL;
 
     /**
-     * Whether a measurement of this provenance may be <em>said out loud</em> on the given channel.
+     * Whether a measurement of this provenance may be <em>said out loud</em> on the given channel — the
+     * second half of the delivery predicate; {@link PracticeReviewTier#delivers} is the first, and a unit
+     * travels only where <em>both</em> admit it.
      *
-     * <p>The second half of the delivery predicate; {@link PracticeReviewTier#delivers} is the first,
-     * and a unit travels only where <em>both</em> admit it. The two are not merged because they answer
-     * different questions: the tier is a policy an admin sets, this is a fact about the measurement.
-     *
-     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#PROFILE} and nothing else. Posting a
+     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#PROFILE} and nothing else: posting a
      * backfilled finding in context would notify everyone subscribed to a merged pull request about work
-     * nobody can act on; raising it in a mentor turn would coach a developer about a months-old decision
-     * as though it were today's. Written as this derivation rather than {@code return false} so that
-     * building a PROFILE producer makes it correct without an edit.
+     * nobody can act on.
      */
     public boolean delivers(FeedbackChannel channel) {
         return switch (this) {

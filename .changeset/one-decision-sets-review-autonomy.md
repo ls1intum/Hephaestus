@@ -14,13 +14,15 @@ practice that stops being reviewed leaves a gap in its own history that later re
 team's behaviour. Nothing a quiet practice held back is lost either — the work's review activity shows
 it as reviewed, with what it saw, nothing delivered, and the setting named as the reason.
 
-The **How much** section of Review, under Administration → Practices, summarises how many practices sit at
-each setting, per area and overall, so you can see what a workspace is actually doing without opening
-a hundred rows — and change a whole area, or a filtered selection, in one action.
+The **How much** section of Review, under Administration → Practices, is where all of this is set. A
+line that stays on screen counts how many practices sit at each setting, so you can see what a
+workspace is actually doing without scrolling the list; practices are grouped by area with each area's
+own counts; a filter narrows the list to just the exceptions somebody set by hand; and a whole area,
+or a filtered selection, can be moved in one action.
 
 Where feedback goes is a separate workspace setting — the mentor conversation only, or also on the
-work itself — rather than being mixed into the per-practice choice. Narrowing it never makes a quiet
-practice speak.
+work itself — rather than being mixed into the per-practice choice. It can narrow where a practice
+speaks, but it never lets a practice do more on its own than its own setting allows.
 
-Nothing gets louder or quieter on upgrade: a practice that was used in new reviews reviews and
-delivers as before, and one that was not stays off.
+Nothing changes on upgrade: a practice that was reviewed and delivered before goes on doing both, and
+one that was switched off stays off.

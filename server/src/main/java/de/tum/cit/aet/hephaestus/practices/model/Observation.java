@@ -47,7 +47,7 @@ import tools.jackson.databind.JsonNode;
             columnList = "artifact_kind, artifact_id, agent_job_id, observed_at DESC"
         ),
         @Index(name = "idx_observation_correlation", columnList = "recurrence_key"),
-        // Reviewer-side observations are filed against the subject (about_user_id); index for subject dashboards.
+        // Observations are filed against the subject (about_user_id); index for subject dashboards.
         @Index(name = "idx_observation_subject", columnList = "about_user_id"),
     }
 )
@@ -63,10 +63,8 @@ public class Observation {
 
     /**
      * Per-occurrence dedup grain: identifies this one detection event so {@code insertIfAbsent} is
-     * idempotent — a re-run of the same job cannot double-insert the same row. Enforced unique by
-     * {@code uk_observation_occurrence}. Distinct from the cross-run {@link #recurrenceKey} locus grain:
-     * occurrence-key dedups a single run's repeats, recurrence-key tracks one underlying problem ACROSS
-     * runs.
+     * idempotent. Enforced unique by {@code uk_observation_occurrence}; distinct from the cross-run
+     * {@link #recurrenceKey}.
      */
     @NotNull
     @Column(name = "occurrence_key", nullable = false, length = 255)
@@ -78,10 +76,9 @@ public class Observation {
     private UUID agentJobId;
 
     /**
-     * The practice measured. Deliberately NOT cascade-deleted: an observation is an immutable
-     * measurement and the substrate for longitudinal research, so pruning a practice from the
-     * catalog must not erase the history of everyone ever measured against it. Retire practices
-     * instead; hard deletion is reserved for workspace purge, which removes observations directly.
+     * The practice measured. Deliberately not cascade-deleted: an observation is immutable and the
+     * substrate for longitudinal research, so pruning a practice must not erase everyone's history
+     * against it — retire it instead.
      */
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
@@ -89,11 +86,10 @@ public class Observation {
     private Practice practice;
 
     /**
-     * The {@link PracticeRevision} (SCD-2 criteria snapshot) the detector evaluated this observation
-     * against, pinning it to the criteria as they were for reproducibility. NULL means the observation
-     * predates criteria versioning — a "pre-versioning" marker, not a missing reference. FK
-     * {@code fk_observation_revision}, {@code ON DELETE SET NULL}: pruning a revision nulls the pin rather
-     * than deleting the observation, so an immutable observation outlives its criteria history.
+     * The {@link PracticeRevision} (SCD-2 snapshot) the detector evaluated this observation against,
+     * pinning it to criteria as they were for reproducibility. NULL means the observation predates
+     * criteria versioning, not a missing reference — {@code ON DELETE SET NULL} lets the immutable
+     * observation outlive a pruned revision.
      */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "practice_revision_id", foreignKey = @ForeignKey(name = "fk_observation_revision"))
@@ -109,19 +105,15 @@ public class Observation {
     private Long artifactId;
 
     /**
-     * Whose conduct the observation is ABOUT — the single subject identity, ALWAYS populated (ADR 0022 §3):
-     * the author for author-side practices, the reviewer for reviewer-side ones. This is the reviewer-side
-     * firewall axis: visibility and the feedback recipient key off this column, NOT a static user role, so a
-     * reviewer-side observation is filed against the reviewer (its {@code about_user_id}) and feeds
-     * reviewer-facing feedback, never bleeding into the author's delivered feedback — the contrast is
-     * {@code about_user_id} (who the row is ABOUT) versus the delivery's {@code recipient_user_id} (who
-     * feedback is delivered TO), there being no actor/developer column in the actor-free model (ADR 0022 §3).
-     * Raw {@code Long} FK to {@code user} with no {@code @ManyToOne}, keeping the cross-cutting identity column
-     * scalar. DB FK {@code sfk_observation_subject} — the {@code sfk_} prefix marks a deliberate scalar user FK
-     * (no {@code @ManyToOne}) so the Liquibase schema-drift gate ({@code diffExcludeObjects foreignkey:sfk_.*})
-     * treats it as intentional rather than Hibernate drift (sibling: {@code sfk_feedback_subject}). No
-     * {@code ON DELETE} (RESTRICT) because the column is {@code NOT NULL} — a referenced user delete must be
-     * blocked, not silently nulled.
+     * Whose conduct the observation is ABOUT — always populated (ADR 0022 §3): the author for author-side
+     * practices, the reviewer for reviewer-side ones. Visibility and the feedback recipient key off this
+     * column, not a static role — contrast with the delivery's {@code recipient_user_id} (who feedback
+     * goes TO).
+     *
+     * <p>Raw {@code Long} FK, no {@code @ManyToOne}: DB FK {@code sfk_observation_subject}, whose
+     * {@code sfk_} prefix marks it a deliberate scalar FK so the Liquibase schema-drift gate treats it as
+     * intentional rather than Hibernate drift. No {@code ON DELETE} because the column is {@code NOT NULL}
+     * — a referenced user delete must be blocked, not silently nulled.
      */
     @NotNull
     @Column(name = "about_user_id", nullable = false)
@@ -129,11 +121,10 @@ public class Observation {
 
     /**
      * Cross-run locus grain: a deterministic hash of WHAT the observation is about (practice + target +
-     * subject + a content anchor), never of WHEN it was produced (no job id, no line number), computed by
-     * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}. Lets a {@code Feedback}
-     * supersede rather than re-post and lets a reaction follow one underlying locus across re-detections;
-     * indexed by {@code idx_observation_correlation}. NULL means the observation predates the fingerprint
-     * (backfill-free, populated for new rows only) — distinct from the per-run {@link #occurrenceKey}.
+     * subject + a content anchor), never of WHEN, computed by
+     * {@link de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint}. Lets a
+     * {@code Feedback} supersede rather than re-post and lets a reaction follow one locus across
+     * re-detections. NULL means the observation predates the fingerprint, not a missing reference.
      */
     @Column(name = "recurrence_key", length = 64)
     private String recurrenceKey;
@@ -154,10 +145,8 @@ public class Observation {
 
     /**
      * The good/bad valence of this observation, resolved per observation by the detector (ADR 0022).
-     * NULL exactly when {@link #presence} does not {@link Presence#carriesValence() carry valence} — an
-     * inapplicable practice and an undecided one both have a direction of nothing. This coupling is the
-     * 2×2 invariant, enforced in the DB by {@code chk_observation_presence_assessment} and mirrored on
-     * the JPA path by {@link #onCreate}.
+     * NULL exactly when {@link #presence} does not {@link Presence#carriesValence() carry valence} —
+     * enforced in the DB by {@code chk_observation_presence_assessment} and mirrored by {@link #onCreate}.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "assessment", length = 8)
@@ -177,9 +166,8 @@ public class Observation {
 
     /**
      * Impact band — meaningful only for an {@link Assessment#BAD} observation; NULL on a GOOD or
-     * NOT_APPLICABLE row (ADR 0022). The "NULL unless BAD" coupling has no DB CHECK: the DB only
-     * allow-lists the values ({@code chk_observation_severity}). Enforcement is the detection parser's
-     * coherence coercion, with {@link #onCreate} as the JPA-path backstop.
+     * NOT_APPLICABLE row (ADR 0022). Unlike {@link #assessment}, this coupling has no DB CHECK — the
+     * detection parser's coherence coercion enforces it, with {@link #onCreate} as the JPA-path backstop.
      */
     @Enumerated(EnumType.STRING)
     @Column(name = "severity", length = 16)
@@ -205,13 +193,11 @@ public class Observation {
     private Instant observedAt;
 
     /**
-     * JPA-path safety net only. The production write path is the native {@code ObservationRepository.insertIfAbsent}
-     * (this entity is {@code @Immutable} and nothing calls {@code save()}), so @PrePersist never fires in prod — the
-     * real guards there are {@link de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser}'s
-     * coherence coercion plus the DB CHECK constraints. The presence/assessment invariant below HAS a DB backstop
-     * ({@code chk_observation_presence_assessment}); the severity invariant does NOT (the DB only allow-lists severity
-     * values), so the parser coercion is its sole enforcement. This method keeps both invariants meaningful for any
-     * future caller that does go through the JPA persist path.
+     * JPA-path safety net only: the production write path is the native
+     * {@code ObservationRepository.insertIfAbsent} (this entity is {@code @Immutable}; nothing calls
+     * {@code save()}), so this never fires in prod. Kept so the coherence invariants documented on
+     * {@link #assessment} and {@link #severity} stay enforced for any future caller that does persist
+     * through JPA.
      */
     @PrePersist
     protected void onCreate() {
@@ -224,9 +210,6 @@ public class Observation {
         if (origin == null) {
             origin = ObservationOrigin.LIVE;
         }
-        // Mirror the DB CHECK chk_observation_presence_assessment: assessment is NULL exactly when the
-        // presence carries no direction. A present/absent observation always carries a GOOD/BAD valence;
-        // an inapplicable or undecided one never does.
         if (presence.carriesValence() != (assessment != null)) {
             throw new IllegalStateException(
                 "Observation coherence violation: assessment is required exactly for a presence that carries valence (presence=" +
@@ -236,9 +219,6 @@ public class Observation {
                     ")"
             );
         }
-        // Severity is an impact band for a BAD observation only (ADR 0022, mirrored by the severity field's
-        // javadoc): it MUST be null unless the assessment is BAD. No DB CHECK enforces this (see method javadoc);
-        // the parser's coercion is the production backstop, this is the JPA-path one.
         if (assessment != Assessment.BAD && severity != null) {
             throw new IllegalStateException(
                 "Observation coherence violation: severity must be null unless assessment is BAD (assessment=" +

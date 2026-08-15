@@ -12,19 +12,8 @@ import {
 	workspacePractices,
 } from "./story-mock-data";
 
-/**
- * A stand-in for the review endpoints that actually answers the question it was asked.
- *
- * <p>The list stories used to hand MSW a fixed array and return it for every request. Choosing a
- * severity then changed the URL, refetched, and got the same rows back — so the toolbar looked
- * connected and the list underneath it was a photograph. Combined with a story whose `search` prop
- * could not change (see `@/stories/stateful`), that is two independent reasons a filter appeared
- * to do nothing, and fixing one alone would still have looked broken.
- *
- * <p>These handlers filter and paginate the fixture the way the server does, so a story can show a
- * genuinely filtered list, a second page, or an empty result reached by over-filtering — and a play
- * function that clicks a facet is testing something.
- */
+// These handlers filter, sort and paginate the fixture the way the server does. A mock that answers
+// every URL with the same array leaves a story that clicks a facet testing nothing.
 
 const PAGE_SIZE = 25;
 
@@ -43,7 +32,6 @@ function single(url: URL, name: string): string | undefined {
 	return url.searchParams.get(name) ?? undefined;
 }
 
-/** True when the filter was not asked for, or when it was and this row satisfies it. */
 function matches(selected: string[], actual: string | undefined): boolean {
 	return selected.length === 0 || (actual !== undefined && selected.includes(actual));
 }
@@ -112,12 +100,9 @@ function filterFeedback(rows: ReviewFeedback[], url: URL) {
 }
 
 /**
- * Worst first: shortfalls by severity, then strengths, then the observations that judged nothing.
- *
- * This is the server's `ACTIONABILITY` ordering, written out so a story can *show* it. The mock used
- * only to check that the parameter was sent and then answer in the fixture's order — which would let
- * a control that sets the wrong value, or a screen that reads the answer back in its own order, pass
- * a story that claims the list is sorted.
+ * The server's `ACTIONABILITY` ordering, applied rather than merely accepted: a mock that checked
+ * only that the parameter was sent would pass a story whose control sets the wrong value, or whose
+ * screen re-orders the answer on the way in.
  */
 const ACTIONABILITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
 
@@ -137,25 +122,19 @@ function sortObservations(rows: ReviewObservation[], url: URL) {
 }
 
 export interface ReviewMockOptions {
-	/** Override the rows the observation list serves — used by the long-page stories. */
 	observations?: ReviewObservation[];
-	/** Override the rows the feedback list serves. */
 	feedback?: ReviewFeedback[];
 	/**
-	 * Reject an observation query that does not ask for this ordering.
-	 *
-	 * The review detail screen shows the five observations most worth acting on, which is a server
-	 * ordering it has to request. A mock that ignores `sort` would answer a screen that forgot to ask
-	 * exactly as it answers one that remembered.
+	 * Answer an observation query with a 400 unless it asks for this ordering. A screen that shows
+	 * only the observations most worth acting on has to request that ordering, and a mock that ignores
+	 * `sort` answers a screen that forgot to ask exactly as it answers one that remembered.
 	 */
 	requireObservationSort?: string;
 }
 
 /**
- * Every read the practice-review screens make, answered from the fixture.
- *
- * Spread it into a story's `msw.handlers` and add the ones that story overrides *before* it: MSW
- * matches the first handler that fits, so a story wanting a 500 puts its own handler first.
+ * Spread into a story's `msw.handlers` with the handlers that story overrides placed *before* it:
+ * MSW matches the first handler that fits.
  */
 export function reviewHandlers({
 	observations,

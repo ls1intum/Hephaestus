@@ -114,12 +114,8 @@ export function PracticeCatalog({
 	const supportedModesFor = (practice: Practice) =>
 		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
 			?.supportedAutomatedReviewModes ?? [];
-	// Named from the area list this screen already renders, so a row can say "Follows Testing" rather
-	// than the slug the assignment carries. Null when there is no name to give, which the sentence
-	// handles rather than this map: it reads the level off the assignment's own `source`, so a
-	// missing name degrades to "its area" instead of claiming the workspace decided. (The tree below
-	// buckets only by the areas it was given, so a practice in an area this list has not loaded is
-	// not rendered at all — the fallback is a property of the shared sentence, not of this screen.)
+	// Null rather than the slug when the area has no name here: `inheritedTierSourceSentence` degrades
+	// to "its area" instead of claiming the workspace decided.
 	const areaNames = new Map(areas.map((area) => [area.slug, area.name]));
 	const inheritedFromFor = (practice: Practice) =>
 		(practice.areaSlug ? areaNames.get(practice.areaSlug) : null) ?? null;
@@ -186,10 +182,6 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							// The prose a practice carries has never been on this screen at all: a row is a name
-							// and a set of badges, and an admin deciding where a practice belongs could not tell
-							// from "Scope the change to one concern" what it asks of their team without opening
-							// it. On the name, on hover or on focus, and on the same card the review screen uses.
 							<PracticeDetailHoverCard practice={practice}>
 								<Link
 									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
@@ -451,12 +443,8 @@ function PracticeActions({
 					Edit practice
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				{/* A link out, not a picker. This screen used to write the tier through a second hook of
-					    its own, and because the control bound the *effective* value with nothing saying where
-					    that value came from, choosing a tier here pinned a practice-level override — undoing
-					    the workspace answer an admin had just set, without the word "inherited" ever
-					    appearing. One field, one writer; the row still reads the tier out beside the
-					    practice's name. */}
+				{/* A link out, not a picker: the tier has one writer, on Review. A control bound to the
+				 *effective* value would pin a practice-level override the moment it was touched. */}
 				<DropdownMenuItem
 					render={
 						<Link
@@ -582,7 +570,7 @@ function PracticeRowDetails({
 	practice: Practice;
 	title: ReactNode;
 	supportedModes: readonly Practice["automatedReviewPolicy"]["automatedReview"]["mode"][];
-	/** The practice's area by name, or null when this list cannot name it. */
+	/** The area's name, never its slug; null when this list cannot name it. */
 	inheritedFrom: string | null;
 }) {
 	const unavailableLabel = automatedReviewUnavailableLabel(
@@ -595,20 +583,15 @@ function PracticeRowDetails({
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
-				{/* Every tier, including Deliver. The badge used to hide there, which was defensible while a
-				    picker beside it always said the tier out loud; now that this is the only read-out, a
-				    hidden one would leave the rows an admin is least likely to question saying nothing at
-				    all about how far the system may go on them. */}
 				<Badge variant="outline">
-					{/* Two badges and a bare sentence in a row read as a list of unrelated words. The prefix
-					    is absolutely positioned, which blockifies it — every engine inserts the space, so it
-					    is announced as a sentence rather than welded to the tier name. */}
+					{/* `position: absolute` blockifies the prefix, so every engine inserts the space and it is
+					    announced as a sentence rather than welded to the tier name. */}
 					<span className="sr-only">How far Hephaestus may go: </span>
 					{REVIEW_TIER_LABELS[practice.reviewTier.effective]}
 				</Badge>
-				{/* Where the tier came from, because the value alone cannot be acted on: an admin who reads
-				    "Off" here needs to know whether this practice was singled out or whether the whole
-				    workspace is off, and those have different fixes. */}
+				{/* The tier alone cannot be acted on: an admin who reads "Off" needs to know whether this
+				    practice was singled out or whether the whole workspace is off, and those have
+				    different fixes. */}
 				<span>{follows ?? "Set for this practice"}</span>
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />

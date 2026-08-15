@@ -3,30 +3,19 @@ import type { ReviewFeedback } from "@/api/types.gen";
 /**
  * The opening words of a piece of feedback, as a line of prose a row can be told apart by.
  *
- * <h4>What the server sends</h4>
- * `bodyPreview` is `left(body, 320)` over the stored body, and the stored body is the Markdown note
- * the developer receives: a lead line, bold finding headings with an inline-code file locator, a
- * fenced quote of their code, an italic aside, and `---` between findings. A real note runs one to
- * three thousand characters, so 320 of them lands somewhere inside the first fenced block. Printing
- * that verbatim gives a row title of `**🔴 A cache miss …** · \`ReviewQueryService.java:118\` You
- * wrote: ```java return repository.findVisible(workspaceId, id)` — markup, a language tag and half a
- * statement, in the one place on the screen that is supposed to say what the feedback is about.
+ * `bodyPreview` is a fixed-character cut of the Markdown note the developer receives, so it usually
+ * ends somewhere inside the first fenced code quote. Printed verbatim a row title reads as markup, a
+ * language tag and half a statement. This flattens it to the sentence a person would read out: code
+ * fences go entirely — a fragment of somebody's Java is never the useful summary of a note about
+ * their Java — as do rules and list bullets, while inline markers are unwrapped so the words survive.
  *
- * <h4>What this does</h4>
- * Flattens that to the sentence a person would read out. Code fences go entirely — a fragment of
- * somebody's Java is never the useful summary of a note about their Java — as do rules and list
- * bullets, and the inline markers are unwrapped rather than deleted so the words survive.
- *
- * <h4>The ellipsis is not decoration</h4>
- * It marks the two different cuts this text has been through: the server's 320 characters, and this
- * function dropping a block it would not print. Without it a preview that stops mid-clause reads as
- * feedback that was itself truncated, which is the reading the product owner arrived at. `bodyTruncated`
- * has been on the wire since the endpoint shipped and nothing had ever read it.
+ * The trailing ellipsis marks both cuts the text has been through, the server's and this function's.
+ * Without it a preview that stops mid-clause reads as feedback that was itself truncated.
  *
  * Returns `undefined` for the two states with no prose to show: no body at all — conversation
- * feedback is recorded before anything is composed — and a preview that is nothing but a code
- * quote. They read differently to an operator, so the caller tells them apart on `bodyPreview`
- * rather than printing one sentence for both.
+ * feedback is recorded before anything is composed — and a preview that is nothing but a code quote.
+ * They read differently to an operator, so the caller tells them apart on `bodyPreview` rather than
+ * printing one sentence for both.
  */
 export function feedbackPreviewText(
 	feedback: Pick<ReviewFeedback, "bodyPreview" | "bodyTruncated">,
@@ -76,18 +65,15 @@ function flattenMarkdown(source: string): Flattened {
 		kept.push(inlineToText(trimmed.replace(/^#{1,6}\s+/, "").replace(/^([-*+]|\d+\.|>)\s+/, "")));
 	}
 
-	// Dropping the lead-in is right when prose follows the block and wrong when nothing does: on a
-	// preview the server cut inside the first fence, that one line is every word of prose there is,
-	// and popping it turns a row title into "No feedback text was composed" for feedback that has a
-	// body. Put it back rather than report the note as empty.
+	// Dropping the lead-in is right when prose follows the block and wrong when nothing does: where
+	// the cut landed inside the first fence, that one line is every word of prose there is, and
+	// popping it would report a note that has a body as having none.
 	if (kept.length === 0 && leadIn) kept.push(leadIn);
 
 	return { text: kept.join(" ").replace(/\s+/g, " ").trim(), dropped };
 }
 
 /**
- * Inline markers unwrapped to the words they were marking.
- *
  * Link text is kept and the target dropped: a URL in a two-line preview is the least readable thing
  * that could occupy it, and the row already links somewhere of its own.
  */

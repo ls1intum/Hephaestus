@@ -3,8 +3,8 @@
 ---
 
 Reviewed work is named the same way everywhere. A practice, a review run and a recorded observation
-all now identify what was reviewed as `scm.pull_request`, `scm.issue` or `chat.conversation_thread`,
-instead of two internal vocabularies that had already drifted apart — a chat thread was called one
+all now identify what was reviewed by one name each — `scm.pull_request`, `scm.issue`,
+`chat.conversation_thread` — instead of two internal vocabularies that had already drifted apart — a chat thread was called one
 thing where reviews are stored and another where they are run. The bundled practice catalog, the API
 and the admin screens use the new names.
 

@@ -9,14 +9,13 @@ import org.jspecify.annotations.Nullable;
 /**
  * One area's slice of the review-tier rollup.
  *
- * <p>A top-level record rather than a member of {@link ReviewTierRollupDTO}, because the OpenAPI filter
- * keeps a schema only when its name ends in {@code DTO} or it is named in the allowlist. A nested record is
- * emitted under its bare simple name, gets dropped by that filter, and leaves a dangling {@code $ref} that
- * fails the client generator rather than the spec build — the silent-drop trap the allowlist comment
- * warns about.
+ * <p>A top-level record, not a member of {@link ReviewTierRollupDTO}, because the OpenAPI filter keeps a
+ * schema only when its name ends in {@code DTO} or appears in the allowlist — a nested record is emitted
+ * under its bare name, gets dropped, and leaves a dangling {@code $ref} that fails the client generator
+ * rather than the spec build.
  *
- * @param areaSlug the area, or {@code null} for the practices belonging to no area at all — they skip the
- *     middle level entirely and inherit straight from the workspace
+ * @param areaSlug null groups the practices belonging to no area; they skip the middle level entirely and
+ *     inherit straight from the workspace
  */
 @Schema(description = "One area's practice counts per effective tier, and the area's own tier")
 public record AreaReviewTierRollupDTO(

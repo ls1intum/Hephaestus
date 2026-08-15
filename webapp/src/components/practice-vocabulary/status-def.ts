@@ -4,28 +4,14 @@ import type { FacetOption } from "@/components/common/FacetMultiSelect";
 /**
  * One entry in a status registry: everything a surface needs to render one value of one enum.
  *
- * Every screen that shows a status — a table cell, a filter dropdown, a select item, an empty state,
- * a detail header — reads the same entry, so the four of them cannot drift. Before this existed each
- * screen kept its own label map and its own `switch` returning a badge variant, which is why the
- * Delivery filter dropdown rendered plain grey text next to a table of coloured tags.
- *
- * `icon` is not decoration and not optional. Colour is never the only channel that carries meaning
- * (WCAG 2.2 SC 1.4.1), and the badge variants collapse: two severities share `destructive`, three
- * statuses share `outline`. The icon is what still separates them in greyscale and under a filter.
+ * `icon` is required and must be unique within its own enum. Badge variants collapse — several
+ * values share one — so the icon is the only channel left when colour is unavailable
+ * (WCAG 2.2 SC 1.4.1). `label` is operator-facing words, never the wire constant.
  */
 export interface StatusDef {
-	/** Operator-facing words. Sentence case, and never the wire constant. */
 	label: string;
-	/** Second channel alongside colour; distinct within its own enum. */
 	icon: LucideIcon;
 	badgeVariant: BadgeVariant;
-	/**
-	 * One sentence saying what the value means, for a detail surface, a tooltip or an empty state.
-	 * Not a restatement of `label` — it earns its place by saying something the label cannot.
-	 *
-	 * Deliberately not rendered in the filter dropdown: a facet item is one truncated line, so a
-	 * sentence there arrives as a fragment. The icon and the words are what carry that surface.
-	 */
 	description: string;
 }
 
@@ -44,10 +30,7 @@ export type BadgeVariant =
  */
 export type StatusDefs<TValue extends string> = Record<TValue, StatusDef>;
 
-/**
- * Icon colour matching a badge variant, for the places an icon appears outside a badge — filter
- * items, the trace rail. Keeps the dropdown's visual identity the same as the tag's.
- */
+/** Icon colour matching a badge variant, for the places an icon appears outside a badge. */
 const TONE_CLASS: Record<BadgeVariant, string> = {
 	default: "text-primary",
 	secondary: "text-muted-foreground",
@@ -62,8 +45,7 @@ export function statusToneClass(variant: BadgeVariant): string {
 }
 
 /**
- * The registry's values in declaration order, for a schema allowlist or a story that walks them all.
- * Declaration order is the order a reader should meet them in, so it is also the filter order.
+ * The registry's values in declaration order, which is the order a reader should meet them in.
  *
  * <p>Typed as a non-empty tuple so it drops straight into `z.enum(...)`, which will not take a plain
  * array. The assertion holds by construction: `StatusDefs` is a total `Record` over a union of
@@ -75,14 +57,7 @@ export function statusValues<TValue extends string>(
 	return Object.keys(defs) as [TValue, ...TValue[]];
 }
 
-/**
- * Filter options built from the registry, so a dropdown cannot say something a badge does not.
- *
- * <p>Every value, in registry order. A facet that wants fewer filters the result — one caller does,
- * the delivery place filter, and it says why at its call site. That is a fact about that one screen
- * and it used to live here as an `only` parameter whose own documentation named its single caller,
- * which is the shape of a prop that should have been a `.filter()`.
- */
+/** Every value as a facet option, in registry order. A facet wanting fewer filters the result. */
 export function statusFacetOptions<TValue extends string>(
 	defs: StatusDefs<TValue>,
 ): FacetOption<TValue>[] {

@@ -67,10 +67,9 @@ Silent Mode is engaged.
 
 `begin` stamps an absolute ceiling `imp_exp` (`hephaestus.auth.impersonation-max-lifetime`, default
 1h); the issuer caps each token's `exp` at `min(now + accessTtl, imp_exp)`, and `refresh` drops the
-`act` claim (auto-exit) once it passes. **Note:** there is currently no proactive/silent refresh
-caller, so a session already ends at the access-token expiry (`accessTtl`, ~15m) — shorter than the
-ceiling. The `imp_exp` machinery is therefore future-proofing that becomes the binding limit only once
-silent refresh is wired; until then the de-facto impersonation time-box is `accessTtl`.
+`act` claim (auto-exit) once it passes. `imp_exp` is the binding limit: the webapp keeps the session
+alive across access-token expiry (`use-session-keep-alive.ts`, mounted from `main.tsx`), so an
+impersonation ends at the ceiling rather than at `accessTtl`.
 
 ## Deferred / follow-up
 
@@ -80,15 +79,12 @@ silent refresh is wired; until then the de-facto impersonation time-box is `acce
 - **Elevation tagging** (`elevated_via_instance_admin`): make an instance admin's cross-workspace
   access distinguishable in the audit trail. Needs a new `auth_event` type (a CHECK-constraint
   migration) + a log-volume decision — its own slice.
-- **Banner countdown / proactive refresh**: only meaningful once the session-refresh decision is made
-  (see above).
-- **`APP_AUDITOR`** read-only tier: cut as YAGNI for a single-operator instance; the enum + authority
-  design makes later reintroduction ~1 day.
-- ~~**Instance-provided LLM resources (BYO vs pooled)**~~: **shipped** (#1368). The plan recorded here
-  was to buy per-workspace budgets via self-hosted LiteLLM virtual keys rather than build a metering
-  subsystem; that was reversed. An instance admin now registers connections and models under
-  `/admin/llm/*`, prices them, and grants them to workspaces; workspaces may add their own connection
-  when instance settings permit it. Usage is metered into `llm_usage_event` and capped by two
-  independent monthly budgets — the instance's cap on shared-model spend and the workspace's cap on
-  its own provider — which are never summed. See
-  [ADR 0026](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md).
+- **`APP_AUDITOR`** read-only tier: not built. A single-operator instance has no second audience for
+  it, and the enum + authority design does not stand in the way of adding one.
+LLM governance is not on this list — it is built. An instance admin registers connections and models
+under `/admin/llm/*`, prices them, and grants them to workspaces; a workspace may add its own
+connection when instance settings permit it. Usage is metered into `llm_usage_event` and capped by two
+independent monthly budgets — the instance's cap on shared-model spend and the workspace's cap on its
+own provider — which are never summed.
+[ADR 0026](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0026-per-purpose-agent-bindings-and-llm-governance.md)
+records the decision.

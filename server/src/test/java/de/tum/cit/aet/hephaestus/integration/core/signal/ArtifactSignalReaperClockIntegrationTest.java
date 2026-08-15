@@ -63,10 +63,9 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     void aPermanentlyFailingSignalStillLapsesOnSchedule() {
         SignalKey key = recordPending(1L, START);
 
-        // Every re-offer throws, so nothing ever calls markRefused and the claim is the only write the row
-        // sees. Were the claim to stamp state_changed_at — the column lapseStalePending reads — a retry
-        // delay shorter than the deadline would push the deadline out on every sweep, and the row would
-        // be immortal.
+        // Every re-offer throws, so the claim is the only write the row sees. Were the claim to stamp
+        // state_changed_at — the column lapseStalePending reads — the deadline would push out on every
+        // sweep and the row would be immortal.
         Instant lapsedAt = null;
         for (Instant now : sweeps(Duration.ofDays(30))) {
             signals.lapseStalePending(now.minus(LAPSE_AFTER), now);
@@ -89,10 +88,8 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     void aRepeatedlyRefusedSignalStillLapsesOnSchedule() {
         SignalKey key = recordPending(2L, START);
 
-        // The dominant path, and the one a throw-based simulation never reaches: the re-offer gets as far
-        // as the gate and is refused again for the same class of reason, so markRefused writes PENDING
-        // over PENDING. If that restamped state_changed_at the deadline would move out by an hour every
-        // hour, and this signal would outlive the instance.
+        // The dominant path, unreachable by a throw-based simulation: markRefused writes PENDING over
+        // PENDING. If that restamped state_changed_at, the deadline would move out on every sweep.
         Instant lapsedAt = null;
         for (Instant now : sweeps(Duration.ofDays(30))) {
             signals.lapseStalePending(now.minus(LAPSE_AFTER), now);
@@ -145,10 +142,9 @@ class ArtifactSignalReaperClockIntegrationTest extends BaseIntegrationTest {
     @Test
     @DisplayName("a claimed batch does not come back as the next batch")
     void aClaimedBatchIsNotHandedToTheNextSweep() {
-        // More due rows than one batch holds. Every row a claim touches is stamped with one identical
-        // timestamp, so without the id tiebreak the ordering key cannot tell them apart and the database
-        // is free to return the same rows again — the starvation the claim was added to remove, in a
-        // weaker form that only shows up above one batch size.
+        // More due rows than one batch holds. A claim stamps every touched row with one identical
+        // timestamp, so without an id tiebreak the ordering key cannot tell them apart and the same
+        // rows could come back.
         for (long artifactId = 100L; artifactId < 106L; artifactId++) {
             recordPending(artifactId, START);
         }

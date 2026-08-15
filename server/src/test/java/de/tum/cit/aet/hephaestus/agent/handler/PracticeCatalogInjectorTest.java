@@ -71,7 +71,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
 
     /**
      * A workspace that has expressed no review opinion of its own, so every practice below it resolves to
-     * {@link PracticeReviewTier#DEFAULT} — the tier the SQL predicate this class no longer uses assumed.
+     * {@link PracticeReviewTier#DEFAULT}.
      */
     private Workspace workspace() {
         Workspace ws = new Workspace();
@@ -186,9 +186,9 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("a practice whose effective tier is OFF is not staged, and one that inherits its tier is")
     void offPracticesAreFilteredOutAfterTheTierIsResolved() {
-        // The repository no longer filters by tier — a `review_tier <> 'OFF'` predicate answers UNKNOWN for
-        // the null column that means "inherit", so the whole inheritance chain would vanish from the
-        // catalogue. The injector resolves the chain and filters here instead, which is what this pins.
+        // The repository does not filter by tier: a `review_tier <> 'OFF'` predicate would answer UNKNOWN
+        // for the null column that means "inherit", making the inheritance chain vanish from the
+        // catalogue. The injector resolves the chain and filters here instead.
         Practice off = practice("silenced", ScmSignals.PULL_REQUEST_OPENED);
         off.setReviewTier(PracticeReviewTier.OFF);
         Practice inherits = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
@@ -306,11 +306,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         assertThat(slugs).containsExactly("authoring");
     }
 
-    /**
-     * Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work — which is what
-     * a workspace that has never configured anything gets, and therefore what these fixtures meant before
-     * the chain existed.
-     */
+    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

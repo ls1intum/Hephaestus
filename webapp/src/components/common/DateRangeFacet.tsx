@@ -11,11 +11,10 @@ export interface DateRangeFacetProps {
 	/**
 	 * Which date this filters, in the words the rows use: "Observed", "Composed", "Changed".
 	 *
-	 * Required, and not defaulted to "Date". Four screens filter four different timestamps through
-	 * this control — when an observation was made, when feedback was composed, when a setting was
-	 * changed, when a sign-in happened — and every one of them was labelled "Date", which is the
-	 * category and not the value. A filter's name has to be "concrete and predictable" (NN/g, "Filter
-	 * Categories and Values"); a default here would let the next screen ship unlabelled again.
+	 * Required, and deliberately not defaulted to "Date": several screens filter different timestamps
+	 * through this control, and "Date" names the category rather than the value. A filter's name has to
+	 * be "concrete and predictable" (NN/g, "Filter Categories and Values"), and a default would let the
+	 * next screen ship unlabelled.
 	 */
 	title: string;
 	value: DateRange | undefined;
@@ -66,8 +65,8 @@ export function DateRangeFacet({ title, value, onChange }: DateRangeFacetProps) 
 					onSelect={onChange}
 					numberOfMonths={1}
 				/>
-				{/* The way out, which every other facet in the toolbar has and this one did not: a picked
-				    range could only be widened by picking another, never removed. */}
+				{/* The way out every other facet in the toolbar has: without it a picked range can only be
+				    replaced by picking another, never removed. */}
 				{applied && (
 					<>
 						<Separator />

@@ -35,28 +35,19 @@ export interface TracePageProps {
 	workspaceSlug: string;
 	artifactKind: string;
 	artifactId: number;
-	/**
-	 * Whether this reader may open workspace administration, which decides whether a refusal is
-	 * allowed to offer its fix. Resolved by the route from the membership the guard already fetched,
-	 * so this page stays a pure render of what it is given.
-	 */
+	/** Resolved by the route from the membership its guard already fetched. */
 	canAdminister: boolean;
 }
 
 /**
- * The kinds a person can point at and ask about. A conversation thread and a document are reviewed on
- * the occasion their source produces, and the request endpoint refuses them — so offering the button
- * there would be a control whose only outcome is an error.
- *
- * <p>Kept here because nothing on the wire says which kinds have a front door; the durable answer is a
- * flag on the trace itself. Being wrong in this direction costs a missing button, not a broken one.
+ * The kinds the request endpoint accepts. A conversation thread and a document are reviewed on the
+ * occasion their source produces, and asking for one by hand is refused. Kept here because nothing
+ * on the wire says which kinds have a front door; being wrong in this direction costs a missing
+ * button rather than a broken one.
  */
 const REVIEWABLE_ON_DEMAND: readonly string[] = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue];
 
-/**
- * One piece of work and every practice's answer, the quiet ones included. Nothing collapses behind
- * a "show more": a practice that did nothing is precisely what the reader came to find.
- */
+/** One piece of work and every practice's answer, the quiet ones included. */
 export function TracePage({
 	workspaceSlug,
 	artifactKind,
@@ -81,8 +72,7 @@ export function TracePage({
 				description: problemDetailOf(error, "Try again in a moment."),
 			}),
 	});
-	// Shown on the page rather than raised as a toast: a refusal is the answer to the question this
-	// whole page exists to answer, and a toast is gone before the reader has finished reading it.
+	// On the page rather than in a toast: a toast is gone before the reader has finished reading it.
 	const refusal = requestReview.data?.status === "REFUSED" ? requestReview.data : undefined;
 	const backLink = (
 		<Link
@@ -162,8 +152,6 @@ export function TracePage({
 							)}
 						</div>
 					</div>
-					{/* On this page and not only on the listing: this is where a developer is already
-					    asking why nothing happened, and the answer is often "nothing has asked yet". */}
 					{REVIEWABLE_ON_DEMAND.includes(trace.artifactKind) && (
 						<Button
 							variant="outline"
@@ -184,10 +172,8 @@ export function TracePage({
 					<Alert variant="warning">
 						<AlertTitle>No review was started</AlertTitle>
 						<AlertDescription>
-							{/* Verbatim: the sentence is written next to the reason it explains so that a
-							    screen, a bot comment and a support answer cannot come to say different things
-							    about one refusal. The coded reason, not the prose, is what the fix link is
-							    keyed on — the prose is the server's to change. */}
+							{/* Verbatim, and the fix link is keyed on the coded reason rather than the prose:
+							    the prose is the server's to change. */}
 							<span>{refusal.reasonDescription ?? "No review was started."}</span>
 							{refusal.reason && (
 								<RefusalFixLink
@@ -304,8 +290,6 @@ export function TracePage({
 													{entry.practiceName}
 												</ItemTitle>
 											</div>
-											{/* Printed verbatim: the server phrases it as what would change the outcome, and
-										    re-wording it here is how a screen and a support answer drift. */}
 											<p className="break-words text-sm text-muted-foreground">
 												{entry.explanation}
 											</p>
@@ -341,8 +325,8 @@ export function TracePage({
 														<dd className="min-w-0">
 															{occurrence ? (
 																// The accessible name contains the visible label verbatim, so a
-																// speech-control user can activate the link by the words they can
-																// see (WCAG 2.2 SC 2.5.3).
+																// speech-control user can activate the link by the words they
+																// can see (WCAG 2.2 SC 2.5.3).
 																<a
 																	href={`#${occurrenceDomId(occurrence.id)}`}
 																	className="inline-flex max-w-full items-center gap-1 font-medium text-foreground underline underline-offset-4 hover:no-underline"
@@ -352,8 +336,8 @@ export function TracePage({
 																	<ArrowUpIcon className="size-3 shrink-0" aria-hidden />
 																</a>
 															) : (
-																// The id names an occurrence this trace does not carry: the raw signal
-																// name is worse copy than a label and far better than silence.
+																// The id names an occurrence this trace does not carry — a skew
+																// between the recorder and this endpoint.
 																<span className="break-all">{entry.occasionedBy}</span>
 															)}
 														</dd>
@@ -379,9 +363,8 @@ export function TracePage({
 												</ul>
 											)}
 											{entry.watches.length > 0 && (
-												// Set as identifiers, because that is what they are: this endpoint sends
-												// signal names and no display names, and inventing labels here would
-												// disagree with the timeline above, which prints the ones the server owns.
+												// Identifiers, because this endpoint sends signal names and no display
+												// names; inventing labels here would disagree with the timeline above.
 												<p className="w-full min-w-0 break-words text-xs text-muted-foreground">
 													Starts a review on:{" "}
 													{entry.watches.map((signal, index) => (

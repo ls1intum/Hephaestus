@@ -3,6 +3,7 @@ import { HttpResponse, http } from "msw";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { tracedArtifactPage, tracedArtifacts } from "./story-mock-data";
 import { TraceListPage } from "./TraceListPage";
@@ -27,10 +28,8 @@ const meta = {
 		onSearchChange: fn(),
 	},
 	/**
-	 * The work-kind picker and the pager are controlled, so a story that passed only `fn()` could not
-	 * show a chosen kind: clicking "Documents" left the trigger reading "All work". The harness holds
-	 * the answer, and the spy still records the patch — the stories below assert on the *shape* of
-	 * what is emitted, which is where the `kind=__all` sentinel would escape into a shareable URL.
+	 * The picker and the pager are controlled, so a story passing only `fn()` could not show a chosen
+	 * kind. The harness holds the answer and the spy still records the patch.
 	 */
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
@@ -53,15 +52,14 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// The five kinds the fixture carries, counted here rather than read back off it: a fixture
-		// that loses a row should fail this story instead of quietly agreeing with it.
+		// Written out rather than read back off the fixture, so a fixture that loses a row fails here
+		// instead of quietly agreeing with the page.
 		await expect(await canvas.findByText("5 pieces of work.")).toBeVisible();
 		await expect(canvas.getByRole("link", { name: /Member-facing review activity/ })).toBeVisible();
 		await expect(canvas.getByText("6 moments recorded · 2 started a review")).toBeVisible();
 	},
 };
 
-/** An artifact with no number, container or upstream link still lists rather than disappearing. */
 export const UnlinkableArtifact: Story = {
 	parameters: {
 		msw: {
@@ -76,19 +74,15 @@ export const UnlinkableArtifact: Story = {
 	},
 };
 
-/**
- * Every kind this build knows carries a name a person can read. A raw `docs.document` in the picker
- * is the failure this list already fixed once for pull requests, and documents ship reviewable now.
- */
 export const EveryKindIsNamed: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await expect(await canvas.findByText("Onboarding: your first week")).toBeVisible();
 		await expect(canvas.queryByText("docs.document")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("combobox", { name: /Show/ }));
-		// Base UI portals the listbox outside the story's subtree.
-		await expect(await screen.findByRole("option", { name: "Documents" })).toBeVisible();
-		await expect(screen.getByRole("option", { name: "Conversations" })).toBeVisible();
+		// The listbox is portalled, so it is on `screen` rather than in the canvas.
+		await expectSettledVisible(await screen.findByRole("option", { name: "Documents" }));
+		screen.getByRole("option", { name: "Conversations" });
 	},
 };
 
@@ -118,13 +112,8 @@ export const FilteredToOneKind: Story = {
 	},
 };
 
-/**
- * Clearing the filter must leave no trace in the URL: a `kind=__all` link filters for a kind nothing
- * ever has, and would hand somebody an empty list they cannot explain.
- */
+/** The `ALL_KINDS` sentinel must not escape into the URL: it filters for a kind nothing ever has. */
 export const ClearingTheFilterFromThePicker: Story = {
-	// "Everything" carries a sentinel value because Base UI reads "" as no selection at all; the
-	// sentinel is what must not escape into the search params.
 	args: { search: { kind: "scm.issue", page: 3 }, onSearchChange: fn() },
 	play: async ({ args, canvas }) => {
 		await userEvent.click(await canvas.findByRole("combobox", { name: "Show" }));

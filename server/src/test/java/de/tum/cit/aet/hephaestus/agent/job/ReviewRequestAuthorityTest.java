@@ -24,10 +24,8 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.Mock;
 
 /**
- * The rule that decides who may spend the workspace's budget to have coaching delivered to somebody
- * else. Before this class existed, the {@code /hephaestus review} command answered "anybody who can
- * comment", which is why every case below is written from the attacker's side rather than the
- * feature's.
+ * The rule that decides who may spend the workspace's budget to have coaching delivered to somebody else.
+ * Every case below is written from the attacker's side rather than the feature's.
  */
 @Tag("unit")
 @DisplayName("Who may ask for a review")
@@ -60,9 +58,9 @@ class ReviewRequestAuthorityTest extends BaseUnitTest {
     }
 
     /**
-     * The case the security fix is about. A bystander can comment on the merge request — that is what
-     * being on the team means — but the feedback the review produces is delivered to the author, so
-     * letting the bystander occasion it hands them a way to aim coaching at a colleague.
+     * A bystander can comment on the merge request — that is what being on the team means — but the
+     * feedback the review produces is delivered to the author, so letting the bystander occasion it hands
+     * them a way to aim coaching at a colleague.
      */
     @Test
     void aWorkspaceMemberWhoIsNeitherAuthorNorAssigneeMayNot() {

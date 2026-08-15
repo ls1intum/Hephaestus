@@ -101,9 +101,8 @@ class PracticeBindingTest extends BaseUnitTest {
     }
 
     /**
-     * What a review reads depends on what occasioned it — that dependency is the whole reason evidence
-     * sits on the binding — and a review nobody occasioned reads everything, because a review somebody
-     * asked for is a request to apply the practice as widely as it applies.
+     * A review nobody occasioned reads everything, because a review somebody asked for is a request to
+     * apply the practice as widely as it applies.
      */
     @Test
     void evidenceIsSelectedByTheOccasionAndUnionedWhenThereIsNone() {
@@ -121,10 +120,9 @@ class PracticeBindingTest extends BaseUnitTest {
     }
 
     /**
-     * A binding that says nothing about drafts is a binding that does not run on them. Stated in the
-     * reader because the component is a primitive: without a default, every bundled practice and every
-     * client would have to write {@code "onDrafts": false}, and a shape that must be written out is a
-     * shape that will be written out wrong.
+     * The default lives in the reader, not the schema, because the component is a primitive: without it,
+     * every bundled practice and client would have to write {@code "onDrafts": false}, and a shape that
+     * must be written out is a shape that will be written out wrong.
      */
     @Test
     void aBindingThatSaysNothingAboutDraftsDoesNotRunOnThem() {

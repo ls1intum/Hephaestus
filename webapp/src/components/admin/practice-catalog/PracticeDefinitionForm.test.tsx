@@ -71,9 +71,8 @@ describe("the identifier a practice is created under", () => {
 });
 
 /**
- * `isPending` drops the instant the mutation resolves, and the caller navigates on the very next
- * line. Releasing the guard on `isPending` alone therefore races that navigation and asks "Discard
- * unsaved changes?" about the save that has just succeeded.
+ * `isPending` drops the instant the mutation resolves and the caller navigates on the next line, so
+ * a guard released on it races that navigation and asks to discard a save that just succeeded.
  */
 describe("the unsaved-changes guard around a save", () => {
 	it("stays out of the way of a caller navigating after a successful save", async () => {

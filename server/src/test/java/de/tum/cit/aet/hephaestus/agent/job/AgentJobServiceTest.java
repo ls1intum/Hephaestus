@@ -129,7 +129,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
         // One pull-request practice that says nothing about its own tier, so it inherits the workspace's —
         // and the workspace has expressed no opinion either, so the chain bottoms out at DELIVER, which
-        // admits a review. The tier is no longer filtered in SQL; the service resolves these rows itself.
+        // admits a review.
         lenient()
             .when(practiceRepository.findReviewTierRows(anyLong()))
             .thenReturn(List.of(tierRow(null, ArtifactKinds.PULL_REQUEST)));
@@ -697,8 +697,7 @@ class AgentJobServiceTest extends BaseUnitTest {
         @Test
         void submitPreparedNamesTheCooldownRatherThanGuessingAtTheBudget() {
             // The live case this pins: an enabled binding, no budget configured at all, and a run
-            // stopped by the workspace's cooldown. The message used to name an exhausted budget and a
-            // disabled binding — three claims, all false, one of them pointing at a cap nobody set.
+            // stopped by the workspace's cooldown.
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);

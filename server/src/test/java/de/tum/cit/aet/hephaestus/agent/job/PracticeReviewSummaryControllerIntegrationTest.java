@@ -238,12 +238,9 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     /**
-     * The window narrows the list, and it narrows what {@code status} already selected rather than
-     * replacing it — the two filters have to intersect, or an operator who picks a status and then a
-     * date range silently gets one of the two answers back.
-     *
-     * <p>The window is half-open like the sibling observation and feedback listings: a review created
-     * exactly at {@code from} is in, one created exactly at {@code to} is out.
+     * The window intersects with {@code status} rather than replacing it, and is half-open like the
+     * sibling observation and feedback listings: a review created exactly at {@code from} is in, one
+     * created exactly at {@code to} is out.
      */
     @Test
     @WithAdminUser
@@ -258,10 +255,8 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         // Same window, another tenant: the workspace predicate must survive the new filters.
         persistReviewAt(otherWorkspace, from.plusSeconds(60), AgentJobStatus.COMPLETED);
 
-        // Unfiltered: every review in this workspace, and none of the other workspace's.
         listReviews("").jsonPath("$.page.totalElements").isEqualTo(4);
 
-        // The window alone keeps the lower bound and the failed run inside it, and drops both ends.
         listReviews("?from=2026-03-10T00:00:00Z&to=2026-03-12T00:00:00Z")
             .jsonPath("$.page.totalElements")
             .isEqualTo(2)
@@ -270,16 +265,12 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             .jsonPath("$.content[1].id")
             .isEqualTo(onLowerBound.getId().toString());
 
-        // The window intersected with a status: the failed run inside the window drops out, and the
-        // completed runs outside it stay out. A filter that replaced the other would return 3 or 2.
         listReviews("?status=COMPLETED&from=2026-03-10T00:00:00Z&to=2026-03-12T00:00:00Z")
             .jsonPath("$.page.totalElements")
             .isEqualTo(1)
             .jsonPath("$.content[0].id")
             .isEqualTo(onLowerBound.getId().toString());
 
-        // An open-ended lower bound still excludes what precedes it: three left, oldest is the one
-        // sitting exactly on the bound rather than the review a second before it.
         listReviews("?from=2026-03-10T00:00:00Z")
             .jsonPath("$.page.totalElements")
             .isEqualTo(3)
@@ -288,7 +279,6 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             .jsonPath("$.content[2].id")
             .isEqualTo(onLowerBound.getId().toString());
 
-        // An open-ended upper bound is exclusive, so the review created exactly on it is the one gone.
         listReviews("?to=2026-03-12T00:00:00Z")
             .jsonPath("$.page.totalElements")
             .isEqualTo(3)

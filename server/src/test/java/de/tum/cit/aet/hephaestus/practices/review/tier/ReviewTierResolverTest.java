@@ -53,10 +53,7 @@ class ReviewTierResolverTest extends BaseUnitTest {
             assertThat(resolved.source()).isEqualTo(ReviewTierSource.WORKSPACE);
         }
 
-        /**
-         * A practice in no area skips the middle level rather than failing. Areas are optional — the FK is
-         * {@code ON DELETE SET NULL} — so an unfiled practice is a normal state, not a broken one.
-         */
+        /** Areas are optional — the FK is {@code ON DELETE SET NULL} — so an unfiled practice is normal. */
         @Test
         void aPracticeWithNoAreaFallsStraightThroughToTheWorkspace() {
             Practice practice = new Practice();
@@ -68,7 +65,6 @@ class ReviewTierResolverTest extends BaseUnitTest {
             assertThat(resolved.source()).isEqualTo(ReviewTierSource.WORKSPACE);
         }
 
-        /** Every level can hold every tier, and the nearest one that holds any always wins. */
         @ParameterizedTest
         @EnumSource(PracticeReviewTier.class)
         void theNearestDecisionWinsWhicheverTierItIs(PracticeReviewTier tier) {
@@ -87,8 +83,7 @@ class ReviewTierResolverTest extends BaseUnitTest {
     class Bottom {
 
         /**
-         * A workspace that never chose keeps doing what every practice already did. The migration relies on
-         * this exactly: it nulls out every practice whose migrated tier equals this value, and that is only
+         * The migration nulls out every practice whose migrated tier equals this value, which is only
          * behaviour-preserving because an unset workspace resolves back to it.
          */
         @Test
@@ -130,8 +125,7 @@ class ReviewTierResolverTest extends BaseUnitTest {
         }
 
         /**
-         * Resolving a practice through its area entity must agree with resolving the two raw columns. They
-         * are separate overloads and every caller picks one, so a divergence would be invisible until two
+         * Separate overloads, each with its own caller, so a divergence would stay invisible until two
          * surfaces disagreed about the same practice.
          */
         @Test
@@ -156,11 +150,9 @@ class ReviewTierResolverTest extends BaseUnitTest {
     class Inheritance {
 
         /**
-         * The source says which level answered; it does not say whether the level being described inherited.
-         * The two come apart exactly on an area that decided for itself: source {@code AREA}, and to that
-         * area the value is its own. Reading "inherited" off the source instead of off the presence of an
-         * override is how an area that had made a decision gets rendered as though it had not — offering a
-         * reset for a value there is nothing to reset.
+         * The source says which level answered; it does not say whether the level being described
+         * inherited. Reading "inherited" off the source instead of off the presence of an override is how
+         * an area that decided for itself gets rendered as though it had not.
          */
         @Test
         void anAreaThatDecidedIsNotInheritingEvenThoughTheSourceIsArea() {

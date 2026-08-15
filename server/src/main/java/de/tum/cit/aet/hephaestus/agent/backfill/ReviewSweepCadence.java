@@ -3,25 +3,20 @@ package de.tum.cit.aet.hephaestus.agent.backfill;
 import java.time.Duration;
 
 /**
- * How often a schedule re-offers a workspace's recent work to the review path.
- *
- * <p>Two values, not a cron expression. A cron field would let an operator write a schedule whose next
- * occurrence nobody can predict from the row, and the one property this feature has to keep — that a
- * sweep's window is bounded to the recent past — is stated relative to the cadence. A vocabulary of two
- * makes {@link #maxLookback()} a fact rather than an evaluation.
+ * How often a schedule re-offers a workspace's recent work to the review path. Two values, not a cron
+ * expression: a cron field would let an operator write a schedule whose next occurrence nobody can predict
+ * from the row, and the property this feature must keep — that a sweep's window is bounded to the recent
+ * past — is stated relative to the cadence.
  */
 public enum ReviewSweepCadence {
     DAILY(Duration.ofDays(1)),
     WEEKLY(Duration.ofDays(7));
 
     /**
-     * The longest window any sweep may look back over, whatever its cadence.
-     *
-     * <p>This is what keeps a sweep honest as a LIVE measurement. A sweep files its observations in the
-     * same population as the event path (see {@code SignalOrigins}), and that is only defensible while
-     * its corpus is "work from the last few days" — a population defined by when the sweep ran, not by
-     * anybody's choice. Stretch the window and it becomes a corpus somebody selected with hindsight,
-     * which is a campaign, and a campaign records itself as BACKFILL for exactly that reason.
+     * The longest window any sweep may look back over, whatever its cadence. This is what keeps a sweep
+     * honest as a LIVE measurement: its corpus must be "work from the last few days", defined by when the
+     * sweep ran rather than anybody's choice — stretch the window and it becomes a hindsight-selected
+     * corpus, which is what BACKFILL is for.
      */
     public static final Duration MAX_LOOKBACK = Duration.ofDays(7);
 
@@ -31,7 +26,6 @@ public enum ReviewSweepCadence {
         this.interval = interval;
     }
 
-    /** How long between one sweep and the next. */
     public Duration interval() {
         return interval;
     }

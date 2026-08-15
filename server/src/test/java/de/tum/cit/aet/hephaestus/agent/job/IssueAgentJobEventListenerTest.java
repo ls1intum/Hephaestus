@@ -438,8 +438,7 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
         @Test
         void onIssueClosed_recordsSyncDiscoveredClosesWithoutReviewingThem() {
             // The sync-trigger guard: a history replay must NOT fire a retrospective review for every issue
-            // the repository ever closed. Without it, one sync = a mass-replay job storm. The ledger row is
-            // still written, so a close we did receive leaves a trace instead of being dropped at the door.
+            // the repository ever closed. Without it, one sync = a mass-replay job storm.
             var issueData = createIssueData(Issue.State.CLOSED);
             listener.onIssueClosed(new ScmDomainEvent.IssueClosed(issueData, "completed", syncContext()));
 

@@ -1,14 +1,11 @@
 import { z } from "zod";
 
 /**
- * The list's URL state.
- *
  * `kind` is deliberately *not* named `artifactKind`: TanStack Router merges every route's search
- * schema into one global type, and the admin review surfaces narrow `artifactKind` to the kinds
- * this build knows — reusing the name with a wider type would widen it for them and break their
- * `search={(previous) => previous}` links.
+ * schema into one global type, and the admin review surfaces narrow `artifactKind` to the kinds this
+ * build knows — reusing the name with a wider type would widen it for them.
  *
- * It stays a free string rather than an enum because the server derives kinds from whichever
+ * <p>It stays a free string rather than an enum because the server derives kinds from whichever
  * integrations are registered: an unknown value costs one 400 the page reports out loud, a narrowed
  * one would quietly ignore the reader's filter.
  */

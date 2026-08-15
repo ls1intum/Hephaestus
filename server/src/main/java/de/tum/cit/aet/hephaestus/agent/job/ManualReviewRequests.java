@@ -34,40 +34,22 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The one path a review somebody asked for takes, whichever front door they asked through.
+ * The one path a review somebody asked for takes, whether through the {@code /hephaestus review} command
+ * or the "Review this now" REST endpoint: check standing (see {@link ReviewRequestAuthority}), ask the
+ * gate, record the ask in the signal ledger, submit, and return a refusal a person can read.
  *
- * <p>Two doors exist today — the {@code /hephaestus review} command on a merge request and the REST
- * endpoint the web app's "Review this now" calls — and both have to do the same five things in the same
- * order: establish that the asker has standing (see {@link ReviewRequestAuthority}), ask the workspace's
- * gate whether a review of this kind of work runs at all, record the ask in the signal ledger so the
- * artifact trace can say who asked and what came of it, submit, and hand back a refusal a person can read.
+ * <p>The gate is asked about the kind's declared manual-request signal, not a lifecycle event that did not
+ * happen — the artifact trace renders the signal as the reason a review ran.
  *
- * <h2>The occasion is the request, and it is recorded as one</h2>
- * <p>The gate is asked about the kind's declared manual-request signal — {@code
- * scm.pull_request.manual_review} and its issue counterpart — not about some lifecycle event that
- * did not happen. The artifact trace renders the signal as the reason a review ran, so naming an event
- * nobody observed puts an untruth in the one place a developer goes to find out why.
+ * <p>The job's metadata carries no trigger signal: a job with none runs every active practice of the
+ * artifact's kind, which is what "review this now" means. The ledger key still names the request signal.
  *
- * <h2>The job's metadata carries no signal, deliberately</h2>
- * <p>The ledger key names the request; the submission request does not. That asymmetry is the contract
- * {@code PracticeCatalogInjector} already documents: a job with no trigger signal in its metadata runs
- * every active practice of the artifact's kind, which is what a person asking "review this now" means.
- * Putting the request signal in the metadata instead would have the injector filter practices by a
- * signal no practice binds to, and the job would fail to prepare having found none.
+ * <p>{@link ObservationOrigin#MANUAL} is passed explicitly rather than left to the submission request's
+ * default, which reads the trigger signal and would misreport this as an unbounded organic signal.
  *
- * <h2>Origin</h2>
- * <p>{@link ObservationOrigin#MANUAL}, passed explicitly rather than left to the submission request's
- * default. The default reads the trigger signal, so it is right only for as long as the metadata signal
- * stays null; stating it here means a later change to that contract cannot quietly file a self-selected
- * sample into the population the LIVE trend line is read from.
- *
- * <h2>Order of the checks, which is load-bearing</h2>
- * <p>Standing, then the rate limits, then the ledger row, then the gate. Authorizing first means the
- * limits only ever count asks the product was willing to entertain, so a stranger cannot consume a
- * team's allowance by being refused repeatedly. Limiting before recording means a declined ask leaves
- * no row — see {@link ManualReviewRateLimits} for why counting one's own refusals would make the limit
- * tighten under retry. The gate comes last because it is the only step whose answer belongs in the
- * artifact's trace: by then there is a row for it to settle.
+ * <p>Checks run standing, then rate limits, then the ledger row, then the gate. Limiting before recording
+ * keeps a declined ask from tightening the limit under retry (see {@link ManualReviewRateLimits}); the
+ * gate runs last because only it needs a ledger row to settle against.
  */
 @Service
 public class ManualReviewRequests {
@@ -101,16 +83,12 @@ public class ManualReviewRequests {
     }
 
     /**
-     * Ask for a review of a pull request now.
+     * <strong>Must not be called inside a transaction</strong> — {@link AgentJobService#submit} opens its
+     * own. The pull request's associations (author, assignees, repository, branch refs) must already be
+     * fetched.
      *
-     * <p><strong>Must not be called inside a transaction</strong> — {@link AgentJobService#submit} opens
-     * its own and says why. The pull request's associations (author, assignees, repository, branch refs)
-     * must already be fetched; nothing here reopens a session to read them.
-     *
-     * @param requesters every SCM identity of the person asking. A collection rather than one identity
-     *     because a Hephaestus account may link several, and asking the question of one of them at a
-     *     time refuses an admin for signing in through the wrong provider. Empty means nobody was
-     *     identified, which is itself a refusal.
+     * @param requesters every SCM identity of the person asking; asking only one risks refusing an admin
+     *     who signed in through a different provider. Empty means nobody was identified.
      */
     public ManualReviewOutcome requestPullRequestReview(
         Workspace workspace,
@@ -132,8 +110,8 @@ public class ManualReviewRequests {
             pullRequest.getHeadRefName() == null ||
             pullRequest.getBaseRefName() == null
         ) {
-            // Nothing to clone or diff. Reported as the artifact being gone rather than as a gate skip:
-            // the mirror has not caught up with the branch, and it is not the workspace that declined.
+            // Reported as the artifact being gone, not a gate skip: the mirror hasn't caught up, the
+            // workspace didn't decline anything.
             return ManualReviewOutcome.refused(SignalStateReason.ARTIFACT_GONE);
         }
         return run(
@@ -201,7 +179,6 @@ public class ManualReviewRequests {
      */
     private record Asker(User standing, List<Long> identityIds) {}
 
-    /** Which signal this kind says a person raises by asking, the limits, the ledger, the gate, the job. */
     private ManualReviewOutcome run(
         Workspace workspace,
         Issue artifact,
@@ -213,8 +190,7 @@ public class ManualReviewRequests {
         ArtifactKind kind = AgentJobService.artifactKindFor(jobType);
         SignalName requestSignal = signalOptions.manualRequestSignalFor(kind).orElse(null);
         if (requestSignal == null) {
-            // The kind never declared one, so there is no occasion to record this under and no vocabulary
-            // to explain it in. Refusing beats inventing a signal name the descriptor does not know.
+            // Refusing beats inventing a signal name the descriptor does not know.
             log.warn("Manual review request on a kind that declares none: kind={}", kind);
             return ManualReviewOutcome.refused(SignalStateReason.NO_ACTIVE_PRACTICE);
         }
@@ -233,9 +209,8 @@ public class ManualReviewRequests {
             return ManualReviewOutcome.refused(limited);
         }
 
-        // A fresh run id per ask, which is what makes two people asking two occasions rather than one
-        // deduplicated against the other — and what keeps a request from consuming the ledger entry an
-        // ordinary event was going to use.
+        // A fresh run id per ask keeps two people asking as two occasions instead of one deduplicating
+        // the other, and keeps a request from consuming the ledger entry an ordinary event would use.
         SignalKey key = ScmSignals.manualKey(workspace.getId(), artifact.getId(), requestSignal, UUID.randomUUID());
         transactionTemplate.executeWithoutResult(status ->
             signalRecorder.record(key, Instant.now(), DiscoveredVia.MANUAL, asker.standing().getId())

@@ -63,8 +63,7 @@ export function ObservationsListPage({
 	const totalPages = observationsQueryResult.data?.page?.totalPages;
 	// Guarded on the filter being set, because that is the only condition under which the first row
 	// names the filtered person — unfiltered, row zero is whoever happens to sort first, and the facet
-	// would put a stranger's name on somebody else's id. `ReviewPersonFacet` reads `fallbackName` only
-	// inside `selected != null`; deriving it under the same condition is what keeps the two together.
+	// would put a stranger's name on somebody else's id.
 	const filteredSubject = search.subjectUserId != null ? observations[0]?.subject : undefined;
 	const hasFilter = Boolean(
 		search.areaSlug?.length ||
@@ -162,9 +161,8 @@ export function ObservationsListPage({
 						onChange={(subjectUserId) => patchFilter({ subjectUserId })}
 						fallbackName={filteredSubject?.name ?? filteredSubject?.login}
 					/>
-					{/* "Observed" rather than "Date": this range filters `observedAt`, and the same control
-					    on Delivery filters when the feedback was composed. A filter label has to be
-					    "concrete and predictable" (NN/g, "Filter Categories and Values"). */}
+					{/* "Observed", not "Date": this range filters `observedAt`, while the same control on
+					    Delivery filters when the feedback was composed. */}
 					<DateRangeFacet
 						title="Observed"
 						value={toDateRange(search)}

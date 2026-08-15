@@ -70,9 +70,7 @@ export function recommendedBinding(
 	usedSignals: readonly string[] = [],
 ): PracticeBinding {
 	const taken = new Set(usedSignals);
-	// Only moments on the artifact's lifecycle are candidates. Seeding a new occasion with the
-	// hand-asked review would hand the author an occasion that never fires on its own — the server
-	// matches a manual request against any binding of the kind, so the signal decides nothing.
+	// Lifecycle moments only: an occasion seeded with the hand-asked review never fires on its own.
 	const free = lifecycleSignals(options.signals).filter((option) => !taken.has(option.signal));
 	const recommended = free.filter((option) => option.recommended);
 	const signals = (recommended.length > 0 ? recommended : free.slice(0, 1)).map(
@@ -87,8 +85,7 @@ export function claimedSignals(bindings: readonly PracticeBinding[]): Set<string
 
 /**
  * Which occasion holds each moment, numbered as the author sees them, skipping the occasion being
- * edited. The strip needs the number and not just the fact: "already taken" leaves the author hunting
- * for which card to change.
+ * edited. The number and not just the fact, so the author is told which card to change.
  */
 export function signalOwners(
 	bindings: readonly PracticeBinding[],
@@ -118,9 +115,9 @@ export function workTypeOptionsFor(
 }
 
 /**
- * The server sorts work types alphabetically, which is a stability guarantee rather than a claim
- * about what an author most often writes. That claim is presentation and lives here: the kinds this
- * build can label lead, and one it has never heard of follows rather than disappearing.
+ * The server sorts work types alphabetically as a stability guarantee, not a claim about what an
+ * author most often writes. That claim is presentation: known kinds lead, unknown ones follow rather
+ * than disappearing.
  */
 export function orderedWorkTypes(
 	definitionOptions: PracticeDefinitionOptions,
@@ -133,10 +130,7 @@ export function orderedWorkTypes(
 	);
 }
 
-/**
- * Only a pull request can be a draft. Offering the choice on any other kind asks the author about a
- * state that cannot occur.
- */
+/** Only a pull request can be a draft; on any other kind the choice is about an impossible state. */
 export function hasDrafts(artifactKind: string | undefined): boolean {
 	return artifactKind === ARTIFACT_KIND.pullRequest;
 }
@@ -149,10 +143,7 @@ export function bindingFieldId(index: number, field: string): string {
 	return `${bindingIdPrefix(index)}-${field}`;
 }
 
-/**
- * How an occasion is named to a reader who cannot see which card they are in. Two occasions present
- * two identically shaped groups, so every accessible name that belongs to one ends with this.
- */
+/** Occasions present identically shaped groups, so every accessible name inside one ends with this. */
 export function occasionLabel(index: number): string {
 	return `occasion ${index + 1}`;
 }

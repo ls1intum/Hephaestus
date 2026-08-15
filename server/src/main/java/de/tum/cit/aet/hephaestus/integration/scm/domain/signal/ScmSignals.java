@@ -41,10 +41,8 @@ public final class ScmSignals {
      * Somebody asked Hephaestus for a review of this pull request by hand.
      *
      * <p>Deliberately not {@code review_requested}: GitHub's {@code pull_request} webhook already uses
-     * that action for something else — a human reviewer being assigned — and {@link
-     * #PULL_REQUEST_REVIEWED} above already occupies that world. A name that reads as an ingested
-     * lifecycle event would also invite a vendor to claim it can raise this one; nothing can, which is
-     * why its descriptor declares an empty provenance.
+     * that action for a human reviewer being assigned. No vendor can raise this signal — its descriptor
+     * declares an empty provenance.
      */
     public static final SignalName PULL_REQUEST_MANUAL_REVIEW = SignalName.of("scm.pull_request.manual_review");
 

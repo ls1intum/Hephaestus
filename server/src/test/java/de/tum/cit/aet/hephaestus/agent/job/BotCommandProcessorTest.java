@@ -101,11 +101,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
     }
 
-    /**
-     * The commenter's identity is resolved here and nowhere else, because this is the only place that
-     * knows how a webhook names a person. What is done with it is {@link ReviewRequestAuthority}'s
-     * question — these tests pin only that the right identity reaches it.
-     */
+    /** These tests pin only that the right identity reaches {@link ReviewRequestAuthority}. */
     @Nested
     class CommenterIdentity {
 
@@ -129,11 +125,6 @@ class BotCommandProcessorTest extends BaseUnitTest {
             assertThat(captor.getValue()).containsExactly(commenter);
         }
 
-        /**
-         * A comment from an account the mirror has never synced is still an ask that must be answered
-         * for. It is handed on as null, which the authority refuses — an unattributable request cannot
-         * be shown to be an authorized one — an empty identity set has nobody with standing in it.
-         */
         @Test
         void anUnknownCommenterIsHandedOnAsNobody_ratherThanSkippingTheCheck() {
             PullRequest pr = createOpenPr();

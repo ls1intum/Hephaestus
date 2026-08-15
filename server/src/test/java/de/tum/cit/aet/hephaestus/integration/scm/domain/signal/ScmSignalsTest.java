@@ -43,9 +43,8 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldReMeasureAnIssueAfterItsAuthorRewritesTheDescription() {
-        // The motivating case for per-signal revisions. An issue has no commits, so if its signals
-        // keyed on anything code-shaped a practice about how issues are written could be measured once
-        // and never again — exactly the coaching loop it exists for.
+        // An issue has no commits, so if its signal keyed on anything code-shaped, an issue-writing
+        // practice could be measured once and never again.
         SignalKey before = issue(TriggerEventNames.ISSUE_CREATED, "Bug", "it broke", null).orElseThrow();
         SignalKey after = issue(
             TriggerEventNames.ISSUE_CREATED,
@@ -67,10 +66,9 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldGiveEachLabelOfOneUpdateItsOwnOccurrence() {
-        // The shape the webhook path produces: applying three labels in a single edit raises three
-        // events that agree on the issue, its prose and its update timestamp, and differ only in the
-        // label. Keying on anything but the label collapses all three into one ledger row, so a
-        // practice bound to "labelled" is measured once and never again for that edit.
+        // Applying three labels in one edit raises three events differing only in the label; keying on
+        // anything else collapses them into one ledger row, measuring a labelling-bound practice once per
+        // edit instead of once per label.
         SignalKey bug = issue(
             TriggerEventNames.ISSUE_LABELED,
             "Login fails",
@@ -95,8 +93,6 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldNotReMeasureTheSameLabellingThatWasMerelyRedelivered() {
-        // The other half: the same label on the same prose is the same occurrence however many times
-        // the provider announces it.
         SignalKey first = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug").orElseThrow();
         SignalKey redelivered = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug").orElseThrow();
 
@@ -105,15 +101,14 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldDeclineToKeyALabellingThatCannotNameItsLabel() {
-        // Same rule as a code-shaped signal with no head commit: a row keyed on nothing would swallow
-        // every later labelling of this issue.
+        // Same rule as a code-shaped signal with no head commit: a row keyed on nothing swallows every later labelling.
         assertThat(issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", null)).isEmpty();
     }
 
     @Test
     void shouldNotReReviewUnchangedCodeBecauseTheDescriptionWasEdited() {
-        // The converse of the issue case: a push signal's subject is the code, so editing prose around
-        // it must not buy another review.
+        // Converse of the issue case: a push signal's subject is the code, so editing prose must not buy
+        // another review.
         SignalKey before = pullRequest(
             TriggerEventNames.PULL_REQUEST_SYNCHRONIZED,
             "abc123",
@@ -150,8 +145,7 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldMakeARedeliveredMergeInert() {
-        // A merge happens once. Keying it on anything that can move would let a provider's redelivery
-        // spend a second review on the same landing.
+        // A merge happens once; keying it on anything that can move would let a redelivery spend a second review.
         SignalKey merged = pullRequest(
             TriggerEventNames.PULL_REQUEST_MERGED,
             "abc123",
@@ -178,8 +172,7 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldDeclineToKeyACodeShapedSignalWithNoHeadCommit() {
-        // Better no ledger row than one keyed on nothing: a row we cannot identify would deduplicate
-        // away every later occurrence of the same signal.
+        // Better no ledger row than one keyed on nothing, which would deduplicate away every later occurrence.
         assertThat(pullRequest(TriggerEventNames.PULL_REQUEST_READY, null, "t", "b")).isEmpty();
     }
 
@@ -192,8 +185,7 @@ class ScmSignalsTest extends BaseUnitTest {
 
     @Test
     void shouldRoundTripEverySignalBackToTheTriggerEventThatRaisedIt() {
-        // The reaper re-runs the gate from a stored signal, which needs the literal practices subscribe
-        // to; a signal that cannot name its trigger can never be re-offered.
+        // The reaper re-runs the gate from a stored signal; one that cannot name its trigger can never be re-offered.
         for (String triggerEvent : new String[] {
             TriggerEventNames.PULL_REQUEST_CREATED,
             TriggerEventNames.PULL_REQUEST_READY,

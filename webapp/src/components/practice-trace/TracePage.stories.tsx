@@ -12,15 +12,14 @@ const traceHandler = http.get(TRACE_URL, () => HttpResponse.json(artifactTrace))
 
 const COOLDOWN_SENTENCE = "This work was reviewed a moment ago, so nothing new was started.";
 
-// Reset by the play function rather than only initialised here: a story replayed in the same
-// session would otherwise carry the previous run's count and submit on the first click.
+// Reset by the play function, not only here: a story replayed in the same session would otherwise
+// carry the previous run's count and submit on the first click.
 let requestCalls = 0;
 
 const resetRequestCalls = () => {
 	requestCalls = 0;
 };
 
-/** Refuses the first request of a story run and submits every later one. */
 const refuseThenSubmitHandler = http.post(REQUEST_URL, () => {
 	requestCalls += 1;
 	return HttpResponse.json(
@@ -54,7 +53,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/** Every outcome the API can report, each with its own reason, none of them behind a toggle. */
 export const EveryOutcome: Story = {
 	play: async ({ canvas }) => {
 		await expect(
@@ -66,17 +64,13 @@ export const EveryOutcome: Story = {
 			canvas.getByText("This practice is set to measure quietly rather than to speak up."),
 		).toBeVisible();
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
-		// The word, not `REVIEW_TIER_LABELS.PROPOSE`: the component renders that same entry, so reading
-		// it back here would agree with any label the registry happens to hold, including a renamed
-		// one. This screen and the catalog have to say "Propose", and that is what is written down.
+		// The word, not `REVIEW_TIER_LABELS.PROPOSE`: reading the registry back would agree with any
+		// label it happens to hold, including a renamed one.
 		await expect(canvas.getByText("Propose")).toBeVisible();
 	},
 };
 
-/**
- * Two occurrences share one signal name at different revisions: a practice row has to point at the
- * occurrence, not at the name.
- */
+/** The same signal name recurs on every revision, so a row has to point at the occurrence. */
 export const SameSignalTwice: Story = {
 	play: async ({ canvas, canvasElement }) => {
 		await canvas.findByText("Small, reviewable changes");
@@ -102,15 +96,12 @@ export const SameSignalTwice: Story = {
 	},
 };
 
-/** The timeline carries the reason a signal never became a review, not just that it did not. */
 export const SignalsExplainThemselves: Story = {
 	play: async ({ canvas }) => {
 		// Scoped to the timeline: an occurrence's label also appears as "Rests on" text on every
 		// practice row that rests on it, so a page-wide query is ambiguous by design.
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 		await expect(timeline.getByText("Marked ready for review")).toBeVisible();
-		// Names the cause and what follows from it: a cooldown is not the end of the matter, and a
-		// reason that stops at the cause leaves the reader thinking it is.
 		await expect(
 			timeline.getByText(
 				"This work was reviewed too recently; a later change gets its own review.",
@@ -120,20 +111,10 @@ export const SignalsExplainThemselves: Story = {
 	},
 };
 
-/**
- * A refusal that can be undone offers the way to undo it, and one that cannot says nothing extra.
- *
- * This is the whole thesis of the page in one line of markup. "The workspace's review settings
- * turned it away" names a screen an admin has to go and find; a link is that screen. The two quiet
- * reasons beside it are the control: a cooldown expires on its own and a missed deadline is already
- * past, so a settings link there would only invite somebody to widen a limit to fix a non-fault.
- */
 export const RefusalsLinkToTheirFix: Story = {
 	play: async ({ canvas }) => {
 		const timeline = within(await canvas.findByRole("region", { name: "What we noticed" }));
 
-		// The accessible name names the destination. It survives being read out of its sentence, in a
-		// screen reader's list of the page's links, which "here" does not.
 		await expect(
 			timeline.getByRole("link", { name: "Open Review: When and where" }),
 		).toHaveAttribute("href", "/w/demo/admin/practices/review?section=when-and-where");
@@ -141,13 +122,6 @@ export const RefusalsLinkToTheirFix: Story = {
 	},
 };
 
-/**
- * The same page for somebody who cannot open administration: the reasons stay, the links go.
- *
- * Every member of a workspace can read a trace, and most of them are not admins. A link into
- * `/admin` would bounce them off the route guard and back to the workspace home — losing the page
- * they were reading, to be told nothing. The sentence already says everything they can act on.
- */
 export const MembersAreOfferedNoAdminLinks: Story = {
 	args: { canAdminister: false },
 	play: async ({ canvas }) => {
@@ -159,7 +133,6 @@ export const MembersAreOfferedNoAdminLinks: Story = {
 	},
 };
 
-/** Nothing was ever measured here, and the page says why rather than showing an empty screen. */
 export const NothingWasReviewed: Story = {
 	args: { artifactKind: "scm.issue", artifactId: 1430 },
 	parameters: {
@@ -174,11 +147,7 @@ export const NothingWasReviewed: Story = {
 	},
 };
 
-/**
- * A practice can name an occurrence this timeline does not carry — what a version skew between the
- * recorder and this endpoint looks like from here. The raw signal name is worse copy than a label
- * and far better than a row that drops the one thing explaining it.
- */
+/** What a version skew between the recorder and this endpoint looks like from the page. */
 export const OccurrenceMissingFromTheTimeline: Story = {
 	parameters: {
 		msw: {
@@ -215,10 +184,6 @@ export const OccurrenceMissingFromTheTimeline: Story = {
 	},
 };
 
-/**
- * An empty state has to be a statement about us — "we never saw it" — rather than a blank page the
- * reader is left to interpret.
- */
 export const NothingReachedIt: Story = {
 	args: { artifactKind: "scm.issue", artifactId: 1430 },
 	parameters: {
@@ -238,11 +203,6 @@ export const NothingReachedIt: Story = {
 	},
 };
 
-/**
- * A written document: named in the reader's words rather than as `docs.document`, and without the
- * "Review this now" button — a document is reviewed when its source publishes it, and asking for one
- * by hand is refused, so the button could only ever produce an error.
- */
 export const DocumentHasNoButtonToAsk: Story = {
 	args: { artifactKind: "docs.document", artifactId: 512 },
 	parameters: {
@@ -290,12 +250,7 @@ export const Mobile: Story = {
 	},
 };
 
-/**
- * The refusal is the point. A workspace turns an ask down for reasons the person asking can neither
- * see nor fix, so the answer is a 200 carrying a sentence — and that sentence is printed exactly as
- * the server phrased it, because a re-worded copy is how a screen and a support answer start
- * disagreeing about the same refusal.
- */
+/** A refused ask is a 200 carrying the server's own sentence, not an error. */
 export const RefusesTheAskInTheServersWords: Story = {
 	parameters: {
 		msw: {
@@ -321,19 +276,12 @@ export const RefusesTheAskInTheServersWords: Story = {
 				"You have asked for as many reviews as an hour allows; the allowance refills.",
 			),
 		).toBeVisible();
-		// An allowance that refills is not something an admin can go and change, so the alert offers
-		// nowhere to go. Every refusal getting a link would make the links worth nothing.
+		// An allowance that refills is not something an admin can go and change.
 		await expect(alert.queryByRole("link")).not.toBeInTheDocument();
 	},
 };
 
-/**
- * Somebody pressed a button and was told no. That is the reader with the most immediate use for the
- * fix, and until now this alert was the one refusal surface that named none.
- *
- * The server's sentence is still printed exactly as it phrased it — the link is added beside it,
- * keyed on the coded reason, never on the prose.
- */
+/** The link is keyed on the coded reason, never on the prose the server sent beside it. */
 export const RefusalOffersTheFixToAnAdmin: Story = {
 	parameters: {
 		msw: {
@@ -389,12 +337,8 @@ export const RefusalWithheldFixFromAMember: Story = {
 };
 
 /**
- * A refusal is the answer to one attempt, so the next attempt clears it rather than leaving a stale
- * explanation above a review that is now running.
- *
- * <p>Two attempts, and the first one has to be refused. A story that only ever submits asserts that
- * a refusal is absent from a page it was never on — which an implementation that clears nothing
- * satisfies just as well.
+ * The first attempt has to be refused: a story that only ever submits asserts that a refusal is
+ * absent from a page it was never on, which an implementation clearing nothing satisfies too.
  */
 export const StartsAReviewAfterARefusal: Story = {
 	parameters: {
@@ -412,10 +356,6 @@ export const StartsAReviewAfterARefusal: Story = {
 	},
 };
 
-/**
- * Standing on the work is not the same as reaching it, so this one really is a 403 — and the page
- * says so through the error channel rather than pretending the workspace declined.
- */
 export const RefusesSomebodyWithNoStanding: Story = {
 	parameters: {
 		msw: {
@@ -438,9 +378,8 @@ export const RefusesSomebodyWithNoStanding: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
 
-		// The error channel, and only it: a 403 is not a decision the workspace made about this work,
-		// so it must not appear in the refusal alert, which is reserved for a `REFUSED` outcome whose
-		// sentence the server wrote. The toast is portalled, so it is on `screen`, not in the canvas.
+		// A 403 is not a decision the workspace made, so it must not reach the refusal alert, which is
+		// reserved for a `REFUSED` outcome. The toast is portalled, so it is on `screen`.
 		await screen.findByText("Couldn't ask for a review");
 		await screen.findByText(
 			"Only the work's author or assignees, or a workspace admin, can ask for a review of it.",

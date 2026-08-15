@@ -14,9 +14,6 @@ import org.jspecify.annotations.NonNull;
 /**
  * A campaign as an admin sees it — before confirming, while it runs, and after it ends.
  *
- * @param estimatedCostUsd absent when the workspace has no priced review history to derive a per-review
- *     cost from. The UI must show that as unknown; rendering an absent estimate as {@code $0.00} would
- *     invite exactly the unconsidered spend the confirmation step exists to prevent.
  * @param submittedCount artifacts for which a review job was created
  * @param passedCount artifacts walked past without one: already measured at their current state, or
  *     refused by the review gate. The campaign looked at each of these and decided.

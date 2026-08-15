@@ -38,10 +38,7 @@ export const RequirementsThatKeepSkipping: Story = {
 	},
 };
 
-/**
- * Reasons are counted per source, so a review blocked on several appears once for each. The rows can
- * therefore total more than the skipped count, and the copy above them never claims otherwise.
- */
+/** Reasons are counted per source, so a review blocked on several appears once for each. */
 export const ReasonsCanOutnumberTheSkips: Story = {
 	args: {
 		outcome: outcome({
@@ -71,7 +68,6 @@ export const ReasonsCanOutnumberTheSkips: Story = {
 	},
 };
 
-/** A practice the author turned off is skipped by its own setting, not by a failing source. */
 export const SkippedByItsOwnSetting: Story = {
 	args: {
 		outcome: outcome({
@@ -96,10 +92,7 @@ export const RequirementsThatAlwaysHold: Story = {
 	},
 };
 
-/**
- * A source that failed is named in the work type's own words, so the same panel serves a practice on
- * documents without a line of it being about pull requests.
- */
+/** A failed source is named in the work type's own words, never in a pull request's. */
 export const OnADocumentPractice: Story = {
 	args: {
 		sources: mockDocumentWorkType.allowedSources,
@@ -119,7 +112,7 @@ export const OnADocumentPractice: Story = {
 	},
 };
 
-/** Nothing to say before the practice has been reviewed, so the panel is absent rather than empty. */
+/** Absent rather than empty: there is nothing to say before the practice has been reviewed. */
 export const NeverReviewed: Story = {
 	args: { outcome: outcome({ practiceSlug: "submit-reviewable-work", considered: 0 }) },
 	play: async ({ canvasElement }) => {

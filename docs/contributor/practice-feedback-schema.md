@@ -76,7 +76,7 @@ part we did not fetch". So an `ABSENT` observation carries an `evidence.search` 
 - `boundary`: what the search did not cover.
 
 A practice declares the corpus its absences range over by holding a source `EXHAUSTIVE` (see
-[`EvidenceStance`](../../server/src/main/java/de/tum/cit/aet/hephaestus/practices/EvidenceStance.java)).
+[`EvidenceStance`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/EvidenceStance.java)).
 Every such source must appear in `consulted`, or delivery rejects the observation — the correct answer
 for a search that could not cover them is `INCONCLUSIVE`. There is deliberately no second field
 declaring "may assert absence here": `EXHAUSTIVE` already carries that decision, and a parallel

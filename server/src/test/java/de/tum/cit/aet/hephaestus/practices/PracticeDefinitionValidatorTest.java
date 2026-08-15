@@ -31,9 +31,8 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     );
 
     /**
-     * The cross-check that keeps a derived artifact kind honest: the kind is read off the signal's
-     * prefix, so a misspelled signal would otherwise invent a kind nothing can raise and leave the
-     * practice sitting in the catalog looking configured and never firing.
+     * The artifact kind is derived from the signal's prefix, so a misspelled signal would otherwise
+     * invent a kind nothing can raise and leave the practice looking configured but never firing.
      */
     @Test
     void rejectsASignalNoRegisteredDomainDeclares() {
@@ -96,9 +95,9 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
     }
 
     /**
-     * An exhaustive claim over a source that can never report a complete capture is a practice switched
-     * on and refusing every review it triggers — a state indistinguishable, in the report it produces,
-     * from nobody having done the thing yet.
+     * An exhaustive claim over a source that can never report a complete capture is a practice that
+     * refuses every review it triggers, indistinguishable in its report from nobody having done the
+     * thing yet.
      */
     @Test
     void rejectsAnAbsenceClaimOverASourceThatIsNeverComplete() {

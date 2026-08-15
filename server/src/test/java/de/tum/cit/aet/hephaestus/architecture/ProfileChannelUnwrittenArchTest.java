@@ -13,34 +13,22 @@ import org.junit.jupiter.api.Test;
  *
  * <p>{@code FeedbackReach.reaches(PROFILE)} returns {@code false} at every reach and
  * {@code ObservationOrigin.BACKFILL} is entitled to {@code PROFILE} and nothing else, so a backfilled
- * observation reaches no channel anybody can write to today. That is deliberate — posting on a merged pull
- * request notifies people about work they cannot act on, and the silence is recorded as
- * {@code FeedbackSuppressionReason.BACKFILL_QUIET} rather than swallowed.
- *
- * <p>The restriction only holds while nothing writes a {@code PROFILE} unit. {@code FeedbackAdmissionTest}
- * pins the entitlement matrix, but a matrix cannot see a {@code Feedback.builder().channel(PROFILE)} appearing
- * somewhere in {@code agent}: the ledger recorder would happily persist it, the tier gate would never have been
- * consulted, and a campaign's findings would start being delivered without anybody deciding they should be.
- * This rule closes that: naming the constant at all, outside the one place that derives the entitlement, is the
- * act that has to be deliberate.
- *
- * <p>Writing a profile surface is legitimate — it is the channel a backfill is <em>for</em>. When it is built,
- * add its producer to the allowance below, and expect {@code FeedbackReachTest} and
- * {@code FeedbackAdmissionTest} to fail on the same commit. Three failing pins is the intended cost of turning
- * a declared channel into a real one.
+ * observation reaches no channel anybody can write to today — recorded as
+ * {@code FeedbackSuppressionReason.BACKFILL_QUIET} rather than swallowed. {@code FeedbackAdmissionTest} pins
+ * the entitlement matrix, but a matrix cannot see a new {@code Feedback.builder().channel(PROFILE)} call site
+ * appearing elsewhere; this rule can.
  */
 class ProfileChannelUnwrittenArchTest extends HephaestusArchitectureTest {
 
     /**
      * The three allowed namers, and why each is not a producer:
      * <ul>
-     *   <li>{@code FeedbackChannel} itself — an enum cannot declare a constant without its {@code <clinit>}
-     *       and synthetic {@code $values()} touching it.</li>
-     *   <li>{@code ObservationOrigin} — derives which channel a BACKFILL observation is entitled to.</li>
-     *   <li>{@code FeedbackReach} — derives whether a workspace's reach extends to the channel, and answers
-     *       no. Matched by prefix because {@code javac} compiles its {@code switch} over the channel into a
+     *   <li>{@code FeedbackChannel} — an enum cannot declare a constant without its {@code <clinit>} and
+     *       synthetic {@code $values()} touching it.</li>
+     *   <li>{@code ObservationOrigin} and {@code FeedbackReach} — they derive the entitlement described above;
+     *       {@code FeedbackReach} is matched by prefix because {@code javac} compiles its {@code switch} into a
      *       synthetic {@code FeedbackReach$1} holding the switch map, and that synthetic is where the field
-     *       access actually lands.</li>
+     *       access lands.</li>
      * </ul>
      */
     @Test

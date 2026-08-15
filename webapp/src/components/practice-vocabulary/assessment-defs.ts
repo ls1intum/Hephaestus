@@ -7,8 +7,8 @@ export type Assessment = NonNullable<ReviewObservation["assessment"]>;
 /**
  * How the practice was followed, once `presence-defs` has established that it was in play.
  *
- * `BAD` wears a wrench rather than a second alert icon: the severity badge sits directly beside it
- * on every row that has one, and two alert triangles in a row read as one thing said twice.
+ * `BAD` wears a wrench rather than an alert icon because the severity badge, which does wear one,
+ * sits directly beside it on every row that has one.
  */
 export const ASSESSMENT_DEFS: StatusDefs<Assessment> = {
 	GOOD: {

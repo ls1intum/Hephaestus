@@ -15,14 +15,7 @@ export interface ReviewPersonProps {
 	className?: string;
 }
 
-/**
- * One person, as a chip: avatar and name, sized to sit in a row of badges.
- *
- * <p>The `display="compact" | "full"` fork is gone. It existed so a table cell could truncate and a
- * card could wrap, which is a distinction only the two renderings of each list needed; with one
- * responsive row there is one behaviour, and it is to wrap. Rule 7 of the rubric — a prop needs two
- * screens that genuinely disagree, and these two were the same screen twice.
- */
+/** One person, as a chip: avatar and name, sized to sit in a row of badges. */
 export function ReviewPerson({ person, prefix, className }: ReviewPersonProps) {
 	return (
 		<span

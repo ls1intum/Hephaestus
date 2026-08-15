@@ -14,14 +14,12 @@ import java.util.Optional;
 /**
  * The signal options a running server offers, assembled from the real shipped descriptors.
  *
- * <p>Names descriptor classes from outside the practices module, which that module itself may not do.
- * That is the point of it being test code: the boundary rule is checked over production classes, and this
- * fixture exists precisely to assert that the production module reaches the same answer without ever
- * naming them.
+ * <p>Lives in test code because it names descriptor classes from outside the practices module, which that
+ * module itself may not — the fixture exists to assert the production module reaches the same answer
+ * without naming them.
  *
- * <p>Deliberately the real ones rather than stubs: what an author may bind to is derived from the
- * shipped declarations, so a unit test built on invented options would stop testing the thing that can
- * actually break.
+ * <p>Deliberately the real descriptors, not stubs: what an author may bind to is derived from the shipped
+ * declarations, so invented options would stop testing what can actually break.
  */
 public final class PracticeSignalOptionsFixture {
 

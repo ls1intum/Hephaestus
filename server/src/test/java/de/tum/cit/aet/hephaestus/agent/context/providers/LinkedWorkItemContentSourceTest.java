@@ -382,10 +382,8 @@ class LinkedWorkItemContentSourceTest extends BaseUnitTest {
         metadata.put("source_branch", "feature/plain");
         var captured = provider.capture(request(metadata), provider.sourceKinds());
 
-        // The scan reached the end of the commit range and found no reference, which is as exhaustive
-        // as this source gets — and still does not establish that the work links to nothing, because
-        // a link the author never wrote in the description, the branch name or a commit subject is
-        // invisible to it. EMPTY says what was found; PARTIAL says what that finding can support.
+        // A link the author never wrote in the description, branch name or a commit subject is invisible
+        // to this scan, so even an exhaustive one stays PARTIAL rather than COMPLETE.
         assertThat(captured.completeness()).containsValue(SourceCompleteness.PARTIAL);
         assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
         assertThat(

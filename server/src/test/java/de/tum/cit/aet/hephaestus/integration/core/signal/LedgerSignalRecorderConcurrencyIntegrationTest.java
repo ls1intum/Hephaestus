@@ -25,18 +25,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * The ledger's arbitration, settled by a real database.
- *
- * <p>Everything that makes two observers of one occurrence produce one review sits inside a single
- * statement: an upsert whose update is conditional on the row still being undecided. Stubbing that
- * statement's row count proves only that the recorder reads it correctly — whether the database hands
- * out one claim or two is a property of the SQL, and nothing above it can be substituted for the
- * answer.
- *
- * <p>The outcome does not depend on the interleaving. Whichever transaction inserts first settles the
- * signal before it commits, so the other's conditional update finds a decided row and matches nothing;
- * if they do not overlap at all, the second one finds the same decided row. Exactly one winner either
- * way — which is the guarantee, not an artefact of timing.
+ * Proves the ledger's arbitration against a real database rather than a stub: two observers of one
+ * occurrence race on a single conditional upsert, and whether it hands out one claim or two is a property
+ * of the SQL itself — no mocked row count can substitute for that answer.
  */
 class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest {
 
@@ -104,10 +95,9 @@ class LedgerSignalRecorderConcurrencyIntegrationTest extends BaseIntegrationTest
     }
 
     /**
-     * The other half of the same clause. A reconciliation pass that saw a transition seconds before the
-     * provider announced it leaves a row nobody has ruled on; if the live announcement could not take it
-     * over, the review it was going to occasion would be deduplicated away by a pass that reviewed
-     * nothing.
+     * A reconciliation pass that saw a transition before the provider announced it leaves a row nobody has
+     * ruled on; if the live announcement could not take it over, that review would be silently deduplicated
+     * away.
      */
     @Test
     @DisplayName("a live observation claims a row nobody has decided yet")

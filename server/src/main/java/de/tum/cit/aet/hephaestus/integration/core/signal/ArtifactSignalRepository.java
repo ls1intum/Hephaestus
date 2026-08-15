@@ -20,11 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
  * the persistence context would let two observers of the same occurrence both decide to review it.
  */
 public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, UUID> {
-    /**
-     * Record an observation that must never displace a decision already taken.
-     *
-     * @return 1 when this call created the row, 0 when it was already there
-     */
+    /** @return 1 when this call created the row, 0 when it was already there */
     @Modifying
     @Query(
         value = """
@@ -48,12 +44,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * Record an observation, taking over a row that was merely observed and never decided on.
-     *
-     * <p>Without the takeover, a reconciliation pass that saw a transition just before the provider
-     * announced it would leave a {@code RECORDED} row that makes the live announcement lose its insert
-     * and be dropped. The {@code WHERE} clause keeps that from also letting a redelivery re-run a signal
-     * somebody already ruled on.
+     * Takes over a row that was merely observed and never decided on, so a reconciliation pass that ran
+     * just before the provider announced the same transition cannot make the live announcement lose its
+     * insert. The {@code WHERE} clause stops that from also letting a redelivery re-run a decided signal.
      *
      * @return 1 when this call now owns the signal, 0 when someone already decided it
      */
@@ -86,16 +79,10 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * Whether anybody has asked for a review of this artifact since {@code since}.
-     *
-     * <p>The artifact half of the limit on hand-requested reviews, and the reason the workspace's
-     * ordinary cooldown cannot serve as it: that cooldown is keyed on an agent-job idempotency key
-     * whose phase segment is the trigger signal, and a request occupies a phase of its own, so a
-     * requested review never lands in the same cooldown lane as the lifecycle review it repeats.
-     *
-     * <p>It counts asks, not reviews. An ask that was refused still consumed the workspace's attention
-     * and would be refused again for the same reason a second later, so re-asking immediately is the
-     * behaviour to damp — and an ask that succeeded is covered by this too.
+     * The artifact half of the limit on hand-requested reviews. The workspace's ordinary cooldown cannot
+     * serve as it: that cooldown is keyed on an idempotency key whose phase segment is the trigger
+     * signal, and a request occupies a phase of its own, so it never lands in the same lane as the
+     * lifecycle review it repeats. Counts asks, not reviews — a refused ask is the one worth damping.
      */
     @Query(
         "SELECT COUNT(s) > 0 FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
@@ -111,11 +98,8 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * How many reviews these identities have asked for in this workspace since {@code since}.
-     *
-     * <p>Takes a collection because one person is several SCM identities: a Hephaestus account can link
-     * a GitLab and a GitHub login, and counting per identity would hand a linked account one allowance
-     * per provider — which is the same person asking twice as often, exactly what this bounds.
+     * Takes a collection because one person is several SCM identities; counting per identity would hand a
+     * linked account one allowance per provider, which is the same person asking twice as often.
      */
     @Query(
         "SELECT COUNT(s) FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
@@ -128,12 +112,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * Settle an undecided signal as triggered.
-     *
-     * <p>The state predicate is what makes this an arbitration rather than a blind overwrite: only a row
-     * nobody has ruled on ({@code RECORDED}) or one the reaper is re-offering ({@code PENDING}) may be
-     * moved. Without it a late duplicate could re-point a {@code LAPSED} or already-{@code TRIGGERED} row
-     * at a second job and lose the first job's id.
+     * The state predicate makes this an arbitration rather than a blind overwrite: without it a late
+     * duplicate could re-point a {@code LAPSED} or already-{@code TRIGGERED} row at a second job and lose
+     * the first job's id.
      *
      * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
      */
@@ -154,15 +135,12 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     int markTriggered(@Param("key") SignalKey key, @Param("jobId") UUID jobId, @Param("now") Instant now);
 
     /**
-     * Settle an undecided signal as refused, in whichever state the reason implies.
+     * Same predicate as {@link #markTriggered}, and in particular a refusal must not walk a
+     * {@code LAPSED} row back to {@code PENDING}, which would re-enter it into the reaper's sweep and
+     * defeat the deadline that retired it.
      *
-     * <p>Same predicate and same reason as {@link #markTriggered}: a refusal must not overwrite a
-     * decision, and in particular must not walk a {@code LAPSED} row back to {@code PENDING}, which would
-     * re-enter it into the reaper's sweep and defeat the deadline that retired it.
-     *
-     * <p>{@code state_changed_at} moves only when the state does. A re-offer refused again for a new
-     * reason records the reason and leaves the clock alone, because restamping on every refusal would
-     * push the lapse deadline out by one retry interval per retry interval and nothing would ever lapse.
+     * <p>{@code state_changed_at} moves only when the state does: restamping on every refusal would push
+     * the lapse deadline out by one retry interval per retry interval, so nothing would ever lapse.
      *
      * @return rows updated (0 or 1); 0 means the signal was not where the caller left it.
      */
@@ -190,13 +168,10 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * Claim a swept batch by stamping its retry clock, before any of it is re-offered.
-     *
-     * <p>This is what makes {@link #findRetryablePending}'s ordering a queue rather than a treadmill. The
-     * sweep is ordered longest-since-attempt first and bounded; a re-offer that throws — or never returns
-     * at all — leaves the row untouched, so without an up-front claim the same batch returns to the head
-     * of the very next sweep and permanently-failing signals starve every other workspace until the lapse
-     * deadline retires them.
+     * Claims the batch before any of it is re-offered, which is what makes {@link #findRetryablePending}'s
+     * ordering a queue rather than a treadmill: a re-offer that throws leaves the row untouched, so
+     * without an up-front claim the same batch returns to the head of the very next sweep and
+     * permanently-failing signals starve every other workspace.
      *
      * <p>Its own column rather than {@code state_changed_at}: claiming on the column the lapse deadline
      * measures would push that deadline out by one sweep every sweep, so nothing could ever reach it.
@@ -216,15 +191,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     int claimPendingForRetry(@Param("ids") List<UUID> ids, @Param("now") Instant now);
 
     /**
-     * Signals whose blocker has had time to clear, longest since the last attempt first so nothing
-     * starves.
-     *
-     * <p>{@code last_attempted_at} is null until the reaper first claims a row, so the fallback is when
-     * the signal entered the state.
-     *
-     * <p>The id tiebreak is not cosmetic: a claim stamps a whole batch with one timestamp, so beyond one
+     * The id tiebreak is not cosmetic: a claim stamps a whole batch with one timestamp, so beyond one
      * batch of due rows the ordering key alone ties across all of them and the database may keep
-     * returning the same rows. The tiebreak is what makes the next sweep a different batch.
+     * returning the same rows.
      */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
     @Query(
@@ -235,11 +204,7 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     )
     List<ArtifactSignal> findRetryablePending(@Param("retryBefore") Instant retryBefore, Pageable pageable);
 
-    /**
-     * Retire signals that have waited longer than we are willing to keep re-offering them.
-     *
-     * @return how many signals lapsed
-     */
+    /** @return how many signals lapsed */
     @WorkspaceAgnostic("The reaper re-offers refused signals for every workspace on one instance")
     @Transactional
     @Modifying
@@ -254,11 +219,9 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     int lapseStalePending(@Param("deadline") Instant deadline, @Param("now") Instant now);
 
     /**
-     * Everything this workspace ever recorded about one artifact, oldest first.
-     *
-     * <p>This is also the tenancy check: the ledger row is the only workspace-scoped fact about a
-     * mirrored artifact — a repository belongs to a workspace through a monitor mapping rather than a
-     * column — so an id the caller does not own comes back empty here, and a 404 rather than a title.
+     * This is also the tenancy check: the ledger row is the only workspace-scoped fact about a mirrored
+     * artifact — a repository belongs to a workspace through a monitor mapping rather than a column — so
+     * an id the caller does not own comes back empty here, and a 404 rather than a title.
      */
     @Query(
         "SELECT s FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId" +
@@ -272,10 +235,8 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * One row per artifact this workspace has recorded anything about, most recently signalled first.
-     *
-     * <p>The index of everything the system was in a position to say something about — including,
-     * deliberately, the artifacts it said nothing about, which no job-derived listing can show.
+     * One row per artifact this workspace was in a position to say something about — including,
+     * deliberately, the ones it said nothing about, which no job-derived listing can show.
      */
     @Query(
         value = "SELECT s.artifactKind AS artifactKind, s.artifactId AS artifactId," +
@@ -295,18 +256,14 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * Every signal this workspace has ever actually recorded about one kind of artifact.
+     * Evidence against a dormancy claim, which is otherwise derived from which integrations are
+     * connected. That derivation answers "will this ever fire" and not "has this ever fired", so a signal
+     * already in the ledger overrules it.
      *
-     * <p>Evidence against a dormancy claim, which is otherwise derived from which integrations are
-     * connected. That derivation answers "will this ever fire" and not "has this ever fired", so a
-     * signal already in the ledger overrules it — reporting a practice as waiting on an integration
-     * whose signal is in the log would be wrong on the one surface whose job is explaining silence.
-     *
-     * <p>Narrowing to one kind loses no such refutation: {@code artifact_kind} is written from the
-     * signal name's own prefix ({@link SignalKey#artifactKind()}), so a signal a practice of this kind
-     * can watch is never recorded under another kind. The ledger grows one row per artifact × signal ×
-     * revision, and the whole-workspace form scanned all of it; this one seeks the leading columns of
-     * {@code uq_artifact_signal}.
+     * <p>Narrowing to one kind loses no such refutation, and seeks the leading columns of
+     * {@code uq_artifact_signal}: {@code artifact_kind} is written from the signal name's own prefix
+     * ({@link SignalKey#artifactKind()}), so a signal a practice of this kind can watch is never recorded
+     * under another kind.
      */
     @Query(
         "SELECT DISTINCT s.signalName FROM ArtifactSignal s" +

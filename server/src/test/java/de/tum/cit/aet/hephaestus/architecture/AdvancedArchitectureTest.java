@@ -232,21 +232,12 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         implementsSpiFromSameModule ||
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
-                        // Job type handlers implement the handler SPI; the review-execution catalog sits
-                        // with them because the question it answers — which kinds this build can run a
-                        // review of — is a fact about exactly this set of beans.
-                        javaClass.getPackageName().contains(".handler") ||
-                        // Content sources are the agent's adapters onto a domain; one of them additionally
-                        // declares ReviewContextBuilder so the integration framework can check that a
-                        // reviewable artifact kind has something able to assemble its subject.
-                        javaClass.getPackageName().contains(".context.providers") ||
+                        javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
+                        javaClass.getPackageName().contains(".context.providers") || // Content sources declare ReviewContextBuilder
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getPackageName().contains(".manifest") || // IntegrationManifest impls + bootstrap utilities
                         javaClass.getPackageName().contains(".registry") || // ConnectionPurgeContributor lives with the entity
-                        // An ArtifactDescriptor is a domain declaring what it is and what happens to it,
-                        // not an adapter onto somebody else's system. It belongs beside the artifact it
-                        // describes — a conversation thread is assembled by the agent module out of
-                        // ingested messages, so its descriptor lives there and not in a vendor package.
+                        // A domain descriptor belongs beside the artifact it describes, not in a vendor package.
                         javaClass.getSimpleName().endsWith("ArtifactDescriptor") ||
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||

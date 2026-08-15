@@ -58,8 +58,7 @@ const PRACTICE_FIELDS = {
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
 	precomputeScript: "Static analysis",
-	// PracticeEvidenceSummary renders the occasions and their evidence together under a heading of its
-	// own, so this label must not repeat it.
+	// The occasions and their evidence render under a heading of their own, which this must not repeat.
 	automatedReviewPolicy: "How it is reviewed",
 } satisfies Record<
 	Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation" | "bindings">,

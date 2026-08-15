@@ -21,12 +21,7 @@ class PracticeTest extends BaseUnitTest {
         assertThat(practice.getArtifactKind()).isEqualTo(ArtifactKinds.ISSUE);
     }
 
-    /**
-     * {@code isDefectDetector()} is the single source of the firewall that coerces a model-emitted
-     * {@code (PRESENT, GOOD)} to NOT_APPLICABLE and suppresses false "strengths" on the dashboard. It keys on the
-     * verbatim {@code DEFECT-DETECTOR DISCIPLINE} marker in the criteria, so pin the contract in both directions
-     * plus the null-criteria (transient-entity) guard.
-     */
+    /** Pins the {@code DEFECT-DETECTOR DISCIPLINE} marker contract in both directions, plus the null-criteria guard. */
     @Test
     void isDefectDetector_trueOnlyWhenCriteriaContainsTheMarker() {
         Practice marked = new Practice();
@@ -35,7 +30,7 @@ class PracticeTest extends BaseUnitTest {
         Practice ordinary = new Practice();
         ordinary.setCriteria("Assess whether the PR description explains the change.");
 
-        Practice noCriteria = new Practice(); // criteria == null (e.g. a freshly-constructed transient entity)
+        Practice noCriteria = new Practice();
 
         assertThat(marked.isDefectDetector()).isTrue();
         assertThat(ordinary.isDefectDetector()).isFalse();
@@ -44,8 +39,6 @@ class PracticeTest extends BaseUnitTest {
 
     @Test
     void isDefectDetector_isCaseAndPunctuationSensitive_markerMatchesVerbatim() {
-        // The marker is matched verbatim — a reformatted token (lowercased / hyphen→space) does NOT count, which
-        // is exactly why the marker is documented as load-bearing and an admin edit must preserve it.
         Practice lowercased = new Practice();
         lowercased.setCriteria("defect-detector discipline applies here");
 

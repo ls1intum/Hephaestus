@@ -13,25 +13,12 @@ import {
 import type { PracticeTraceEntry } from "@/api/types.gen";
 import type { StatusDefs } from "./status-def";
 
-/**
- * Keyed off the generated wire union rather than a hand-kept list, so an outcome the server adds
- * fails `typecheck:webapp` on this registry instead of rendering as a blank cell.
- */
 export type TraceOutcome = PracticeTraceEntry["outcome"];
 
 /**
  * What became of one practice on one piece of work — the *measurement* axis, and nothing more.
- *
- * <p>Whether anybody heard about it is the separate question the delivery registries answer:
- * "Reviewed" having delivered nothing is the PROPOSE tier working exactly as configured, not a
- * failure. Six of these ten are ways a review never began, and they are worth telling apart because
- * each has a different person who can change it — the workspace's settings, an integration nobody
- * connected, a practice somebody switched off.
- *
- * <p>This was the last surface still keeping its labels in one file and its icons and colours in
- * another. They are here together for the same reason every other status is: a dropdown that reads
- * from the labels and a badge that reads from the icons will drift, and the drift shows up as a
- * filter whose grey text does not match the coloured tag it filters.
+ * Whether anybody heard about it is the separate question the delivery registries answer, so
+ * "Reviewed" having delivered nothing is the PROPOSE tier working as configured, not a failure.
  */
 export const TRACE_OUTCOME_DEFS: StatusDefs<TraceOutcome> = {
 	REVIEWED: {

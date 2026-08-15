@@ -3,21 +3,17 @@ import type { Practice, PracticeReviewSettings, ReviewTierAssignment } from "@/a
 /**
  * How much autonomy the system has over one practice, in the words every surface has to use.
  *
- * <p>One module rather than a copy per screen. The catalog is where an admin sets the tier and the
- * artifact trace is where a developer reads it back, and the two shipped the same tier under two
- * names — "Measure" in one and "Measure only" in the other — which is how a screen and a support
- * answer stop agreeing about a setting nobody changed.
- *
- * <p>Derived from the `effective` field, not from `reviewTier` itself: the API reports a tier as an
- * assignment — the tier in force, the raw override, the level that decided it, and whether it was
- * inherited — because a screen has to render "inherited, de-emphasised, with a reset" differently from
- * "set here". The vocabulary below is about the tier alone.
+ * Derived from `effective`, not from `reviewTier` itself: the API reports a tier as an assignment —
+ * the tier in force, the raw override, the level that decided it, whether it was inherited — because
+ * a screen renders "inherited, with a reset" differently from "set here". This vocabulary is about the
+ * tier alone.
  */
 export type ReviewTier = Practice["reviewTier"]["effective"];
 
 /**
- * Ascending autonomy. Every tier above Off runs the review; they differ in how far the system may act
- * on its own. Where feedback goes is a separate, workspace-level setting.
+ * Ascending autonomy, and load-bearing: every surface lays the tiers out in this order. Each tier
+ * above Off runs the review and they differ only in how far the system may act on its own — where
+ * feedback goes is the separate, workspace-level {@link FeedbackReach}.
  */
 export const REVIEW_TIER_ORDER = [
 	"OFF",
@@ -32,17 +28,12 @@ export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
 };
 
 /**
- * Each sentence stands on its own, because one of the two surfaces shows a single tier in a tooltip
- * with nothing to compare it against. A ladder that only reads top-down ("Also raised in…") says
- * nothing there.
+ * Two constraints on anything written here. Each sentence has to stand alone, because a surface may
+ * show one tier with nothing to compare it against; and none of them may say *where* feedback goes,
+ * which is the reach setting and not this one.
  *
- * <p>None of them says *where* feedback goes. That is the workspace's reach setting, and folding it in
- * here would tell an admin that turning a practice down changes where the system speaks, when it
- * changes whether it speaks at all.
- *
- * <p>Kept to one short line each. The catalog prints these beside the tier name inside a menu that is
- * already tall; a sentence long enough to wrap turns that menu into a scrollable region a keyboard
- * cannot reach, which the a11y check fails.
+ * One short line each: these are printed inside a menu that is already tall, and a sentence long
+ * enough to wrap turns it into a scrollable region a keyboard cannot reach, which the a11y gate fails.
  */
 export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
 	OFF: "Not reviewed at all.",
@@ -51,16 +42,11 @@ export const REVIEW_TIER_DESCRIPTIONS: Record<ReviewTier, string> = {
 };
 
 /**
- * The same three tiers said as a ladder: what each rung *adds* to the one below it.
+ * What each rung *adds* to the one below it — a second set beside {@link REVIEW_TIER_DESCRIPTIONS}
+ * rather than a rewrite of it, because these are only readable next to all three at once and those
+ * have to work for a reader seeing one tier alone.
  *
- * <p>A second set rather than a rewrite of {@link REVIEW_TIER_DESCRIPTIONS}, because the two answer
- * different questions. The descriptions above answer "what is this practice doing" for a reader who
- * sees one tier alone; these answer "what changes if I move one step right" for a reader looking at
- * all three at once. Folding them together would leave the standalone tooltip saying "Adds…" with
- * nothing to add to.
- *
- * <p>Off is the floor and adds nothing, so it says what it removes instead. Propose does not promise a
- * draft to read: nothing is composed at that tier, so the sentence stops at what is recorded.
+ * Propose must not promise a draft to read: nothing is composed at that tier.
  */
 export const REVIEW_TIER_ADDS: Record<ReviewTier, string> = {
 	OFF: "Nothing runs. No review, no record, nothing said.",
@@ -72,22 +58,17 @@ export const REVIEW_TIER_ADDS: Record<ReviewTier, string> = {
 export const WORKSPACE_DEFAULT_SOURCE = "the workspace default";
 
 /**
- * Which level decided the tier in force, as the one sentence every screen prints.
+ * Which level decided the tier in force. Null when the tier was set on the thing itself, because what
+ * a screen offers there differs — the one that can change it offers a reset, the one that only reads
+ * it says where to go.
  *
- * <p>Null when the tier was set on the thing itself, because the two screens honestly say different
- * things there: the one that can change it offers the way back, and the one that only reads it says
- * where to go instead. Only the shared half — the wording of "inherited, and from where" — lives here,
- * which is the half that drifts when it is written twice.
+ * `inheritedFrom` supplies a name and never decides which level is named: a practice under an area
+ * that holds no tier inherits the workspace default directly, so naming the area would point an admin
+ * at a level that decided nothing. The assignment's `source` decides.
  *
- * <p>`inheritedFrom` is what the caller believes sits one level up, and it is deliberately not trusted
- * on its own: a practice in an area that holds no tier inherits the workspace default directly, and
- * naming the area there would send an admin to a level that decided nothing. The assignment's own
- * `source` decides which level is named; `inheritedFrom` only supplies the name.
- *
- * <p>Null `inheritedFrom` means the caller cannot name that level — a practice whose area the
- * caller's list does not carry, which the two queries behind a catalogue can be for one render after
- * a write. It degrades to "its area" rather than to the workspace, because "Follows the workspace
- * default" on a row the server says an *area* decided is not a vaguer answer, it is a wrong one.
+ * A null `inheritedFrom` means the caller cannot name that level, which the two queries behind a
+ * catalogue can be for one render after a write. It degrades to "its area" and not to the workspace:
+ * on a row the server says an *area* decided, the workspace answer is wrong rather than vaguer.
  */
 export function inheritedTierSourceSentence(
 	assignment: ReviewTierAssignment,
@@ -101,9 +82,7 @@ export function inheritedTierSourceSentence(
 /** Where a workspace lets feedback go at all. ANDed with every tier, so it can only ever silence. */
 export type FeedbackReach = PracticeReviewSettings["feedbackReach"];
 
-/**
- * Narrowest first, so the pair reads the same way the tier ladder does — left is less.
- */
+/** Narrowest first, so the pair reads the way the tier ladder does — left is less. */
 export const FEEDBACK_REACH_ORDER = [
 	"CONVERSATION",
 	"ON_THE_WORK",
@@ -115,8 +94,8 @@ export const FEEDBACK_REACH_LABELS: Record<FeedbackReach, string> = {
 };
 
 /**
- * Neither sentence promises feedback: reach is ANDed with the tier, so it can stop a practice speaking
- * in a place but never make a quiet one speak. "Also" carries that in the wider of the two.
+ * Neither sentence may promise feedback: reach is ANDed with the tier, so it can stop a practice
+ * speaking in a place but never make a quiet one speak.
  */
 export const FEEDBACK_REACH_DESCRIPTIONS: Record<FeedbackReach, string> = {
 	CONVERSATION: "Feedback reaches the person in their mentor conversation and nowhere else.",
@@ -130,12 +109,9 @@ export interface ReviewTierCount {
 }
 
 /**
- * A tier count map as an ordered list, with the empty tiers dropped.
- *
- * <p>The rollup carries every tier as a key even at zero, which is what lets a caller render a
- * distribution without gap-filling — but printing "0 propose" on a workspace with none of them spends
- * the summary line on a number nobody asked about. Ladder order, not count order: an admin reading
- * "12 off · 84 propose" twice in a row should see the same shape both times.
+ * The rollup carries every tier as a key even at zero, so a caller never gap-fills — but the zeroes
+ * are dropped here rather than printed. Ladder order, not count order, so the shape of the line does
+ * not move when the numbers do.
  */
 export function tierDistribution(counts: Record<string, number>): ReviewTierCount[] {
 	return REVIEW_TIER_ORDER.map((tier) => ({ tier, count: counts[tier] ?? 0 })).filter(
@@ -148,10 +124,8 @@ export function tierTotal(counts: Record<string, number>): number {
 }
 
 /**
- * The distribution as one spoken sentence, for the live region that announces it.
- *
- * <p>The visible line separates counts with a middot, which a screen reader either skips or reads as
- * "middle dot"; neither is the sentence an admin needs to hear when a bulk change lands.
+ * A sentence rather than a separated list, because this is read aloud: it is the content of the live
+ * region that announces the distribution after a bulk change.
  */
 export function tierDistributionSentence(counts: Record<string, number>): string {
 	const parts = tierDistribution(counts).map(

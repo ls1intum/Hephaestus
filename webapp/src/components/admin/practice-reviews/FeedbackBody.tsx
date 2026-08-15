@@ -12,9 +12,9 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { cn } from "@/lib/utils";
 
 /**
- * Everything the card reads, and it takes the record rather than three fields off it. The outcome
- * depends on all of them together, so a caller that could pass a state without its channel could
- * label a conversation unit with words that only make sense on the work.
+ * The whole record rather than the three fields read off it: the outcome depends on all of them
+ * together, so a caller able to pass a state without its channel could label a conversation unit
+ * with words that only make sense on the work.
  */
 export type FeedbackBodyFeedback = DeliveryFacts & { body?: string };
 
@@ -53,17 +53,16 @@ const UNTRUSTED_MARKDOWN_COMPONENTS = {
 };
 
 /**
- * Tailwind Typography sizes its vertical rhythm for an article, where a heading opens a section the
- * reader has scrolled to. This is a short comment in a card: three headings and a list inside a few
- * hundred words, and the default `mt-8` above each one left a gap the product owner measured as
- * "almost doubling what you would expect". Tightened to a rhythm that suits the length of the thing.
- */
-/**
- * The composer quotes the developer's own code in fenced blocks, and Typography gives a `pre`
- * `overflow-x: auto`. A block wider than the card then becomes a scrollable region no keyboard can
- * reach — axe's `scrollable-region-focusable`, and a real one: on a phone the right-hand end of the
- * line is unreachable without a horizontal drag inside a vertically scrolling page. Wrapping is the
- * right answer for a quotation of two or three lines inside a comment, which is what these are.
+ * Two departures from Tailwind Typography's defaults, which are sized for an article rather than a
+ * short comment inside a card.
+ *
+ * <p>The heading rhythm is tightened, because `mt-8` above a heading assumes a section the reader
+ * scrolled to rather than one of three inside a few hundred words.
+ *
+ * <p>`pre` gives up `overflow-x: auto` and wraps instead. The composer quotes the developer's own
+ * code in fenced blocks, and a block wider than the card becomes a scrollable region no keyboard can
+ * reach — axe's `scrollable-region-focusable`, and a real problem on a phone, where the end of the
+ * line needs a horizontal drag inside a vertically scrolling page.
  */
 const FEEDBACK_PROSE =
 	"prose prose-sm dark:prose-invert max-w-none break-words prose-headings:mt-4 prose-headings:mb-1.5 prose-headings:text-sm prose-headings:font-semibold prose-p:my-2 prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-2 prose-pre:overflow-x-visible prose-pre:whitespace-pre-wrap prose-pre:break-words first:prose-headings:mt-0";
@@ -71,17 +70,9 @@ const FEEDBACK_PROSE =
 type FeedbackView = "rendered" | "source";
 
 /**
- * The composed feedback, as the developer would read it or as it was actually written.
- *
- * <p>The source used to sit in a collapsed accordion below the card labelled "View Markdown source" —
- * a second control, in a second place, that pushed the page down when opened and showed the same text
- * twice. It is a view of one thing, so it is a switch on the thing: two toggles in the card's own
- * header, and the body swaps underneath them.
- *
- * <p>The badge in that header appears only on text that did *not* simply reach the developer. Badging
- * the ordinary case would colour every card and put a second "Delivered" on a page whose Delivery
- * section already says so. Text that was withheld, failed, is still queued, or has since been replaced
- * is the case that needs marking, because it can otherwise be quoted as though it was sent.
+ * The header badge appears only on text that did *not* simply reach the developer: badging the
+ * ordinary case would colour every card and repeat what the surrounding page already says, while
+ * text that was withheld, failed, is queued or has been replaced can otherwise be read as sent.
  */
 export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 	const [view, setView] = useState<FeedbackView>("rendered");
@@ -102,10 +93,9 @@ export function FeedbackBody({ feedback, className }: FeedbackBodyProps) {
 		<Card className={cn("gap-0 border py-0", className)}>
 			<CardHeader className="flex flex-wrap items-center justify-between gap-2 border-b py-3">
 				{unsent ? <StatusBadge def={deliveryOutcome(feedback)} /> : <span />}
-				{/* One control on one thing, not two buttons that happen to agree: the group holds the
-				    current view, so the invariant that exactly one is pressed is the control's rather
-				    than something two `onClick`s keep by hand. Deselecting the pressed item is refused
-				    below — there is no third state in which the body shows nothing. */}
+				{/* The group holds the current view, so "exactly one is pressed" is the control's
+				    invariant rather than something two `onClick`s keep by hand. Deselecting the pressed
+				    item is refused below — there is no third state in which the body shows nothing. */}
 				<ToggleGroup
 					variant="outline"
 					size="sm"

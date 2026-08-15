@@ -11,12 +11,10 @@ import org.springframework.data.repository.Repository;
 import org.springframework.data.repository.query.Param;
 
 /**
- * The few columns it takes to name a merge request or an issue to a person.
- *
- * <p>Its own repository rather than two more methods on {@code IssueRepository} and
- * {@code PullRequestRepository}: those are the sync engine's write path, and a read surface that only
- * ever wants a title has no business inheriting {@code JpaRepository}'s unscoped {@code findAll} into
- * a package that hands rows to an HTTP response.
+ * The few columns it takes to name a merge request or an issue to a person. Its own repository rather than
+ * two more methods on {@code IssueRepository} / {@code PullRequestRepository}: those are the sync engine's
+ * write path, and a read surface that only ever wants a title has no business inheriting
+ * {@code JpaRepository}'s unscoped {@code findAll} into a package that hands rows to an HTTP response.
  */
 @WorkspaceAgnostic(
     "Labels ids the signal ledger already scoped to the workspace; the mirror carries no workspace column " +

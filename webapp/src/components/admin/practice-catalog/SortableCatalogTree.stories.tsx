@@ -48,8 +48,7 @@ const entries: SortableCatalogEntry[] = [
 ];
 
 interface HarnessProps {
-	/** Areas whose own rows may not be reordered. Kept apart from {@link blockedDestinations} so a
-	 * story can tell which of the tree's two independent guards it exercised. */
+	/** Areas whose own rows may not be reordered, while the areas stay valid destinations. */
 	blockedOrderBuckets?: readonly string[];
 	blockedDestinations?: readonly string[];
 	/** Areas that may not change their own position, while everything inside them still moves. */
@@ -63,12 +62,10 @@ interface HarnessProps {
 }
 
 /**
- * Applies the moves the tree asks for, which is what makes focus restoration and the badge counts
- * observable at all.
+ * Applies the moves the tree asks for, so focus restoration and the badge counts are observable.
  *
  * Its menu items are `aria-disabled` and still clickable rather than natively `disabled` — the
- * a11y-preferred shape for a menu item, and what lets these stories ask both halves of the question:
- * *is* the destination offered, and does asking for it anyway do nothing.
+ * a11y-preferred shape for a menu item, and what lets a story click a refused item at all.
  */
 function CatalogTreeHarness({
 	blockedOrderBuckets = [],
@@ -173,13 +170,7 @@ function CatalogTreeHarness({
 	);
 }
 
-/**
- * No `autodocs`: the component under test is `SortableCatalogTree`, whose API is twelve props and
- * five render callbacks, and what the stories render is a four-prop harness around it. An
- * auto-generated page here would publish the harness's props as if they were the component's, which
- * is worse than no page. The harness's own props are still Controls, because they are what these
- * stories vary.
- */
+/** No `autodocs`: these stories render a harness, whose props would be published as the API. */
 const meta = {
 	title: "Shared/Practice catalog/Catalog tree",
 	component: CatalogTreeHarness,
@@ -198,7 +189,6 @@ const openActions = async (canvas: ReturnType<typeof within>, name: string) => {
 	return within(await screen.findByRole("menu"));
 };
 
-/** What dnd-kit is telling a screen reader right now. Also how this file waits for it. */
 const announcement = () =>
 	document.querySelector('[id^="DndLiveRegion"]')?.textContent?.trim() ?? "";
 
@@ -209,9 +199,9 @@ const rowOf = (canvas: ReturnType<typeof within>, name: string) => {
 };
 
 /**
- * A pointer drag from a row's grip, stepping past the sensor's activation distance and waiting on
- * each announcement rather than on a frame count — under a full suite run there is no fixed number
- * of frames that is both enough and not wasteful.
+ * A pointer drag from a row's grip. The first move only has to clear the sensor's activation
+ * distance; each step then waits on dnd-kit's own announcement rather than on a frame count, which
+ * under a full suite run is never both enough and not wasteful.
  */
 const dragTo = async (handle: HTMLElement, clientY: number) => {
 	const box = handle.getBoundingClientRect();
@@ -243,9 +233,8 @@ export const Default: Story = {};
 
 /**
  * A move unmounts the row from one bucket and mounts it in the other, so the menu's own focus
- * restoration has nothing left to return to and focus falls to the document. Without the tree
- * re-focusing the moved row's trigger, a keyboard reader is dropped at the top of the page after
- * every move (WCAG 2.2 SC 2.4.3 Focus Order).
+ * restoration has nothing to return to and focus falls to the document — dropping a keyboard reader
+ * at the top of the page after every move (WCAG 2.2 SC 2.4.3 Focus Order).
  */
 export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
 	play: async ({ args, canvasElement }) => {
@@ -261,10 +250,6 @@ export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
 	},
 };
 
-/**
- * While a move is in flight the area it would land in is off limits, and the tree says so on the
- * control rather than accepting the click and being refused a round trip later.
- */
 export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 	args: { blockedDestinations: ["quality"] },
 	play: async ({ args, canvasElement }) => {
@@ -273,14 +258,12 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 		const blocked = menu.getByRole("menuitem", { name: "Move to Quality" });
 
 		await expect(blocked).toHaveAttribute("aria-disabled", "true");
-		// Unassigned is not in flight, so the row can still go there: this is one blocked area and not
-		// a row that has stopped moving.
+		// One blocked area, not a row that has stopped moving.
 		await expect(menu.getByRole("menuitem", { name: "Move to Unassigned" })).toHaveAttribute(
 			"aria-disabled",
 			"false",
 		);
-		// Blocking a destination says nothing about ordering inside the row's own area, which is the
-		// other prop. A mid-list row can still move within Delivery.
+		// Blocking a destination says nothing about ordering inside the row's own area.
 		await expect(menu.getByRole("menuitem", { name: "Move up" })).toHaveAttribute(
 			"aria-disabled",
 			"false",
@@ -291,10 +274,6 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 	},
 };
 
-/**
- * The mirror image, and the reason the two are separate props: a bucket whose order is in flight
- * refuses its own up and down while remaining a destination anything may be moved into.
- */
 export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
 	args: { blockedOrderBuckets: ["delivery"] },
 	play: async ({ args, canvasElement }) => {
@@ -319,10 +298,7 @@ export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
 	},
 };
 
-/**
- * Both the offer and the move itself have to refuse, because the caller renders the control and may
- * leave it reachable.
- */
+/** The move itself refuses too, because the caller renders the control and may leave it reachable. */
 export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -340,7 +316,6 @@ export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
 	},
 };
 
-/** The middle of the same list still moves, so the refusals above are about the ends. */
 export const ReorderingInsideAnArea: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -352,16 +327,6 @@ export const ReorderingInsideAnArea: Story = {
 	},
 };
 
-/**
- * The third guard, and the narrowest: one area cannot change its own position while everything
- * inside it still moves normally.
- *
- * <p>This is not `areaReorderDisabled`, which stops every area at once, and not
- * `blockedEntryOrderBuckets`, which stops the rows. The screen sets it for the single area whose
- * write is in flight, so the assertion that matters is the one about the *other* area and about this
- * area's own rows — a guard that quietly froze the whole tree would satisfy the first assertion
- * alone.
- */
 export const AnAreaWithItsOwnMoveInFlightHoldsItsPosition: Story = {
 	args: { disabledAreas: ["delivery"] },
 	play: async ({ args, canvasElement }) => {
@@ -376,21 +341,12 @@ export const AnAreaWithItsOwnMoveInFlightHoldsItsPosition: Story = {
 		// ends-of-list arithmetic whatever this prop does, and asserting that would prove nothing.
 		await expect(canvas.getByRole("button", { name: "Reorder Quality" })).toBeEnabled();
 
-		// Its contents are untouched by it, which is the whole point of the prop being per-area.
 		const menu = await openActions(canvas, "Explain what changed and why");
 		await userEvent.click(menu.getByRole("menuitem", { name: "Move down" }));
 		await expect(args.onPlaceEntry).toHaveBeenCalledWith("explain-why", "delivery", 2);
 	},
 };
 
-/**
- * The fourth guard: one row is pinned, and unlike a blocked bucket it has no way out either.
- *
- * <p>`blockedEntryOrderBuckets` stops a row reordering while leaving it free to leave its area;
- * this stops the row itself, so the "Move to …" items go with the up and down. The sibling row is
- * asserted too, because a guard applied to the bucket rather than to the slug would look identical
- * on the pinned row alone.
- */
 export const ARowWithItsOwnMoveInFlightCannotLeaveEither: Story = {
 	args: { disabledEntries: ["explain-why"] },
 	play: async ({ args, canvasElement }) => {
@@ -407,6 +363,7 @@ export const ARowWithItsOwnMoveInFlightCannotLeaveEither: Story = {
 			canvas.getByRole("button", { name: "Reorder Explain what changed and why" }),
 		).toBeDisabled();
 
+		// A guard applied to the bucket rather than to the slug would look identical on the pinned row.
 		const sibling = await openActions(canvas, "Drafts are not left open");
 		await expect(sibling.getByRole("menuitem", { name: "Move to Quality" })).toHaveAttribute(
 			"aria-disabled",
@@ -415,10 +372,6 @@ export const ARowWithItsOwnMoveInFlightCannotLeaveEither: Story = {
 	},
 };
 
-/**
- * A filtered tree hides rows; it does not shrink the areas. The count beside one visible row is what
- * tells the reader the rest are behind the filter rather than gone.
- */
 export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 	args: { visible: ["explain-why", "tests-with-changes"] },
 	play: async ({ canvasElement }) => {
@@ -435,11 +388,7 @@ export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 	},
 };
 
-/**
- * Picking a row up and putting it back down is not an edit. The keyboard path through drag-and-drop
- * ends in a drop wherever it ends, including on the row's own position, and every drop that reaches
- * the server costs a round trip and a re-render of the whole catalog.
- */
+/** Every drop that reaches the server costs a round trip and a re-render of the whole catalog. */
 export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -452,8 +401,8 @@ export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
 			Math.round(next.top + 2),
 		);
 
-		// The drop resolved a destination — this is the guard refusing a no-op, not a drag that never
-		// found anywhere to land and would refuse everything.
+		// The drop resolved a destination, so this is the guard refusing a no-op rather than a drag
+		// that never found anywhere to land and would refuse everything.
 		await expect(announcement()).toBe(
 			"Moved Small, reviewable changes to position 1 of 3 in Delivery.",
 		);
@@ -461,8 +410,7 @@ export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
 	},
 };
 
-/** …and the same drag carried past that midpoint is a move, so the guard above is not a mute. */
-export const DraggingARowOntoTheNext: Story = {
+export const DraggingARowPastTheNextRowsMidpoint: Story = {
 	play: async ({ args, canvasElement }) => {
 		const canvas = within(canvasElement);
 		const next = rowOf(canvas, "Explain what changed and why").getBoundingClientRect();

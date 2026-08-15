@@ -26,11 +26,7 @@ import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 
-/**
- * Rendering the message is not enough on its own: an author sent to the control that has to change
- * hears the group's name and nothing about what is wrong with it unless that control is described by
- * the message.
- */
+/** Also the `aria-describedby` target: focus lands on the control, not on the rendered message. */
 const BINDINGS_ERROR_ID = "practice-bindings-error";
 
 export interface PracticeBindingsEditorProps {
@@ -48,10 +44,6 @@ export interface PracticeBindingsEditorProps {
 	disabled?: boolean;
 }
 
-/**
- * A list rather than one shared set of fields: reviewing a change when it opens and reviewing it at
- * the merge are different reviews reading different things, and separate cards keep that visible.
- */
 export function PracticeBindingsEditor({
 	options,
 	bindings,
@@ -73,9 +65,7 @@ export function PracticeBindingsEditor({
 
 	return (
 		<div className="space-y-4">
-			{/* Everything true of the work type rather than of one occasion sits here once. Repeated on
-			    every card — as the kind, the evidence rule and the hand-asked review all were — it is
-			    three paragraphs an author reads twice and a wall before the first strip. */}
+			{/* Everything true of the work type rather than of one occasion sits here once. */}
 			<div className="space-y-1.5">
 				<p className="flex items-center gap-2 text-sm font-medium">
 					<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
@@ -203,8 +193,6 @@ function BindingCard({
 
 	return (
 		<div className="space-y-4">
-			{/* An ordinal only where there is something to tell apart. One occasion needs no number, and
-			    the moments it holds are on the strip below rather than repeated as a sentence here. */}
 			{total > 1 && (
 				<div className="flex items-start justify-between gap-3">
 					<p className="font-medium">Occasion {index + 1}</p>

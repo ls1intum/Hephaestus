@@ -91,17 +91,15 @@ public class PracticeDetectionDeliveryService {
 
     /**
      * Job-metadata key carrying {@link ObservationOrigin}. Written at submission and read back here rather
-     * than re-derived: by delivery time, what occasioned the run is no longer reconstructable from the job
-     * row, and a scheduled sweep over live threads looks exactly like a backfill sweep over old ones.
+     * than re-derived: by delivery time, what occasioned the run is no longer reconstructable from the job row.
      */
     public static final String ORIGIN_METADATA_KEY = "observation_origin";
 
     private record Target(ArtifactKind type, Long id, Long aboutUserId) {}
 
     /**
-     * The origin stamped on this job, or {@link ObservationOrigin#LIVE} for a job submitted before the key
-     * existed. Falling back rather than failing is right for exactly one reason: every job that predates the
-     * key came from the event-driven path, so LIVE is the true value and not a guess.
+     * The origin stamped on this job, or {@link ObservationOrigin#LIVE} for a job with no origin key: every
+     * such job came from the event-driven path, so LIVE is a fact, not a guess.
      */
     public static ObservationOrigin originOf(@Nullable JsonNode metadata) {
         JsonNode node = metadata == null ? null : metadata.get(ORIGIN_METADATA_KEY);
@@ -111,8 +109,8 @@ public class PracticeDetectionDeliveryService {
         try {
             return ObservationOrigin.valueOf(node.asString());
         } catch (IllegalArgumentException unknown) {
-            // A value this build does not know is a newer writer, not a licence to guess: refuse rather
-            // than silently file the run under LIVE and pollute the only population we treat as unbiased.
+            // An unrecognized value is a newer writer, not license to guess: refuse rather than silently
+            // filing the run under LIVE and polluting the only population treated as unbiased.
             throw new JobDeliveryException("Unknown observation origin in job metadata: " + node.asString());
         }
     }
@@ -176,7 +174,7 @@ public class PracticeDetectionDeliveryService {
             PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
             Practice practice = revision.getPractice();
 
-            // The index disambiguates multiple findings for the same practice on one artifact.
+            // Includes the index so distinct findings for the same practice on one artifact don't collide.
             String occurrenceKey =
                 finding.practiceSlug() + ":" + i + ":" + artifactKind.value() + ":" + artifactId + ":" + job.getId();
 
@@ -189,9 +187,9 @@ public class PracticeDetectionDeliveryService {
                 }
             }
 
-            // Cross-run identity (ADR 0021): a content-derived key that is STABLE across re-detections —
-            // so a later Feedback can supersede instead of re-post and the RQ "do practices change over time"
-            // becomes answerable. Derived from what the finding is ABOUT, never from the job or line number.
+            // Cross-run identity (ADR 0021): a content-derived key STABLE across re-detections, so a later
+            // Feedback can supersede instead of re-post. Derived from what the finding is ABOUT, never from
+            // the job or a line number.
             String recurrenceKey = ObservationFingerprint.compute(
                 finding.practiceSlug(),
                 artifactKind.value(),
@@ -203,9 +201,8 @@ public class PracticeDetectionDeliveryService {
 
             Long practiceRevisionId = revision.getId();
 
-            // Self-enforce the ADR-0022 invariant that Observation.@PrePersist applies but the native
-            // insertIfAbsent path bypasses: severity is an impact band for a BAD observation only, so it
-            // must be null unless the assessment is BAD. Idempotent for an already-coerced finding.
+            // Enforced here because the native insertIfAbsent path bypasses Observation's @PrePersist
+            // (ADR-0022): severity is an impact band for a BAD observation only.
             String severityName =
                 finding.assessment() == Assessment.BAD && finding.severity() != null ? finding.severity().name() : null;
 
@@ -255,7 +252,7 @@ public class PracticeDetectionDeliveryService {
                 workspaceId,
                 artifactKind,
                 artifactId,
-                aboutUserId, // the event's developerId field == aboutUserId (author-side subject today)
+                aboutUserId, // the event's developerId field == aboutUserId (author-side subject)
                 inserted,
                 discardedDuplicate,
                 hasNegative
@@ -286,12 +283,10 @@ public class PracticeDetectionDeliveryService {
                     job.getId()
             );
         }
-        // The sources a practice may assert an ABSENCE over are still its own: that stance is a claim
-        // about how far "I did not find it" reaches, and only the practice author can make it. What a
-        // practice may CITE is not narrowed the same way. Every source that applies to the
-        // artifact is staged for every review, so a quote from one this practice's bindings did not
-        // name is a quote from bytes that were really there and really read — the fabrication check is
-        // the manifest and the byte-exact quote below, not a list of sources somebody predicted.
+        // What a practice may CITE is not narrowed to its bindings: every source that applies to the
+        // artifact is staged for every review, so a quote from an unbound source is still a quote from
+        // bytes that were really there — the fabrication check is the byte-exact quote below, not binding
+        // membership. Only EXHAUSTIVE stance (an ABSENCE claim) is the practice's own to make.
         Set<SourceKind> exhaustive = new HashSet<>();
         PracticeBinding.needsFor(revision.getBindings(), PracticeCatalogInjector.signalOf(job)).forEach(need -> {
             if (need.stance() == EvidenceStance.EXHAUSTIVE) {
@@ -449,24 +444,12 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * Holds a {@code NOT_APPLICABLE} observation to the claim it is making.
+     * Holds a {@code NOT_APPLICABLE} observation to the claim it is making: unlike {@code ABSENT}, it costs
+     * nothing to say, so uncertainty drains into it unless naming the subject and what ruled it out costs as
+     * much as recording a search does — otherwise the honest answer, {@code INCONCLUSIVE}, loses every time.
      *
-     * <p>Of the four presences this is the only one that costs nothing to say. {@code PRESENT} is warranted
-     * by the citation showing the thing. {@code ABSENT} has to record the search that came up empty. But a
-     * citation attached to {@code NOT_APPLICABLE} proves nothing — quoting any line of the change is
-     * consistent with the practice applying perfectly well — so it is the cheapest answer on the menu, and
-     * uncertainty drains into it. Every form anybody has ever filled in uses N/A for "no answer".
-     *
-     * <p>That is not a tidiness problem. {@code NOT_APPLICABLE} is a claim about the developer's work — this
-     * practice has no subject here — and it enters a long-running record of how a person works as "there was
-     * nothing to see" on a change where there may well have been something to see. The honest answer when a
-     * detector cannot tell is {@code INCONCLUSIVE}. Requiring the ground to be named is what makes the two
-     * cost the same to say, which is the only thing that makes choosing between them a real choice.
-     *
-     * <p>Enforced here as well as in the sandbox for the same reason the recorded search is: the in-sandbox
-     * normalizer runs inside the thing it is checking, and a crashed runner, an older image or a rescued
-     * text payload all reach delivery without it having run. A guard the constrained party can skip is
-     * advice, not a boundary.
+     * <p>Enforced here as well as in the sandbox: a guard the constrained party can skip is advice, not a
+     * boundary.
      */
     private void enforceStatedInapplicability(ValidatedFinding finding, EvidenceBoundary boundary, AgentJob job) {
         if (finding.presence() != Presence.NOT_APPLICABLE) {
@@ -513,9 +496,6 @@ public class PracticeDetectionDeliveryService {
                     e
                 );
             }
-            // The same boundary the citations and the recorded search answer to: a source this run never
-            // staged cannot have been read, so claiming it was is the inapplicability-shaped version of
-            // citing evidence we never had.
             if (!boundary.allowedSources().contains(sourceKind)) {
                 throw new JobDeliveryException(
                     "Stated inapplicability claims a source this run did not stage " +
@@ -530,13 +510,9 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * Holds an {@code ABSENT} observation to the search it recorded.
-     *
-     * <p>An absence is a universal claim, and the only claim a fragment of a corpus can never support:
-     * a partial capture of the review threads is equally consistent with "nobody raised it" and "the
-     * raising was in the part we did not fetch". {@link EvidenceStance#EXHAUSTIVE} is the practice
-     * declaring the corpus its absence ranges over, so those sources are exactly what the search must
-     * have covered.
+     * Holds an {@code ABSENT} observation to the search it recorded: a partial capture of the review threads
+     * is equally consistent with "nobody raised it" and "the raising was in the part we did not fetch", so
+     * {@link EvidenceStance#EXHAUSTIVE} sources are exactly what the search must have covered.
      */
     private void enforceRecordedSearch(
         ValidatedFinding finding,
@@ -588,8 +564,8 @@ public class PracticeDetectionDeliveryService {
                     e
                 );
             }
-            // Same boundary the citations answer to: a source this run never staged cannot have been
-            // searched, so claiming it was is the absence-shaped version of citing evidence we never had.
+            // Same boundary the citations answer to: a source not staged for this run cannot have been
+            // searched or read, so claiming otherwise is fabrication either way.
             if (!boundary.allowedSources().contains(sourceKind)) {
                 throw new JobDeliveryException(
                     "Recorded search claims a source this run did not stage " +
@@ -783,11 +759,9 @@ public class PracticeDetectionDeliveryService {
     ) {}
 
     /**
-     * The artifact kinds {@link #resolveTarget} knows how to address.
-     *
-     * <p>Held against the handlers that can actually run a review by {@link JobTypeReviewExecutionCatalog}
-     * at startup, so a kind gains a runner and a delivery route in the same commit. Without that check the
-     * first thing a fifth kind would learn is that it cannot be delivered — after its review was paid for.
+     * The artifact kinds {@link #resolveTarget} knows how to address. Held against the handlers that can
+     * actually run a review by {@link JobTypeReviewExecutionCatalog} at startup, so a kind gains a runner
+     * and a delivery route in the same commit rather than failing delivery after its review was paid for.
      */
     static final Set<ArtifactKind> ROUTABLE_KINDS = Set.of(
         ArtifactKinds.PULL_REQUEST,
@@ -797,12 +771,10 @@ public class PracticeDetectionDeliveryService {
     );
 
     /**
-     * Route the delivery target on the job's artifact.
-     *
-     * <p>A kind no branch below recognises is refused rather than defaulted. Falling through to
-     * pull-request handling turns "this build cannot deliver that kind" into "Missing pull_request_id in
-     * job metadata", which sends whoever reads it looking for the wrong bug. The pull-request default
-     * applies only where it is a fact: a job that names no kind at all.
+     * Route the delivery target on the job's artifact. A kind no branch below recognises is refused rather
+     * than defaulted: falling through to pull-request handling would turn "this build cannot deliver that
+     * kind" into "Missing pull_request_id in job metadata", sending whoever reads it looking for the wrong
+     * bug. The pull-request default applies only where it is a fact: a job that names no kind at all.
      */
     private Target resolveTarget(AgentJob job, JsonNode metadata) {
         String artifactKind =
@@ -812,13 +784,13 @@ public class PracticeDetectionDeliveryService {
                     ? metadata.get("artifact_kind").asString()
                     : null;
         if (artifactKind == null) {
-            // Predates the column and the metadata key alike, which means the event-driven PR path —
-            // the only producer that existed then.
+            // A job with no kind at all came from the event-driven PR path, the only producer that ever
+            // omitted it.
             artifactKind = ArtifactKinds.PULL_REQUEST.value();
         }
         if (ArtifactKinds.CONVERSATION_THREAD.value().equals(artifactKind)) {
-            // Repo-less: the subject user is carried EXPLICITLY in metadata (about_user_id), not resolved
-            // from an SCM artifact author. artifactId is the slack_thread aggregate id.
+            // Repo-less: the subject user is carried explicitly (about_user_id), not resolved from an SCM
+            // artifact author.
             JsonNode threadIdNode = metadata.get("slack_thread_id");
             if (threadIdNode == null || threadIdNode.isNull() || !threadIdNode.isNumber()) {
                 throw new JobDeliveryException("Missing slack_thread_id in job metadata: jobId=" + job.getId());
@@ -847,10 +819,8 @@ public class PracticeDetectionDeliveryService {
             return new Target(ArtifactKinds.CONVERSATION_THREAD, threadId, aboutUserId);
         }
         if (ArtifactKinds.DOCUMENT.value().equals(artifactKind)) {
-            // Repo-less, like a conversation: the subject is carried explicitly (about_user_id), resolved
-            // once at submission from the document's author. The document is re-read here only to confirm
-            // it still exists — a document erased or tombstoned while its review ran must not have
-            // observations filed against it, because nothing on any surface could then explain them.
+            // Repo-less, like a conversation. Re-read only to confirm the document still exists: one erased
+            // or tombstoned while its review ran must not gain observations nothing on any surface explains.
             JsonNode documentIdNode = metadata.get(DocumentContentSource.DOCUMENT_ID_METADATA_KEY);
             if (documentIdNode == null || documentIdNode.isNull() || !documentIdNode.isNumber()) {
                 throw new JobDeliveryException(
@@ -950,9 +920,8 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * @param observationKeys the keys persisted for each delivered finding, by finding identity, so the caller
-     *     stamps the SAME keys onto its deliverable findings rather than recomputing them (no drift from what
-     *     was persisted). Empty when no findings were persisted.
+     * @param observationKeys the keys persisted for each finding, by identity, so the caller stamps the same
+     *     keys onto its deliverable findings instead of recomputing them
      */
     public record DeliveryResult(
         int inserted,

@@ -47,34 +47,25 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * One row per observation, at every conclusion the model can reach.
- *
- * <p>This used to be two components: a four-column table above `xl` and a card list below it, with
- * different fields in each. A 25-row list whose dominant cell is a sentence gains nothing from a
- * table, and keeping two of them in step is what let the card version drop the severity.
- */
+/** One row per observation, at every conclusion the model can reach. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// The leading icon and the badge both come from `observationResult`, so a shortfall shows its
-		// assessment and its severity, and a presence that ends the question shows only itself.
-		// Six shortfalls in the fixture, so this is a count and not a lookup.
+		// A shortfall shows its assessment and its severity; a presence that ends the question shows
+		// only itself.
 		expect(canvas.getAllByText("Needs improvement")).toHaveLength(6);
 		canvas.getByText("Critical");
 		canvas.getByText("Not applicable");
 		canvas.getByText("Could not be determined");
-		// The origin badge is silent for the ordinary case and speaks for the two that are not.
 		expect(canvas.getAllByText("From a review of past work")).toHaveLength(2);
 		expect(canvas.getAllByText("Requested by hand")).toHaveLength(2);
 		await expect(canvas.queryAllByText("No result")).toHaveLength(0);
 	},
 };
 
-/** The practice name reaches its definition, and its prose is one hover away. */
 export const PracticeOpensItsDefinition: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
-		// Two observations name this practice; both of them reach the same definition.
+		// Several observations name this practice, and every one of them reaches the same definition.
 		const links = await canvas.findAllByRole("link", { name: /Thin controllers/ });
 		for (const link of links) {
 			await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
@@ -106,7 +97,6 @@ export const LongContent: Story = {
 	},
 };
 
-/** The skeleton draws the row it is standing in for: icon tile, title, meta line, chips. */
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	parameters: { chromatic: { viewports: [1440] } },
@@ -117,12 +107,6 @@ export const Empty: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 };
 
-/**
- * Over-filtered, with the way out on screen.
- *
- * The copy used to advise removing a filter and offer nothing to press, which is how a reader
- * "incorrectly assume[s] products don't exist when filters are simply too restrictive" (Baymard).
- */
 export const FilteredToNothing: Story = {
 	args: { state: { status: "empty", filtered: true, onClearFilters: clearFilters } },
 	parameters: { chromatic: { viewports: [1440] } },

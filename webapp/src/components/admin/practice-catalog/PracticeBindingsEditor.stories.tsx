@@ -26,11 +26,6 @@ const meta = {
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	/**
-	 * Adding an occasion, ticking a moment or editing its evidence all replace the whole binding list,
-	 * so the editor cannot show any of it without somewhere to put the new list. Every story here paired
-	 * a frozen `bindings` with `fn()`, which made the entire screen a picture of one configuration.
-	 */
 	render: (args) => (
 		<Stateful initial={args.bindings}>
 			{(bindings, setBindings) => (
@@ -50,17 +45,11 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A pull request offers the fullest lifecycle of the four work types: it starts once, churns while it
- * is open, and ends one of two ways. The three bands are what say so — a single arrow through all six
- * moments would claim "Merged" comes after "Closed without merging".
- */
 export const PullRequestLifecycle: Story = {
 	play: async ({ canvas }) => {
 		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
 		await expect(strip.getByRole("checkbox", { name: /^Opened/ })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: /^Merged/ })).not.toBeChecked();
-		// Binding a moment that recurs is a decision about volume, so the node says it recurs.
 		await expect(
 			strip.getByRole("checkbox", { name: "New commits pushed every time" }),
 		).toBeVisible();
@@ -69,10 +58,6 @@ export const PullRequestLifecycle: Story = {
 	},
 };
 
-/**
- * An issue has no draft state and no churn worth reviewing beyond labelling, so its strip is three
- * nodes — the same visual language, shorter.
- */
 export const IssueLifecycle: Story = {
 	args: { options: mockIssueWorkType, bindings: [mockIssueBinding] },
 	play: async ({ canvas }) => {
@@ -83,10 +68,6 @@ export const IssueLifecycle: Story = {
 	},
 };
 
-/**
- * A document is published, changes, and is eventually archived. The moments differ from a pull
- * request's entirely; the strip does not.
- */
 export const DocumentLifecycle: Story = {
 	args: { options: mockDocumentWorkType, bindings: [mockDocumentBinding] },
 	play: async ({ canvas }) => {
@@ -97,11 +78,7 @@ export const DocumentLifecycle: Story = {
 	},
 };
 
-/**
- * A conversation offers exactly one moment worth reviewing, so the strip is one node and the band
- * headings drop away — there is no lifecycle to narrate. The "Add occasion" button goes with them,
- * because a second occasion would have nothing left to start on.
- */
+/** A second occasion is refused because there is no moment left for it to start on. */
 export const ConversationHasOneMoment: Story = {
 	args: { options: mockConversationWorkType, bindings: [mockConversationBinding] },
 	play: async ({ canvas }) => {
@@ -114,8 +91,8 @@ export const ConversationHasOneMoment: Story = {
 };
 
 /**
- * One habit reviewed twice: as the work arrives, and at the merge — where reading the review threads
- * whole is what licenses the review to say nobody ever resolved one.
+ * Only the review at the merge reads the threads whole, which is what licenses it to say nobody ever
+ * resolved one.
  */
 export const TwoOccasionsReadingDifferentThings: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
@@ -132,8 +109,7 @@ export const TwoOccasionsReadingDifferentThings: Story = {
 
 /**
  * The server rejects a moment bound twice, and the refusal would otherwise arrive as a failed save
- * with nothing on screen explaining it. Naming the occasion that holds it saves the author hunting
- * through the cards for which one to change.
+ * with nothing on screen explaining it.
  */
 export const AMomentBelongsToOneOccasion: Story = {
 	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
@@ -147,11 +123,6 @@ export const AMomentBelongsToOneOccasion: Story = {
 	},
 };
 
-/**
- * A review somebody asks for by hand runs every practice bound to that kind of work, whatever state
- * it is in — so it is stated, not offered. Ticking it would have changed nothing, and an occasion
- * holding only that moment would have looked configured while never firing on its own.
- */
 export const AskingByHandIsNotAMoment: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("checkbox", { name: /Review requested by hand/ })).toBeNull();
@@ -159,11 +130,6 @@ export const AskingByHandIsNotAMoment: Story = {
 	},
 };
 
-/**
- * Drafts widen which pull requests the moments apply to, so the switch belongs to the occasion rather
- * than to the practice — reviewing early as the work arrives is compatible with judging only finished
- * work at the merge.
- */
 export const DraftsAreAPropertyOfTheOccasion: Story = {
 	args: {
 		bindings: [{ ...mockPullRequestBinding, onDrafts: true }, mockMergeBinding],
@@ -175,7 +141,6 @@ export const DraftsAreAPropertyOfTheOccasion: Story = {
 	},
 };
 
-/** Under "Human review needed" the evidence is still authored, but nothing checks it. */
 export const RecordedButNotReviewed: Story = {
 	args: { canAttemptReview: false },
 	play: async ({ canvas }) => {
@@ -183,7 +148,6 @@ export const RecordedButNotReviewed: Story = {
 	},
 };
 
-/** With no review running, an occasion reads nothing — and saying so is clearer than an empty list. */
 export const GuidanceOnly: Story = {
 	args: {
 		guidanceOnly: true,
@@ -217,8 +181,7 @@ export const WithRecentOutcomes: Story = {
 
 /**
  * A submit sends focus to the control that has to change, and the message has to travel with it: on
- * its own it is text somewhere else on a long form. The strip carries the fault too — every empty node
- * takes the destructive outline, so the occasion at fault is visible before the message is read.
+ * its own it is text somewhere else on a long form.
  */
 export const Invalid: Story = {
 	args: {
@@ -230,8 +193,7 @@ export const Invalid: Story = {
 		await expect(
 			canvas.getByRole("group", { name: "Reviews when, occasion 1" }),
 		).toHaveAccessibleDescription("Choose when this occasion starts a review.");
-		// Only the faulted group carries it — describing every group with it would make the message
-		// mean "something on this form is wrong" rather than "this is the thing to change".
+		// Describing every group would make the message mean "something on this form is wrong".
 		await expect(
 			canvas.getByRole("group", { name: "What this review reads, occasion 1" }),
 		).not.toHaveAccessibleDescription("Choose when this occasion starts a review.");
@@ -253,12 +215,8 @@ export const NoOccasionAtAll: Story = {
 };
 
 /**
- * Every edit reports the whole list back, because the editor holds no state of its own — and a new
- * occasion is seeded from the *work type's* recommended evidence rather than copied off the occasion
- * above it.
- *
- * The shared fixture aliases the two to the same list, which would let either behaviour satisfy the
- * assertion below, so this story gives the work type a recommendation of its own.
+ * The shared fixture aliases the work type's recommended evidence to the first occasion's, which
+ * would let seeding from either satisfy the assertion below, so this gives the work type its own.
  */
 export const AddingAnOccasion: Story = {
 	args: {
@@ -270,8 +228,7 @@ export const AddingAnOccasion: Story = {
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Add occasion" }));
 
-		// Every recommended moment already belongs to occasion 1, so the new one takes the first still
-		// free rather than a moment the server would refuse for being bound twice.
+		// Every recommended moment already belongs to occasion 1, so the new one takes the first free.
 		await expect(args.onChange).toHaveBeenCalledWith([
 			mockPullRequestBinding,
 			{

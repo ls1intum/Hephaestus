@@ -147,7 +147,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return practice;
     }
 
-    /** A practice that also reviews an artifact still marked draft. */
     private Practice createDraftPractice(SignalName... signals) {
         Practice practice = new Practice();
         practice.setBindings(
@@ -168,16 +167,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * Whether a draft occasions a review is a per-binding fact, because it is a property of the occasion
-     * rather than of the workspace: judging how a change was handed over is exactly what one wants to say
-     * about a draft, while judging how a merged change was reviewed cannot arise on one. A fleet-wide
-     * veto puts the draft-specific criteria of a practice like {@code ready-and-traceable-handoff} out of
-     * reach of the only artifact they apply to.
-     */
-    /**
-     * A review somebody asked for by hand. No bundled practice binds {@code scm.pull_request.manual_review}
-     * — nothing in {@code default-catalog.json} mentions it — so matching a request by signal would refuse
-     * every one of them with "no matching practices", which reads to a developer as a broken workspace. The
+     * A review somebody asked for by hand. No bundled practice binds {@code scm.pull_request.manual_review},
+     * so matching a request by signal would refuse every one of them with "no matching practices". The
      * request instead admits every practice on the kind.
      */
     @Nested
@@ -254,6 +245,11 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         }
     }
 
+    /**
+     * Whether a draft occasions a review is a per-binding fact, not a workspace-wide one: a fleet-wide veto
+     * would put the draft-specific criteria of a practice like {@code ready-and-traceable-handoff} out of
+     * reach of the only artifact they apply to.
+     */
     @Nested
     class DraftGateTests {
 
@@ -525,7 +521,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             GateDecision.Detect detect = (GateDecision.Detect) decision;
             assertThat(detect.workspace().getId()).isEqualTo(WORKSPACE_ID);
             assertThat(detect.matchedPractices()).containsExactly(practice);
-            // Verify role checker was NEVER consulted
             verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
             verify(userRoleChecker, never()).isHealthy();
         }
@@ -682,7 +677,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         @Test
         void skipWhenAssigneeHalfSyncedNoProvider() {
             // Fail-safe guard: an assignee whose provider didn't sync has no resolvable identity, so the
-            // gate must skip it WITHOUT a role lookup (a null subject would otherwise be passed to hasRole).
+            // gate must skip WITHOUT a role lookup rather than pass a null subject to hasRole.
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(SIGNAL);
             setupThroughPracticeMatching(pr, practice);
@@ -703,8 +698,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
         @Test
         void skipWhenAssigneeHalfSyncedNoNativeId() {
-            // Same fail-safe guard for the other half of the (provider, subject) identity: a missing
-            // native id also short-circuits before any role lookup.
+            // Same fail-safe guard for the other half of the (provider, subject) identity.
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(SIGNAL);
             setupThroughPracticeMatching(pr, practice);
@@ -772,9 +766,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * The autonomy tier's admission half. OFF is the only tier that stops a review; PROPOSE is as reviewed
-     * as DELIVER and differs only in what may be said about the result, so its signals must reach the agent
-     * exactly like DELIVER's do.
+     * OFF is the only tier that stops a review; PROPOSE is as reviewed as DELIVER and differs only in what
+     * may be said about the result, so its signals must reach the agent exactly like DELIVER's do.
      */
     @Nested
     class ReviewTierAdmissionTests {
@@ -841,9 +834,8 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * The workspace review scope's half: which of the workspace's work is reviewed at all. A binding names
-     * a signal and cannot name the trunk it fires against, so this is where "we only review merges into
-     * main" is expressible at all.
+     * A binding names a signal and cannot name the trunk it fires against, so this is where "we only
+     * review merges into main" is expressible at all.
      */
     @Nested
     class ReviewScopeTests {
@@ -931,12 +923,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * The gate reached by a kind that has no repository, no branch and no assignee.
-     *
-     * <p>An entry point that took a {@code PullRequest} or an {@code Issue} could not gate such a kind at
-     * all: it would go straight to submission, losing the difference between "no practice for this work"
-     * and "a practice bound to it and turned off". These tests use a document signal, but nothing in the
-     * method names one.
+     * The gate reached by a kind that has no repository, no branch and no assignee. An entry point that
+     * took a {@code PullRequest} or an {@code Issue} could not gate such a kind at all: it would go
+     * straight to submission, losing the difference between "no practice for this work" and "a practice
+     * bound to it and turned off".
      */
     @Nested
     class RepoLessSignalGate {

@@ -31,14 +31,9 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
     }
 
     /**
-     * The property that makes a missed artifact recoverable, and the reason the lookback ceiling is twice
-     * the cadence rather than once.
-     *
-     * <p>Anchoring each window where the previous one ended would look tidier and would be wrong: a
-     * campaign that paused on an exhausted budget, or was cancelled, leaves artifacts it never offered,
-     * and an abutting window would have moved past them for good. Overlapping means the next night
-     * covers them — and costs nothing, because an artifact already measured at its current state
-     * produces the key the first sweep recorded and the ledger refuses the second offer.
+     * Overlapping windows, not abutting ones: a paused or cancelled campaign leaves artifacts unswept, and
+     * an abutting window would move past them for good. This costs nothing — an already-measured artifact
+     * reproduces the key the first sweep recorded, and the ledger refuses the second offer.
      */
     @Test
     void consecutiveDailySweepsOverlapSoAMissedArtifactGetsAnotherTurn() {
@@ -51,11 +46,8 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
     }
 
     /**
-     * The rule that keeps a sweep admissible as a live measurement, at the one moment it is most tempting
-     * to break: an instance that was unreachable for a month comes back, and "review everything since we
-     * last looked" would sweep a month of history and file it in the same population as reviews that
-     * events triggered. That is a corpus chosen by an outage, which is hindsight by another name. The
-     * window does not depend on when the last sweep ran, so there is nothing for an outage to stretch.
+     * The window doesn't depend on when the sweep last ran, so a long outage can't turn "review everything
+     * since we last looked" into a corpus chosen by hindsight.
      */
     @Test
     void anOutageDoesNotWidenTheWindowItComesBackTo() {
@@ -65,12 +57,7 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
         assertThat(schedule.windowStart(NOW)).isEqualTo(NOW.minus(Duration.ofDays(2)));
     }
 
-    /**
-     * The next occurrence is derived from the previous one, never from the moment the tick ran. A
-     * schedule that added a day to "now" would slip later by however long each tick was delayed, and a
-     * sweep an admin set for the small hours would be running in the middle of the working day within a
-     * month.
-     */
+    /** Derived from the previous occurrence, never from when the tick ran, so a delayed tick can't drift the phase. */
     @Test
     void theNextOccurrenceKeepsItsPhaseRatherThanDriftingByTheTicksDelay() {
         ReviewSweepSchedule schedule = schedule(ReviewSweepCadence.DAILY, 2);
@@ -83,11 +70,7 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
         assertThat(schedule.getNextRunAt()).isEqualTo(Instant.parse("2026-08-10T02:00:00Z"));
     }
 
-    /**
-     * Missed occurrences are skipped, not queued. A week of downtime must not come back as seven
-     * campaigns in seven minutes — each would review the same recent work, only the first would find
-     * anything unsettled, and all seven would be priced and audited.
-     */
+    /** Missed occurrences are skipped, not queued — a week of downtime must not come back as seven priced campaigns. */
     @Test
     void aWeekOfDowntimeProducesOneSweepAndNotSeven() {
         ReviewSweepSchedule schedule = schedule(ReviewSweepCadence.DAILY, 2);
@@ -110,11 +93,7 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
         assertThat(schedule.getNextRunAt()).isAfter(NOW);
     }
 
-    /**
-     * The jitter is a phase offset applied once, not a delay added on every advance. Added each time it
-     * would be the same forward drift the phase-keeping advance exists to prevent; applied once it
-     * spreads an instance's schedules across an hour permanently.
-     */
+    /** The jitter is a phase offset applied once, not a delay re-added on every advance. */
     @Test
     void twoWorkspacesCreatedTheSameSecondDoNotWakeTheSameMinuteForEver() {
         Instant firstA = ReviewSweepSchedule.firstRunAt(7L, NOW);
@@ -125,7 +104,6 @@ class ReviewSweepScheduleTest extends BaseUnitTest {
         assertThat(Duration.between(NOW, firstB)).isLessThan(Duration.ofHours(1));
     }
 
-    /** A daily sweep may overlap itself once; a weekly one may reach back a week and no further. */
     @Test
     void theLookbackCeilingIsTwiceTheCadenceCappedAtAWeek() {
         assertThat(ReviewSweepCadence.DAILY.maxLookback()).isEqualTo(Duration.ofDays(2));

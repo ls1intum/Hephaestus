@@ -66,7 +66,15 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    pnpm dev:webapp   # terminal 2 — Vite dev server
    ```
 
-3. Access the API at `http://localhost:8080` (Swagger UI at `http://localhost:8080/swagger-ui/index.html`) and the webapp at `http://localhost:4200`.
+3. Access the API at `http://localhost:8080` and the webapp at `http://localhost:4200`.
+
+   The OpenAPI description and Swagger UI are **off** unless you switch them on: the endpoints answer
+   unauthenticated wherever springdoc registers them, so a deployment that left them on published its
+   complete route list, admin routes included. For a local session, set `SPRINGDOC_API_DOCS_ENABLED=true`
+   (and `SPRINGDOC_SWAGGER_UI_ENABLED=true` for the browser UI) and Swagger UI appears at
+   `http://localhost:8080/swagger-ui/index.html`. Committing a spec does not need either flag —
+   `pnpm run generate:api:application-server:specs` boots under the `specs` profile, which turns them on
+   itself.
 
 To wipe the local database (e.g. after a bad migration or sync), run `pnpm dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
 

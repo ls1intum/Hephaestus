@@ -81,17 +81,13 @@ export interface FeedbackRowProps {
 }
 
 /**
- * One piece of feedback: what it says, where it was headed, and what became of it.
+ * The row's name is the feedback's own opening words, because that is the only text that tells two
+ * rows apart — a title built from the recipient repeats down the page. The person goes in a chip,
+ * where it is scanned rather than read.
  *
- * <p>The row's name is the feedback's own opening words. It used to be "Feedback for Ada Lovelace",
- * computed from the recipient — so a page of twenty-five rows was twenty-five near-identical titles
- * and the only distinguishing text was a clamped preview *below* the link. The person is a chip on
- * the right, where it is scanned rather than read, and the preview is promoted to the one thing that
- * tells two rows apart.
- *
- * <p>Place and outcome stay separate, as everywhere else: the badge says what happened, the meta
- * line says where it was going. A withheld row also carries its own precise reason, because the
- * outcome badge only says that something stopped it.
+ * <p>Place and outcome stay separate: the badge says what happened, the meta line says where it was
+ * going. A withheld row also carries its own precise reason, because the outcome badge only says
+ * that something stopped it.
  */
 export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps) {
 	const place = DELIVERY_PLACE_DEFS[feedback.channel];
@@ -105,10 +101,8 @@ export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps
 					search={scope ?? ((previous) => previous)}
 					className="line-clamp-2"
 				>
-					{/* Flattened, not printed raw: the wire preview is 320 characters of the Markdown note,
-					    which lands inside a fenced code block on any feedback of ordinary length. Feedback
-					    that opens straight into that block has a body but no prose to show for it, which
-					    is not the same state as feedback nobody has composed yet. */}
+					{/* Feedback whose preview is nothing but a code quote has a body and no prose to show
+					    for it, which is not the same state as feedback nobody has composed yet. */}
 					{feedbackPreviewText(feedback) ??
 						(feedback.bodyPreview
 							? "Opens with a quote from the work…"

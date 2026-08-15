@@ -17,5 +17,5 @@ configuration** button. The evidence behind an observation says which source eac
 in plain words instead of repeating a contract identifier under every quote, and shows a file and
 line only where that location is a real one you could open.
 
-**Operators:** links to `…/practices/reviews/findings` now redirect to `…/practices/reviews/observations`,
-keeping any filters in the URL. Existing bookmarks keep working.
+Links to the old observations address redirect to the new one, keeping any filters in the URL, so
+existing bookmarks keep working and nothing is required of you at upgrade.

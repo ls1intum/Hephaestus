@@ -90,13 +90,9 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         Workspace owningWorkspace = new Workspace();
         owningWorkspace.setId(WORKSPACE_ID);
-        // Every dispatching path asks two questions before it may do anything: who owns this
-        // repository, and is this observation ours to act on. Lenient because the paths that
-        // short-circuit before dispatch never ask them.
+        // Lenient: the paths that short-circuit before dispatch never ask these questions.
         lenient().when(workspaceResolver.resolveForRepository(any())).thenReturn(Optional.of(owningWorkspace));
         lenient().when(signalRecorder.record(any(), any(), any())).thenReturn(true);
-        // A PR signal is keyed on its head commit, read through a projection rather than the gate's
-        // fetch graph so that recording costs nothing extra.
         lenient().when(pullRequestRepository.findHeadRefOidById(any())).thenReturn(Optional.of("abc123"));
     }
 
@@ -197,9 +193,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
-            // Recording is unconditional; triggering is policy. Reconciliation establishes THAT the
-            // transition happened, which is why the row is written — but replaying a repository's whole
-            // history as live coaching is not what a sync was asked to do, so nothing else runs.
+            // Recording is unconditional; triggering is policy — replaying history as live coaching is
+            // not what a sync was asked to do.
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestCreated(prData, syncContext());
 
@@ -496,8 +491,6 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
-            // Same split as every other handler: the push is recorded so it is not lost, and no review is
-            // coached on a revision reconciliation merely caught up with.
             var prData = createPrData(Issue.State.OPEN, false, false);
             var event = new ScmDomainEvent.PullRequestSynchronized(prData, syncContext());
 
@@ -550,9 +543,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void shouldRecordSyncDiscoveredSignalsWithoutReviewingThem() {
-            // A ReviewSubmitted event carries no PullRequestData, so unlike the PR handlers this path must
-            // load the PR before it can key anything — the recording still happens and the review still
-            // does not, because a reconciled review is history, not a live transition to coach on.
+            // Unlike the other handlers, ReviewSubmitted carries no PullRequestData, so the PR must be
+            // loaded before anything can be keyed.
             var reviewData = createReviewData();
             var event = new ScmDomainEvent.ReviewSubmitted(reviewData, syncContext());
 
@@ -741,9 +733,8 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
         @Test
         void onPullRequestMerged_recordsSyncDiscoveredMergesWithoutReviewingThem() {
-            // A sync replays EVERY historical merge — retrospective detection is for real-time transitions
-            // only. The ledger row is still written, so the merge we did receive leaves a trace instead of
-            // being dropped at the door and never noticed again.
+            // A sync replays every historical merge, unlike a live merge event; retrospective detection
+            // only runs for real-time transitions.
             var prData = createPrData(Issue.State.MERGED, false, true);
             listener.onPullRequestMerged(new ScmDomainEvent.PullRequestMerged(prData, syncContext()));
 

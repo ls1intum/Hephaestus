@@ -40,11 +40,9 @@ public record ReviewTierAssignmentDTO(
     Boolean inherited
 ) {
     /**
-     * {@code inherited} is derived from the override, not from the source, because "inherited" is a fact
-     * about the level being described while the source is a fact about which level answered. They differ
-     * exactly where it matters: an area that set its own tier reports source {@code AREA}, and to that area
-     * the value is an override — to a practice under it, the same source is an inheritance. Reading it off
-     * the source labelled every area that had made a decision as if it had not.
+     * {@code inherited} is derived from the override, not the source: an area that set its own tier
+     * reports source {@code AREA} to itself as an override, and that same source to a practice below it as
+     * an inheritance.
      */
     public static ReviewTierAssignmentDTO of(EffectiveReviewTier resolved, @Nullable PracticeReviewTier override) {
         return new ReviewTierAssignmentDTO(resolved.tier(), override, resolved.source(), override == null);

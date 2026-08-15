@@ -4,15 +4,11 @@ import java.util.Objects;
 
 /**
  * The vendor pipe that posts a review's summary — every integration declaring
- * {@link Capability#FEEDBACK_DELIVERY} implements it. Named for what it posts, like its siblings
- * {@link InlineFindingChannel} and {@link ApprovalChannel}, which are separate capability-gated SPIs.
+ * {@link Capability#FEEDBACK_DELIVERY} implements it, alongside the capability-gated
+ * {@link InlineFindingChannel} and {@link ApprovalChannel}.
  *
- * <p>Distinct from {@code practices.feedback.FeedbackChannel}, which is the enum of destinations a
- * delivery is recorded against. That one names where feedback landed; this one does the landing.
- *
- * <p>Vendor-specific subject formatting (e.g. GitHub {@code owner/repo#42} vs
- * GitLab {@code group/project!42}) lives behind {@link #formatPullRequestSubjectId} so
- * the agent module never branches on {@link IntegrationKind}.
+ * <p>Distinct from {@code practices.feedback.FeedbackChannel}, which names where feedback landed; this
+ * one does the landing.
  */
 public interface SummaryChannel {
     IntegrationKind kind();
@@ -20,17 +16,9 @@ public interface SummaryChannel {
     SummaryHandle postSummary(FeedbackTarget target, FeedbackContent content);
 
     /**
-     * Edit an already-posted summary <em>in place</em> (ADR 0021 re-review UX): the persistent overview
-     * comment is updated rather than re-posted, so a re-reviewed PR/MR keeps ONE evolving summary thread
-     * instead of accumulating one comment per run (the Qodo {@code persistent_comment} / CodeRabbit model).
-     * {@code externalId} is the handle a prior {@link #postSummary} returned.
-     *
-     * <p>Returns a typed {@link UpdateOutcome} rather than throwing for recoverable cases, so the caller can
-     * tell apart: {@code EDITED} (success), {@code GONE} (the prior comment is confirmed deleted — re-post),
-     * {@code TRANSIENT} (a rate-limit / network / unknown vendor error — keep the prior summary, do NOT
-     * re-post this run, else a flaky update double-posts a second summary), and {@code UNSUPPORTED}
-     * (append-only channel — re-post). A genuine data error (e.g. a blank external id) still throws
-     * {@link FeedbackDeliveryException}.
+     * Edits an already-posted summary <em>in place</em> (ADR 0021 re-review UX) instead of re-posting, so a
+     * re-reviewed PR/MR keeps one evolving thread. {@code externalId} is the handle a prior
+     * {@link #postSummary} returned.
      */
     default UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {
         return UpdateOutcome.unsupported();
@@ -49,10 +37,8 @@ public interface SummaryChannel {
     }
 
     /**
-     * Format the vendor's external identifier for a pull request / merge request. GitHub
-     * uses {@code repoFullName#prNumber}; GitLab uses {@code repoFullName!prNumber};
-     * future kinds add their own. The {@code subjectExternalId} stored on the
-     * vendor post id is recorded as a {@code FeedbackPlacement.external_ref} (ADR 0021).
+     * Format the vendor's external identifier for a pull request / merge request: GitHub uses
+     * {@code repoFullName#prNumber}; GitLab uses {@code repoFullName!prNumber}.
      *
      * @throws IllegalArgumentException if {@code repoFullName} is not well-formed for the
      *     vendor (e.g. GitHub's two-segment {@code owner/repo} requirement).
@@ -60,10 +46,9 @@ public interface SummaryChannel {
     String formatPullRequestSubjectId(String repoFullName, int prNumber);
 
     /**
-     * Format the vendor's external identifier for an issue. Both GitHub and GitLab address issues as
-     * {@code repoFullName#issueNumber}; the GitLab channel routes a {@code #}-suffixed subject to the
-     * issue note path (vs {@code !} for a merge request). Default mirrors that convention; a vendor with
-     * a different scheme overrides.
+     * Format the vendor's external identifier for an issue: both GitHub and GitLab address issues as
+     * {@code repoFullName#issueNumber}. The GitLab channel routes a {@code #}-suffixed subject to the
+     * issue note path (vs {@code !} for a merge request); a vendor with a different scheme overrides.
      */
     default String formatIssueSubjectId(String repoFullName, int issueNumber) {
         if (repoFullName == null || repoFullName.isBlank()) {
@@ -72,7 +57,6 @@ public interface SummaryChannel {
         return repoFullName + "#" + issueNumber;
     }
 
-    /** Hephaestus's typed reference to the subject the feedback attaches to. */
     record FeedbackTarget(IntegrationRef ref, String subjectExternalId, String resourceUrl) {}
 
     record FeedbackContent(String body, String marker) {}
@@ -82,11 +66,8 @@ public interface SummaryChannel {
 
     record ExistingSummaryLookup(Kind kind, SummaryHandle handle) {
         public enum Kind {
-            /** A comment carrying the marker was found. */
             FOUND,
-            /** The channel searched everything it can and confirmed no comment carries the marker. */
             ABSENT,
-            /** The channel could not determine either way (error, rate limit, or unsupported). */
             UNKNOWN,
         }
 

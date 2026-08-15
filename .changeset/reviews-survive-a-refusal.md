@@ -17,5 +17,4 @@ after it finished paid for the whole review again; the review cooldown minutes a
 limit rather than the last line of defence.
 
 How long a blocked review keeps waiting is configurable, and the defaults need no action: it is
-re-attempted hourly and given up on after seven days (`hephaestus.signal-ledger.pending-retry-after`,
-`hephaestus.signal-ledger.pending-lapse-after`).
+re-attempted hourly and given up on after seven days.

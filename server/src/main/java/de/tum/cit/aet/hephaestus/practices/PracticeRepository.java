@@ -23,37 +23,24 @@ import org.springframework.transaction.annotation.Transactional;
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
     /**
-     * Every practice of the workspace, at any tier — including {@code OFF}.
-     *
-     * <p>Unfiltered so the detection gate can tell "nothing is bound to this signal" apart from "something
-     * is bound and its workspace turned it off" and record them as different reasons. A workspace's
-     * catalogue is small enough that filtering in the JVM beats a second query.
+     * Every practice of the workspace, at any tier — including {@code OFF}, so the detection gate can tell
+     * "nothing is bound to this signal" apart from "something is bound and turned off".
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceId(Long workspaceId);
 
     /**
-     * Every practice of the workspace for one work type, at any tier — including the ones resolving to
-     * {@code OFF}.
-     *
-     * <p>Deliberately unfiltered by tier. The two derived {@code ...ReviewTierNot...} finders this replaces
-     * pushed {@code review_tier <> 'OFF'} into SQL, which was correct only while the column could not be
-     * null: {@code NULL <> 'OFF'} is UNKNOWN, so every practice that inherits its tier would silently
-     * vanish from the catalog the reviewer is given and from the "is anything switched on here" check —
-     * turning the whole inheritance chain into an outage. Tier is resolved in the JVM by
-     * {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}, which is the only
-     * implementation of the chain there is.
+     * Every practice of the workspace for one work type, at any tier. Deliberately unfiltered: pushing
+     * {@code review_tier <> 'OFF'} into SQL is a trap once the column can be null, since
+     * {@code NULL <> 'OFF'} is UNKNOWN and an inheriting practice would silently vanish from the query.
+     * Tier is resolved in the JVM by {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
     /**
-     * The raw tier columns of every practice in a workspace, with its area's, and nothing else.
-     *
-     * <p>For the callers that only need to count or test tiers — the rollup the admin screen reads and the
-     * "does this workspace have anything switched on" check on the review path. Both would otherwise
-     * hydrate the whole catalogue, and both resolve the pairs through the same resolver as everyone else,
-     * so no second expression of the chain exists in SQL to drift from it.
+     * The raw tier columns of every practice in a workspace, with its area's, for callers that only need to
+     * count or test tiers without hydrating the whole catalogue.
      */
     @Query(
         """
@@ -96,10 +83,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("areaId") @Nullable Long areaId);
 
     /**
-     * Acquire a row-level write lock on a practice ({@code SELECT ... FOR UPDATE}). Used to serialise
-     * {@link PracticeRevision} appends per practice: holding this lock for the duration of the
-     * read-max-then-insert makes the next revision number race-free, so concurrent criteria edits append
-     * with distinct, gap-free numbers instead of colliding on {@code uk_practice_revision_practice_number}.
+     * Row-level write lock ({@code SELECT ... FOR UPDATE}) held for the read-max-then-insert that appends a
+     * {@link PracticeRevision}, so concurrent criteria edits get distinct, gap-free revision numbers instead
+     * of colliding on {@code uk_practice_revision_practice_number}.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Practice p WHERE p.id = :id")
@@ -120,13 +106,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Practice> findSourceAlignedV1Practices();
 
     /**
-     * Every practice of a workspace in the order the admin catalogue shows them, areas first.
-     *
-     * <p>No tier predicate: filtering to a tier means filtering to an <em>effective</em> tier, and the
-     * effective tier of a practice that holds no opinion is not in this row. The caller resolves and then
-     * filters. The old {@code p.reviewTier = :reviewTier} could not have been kept anyway — it never
-     * matches a null column, so asking for the workspace's own default tier would have returned every
-     * practice except the ones actually at it.
+     * Every practice of a workspace in the order the admin catalogue shows them, areas first. No tier
+     * predicate: filtering to a tier means filtering to an <em>effective</em> tier, which is not a column
+     * on this row — the caller resolves, then filters.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(

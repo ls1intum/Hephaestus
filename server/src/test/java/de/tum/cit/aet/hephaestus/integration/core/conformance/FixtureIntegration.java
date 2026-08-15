@@ -30,24 +30,18 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * An integration that reviews an artifact Hephaestus has never heard of.
+ * An integration that reviews an artifact Hephaestus has never heard of — the standing proof that the
+ * review contract is real, not a description of what GitHub happens to do. {@code fixture.widget} exists
+ * nowhere in {@code src/main}, so if the framework or the practices module ever grows a dependency on a
+ * concrete artifact kind, the tests built on this fixture stop compiling or stop passing.
  *
- * <p>This is the standing proof that the review contract is real rather than a description of what
- * GitHub happens to do. {@code fixture.widget} exists nowhere in {@code src/main}: no entity, no table,
- * no enum constant, no branch. If the framework or the practices module ever grows a dependency on a
- * concrete artifact kind — a {@code switch} over pull requests, an {@code instanceof Issue}, a lane
- * assumed present — the tests built on this fixture stop compiling or stop passing. That failure is the
- * fixture's entire purpose; it is not a test of the widget.
- *
- * <p>Two deliberate compromises, both stated rather than hidden:
+ * <p>Two deliberate compromises:
  * <ul>
- *   <li>It borrows an existing {@link IntegrationKind} instead of adding a fixture constant.
- *       {@code IntegrationKind} is persisted on connections and jobs, and a value that exists only for
- *       tests would be a value production data could acquire.
- *   <li>It cannot be driven through {@code PracticeReviewDetectionGate}, which takes a
- *       {@code PullRequest} or an {@code Issue}. That coupling is frozen and shrinking under
- *       {@code PracticesIntegrationBoundaryTest}; the practices-side proof therefore runs through
- *       {@code PracticeSignalCoverage}, which is fully kind-agnostic.
+ *   <li>It borrows an existing {@link IntegrationKind} rather than adding a fixture-only constant, since
+ *       that enum is persisted on connections and jobs.
+ *   <li>It cannot be driven through {@code PracticeReviewDetectionGate} (which takes a
+ *       {@code PullRequest}/{@code Issue}), so the practices-side proof runs through the kind-agnostic
+ *       {@code PracticeSignalCoverage} instead.
  * </ul>
  */
 final class FixtureIntegration {
@@ -65,13 +59,7 @@ final class FixtureIntegration {
 
     private FixtureIntegration() {}
 
-    /**
-     * The evidence a binding on a widget reads.
-     *
-     * <p>A source kind no contract in {@code src/main} declares, for the same reason the artifact kind
-     * is: a binding carries whatever its author wrote, and nothing between the author and the review
-     * checks it against a list of the sources that happen to exist today.
-     */
+    /** The evidence a binding on a widget reads — a source kind no contract in {@code src/main} declares. */
     static PracticeEvidenceRequirement need() {
         return new PracticeEvidenceRequirement(new SourceKind("fixture.widget.parts"), EvidenceStance.REQUIRED);
     }
@@ -136,9 +124,7 @@ final class FixtureIntegration {
 
             @Override
             public List<ReviewLimitation> reviewLimitations() {
-                // A reviewable kind must name what its evidence cannot settle. The fixture reviews
-                // nothing real, so it says the one thing that is true of it — which is also the
-                // point: the rule is satisfiable by a kind the practices module has never heard of.
+                // A reviewable kind must name what its evidence cannot settle.
                 return List.of(
                     new ReviewLimitation("FIXTURE_OBSERVES_NOTHING", "A fixture widget has no real work behind it.")
                 );
@@ -215,12 +201,9 @@ final class FixtureIntegration {
     }
 
     /**
-     * The fixture's stand-in for a job type and a registered handler.
-     *
-     * <p>A widget has neither, and cannot: {@code AgentJobType} is a compiled enum in the agent module and
-     * the whole claim of this fixture is that no kind of ours needs to exist in {@code src/main}. So the
-     * executability the contract insists on is supplied here directly. That is not a hole — the rule under
-     * test is "a reviewable kind must be executable", and this is the fixture asserting that it is.
+     * The fixture's stand-in for a job type and a registered handler. A widget has neither and cannot —
+     * {@code AgentJobType} is a compiled enum in the agent module — so the executability the contract
+     * insists on is supplied here directly.
      */
     static ReviewExecutionCatalog executionCatalog() {
         return () -> Set.of(WIDGET);

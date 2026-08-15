@@ -93,9 +93,8 @@ does differ by role. The whole `core.auth` module carries `@ConditionalOnServerR
 `OAuth2ResourceServerAutoConfiguration` outright, so a worker-only pod never depends on user-auth
 wiring at boot. The `webhook` overlay does not carry that exclusion and relies on the role gate alone.
 
-There is no `hephaestus.sandbox.enabled`: that flag was retired (an arch test now forbids
-reintroducing it) because the Docker sandbox IS the worker capability — it follows
-`hephaestus.runtime.worker.enabled`.
+There is no `hephaestus.sandbox.enabled`, and an arch test forbids introducing one: the Docker
+sandbox *is* the worker capability, so it follows `hephaestus.runtime.worker.enabled`.
 
 One row reads differently from what a bare `docker compose up` produces, because the shipped compose
 file sets the env var the base default leaves off:

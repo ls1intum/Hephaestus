@@ -15,7 +15,7 @@ This file governs the entire repository. Each service has its own `AGENTS.md` wi
 
 ## 2. Toolchain & environment prerequisites
 
-- **Node.js**: Use the exact version from `.node-version` (currently 24.15.0). The repo uses pnpm 11 with `pnpm-lock.yaml` and pnpm workspaces (`pnpm-workspace.yaml`). The webapp is the only TypeScript package.
+- **Node.js**: Use the exact version pinned in `.node-version`. The repo uses pnpm 11 with `pnpm-lock.yaml` and pnpm workspaces (`pnpm-workspace.yaml`). The webapp is the only TypeScript package.
 - **Java**: JDK 21 (see `pom.xml`). Run builds with `mvn` from `server/`.
 - **Docker & Docker Compose**: Required for database helper scripts (`scripts/db-utils.sh`) and for spinning up Postgres/NATS locally.
 - **Databases**: Default PostgreSQL DSN is `postgresql://root:root@localhost:5432/hephaestus`. The database helpers spin this up for you via Docker.
@@ -117,7 +117,7 @@ Regeneration is destructive; stash local edits before running these commands. Ch
 - Lives at `server/src/main/java/de/tum/cit/aet/hephaestus/integration/core/webhook/`. Pure verifier/builder classes (HMAC, GitLab token, subject builders, dedup-id) sit beside Spring-backed controllers, JetStream publisher, and stream bootstrap — all gated together via `RuntimeRole.WEBHOOK_PROPERTY`.
 - Production runs the receiver in a dedicated `webhook-server` container (same image as `application-server`, `SPRING_PROFILES_ACTIVE=prod,webhook`). The app-server's deploy cycle therefore does not interrupt webhook reception — push events on GitHub/GitLab are not manually redeliverable.
 - NATS subject grammar: `github.<owner>.<repo>.<event>`, `gitlab.<namespace>.<project>.<event>`. Dots in path segments are replaced with `~`; nested GitLab groups join with `~`. The consumer-side prefix builder at `integration.core.consumer.ConsumerSubjectMath#buildSubjectPrefix` must agree — `SubjectGrammarRoundTripTest` enforces this for every committed fixture.
-- HMAC / hex / locale safety enforced by ArchUnit: `HexEncodingArchTest` (only `HexFormat.of()`), `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). Coverage gate: the webhook packages carry per-package JaCoCo branch floors (0.60 and 0.70), enforced by the unit-test CI job via `-DskipCoverage=false`. The floors record what the tier covers today and exist to fail a regression — raise one whenever its package clears the next step.
+- HMAC / hex / locale safety enforced by ArchUnit: `HexEncodingArchTest` (only `HexFormat.of()`), `LocaleSafetyArchTest` (no naked `toLowerCase`/`toUpperCase`). Coverage gate: the webhook packages carry per-package JaCoCo branch floors (0.60 and 0.70), enforced by the unit-test CI job via `-DskipCoverage=false`. The floors record what the tier covers and exist to fail a regression — raise one whenever its package clears the next step.
 - Configuration: bound to `hephaestus.webhook.*` via `core.webhook.WebhookProperties` (shared with auto-registration in `workspace/GitLabWebhookService`).
 
 ## 9. Documentation & assets

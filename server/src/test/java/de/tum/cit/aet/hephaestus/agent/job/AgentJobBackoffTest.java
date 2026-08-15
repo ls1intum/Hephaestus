@@ -87,10 +87,9 @@ class AgentJobBackoffTest extends BaseUnitTest {
     }
 
     /**
-     * The smallest wait any input can produce is {@code round((0^4 + 15) * 0.9) = 14s}: {@code
-     * nextDouble()} is bounded to {@code [0, 1)}, so the jitter multiplier never falls below 0.9. The
-     * {@code Math.max(1, …)} floor in {@code compute} therefore sits below every reachable value and no
-     * legal input exercises it; what this pins is the reachable minimum.
+     * {@code nextDouble()} is bounded to {@code [0, 1)}, so the jitter multiplier never falls below 0.9 —
+     * the {@code Math.max(1, …)} floor in {@code compute} sits below every reachable value and no legal
+     * input exercises it; this pins the reachable minimum instead.
      */
     @Test
     @DisplayName("never returns zero or negative, even at the smallest attempt with max negative jitter")

@@ -21,15 +21,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Every outcome, on both places feedback can go, with a withheld row from each of the four reason
- * families.
- *
- * <p>The row's name is the feedback's own opening words. It used to be "Feedback for {person}",
- * computed from the recipient, so a page of twenty-five rows was twenty-five near-identical titles
- * and the only text telling them apart was a clamped preview underneath the link. The person moved
- * to the chips, where it is scanned.
- */
+/** Every outcome, on both places feedback can go, with a withheld row from each reason family. */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		// A conversation row's outcome is refined by its place, and still begins with the stem of the
@@ -48,11 +40,9 @@ export const Default: Story = {
 };
 
 /**
- * A row whose feedback runs to seventeen hundred characters of Markdown.
- *
- * The endpoint sends the first 320 of them, which on a note of that length is the lead line, a bold
- * observation heading, a file locator in backticks and the opening of a fenced Java block. The row shows
- * the sentence a person would read out and marks the cut; the code and the markers do not appear.
+ * The wire preview of a real note is a lead line, a bold heading, a backticked file locator and the
+ * opening of a fenced Java block. The row shows the sentence a person would read out and marks the
+ * cut; the code and the markers do not appear.
  */
 export const LongFeedback: Story = {
 	args: {
@@ -84,7 +74,6 @@ export const Mobile: Story = {
 	},
 };
 
-/** Nothing was composed, so the row says that rather than showing an empty title. */
 export const WithoutAPreview: Story = {
 	args: {
 		state: {
@@ -108,12 +97,6 @@ export const Empty: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 };
 
-/**
- * Over-filtered, with the way out on screen.
- *
- * The copy used to advise removing a filter and offer nothing to press, which is how a reader
- * "incorrectly assume[s] products don't exist when filters are simply too restrictive" (Baymard).
- */
 export const FilteredToNothing: Story = {
 	args: { state: { status: "empty", filtered: true, onClearFilters: clearFilters } },
 	parameters: { chromatic: { viewports: [1440] } },

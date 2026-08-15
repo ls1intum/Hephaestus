@@ -1316,10 +1316,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldPublishReadyWhenSyncFindsAMergeRequestThatLeftDraft() {
-            // The transition arrives as a difference against what we last knew, and the upsert below
-            // overwrites that. Dropping it here leaves a merge request that went ready between webhooks
-            // unreviewable as ready forever: the mirror agrees with upstream, and upstream has already
-            // announced the change.
+            // Detected as a diff against the prior row, before the upsert below overwrites it.
             PullRequest existingDraft = createPullRequestEntity();
             existingDraft.setDraft(true);
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
@@ -1361,8 +1358,7 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
 
         @Test
         void shouldNotInventATransitionForAMergeRequestSyncIsSeeingForTheFirstTime() {
-            // Nothing to diff against, so a backfill of open merge requests must not read as a wave of
-            // freshly-ready ones.
+            // No prior row to diff against, so a backfill must not read as a wave of new transitions.
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(createPullRequestEntity()));

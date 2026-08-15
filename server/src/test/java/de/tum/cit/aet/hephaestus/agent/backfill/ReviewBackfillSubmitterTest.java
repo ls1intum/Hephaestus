@@ -101,10 +101,7 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
      * The same two stamps, taken from the run instead of written here.
      *
      * <p>A sweep's window is bounded to the recent past, so it measures the population events measure and
-     * its findings belong in the live trend line. Had this class kept hard-coding BACKFILL, every
-     * scheduled review would have filed itself as a hindsight-selected corpus — invisible to the
-     * developer it is about, because the reflection read model separates campaign rows, and silent,
-     * because {@code ObservationOrigin.BACKFILL} withholds every channel but the profile.
+     * its findings belong in the live trend line.
      */
     @Test
     void aScheduledSweepIsStampedAsASweepAndMeasuredAsLiveWork() {
@@ -142,7 +139,6 @@ class ReviewBackfillSubmitterTest extends BaseUnitTest {
         Mockito.verifyNoInteractions(detectionGate, agentJobService);
     }
 
-    /** A campaign is asked for by a person, so it is a manual trigger — not an event that never happened. */
     @Test
     void theGateIsAskedInManualModeBecauseNoEventOccasionedThis() {
         PullRequest pr = mergedPullRequest();

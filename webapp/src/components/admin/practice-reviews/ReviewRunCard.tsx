@@ -12,14 +12,11 @@ export interface ReviewRunCardProps {
 }
 
 /**
- * How the review ran: what it read the work with, how much of it there was, and when it finished.
+ * On the page rather than behind a disclosure: the model and the token count are what an operator
+ * checks when a review costs more than it should or answers worse than it used to.
  *
- * <p>On the page rather than behind a disclosure: the model and the token count are the two facts an
- * operator checks when a review costs more than it should or answers worse than it used to, and the
- * review's own id is already in the address bar.
- *
- * <p>The configuration snapshot is copied and never rendered. It is a machine artefact, so the useful
- * action on it is putting it where a machine can read it.
+ * <p>The configuration snapshot is copied and never rendered — it is a machine artefact, so the
+ * useful action on it is putting it where a machine can read it.
  */
 export function ReviewRunCard({ job }: ReviewRunCardProps) {
 	const copyConfiguration = async () => {
@@ -51,8 +48,8 @@ export function ReviewRunCard({ job }: ReviewRunCardProps) {
 				<ReviewFact label="Model calls">{formatTokens(job.llmTotalCalls)}</ReviewFact>
 				<ReviewFact label="Tokens read">{formatTokens(job.llmTotalInputTokens)}</ReviewFact>
 				<ReviewFact label="Tokens written">
-					{/* Reasoning tokens are billed as output and were shown on their own row, which read as
-					    a third, separate quantity. Naming the whole and the part says what the bill is. */}
+					{/* Reasoning tokens are billed as output, so they are named as a part of it. On a row of
+					    their own they read as a third quantity to be added to the other two. */}
 					{formatTokens(job.llmTotalOutputTokens)}
 					{job.llmTotalReasoningTokens != null && job.llmTotalReasoningTokens > 0 && (
 						<span className="text-muted-foreground">

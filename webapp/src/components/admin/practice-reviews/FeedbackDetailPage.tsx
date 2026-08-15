@@ -91,8 +91,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{breadcrumbs}
 			{/* No outcome chip in the header: the trace below states it, and the card around the text
-			    states it again for text that was not sent — a third copy three lines above the trace
-			    is the redundancy this rewrite exists to remove. */}
+			    states it again for text that was not sent. */}
 			<ReviewDetailHeader
 				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
 				provenance={
@@ -162,8 +161,6 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 				)}
 				{feedback.replacesId && (
 					<p className="text-sm text-muted-foreground">
-						{/* The one identifier worth keeping from the old Technical details drawer, because it
-						    is a link and not a label — the earlier feedback this one took the place of. */}
 						<Link
 							to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
 							params={{ workspaceSlug, feedbackId: feedback.replacesId }}

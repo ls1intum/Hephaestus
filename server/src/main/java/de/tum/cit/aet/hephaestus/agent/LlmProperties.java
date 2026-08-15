@@ -36,11 +36,10 @@ public record LlmProperties(
     public static final String ECB_DAILY_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 
     /**
-     * @param allowLoopback whether {@code http://localhost}-style provider base URLs are accepted.
-     *                      SECURITY: enabling this lets a workspace admin aim a "provider" at
-     *                      host-local services, so it belongs in local/dev profiles only. The
-     *                      private/link-local/CGNAT check is unconditional and this flag does not
-     *                      relax it
+     * @param allowLoopback whether {@code http://localhost}-style provider base URLs are accepted; belongs
+     *                      in local/dev profiles only, since it lets a workspace admin aim a "provider" at
+     *                      host-local services. Does not relax the unconditional private/link-local/CGNAT
+     *                      check
      */
     public record Egress(@DefaultValue("false") boolean allowLoopback) {}
 

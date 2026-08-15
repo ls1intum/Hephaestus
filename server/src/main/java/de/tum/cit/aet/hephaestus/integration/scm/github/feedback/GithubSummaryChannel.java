@@ -127,13 +127,11 @@ public class GithubSummaryChannel implements SummaryChannel {
     /**
      * Edit an already-posted summary comment in place via the {@code updateIssueComment} mutation (ADR 0021
      * re-review UX). GitHub addresses both PR-level and issue comments as {@code IssueComment}s, so the same
-     * mutation edits either. No subject resolution is needed — the comment's own node id ({@code externalId},
-     * returned by a prior {@link #postSummary}) addresses it directly.
+     * mutation edits either, and the comment's own node id ({@code externalId}) addresses it directly.
      *
-     * <p>Mirrors the GitLab channel's typed outcome: a rate-limit / transport / unknown error is
-     * {@code TRANSIENT} (keep the prior summary, do NOT re-post — a flaky update must not double-post a second
-     * summary); a confirmed not-found comment is {@code GONE} (re-post); only a blank external id — a data bug —
-     * throws.
+     * <p>Mirrors the GitLab channel's typed outcome: rate-limit / transport / unknown errors are
+     * {@code TRANSIENT} (keep the prior summary, do not re-post); a confirmed not-found comment is
+     * {@code GONE} (re-post); only a blank external id — a data bug — throws.
      */
     @Override
     public UpdateOutcome updateSummary(FeedbackTarget target, String externalId, FeedbackContent content) {

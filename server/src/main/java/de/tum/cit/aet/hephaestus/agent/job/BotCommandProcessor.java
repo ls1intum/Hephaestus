@@ -46,10 +46,8 @@ import org.springframework.transaction.event.TransactionalEventListener;
  *
  * <h2>What the review is recorded as</h2>
  * <p>The command raises the kind's declared manual-request signal, and the run is filed as
- * {@link ObservationOrigin#MANUAL}. Naming a lifecycle event instead would put an occasion nobody observed
- * in the one place a developer goes to find out why a review ran, and filing it as LIVE would mix a
- * self-selected sample into the population the trend line is read from: people ask for reviews of work
- * they were already unsure of.
+ * {@link ObservationOrigin#MANUAL} — filing it as LIVE would mix a self-selected sample (people ask for
+ * reviews of work they were already unsure of) into the population the trend line is read from.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -85,13 +83,10 @@ public class BotCommandProcessor {
     }
 
     /**
-     * No transaction, deliberately. {@link AgentJobService#submit} states that callers must not wrap it
-     * in one: it opens its own so that the idempotency-key race it absorbs rolls back that insert alone.
-     * Joined to an outer transaction, the same race
-     * marks the whole unit of work rollback-only, so a second person asking at the same moment as the
-     * first would not merely be deduplicated: the ledger row recording that they asked would roll back
-     * with it, and the ask would vanish leaving no reason for the silence. Everything this method reads
-     * is fetched with its association graph and used detached.
+     * No transaction, deliberately. {@link AgentJobService#submit} opens its own so the idempotency-key
+     * race it absorbs rolls back that insert alone. Joined to an outer transaction, the same race would
+     * mark the whole unit of work rollback-only — so a second person asking at the same moment as the
+     * first would lose the ledger row recording that they asked, not just the duplicate job.
      */
     @Async
     @TransactionalEventListener
@@ -172,13 +167,10 @@ public class BotCommandProcessor {
                 return;
             }
 
-            // The commenter by the identity the provider knows them by, never by login: a login is
-            // provider-scoped and its owner can change it, so authorizing on one authorizes whoever
-            // holds it today. An unknown commenter resolves to null, which the authority refuses.
-            //
-            // Exactly one identity, never the account's whole set: a comment carries no Hephaestus
-            // account, so the set would have to be inferred from this identity — and an admin under a
-            // second provider would then be authorized by a link this comment does not prove they hold.
+            // By the identity the provider knows them by, never by login — a login's owner can change it,
+            // so authorizing on one authorizes whoever holds it now. Exactly one identity, never the
+            // account's whole set: a comment carries no Hephaestus account, so an admin under a second
+            // provider would otherwise be authorized by a link this comment does not prove they hold.
             List<User> commenter = userRepository
                 .findByNativeIdAndProviderId(event.authorNativeId(), event.providerId())
                 .map(List::of)
@@ -220,8 +212,6 @@ public class BotCommandProcessor {
             );
         }
     }
-
-    // Emoji reaction
 
     /**
      * Add an eyes emoji reaction to the bot command note. Dispatches through the

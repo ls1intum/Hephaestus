@@ -198,12 +198,8 @@ class PracticeCatalogInjector {
             }
             entry.put("revisionId", p.getCurrentRevision().getId());
             entry.put("defectDetector", p.isDefectDetector());
-            // Where this practice's author expects the answer to be — a pointer into a sandbox that now
-            // stages the whole workspace, not a fence around it. What may be CITED is what the run
-            // staged, which {@code inputs/manifest.json} states once for every practice; a per-practice
-            // copy of that would only be a second thing to disagree with it. A practice whose subject
-            // turns out to live somewhere its author did not think to name is the case full context
-            // exists to catch, so reading beyond this list is expected rather than a violation.
+            // A pointer, not a fence: what may be CITED is what the run staged (inputs/manifest.json), so
+            // reading beyond this list is expected, not a violation.
             ArrayNode readsSources = entry.putArray("readsSources");
             PracticeBinding.needsFor(p.getBindings(), signalOf(job))
                 .stream()
@@ -211,11 +207,8 @@ class PracticeCatalogInjector {
                 .distinct()
                 .sorted()
                 .forEach(readsSources::add);
-            // The subset the practice holds EXHAUSTIVE: the sources it says its claim asserts something
-            // is NOT in. That stance is what makes an absence assertable at all, so it doubles as the
-            // domain a search must cover before the runner will accept an ABSENT observation. Published
-            // here rather than inferred in the sandbox, because the stance lives on the binding and the
-            // model must be told what it is on the hook for searching.
+            // The sources the practice claims to have searched exhaustively — what makes an ABSENT
+            // observation assertable, and what the runner requires be searched before accepting one.
             ArrayNode exhaustiveSources = entry.putArray("exhaustiveSources");
             PracticeBinding.needsFor(p.getBindings(), signalOf(job))
                 .stream()

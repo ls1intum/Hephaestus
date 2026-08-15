@@ -117,11 +117,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(cas.get(sha)).contains(diff);
     }
 
-    /**
-     * A source nothing collected is reported as a fact about this deployment, never as a decision about
-     * this review. There is no longer any such decision to report: relevance stopped being a reason a
-     * source is missing when the plan stopped choosing sources.
-     */
     @Test
     void shouldReportASourceWithNoCollectorAsUnavailableRatherThanUnwanted() {
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -138,11 +133,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(comments.path("state").path("completeness").asString()).isEqualTo("COMPLETE");
     }
 
-    /**
-     * The bug this slice exists to close: {@code workspace.project-inventory} is declared by none of the
-     * 37 shipped practices, so the old per-practice union never selected it and the orchestrator prompt
-     * pointed the model at a file that was never written.
-     */
     @Test
     void shouldStageASourceNoPracticeDeclares() {
         assertThat(builder.stagedSources(plan())).contains(PROJECT_INVENTORY, OUTLINE, REPOSITORY_TREE);
@@ -185,9 +175,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldReviewAMirroredRecordWhoseCurrentnessCannotBeEstablished() {
-        // A pull request unchanged for months is correctly mirrored, not stale. Reading the mirror's
-        // last-written timestamp as a last-verified one would refuse exactly this case, which covers
-        // every backfilled review and every established repository.
+        // A pull request unchanged for months is correctly mirrored, not stale — reading the mirror's
+        // last-written timestamp as a last-verified one would wrongly refuse this case.
         var manifest = coreManifest(builder, "job-quiet", Instant.EPOCH);
 
         assertThat(
@@ -199,11 +188,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
     @Test
     void shouldDeclineWhenASourceThatMustHoldSomethingCapturedNothing() {
-        // A pull request really can produce an empty diff — a full revert, a force-push, a
-        // merge-commit-only range. The contract allows it, so availability and completeness both pass.
-        // Only the diff's declared COMPLETE_AND_NON_EMPTY separates "there is nothing here to judge"
-        // from "I looked and it was fine", and it applies to every practice requiring the diff, not
-        // only to the ones that thought to ask for it.
+        // An empty diff is valid (full revert, force-push, merge-only range); only the declared
+        // COMPLETE_AND_NON_EMPTY separates "nothing to judge" from "looked and it was fine".
         Map<String, byte[]> files = new LinkedHashMap<>();
         String path = "inputs/context/diff.patch";
         files.put(path, new byte[0]);
@@ -237,15 +223,11 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     /**
-     * The reason a source is unusable is one reason. When nothing captured the diff, the reader was
-     * told it "was not captured; was captured only in part; was captured empty" — three claims that
-     * cannot all hold, on the one sentence the whole trace exists to deliver. Incompleteness and
-     * emptiness are facts about a capture that happened; where none did, absence is the whole answer.
+     * Incompleteness and emptiness are facts about a capture that happened; where none did, absence is
+     * the whole answer.
      */
     @Test
     void shouldNameOnlyAbsenceWhenNothingWasCaptured() {
-        // The diff was asked for and nothing provided it, and the practice needing it requires the
-        // strictest quality any source declares — the combination that produced all three at once.
         ArtifactSourceManifest manifest = builder.augment(
             new LinkedHashMap<>(),
             Map.of(),
@@ -265,7 +247,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         );
     }
 
-    /** The counterpart the other three cases are distinguished from: a good capture names nothing at all. */
     @Test
     void shouldNameNoReasonWhenACompleteCaptureHeldSomething() {
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -299,10 +280,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(check.reasonCodes()).isEmpty();
     }
 
-    /**
-     * The same empty capture of a source whose contract asks nothing of it is reviewable: emptiness is
-     * the answer there, not a gap in it.
-     */
     @Test
     void shouldReviewAnEmptyCaptureOfASourceThatMayBeEmpty() {
         Map<String, byte[]> files = new LinkedHashMap<>();
@@ -332,9 +309,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     /**
-     * A partial capture of a source the contract is content to take partially still refuses the one
-     * practice whose claim is that something is not in it — a fragment that does not contain the
-     * resolution is equally consistent with the resolution being in the part nobody fetched.
+     * A fragment that does not contain something is equally consistent with that something being in the
+     * part nobody fetched, so a partial capture still refuses an absence claim.
      */
     @Test
     void shouldRefuseAnAbsenceClaimOnAPartialCapture() {
@@ -357,7 +333,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             )
         );
 
-        // The same partial capture, read by a practice that only reads what is in front of it.
         assertThat(
             builder
                 .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiringComments()))
@@ -402,9 +377,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             )
         );
 
-        // The manifest the model reads has to say which bound stopped the walk, not merely that
-        // something is missing: "we stopped at 20,000 files" and "we skipped one 400 MB binary" send a
-        // reader to different conclusions about what the tree could still have contained.
+        // The manifest must say which bound stopped the walk, not merely that something is missing.
         SourceCaptureState.Available tree = (SourceCaptureState.Available) manifest
             .sources()
             .stream()
@@ -415,7 +388,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         assertThat(tree.completeness()).isEqualTo(SourceCompleteness.PARTIAL);
         assertThat(tree.limitations()).containsExactly(GitRepositoryManager.TREE_LIMITATION_FILE_COUNT);
 
-        // A practice that only reads what is in front of it still runs on a fragment.
         assertThat(
             builder
                 .checkAutomatedReviewReadinessAsOfNow(
@@ -425,8 +397,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 .readyPractices()
         ).hasSize(1);
 
-        // The one that matters: a practice whose verdict rests on something being absent from the
-        // repository must not be answered from a tree we only partly walked.
+        // A practice whose verdict rests on something being absent from the repository must not be
+        // answered from a tree we only partly walked.
         AutomatedReviewReadinessResult refused = builder.checkAutomatedReviewReadinessAsOfNow(
             manifest,
             List.of(practiceRequiring(REPOSITORY_TREE, "asserts-nothing-in-the-repo", EvidenceStance.EXHAUSTIVE))
@@ -557,8 +529,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         List<Practice> practices = List.of(practiceRequiring(CORE, "pr-core"));
 
         var original = builder.checkAutomatedReviewReadiness(manifest, practices, NOW, null);
-        // Re-evaluated much later against the recorded evidence and the recorded anchor. Readiness is
-        // a pure function of those inputs, so the result must be identical.
+        // Readiness is a pure function of the recorded evidence and anchor, so re-evaluating later must
+        // produce an identical result.
         var replayed = builderAt(NOW.plusSeconds(90 * 86_400)).checkAutomatedReviewReadiness(
             manifest,
             practices,
@@ -687,8 +659,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     void shouldTreatAnIncoherentWatermarkAsUnknownRatherThanStale() {
         ArtifactSourceManifest manifest = coreManifest(builder, "job-invalid-watermark", NOW.plusSeconds(60));
 
-        // Nothing here can show the copy is behind: the mirror records when a row last changed, not
-        // when it was last checked. Refusing on that is refusing for a reason we cannot establish.
+        // The mirror records when a row last changed, not when it was last checked, so nothing here can
+        // show the copy is behind.
         assertThat(
             builder
                 .checkAutomatedReviewReadinessAsOfNow(manifest, List.of(practiceRequiring(CORE, "pr-core")))

@@ -39,10 +39,9 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <p>Uses {@code @Async @TransactionalEventListener(AFTER_COMMIT)} to avoid blocking the webhook
  * processing thread and to ensure entities are committed before we read them.
  *
- * <p><strong>How a transition was discovered does not decide whether it is recorded.</strong> Dropping
- * a reconciliation-sourced event at the door would leave a successfully received transition with no
- * trace anywhere, after which the mirror agrees with upstream and nothing can ever notice it again. The
- * source governs only whether a review is <em>triggered</em>; both sources reach the ledger.
+ * <p><strong>How a transition was discovered does not decide whether it is recorded.</strong> Dropping a
+ * reconciliation-sourced event at the door would leave a successfully received transition with no trace
+ * anywhere. The source governs only whether a review is <em>triggered</em>; both sources reach the ledger.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -160,9 +159,8 @@ public class AgentJobEventListener {
                 return;
             }
 
-            // Reconciliation establishes THAT a transition happened; replaying a repository's history
-            // as live coaching is not what it was asked to do. The row it leaves behind is still what
-            // keeps the transition from being lost, and what a later live delivery can claim.
+            // Reconciliation establishes THAT a transition happened, not live coaching about it — the
+            // row it leaves behind is what a later live delivery can still claim.
             if (context.isSync()) {
                 return;
             }

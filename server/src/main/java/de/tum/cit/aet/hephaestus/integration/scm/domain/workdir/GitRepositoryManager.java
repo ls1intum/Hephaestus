@@ -734,18 +734,17 @@ public class GitRepositoryManager {
      * {@link GitTreeSnapshot#close() close} it to delete the directory.
      *
      * <p>Peak memory being bounded is not the same as the capture being bounded: a repository can be
-     * arbitrarily large, and a review that reads all of it costs an unbounded number of tokens. So the
-     * walk stops at {@code hephaestus.git.tree-max-files} and {@code tree-max-total-size}, and skips any
-     * single blob over {@code tree-max-file-size}. Each of those adds its own limitation, which makes
-     * {@link GitTreeSnapshot#complete()} false — the point being not that the tree is smaller, but that
-     * nothing downstream may then claim something is absent from a repository it only partly saw.
+     * arbitrarily large, and a review that reads all of it costs an unbounded number of tokens. The walk
+     * also stops at {@code hephaestus.git.tree-max-files} and {@code tree-max-total-size}, and skips any
+     * blob over {@code tree-max-file-size} — each of which makes {@link GitTreeSnapshot#complete()} false,
+     * so nothing downstream can claim something is absent from a repository it only partly saw.
      *
      * <p>A blob's size is read from the object database before it is written, so an oversized file is
      * never staged and then deleted; the bound protects the disk as well as the context window.
      *
-     * <p>The git handles are opened and closed entirely within this call. Returning lazy readers instead
-     * would be cheaper still, but would leave an {@code ObjectReader} and the repository read lock alive
-     * across the staging boundary, where a slow consumer would hold both open indefinitely.
+     * <p>Git handles are opened and closed entirely within this call rather than returned as lazy readers,
+     * which would leave an {@code ObjectReader} and the repository read lock open across the staging
+     * boundary.
      */
     public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha) {
         if (!properties.enabled()) {
@@ -810,8 +809,8 @@ public class GitRepositoryManager {
                                 continue;
                             }
                             // The count bound stops the walk rather than skipping a file: past it we no
-                            // longer know what we are not reading, and "we read the first 20,000 paths in
-                            // tree order" is a claim we can state, where "we read some of them" is not.
+                            // longer know what we are not reading, so "we read the tree in order up to the
+                            // limit" stays a claim we can state, where "we read some of it" is not.
                             if (result.size() >= maxFiles) {
                                 limitations.add(TREE_LIMITATION_FILE_COUNT);
                                 log.warn(

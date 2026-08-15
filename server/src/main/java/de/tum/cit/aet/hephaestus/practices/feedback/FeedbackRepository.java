@@ -56,12 +56,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     }
 
     /**
-     * The headline locus of a feedback unit: the {@code recurrence_key} of its earliest {@code PRIMARY}-role
-     * bound observation. Denormalized onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction}
-     * at write time so reaction suppression (ADR 0021) can follow a reacted locus across the detector's per-run
-     * re-detections, even though the per-run feedback row differs each run. Null-key PRIMARY rows are
-     * SKIPPED (the {@code recurrenceKey IS NOT NULL} filter): this returns the earliest PRIMARY observation
-     * that HAS a non-null key. Empty only when the unit binds no PRIMARY observation with a recurrence_key.
+     * The {@code recurrence_key} of a feedback unit's earliest {@code PRIMARY}-role observation, denormalized
+     * onto a {@link de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction} (ADR 0021) so reaction
+     * suppression can follow a reacted locus across re-detections. Null-key rows are filtered out rather than
+     * returned as a false locus.
      */
     @Query(
         """
@@ -94,8 +92,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     );
 
     /**
-     * Supersedes the prior delivered summary selected through its SUMMARY placement. Inline-only deliveries
-     * intentionally remain DELIVERED on the same thread. The state predicate makes concurrent retries idempotent.
+     * Marks a prior DELIVERED summary superseded when a new one replaces it; inline-only deliveries stay
+     * DELIVERED on the same thread. The state predicate makes concurrent retries idempotent.
      */
     @Modifying
     @Transactional
@@ -106,24 +104,23 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int updateState(@Param("id") UUID id, @Param("state") String state);
 
     /**
-     * Purge all feedback for a workspace. The soft-delete that drives a workspace purge never fires the
-     * RESTRICT FK on {@code feedback}, so feedback (and its CASCADE children {@code feedback_observation},
-     * {@code feedback_placement}, {@code feedback_reaction}) would otherwise persist indefinitely. Called
-     * first by the practices purge contributor.
+     * A workspace purge soft-deletes rather than dropping rows, so it never fires the RESTRICT FK on
+     * {@code feedback}; without this, feedback and its CASCADE children would persist indefinitely.
      */
     @Modifying
     @Transactional
     @Query("DELETE FROM Feedback f WHERE f.workspaceId = :workspaceId")
     void deleteAllByWorkspaceId(@Param("workspaceId") Long workspaceId);
 
+    // Each erasure method below hard-deletes feedback for one workspace + artifact-kind scope. DB
+    // ON DELETE CASCADE clears feedback_observation/feedback_placement/feedback_reaction; the predicates keep
+    // every other tenant's and kind's rows untouched. Bulk JPQL delete, since the @Immutable entity forbids
+    // an ORM remove.
+
     /**
-     * Hard-delete the {@code chat.conversation_thread} feedback for a workspace whose {@code artifact_id} (the
-     * {@code slack_thread} id) is one of {@code artifactIds} — the derived-content erasure the Slack module invokes
-     * through {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
-     * withdrawn. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} / {@code feedback_placement} /
-     * {@code feedback_reaction}. Bulk JPQL delete (the {@code @Immutable} entity forbids an ORM remove). The
-     * {@code workspace_id} + {@code artifact_kind} + {@code artifact_id} predicates keep it scoped so no PR/ISSUE unit
-     * and no other-tenant row is affected. Callers guard an empty {@code artifactIds}.
+     * Erases {@code chat.conversation_thread} feedback by {@code artifact_id}, invoked through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure} when a channel's consent is
+     * withdrawn.
      *
      * @return the number of feedback units deleted
      */
@@ -148,13 +145,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     }
 
     /**
-     * Hard-delete <em>every</em> {@code chat.conversation_thread} feedback unit for a workspace — the whole-tenant erasure
-     * the Slack module invokes through
-     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseAllConversationForWorkspace} on
-     * app-uninstall / workspace-purge. DB {@code ON DELETE CASCADE} clears {@code feedback_observation} /
-     * {@code feedback_placement} / {@code feedback_reaction}. The {@code workspace_id} + {@code artifact_kind}
-     * predicates keep it scoped so no PR/ISSUE unit and no other-tenant row is affected. Idempotent (0 when the
-     * workspace has no conversation feedback).
+     * Erases every {@code chat.conversation_thread} feedback unit for a workspace, invoked on app-uninstall /
+     * workspace-purge.
      *
      * @return the number of feedback units deleted
      */
@@ -177,15 +169,9 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     }
 
     /**
-     * Hard-delete every {@code scm.pull_request} / {@code scm.issue} feedback unit for a workspace — the
-     * SCM-derived counterpart of {@link #deleteAllConversationThreadFeedback}, invoked when the
-     * workspace's SCM mirror is erased on connection-disconnect or workspace-purge. These units hold
-     * mirrored third-party content directly (quoted diff/comment text in the evidence payload) and
-     * reference the artifact only by a soft {@code artifact_id}, so they neither cascade with the
-     * repository delete nor survive it meaningfully. DB {@code ON DELETE CASCADE} clears
-     * {@code feedback_observation} / {@code feedback_placement} / {@code feedback_reaction}. The
-     * {@code workspace_id} + {@code artifact_kind} predicates keep {@code chat.conversation_thread} units
-     * and other tenants' rows untouched. Idempotent.
+     * Erases every {@code scm.pull_request} / {@code scm.issue} feedback unit for a workspace, invoked when
+     * the SCM mirror is erased. These units hold mirrored third-party content directly, so they neither
+     * cascade with the repository delete nor survive it meaningfully.
      *
      * @return the number of feedback units deleted
      */
@@ -208,13 +194,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     }
 
     /**
-     * Hard-delete the {@code chat.conversation_thread} feedback a single person is the <em>subject</em> of
-     * ({@code about_user_id = :aboutUserId}) within a workspace — the derived-content half of a person opt-out /
-     * account hard-delete, invoked through
-     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}.
-     * DB {@code ON DELETE CASCADE} clears the join/placement/reaction children. The {@code workspace_id} +
-     * {@code artifact_kind} + {@code about_user_id} predicates keep another person's rows, PR/ISSUE rows, and other
-     * tenants' rows intact. Idempotent.
+     * Erases the {@code chat.conversation_thread} feedback a person is the subject of ({@code about_user_id}),
+     * invoked through
+     * {@link de.tum.cit.aet.hephaestus.practices.spi.ConversationFeedbackErasure#eraseConversationFeedbackAboutUser}
+     * for a person opt-out / account hard-delete.
      *
      * @return the number of feedback units deleted
      */
@@ -241,13 +224,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     // --- conversational feedback delivery loop ---
 
     /**
-     * Flip a PREPARED conversational unit to DELIVERED (compare-and-set). Native (not JPQL) because the
-     * {@code @Immutable} entity forbids ORM state mutation, mirroring {@link #updateState}. The
-     * {@code delivery_state='PREPARED'} predicate is the CAS guard: exactly one of N racing mentor turns wins the
-     * flip; the others see a rowcount of 0. A unit already DELIVERED, SUPPRESSED (aged out), or non-existent yields
-     * 0 - the caller treats that as a no-op and does NOT write a placement.
+     * Flips a PREPARED conversational unit to DELIVERED (compare-and-set): the {@code delivery_state='PREPARED'}
+     * predicate lets exactly one of N racing mentor turns win the flip, the rest see rowcount 0.
      *
-     * @return {@code 1} on a clean flip, {@code 0} if the unit was no longer PREPARED (lost race / expired).
+     * @return {@code 1} on a clean flip, {@code 0} if the unit was no longer PREPARED
      */
     @Modifying
     @Transactional
@@ -259,8 +239,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int markConversationDelivered(@Param("id") UUID id, @Param("at") Instant at);
 
     /**
-     * Flip a PREPARED conversational unit to SUPPRESSED when its actual transport attempt was blocked by
-     * instance Silent Mode. The state predicate prevents overwriting a unit another transaction already delivered.
+     * Flips a PREPARED conversational unit to SUPPRESSED when instance Silent Mode blocked its transport
+     * attempt; the state predicate avoids overwriting a unit another transaction already delivered.
      */
     @Modifying
     @Transactional
@@ -272,9 +252,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int markConversationSuppressedBySilentMode(@Param("id") UUID id);
 
     /**
-     * Newest PREPARED conversational units for a developer (as RECIPIENT) in a workspace - the mentor's queue.
-     * Body is intentionally NULL on these rows (composed at delivery). Ordered newest-first, bounded by the caller's
-     * {@code Pageable}.
+     * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. Body is null
+     * on these rows; it is composed at delivery.
      */
     @Query(
         """
@@ -293,9 +272,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     );
 
     /**
-     * Does a DELIVERED IN_CONTEXT feedback unit already exist for this recipient in this workspace bound to an
-     * observation carrying {@code recurrenceKey}? The router uses this to avoid re-raising a locus already received
-     * inline. A null key is never passed (the caller skips the check when the key is null).
+     * Whether a DELIVERED IN_CONTEXT unit already exists for this recipient bound to an observation carrying
+     * {@code recurrenceKey}, so the router can avoid re-raising a locus already received inline.
      */
     @Query(
         """
@@ -314,7 +292,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         @Param("recurrenceKey") String recurrenceKey
     );
 
-    /** Distinct workspaces that currently hold at least one PREPARED conversational unit (TTL sweep enumeration). */
+    /** Distinct workspaces holding at least one PREPARED conversational unit (TTL sweep enumeration). */
     @Query(
         """
         SELECT DISTINCT f.workspaceId FROM Feedback f
@@ -325,9 +303,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     List<Long> findWorkspaceIdsWithPreparedConversation();
 
     /**
-     * Age out every PREPARED conversational unit for a workspace created strictly before {@code cutoff}: SUPPRESSED /
-     * CONVERSATION_EXPIRED. Native - the {@code @Immutable} entity forbids an ORM update. Carries the
-     * {@code workspace_id} predicate the tenancy inspector requires for a raw native statement.
+     * Ages out every PREPARED conversational unit created before {@code cutoff} to SUPPRESSED /
+     * CONVERSATION_EXPIRED (native, since the {@code @Immutable} entity forbids an ORM update).
      *
      * @return the number of units expired
      */
@@ -416,12 +393,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /**
      * How much of what was measured on one artifact actually reached a person, by practice.
-     *
-     * <p>The second axis of the trace view. A practice can be assessed and still say nothing — because
-     * its tier is {@code MEASURE}, because the recipient disputed the last one, because a cap was hit —
-     * and reporting only the measurement would hide precisely the distinction loudness tiers exist to
-     * make. {@code COUNT(DISTINCT)} because one unit routinely fuses several observations of the same
-     * practice, and counting the join rows would triple it.
+     * {@code COUNT(DISTINCT f.id)} because one feedback unit routinely fuses several observations of the
+     * same practice; counting join rows would multiply it.
      */
     @Query(
         """

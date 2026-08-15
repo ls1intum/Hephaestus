@@ -165,10 +165,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         ).isTrue();
     }
 
-    /**
-     * A decision stops permitting at its expiry, not after it. Every bundled decision expires a year
-     * after it was taken, so a review running on a stale contract is the case this boundary decides.
-     */
+    /** A decision stops permitting at its expiry, not after it. */
     @Test
     void shouldStopPermittingAtTheInstantOfExpiry() throws IOException {
         var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
@@ -213,11 +210,8 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     /**
      * A source whose decisions leave one product purpose unapproved is refused, even though every
-     * decision it does name exists and nothing is orphaned.
-     *
-     * <p>The two checks either side of this one both fail on a mismatched id set, which is the easy
-     * mistake. This is the quiet one: the catalog and the decisions agree with each other and disagree
-     * with the product, so a source reaches a purpose it was never approved for.
+     * decision it does name exists and nothing is orphaned — the catalog and the decisions agree with
+     * each other but disagree with the product.
      */
     @Test
     void shouldRejectASourceThatLacksADecisionForOnePurpose() throws IOException {
@@ -276,11 +270,8 @@ class ClasspathArtifactSourceCatalogRegistryTest {
 
     @Test
     void shouldPinTheAbsenceReasonVocabularyToTheJavaEnum() throws IOException {
-        // The schema calls this a "closed vocabulary; see SourceAbsenceReason" and then restates it by
-        // hand, twice. A value added to the enum and not here makes the manifest we write fail its own
-        // published contract; a value removed from the enum and left here keeps advertising a reason
-        // nothing can emit. Neither shows up until someone validates a manifest against the schema,
-        // which no production path does — so the restatement is held to the enum here instead.
+        // The schema restates this "closed vocabulary" by hand; nothing validates a manifest against the
+        // schema in production, so the restatement is held to the enum here instead.
         JsonNode schema = read("contracts/artifact-source/1.0.0/artifact-source-manifest.schema.json");
         List<String> expected = Stream.of(SourceAbsenceReason.values()).map(Enum::name).toList();
 
@@ -296,12 +287,7 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         }
     }
 
-    /**
-     * The same hand-restatement problem as the absence reasons, on the three governance vocabularies.
-     * A constant nobody can produce goes on being advertised to anyone reading the published schema,
-     * and a constant the schema has not heard of makes the catalog we ship fail its own contract.
-     * Neither is caught by loading the catalog, because the loader reads the JSON and never the schema.
-     */
+    /** The same hand-restatement problem as the absence reasons, on the three governance vocabularies. */
     @Test
     void shouldPinTheGovernanceVocabulariesToTheirJavaEnums() throws IOException {
         JsonNode catalogSchema = read("contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json");

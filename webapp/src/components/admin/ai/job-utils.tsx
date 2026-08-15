@@ -2,12 +2,6 @@ import type { AgentJob } from "@/api/types.gen";
 import { asDate } from "@/lib/dates";
 import { humanizeToken } from "@/lib/humanize";
 
-/**
- * Status vocabularies used to live here. They now live in `@/components/practice-vocabulary`, next
- * to the other status registries and the badge they all render through: the only screens that read
- * them are the practice-review screens, and keeping the words here is how the same status ended up
- * wearing one badge in a table and none in the filter beside it.
- */
 export type JobWait = { kind: "hold"; reason: string } | { kind: "backoff" };
 
 /**

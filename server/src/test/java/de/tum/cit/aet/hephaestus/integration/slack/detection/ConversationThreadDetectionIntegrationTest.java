@@ -35,11 +35,11 @@ import tools.jackson.databind.node.ObjectNode;
  * Conversation-detection integration tests (Testcontainers — the candidate scan rides a real Postgres
  * {@code bigint[]} column, the growth count rides lexicographic Slack-{@code ts} comparison, and the watermark
  * advance is a real UPDATE). The fan-out is mocked so the sweep's decision is observable without seeding an
- * agent-config graph; the raw SQL the scheduler owns is exercised for real, and so is the signal-ledger row it
- * now writes before deciding anything.
+ * agent-config graph; the raw SQL the scheduler owns, and the signal-ledger row it writes before deciding
+ * anything, are exercised for real.
  *
- * <p>Channel ingestion is off by default (a deliberate, privacy-sensitive parked capability), so this test — which
- * exercises subsystem B directly — enables it via {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+ * <p>Channel ingestion is off by default (a deliberate, privacy-sensitive parked capability), so this test
+ * enables it via {@code hephaestus.integration.slack.conversation-ingest.enabled}.
  */
 @TestPropertySource(properties = "hephaestus.integration.slack.conversation-ingest.enabled=true")
 class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
@@ -53,12 +53,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
-    /**
-     * The fan-out is mocked, not the job service: the sweep now records the occurrence itself and hands
-     * the participants to this collaborator, whose own unit test covers what it does with them. What is
-     * exercised for real here is the part only Postgres can answer — the {@code bigint[]} candidate scan,
-     * the lexicographic growth count, and the watermark UPDATE.
-     */
+    /** Mocked here; its own unit test covers what it does with the participants it is handed. */
     @MockitoSpyBean
     private ConversationReviewSubmitter conversationReviewSubmitter;
 
@@ -69,8 +64,8 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
     /**
      * A real {@code workspace} row per test. The Slack tables carry no foreign key to one, but the signal
-     * ledger the sweep now writes to does — and that constraint is the reason a conversation occurrence
-     * can be joined to the workspace whose budget paid for it.
+     * ledger the sweep writes to does, which is what lets an occurrence be joined to the workspace whose
+     * budget paid for it.
      */
     private long newWorkspace() {
         Workspace workspace = WorkspaceTestFixtures.activeWorkspace("conv-detect-" + WS_SEQ.incrementAndGet());
@@ -79,7 +74,6 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
     private SlackConversationTestSupport support;
 
-    /** Add the raw-JDBC-only {@code slack_thread} columns to the entity-derived test schema — see {@link SlackConversationTestSupport}. */
     @BeforeEach
     void ensureUnmappedSlackThreadColumns() {
         support = new SlackConversationTestSupport(jdbc);
@@ -138,7 +132,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         assertThat(candidate.lastTs()).isEqualTo(lastTs);
 
         // The occurrence is in the ledger, which is what lets the artifact trace explain a conversation
-        // that nothing happened to. Before this, the whole path submitted with no signal key.
+        // that nothing happened to.
         Long recorded = jdbc.queryForObject(
             "SELECT count(*) FROM artifact_signal WHERE workspace_id = ? AND artifact_kind = ?" +
                 " AND artifact_id > 0 AND signal_name = ?",
@@ -149,7 +143,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         );
         assertThat(recorded).isEqualTo(1L);
 
-        // Watermark advanced to the thread's newest ts after enqueue → a no-growth re-sweep now enqueues nothing.
+        // Watermark advanced to the thread's newest ts after enqueue → a no-growth re-sweep enqueues nothing.
         String watermark = jdbc.queryForObject(
             "SELECT last_reviewed_ts FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
             String.class,

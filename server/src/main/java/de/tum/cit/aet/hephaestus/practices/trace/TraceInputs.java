@@ -11,18 +11,15 @@ import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The facts a trace is derived from, flattened out of their entities.
- *
- * <p>Plain values so {@link PracticeTraceDeriver}, which holds every judgement in this feature, can be
- * exercised without a database, a Spring context or a mirror.
+ * The facts a trace is derived from, flattened out of their entities into plain values so
+ * {@link PracticeTraceDeriver}, which holds every judgement in this feature, can be exercised without a
+ * database, a Spring context or a mirror.
  */
 final class TraceInputs {
 
     private TraceInputs() {}
 
     /**
-     * A practice as the trace sees it.
-     *
      * @param dormancyReason why nothing connected here can raise what it watches, or {@code null} when
      *                      something can; the sentence comes straight from {@code DormantBinding}
      */
@@ -36,11 +33,8 @@ final class TraceInputs {
     ) {}
 
     /**
-     * One ledger row.
-     *
-     * @param id the row's own identity. Carried because a signal name cannot identify the occurrence an
-     *           answer rests on: the same signal recurs on every new revision, and "assessed when new
-     *           commits were pushed" is a different claim depending on which push
+     * @param id carried because a signal name alone cannot identify which occurrence an answer rests on:
+     *           the same signal recurs on every new revision
      */
     record SignalOccurrence(
         UUID id,

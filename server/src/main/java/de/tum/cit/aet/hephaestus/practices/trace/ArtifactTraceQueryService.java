@@ -198,9 +198,8 @@ class ArtifactTraceQueryService {
      * for "will this ever fire here" and the wrong one for "has this ever fired": a signal already in
      * this workspace's ledger demonstrably arrives, whatever the registry says.
      *
-     * <p>Only this page's artifact kind is read back. Every practice this map is consulted for is one
-     * of that kind, and a practice's signals carry their kind in their own names, so a row filed under
-     * another kind could never have refuted one of these claims.
+     * <p>Only this page's artifact kind is read back — a practice's signals carry their kind in their own
+     * names, so a row filed under another kind could never have refuted one of these claims.
      */
     private Map<Long, String> dormancyContradictedByTheLedger(Long workspaceId, ArtifactKind artifactKind) {
         List<DormantBinding> dormant = coverage.dormantBindings(workspaceId);

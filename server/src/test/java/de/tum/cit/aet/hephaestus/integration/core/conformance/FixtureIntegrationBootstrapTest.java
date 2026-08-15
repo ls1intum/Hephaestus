@@ -36,17 +36,11 @@ import java.util.Set;
 import org.junit.jupiter.api.Test;
 
 /**
- * An artifact kind that exists nowhere in {@code src/main}, driven through the real machinery.
+ * An artifact kind that exists nowhere in {@code src/main}, driven through the real machinery — proving
+ * the integration framework and practices module hold no knowledge of which artifact kinds exist.
  *
- * <p>The claim under test is not that widgets work. It is that the integration framework and the
- * practices module contain no knowledge of which artifact kinds happen to exist — that
- * {@code scm.pull_request} is data to them, not a case. Every assertion here would still pass if pull
- * requests were deleted from the codebase, and every one of them fails the moment somebody reaches for a
- * concrete kind on either side of the contract.
- *
- * <p>What is deliberately absent: the trigger gate. {@code PracticeReviewDetectionGate} takes a
- * {@code PullRequest} or an {@code Issue} directly, so a fixture kind cannot reach it — a gap frozen and
- * shrinking under {@code PracticesIntegrationBoundaryTest}, not a claim this test makes.
+ * <p>Deliberately out of scope: the trigger gate, which takes a {@code PullRequest} or {@code Issue}
+ * directly and so cannot reach a fixture kind ({@code PracticesIntegrationBoundaryTest} covers that gap).
  */
 class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
@@ -72,8 +66,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     @Test
     void anUnconnectedWorkspaceCoversNothingWithoutFailing() {
-        // The distinction the whole design turns on: nothing raises the signal here, and that is an
-        // ordinary state of a workspace mid-onboarding — not a reason to refuse to serve it.
+        // Mid-onboarding is an ordinary state, not a reason to refuse to serve the workspace.
         DeclaredSignalCoverage coverage = coverage(false);
 
         assertThat(coverage.connectedCoverage(WORKSPACE_ID)).isEmpty();
@@ -109,10 +102,8 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     @Test
     void aPracticeStaysLiveWhileAnyOneOfItsSignalsIsCovered() {
-        // A practice watching two things is not dormant because one of them is unreachable; reporting it
-        // as dormant would teach people that the dormancy report is noise. Two integrations raise one
-        // signal each here and only the first is connected, which is the only shape in which one
-        // practice's signals can differ in coverage.
+        // Not dormant just because one of two watched signals is unreachable — that would make the
+        // dormancy report noise.
         PracticeRepository repository = mock(PracticeRepository.class);
         when(repository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practiceBoundTo(FixtureIntegration.WIDGET_ASSEMBLED, FixtureIntegration.WIDGET_SHIPPED))
@@ -160,8 +151,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
 
     private static DeclaredSignalCoverage coverage(boolean connected) {
         ConnectionService connections = mock(ConnectionService.class);
-        // Lenient because half these tests only ask the compiled question, which never consults a
-        // connection — that asymmetry is the point of the two coverages, not a stray stub.
+        // Lenient: half these tests only ask the compiled question, which never consults a connection.
         lenient()
             .when(connections.findActive(anyLong(), eq(FixtureIntegration.KIND)))
             .thenReturn(connected ? Optional.of(mock(Connection.class)) : Optional.empty());
@@ -171,10 +161,6 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Two integrations about one artifact, one signal each, only the first connected — so a practice
-     * bound to both has one covered signal and one uncovered one.
-     */
     private static DeclaredSignalCoverage splitCoverage() {
         ConnectionService connections = mock(ConnectionService.class);
         when(connections.findActive(WORKSPACE_ID, FixtureIntegration.KIND)).thenReturn(
@@ -215,10 +201,7 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * A workspace that has expressed no opinion, so the fixture practices inherit the vocabulary's default
-     * and stay admitted to review — the state in which dormancy is the only thing that can silence them.
-     */
+    /** A workspace with no opinion set, so the fixture practices inherit the default and stay admitted. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider defaults = mock(WorkspaceReviewDefaultsProvider.class);
         when(defaults.forWorkspace(WORKSPACE_ID)).thenReturn(WorkspaceReviewDefaults.UNSET);

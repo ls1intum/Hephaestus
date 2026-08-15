@@ -6,9 +6,8 @@ import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationEvidence } from "./ObservationEvidence";
 
 /**
- * A quote per source kind, so the wire values and the words for them are exercised together. The
- * `path` is what that kind actually puts there: a repo-relative file for the two code sources, and
- * a human-facing object name for the rest — the server's own instruction is that a non-diff citation
+ * `path` is what each kind actually puts there: a repo-relative file for the code sources, and a
+ * human-facing object name for the rest — the server's own instruction is that a non-diff citation
  * "names the issue or comment object, not a fabricated source file".
  */
 const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
@@ -117,13 +116,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * The ordinary case: several passages from one source, and one from another.
- *
- * The source is named once per group. It used to be printed as a contract id in a badge row above,
- * and then again under every single citation — the same `scm.pull-request.diff` three times on a
- * screen whose reader has never seen the source catalog.
- */
 export const Default: Story = {
 	play: async ({ canvas }) => {
 		canvas.getByText("3 passages from 2 sources.");
@@ -137,12 +129,10 @@ export const Default: Story = {
 };
 
 /**
- * Every source a review can quote from, one passage each.
- *
  * The citations are built by walking the registry, so a kind added to the catalog is rendered here
- * the day it lands. The expected headings are written out instead, because the registry falls back
- * to the raw contract id for a kind it has no words for — asking it what the heading should say
- * makes a missing label agree with itself, and `scm.pull-request.diff` passes as a heading.
+ * the day it lands. The expected headings are written out rather than read back from the registry,
+ * which falls back to the raw contract id for a kind it has no words for — asking it what the
+ * heading should say would make a missing label agree with itself.
  */
 export const EverySource: Story = {
 	args: {
@@ -181,12 +171,10 @@ export const EverySource: Story = {
 };
 
 /**
- * Only a source with a `code` locator carries a `path:line` coordinate.
- *
- * Everywhere else the range is an offset into the serialised context file the quote was pulled from —
- * line 12 of a JSON blob, not the twelfth message of a Slack thread — and the server never checks
- * that it points at the quote. Both citations here claim lines 12–13; only one of them is a location
- * a reader could open.
+ * Outside a `code` locator the line range is an offset into the serialised context file the quote
+ * was pulled from — a line of a JSON blob, not a message of a Slack thread — and the server never
+ * checks that it points at the quote. Both citations here claim the same lines; only one of them is
+ * a location a reader could open.
  */
 export const LineNumbersOnlyWhereTheyAreReal: Story = {
 	args: {
@@ -202,11 +190,9 @@ export const LineNumbersOnlyWhereTheyAreReal: Story = {
 };
 
 /**
- * A passage the secret scanner matched.
- *
  * The server accepts a citation with no quote from exactly one detector, so when that detector ran
- * the reason is knowable — and saying it turns a blank panel into an instruction. The location is
- * still shown, because that is the part an operator can act on.
+ * the reason for the blank is knowable and can be said instead of shown as an empty panel. The
+ * location is still shown, because that is the part an operator can act on.
  */
 export const RedactedQuote: Story = {
 	args: {
@@ -222,7 +208,6 @@ export const RedactedQuote: Story = {
 	},
 };
 
-/** A kind this build has no words for still names itself, rather than rendering an empty heading. */
 export const UnknownSource: Story = {
 	args: {
 		evidence: {
@@ -245,7 +230,6 @@ export const UnknownSource: Story = {
 	},
 };
 
-/** No evidence at all is a statement about the observation, not a blank panel. */
 export const NoEvidence: Story = {
 	args: { evidence: null },
 	play: async ({ canvas }) => {

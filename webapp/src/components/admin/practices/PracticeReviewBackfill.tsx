@@ -41,8 +41,8 @@ export interface PracticeReviewBackfillProps {
 }
 
 /**
- * A chosen subset of {@link ARTIFACT_KIND}, not every kind the instance knows: a backfill re-reads
- * work as it stands today, which only makes sense where the work is still there to be re-read.
+ * A subset of {@link ARTIFACT_KIND}: a backfill re-reads work as it stands today, which only makes
+ * sense where the work is still there to be re-read.
  */
 const WORK_KINDS = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue] as const;
 
@@ -68,19 +68,15 @@ const PAUSE_EXPLANATIONS: Record<NonNullable<ReviewBackfillRun["pauseReason"]>, 
 		"Practice reviews are off for this workspace, or the workspace is not active. Nothing has been skipped — the backfill continues once they are back on.",
 };
 
-/** The kind as it reads mid-sentence: "each pull or merge request", "each issue". */
 const nounFor = (artifactKind: string) => artifactKindLabel(artifactKind).toLowerCase();
 
-/** "1 issue", "128 pull or merge requests" — the plural is the vocabulary's, not an appended "s". */
+/** The plural is the vocabulary's, not an appended "s". */
 const countOf = (count: number, artifactKind: string) =>
 	`${count} ${(count === 1 ? artifactKindLabel(artifactKind) : artifactKindPluralLabel(artifactKind)).toLowerCase()}`;
 
 /**
- * The stretch of history a backfill covers, as a card subtitle: "12 Feb 2026 – 13 Aug 2026".
- *
  * `fromAt`/`toAt` are typed `Date` but arrive as ISO strings, so they go through `asDate`. Both ends
- * carry the year: a 180-day window crosses one often enough that dropping it from the left-hand date
- * would make the shortest windows and the longest ones read the same.
+ * carry the year, because the longest windows offered can cross one.
  */
 const formatWindow = (run: ReviewBackfillRun) => {
 	const from = asDate(run.fromAt);
@@ -90,9 +86,9 @@ const formatWindow = (run: ReviewBackfillRun) => {
 };
 
 /**
- * Two steps on purpose: choosing a range only produces an estimate, and a second, explicitly-worded
- * confirmation is what starts spending. A backfill can consume a workspace's whole monthly budget
- * from a single click, so the count and the cost are on screen before anything is submitted.
+ * Two steps on purpose: a backfill can consume a workspace's whole monthly AI budget, so choosing a
+ * range only produces an estimate, and the count and the cost are on screen before the second,
+ * explicitly-worded confirmation starts any spending.
  */
 export function PracticeReviewBackfill({
 	runs,
@@ -116,8 +112,6 @@ export function PracticeReviewBackfill({
 					<AlertCircle />
 					<AlertTitle>Backfills couldn't be loaded</AlertTitle>
 					<AlertDescription>
-						{/* A backfill that is already running keeps running; saying so stops an admin starting a
-						    second one because the first appeared to have vanished. */}
 						<p>Any backfill already running is unaffected — this is only about showing it here.</p>
 						<Button variant="outline" size="sm" onClick={onRetry}>
 							Try again
@@ -247,8 +241,7 @@ function ConfirmationCard({
 }) {
 	const noun = nounFor(run.artifactKind);
 	const plural = artifactKindPluralLabel(run.artifactKind).toLowerCase();
-	// An estimate that is missing is not an estimate of nothing, so it stays `undefined` and gets its
-	// own copy rather than a formatted zero.
+	// A missing estimate is not an estimate of zero, and zero is a value this can legitimately carry.
 	const cost = run.estimatedCostUsd === undefined ? undefined : formatCostUsd(run.estimatedCostUsd);
 	const nothingToDo = run.estimatedArtifacts === 0;
 
@@ -307,8 +300,6 @@ function ConfirmationCard({
 					<Button variant="outline" onClick={() => onCancel(run.id)} disabled={isUpdating}>
 						Discard
 					</Button>
-					{/* A disabled button says what cannot happen; this says what to do instead, which is the
-					    half an estimate of nothing usually leaves out. */}
 					{nothingToDo ? (
 						<p className="text-muted-foreground text-sm">
 							Nothing was opened in that stretch. Discard this and try a longer one.

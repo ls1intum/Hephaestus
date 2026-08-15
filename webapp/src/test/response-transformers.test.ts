@@ -7,18 +7,14 @@ import { server } from "@/mocks/server";
  * Guards the one setting that makes the generated `Date` types true: `transformer: true` on the
  * `@hey-api/sdk` plugin in `openapi-ts.config.ts`.
  *
- * The transformers plugin *emits* `transformers.gen.ts` whether or not anything consumes it, so
- * dropping that setting leaves a client that still compiles, still exports every hook, and still
- * types timestamps as `Date` — while handing components the raw ISO string. `pnpm typecheck` cannot
- * see the difference, because the types are identical either way. That is not a hypothetical: it
- * shipped, and `PracticeReviewBackfill` crashed formatting `run.fromAt` the first time
- * an admin opened it, because every story fed it a `new Date(…)` the server never sent.
+ * The transformers plugin emits `transformers.gen.ts` whether or not anything consumes it, so
+ * dropping that setting leaves a client that compiles, exports every hook and still types timestamps
+ * as `Date` while handing components the raw ISO string. `typecheck` cannot see the difference. It
+ * has shipped that way once, crashing a screen that formatted a timestamp.
  *
- * These assertions go through the real SDK rather than reading `sdk.gen.ts` as text, so they fail for
- * the reason that actually matters — a caller not getting a `Date` — however the wiring got lost.
- *
- * Lives here rather than beside the client it tests because `openapi-ts` *empties* `src/api/` on
- * every run: a guard kept there is deleted by the very command whose output it exists to check.
+ * The assertions go through the real SDK rather than reading `sdk.gen.ts` as text, so they fail for
+ * the reason that matters — a caller not getting a `Date` — however the wiring got lost. It lives
+ * outside `src/api/` because `openapi-ts` empties that directory on every run.
  */
 describe("generated SDK response transformers", () => {
 	it("revives a required date field into a Date", async () => {
@@ -45,7 +41,6 @@ describe("generated SDK response transformers", () => {
 
 		const { data } = await listBackfillRuns({ path: { workspaceSlug: "acme" } });
 
-		// `fromAt` is the field the shipped crash was thrown from.
 		expect(data?.[0]?.fromAt).toBeInstanceOf(Date);
 		expect(data?.[0]?.createdAt).toBeInstanceOf(Date);
 	});

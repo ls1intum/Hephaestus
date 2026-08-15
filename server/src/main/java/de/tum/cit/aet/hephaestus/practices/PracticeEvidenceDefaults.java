@@ -13,13 +13,9 @@ import org.springframework.stereotype.Component;
  * The frame a practice on an artifact kind starts with: the evidence a binding reads by default, and the
  * review limitations every review of that kind carries.
  *
- * <p>Both answers are looked up rather than listed here, so that a kind becomes authorable by being
- * declared rather than by an edit to this file — the source contracts say which sources are a kind's
- * starting evidence, and each kind's {@code ArtifactDescriptor} states what its evidence can never
- * settle.
- *
- * <p>An unknown kind throws rather than borrowing a pull request's requirements, which would demand a
- * diff of something that has none and so refuse every review.
+ * <p>Both answers are looked up from the source contracts and each kind's {@code ArtifactDescriptor}
+ * rather than listed here, so a new kind becomes authorable by being declared, not by editing this file.
+ * An unknown kind throws rather than borrowing a pull request's requirements.
  */
 @Component
 public class PracticeEvidenceDefaults {
@@ -49,10 +45,6 @@ public class PracticeEvidenceDefaults {
             .toList();
     }
 
-    /**
-     * The review frame a practice on this kind starts with: the source-catalog version it reads under
-     * and the claims that kind of evidence can never support, whatever the occasion.
-     */
     public PracticeAutomatedReviewPolicy policyFor(ArtifactKind artifact) {
         List<ReviewLimitation> limitations = artifacts
             .descriptorFor(artifact)

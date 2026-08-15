@@ -21,10 +21,6 @@ import org.springframework.stereotype.Component;
  * stale: deleting a handler makes its kind unexecutable in the same commit, and the contract refuses to
  * start.
  *
- * <p>Takes the handler beans directly instead of {@link JobTypeHandlerRegistry} only to keep the
- * dependency one bean shallower; the registry's own constructor already refuses a build where an
- * {@code AgentJobType} has no handler.
- *
  * <p>It also closes the seam on the other side, because it is the only place holding the run-able set: a
  * kind that can be run but has no branch in {@code PracticeDetectionDeliveryService#resolveTarget} would
  * otherwise announce itself through the first review that failed after being paid for.

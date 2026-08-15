@@ -87,14 +87,8 @@ class LiquibaseSchemaValidationIntegrationTest {
     @Test
     @DisplayName("Production Liquibase schema applies cleanly and the JPA entities validate against it")
     void productionSchemaAppliesAndEntitiesValidate() {
-        // Reaching this point means: (a) all Liquibase changesets applied to an empty DB, and
-        // (b) Hibernate ddl-auto:validate found every @Entity mapping consistent with that schema.
-        // The explicit assertions below make the test assert something concrete, not just
-        // "context loaded".
-
-        // (a) The migration ledger holds the full changeset set. 600+ in master.xml; assert a
-        // conservative floor so the test stays robust to new changesets but still catches a
-        // half-applied / empty ledger.
+        // A conservative floor rather than an exact count, so the test stays robust to new changesets
+        // but still catches a half-applied / empty ledger.
         Integer appliedChangesets = jdbcTemplate.queryForObject(
             "SELECT COUNT(*) FROM databasechangelog",
             Integer.class
@@ -104,14 +98,10 @@ class LiquibaseSchemaValidationIntegrationTest {
             .isNotNull()
             .isGreaterThan(500);
 
-        // (b) Representative production columns exist in the Liquibase-built schema (not the
-        // Hibernate-create schema). Query information_schema so we assert against the real catalog.
+        // Representative production columns, queried from information_schema so this asserts against
+        // the real catalog rather than the Hibernate-create schema.
         assertColumnExists("workspace", "account_login");
         assertColumnExists("connection", "credentials_encrypted");
-
-        // Slack integration: the four tables + the additive columns the ingest/detection
-        // paths rely on must be present in the Liquibase-built schema, and the git_provider->
-        // identity_provider rename must have landed (data-safe rename, not drop+add).
         assertColumnExists("slack_message", "author_member_id");
         assertColumnExists("slack_thread", "participant_member_ids");
         assertColumnExists("slack_thread", "last_reviewed_ts");

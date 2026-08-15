@@ -25,11 +25,8 @@ export const WORK_ARTIFACT_FILTER_OPTIONS = [
 ] as const;
 
 /**
- * The same list with the "no filter" choice at its head, which is what both catalog screens' work-type
- * control offers — one dropdown on a narrow viewport, one toggle group on a wide one, on each screen.
- *
- * "ALL" is a value rather than an absent one because a Base UI `Select` must hold one, and it is the
- * sentinel both screens already put in the URL.
+ * The same list with the "no filter" choice at its head. "ALL" is a value rather than an absent one
+ * because a Base UI `Select` must hold one, and it is the sentinel the URL already carries.
  */
 export const WORK_ARTIFACT_FILTER_ITEMS: {
 	value: "ALL" | ArtifactKindId;

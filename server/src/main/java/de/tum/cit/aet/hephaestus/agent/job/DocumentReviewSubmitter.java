@@ -26,15 +26,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 /**
  * Turns a recorded {@code docs.document} signal into a review, and settles the ledger row either way.
  *
- * <p>One class serves both paths deliberately. The live path ({@link DocumentReviewTrigger}) runs when
- * the sync writes a new ledger row; the reaper path ({@link PendingSignalResubmitter}) re-offers a row
- * that was refused for something an operator can undo. Splitting them would be two places to keep the
- * refusal vocabulary honest, and the reaper's whole purpose is that the second attempt reaches exactly
- * the same decision as the first.
+ * <p>The live path ({@link DocumentReviewTrigger}) and the reaper path ({@link PendingSignalResubmitter})
+ * share this class so a resubmitted signal reaches the same decision as the first attempt.
  *
- * <p>The observation is attributed to the document's author, per {@code DocumentArtifactDescriptor}'s
- * sole {@code AUTHOR} role, never to whoever last edited it. The consequence is accepted rather than
- * hidden: on an update signal the author is measured on a document somebody else may have changed.
+ * <p>The observation is attributed to the document's author ({@code DocumentArtifactDescriptor}'s sole
+ * {@code AUTHOR} role), never to whoever last edited it — even on an update signal.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -77,25 +73,21 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
 
     @Override
     public void resubmit(ArtifactSignal signal) {
-        // The ledger row's discovery mode is the only thing that still remembers which population this
-        // review was meant to measure; deriving it from the retry would file a campaign's tail as LIVE.
+        // Reuse the ledger row's own discovery mode; deriving it from the retry would file a campaign's
+        // tail as LIVE.
         submit(signal.key(), signal.getDiscoveredVia());
     }
 
     /**
-     * Deliberately NOT transactional: {@link AgentJobService#submit} opens its own and takes a pessimistic
-     * lock on the workspace inside it, which must not be widened to a caller's unit of work.
-     *
-     * <p>Which is why every refusal below goes through {@link #refuse} rather than calling the recorder
-     * directly: {@code markRefused} is {@code Propagation.MANDATORY}, and neither entry point holds a
-     * transaction. A direct call throws, the caller swallows it, and the row stays {@code RECORDED}
-     * forever with no reason on it.
+     * Deliberately not transactional: {@link AgentJobService#submit} opens its own transaction and takes a
+     * pessimistic lock on the workspace, which must not be widened to a caller's unit of work. Every
+     * refusal below therefore goes through {@link #refuse} rather than the recorder directly, since
+     * {@code markRefused} is {@code Propagation.MANDATORY} and neither entry point holds a transaction.
      */
     private void submit(SignalKey key, DiscoveredVia discoveredVia) {
         Workspace workspace = workspaceRepository.findById(key.workspaceId()).orElse(null);
         if (workspace == null) {
-            // The ledger has a foreign key to the workspace, so this is a workspace deleted between
-            // recording and here — nothing left to review, and nothing an operator can undo.
+            // FK ties the ledger row to the workspace: null here means it was deleted after recording.
             refuse(key, SignalStateReason.ARTIFACT_GONE);
             return;
         }
@@ -150,10 +142,8 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
     }
 
     /**
-     * Settle the ledger row in a transaction of this class's own.
-     *
-     * <p>Not an annotation on this method: it is private, so self-invocation would bypass the proxy and
-     * the {@code MANDATORY} recorder would still throw, with the annotation claiming otherwise.
+     * Not annotated {@code @Transactional}: this method is private, so self-invocation would bypass the
+     * proxy and {@code markRefused} would still throw.
      */
     private void refuse(SignalKey key, SignalStateReason reason) {
         transactionTemplate.executeWithoutResult(status -> signalRecorder.markRefused(key, reason));

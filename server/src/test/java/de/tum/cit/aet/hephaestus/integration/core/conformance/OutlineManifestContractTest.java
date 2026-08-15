@@ -7,11 +7,8 @@ import de.tum.cit.aet.hephaestus.integration.outline.manifest.OutlineManifest;
 import java.util.List;
 
 /**
- * Outline through the shared acceptance suite.
- *
- * <p>Run against a manifest constructed as enabled. The bean is registered either way — what an
- * integration could raise is a fact about the build — but the rules the suite runs are about the wiring a
- * disabled deployment does not have.
+ * Constructed as enabled: the suite's rules are about wiring a disabled deployment lacks, not about
+ * whether the bean is registered — it is, either way.
  */
 class OutlineManifestContractTest extends IntegrationManifestContractTest {
 
