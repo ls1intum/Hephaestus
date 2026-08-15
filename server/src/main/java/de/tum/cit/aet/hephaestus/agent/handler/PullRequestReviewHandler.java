@@ -420,8 +420,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         // Stamp each finding with the EXACT keys deliver() persisted, by identity, so downstream
         // stages address the stored observation without recomputing a key that could drift. Done BEFORE the
-        // reaction filter so an escalated copy inherits them. A finding absent from the map (unknown slug —
-        // never persisted) stays unstamped.
+        // reaction filter so an escalated copy inherits them.
         Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
         for (int i = 0; i < scopedFindings.size(); i++) {
             scopedFindings.set(i, scopedFindings.get(i).withKeys(keysByFinding.get(scopedFindings.get(i))));

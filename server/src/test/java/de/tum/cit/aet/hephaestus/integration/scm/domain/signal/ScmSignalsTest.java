@@ -6,7 +6,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
 
@@ -30,14 +30,14 @@ class ScmSignalsTest extends BaseUnitTest {
         );
     }
 
-    private Optional<SignalKey> issue(String triggerEvent, String title, String body, Instant updatedAt) {
+    private Optional<SignalKey> issue(String triggerEvent, String title, String body, String labelName) {
         return ScmSignals.issueKey(
             WORKSPACE_ID,
             ARTIFACT_ID,
             ScmSignals.forTriggerEvent(triggerEvent).orElseThrow(),
             title,
             body,
-            updatedAt
+            labelName
         );
     }
 
@@ -66,23 +66,48 @@ class ScmSignalsTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldTreatASecondLabellingOfUnchangedProseAsItsOwnOccurrence() {
-        // A labelling's identity is the label set, which the payload does not carry. Keying it on the
-        // prose alone would deduplicate every label after the first.
-        SignalKey firstLabel = issue(
+    void shouldGiveEachLabelOfOneUpdateItsOwnOccurrence() {
+        // The shape the webhook path produces: applying three labels in a single edit raises three
+        // events that agree on the issue, its prose and its update timestamp, and differ only in the
+        // label. Keying on anything but the label collapses all three into one ledger row, so a
+        // practice bound to "labelled" is measured once and never again for that edit.
+        SignalKey bug = issue(
             TriggerEventNames.ISSUE_LABELED,
-            "Bug",
-            "it broke",
-            Instant.parse("2026-01-01T10:00:00Z")
+            "Login fails",
+            "500 on expired token",
+            "bug"
         ).orElseThrow();
-        SignalKey secondLabel = issue(
+        SignalKey regression = issue(
             TriggerEventNames.ISSUE_LABELED,
-            "Bug",
-            "it broke",
-            Instant.parse("2026-01-01T10:05:00Z")
+            "Login fails",
+            "500 on expired token",
+            "regression"
+        ).orElseThrow();
+        SignalKey priorityHigh = issue(
+            TriggerEventNames.ISSUE_LABELED,
+            "Login fails",
+            "500 on expired token",
+            "priority/high"
         ).orElseThrow();
 
-        assertThat(secondLabel.revision()).isNotEqualTo(firstLabel.revision());
+        assertThat(List.of(bug.revision(), regression.revision(), priorityHigh.revision())).doesNotHaveDuplicates();
+    }
+
+    @Test
+    void shouldNotReMeasureTheSameLabellingThatWasMerelyRedelivered() {
+        // The other half: the same label on the same prose is the same occurrence however many times
+        // the provider announces it.
+        SignalKey first = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug").orElseThrow();
+        SignalKey redelivered = issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", "bug").orElseThrow();
+
+        assertThat(redelivered).isEqualTo(first);
+    }
+
+    @Test
+    void shouldDeclineToKeyALabellingThatCannotNameItsLabel() {
+        // Same rule as a code-shaped signal with no head commit: a row keyed on nothing would swallow
+        // every later labelling of this issue.
+        assertThat(issue(TriggerEventNames.ISSUE_LABELED, "Login fails", "500", null)).isEmpty();
     }
 
     @Test

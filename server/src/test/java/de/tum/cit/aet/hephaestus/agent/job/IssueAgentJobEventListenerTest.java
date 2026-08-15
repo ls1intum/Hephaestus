@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -17,6 +18,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.RepositoryRef;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
@@ -122,7 +124,11 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
     }
 
     private ScmEventPayload.LabelData createLabelData() {
-        return new ScmEventPayload.LabelData(500L, "bug", "ff0000", null);
+        return createLabelData("bug");
+    }
+
+    private ScmEventPayload.LabelData createLabelData(String name) {
+        return new ScmEventPayload.LabelData(500L, name, "ff0000", null);
     }
 
     /**
@@ -459,6 +465,25 @@ class IssueAgentJobEventListenerTest extends BaseUnitTest {
             var request = captureSubmission(WORKSPACE_ID);
             assertThat(request.triggerSignal()).isEqualTo(ScmSignals.ISSUE_LABELED);
             assertThat(request.issueId()).isEqualTo(ISSUE_ID);
+        }
+
+        /**
+         * Two labels applied in one edit raise two events that agree on the issue, its prose and its
+         * timestamps; the label is the only thing that tells them apart. A key that does not carry it
+         * gives both the same ledger identity, so the second labelling is deduplicated away and the
+         * practice bound to it is measured once for an edit that occasioned it twice.
+         */
+        @Test
+        void shouldGiveEachLabelOfOneEditItsOwnLedgerIdentity() {
+            var issueData = createIssueData(Issue.State.OPEN);
+            var context = webhookContext(1L);
+
+            listener.onIssueLabeled(new ScmDomainEvent.IssueLabeled(issueData, createLabelData("bug"), context));
+            listener.onIssueLabeled(new ScmDomainEvent.IssueLabeled(issueData, createLabelData("regression"), context));
+
+            ArgumentCaptor<SignalKey> keys = ArgumentCaptor.forClass(SignalKey.class);
+            verify(signalRecorder, times(2)).record(keys.capture(), any(), any());
+            assertThat(keys.getAllValues()).extracting(SignalKey::revision).doesNotHaveDuplicates();
         }
 
         @Test

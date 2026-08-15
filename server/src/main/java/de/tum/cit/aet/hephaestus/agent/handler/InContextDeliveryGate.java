@@ -42,10 +42,12 @@ import org.springframework.transaction.annotation.Transactional;
  * evaluation can tell a deliberate quiet from a detection miss. Writing the row is best-effort: a ledger
  * failure never blocks the delivery of the findings that survived.
  *
- * <p><strong>An unrecognised practice slug is kept</strong> when only the tier would have withheld it. A
- * finding whose slug is not in the workspace's catalogue was never persisted as an observation either,
- * so there is no tier to consult and no row to write; withholding it would silently drop feedback on the
- * strength of a lookup miss. The provenance rule has no such escape hatch — it needs no lookup.
+ * <p><strong>A slug the catalogue read does not resolve is kept</strong> when only the tier would have
+ * withheld it. It is never an unknown practice: {@code PracticeDetectionDeliveryService.deliver} refuses a
+ * finding naming one, and it runs first. What is left is a practice renamed while its review ran — already
+ * persisted as an observation under the revision's slug, so keeping it is traceable and dropping it would
+ * cost a developer feedback over a rename. It is logged rather than passed over in silence. The provenance
+ * rule has no such escape hatch — it needs no lookup.
  */
 @Component
 class InContextDeliveryGate {
@@ -111,14 +113,16 @@ class InContextDeliveryGate {
         List<ValidatedFinding> admitted = new ArrayList<>(findings.size());
         List<ValidatedFinding> withheld = new ArrayList<>();
         for (ValidatedFinding finding : findings) {
-            if (
-                FeedbackAdmission.delivers(
-                    origin,
-                    tierBySlug.get(finding.practiceSlug()),
-                    defaults.reach(),
-                    FeedbackChannel.IN_CONTEXT
-                )
-            ) {
+            PracticeReviewTier tier = tierBySlug.get(finding.practiceSlug());
+            if (tier == null) {
+                log.warn(
+                    "No tier resolved for a delivered finding's practice, so the tier axis cannot " +
+                        "withhold it: slug={}, jobId={}",
+                    finding.practiceSlug(),
+                    job.getId()
+                );
+            }
+            if (FeedbackAdmission.delivers(origin, tier, defaults.reach(), FeedbackChannel.IN_CONTEXT)) {
                 admitted.add(finding);
             } else {
                 withheld.add(finding);

@@ -119,7 +119,7 @@ class DevTriggerControllerTest extends BaseUnitTest {
                 ScmSignals.ISSUE_CLOSED,
                 issue.getTitle(),
                 issue.getBody(),
-                issue.getUpdatedAt()
+                null
             ).orElseThrow(),
             SignalStateReason.GATE_SKIPPED
         );

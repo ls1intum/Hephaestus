@@ -48,6 +48,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -1536,18 +1537,27 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     @DisplayName("PATCH /practices/{practiceSlug}/review-tier")
     class SetUsedInNewReviews {
 
-        @Test
+        /**
+         * Every rung is settable on a practice, and setting one is the practice's own decision. PROPOSE is
+         * in the list on purpose: it is the only way to turn one practice down without turning its
+         * measurement off, so refusing it here would make the tier a boolean again. The seed is always the
+         * opposite end of the ladder, so every case is a real change rather than a re-send of the tier
+         * already in force.
+         */
+        @ParameterizedTest
+        @EnumSource(PracticeReviewTier.class)
         @WithAdminUser
-        void shouldExcludeFromNewReviews() {
+        @DisplayName("stores any tier as the practice's own and reports the practice as the source")
+        void shouldSetThePracticesOwnTier(PracticeReviewTier tier) {
             ensureAdminMembership(workspace);
-            persistPractice("deactivate-me", "Name", true);
+            persistPractice("retier-me", "Name", tier == PracticeReviewTier.OFF);
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "deactivate-me")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "retier-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(tier))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1556,38 +1566,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().effective()).isEqualTo(tier);
+            assertThat(result.reviewTier().override()).isEqualTo(tier);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.PRACTICE);
 
-            Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(
-                workspace.getId(),
-                "deactivate-me"
-            );
+            Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "retier-me");
             assertThat(persisted).isPresent();
-            assertThat(persisted.get().getReviewTier()).isEqualTo(PracticeReviewTier.OFF);
-        }
-
-        @Test
-        @WithAdminUser
-        void shouldIncludeInNewReviews() {
-            ensureAdminMembership(workspace);
-            persistPractice("activate-me", "Name", false);
-
-            PracticeDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "activate-me")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeDTO.class)
-                .returnResult()
-                .getResponseBody();
-
-            assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(persisted.get().getReviewTier()).isEqualTo(tier);
         }
 
         @Test
@@ -1708,42 +1693,6 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                     .orElseThrow()
                     .getReviewTier()
             ).isNull();
-        }
-
-        /**
-         * The middle rung is settable on a practice too. PROPOSE was refused at this boundary while the
-         * ladder still carried OBSERVE; with OBSERVE retired it is the only way to turn one practice down
-         * without turning its measurement off, so refusing it would make the tier a boolean again.
-         */
-        @Test
-        @WithAdminUser
-        @DisplayName("accepts PROPOSE and stores it as the practice's own tier")
-        void shouldAcceptProposeTier() {
-            ensureAdminMembership(workspace);
-            persistPractice("middle-rung", "Name", true);
-
-            PracticeDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "middle-rung")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeDTO.class)
-                .returnResult()
-                .getResponseBody();
-
-            assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.PRACTICE);
-            assertThat(
-                practiceRepository
-                    .findByWorkspaceIdAndSlug(workspace.getId(), "middle-rung")
-                    .orElseThrow()
-                    .getReviewTier()
-            ).isEqualTo(PracticeReviewTier.PROPOSE);
         }
 
         @Test

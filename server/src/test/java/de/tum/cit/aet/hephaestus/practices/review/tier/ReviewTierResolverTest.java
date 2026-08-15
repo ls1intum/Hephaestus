@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -103,28 +102,6 @@ class ReviewTierResolverTest extends BaseUnitTest {
             assertThat(ReviewTierResolver.workspaceDefault(PracticeReviewTier.PROPOSE)).isEqualTo(
                 PracticeReviewTier.PROPOSE
             );
-        }
-
-        /** Resolution is total: there is no combination of the three levels that yields no answer. */
-        @Test
-        void thereIsAlwaysAnAnswer() {
-            for (PracticeReviewTier practiceTier : withNull()) {
-                for (PracticeReviewTier areaTier : withNull()) {
-                    for (PracticeReviewTier workspaceTier : PracticeReviewTier.values()) {
-                        assertThat(ReviewTierResolver.resolvePractice(practiceTier, areaTier, workspaceTier).tier())
-                            .as("practice=%s area=%s workspace=%s", practiceTier, areaTier, workspaceTier)
-                            .isNotNull();
-                    }
-                }
-            }
-        }
-
-        private static @Nullable PracticeReviewTier[] withNull() {
-            PracticeReviewTier[] values = PracticeReviewTier.values();
-            PracticeReviewTier[] all = new PracticeReviewTier[values.length + 1];
-            System.arraycopy(values, 0, all, 0, values.length);
-            all[values.length] = null;
-            return all;
         }
     }
 

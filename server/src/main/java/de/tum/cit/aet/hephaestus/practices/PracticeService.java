@@ -229,11 +229,10 @@ public class PracticeService {
         practice.setSlug(slug);
         applyDefinition(practice, definition);
         // A new practice holds NO opinion of its own and inherits its area's, and through it the
-        // workspace's. It used to be stamped with the default tier at creation, which is how forty
-        // practices came to carry an opinion nobody had expressed and why turning the system down meant
-        // editing every one of them. The exception is a practice whose policy cannot attempt an automated
-        // review: that is not a preference to be inherited over, it is a fact about the practice, so it is
-        // written explicitly.
+        // workspace's. Stamping the resolved default here instead would give every practice an opinion
+        // nobody expressed, and turning the whole workspace down would then mean editing each of them.
+        // The exception is a practice whose policy cannot attempt an automated review: that is not a
+        // preference to be inherited over, it is a fact about the practice, so it is written explicitly.
         practice.setReviewTier(
             definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
                 ? null

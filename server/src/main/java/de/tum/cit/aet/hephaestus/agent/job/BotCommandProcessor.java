@@ -41,20 +41,15 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * </ul>
  *
  * <h2>Who may command it</h2>
- * <p>Every command is authorized against the commenter through {@link ReviewRequestAuthority} before
- * anything is spent or written. Reaching a merge request is not standing to commission a review of it:
- * the feedback goes to the artifact's author rather than to whoever asked, so an unchecked command lets
- * anyone with comment access aim coaching at a colleague. See that class for the rule and for the
- * identity it fails closed on.
+ * <p>Every command is authorized against the commenter through {@link ReviewRequestAuthority}, which owns
+ * the rule and the identity it fails closed on.
  *
  * <h2>What the review is recorded as</h2>
  * <p>The command raises the kind's declared manual-request signal, and the run is filed as
- * {@link ObservationOrigin#MANUAL}. Both of those used to be wrong in the same direction. The gate was
- * told {@code scm.pull_request.opened}, which the artifact trace then rendered as the reason the review
- * happened — a plain untruth about an occasion nobody observed, and one that made a requested review
- * indistinguishable from the pull request being opened. And the observations were filed as LIVE, which
- * mixes a self-selected sample into the population the trend line is read from: people ask for reviews
- * of work they were already unsure of.
+ * {@link ObservationOrigin#MANUAL}. Naming a lifecycle event instead would put an occasion nobody observed
+ * in the one place a developer goes to find out why a review ran, and filing it as LIVE would mix a
+ * self-selected sample into the population the trend line is read from: people ask for reviews of work
+ * they were already unsure of.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -92,7 +87,7 @@ public class BotCommandProcessor {
     /**
      * No transaction, deliberately. {@link AgentJobService#submit} states that callers must not wrap it
      * in one: it opens its own so that the idempotency-key race it absorbs rolls back that insert alone.
-     * Joined to an outer transaction — which {@code REQUIRES_NEW} here used to supply — the same race
+     * Joined to an outer transaction, the same race
      * marks the whole unit of work rollback-only, so a second person asking at the same moment as the
      * first would not merely be deduplicated: the ledger row recording that they asked would roll back
      * with it, and the ask would vanish leaving no reason for the silence. Everything this method reads

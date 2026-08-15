@@ -14,19 +14,16 @@ package de.tum.cit.aet.hephaestus.practices.model;
  *   <tr><td>{@link #DELIVER}</td> <td>yes</td> <td>yes</td> <td>yes, without asking</td></tr>
  * </table>
  *
- * <p><b>Three modes, not four.</b> The axis is how much Hephaestus does without you, and a rung an
- * administrator cannot tell apart from its neighbour is not a rung. An earlier ladder split the middle into
- * <em>observe</em> (runs, records, prepares nothing) and <em>propose</em> (runs, records, prepares feedback
- * for approval); both sent nothing, and the difference between them was invisible on every screen that
- * showed them. That is the same fault that made the ladder before it — <em>coach</em> against
- * <em>engage</em> — unpickable. One middle rung, {@link #PROPOSE}, carries the whole of "runs, records,
- * says nothing".
+ * <p><b>Three modes, not four.</b> A rung an administrator cannot tell apart from its neighbour is not a
+ * rung. Splitting the middle — say, into one tier that prepares nothing and one that prepares feedback for
+ * approval — buys nothing an administrator can see, because both send the same thing: nothing. One middle
+ * rung, {@link #PROPOSE}, carries the whole of "runs, records, says nothing".
  *
  * <p><b>Autonomy, not reach.</b> This axis says how far the system may act on its own. <em>Where</em> the
  * feedback may go — the mentor conversation only, or also on the work itself — is a separate, workspace-level
- * decision carried by {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach}. The two were once
- * one ladder, which did not order: a mentor chat is not obviously quieter or louder than one review comment.
- * Autonomy does order, and it is the adoption ladder a team actually walks.
+ * decision carried by {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach}, and it does not
+ * belong on this ladder because it does not order: a mentor chat is not obviously quieter or louder than one
+ * review comment. Autonomy does order, and it is the adoption ladder a team actually walks.
  *
  * <p>{@link #PROPOSE} is the tier that separates measurement from intervention: the review runs and every
  * observation is recorded, so the behaviour series stays unbroken, and nobody is told anything. Silencing a

@@ -25,9 +25,11 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -191,8 +193,10 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
         when(
             feedbackRepository.findRecentDeliveredForRecipient(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of(feedback));
-        Observation observation = bind(feedback);
-        when(visibilityPolicy.permits(1L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(false);
+        bind(feedback);
+        when(visibilityPolicy.permitsAll(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING))).thenReturn(
+            Set.of()
+        );
 
         ObjectNode root = provider.buildPayload(1L, 2L);
 
@@ -201,23 +205,33 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
 
     private void authorize(Feedback... feedback) {
         List<FeedbackObservationVisibility> bindings = new ArrayList<>();
+        Set<UUID> permitted = new HashSet<>();
         for (Feedback unit : feedback) {
-            Observation observation = mock(Observation.class);
+            Observation observation = observationWithId();
             FeedbackObservationVisibility binding = mock(FeedbackObservationVisibility.class);
             when(binding.getFeedbackId()).thenReturn(unit.getId());
             when(binding.getObservation()).thenReturn(observation);
             bindings.add(binding);
-            when(visibilityPolicy.permits(1L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(true);
+            permitted.add(observation.getId());
         }
+        when(visibilityPolicy.permitsAll(eq(1L), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING))).thenReturn(
+            permitted
+        );
         when(feedbackObservationRepository.findForVisibility(eq(1L), any())).thenReturn(bindings);
     }
 
     private Observation bind(Feedback feedback) {
-        Observation observation = mock(Observation.class);
+        Observation observation = observationWithId();
         FeedbackObservationVisibility binding = mock(FeedbackObservationVisibility.class);
         when(binding.getFeedbackId()).thenReturn(feedback.getId());
         when(binding.getObservation()).thenReturn(observation);
         when(feedbackObservationRepository.findForVisibility(eq(1L), any())).thenReturn(List.of(binding));
+        return observation;
+    }
+
+    private static Observation observationWithId() {
+        Observation observation = mock(Observation.class);
+        when(observation.getId()).thenReturn(UUID.randomUUID());
         return observation;
     }
 }

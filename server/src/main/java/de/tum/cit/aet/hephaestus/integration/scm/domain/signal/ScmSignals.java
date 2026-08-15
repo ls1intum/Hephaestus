@@ -7,7 +7,6 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRevision;
-import java.time.Instant;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -139,24 +138,32 @@ public final class ScmSignals {
         );
     }
 
-    /** The ledger identity of an issue signal, keyed on what its author wrote. */
+    /**
+     * The ledger identity of an issue signal, keyed on what its author wrote.
+     *
+     * @param labelName the label {@link #ISSUE_LABELED} was raised for, which is what that occurrence
+     *                  <em>is</em>: three labels applied in one update are three occurrences, and keying
+     *                  them on the prose alone would deduplicate all but the first. Empty for a caller
+     *                  that cannot name the label, in which case a labelling has nothing to key on —
+     *                  better no ledger row than one that swallows every later labelling. Ignored by
+     *                  every other signal.
+     */
     public static Optional<SignalKey> issueKey(
         long workspaceId,
         long issueId,
         SignalName signal,
         String title,
         @Nullable String body,
-        @Nullable Instant updatedAt
+        @Nullable String labelName
     ) {
         if (!ISSUE.equals(signal.artifactKind())) {
             return Optional.empty();
         }
-        // A labelling's own identity is the label set, which the event payload does not carry; the
-        // update timestamp stands in for it, so a second label added to unchanged prose still reads as a
-        // new occurrence rather than being deduplicated away.
-        String[] content = signal.equals(ISSUE_LABELED)
-            ? new String[] { title, body, String.valueOf(updatedAt) }
-            : new String[] { title, body };
+        boolean labelling = signal.equals(ISSUE_LABELED);
+        if (labelling && (labelName == null || labelName.isBlank())) {
+            return Optional.empty();
+        }
+        String[] content = labelling ? new String[] { title, body, labelName } : new String[] { title, body };
         return revisionFor(signal, null, content).map(revision ->
             new SignalKey(workspaceId, issueId, signal, revision)
         );

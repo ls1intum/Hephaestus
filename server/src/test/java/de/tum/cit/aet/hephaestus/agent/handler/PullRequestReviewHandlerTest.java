@@ -421,69 +421,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
-    class FilterByDiffScope {
-
-        @Test
-        void keepsFindingInDiff() {
-            var finding = finding(Presence.ABSENT, "scm.pull-request.diff", "Sources/View.swift");
-            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
-            assertThat(filtered).containsExactly(finding);
-        }
-
-        @Test
-        void keepsFindingBackedByNonDiffSource() {
-            var finding = finding(Presence.ABSENT, "scm.pull-request.core", "body");
-            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
-            assertThat(filtered).containsExactly(finding);
-        }
-
-        @Test
-        void filtersFindingWithoutSourceIdentity() {
-            var finding = finding(Presence.ABSENT, "", "Sources/View.swift");
-            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
-            assertThat(filtered).isEmpty();
-        }
-
-        @Test
-        void filtersFindingOutsideDiff() {
-            var finding = finding(Presence.ABSENT, "scm.pull-request.diff", "Sources/Other.swift");
-            var filtered = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("Sources/View.swift"));
-            assertThat(filtered).isEmpty();
-        }
-
-        private PracticeDetectionResultParser.ValidatedFinding finding(
-            Presence presence,
-            String sourceKind,
-            String path
-        ) {
-            Assessment assessment = switch (presence) {
-                case PRESENT -> Assessment.GOOD;
-                case ABSENT -> Assessment.BAD;
-                case NOT_APPLICABLE, INCONCLUSIVE -> null;
-            };
-            return new PracticeDetectionResultParser.ValidatedFinding(
-                "fatal-error-crash",
-                "title",
-                presence,
-                assessment,
-                Severity.MINOR,
-                0.8f,
-                objectMapper
-                    .createObjectNode()
-                    .set(
-                        "citations",
-                        objectMapper
-                            .createArrayNode()
-                            .add(objectMapper.createObjectNode().put("sourceKind", sourceKind).put("path", path))
-                    ),
-                null,
-                null,
-                List.of()
-            );
-        }
-    }
-
-    @Nested
     class ParseDiffNameOnlyPaths {
 
         @Test

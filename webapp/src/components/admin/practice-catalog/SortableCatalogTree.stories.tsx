@@ -52,6 +52,10 @@ interface HarnessProps {
 	 * story can tell which of the tree's two independent guards it exercised. */
 	blockedOrderBuckets?: readonly string[];
 	blockedDestinations?: readonly string[];
+	/** Areas that may not change their own position, while everything inside them still moves. */
+	disabledAreas?: readonly string[];
+	/** Rows that may not move at all — not up, not down, and not into another area. */
+	disabledEntries?: readonly string[];
 	/** When set, only these rows are listed — the shape a search box produces. */
 	visible?: readonly string[];
 	onPlaceEntry: (entrySlug: string, areaSlug: string | null, position: number) => void;
@@ -69,6 +73,8 @@ interface HarnessProps {
 function CatalogTreeHarness({
 	blockedOrderBuckets = [],
 	blockedDestinations = [],
+	disabledAreas = [],
+	disabledEntries = [],
 	visible,
 	onPlaceEntry,
 	onReorderAreas,
@@ -101,8 +107,8 @@ function CatalogTreeHarness({
 			entries={rows}
 			visibleEntrySlugs={visible ? new Set(visible) : undefined}
 			areaReorderDisabled={false}
-			disabledAreaSlugs={new Set()}
-			disabledEntrySlugs={new Set()}
+			disabledAreaSlugs={new Set(disabledAreas)}
+			disabledEntrySlugs={new Set(disabledEntries)}
 			blockedEntryOrderBuckets={new Set(blockedOrderBuckets)}
 			blockedMoveDestinationSlugs={new Set(blockedDestinations)}
 			showEntryReorderHandles
@@ -343,6 +349,69 @@ export const ReorderingInsideAnArea: Story = {
 		await userEvent.click(menu.getByRole("menuitem", { name: "Move down" }));
 
 		await expect(args.onPlaceEntry).toHaveBeenCalledWith("explain-why", "delivery", 2);
+	},
+};
+
+/**
+ * The third guard, and the narrowest: one area cannot change its own position while everything
+ * inside it still moves normally.
+ *
+ * <p>This is not `areaReorderDisabled`, which stops every area at once, and not
+ * `blockedEntryOrderBuckets`, which stops the rows. The screen sets it for the single area whose
+ * write is in flight, so the assertion that matters is the one about the *other* area and about this
+ * area's own rows — a guard that quietly froze the whole tree would satisfy the first assertion
+ * alone.
+ */
+export const AnAreaWithItsOwnMoveInFlightHoldsItsPosition: Story = {
+	args: { disabledAreas: ["delivery"] },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+
+		await expect(canvas.getByRole("button", { name: "Move Delivery down" })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+		await expect(canvas.getByRole("button", { name: "Reorder Delivery" })).toBeDisabled();
+		// Quality's own grip, not its "Area down": it is the last area, so down is refused by the
+		// ends-of-list arithmetic whatever this prop does, and asserting that would prove nothing.
+		await expect(canvas.getByRole("button", { name: "Reorder Quality" })).toBeEnabled();
+
+		// Its contents are untouched by it, which is the whole point of the prop being per-area.
+		const menu = await openActions(canvas, "Explain what changed and why");
+		await userEvent.click(menu.getByRole("menuitem", { name: "Move down" }));
+		await expect(args.onPlaceEntry).toHaveBeenCalledWith("explain-why", "delivery", 2);
+	},
+};
+
+/**
+ * The fourth guard: one row is pinned, and unlike a blocked bucket it has no way out either.
+ *
+ * <p>`blockedEntryOrderBuckets` stops a row reordering while leaving it free to leave its area;
+ * this stops the row itself, so the "Move to …" items go with the up and down. The sibling row is
+ * asserted too, because a guard applied to the bucket rather than to the slug would look identical
+ * on the pinned row alone.
+ */
+export const ARowWithItsOwnMoveInFlightCannotLeaveEither: Story = {
+	args: { disabledEntries: ["explain-why"] },
+	play: async ({ args, canvasElement }) => {
+		const canvas = within(canvasElement);
+		const pinned = await openActions(canvas, "Explain what changed and why");
+
+		for (const name of ["Move up", "Move down", "Move to Quality", "Move to Unassigned"]) {
+			await expect(pinned.getByRole("menuitem", { name })).toHaveAttribute("aria-disabled", "true");
+		}
+		await userEvent.click(pinned.getByRole("menuitem", { name: "Move to Quality" }));
+		await expect(args.onPlaceEntry).not.toHaveBeenCalled();
+
+		await expect(
+			canvas.getByRole("button", { name: "Reorder Explain what changed and why" }),
+		).toBeDisabled();
+
+		const sibling = await openActions(canvas, "Drafts are not left open");
+		await expect(sibling.getByRole("menuitem", { name: "Move to Quality" })).toHaveAttribute(
+			"aria-disabled",
+			"false",
+		);
 	},
 };
 

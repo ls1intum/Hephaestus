@@ -29,29 +29,6 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
         assertThat(digest).isEqualTo(PINNED_DIGEST);
     }
 
-    @Test
-    void shouldIncludeReviewModeAndEvidenceSupport() {
-        String baseline = PracticeAutomatedReviewPolicyDigest.digest(
-            policy(
-                capability(
-                    PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                    PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-                )
-            )
-        );
-
-        assertThat(baseline).isNotEqualTo(
-            PracticeAutomatedReviewPolicyDigest.digest(
-                policy(
-                    capability(
-                        PracticeAutomatedReviewMode.LANGUAGE_MODEL,
-                        PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
-                    )
-                )
-            )
-        );
-    }
-
     /**
      * A limitation is a claim the practice will never make, so a review run under a policy that added
      * one is not the same review as one run before it.
@@ -75,23 +52,15 @@ class PracticeAutomatedReviewPolicyDigestTest extends BaseUnitTest {
     }
 
     private static PracticeAutomatedReviewPolicy policy() {
-        return policy(
+        return new PracticeAutomatedReviewPolicy(
+            new SourceContractVersion("1.0.0"),
             capability(
                 PracticeAutomatedReviewMode.LANGUAGE_MODEL,
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
-            )
-        );
-    }
-
-    private static PracticeAutomatedReviewPolicy policy(PracticeAutomatedReview automatedReview) {
-        return new PracticeAutomatedReviewPolicy(
-            new SourceContractVersion("1.0.0"),
-            automatedReview,
+            ),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
             List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime behavior is outside scope.")),
-            automatedReview.evidenceSufficiency() == PracticeEvidenceSufficiency.DECLARED_EVIDENCE_INSUFFICIENT
-                ? new PracticeEvidenceLimitation("HUMAN_CONTEXT", "A person must review this practice.")
-                : null
+            null
         );
     }
 

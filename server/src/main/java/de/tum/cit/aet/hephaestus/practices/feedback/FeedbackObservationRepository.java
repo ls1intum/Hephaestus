@@ -38,13 +38,22 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         @Param("ordinal") int ordinal
     );
 
+    /**
+     * The observations behind a batch of delivered feedback, carrying what decides their visibility.
+     *
+     * <p>Both revisions are fetch-joined because every caller compares them the moment it has a row:
+     * an observation is only shown if the rules it was evaluated under are still the practice's current
+     * ones. Fetched rather than joined — a plain join narrows the result and preloads nothing, so the
+     * comparison would lazy-load its way through the batch one row at a time.
+     */
     @Query(
         """
-        SELECT fo.feedback.id AS feedbackId, fo.observation AS observation
+        SELECT fo.feedback.id AS feedbackId, observation AS observation
         FROM FeedbackObservation fo
-        JOIN fo.observation.practice practice
-        LEFT JOIN fo.observation.practiceRevision
-        LEFT JOIN practice.currentRevision
+        JOIN fo.observation observation
+        JOIN FETCH observation.practice practice
+        LEFT JOIN FETCH practice.currentRevision
+        LEFT JOIN FETCH observation.practiceRevision
         WHERE fo.feedback.workspaceId = :workspaceId
           AND fo.feedback.id IN :feedbackIds
         """

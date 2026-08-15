@@ -28,6 +28,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -525,11 +527,10 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     /**
      * The middle level of the practice → area → workspace chain, and the only one an administrator reaches
-     * to move a dozen practices at once. Three behaviours make it the middle level rather than a second
-     * copy of the practice endpoint: it refuses the tier that has no approval queue behind it, a null
-     * clears the area's own answer back to the workspace's, and re-sending the tier already in force does
-     * nothing at all — including to the audit ledger, which is what "nothing" has to mean for a decision
-     * that is recorded.
+     * to move a dozen practices at once. Two behaviours make it the middle level rather than a second copy
+     * of the practice endpoint: a null clears the area's own answer back to the workspace's, and re-sending
+     * the tier already in force does nothing at all — including to the audit ledger, which is what
+     * "nothing" has to mean for a decision that is recorded.
      */
     @Nested
     @DisplayName("PATCH /practice-areas/{areaSlug}/review-tier")
@@ -576,10 +577,16 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getTotalElements();
         }
 
-        @Test
+        /**
+         * Every rung is settable on an area, and setting one is the area's own decision rather than an
+         * inheritance. PROPOSE is in the list on purpose: refusing the middle rung would leave OFF and
+         * DELIVER, an on/off switch, which is the defect the tier chain exists to remove.
+         */
+        @ParameterizedTest
+        @EnumSource(PracticeReviewTier.class)
         @WithAdminUser
         @DisplayName("sets the area's own tier and reports it as the area's decision, not an inheritance")
-        void shouldSetTheAreasOwnTier() {
+        void shouldSetTheAreasOwnTier(PracticeReviewTier tier) {
             ensureAdminMembership(workspace);
             persistAreaAt("decides", null);
 
@@ -588,7 +595,7 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "decides")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(tier))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -597,46 +604,11 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().effective()).isEqualTo(tier);
+            assertThat(result.reviewTier().override()).isEqualTo(tier);
             assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
             assertThat(result.reviewTier().inherited()).isFalse();
-            assertThat(storedTierOf("decides")).isEqualTo(PracticeReviewTier.PROPOSE);
-        }
-
-        /**
-         * PROPOSE is the middle rung and an administrator may move an area onto it. It was once refused
-         * here, on the grounds that it would prepare feedback nobody could approve; the ladder it sat in
-         * also carried OBSERVE, so refusing it still left two usable rungs. With OBSERVE gone, a refused
-         * PROPOSE would leave OFF and DELIVER — an on/off switch, which is the defect the tier chain was
-         * built to remove. So the refusal is gone, and this pins that it stays gone: nothing is swallowed,
-         * because a withheld finding is still recorded and still shows on the artifact's trace.
-         */
-        @Test
-        @WithAdminUser
-        @DisplayName("accepts PROPOSE, the middle rung, and stores it as the area's own tier")
-        void shouldAcceptProposeTier() {
-            ensureAdminMembership(workspace);
-            persistAreaAt("middle-rung", PracticeReviewTier.OFF);
-
-            PracticeAreaDTO result = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "middle-rung")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
-                .exchange()
-                .expectStatus()
-                .isOk()
-                .expectBody(PracticeAreaDTO.class)
-                .returnResult()
-                .getResponseBody();
-
-            assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
-            assertThat(storedTierOf("middle-rung")).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(storedTierOf("decides")).isEqualTo(tier);
         }
 
         @Test

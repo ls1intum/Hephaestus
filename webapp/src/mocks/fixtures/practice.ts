@@ -115,14 +115,16 @@ export const mockDocumentBinding = {
  * Sources several work types share, declared once so a story cannot show a practice reading "Earlier
  * observations about this person" on a pull request and something differently worded on an issue.
  *
- * The wire ids are the server's; nothing here is shown to an operator except `displayName` and
- * `description`, which are copied verbatim from `contracts/artifact-source/1.0.0/catalog.json`.
+ * The wire ids are the server's; the operator-facing strings are `displayName`, `description` and
+ * `selectionScope`, all copied verbatim from `contracts/artifact-source/1.0.0/catalog.json`.
  */
 const relatedWorkSource = {
 	sourceKind: "workspace.project-inventory",
 	displayName: "Related workspace work",
 	description:
 		"Other work items in the same workspace, supplied so a change can be read against related work.",
+	selectionScope:
+		"Up to 200 issues and 200 pull requests across at most 25 visible repositories, excluding the work item under review. Beyond any of those limits the capture is reported as PARTIAL.",
 	privacyClass: "PERSONAL",
 	requiredQuality: "ANY_CAPTURE",
 	supportsExhaustiveEvidence: true,
@@ -132,6 +134,8 @@ const referencedDocumentsSource = {
 	sourceKind: "outline.documents",
 	displayName: "Referenced Outline documents",
 	description: "Outline documents the reviewed work references.",
+	selectionScope:
+		"Only documents referenced by the reviewed work or matched to it, up to 15. Retrieval cannot establish that it found every relevant document, so this source is never reported as COMPLETE.",
 	privacyClass: "PERSONAL",
 	requiredQuality: "ANY_CAPTURE",
 	supportsExhaustiveEvidence: false,
@@ -142,6 +146,8 @@ const observationHistorySource = {
 	displayName: "Earlier observations about this person",
 	description:
 		"Observations earlier reviews in this workspace recorded about the person whose work is under review.",
+	selectionScope:
+		"The most recent 50 observations about this person in this workspace within the last 90 days, after the same visibility rules that govern any other reading of them. A window over a growing record cannot establish that it holds every earlier observation, so this source is never reported as COMPLETE.",
 	privacyClass: "PERSONAL",
 	requiredQuality: "ANY_CAPTURE",
 	supportsExhaustiveEvidence: false,
@@ -152,6 +158,8 @@ const feedbackHistorySource = {
 	displayName: "Feedback already delivered to this person",
 	description:
 		"Feedback earlier reviews already delivered to the person whose work is under review, with the place it went to.",
+	selectionScope:
+		"The most recent 30 delivered feedback items for this person in this workspace within the last 90 days. A window over a growing record cannot establish that it holds every earlier delivery, so this source is never reported as COMPLETE.",
 	privacyClass: "PERSONAL",
 	requiredQuality: "ANY_CAPTURE",
 	supportsExhaustiveEvidence: false,
@@ -199,6 +207,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Pull request details",
 					description:
 						"The pull request record: title, description, author, branches, state, labels, and commit subjects.",
+					selectionScope:
+						"One pull request, selected by the job, with its own fields and the commit subjects available for it.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,
@@ -208,6 +218,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Code changes",
 					description:
 						"The code changes the pull request introduces, as a unified diff annotated with line numbers.",
+					selectionScope:
+						"The merge-base-to-head diff for one pull request at the reviewed commit, up to 20 MiB. A diff that cannot be read is recorded as a collection error rather than as an empty diff.",
 					privacyClass: "INTERNAL",
 					requiredQuality: "COMPLETE_AND_NON_EMPTY",
 					supportsExhaustiveEvidence: true,
@@ -216,6 +228,8 @@ export const mockPracticeDefinitionOptions = {
 					sourceKind: "scm.pull-request.comments",
 					displayName: "Inline review comments",
 					description: "Review comments left on specific lines of the pull request.",
+					selectionScope:
+						"Up to the 500 most recent inline comments on one pull request, most recent first. Beyond that limit the capture is reported as PARTIAL.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
@@ -225,6 +239,7 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Review threads and decisions",
 					description:
 						"Review conversations on the pull request, whether each was resolved, and each reviewer's decision.",
+					selectionScope: "Every review thread and review decision for one pull request.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
@@ -234,6 +249,7 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "General review comments",
 					description:
 						"Review comments addressing the pull request as a whole rather than a specific line.",
+					selectionScope: "Every general review comment on one pull request.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
@@ -243,6 +259,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Repository files",
 					description:
 						"Files from elsewhere in the repository, supplied as context for reading the change. Not reviewed on their own.",
+					selectionScope:
+						"The repository at the reviewed commit: up to 20,000 files and 32 MiB. Files above 10 MiB, symbolic links, submodules, and paths outside the tree are excluded, and the capture is reported as PARTIAL.",
 					privacyClass: "INTERNAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
@@ -252,6 +270,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Linked work items",
 					description:
 						"Issues the pull request states it addresses, resolved from its description, branch name, and commit subjects.",
+					selectionScope:
+						"Issues resolved from closing references, the branch name, and up to 500 commit subjects. Resolution cannot establish that it found every link the work actually has, so this source is never reported as COMPLETE. References to work outside this repository are reported as unresolved rather than as incomplete evidence.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: false,
@@ -283,6 +303,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Issue details",
 					description:
 						"The issue record: title, description, author, state, labels, and assignees.",
+					selectionScope:
+						"One issue, selected by the job, with its own fields and its rendered description.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,
@@ -291,6 +313,8 @@ export const mockPracticeDefinitionOptions = {
 					sourceKind: "scm.issue.comments",
 					displayName: "Issue comments",
 					description: "The discussion recorded on the issue.",
+					selectionScope:
+						"Up to the 200 most recent comments on one issue, most recent first. Beyond that limit the capture is reported as PARTIAL.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "ANY_CAPTURE",
 					supportsExhaustiveEvidence: true,
@@ -319,6 +343,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Slack thread",
 					description:
 						"One Slack thread in chronological order, read only from channels whose consent is active.",
+					selectionScope:
+						"One thread, selected by the job, with system and bot messages excluded. A thread whose channel consent is not active, or which no longer exists, is reported as REDACTED or UNAVAILABLE rather than as an empty conversation.",
 					privacyClass: "SENSITIVE_PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,
@@ -344,6 +370,8 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Document under review",
 					description:
 						"The written document a review is about: its prose, title, collection, author, and upstream timestamps.",
+					selectionScope:
+						"One mirrored document, selected by the job, rendered whole. A document removed upstream or evicted from the local mirror is reported as UNAVAILABLE rather than as a document that said nothing.",
 					privacyClass: "PERSONAL",
 					requiredQuality: "COMPLETE",
 					supportsExhaustiveEvidence: true,

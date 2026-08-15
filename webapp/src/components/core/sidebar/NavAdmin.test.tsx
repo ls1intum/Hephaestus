@@ -5,7 +5,7 @@ import {
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavAdmin } from "./NavAdmin";
@@ -86,15 +86,16 @@ describe("NavAdmin", () => {
 
 	it("offers three destinations under Practices, not five", async () => {
 		renderNavigation("/w/acme/admin/practices");
+		await screen.findByRole("link", { name: "Practice setup" });
+		const submenu = within(screen.getByRole("list", { name: "Practices" }));
 
-		const practices = await screen.findByRole("link", { name: "Practice setup" });
-		const submenu = practices.closest("ul");
-		if (!submenu) throw new Error("Practices submenu not rendered");
-		expect([...submenu.querySelectorAll("a")].map((link) => link.textContent?.trim())).toEqual([
-			"Practice setup",
-			"Review",
-			"Practice reviews",
-		]);
+		// By accessible name, not by `textContent`: an `sr-only` suffix is part of the name and not
+		// part of the text, so reading the text is how an entry that announces itself wrongly passes
+		// a test about what it announces. `getByRole(name)` runs that computation.
+		submenu.getByRole("link", { name: "Practice setup" });
+		submenu.getByRole("link", { name: "Review" });
+		submenu.getByRole("link", { name: "Practice reviews" });
+		expect(submenu.getAllByRole("link")).toHaveLength(3);
 	});
 
 	it("keeps sections expandable on mobile when the desktop sidebar is collapsed", async () => {

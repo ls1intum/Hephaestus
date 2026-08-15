@@ -12,10 +12,6 @@ import { type ReactNode, useState } from "react";
  * broken, because a spy is a perfectly good `onChange` — it is the *pairing* with an unchanging value
  * that is wrong.
  *
- * <p>That pairing is what the product owner hit when he reported he could not pick a date range on
- * the Observations screen. The control was there and correctly wired; the story it was in could not
- * accept an answer. It was found on three list screens, then on seven more surfaces.
- *
  * <p>`fn()` is still right where a callback has no paired value — `onDelete`, `onRetry`, `onSubmit`.
  * It is only wrong when something on screen is supposed to change as a result.
  *

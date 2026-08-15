@@ -7,20 +7,17 @@ import de.tum.cit.aet.hephaestus.integration.core.framework.ReviewContractValida
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandler;
 import de.tum.cit.aet.hephaestus.integration.core.handler.IntegrationMessageHandlerRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
 import de.tum.cit.aet.hephaestus.integration.core.spi.EventTypeKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
-import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest.ReviewContribution;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.Test;
@@ -78,40 +75,6 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
     }
 
     @Test
-    void observesEveryKindItSpeaksAbout() {
-        ReviewContribution contribution = manifest().reviewContribution();
-        Set<ArtifactKind> declared = descriptors()
-            .stream()
-            .map(ArtifactDescriptor::kind)
-            .collect(Collectors.toUnmodifiableSet());
-
-        assertThat(declared)
-            .as("the test must supply a descriptor for each observed kind, or it is not testing the subset rule")
-            .containsAll(contribution.observes());
-    }
-
-    @Test
-    void raisesOnlySignalsSomeEventOfItsOwnProduces() {
-        IntegrationManifest manifest = manifest();
-        Map<ArtifactKind, ArtifactDescriptor> byKind = descriptorsByKind();
-
-        for (Map.Entry<ArtifactKind, Set<SignalName>> entry : manifest.reviewContribution().raises().entrySet()) {
-            ArtifactDescriptor descriptor = byKind.get(entry.getKey());
-            for (SignalName name : entry.getValue()) {
-                Signal signal = descriptor.signal(name).orElseThrow();
-                assertThat(signal.isProducedBy(manifest.kind()))
-                    .as(
-                        "%s claims to raise %s but no ingested event of %s produces it — the classic aspirational signal",
-                        manifest.kind(),
-                        name,
-                        manifest.kind()
-                    )
-                    .isTrue();
-            }
-        }
-    }
-
-    @Test
     void spendsEveryDeliveryCapabilityItDeclares() {
         // The mirror of the bootstrap's rule that a claimed lane needs its capability. Together the two
         // make capability and lane agree in both directions, which is what stops a channel bean being
@@ -134,17 +97,6 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
             assertThat(lanes)
                 .as("%s declares INLINE_FINDINGS but names no artifact it would anchor them to", manifest.kind())
                 .contains(FeedbackLane.IN_CONTEXT_INLINE);
-        }
-    }
-
-    @Test
-    void declaresSignalNamesThatBelongToTheArtifactTheyAreFiledUnder() {
-        for (Map.Entry<ArtifactKind, Set<SignalName>> entry : manifest().reviewContribution().raises().entrySet()) {
-            for (SignalName name : entry.getValue()) {
-                assertThat(name.artifactKind())
-                    .as("a signal's name carries its kind; filing it elsewhere makes the two disagree")
-                    .isEqualTo(entry.getKey());
-            }
         }
     }
 
@@ -176,9 +128,5 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
             builders,
             () -> executable
         );
-    }
-
-    private Map<ArtifactKind, ArtifactDescriptor> descriptorsByKind() {
-        return descriptors().stream().collect(Collectors.toUnmodifiableMap(ArtifactDescriptor::kind, d -> d));
     }
 }

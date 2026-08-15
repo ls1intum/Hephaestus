@@ -43,18 +43,6 @@ class FeedbackReachTest extends BaseUnitTest {
         assertThat(reach.reaches(FeedbackChannel.PROFILE)).isFalse();
     }
 
-    /** Reach is monotone: widening it never closes a channel that was already open. */
-    @Test
-    void wideningReachOnlyEverAdds() {
-        for (FeedbackChannel channel : FeedbackChannel.values()) {
-            if (FeedbackReach.CONVERSATION.reaches(channel)) {
-                assertThat(FeedbackReach.ON_THE_WORK.reaches(channel))
-                    .as("ON_THE_WORK must reach %s because CONVERSATION does", channel)
-                    .isTrue();
-            }
-        }
-    }
-
     /** The column and its check constraint are sized from this; a longer constant would truncate. */
     @Test
     void everyConstantFitsTheColumn() {

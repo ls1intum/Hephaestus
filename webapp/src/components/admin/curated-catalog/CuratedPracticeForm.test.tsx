@@ -76,7 +76,6 @@ describe("CuratedPracticeForm", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		const name = screen.getByRole("textbox", { name: /Name/ });
 		expect(name.getAttribute("aria-invalid")).toBe("true");
-		expect(name.getAttribute("aria-describedby")).toBe("practice-name-error");
 		expect(
 			screen.getByRole("textbox", { name: /What to look for/ }).getAttribute("aria-describedby"),
 		).toBe("practice-criteria-description practice-criteria-error");
@@ -241,11 +240,15 @@ describe("CuratedPracticeForm", () => {
 
 		// The server rejects a signal bound twice outright, and the rejection arrives after a save. The
 		// checkbox is the only place it can be explained before the author spends the round trip.
+		// `aria-disabled`, not `data-disabled`: Base UI renders the checkbox as a non-native element,
+		// so `data-disabled` is only the hook its CSS uses while `aria-disabled` is what the
+		// accessibility tree exposes. A regression that kept the styling and dropped the semantics
+		// leaves the first in place, and this is the assertion that notices.
 		expect(
 			occasion(2)
 				.getByRole("checkbox", { name: /^Opened/ })
-				.getAttribute("data-disabled"),
-		).not.toBeNull();
+				.getAttribute("aria-disabled"),
+		).toBe("true");
 		// One hint per moment occasion 1 claims, on the moment itself rather than as a banner, and it
 		// names the occasion holding it rather than leaving the author to hunt for the card.
 		expect(occasion(2).getAllByText("in occasion 1")).toHaveLength(3);

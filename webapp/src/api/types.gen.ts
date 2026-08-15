@@ -3077,11 +3077,15 @@ export type PracticeSignalOption = {
 export type PracticeEvidenceSourceOption = {
     description: string;
     displayName: string;
-    privacyClass: 'PUBLIC' | 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
+    privacyClass: 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
     /**
      * What requiring this source demands of its capture; fixed by the source contract
      */
     requiredQuality: 'ANY_CAPTURE' | 'COMPLETE' | 'COMPLETE_AND_NON_EMPTY';
+    /**
+     * How much of the source one capture takes, and the bound past which it is no longer whole
+     */
+    selectionScope: string;
     sourceKind: string;
     /**
      * Whether this source can be captured whole, and so whether a practice may rest a claim about what is absent from it on the capture
@@ -3236,13 +3240,9 @@ export type PracticeDefinitionOptions = {
 };
 
 /**
- * Independent validation status and provenance for automated review requirements
+ * Who stands behind a practice's automated-review policy, and which exact policy
  */
 export type PracticeAutomatedReviewValidation = {
-    /**
-     * Versioned fingerprint of the independently validated model, prompt, tools, and preprocessing
-     */
-    evaluatorProcedureFingerprint?: string;
     /**
      * SHA-256 digest of the exact automated-review policy
      */
@@ -3252,25 +3252,13 @@ export type PracticeAutomatedReviewValidation = {
      */
     reviewRuleFingerprint: string;
     /**
-     * Source contract used by the validated practice definition
+     * Source contract the declared practice definition is written against
      */
     sourceContractVersion: string;
     /**
      * Validation lifecycle; authors cannot mark their own review policy as independently validated
      */
-    status: 'AUTHOR_DECLARED' | 'INDEPENDENTLY_VALIDATED' | 'STALE' | 'SUPERSEDED';
-    /**
-     * Time the independent validation was completed
-     */
-    validatedAt?: Date;
-    /**
-     * Traceable reference to the validation record
-     */
-    validationReference?: string;
-    /**
-     * Independent validator identity
-     */
-    validator?: string;
+    status: 'AUTHOR_DECLARED';
 };
 
 /**

@@ -36,9 +36,7 @@ import { ReviewDetailHeader } from "./ReviewDetailHeader";
 import { REVIEW_PREVIEW_SIZE, ReviewOutputSections } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
 import { ReviewRunCard } from "./ReviewRunCard";
-import type { RunsSearch } from "./review-search";
-
-const ACTIVE_REVIEW_POLL_MS = 5_000;
+import { ACTIVE_REVIEW_POLL_MS, type RunsSearch } from "./review-search";
 
 export interface ReviewRunDetailPageProps {
 	workspaceSlug: string;

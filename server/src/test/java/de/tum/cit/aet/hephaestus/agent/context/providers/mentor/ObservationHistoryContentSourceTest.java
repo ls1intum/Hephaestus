@@ -24,11 +24,14 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -66,14 +69,11 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void authorizeObservations() {
         lenient()
-            .when(
-                visibilityPolicy.permits(
-                    anyLong(),
-                    any(Observation.class),
-                    eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)
-                )
-            )
-            .thenReturn(true);
+            .when(visibilityPolicy.permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING)))
+            .thenAnswer(invocation -> {
+                Collection<Observation> batch = invocation.getArgument(1);
+                return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+            });
     }
 
     @Test
@@ -119,7 +119,9 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         when(
             queryRepository.findReviewsReceivedSince(eq(1L), eq(2L), any(Instant.class), any(Pageable.class))
         ).thenReturn(List.of());
-        when(visibilityPolicy.permits(1L, observation, SourceUsePurpose.CONVERSATIONAL_MENTORING)).thenReturn(false);
+        when(
+            visibilityPolicy.permitsAll(1L, List.of(observation), SourceUsePurpose.CONVERSATIONAL_MENTORING)
+        ).thenReturn(Set.of());
 
         ObjectNode root = provider.buildPayload(1L, 2L);
 

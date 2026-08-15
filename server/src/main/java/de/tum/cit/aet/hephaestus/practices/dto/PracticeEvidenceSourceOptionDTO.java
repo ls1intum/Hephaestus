@@ -10,6 +10,18 @@ public record PracticeEvidenceSourceOptionDTO(
     @NonNull String sourceKind,
     @NonNull String displayName,
     @NonNull String description,
+    /**
+     * How much of the source one capture takes, and the bound past which it stops being whole.
+     *
+     * <p>Distinct from {@code description}, which says what the source <em>is</em>. This says what a
+     * capture of it holds — "up to the 500 most recent inline comments, beyond that the capture is
+     * reported as PARTIAL". That is the fact an author is missing at the moment they decide whether a
+     * practice may rest a claim about what is absent on this source, and it is fixed by the contract
+     * rather than by anything they can configure.
+     */
+    @NonNull
+    @Schema(description = "How much of the source one capture takes, and the bound past which it is no longer whole")
+    String selectionScope,
     @NonNull PrivacyClass privacyClass,
     @NonNull
     @Schema(description = "What requiring this source demands of its capture; fixed by the source contract")

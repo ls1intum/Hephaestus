@@ -84,18 +84,6 @@ class ReviewBackfillSignalsTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Nothing stable to key a code-shaped measurement on. Recording it under an invented revision would
-     * make the row permanently un-deduplicable against the live path.
-     */
-    @Test
-    void aPullRequestWithNoHeadCommitIsNotMeasurable() {
-        PullRequest pr = pullRequest();
-        pr.setHeadRefOid(null);
-
-        assertThat(ReviewBackfillSignals.keyFor(WORKSPACE_ID, pr)).isEmpty();
-    }
-
     @Test
     void anIssueIsMeasuredOpenOrClosed() {
         Issue open = issue();

@@ -129,6 +129,17 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
             assertThat(result).hasSize(1);
         }
 
+        /**
+         * A citation that names no source cannot be placed in or out of the diff, and the finding has no
+         * other citation vouching for it — so it is dropped rather than posted on a file it may not touch.
+         */
+        @Test
+        void dropsFindingWhoseOnlyCitationNamesNoSource() {
+            var finding = makeFinding("test", "", List.of("src/Main.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            assertThat(result).isEmpty();
+        }
+
         @Test
         void keepsMetadataLevelPracticeEvenWithOutOfDiffLocation() {
             var finding = makeFinding(

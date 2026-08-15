@@ -54,11 +54,11 @@ The runtime registry is
 It is an engineering gate and contains only releasable decision summaries. Each record governs exactly one source-use purpose; a source references separate records for automated review, feedback delivery, Mentor context, and operator evidence review:
 
 - `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized
-  product scope. It is not controller or DPO approval and cannot cover scope expansion.
-- `CONTROLLER_DECISION` requires a reviewer, decision time, expiry, and decided outcome. Only an unexpired
-  `APPROVED` decision passes when that basis is used.
+  product scope. It is not controller or DPO approval and cannot cover scope expansion. It is the only basis
+  the contract can express: a use no maintainer has approved carries no record at all, rather than a record
+  saying it was refused, so nothing here can ever be mistaken for a controller sign-off.
 
-Every record carries a reviewer, a decision time, and an expiry, whichever basis it uses, and the server refuses
+Every record carries a reviewer, a decision time, and an expiry, and the server refuses
 to start if a source's decisions do not cover every product purpose or if a decision's retention or erasure
 policy disagrees with its source.
 

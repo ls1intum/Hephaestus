@@ -24,6 +24,18 @@ export const WORK_ARTIFACT_FILTER_OPTIONS = [
 	{ value: ARTIFACT_KIND.document, label: artifactKindPluralLabel(ARTIFACT_KIND.document) },
 ] as const;
 
+/**
+ * The same list with the "no filter" choice at its head, which is what both catalog screens' work-type
+ * control offers — one dropdown on a narrow viewport, one toggle group on a wide one, on each screen.
+ *
+ * "ALL" is a value rather than an absent one because a Base UI `Select` must hold one, and it is the
+ * sentinel both screens already put in the URL.
+ */
+export const WORK_ARTIFACT_FILTER_ITEMS: {
+	value: "ALL" | ArtifactKindId;
+	label: string;
+}[] = [{ value: "ALL", label: "All work types" }, ...WORK_ARTIFACT_FILTER_OPTIONS];
+
 export function generateSlug(name: string): string {
 	return name
 		.toLowerCase()

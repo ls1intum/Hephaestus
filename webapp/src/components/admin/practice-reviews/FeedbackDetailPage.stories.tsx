@@ -104,25 +104,18 @@ export const QueuedForConversation: Story = {
 	},
 };
 
-/** The note this one took the place of is one link away, rather than a UUID in a drawer. */
-export const ReplacedAnEarlierNote: Story = {
-	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
-	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await canvas.findByRole("link", { name: "See the feedback this replaced" });
-	},
-};
-
 /**
- * The composed text and the Markdown it was written in, as two views of one thing.
+ * The composed text and the Markdown it was written in, as two views of one thing rather than as a
+ * card and a "View Markdown source" accordion below it, which would show the same words twice.
  *
- * The source used to sit in a "View Markdown source" accordion below the card — a second control in
- * a second place that pushed the page down and showed the same words twice.
+ * This is also the note that took the place of an earlier one, which is a link on the page rather
+ * than a UUID in a drawer.
  */
 export const RenderedAndSource: Story = {
 	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, canvasElement, userEvent }) => {
+		await canvas.findByRole("link", { name: "See the feedback this replaced" });
 		await canvas.findByText(/2 issues to tighten in this change/);
 		await userEvent.click(canvas.getByRole("button", { name: "Source" }));
 		await expect(canvasElement.querySelector("pre")?.textContent).toContain("```java");

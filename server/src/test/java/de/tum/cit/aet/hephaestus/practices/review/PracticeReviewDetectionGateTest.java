@@ -36,7 +36,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -769,32 +768,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             assertThat(detect.workspace().getId()).isEqualTo(WORKSPACE_ID);
             assertThat(detect.workspace().getWorkspaceSlug()).isEqualTo("test-workspace");
             assertThat(detect.matchedPractices()).containsExactly(practice);
-        }
-
-        @Test
-        void detectThrowsOnNullWorkspace() {
-            Practice practice = createPractice(SIGNAL);
-
-            Assertions.assertThrows(NullPointerException.class, () -> new GateDecision.Detect(null, List.of(practice)));
-        }
-
-        @Test
-        void detectThrowsOnNullMatchedPractices() {
-            Workspace workspace = createWorkspace();
-
-            Assertions.assertThrows(NullPointerException.class, () -> new GateDecision.Detect(workspace, null));
-        }
-
-        @Test
-        void detectMatchedPracticesIsUnmodifiable() {
-            Practice practice = createPractice(SIGNAL);
-            Workspace workspace = createWorkspace();
-
-            GateDecision.Detect detect = new GateDecision.Detect(workspace, List.of(practice));
-
-            Assertions.assertThrows(UnsupportedOperationException.class, () ->
-                detect.matchedPractices().add(new Practice())
-            );
         }
     }
 

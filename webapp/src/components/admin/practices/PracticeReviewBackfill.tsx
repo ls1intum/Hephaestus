@@ -1,3 +1,4 @@
+import { format, subDays } from "date-fns";
 import { AlertCircle, History } from "lucide-react";
 import { useState } from "react";
 import type { CreateReviewBackfillRunRequest, ReviewBackfillRun } from "@/api/types.gen";
@@ -45,8 +46,6 @@ export interface PracticeReviewBackfillProps {
  */
 const WORK_KINDS = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue] as const;
 
-// Without `items`, Base UI has nothing to resolve the selected value against and a closed trigger
-// prints the value itself — "scm.pull_request", not "Pull or merge requests".
 const WORK_KIND_ITEMS = WORK_KINDS.map((kind) => ({
 	value: kind as string,
 	label: artifactKindPluralLabel(kind),
@@ -76,12 +75,18 @@ const nounFor = (artifactKind: string) => artifactKindLabel(artifactKind).toLowe
 const countOf = (count: number, artifactKind: string) =>
 	`${count} ${(count === 1 ? artifactKindLabel(artifactKind) : artifactKindPluralLabel(artifactKind)).toLowerCase()}`;
 
-// `fromAt`/`toAt` are typed `Date` but arrive as ISO strings.
+/**
+ * The stretch of history a backfill covers, as a card subtitle: "12 Feb 2026 – 13 Aug 2026".
+ *
+ * `fromAt`/`toAt` are typed `Date` but arrive as ISO strings, so they go through `asDate`. Both ends
+ * carry the year: a 180-day window crosses one often enough that dropping it from the left-hand date
+ * would make the shortest windows and the longest ones read the same.
+ */
 const formatWindow = (run: ReviewBackfillRun) => {
 	const from = asDate(run.fromAt);
 	const to = asDate(run.toAt);
 	if (!from || !to) return "Dates unavailable";
-	return `${from.toLocaleDateString()} – ${to.toLocaleDateString()}`;
+	return `${format(from, "d MMM yyyy")} – ${format(to, "d MMM yyyy")}`;
 };
 
 /**
@@ -154,8 +159,7 @@ function EstimateCard({
 
 	const estimate = () => {
 		const toAt = new Date();
-		const fromAt = new Date(toAt.getTime() - Number(days) * 24 * 60 * 60 * 1000);
-		onEstimate({ artifactKind, fromAt, toAt });
+		onEstimate({ artifactKind, fromAt: subDays(toAt, Number(days)), toAt });
 	};
 
 	return (

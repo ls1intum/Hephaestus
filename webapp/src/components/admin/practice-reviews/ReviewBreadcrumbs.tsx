@@ -24,11 +24,8 @@ export interface ReviewBreadcrumbsProps {
 /**
  * The trail to a practice-review detail screen. It stops at the section.
  *
- * <p>Every detail screen used to end its trail with a generic leaf that restated the heading three
- * lines below it — `Delivery / Feedback` above `Feedback for Ada Lovelace`, and
- * `Practice reviews / Reviewed work` above a grey `Reviewed work` eyebrow above the work's title.
- * The product owner asked for a sweep of exactly this, and the leaf is what goes: the heading is the
- * record's name, and no breadcrumb can say it better.
+ * <p>No leaf for the record itself: the heading three lines below is the record's name, and a
+ * generic leaf above it — `Delivery / Feedback` over `Feedback for Ada Lovelace` — says it worse.
  *
  * <p>The section stays a link rather than becoming a `BreadcrumbPage`, because it is the way back to
  * the list with its filters intact — a trail whose last step is dead is a trail that lost the only

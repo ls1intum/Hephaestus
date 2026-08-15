@@ -295,15 +295,27 @@ public interface ArtifactSignalRepository extends JpaRepository<ArtifactSignal, 
     );
 
     /**
-     * Every signal this workspace has ever actually recorded.
+     * Every signal this workspace has ever actually recorded about one kind of artifact.
      *
      * <p>Evidence against a dormancy claim, which is otherwise derived from which integrations are
      * connected. That derivation answers "will this ever fire" and not "has this ever fired", so a
      * signal already in the ledger overrules it — reporting a practice as waiting on an integration
      * whose signal is in the log would be wrong on the one surface whose job is explaining silence.
+     *
+     * <p>Narrowing to one kind loses no such refutation: {@code artifact_kind} is written from the
+     * signal name's own prefix ({@link SignalKey#artifactKind()}), so a signal a practice of this kind
+     * can watch is never recorded under another kind. The ledger grows one row per artifact × signal ×
+     * revision, and the whole-workspace form scanned all of it; this one seeks the leading columns of
+     * {@code uq_artifact_signal}.
      */
-    @Query("SELECT DISTINCT s.signalName FROM ArtifactSignal s WHERE s.workspace.id = :workspaceId")
-    List<String> findRecordedSignalNames(@Param("workspaceId") Long workspaceId);
+    @Query(
+        "SELECT DISTINCT s.signalName FROM ArtifactSignal s" +
+            " WHERE s.workspace.id = :workspaceId AND s.artifactKind = :artifactKind"
+    )
+    List<String> findRecordedSignalNames(
+        @Param("workspaceId") Long workspaceId,
+        @Param("artifactKind") String artifactKind
+    );
 
     interface SignalledArtifactRow {
         String getArtifactKind();

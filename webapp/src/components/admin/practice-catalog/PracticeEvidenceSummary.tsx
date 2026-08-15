@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import type {
 	PracticeAutomatedReviewPolicy,
 	PracticeAutomatedReviewValidation,
@@ -6,26 +7,16 @@ import type {
 	PracticeSignalOption,
 } from "@/api/types.gen";
 import { momentDef } from "@/components/admin/practice-catalog/occasion-moments";
-import { RelativeTime } from "@/components/common/RelativeTime";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { evidenceSourceLabel, mentoringSupportLabel } from "./evidence-presentation";
 
-const VALIDATION_LABELS: Record<PracticeAutomatedReviewValidation["status"], string> = {
-	AUTHOR_DECLARED: "Not independently validated",
-	INDEPENDENTLY_VALIDATED: "AI mentoring independently validated",
-	STALE: "Validation is stale",
-	SUPERSEDED: "Validation is superseded",
-};
-
-const VALIDATION_VARIANTS: Record<
+/** Total over the wire union, so a status the API learns to send cannot arrive unlabelled. */
+const VALIDATION_DEFS: Record<
 	PracticeAutomatedReviewValidation["status"],
-	"outline" | "success" | "warning"
+	{ label: string; variant: ComponentProps<typeof Badge>["variant"] }
 > = {
-	AUTHOR_DECLARED: "outline",
-	INDEPENDENTLY_VALIDATED: "success",
-	STALE: "warning",
-	SUPERSEDED: "warning",
+	AUTHOR_DECLARED: { label: "Not independently validated", variant: "outline" },
 };
 
 function signalLabel(signal: string, signals: readonly PracticeSignalOption[]) {
@@ -112,36 +103,16 @@ export interface PracticeAutomatedReviewValidationSummaryProps {
 export function PracticeAutomatedReviewValidationSummary({
 	validation,
 }: PracticeAutomatedReviewValidationSummaryProps) {
+	const def = VALIDATION_DEFS[validation.status];
 	return (
 		<div className="space-y-1 text-sm">
-			<Badge variant={VALIDATION_VARIANTS[validation.status]}>
-				{VALIDATION_LABELS[validation.status]}
-			</Badge>
-			{validation.validator && (
-				<p className="text-muted-foreground">
-					{validation.validator}
-					{validation.validationReference && <> · {validation.validationReference}</>}
-				</p>
-			)}
-			{validation.status !== "AUTHOR_DECLARED" && (
-				<p className="text-muted-foreground">
-					Validated for source contract {validation.sourceContractVersion}{" "}
-					<RelativeTime value={validation.validatedAt} fallback="at an unknown time" />
-				</p>
-			)}
+			<Badge variant={def.variant}>{def.label}</Badge>
 			{/* The digests answer one question — which exact rules produced this verdict — so they
 			    belong beside the verdict, not in a disclosure of their own. Small and monospaced:
 			    nobody reads a hash, they compare one. */}
 			<p className="text-muted-foreground text-xs">
 				Rules <code className="break-all">{validation.reviewRuleFingerprint}</code> · policy{" "}
 				<code className="break-all">{validation.policyDigest}</code>
-				{validation.evaluatorProcedureFingerprint && (
-					<>
-						{" "}
-						· procedure{" "}
-						<code className="break-all">{validation.evaluatorProcedureFingerprint}</code>
-					</>
-				)}
 			</p>
 		</div>
 	);

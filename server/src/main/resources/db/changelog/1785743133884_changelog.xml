@@ -857,7 +857,8 @@
         <preConditions onFail="MARK_RAN" onFailMessage="practice.applies_to already namespaced">
             <sqlCheck expectedResult="1">
                 SELECT count(*) FROM information_schema.columns
-                WHERE table_name = 'practice' AND column_name = 'applies_to'
+                WHERE table_schema = current_schema()
+                  AND table_name = 'practice' AND column_name = 'applies_to'
                   AND column_default LIKE '%PULL_REQUEST%'
             </sqlCheck>
         </preConditions>
@@ -1879,9 +1880,10 @@
          The four artifact_kind / applies_to CHECKs above were written as a hand-maintained list of
          three literals, and the branch that added docs.document never added it to any of them. The
          result was not a clean rejection: artifact_signal.artifact_kind and agent_job.artifact_kind
-         carry no CHECK at all, so a document signal recorded, the gate admitted it, the job ran, the
-         model was paid — and the work was thrown away at INSERT INTO observation. Nothing caught it
-         because the test suite builds its schema with ddl-auto:create and never sees these CHECKs.
+         carried no CHECK at all (-49 gives them one), so a document signal recorded, the gate admitted
+         it, the job ran, the model was paid — and the work was thrown away at INSERT INTO observation.
+         Nothing caught it because the test suite builds its schema with ddl-auto:create and never sees
+         these CHECKs.
 
          The list is therefore replaced by the grammar, which is the thing that is actually invariant.
          ArtifactKind owns "<domain>.<kind>, lowercase snake_case, <= 64 chars" and enforces exactly this
@@ -2339,7 +2341,8 @@
         <preConditions onFail="MARK_RAN" onFailMessage="signal state reasons already name the model binding">
             <sqlCheck expectedResult="1">
                 SELECT count(*) FROM information_schema.columns
-                WHERE table_name = 'artifact_signal' AND column_name = 'state_reason'
+                WHERE table_schema = current_schema()
+                  AND table_name = 'artifact_signal' AND column_name = 'state_reason'
             </sqlCheck>
         </preConditions>
         <comment>Say the review model is unbound, not that a practice binding is off: they send an operator to different screens.</comment>
@@ -2683,6 +2686,97 @@
             ALTER TABLE workspace ADD CONSTRAINT chk_workspace_default_review_tier
                 CHECK (practice_default_review_tier IS NULL
                     OR practice_default_review_tier IN ('OFF', 'OBSERVE', 'PROPOSE', 'DELIVER'));
+        ]]></rollback>
+    </changeSet>
+
+    <!-- Every column that stores an artifact kind enforces the grammar ArtifactKind owns, not a subset of
+         them. A kind is authorable by being declared, and the four columns below were the ones where SQL
+         still said otherwise: a signal, a job, a practice's subject and a campaign's scope could each hold
+         a spelling no reader could resolve, and the first thing that noticed was the INSERT into
+         observation at the end of a paid review. -->
+    <changeSet author="hephaestus-readiness" id="1785743133884-49">
+        <preConditions onFail="MARK_RAN" onFailMessage="the artifact-kind grammar already reaches every column that stores one">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_artifact_signal_artifact_kind'
+                  AND conrelid = 'artifact_signal'::regclass
+            </sqlCheck>
+        </preConditions>
+        <comment>Enforce the artifact-kind grammar on the signal ledger, the job queue, the practice and the campaign.</comment>
+        <sql splitStatements="false"><![CDATA[
+            -- Named before constrained. A bare check-constraint violation says which table refused and
+            -- nothing about which rows, and these four columns are old enough to hold a spelling from a
+            -- vocabulary that predates the grammar. The operator decides what happens to that data; a
+            -- migration that quietly rewrote or deleted it would be deciding for them.
+            DO $$
+            DECLARE offending text;
+            BEGIN
+                SELECT string_agg(DISTINCT entry, ', ') INTO offending FROM (
+                    SELECT 'artifact_signal.artifact_kind=' || artifact_kind AS entry FROM artifact_signal
+                     WHERE artifact_kind !~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' OR length(artifact_kind) > 64
+                    UNION ALL
+                    SELECT 'agent_job.artifact_kind=' || artifact_kind FROM agent_job
+                     WHERE artifact_kind IS NOT NULL
+                       AND (artifact_kind !~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' OR length(artifact_kind) > 64)
+                    UNION ALL
+                    SELECT 'practice.applies_to=' || applies_to FROM practice
+                     WHERE applies_to !~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' OR length(applies_to) > 64
+                    UNION ALL
+                    SELECT 'review_backfill_run.artifact_kind=' || artifact_kind FROM review_backfill_run
+                     WHERE artifact_kind !~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' OR length(artifact_kind) > 64
+                ) found;
+                IF offending IS NOT NULL THEN
+                    RAISE EXCEPTION 'Cannot enforce the artifact-kind grammar: rows hold kinds outside it (%). Migrate those rows to <domain>.<kind> first — this changeset will not rewrite them for you.', offending;
+                END IF;
+            END $$;
+
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS ck_artifact_signal_artifact_kind;
+            ALTER TABLE artifact_signal ADD CONSTRAINT ck_artifact_signal_artifact_kind
+                CHECK (artifact_kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(artifact_kind) <= 64);
+
+            -- Nullable: a job row predating the discriminator carries no kind, and this changeset is not
+            -- the place that decides what one of those is about.
+            ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_artifact_kind;
+            ALTER TABLE agent_job ADD CONSTRAINT ck_agent_job_artifact_kind
+                CHECK (artifact_kind IS NULL
+                       OR (artifact_kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(artifact_kind) <= 64));
+
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_applies_to;
+            ALTER TABLE practice ADD CONSTRAINT chk_practice_applies_to
+                CHECK (applies_to ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(applies_to) <= 64);
+
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_artifact_kind;
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_artifact_kind
+                CHECK (artifact_kind ~ '^[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*$' AND length(artifact_kind) <= 64);
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_artifact_kind;
+            ALTER TABLE practice DROP CONSTRAINT IF EXISTS chk_practice_applies_to;
+            ALTER TABLE agent_job DROP CONSTRAINT IF EXISTS ck_agent_job_artifact_kind;
+            ALTER TABLE artifact_signal DROP CONSTRAINT IF EXISTS ck_artifact_signal_artifact_kind;
+        ]]></rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-50">
+        <preConditions onFail="MARK_RAN" onFailMessage="the campaign counter floor already covers failed_count">
+            <sqlCheck expectedResult="0">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'ck_review_backfill_run_counts'
+                  AND conrelid = 'review_backfill_run'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%failed_count%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Hold every campaign counter to the same floor, including the one counting crashes.</comment>
+        <sql splitStatements="false"><![CDATA[
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_counts;
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_counts
+                CHECK (estimated_artifacts >= 0 AND submitted_count >= 0
+                       AND passed_count >= 0 AND failed_count >= 0);
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE review_backfill_run DROP CONSTRAINT IF EXISTS ck_review_backfill_run_counts;
+            ALTER TABLE review_backfill_run ADD CONSTRAINT ck_review_backfill_run_counts
+                CHECK (estimated_artifacts >= 0 AND submitted_count >= 0 AND passed_count >= 0);
         ]]></rollback>
     </changeSet>
 

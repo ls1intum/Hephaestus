@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, userEvent, within } from "storybook/test";
-import { REVIEW_TIER_LABELS } from "@/lib/review-tiers";
+import { expect, screen, userEvent, waitFor, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { artifactTrace, documentArtifactTrace, untouchedArtifactTrace } from "./story-mock-data";
 import { TracePage } from "./TracePage";
@@ -10,6 +9,30 @@ const TRACE_URL = "*/workspaces/:workspaceSlug/practices/trace/:artifactKind/:ar
 const REQUEST_URL = "*/workspaces/:workspaceSlug/practices/review-requests";
 
 const traceHandler = http.get(TRACE_URL, () => HttpResponse.json(artifactTrace));
+
+const COOLDOWN_SENTENCE = "This work was reviewed a moment ago, so nothing new was started.";
+
+// Reset by the play function rather than only initialised here: a story replayed in the same
+// session would otherwise carry the previous run's count and submit on the first click.
+let requestCalls = 0;
+
+const resetRequestCalls = () => {
+	requestCalls = 0;
+};
+
+/** Refuses the first request of a story run and submits every later one. */
+const refuseThenSubmitHandler = http.post(REQUEST_URL, () => {
+	requestCalls += 1;
+	return HttpResponse.json(
+		requestCalls === 1
+			? {
+					status: "REFUSED",
+					reason: "REQUEST_COOLDOWN_ACTIVE",
+					reasonDescription: COOLDOWN_SENTENCE,
+				}
+			: { status: "SUBMITTED", jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01" },
+	);
+});
 
 const meta = {
 	title: "Practice trace/Review activity detail",
@@ -43,9 +66,10 @@ export const EveryOutcome: Story = {
 			canvas.getByText("This practice is set to measure quietly rather than to speak up."),
 		).toBeVisible();
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
-		// The tier is named exactly as the catalog names it, from one shared list. This screen used to
-		// say "Measure only" for the tier the catalog called "Measure".
-		await expect(canvas.getByText(REVIEW_TIER_LABELS.PROPOSE)).toBeVisible();
+		// The word, not `REVIEW_TIER_LABELS.PROPOSE`: the component renders that same entry, so reading
+		// it back here would agree with any label the registry happens to hold, including a renamed
+		// one. This screen and the catalog have to say "Propose", and that is what is written down.
+		await expect(canvas.getByText("Propose")).toBeVisible();
 	},
 };
 
@@ -364,25 +388,27 @@ export const RefusalWithheldFixFromAMember: Story = {
 	},
 };
 
-/** A started review clears any earlier refusal instead of leaving a stale explanation on screen. */
-export const StartsAReview: Story = {
+/**
+ * A refusal is the answer to one attempt, so the next attempt clears it rather than leaving a stale
+ * explanation above a review that is now running.
+ *
+ * <p>Two attempts, and the first one has to be refused. A story that only ever submits asserts that
+ * a refusal is absent from a page it was never on — which an implementation that clears nothing
+ * satisfies just as well.
+ */
+export const StartsAReviewAfterARefusal: Story = {
 	parameters: {
-		msw: {
-			handlers: [
-				traceHandler,
-				http.post(REQUEST_URL, () =>
-					HttpResponse.json({
-						status: "SUBMITTED",
-						jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
-					}),
-				),
-			],
-		},
+		msw: { handlers: [traceHandler, refuseThenSubmitHandler] },
 	},
 	play: async ({ canvas }) => {
+		resetRequestCalls();
+
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		await canvas.findByText(COOLDOWN_SENTENCE);
+
+		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
+		await waitFor(() => expect(canvas.queryByText(COOLDOWN_SENTENCE)).not.toBeInTheDocument());
 		await expect(await canvas.findByRole("button", { name: "Review this now" })).toBeEnabled();
-		await expect(canvas.queryByText("No review was started")).not.toBeInTheDocument();
 	},
 };
 
@@ -411,7 +437,14 @@ export const RefusesSomebodyWithNoStanding: Story = {
 	},
 	play: async ({ canvas }) => {
 		await userEvent.click(await canvas.findByRole("button", { name: "Review this now" }));
-		await expect(await canvas.findByRole("button", { name: "Review this now" })).toBeEnabled();
-		await expect(canvas.queryByText("No review was started")).not.toBeInTheDocument();
+
+		// The error channel, and only it: a 403 is not a decision the workspace made about this work,
+		// so it must not appear in the refusal alert, which is reserved for a `REFUSED` outcome whose
+		// sentence the server wrote. The toast is portalled, so it is on `screen`, not in the canvas.
+		await screen.findByText("Couldn't ask for a review");
+		await screen.findByText(
+			"Only the work's author or assignees, or a workspace admin, can ask for a review of it.",
+		);
+		await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
 	},
 };

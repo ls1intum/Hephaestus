@@ -68,6 +68,9 @@ quiet until both are done.
 | `PRACTICE_REVIEW_FOR_ALL` | `false` | Enables the feature flag and the review gate for all users |
 | `PRACTICE_REVIEW_DELIVER_TO_MERGED` | `false` | Instance default for posting after merge; a workspace may override it |
 | `PRACTICE_REVIEW_COOLDOWN_MINUTES` | `15` | Instance default for the minimum gap between reviews of the same work; a workspace may override it |
+| `PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` | `5` | The per-person hourly allowance in the table above. Keyed on the person, not the work, so it is the one limit that catches somebody asking for a review on twenty colleagues' merge requests. `0` removes it |
+| `PRACTICE_REVIEW_PROGRESS_FOOTER` | `false` | Appends the run-to-run progress footer and the re-review reply. Renders nothing until a target has been reviewed twice |
+| `PRACTICE_REVIEW_REACTION_SUPPRESSION` | `false` | Stops re-raising a point the author already disputed or marked not applicable |
 | `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | `30` | Age after which replay directories and unreferenced evidence blobs become collectable |
 
 :::caution Two of these do not behave the way the variable name suggests

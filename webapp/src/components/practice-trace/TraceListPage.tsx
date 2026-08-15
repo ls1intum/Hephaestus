@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ChevronRightIcon, RadarIcon } from "lucide-react";
 import { listTracedArtifactsOptions } from "@/api/@tanstack/react-query.gen";
+import { ReviewResultsSkeleton } from "@/components/admin/practice-reviews/ReviewResultsSkeleton";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
@@ -31,7 +32,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
 import {
 	ARTIFACT_KIND_VALUES,
 	artifactKindIcon,
@@ -73,8 +73,6 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 			...(search.kind ? [search.kind] : []),
 		]),
 	];
-	// Without `items`, Base UI has nothing to resolve the selected value against and the closed
-	// trigger prints the value itself — "scm.issue", not "Issues".
 	const kindItems = [
 		{ value: ALL_KINDS, label: "All work" },
 		...kinds.map((kind) => ({ value: kind, label: artifactKindPluralLabel(kind) })),
@@ -139,7 +137,7 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 						onRetry={() => void query.refetch()}
 					/>
 				) : query.isLoading ? (
-					<TraceListSkeleton />
+					<ReviewResultsSkeleton label="Loading review activity" rows={PAGE_SIZE} />
 				) : artifacts.length === 0 ? (
 					<Empty className="border">
 						<EmptyHeader>
@@ -227,21 +225,6 @@ export function TraceListPage({ workspaceSlug, search, onSearchChange }: TraceLi
 					)}
 				/>
 			</section>
-		</div>
-	);
-}
-
-function TraceListSkeleton() {
-	return (
-		<div role="status" className="space-y-4">
-			<span className="sr-only">Loading review activity</span>
-			{Array.from({ length: 4 }, (_, index) => (
-				<div key={index} className="space-y-2 rounded-lg border p-3">
-					<Skeleton className="h-5 w-3/4 max-w-md" />
-					<Skeleton className="h-4 w-1/2 max-w-xs" />
-					<Skeleton className="h-4 w-40" />
-				</div>
-			))}
 		</div>
 	);
 }

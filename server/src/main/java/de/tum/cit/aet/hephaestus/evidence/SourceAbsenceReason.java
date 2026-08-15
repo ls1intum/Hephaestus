@@ -15,8 +15,6 @@ public enum SourceAbsenceReason {
     NO_PROVIDER,
     /** {@code UNAVAILABLE}: the collector reported empty for a source whose contract forbids empty. */
     EMPTY_NOT_VALID,
-    /** {@code UNAVAILABLE}: the pinned commit the capture is anchored to is gone from the mirror. */
-    PINNED_HEAD_MISSING,
     /** {@code UNAVAILABLE}: this repository has no working copy, so nothing could be read at any commit. */
     NO_WORKING_COPY,
     /** {@code UNAVAILABLE}: the requested conversation or artifact does not exist upstream. */
@@ -26,12 +24,11 @@ public enum SourceAbsenceReason {
      * cap.
      *
      * <p>Deliberately distinct from {@link #NOT_FOUND}: the artifact exists and the operator's fix is to
-     * raise the cap, not to go looking for something deleted. Previously reported as the minimisation
-     * reason, which sent that operator to a consent-and-retention control that had nothing to do with it.
+     * raise the cap, not to go looking for something deleted. A privacy reason here would be wrong twice
+     * over — it sends that operator to a consent-and-retention control, and it claims a minimisation
+     * decision nobody took.
      */
     CONTENT_EVICTED,
-    /** {@code REDACTED}: withheld by policy rather than by a subject's choice. */
-    PRIVACY_POLICY,
     /** {@code REDACTED}: the people in it have not granted, or have withdrawn, consent to read it. */
     CONSENT_NOT_ACTIVE,
     /** {@code COLLECTION_ERROR}: the collector failed; the source's true content is unknown. */

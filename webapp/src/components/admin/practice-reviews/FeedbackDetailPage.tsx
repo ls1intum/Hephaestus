@@ -5,6 +5,7 @@ import { getPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.ge
 import type { ReviewPlacement } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DeliveryTrace } from "@/components/practice-vocabulary/DeliveryTrace";
+import { codeCitationLocator } from "@/components/practice-vocabulary/evidence-source-defs";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
 import { PLACEMENT_DEFS } from "@/components/practice-vocabulary/placement-defs";
 import {
@@ -244,13 +245,18 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 	);
 }
 
-/** The file and lines an inline note is anchored to; only inline placements have one. */
+/**
+ * The file and lines an inline note is anchored to; only inline placements have one.
+ *
+ * A `FILE` anchor carries a path and no line, so it stays a bare path rather than picking up a
+ * coordinate it does not have.
+ */
 function anchorLabel(placement: ReviewPlacement): string {
 	const { anchorPath, anchorStartLine, anchorEndLine } = placement;
-	if (!anchorStartLine) return anchorPath ?? "";
-	const span =
-		anchorEndLine && anchorEndLine !== anchorStartLine
-			? `${anchorStartLine}–${anchorEndLine}`
-			: `${anchorStartLine}`;
-	return `${anchorPath}:${span}`;
+	if (!anchorPath || !anchorStartLine) return anchorPath ?? "";
+	return codeCitationLocator({
+		path: anchorPath,
+		startLine: anchorStartLine,
+		endLine: anchorEndLine,
+	});
 }

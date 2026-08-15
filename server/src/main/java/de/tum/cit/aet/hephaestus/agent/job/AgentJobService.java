@@ -168,9 +168,6 @@ public class AgentJobService {
      * Submit a prepared dev request and render the result message. Call only after the build
      * transaction commits.
      *
-     * <p>The message quotes the reason the submission actually stopped on. It used to name a fixed
-     * pair of guesses instead, which is how a run stopped by a cooldown was reported as an exhausted
-     * budget — sending the reader to raise a cap that was never set.
      */
     public String submitPrepared(
         Long workspaceId,

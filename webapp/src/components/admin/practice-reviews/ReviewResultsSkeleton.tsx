@@ -3,21 +3,18 @@ import { Skeleton } from "@/components/ui/skeleton";
 export interface ReviewResultsSkeletonProps {
 	label: string;
 	/**
-	 * The page size the list is about to show. Required, and no default: the default was five, no
-	 * caller ever overrode it, and the lists it stood in for render twenty-five — so the page jumped
-	 * by twenty rows at the moment this prop exists to make uneventful. A skeleton that does not
-	 * mimic the layout it replaces (NN/g, "Skeleton Screens") is a slower blank page.
+	 * The page size the list is about to show. Required, and deliberately undefaulted: a skeleton
+	 * only earns its place by mimicking the layout it replaces (NN/g, "Skeleton Screens"), and any
+	 * default here is a row count that can silently disagree with its caller's page size — which
+	 * makes the arriving results push the pagination down the screen, the jump this exists to
+	 * prevent.
 	 */
 	rows: number;
 }
 
 /**
- * The shape of {@link ReviewRow}, before the rows exist.
- *
- * <p>It draws the same four regions in the same places: the icon tile, a title bar, a meta line, and
- * the chips on the right. The skeleton it replaces drew three equal bars in a bordered box that
- * matched no list on any screen — which is the inconsistency the product owner flagged twice, and it
- * was inevitable while each list had two renderings and the skeleton had a third.
+ * The shape of {@link ReviewRow}, before the rows exist: the same four regions in the same places —
+ * the icon tile, a title bar, a meta line, and the chips on the right.
  */
 export function ReviewResultsSkeleton({ label, rows }: ReviewResultsSkeletonProps) {
 	return (

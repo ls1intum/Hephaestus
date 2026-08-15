@@ -14,15 +14,12 @@ export interface ReviewRunCardProps {
 /**
  * How the review ran: what it read the work with, how much of it there was, and when it finished.
  *
- * <p>All of this used to live inside a collapsed accordion called "Technical details", together with
- * the review's own UUID and a pretty-printed dump of its configuration. Two of those three were
- * noise — an id that is already in the address bar, and a JSON blob nobody reads on screen — and
- * their presence is what made the third look like something only a technician would want. The model
- * and the token count are the two facts an operator checks when a review costs more than it should
- * or answers worse than it used to, and they are now simply on the page.
+ * <p>On the page rather than behind a disclosure: the model and the token count are the two facts an
+ * operator checks when a review costs more than it should or answers worse than it used to, and the
+ * review's own id is already in the address bar.
  *
- * <p>The configuration is still reachable and is no longer rendered: it is a machine artefact, so the
- * useful action on it is to put it somewhere a machine can read it. One button does that.
+ * <p>The configuration snapshot is copied and never rendered. It is a machine artefact, so the useful
+ * action on it is putting it where a machine can read it.
  */
 export function ReviewRunCard({ job }: ReviewRunCardProps) {
 	const copyConfiguration = async () => {

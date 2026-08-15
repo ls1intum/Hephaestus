@@ -173,7 +173,13 @@ export const DropdownMenuOverlay = reflowStory(
 export const SelectOverlay = reflowStory(
 	() => (
 		<Page>
-			<Select defaultValue="propose">
+			<Select
+				items={[
+					{ value: "propose", label: "Propose feedback for a reviewer" },
+					{ value: "deliver", label: optionLabel },
+				]}
+				defaultValue="propose"
+			>
 				<SelectTrigger aria-label="Autonomy" className="w-full">
 					<SelectValue />
 				</SelectTrigger>

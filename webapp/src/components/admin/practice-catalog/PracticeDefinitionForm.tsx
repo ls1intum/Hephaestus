@@ -220,6 +220,10 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	const [submitted, setSubmitted] = useState(false);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const workTypes = orderedWorkTypes(definitionOptions);
+	const areaItems = [
+		{ value: NO_AREA, label: "Unassigned" },
+		...areas.map((area) => ({ value: area.slug, label: area.name })),
+	];
 	const artifactKind = artifactKindOfBindings(form.bindings);
 	const selectedWorkType = workTypeOptionsFor(definitionOptions, artifactKind);
 	// Recorded history belongs to the work type the practice was reviewed under: switching work type
@@ -451,23 +455,19 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<Field>
 								<FieldLabel htmlFor="practice-area">Practice area</FieldLabel>
 								<Select
+									items={areaItems}
 									value={form.areaSlug}
 									onValueChange={(value) =>
 										setForm((previous) => ({ ...previous, areaSlug: value ?? NO_AREA }))
 									}
 								>
 									<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
-										<SelectValue>
-											{form.areaSlug === NO_AREA
-												? "Unassigned"
-												: areas.find((area) => area.slug === form.areaSlug)?.name}
-										</SelectValue>
+										<SelectValue />
 									</SelectTrigger>
 									<SelectContent>
-										<SelectItem value={NO_AREA}>Unassigned</SelectItem>
-										{areas.map((area) => (
-											<SelectItem key={area.slug} value={area.slug}>
-												{area.name}
+										{areaItems.map((item) => (
+											<SelectItem key={item.value} value={item.value}>
+												{item.label}
 											</SelectItem>
 										))}
 									</SelectContent>

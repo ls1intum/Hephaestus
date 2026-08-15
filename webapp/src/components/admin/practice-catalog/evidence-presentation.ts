@@ -45,10 +45,9 @@ export function evidenceQualityRequirement(
 /**
  * Which part of the picture a source belongs to.
  *
- * A pull request offers eleven sources, and as one flat list they read as eleven equal questions. They
- * are not: three are the change itself, several are the surroundings it has to be read against, and
- * two are what this workspace already said to this person. Grouping is what turns a wall into three
- * short decisions.
+ * A work type's sources as one flat list read as a row of equal questions. They are not equal: some
+ * are the change itself, some are the surroundings it has to be read against, and some are what this
+ * workspace already said to this person. Grouping is what turns a wall into three short decisions.
  */
 export type EvidenceSourceFamily = "work" | "around" | "history" | "other";
 

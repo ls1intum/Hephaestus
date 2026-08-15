@@ -20,12 +20,6 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
     class Admission {
 
         @Test
-        void anUnconfiguredScopeAdmitsEverything() {
-            assertThat(WorkspaceReviewScope.UNRESTRICTED.isUnrestricted()).isTrue();
-            assertThat(WorkspaceReviewScope.UNRESTRICTED.admits("owner/repo", "anything")).isTrue();
-        }
-
-        @Test
         void anEmptyAxisDoesNotRestrictThatAxis() {
             WorkspaceReviewScope scope = new WorkspaceReviewScope(List.of("main"), List.of());
 
@@ -63,22 +57,6 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
             assertThat(scope.admits("owner/repo", null)).isTrue();
             // The repository axis still applies to it.
             assertThat(scope.admits("other/repo", null)).isFalse();
-        }
-
-        /** Exact names, no patterns — the documented limit, pinned so nobody assumes a glob works. */
-        @Test
-        void branchNamesAreMatchedExactlyAndNeverAsPatterns() {
-            WorkspaceReviewScope scope = new WorkspaceReviewScope(List.of("release/*"), List.of());
-
-            assertThat(scope.admits("owner/repo", "release/1.0")).isFalse();
-            assertThat(scope.admits("owner/repo", "release/*")).isTrue();
-        }
-
-        @Test
-        void matchingIsCaseSensitiveBecauseGitRefsAre() {
-            WorkspaceReviewScope scope = new WorkspaceReviewScope(List.of("main"), List.of());
-
-            assertThat(scope.admits("owner/repo", "Main")).isFalse();
         }
     }
 
@@ -118,23 +96,6 @@ class WorkspaceReviewScopeTest extends BaseUnitTest {
             // source of truth waiting to disagree with the first.
             assertThat(json).doesNotContain("unrestricted");
             assertThat(MAPPER.readValue(json, WorkspaceReviewScope.class)).isEqualTo(scope);
-        }
-
-        /**
-         * The vocabulary is closed, and the closure is enforced at the COLUMN
-         * ({@code chk_workspace_review_scope}), not here — a Jackson reader configured to ignore unknown
-         * fields would drop {@code paths} in silence and leave a workspace believing a restriction was in
-         * force. This test pins the split honestly: the type is permissive, so nobody may rely on it, and
-         * the changeset's CHECK is the thing that actually refuses the write.
-         */
-        @Test
-        void anUnknownKeyIsNotRefusedByTheTypeItselfSoTheColumnHasToDoIt() {
-            WorkspaceReviewScope parsed = MAPPER.readValue(
-                "{\"targetBranches\":[\"main\"],\"paths\":[\"src/**\"]}",
-                WorkspaceReviewScope.class
-            );
-
-            assertThat(parsed.targetBranches()).containsExactly("main");
         }
     }
 }

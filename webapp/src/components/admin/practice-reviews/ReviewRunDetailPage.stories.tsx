@@ -40,6 +40,11 @@ type Story = StoryObj<typeof meta>;
 /**
  * A finished review of a pull request: one strength, three things to tighten, and four pieces of
  * feedback that between them were delivered, replaced and withheld.
+ *
+ * <p>How the run went is on the same page rather than in a drawer: the model and the token counts are
+ * what an operator checks when a review costs more than it should or answers worse than it used to.
+ * The configuration snapshot is never rendered — it is a machine artefact, so the useful action on it
+ * is putting it where a machine can read it.
  */
 export const CompletedWithMixedOutput: Story = {
 	play: async ({ canvasElement }) => {
@@ -50,6 +55,10 @@ export const CompletedWithMixedOutput: Story = {
 		canvas.getByText("Summary posted");
 		await canvas.findByText("A cache miss and a permission failure come back as the same 404");
 		await canvas.findByText(/2 issues to tighten in this change/);
+		await canvas.findByRole("heading", { name: "How this review ran", level: 3 });
+		canvas.getByRole("button", { name: "Copy configuration" });
+		canvas.getByText("Tokens read");
+		await expect(canvas.queryByText("Configuration snapshot")).not.toBeInTheDocument();
 		await expectNoPageOverflow();
 	},
 };
@@ -167,23 +176,6 @@ export const FailedWithPartialOutput: Story = {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review output may be incomplete")).toBeVisible();
 		await canvas.findByText("A dropped delivery is logged at debug and never counted");
-	},
-};
-
-/**
- * How the review ran, on the page rather than in a drawer.
- *
- * The model and the token counts are what an operator checks when a review costs more than it should
- * or answers worse than it used to. The configuration snapshot is not rendered at all: it is a
- * machine artefact, so the useful action on it is to put it where a machine can read it.
- */
-export const HowTheRunWent: Story = {
-	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await canvas.findByRole("heading", { name: "How this review ran", level: 3 });
-		canvas.getByRole("button", { name: "Copy configuration" });
-		canvas.getByText("Tokens read");
-		await expect(canvas.queryByText("Configuration snapshot")).not.toBeInTheDocument();
 	},
 };
 

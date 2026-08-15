@@ -33,8 +33,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * The front door a developer uses to ask for a review of a piece of work, now.
  *
  * <p>Thin by design: {@link ManualReviewRequests} owns the whole sequence — standing, rate limits,
- * ledger, gate, submission — because the merge-request bot command has to perform the identical one,
- * and a second copy of it is how one door ends up authorizing and the other not.
+ * ledger, gate, submission — because the merge-request bot command has to perform the identical one.
  *
  * <h2>Why a refusal is a 200</h2>
  * <p>Almost every reason a requested review does not run is a condition of the workspace the asker can
@@ -47,9 +46,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
  * <h2>Membership is checked, and is not sufficient</h2>
  * <p>{@code isMember()} is here because {@code WorkspaceContextFilter} admits an anonymous caller on a
  * publicly viewable workspace, and a spend button must not be one of the things public visibility
- * grants. It is only the outer fence: {@link ReviewRequestAuthority} then requires the asker to be
- * someone the review is <em>about</em>, or an admin. Membership says you may see the work; it does not
- * say you may commission coaching about it aimed at somebody else.
+ * grants. It is only the outer fence; {@link ReviewRequestAuthority} owns the rule that decides standing.
  */
 @WorkspaceScopedController
 @RequestMapping("/practices/review-requests")

@@ -27,12 +27,10 @@ export interface ReviewTargetPageProps {
 /**
  * Everything the reviews have said about one piece of work.
  *
- * <p>The header used to lead with a grey "Reviewed work" eyebrow directly under a breadcrumb reading
- * "Practice reviews / Reviewed work", then a heading, then a sentence explaining what the page was —
- * three lines to say one thing, which is the duplication the product owner asked for a sweep of. The
- * kind of work is now carried by the link's own mark and words (`ls1intum/Hephaestus · PR #1423`,
- * under a GitHub or GitLab glyph), which is a fact about *this* work rather than a label for the
- * page.
+ * <p>No eyebrow and no sentence naming the page above the heading. What kind of work this is comes
+ * out of the link's own mark and words — `ls1intum/Hephaestus · PR #1423` under a GitHub or GitLab
+ * glyph — which is a fact about *this* work; a label for the page only restates the breadcrumb one
+ * line above it.
  */
 export function ReviewTargetPage({
 	workspaceSlug,

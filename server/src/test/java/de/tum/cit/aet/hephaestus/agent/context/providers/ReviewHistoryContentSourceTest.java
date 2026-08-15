@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -11,11 +12,13 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -31,10 +34,12 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -83,7 +88,10 @@ class ReviewHistoryContentSourceTest {
         );
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(List.of());
         when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(List.of());
-        when(visibilityPolicy.permits(anyLong(), any(), any())).thenReturn(true);
+        when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
+            Collection<Observation> batch = invocation.getArgument(1);
+            return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+        });
         when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID))).thenReturn(
             Optional.of(pullRequestBy(AUTHOR_ID))
         );
@@ -103,25 +111,12 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
-    @Test
-    void stagesBothHistoryFilesUnderTheHistoryPrefix() {
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
-
-        assertThat(captured.files()).containsOnlyKeys(
-            "inputs/history/observations.json",
-            "inputs/history/feedback.json"
-        );
-    }
-
     /**
-     * The shape production actually asks for. {@code WorkspaceContextBuilder} captures each source kind
-     * on its own — one {@code capture} call per kind, so that one failing collector costs only its own
-     * source — and then rejects a contribution that reports anything about a kind it did not ask about.
-     * A collector that answers for both halves whichever half was requested therefore fails every
-     * review, not just the half it overreached on.
-     *
-     * <p>Asking for both at once, as the tests around this one do, is the one call shape production
-     * never makes; it is why this went unseen until a real review ran.
+     * The shape production asks for. {@code WorkspaceContextBuilder} captures each source kind on its
+     * own — one {@code capture} call per kind, so that one failing collector costs only its own source —
+     * and then rejects a contribution that reports anything about a kind it did not ask about. A
+     * collector that answers for both halves whichever half was requested therefore fails every review,
+     * not just the half it overreached on.
      */
     @Nested
     class WhenOnlyOneHalfIsAskedFor {
@@ -162,15 +157,21 @@ class ReviewHistoryContentSourceTest {
      */
     @Test
     void aFirstEverReviewGetsAPresentAndEmptyHistory() {
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
+        var observationsCapture = captureObservationHistory();
+        var feedbackCapture = captureFeedbackHistory();
 
-        JsonNode observations = read(captured.files().get("inputs/history/observations.json"));
-        JsonNode feedback = read(captured.files().get("inputs/history/feedback.json"));
+        JsonNode observations = read(observationsCapture.files().get("inputs/history/observations.json"));
+        JsonNode feedback = read(feedbackCapture.files().get("inputs/history/feedback.json"));
         assertThat(observations.get("observations")).isEmpty();
         assertThat(feedback.get("feedback")).isEmpty();
-        assertThat(captured.contentStates())
-            .containsEntry(ReviewHistoryContentSource.OBSERVATION_HISTORY, SourceContentState.EMPTY)
-            .containsEntry(ReviewHistoryContentSource.FEEDBACK_HISTORY, SourceContentState.EMPTY);
+        assertThat(observationsCapture.contentStates()).containsEntry(
+            ReviewHistoryContentSource.OBSERVATION_HISTORY,
+            SourceContentState.EMPTY
+        );
+        assertThat(feedbackCapture.contentStates()).containsEntry(
+            ReviewHistoryContentSource.FEEDBACK_HISTORY,
+            SourceContentState.EMPTY
+        );
     }
 
     @Test
@@ -179,7 +180,7 @@ class ReviewHistoryContentSourceTest {
             List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
         );
 
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
+        var captured = captureObservationHistory();
 
         JsonNode entry = read(captured.files().get("inputs/history/observations.json")).get("observations").get(0);
         assertThat(entry.get("practiceSlug").asString()).isEqualTo("swallows-errors");
@@ -203,7 +204,7 @@ class ReviewHistoryContentSourceTest {
             )
         );
 
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
+        var captured = captureFeedbackHistory();
 
         JsonNode entry = read(captured.files().get("inputs/history/feedback.json")).get("feedback").get(0);
         assertThat(entry.get("channel").asString()).isEqualTo("IN_CONTEXT");
@@ -220,9 +221,8 @@ class ReviewHistoryContentSourceTest {
      */
     @Test
     void neverReportsCompleteBecauseTheWindowIsBounded() {
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
-
-        assertThat(captured.completeness().values()).containsOnly(SourceCompleteness.PARTIAL);
+        assertThat(captureObservationHistory().completeness().values()).containsOnly(SourceCompleteness.PARTIAL);
+        assertThat(captureFeedbackHistory().completeness().values()).containsOnly(SourceCompleteness.PARTIAL);
     }
 
     /** An observation the visibility policy refuses is not staged, exactly as on every other read of it. */
@@ -231,9 +231,11 @@ class ReviewHistoryContentSourceTest {
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
             List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
         );
-        when(visibilityPolicy.permits(anyLong(), any(), any())).thenReturn(false);
+        // doReturn, not when(...): re-stubbing through when() would call the mock, running the
+        // setUp answer against the matchers' null placeholders.
+        doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
+        var captured = captureObservationHistory();
 
         assertThat(read(captured.files().get("inputs/history/observations.json")).get("observations")).isEmpty();
         assertThat(captured.contentStates()).containsEntry(
@@ -252,15 +254,19 @@ class ReviewHistoryContentSourceTest {
     void reportsUnavailableRatherThanEmptyWhenTheSubjectCannotBeResolved() {
         when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID))).thenReturn(Optional.empty());
 
-        var captured = provider.capture(prRequest(), provider.sourceKinds());
+        assertUnavailable(captureObservationHistory(), ReviewHistoryContentSource.OBSERVATION_HISTORY);
+        assertUnavailable(captureFeedbackHistory(), ReviewHistoryContentSource.FEEDBACK_HISTORY);
+        verifyNoInteractions(observationRepository, feedbackRepository);
+    }
 
+    private static void assertUnavailable(EvidenceContribution captured, SourceKind kind) {
         assertThat(captured.files()).isEmpty();
-        assertThat(captured.stateOverrides().values()).allSatisfy(state ->
+        assertThat(captured.stateOverrides()).containsOnlyKeys(kind);
+        assertThat(captured.stateOverrides()).hasEntrySatisfying(kind, state ->
             assertThat(state).isInstanceOfSatisfying(SourceCaptureState.Unavailable.class, unavailable ->
                 assertThat(unavailable.reasonCode()).isEqualTo(SourceAbsenceReason.NOT_FOUND)
             )
         );
-        verifyNoInteractions(observationRepository, feedbackRepository);
     }
 
     /** History is about the person; the mentor chat has its own context sources and its own consent gate. */
@@ -270,6 +276,19 @@ class ReviewHistoryContentSourceTest {
             provider.supports(new ContextRequest.MentorChatRequest(WORKSPACE_ID, AUTHOR_ID, UUID.randomUUID()))
         ).isFalse();
         assertThat(provider.supports(prRequest())).isTrue();
+    }
+
+    /**
+     * One kind per call, which is the only shape {@code WorkspaceContextBuilder} produces. Asking for
+     * both at once is a shape production never makes, and a collector tested that way can report a kind
+     * it was not asked about — a contribution the builder rejects, failing the whole review.
+     */
+    private EvidenceContribution captureObservationHistory() {
+        return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
+    }
+
+    private EvidenceContribution captureFeedbackHistory() {
+        return provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
     }
 
     private JsonNode read(byte[] bytes) {
@@ -299,6 +318,7 @@ class ReviewHistoryContentSourceTest {
         Practice practice = new Practice();
         practice.setSlug(practiceSlug);
         return Observation.builder()
+            .id(UUID.randomUUID())
             .practice(practice)
             .recurrenceKey(recurrenceKey)
             .title(title)

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactDescriptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewExecutionCatalog;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -23,6 +24,10 @@ import org.springframework.stereotype.Component;
  * <p>Takes the handler beans directly instead of {@link JobTypeHandlerRegistry} only to keep the
  * dependency one bean shallower; the registry's own constructor already refuses a build where an
  * {@code AgentJobType} has no handler.
+ *
+ * <p>It also closes the seam on the other side, because it is the only place holding the run-able set: a
+ * kind that can be run but has no branch in {@code PracticeDetectionDeliveryService#resolveTarget} would
+ * otherwise announce itself through the first review that failed after being paid for.
  */
 @Component
 public class JobTypeReviewExecutionCatalog implements ReviewExecutionCatalog {
@@ -34,6 +39,15 @@ public class JobTypeReviewExecutionCatalog implements ReviewExecutionCatalog {
             .stream()
             .map(handler -> AgentJobService.artifactKindFor(handler.jobType()))
             .collect(Collectors.toUnmodifiableSet());
+        Set<ArtifactKind> undeliverable = new HashSet<>(executableKinds);
+        undeliverable.removeAll(PracticeDetectionDeliveryService.ROUTABLE_KINDS);
+        if (!undeliverable.isEmpty()) {
+            throw new IllegalStateException(
+                "Reviewable artifact kinds can be run but not delivered: " +
+                    undeliverable +
+                    ". Give each one a branch in PracticeDetectionDeliveryService#resolveTarget."
+            );
+        }
     }
 
     @Override

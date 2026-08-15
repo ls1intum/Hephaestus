@@ -45,8 +45,13 @@ export interface ReviewPersonFacetProps {
 	selected: number | undefined;
 	onChange: (userId: number | undefined) => void;
 	/**
-	 * The person already on screen, so a filter arrived at by link shows a name rather than an id
-	 * before the member list loads — and still shows one if the person has since left the workspace.
+	 * The name of the person `selected` identifies, so a filter arrived at by link shows a name rather
+	 * than an id before the member list loads — and still shows one if the person has since left the
+	 * workspace.
+	 *
+	 * <p>Read only while `selected` is set, and it must name *that* person. A caller taking it from
+	 * the first row of the list it filters is correct only while the filter is on; off, the first row
+	 * is whoever sorts first, and passing their name here labels a different person's id.
 	 */
 	fallbackName?: string;
 }

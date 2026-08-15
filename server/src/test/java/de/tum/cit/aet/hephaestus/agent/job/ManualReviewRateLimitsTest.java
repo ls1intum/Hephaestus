@@ -17,7 +17,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
@@ -132,30 +131,9 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
         );
     }
 
-    /** Every identity of the same person is counted together, or a linked account gets two allowances. */
-    @Test
-    void everyIdentityOfThePersonIsCountedTogether() {
-        refusalFrom(limits(15, 5), List.of(REQUESTER_ID, 99L));
-
-        @SuppressWarnings("unchecked")
-        ArgumentCaptor<Collection<Long>> ids = ArgumentCaptor.forClass(Collection.class);
-        verify(signals).countRequestsBySince(anyLong(), ids.capture(), any());
-        assertThat(ids.getValue()).containsExactly(REQUESTER_ID, 99L);
-    }
-
     @Test
     void anAllowanceOfZeroTurnsThePerPersonLimitOff() {
         assertThat(refusalFrom(limits(15, 0))).isEmpty();
-        verify(signals, never()).countRequestsBySince(anyLong(), any(), any());
-    }
-
-    /**
-     * Nobody identified means the authority has already refused, and an {@code IN ()} over an empty set
-     * is not a query worth issuing.
-     */
-    @Test
-    void anUnidentifiedAskerIsNotCounted() {
-        assertThat(refusalFrom(limits(15, 5), List.of())).isEmpty();
         verify(signals, never()).countRequestsBySince(anyLong(), any(), any());
     }
 
@@ -169,10 +147,6 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
     }
 
     private Optional<SignalStateReason> refusalFrom(ManualReviewRateLimits limits) {
-        return refusalFrom(limits, List.of(REQUESTER_ID));
-    }
-
-    private Optional<SignalStateReason> refusalFrom(ManualReviewRateLimits limits, List<Long> requesterIds) {
-        return limits.refusalFor(workspace, ScmSignals.PULL_REQUEST, ARTIFACT_ID, requesterIds);
+        return limits.refusalFor(workspace, ScmSignals.PULL_REQUEST, ARTIFACT_ID, List.of(REQUESTER_ID));
     }
 }

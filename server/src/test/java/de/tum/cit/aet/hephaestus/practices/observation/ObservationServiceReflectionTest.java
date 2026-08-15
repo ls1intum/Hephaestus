@@ -22,9 +22,12 @@ import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -68,14 +71,11 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         user.setId(USER_ID);
         when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
         lenient()
-            .when(
-                visibilityPolicy.permits(
-                    eq(WORKSPACE_ID),
-                    any(Observation.class),
-                    eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-                )
-            )
-            .thenReturn(true);
+            .when(visibilityPolicy.permitsAll(eq(WORKSPACE_ID), any(), eq(SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)))
+            .thenAnswer(invocation -> {
+                Collection<Observation> batch = invocation.getArgument(1);
+                return batch.stream().map(Observation::getId).collect(Collectors.toSet());
+            });
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
@@ -133,8 +133,8 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
             )
         ).thenReturn(List.of(observation));
         when(
-            visibilityPolicy.permits(WORKSPACE_ID, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-        ).thenReturn(false);
+            visibilityPolicy.permitsAll(WORKSPACE_ID, List.of(observation), SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
+        ).thenReturn(Set.of());
 
         assertThat(observationService.getReflection(WORKSPACE_ID)).isEmpty();
         verifyNoInteractions(feedbackObservationRepository);

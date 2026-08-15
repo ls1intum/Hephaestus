@@ -326,7 +326,7 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 				{claimed && (
 					<FieldDescription id={consequenceId}>
 						A partial capture then refuses the review: an incomplete list cannot tell “it is not
-						there” apart from “we did not fetch it”.
+						there” apart from “we did not fetch it”. {source.selectionScope}
 					</FieldDescription>
 				)}
 			</FieldContent>

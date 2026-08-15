@@ -38,11 +38,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * <p>Two doors exist today — the {@code /hephaestus review} command on a merge request and the REST
  * endpoint the web app's "Review this now" calls — and both have to do the same five things in the same
- * order: establish that the asker has standing, ask the workspace's gate whether a review of this kind
- * of work runs at all, record the ask in the signal ledger so the artifact trace can say who asked and
- * what came of it, submit, and hand back a refusal a person can read. Duplicating that sequence is how
- * one door ends up authorizing and the other not, which is exactly the state this class was written to
- * end.
+ * order: establish that the asker has standing (see {@link ReviewRequestAuthority}), ask the workspace's
+ * gate whether a review of this kind of work runs at all, record the ask in the signal ledger so the
+ * artifact trace can say who asked and what came of it, submit, and hand back a refusal a person can read.
  *
  * <h2>The occasion is the request, and it is recorded as one</h2>
  * <p>The gate is asked about the kind's declared manual-request signal — {@code

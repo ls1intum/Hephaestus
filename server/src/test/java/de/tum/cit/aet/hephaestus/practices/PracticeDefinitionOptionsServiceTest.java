@@ -97,7 +97,12 @@ class PracticeDefinitionOptionsServiceTest {
         assertThat(pullRequests.allowedSources())
             .filteredOn(option -> option.sourceKind().equals("scm.pull-request.comments"))
             .singleElement()
-            .satisfies(option -> assertThat(option.supportsExhaustiveEvidence()).isTrue());
+            .satisfies(option -> {
+                assertThat(option.supportsExhaustiveEvidence()).isTrue();
+                // The bound the claim is made against travels with the flag. Offering EXHAUSTIVE without
+                // saying where the capture stops asks an author to promise something they cannot check.
+                assertThat(option.selectionScope()).contains("500", "PARTIAL");
+            });
         assertThat(pullRequests.allowedSources())
             .filteredOn(option -> option.sourceKind().equals("scm.linked-work-items"))
             .singleElement()

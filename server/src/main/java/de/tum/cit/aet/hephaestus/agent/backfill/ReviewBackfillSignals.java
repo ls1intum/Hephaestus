@@ -63,13 +63,6 @@ final class ReviewBackfillSignals {
     /** The ledger identity for reviewing this issue as it stands. */
     static Optional<SignalKey> keyFor(long workspaceId, Issue issue) {
         SignalName signal = issue.getState() == Issue.State.CLOSED ? ScmSignals.ISSUE_CLOSED : ScmSignals.ISSUE_OPENED;
-        return ScmSignals.issueKey(
-            workspaceId,
-            issue.getId(),
-            signal,
-            issue.getTitle(),
-            issue.getBody(),
-            issue.getUpdatedAt()
-        );
+        return ScmSignals.issueKey(workspaceId, issue.getId(), signal, issue.getTitle(), issue.getBody(), null);
     }
 }

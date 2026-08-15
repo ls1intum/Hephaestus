@@ -57,8 +57,8 @@ class ManualReviewRateLimits {
      * The reason to refuse this request, or empty to let it through.
      *
      * @param requesterIds every SCM identity of the person asking, so a linked account does not get one
-     *     allowance per provider. Empty means nobody was identified, which the authority has already
-     *     refused; there is then nothing to limit.
+     *     allowance per provider. Never empty: {@link ReviewRequestAuthority} has already refused an ask
+     *     it could not attribute to an identity.
      */
     Optional<SignalStateReason> refusalFor(
         Workspace workspace,
@@ -85,7 +85,7 @@ class ManualReviewRateLimits {
      */
     private boolean requesterQuotaExhausted(long workspaceId, Collection<Long> requesterIds, Instant now) {
         int allowance = reviewProperties.maxRequestsPerRequesterPerHour();
-        if (allowance <= 0 || requesterIds.isEmpty()) {
+        if (allowance <= 0) {
             return false;
         }
         return signals.countRequestsBySince(workspaceId, requesterIds, now.minus(REQUESTER_WINDOW)) >= allowance;

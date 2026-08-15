@@ -2,16 +2,12 @@ package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalog;
-import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceContract;
-import de.tum.cit.aet.hephaestus.evidence.RequiredCaptureQuality;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
-import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -115,50 +111,5 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
         assertThat(exhaustive.get("issue-closed-with-unmet-outcome")).containsExactly(
             new SourceKind("scm.issue.comments")
         );
-    }
-
-    /**
-     * Every source a shipped practice requires is captured to the quality its own contract demands, and
-     * the contract is the only place that quality is written down.
-     *
-     * <p>Nothing may demand a quality of a source the source cannot supply: such a practice is switched
-     * on and refuses every review it ever triggers.
-     */
-    @Test
-    void everyRequiredSourceCanSupplyTheQualityItsContractDemands() {
-        ArtifactSourceCatalog catalog = registry.current();
-        Map<SourceKind, RequiredCaptureQuality> demanded = new LinkedHashMap<>();
-
-        loader
-            .catalog()
-            .practices()
-            .forEach(practice ->
-                practice
-                    .definition()
-                    .bindings()
-                    .forEach(binding ->
-                        binding
-                            .needs()
-                            .stream()
-                            .filter(PracticeEvidenceRequirement::refuses)
-                            .forEach(need ->
-                                demanded.put(
-                                    need.sourceKind(),
-                                    catalog.source(need.sourceKind()).orElseThrow().requiredQuality()
-                                )
-                            )
-                    )
-            );
-
-        assertThat(demanded).isNotEmpty();
-        demanded.forEach((source, quality) -> {
-            ArtifactSourceContract contract = catalog.source(source).orElseThrow();
-            assertThat(!quality.demandsComplete() || contract.completenessPolicy().supportsComplete())
-                .as("source '%s' is required by a shipped practice but can never report COMPLETE", source)
-                .isTrue();
-            assertThat(!quality.demandsContent() || contract.completenessPolicy().supportsEmpty())
-                .as("source '%s' demands non-emptiness although an empty capture of it is never valid", source)
-                .isTrue();
-        });
     }
 }

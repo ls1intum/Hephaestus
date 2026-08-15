@@ -3,7 +3,7 @@ import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
-import { WORK_ARTIFACT_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
+import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
@@ -78,11 +78,6 @@ export interface PracticeCatalogProps {
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
 }
-
-const FOCUS_FILTERS = [
-	{ value: "ALL", label: "All work types" },
-	...WORK_ARTIFACT_FILTER_OPTIONS,
-] satisfies Array<{ value: FocusFilter; label: string }>;
 
 export function PracticeCatalog({
 	workspaceSlug,
@@ -269,7 +264,7 @@ function CatalogToolbar({
 	return (
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 			<Select
-				items={FOCUS_FILTERS}
+				items={WORK_ARTIFACT_FILTER_ITEMS}
 				value={focusFilter}
 				onValueChange={(value) => value && onFocusFilterChange(value as FocusFilter)}
 			>
@@ -277,22 +272,16 @@ function CatalogToolbar({
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
-					{FOCUS_FILTERS.map((filter) => (
+					{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
 						<SelectItem key={filter.value} value={filter.value}>
 							{filter.label}
 						</SelectItem>
 					))}
 				</SelectContent>
 			</Select>
-			{/*
-			 * toolbar, not the primitive's default group: Base UI gives the group a roving tabindex, so
-			 * Tab enters it once and the arrow keys move between the filters. `toolbar` is the role that
-			 * contract belongs to; `group` says nothing about how to move inside it. radiogroup would be
-			 * worse — the items are aria-pressed, not radios.
-			 *
-			 * Not an axe workaround: the vendored `ToggleGroup` suppresses the `aria-orientation` the
-			 * primitive would otherwise put on `role="group"`, so this reads the same under either role.
-			 */}
+			{/* `toolbar`, not the default `group`: Base UI gives the group a roving tabindex, and
+			    `toolbar` is the role that contract belongs to. `radiogroup` would be worse — the items
+			    are `aria-pressed`, not radios. */}
 			<ToggleGroup
 				role="toolbar"
 				value={[focusFilter]}
@@ -302,7 +291,7 @@ function CatalogToolbar({
 				aria-label="Filter by work type"
 				className="hidden sm:flex"
 			>
-				{FOCUS_FILTERS.map((filter) => (
+				{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
 					<ToggleGroupItem
 						key={filter.value}
 						value={filter.value}

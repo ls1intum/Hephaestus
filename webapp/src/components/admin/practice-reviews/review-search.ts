@@ -26,6 +26,16 @@ import { multiValue, narrowToEnum } from "@/lib/search-params";
 export const REVIEW_PAGE_SIZE = 25;
 
 /**
+ * How often the reviews list and a review's own page re-ask while a review is queued or running.
+ *
+ * Both screens watch the same resource move through the same states, so one cadence — two constants
+ * are two answers to "how stale may a running review look", and they drift the first time one is
+ * tuned. Applied through TanStack Query's `refetchInterval`, which stops on its own once the review
+ * reaches a terminal status.
+ */
+export const ACTIVE_REVIEW_POLL_MS = 5_000;
+
+/**
  * How the observations list is ordered, as the server names it.
  *
  * `ACTIONABILITY` puts shortfalls first, worst severity down to informational, then strengths, then
@@ -73,8 +83,8 @@ export const feedbackSearchSchema = z
 		...scope,
 		page,
 		deliveryState: enumValues(statusValues(DELIVERY_STATE_DEFS)),
-		// The URL carries families, not the fourteen reasons: it is the question an operator asks,
-		// and `feedbackQuery` expands it to the reasons the API filters on.
+		// The URL carries families, not individual reasons: the family is the question an operator
+		// asks, and `feedbackQuery` expands it to the reasons the API filters on.
 		withheldFamily: enumValues(statusValues(WITHHOLDING_FAMILY_DEFS)),
 		channel: enumValues(FILTERABLE_PLACES),
 		recipientUserId: positiveId,

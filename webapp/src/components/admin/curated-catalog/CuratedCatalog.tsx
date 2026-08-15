@@ -7,7 +7,7 @@ import type {
 	CuratedCatalogSummary as Summary,
 } from "@/api/types.gen";
 import {
-	WORK_ARTIFACT_FILTER_OPTIONS,
+	WORK_ARTIFACT_FILTER_ITEMS,
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
 import {
@@ -38,7 +38,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { artifactKindLabel, isKnownArtifactKind } from "@/lib/artifact-kinds";
+import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 import { CuratedCatalogTree } from "./CuratedCatalogTree";
@@ -406,15 +406,9 @@ function CatalogFilters({
 					))}
 				</SelectContent>
 			</Select>
-			{/*
-			 * toolbar, not the primitive's default group: Base UI gives the group a roving tabindex, so
-			 * Tab enters it once and the arrow keys move between the filters. `toolbar` is the role that
-			 * contract belongs to; `group` says nothing about how to move inside it. radiogroup would be
-			 * worse — the items are aria-pressed, not radios.
-			 *
-			 * Not an axe workaround: the vendored `ToggleGroup` suppresses the `aria-orientation` the
-			 * primitive would otherwise put on `role="group"`, so this reads the same under either role.
-			 */}
+			{/* `toolbar`, not the default `group`: Base UI gives the group a roving tabindex, and
+			    `toolbar` is the role that contract belongs to. `radiogroup` would be worse — the items
+			    are `aria-pressed`, not radios. */}
 			<ToggleGroup
 				role="toolbar"
 				value={[status]}
@@ -437,6 +431,7 @@ function CatalogFilters({
 				))}
 			</ToggleGroup>
 			<Select
+				items={WORK_ARTIFACT_FILTER_ITEMS}
 				value={artifact}
 				onValueChange={(value) =>
 					onSearchChange({
@@ -446,13 +441,10 @@ function CatalogFilters({
 				}
 			>
 				<SelectTrigger className="w-full lg:w-52" aria-label="Filter by work type">
-					<SelectValue>
-						{artifact === "ALL" ? "All work types" : artifactKindLabel(artifact)}
-					</SelectValue>
+					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
-					<SelectItem value="ALL">All work types</SelectItem>
-					{WORK_ARTIFACT_FILTER_OPTIONS.map(({ value, label }) => (
+					{WORK_ARTIFACT_FILTER_ITEMS.map(({ value, label }) => (
 						<SelectItem key={value} value={value}>
 							{label}
 						</SelectItem>

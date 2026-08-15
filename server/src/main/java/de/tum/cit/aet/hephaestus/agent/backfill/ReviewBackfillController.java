@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Review-backfill campaigns.
@@ -77,7 +79,11 @@ public class ReviewBackfillController {
         @Valid @RequestBody CreateReviewBackfillRunRequestDTO request
     ) {
         ReviewBackfillRunDTO run = reviewBackfillService.preflight(workspaceContext, request);
-        return ResponseEntity.status(201).body(run);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+            .path("/{runId}")
+            .buildAndExpand(run.id())
+            .toUri();
+        return ResponseEntity.created(location).body(run);
     }
 
     @GetMapping

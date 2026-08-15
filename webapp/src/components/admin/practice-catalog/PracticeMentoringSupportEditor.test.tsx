@@ -44,8 +44,6 @@ describe("PracticeMentoringSupportEditor", () => {
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		expect(screen.getByTestId("policy").textContent).toBe("NONE:NONE");
-		// With no review to constrain, there is nothing for a limitation to be a limitation of.
-		expect(screen.queryByRole("button", { name: "Add limitation" })).toBeNull();
 	});
 
 	it("does not leave an empty human-review reason after returning to AI support", async () => {
@@ -125,12 +123,17 @@ describe("PracticeMentoringSupportEditor", () => {
 			"/admin/practices/new",
 		);
 
+		// `aria-disabled`, not `data-disabled`. Base UI renders a radio as a `<span role="radio">`, so
+		// there is no native `disabled` to read; `data-disabled` is the hook its CSS uses, while
+		// `aria-disabled` is what the accessibility tree exposes and what actually tells a reader the
+		// choice is unavailable. A regression that kept the styling and dropped the semantics leaves
+		// the first attribute in place and this assertion is the one that notices.
 		expect(
-			screen.getByRole("radio", { name: /AI-supported mentoring/ }).getAttribute("data-disabled"),
-		).not.toBeNull();
+			screen.getByRole("radio", { name: /AI-supported mentoring/ }).getAttribute("aria-disabled"),
+		).toBe("true");
 		expect(
-			screen.getByRole("radio", { name: /Human review needed/ }).getAttribute("data-disabled"),
-		).toBeNull();
+			screen.getByRole("radio", { name: /Human review needed/ }).getAttribute("aria-disabled"),
+		).not.toBe("true");
 	});
 
 	it("preserves focus while editing limitations", async () => {

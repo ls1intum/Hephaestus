@@ -288,8 +288,8 @@ public class PracticeDetectionDeliveryService {
         }
         // The sources a practice may assert an ABSENCE over are still its own: that stance is a claim
         // about how far "I did not find it" reaches, and only the practice author can make it. What a
-        // practice may CITE is no longer narrowed the same way. Every source that applies to the
-        // artifact is staged for every review now, so a quote from one this practice's bindings did not
+        // practice may CITE is not narrowed the same way. Every source that applies to the
+        // artifact is staged for every review, so a quote from one this practice's bindings did not
         // name is a quote from bytes that were really there and really read — the fabrication check is
         // the manifest and the byte-exact quote below, not a list of sources somebody predicted.
         Set<SourceKind> exhaustive = new HashSet<>();
@@ -449,20 +449,6 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * Holds an {@code ABSENT} observation to the search it recorded.
-     *
-     * <p>An absence is a universal claim, and the only claim a fragment of a corpus can never support:
-     * a partial capture of the review threads is equally consistent with "nobody raised it" and "the
-     * raising was in the part we did not fetch". {@link EvidenceStance#EXHAUSTIVE} is the practice
-     * declaring the corpus its absence ranges over, so those sources are exactly what the search must
-     * have covered.
-     *
-     * <p>Enforced here and not only in the sandbox because the in-sandbox normalizer runs inside the
-     * thing it is checking. A runner that crashed, an older image, or a rescued text payload all reach
-     * delivery without it having run; a guard that can be skipped by the party it constrains is
-     * advice, not a boundary. This is the same reason the citation check below is duplicated here.
-     */
-    /**
      * Holds a {@code NOT_APPLICABLE} observation to the claim it is making.
      *
      * <p>Of the four presences this is the only one that costs nothing to say. {@code PRESENT} is warranted
@@ -543,6 +529,15 @@ public class PracticeDetectionDeliveryService {
         }
     }
 
+    /**
+     * Holds an {@code ABSENT} observation to the search it recorded.
+     *
+     * <p>An absence is a universal claim, and the only claim a fragment of a corpus can never support:
+     * a partial capture of the review threads is equally consistent with "nobody raised it" and "the
+     * raising was in the part we did not fetch". {@link EvidenceStance#EXHAUSTIVE} is the practice
+     * declaring the corpus its absence ranges over, so those sources are exactly what the search must
+     * have covered.
+     */
     private void enforceRecordedSearch(
         ValidatedFinding finding,
         Set<SourceKind> exhaustive,
@@ -788,15 +783,23 @@ public class PracticeDetectionDeliveryService {
     ) {}
 
     /**
+     * The artifact kinds {@link #resolveTarget} knows how to address.
+     *
+     * <p>Held against the handlers that can actually run a review by {@link JobTypeReviewExecutionCatalog}
+     * at startup, so a kind gains a runner and a delivery route in the same commit. Without that check the
+     * first thing a fifth kind would learn is that it cannot be delivered — after its review was paid for.
+     */
+    static final Set<ArtifactKind> ROUTABLE_KINDS = Set.of(
+        ArtifactKinds.PULL_REQUEST,
+        ArtifactKinds.ISSUE,
+        ArtifactKinds.CONVERSATION_THREAD,
+        ArtifactKinds.DOCUMENT
+    );
+
+    /**
      * Route the delivery target on the job's artifact.
      *
-     * <p>The discriminator is taken from the job row's own {@code artifact_kind} column first and only
-     * then from its metadata. The column is set by {@code AgentJobService} for every job from the job
-     * type, so it is present and authoritative even for the pull-request jobs that omit the metadata key
-     * by convention; the metadata copy is kept as the fallback because it is what jobs queued by older
-     * builds carry.
-     *
-     * <p>A kind neither source recognises is refused rather than defaulted. Falling through to
+     * <p>A kind no branch below recognises is refused rather than defaulted. Falling through to
      * pull-request handling turns "this build cannot deliver that kind" into "Missing pull_request_id in
      * job metadata", which sends whoever reads it looking for the wrong bug. The pull-request default
      * applies only where it is a fact: a job that names no kind at all.
@@ -812,15 +815,6 @@ public class PracticeDetectionDeliveryService {
             // Predates the column and the metadata key alike, which means the event-driven PR path —
             // the only producer that existed then.
             artifactKind = ArtifactKinds.PULL_REQUEST.value();
-        } else if (
-            !ArtifactKinds.PULL_REQUEST.value().equals(artifactKind) &&
-            !ArtifactKinds.ISSUE.value().equals(artifactKind) &&
-            !ArtifactKinds.CONVERSATION_THREAD.value().equals(artifactKind) &&
-            !ArtifactKinds.DOCUMENT.value().equals(artifactKind)
-        ) {
-            throw new JobDeliveryException(
-                "No delivery route for artifact kind: kind=" + artifactKind + ", jobId=" + job.getId()
-            );
         }
         if (ArtifactKinds.CONVERSATION_THREAD.value().equals(artifactKind)) {
             // Repo-less: the subject user is carried EXPLICITLY in metadata (about_user_id), not resolved
@@ -898,6 +892,11 @@ public class PracticeDetectionDeliveryService {
             }
             requireMatchingArtifact(issue, metadata, "issue_number", job);
             return new Target(ArtifactKinds.ISSUE, issueId, issue.getAuthor().getId());
+        }
+        if (!ArtifactKinds.PULL_REQUEST.value().equals(artifactKind)) {
+            throw new JobDeliveryException(
+                "No delivery route for artifact kind: kind=" + artifactKind + ", jobId=" + job.getId()
+            );
         }
         JsonNode pullRequestIdNode = metadata.get("pull_request_id");
         if (pullRequestIdNode == null || pullRequestIdNode.isNull() || !pullRequestIdNode.isNumber()) {

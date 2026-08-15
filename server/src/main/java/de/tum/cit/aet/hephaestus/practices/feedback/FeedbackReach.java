@@ -3,11 +3,10 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 /**
  * Where a workspace's practice feedback may go — the reach axis of the delivery gate.
  *
- * <p><b>One decision per workspace, not per practice.</b> Reach used to be folded into the per-practice
- * loudness ladder, which meant every practice carried its own answer to a question almost no workspace
- * answers differently per practice. At a hundred practices that is a hundred decisions nobody makes, so the
- * shipped default was the only setting anyone ever ran. Reach is a statement about how this workspace uses
- * the system — may it speak on the work, or only in the mentor conversation — and one statement is enough.
+ * <p><b>One decision per workspace, not per practice.</b> Almost no workspace answers this differently from
+ * one practice to the next, so carrying it per practice would be a hundred decisions nobody makes and a
+ * shipped default nobody ever changes. Reach is a statement about how this workspace uses the system — may
+ * it speak on the work, or only in the mentor conversation — and one statement is enough.
  *
  * <p>Reach is ANDed with {@link de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier}, which answers
  * the orthogonal question of how much autonomy the system has. A practice at {@code PROPOSE} says nothing

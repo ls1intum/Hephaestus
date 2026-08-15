@@ -43,10 +43,6 @@ export const FullRange: Story = {
 	},
 };
 
-export const AcrossMonths: Story = {
-	args: { value: { from: new Date(2026, 5, 28), to: new Date(2026, 6, 3) } },
-};
-
 export const OpenedCalendar: Story = {
 	play: async ({ canvas }) => {
 		const trigger = await canvas.findByRole("button", { name: "Observed" });

@@ -25,6 +25,13 @@ import {
 
 type ProviderType = "GITHUB" | "GITLAB" | "SLACK" | "OUTLINE";
 
+const PROVIDER_TYPE_ITEMS: { value: ProviderType; label: string }[] = [
+	{ value: "GITHUB", label: "GitHub" },
+	{ value: "GITLAB", label: "GitLab / self-hosted GitLab" },
+	{ value: "SLACK", label: "Slack / Sign in with Slack" },
+	{ value: "OUTLINE", label: "Outline (link-only)" },
+];
+
 function scopesPlaceholder(type: ProviderType): string {
 	if (type === "SLACK") return "openid profile email";
 	if (type === "OUTLINE") return "read";
@@ -161,6 +168,7 @@ export function LoginProviderFormDialog({
 							Provider type
 						</FieldLabel>
 						<Select
+							items={PROVIDER_TYPE_ITEMS}
 							value={type}
 							onValueChange={(v) => setType(v as ProviderType)}
 							disabled={isEdit}
@@ -169,10 +177,11 @@ export function LoginProviderFormDialog({
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent aria-labelledby="lp-type-label">
-								<SelectItem value="GITHUB">GitHub</SelectItem>
-								<SelectItem value="GITLAB">GitLab / self-hosted GitLab</SelectItem>
-								<SelectItem value="SLACK">Slack / Sign in with Slack</SelectItem>
-								<SelectItem value="OUTLINE">Outline (link-only)</SelectItem>
+								{PROVIDER_TYPE_ITEMS.map((item) => (
+									<SelectItem key={item.value} value={item.value}>
+										{item.label}
+									</SelectItem>
+								))}
 							</SelectContent>
 						</Select>
 						{isSlack && (

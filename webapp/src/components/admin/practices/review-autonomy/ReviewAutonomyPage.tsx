@@ -67,11 +67,10 @@ import {
 /**
  * The width of the decision column, shared by an area's ladder and its practices'.
  *
- * <p>They are the same control at two levels of the same chain, so they belong in one column. They used
- * not to be: an area's ladder was laid out after a content-width accordion header, which put it at a
- * different x for every area — 285px under "Documentation", 416px under "Pull request hygiene" — while
- * the practice rows underneath pinned theirs to the right edge at 950px. Twenty-five areas, twenty-five
- * left edges, and no column anywhere on the page.
+ * <p>They are the same control at two levels of one chain, so they belong in one column, and a stated
+ * width is the only thing that puts them there. An area's ladder laid out after a content-width
+ * accordion header instead starts at a different x under every area name on the page — which is a
+ * column only by accident, and never on a page with more than one area.
  */
 const DECISION_COLUMN = "sm:w-80";
 
@@ -524,9 +523,6 @@ function AreaGroup({
 		selectableSlugs.length > 0 && selectableSlugs.every((slug) => selected.has(slug));
 
 	return (
-		// `scroll-mt-24` clears the sticky summary. Tabbing to an area's trigger scrolls it into view, and
-		// `scroll-margin` is what that scroll respects; without it the heading a keyboard user just moved
-		// to landed under the strip — measured at 320px, the strip covers y 0–93.
 		// One box per area, as on Practice setup — twenty-five sections inside a single border read as one
 		// very long thing rather than as twenty-five. `scroll-mt-24` clears the sticky strip: tabbing to an
 		// area's trigger scrolls it into view, and `scroll-margin` is what that scroll respects; without it
@@ -731,8 +727,8 @@ export interface DecisionNoteProps {
 	follows: string | null;
 	/**
 	 * The reset's accessible name. It opens with the visible words, so a voice-control user can say
-	 * what they read (WCAG 2.2 SC 2.5.3), and names the thing it resets, because there are up to
-	 * twenty-six "Use the default" buttons on this screen.
+	 * what they read (WCAG 2.2 SC 2.5.3), and names the thing it resets, because this screen renders
+	 * one of these per area and one per practice — "Use the default" alone identifies none of them.
 	 */
 	resetLabel: string;
 	disabled: boolean;

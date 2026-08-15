@@ -129,9 +129,10 @@ The constraints with direct authoring consequences are:
 
 `ENGINEERING_BASELINE` with `ENGINEERING_APPROVED` records maintainer approval of the shipped, minimized product
 scope. It is not controller or DPO approval and cannot cover an expanded source, purpose, audience, processor,
-retention policy, or collection scope. `CONTROLLER_DECISION` records the releasable subset of a traceable decision;
-only an unexpired `APPROVED` decision passes when that basis is used. The controller's complete record remains
-separate. The reviewed decision is the gate that runtime configuration cannot waive: a source whose decision is missing,
+retention policy, or collection scope. It is also the only basis the contract can express, and the only outcome:
+a use nobody approved carries no decision rather than a recorded refusal, so no entry here can read as a
+controller sign-off. The controller's own record remains separate. Approval is the gate that runtime
+configuration cannot waive: a source whose decision is missing,
 refused, or expired is never read, whatever the deployment sets. Within that boundary, connecting a workspace
 integration and enabling a practice is what authorizes the everyday code sources the product exists to read, so a
 default deployment reviews pull requests, issues and conversations without further configuration. Privacy
@@ -157,7 +158,7 @@ into one state.
 - `COLLECTION_ERROR`: an attempted collection failed.
 
 A non-available source contains no artifacts or source identifiers, and carries a typed
-`SourceAbsenceReason` saying *why* — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `PINNED_HEAD_MISSING`,
+`SourceAbsenceReason` saying *why* — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `NO_WORKING_COPY`,
 `CONSENT_NOT_ACTIVE`, and the rest. Safe, typed reason codes may be role-filtered; free-form exception text
 must not enter the manifest.
 
@@ -366,7 +367,7 @@ The internal readiness report records whether each practice is ready or skipped,
 that stays server-side: it is persisted to `agent_job.review_readiness` and never staged. The **manifest is
 not internal** — the same bytes persisted to `agent_job.evidence_snapshot` are staged into the sandbox at
 `inputs/manifest.json`, carrying every absence reason code including `GOVERNANCE_NOT_EFFECTIVE`,
-`CONSENT_NOT_ACTIVE`, and `PRIVACY_POLICY`. There is no redacted model-facing variant. Treat a reason code
+`CONSENT_NOT_ACTIVE`, and `CONTENT_EVICTED`. There is no redacted model-facing variant. Treat a reason code
 you add to a capture state as model-visible, and put anything that must not be as a readiness decision
 instead.
 

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect } from "react";
 import {
 	listAreasOptions,
 	listPracticeReviewObservationsOptions,
@@ -17,6 +16,7 @@ import { ASSESSMENT_DEFS } from "@/components/practice-vocabulary/assessment-def
 import { PRESENCE_DEFS } from "@/components/practice-vocabulary/presence-defs";
 import { SEVERITY_DEFS } from "@/components/practice-vocabulary/severity-defs";
 import { statusFacetOptions } from "@/components/practice-vocabulary/status-def";
+import { useClampedPage } from "@/hooks/use-clamped-page";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
 import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
@@ -61,7 +61,11 @@ export function ObservationsListPage({
 	}));
 	const observations = observationsQueryResult.data?.content ?? [];
 	const totalPages = observationsQueryResult.data?.page?.totalPages;
-	const subject = observations[0]?.subject;
+	// Guarded on the filter being set, because that is the only condition under which the first row
+	// names the filtered person — unfiltered, row zero is whoever happens to sort first, and the facet
+	// would put a stranger's name on somebody else's id. `ReviewPersonFacet` reads `fallbackName` only
+	// inside `selected != null`; deriving it under the same condition is what keeps the two together.
+	const filteredSubject = search.subjectUserId != null ? observations[0]?.subject : undefined;
 	const hasFilter = Boolean(
 		search.areaSlug?.length ||
 			search.practiceSlug?.length ||
@@ -91,11 +95,7 @@ export function ObservationsListPage({
 		});
 	const patchFilter = (patch: Partial<ObservationsSearch>) => onSearchChange({ ...patch, page: 0 });
 
-	useEffect(() => {
-		if (totalPages !== undefined && search.page && search.page >= totalPages) {
-			onSearchChange({ page: Math.max(0, totalPages - 1) });
-		}
-	}, [onSearchChange, search.page, totalPages]);
+	useClampedPage(search.page, totalPages, (page) => onSearchChange({ page }));
 
 	return (
 		<section aria-label="Practice review observations" className="space-y-4">
@@ -160,7 +160,7 @@ export function ObservationsListPage({
 						title="Developer"
 						selected={search.subjectUserId}
 						onChange={(subjectUserId) => patchFilter({ subjectUserId })}
-						fallbackName={subject?.name ?? subject?.login}
+						fallbackName={filteredSubject?.name ?? filteredSubject?.login}
 					/>
 					{/* "Observed" rather than "Date": this range filters `observedAt`, and the same control
 					    on Delivery filters when the feedback was composed. A filter label has to be

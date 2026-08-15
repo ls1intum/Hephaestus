@@ -116,13 +116,18 @@ export const SupportsAnotherObservation: Story = {
 	},
 };
 
-/** A real shortfall whose feedback was withheld, with the reason on the row that was stopped. */
+/**
+ * A real shortfall whose feedback was withheld, with the reason on the row that was stopped — and
+ * judged against a version of the practice that has since been edited, which the page has to say so
+ * a reader does not measure today's rules against yesterday's answer.
+ */
 export const FeedbackWasWithheld: Story = {
 	args: { observationId: "bbbbbbbb-2222-2222-2222-222222222222" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("link", { name: "Feedback about this observation" });
 		canvas.getByText("Found while reviewing past work, which is measured but never sent.");
+		canvas.getByText("This was judged against an older version of the practice");
 	},
 };
 
@@ -132,15 +137,6 @@ export const NoFeedbackComposed: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Nothing was said to anybody about this");
-	},
-};
-
-/** Judged against a version of the practice that has since been edited. */
-export const JudgedAgainstOlderRules: Story = {
-	args: { observationId: "bbbbbbbb-2222-2222-2222-222222222222" },
-	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvas }) => {
-		await canvas.findByText("This was judged against an older version of the practice");
 	},
 };
 

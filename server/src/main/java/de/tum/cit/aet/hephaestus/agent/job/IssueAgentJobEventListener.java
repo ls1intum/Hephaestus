@@ -70,14 +70,14 @@ public class IssueAgentJobEventListener {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueCreated(ScmDomainEvent.IssueCreated event) {
-        handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_CREATED);
+        handleIssueEvent(event.issue(), null, event.context(), TriggerEventNames.ISSUE_CREATED);
     }
 
     @Async
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     public void onIssueLabeled(ScmDomainEvent.IssueLabeled event) {
-        handleIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_LABELED);
+        handleIssueEvent(event.issue(), event.label().name(), event.context(), TriggerEventNames.ISSUE_LABELED);
     }
 
     @Async
@@ -87,11 +87,16 @@ public class IssueAgentJobEventListener {
         handleRetrospectiveIssueEvent(event.issue(), event.context(), TriggerEventNames.ISSUE_CLOSED);
     }
 
-    private void handleIssueEvent(ScmEventPayload.IssueData issueData, EventContext context, String triggerEventName) {
+    private void handleIssueEvent(
+        ScmEventPayload.IssueData issueData,
+        @Nullable String labelName,
+        EventContext context,
+        String triggerEventName
+    ) {
         if (issueData.state() == Issue.State.CLOSED) {
             return;
         }
-        dispatchIssueEvent(issueData, context, triggerEventName);
+        dispatchIssueEvent(issueData, labelName, context, triggerEventName);
     }
 
     /**
@@ -103,7 +108,7 @@ public class IssueAgentJobEventListener {
         EventContext context,
         String triggerEventName
     ) {
-        dispatchIssueEvent(issueData, context, triggerEventName);
+        dispatchIssueEvent(issueData, null, context, triggerEventName);
     }
 
     /**
@@ -112,11 +117,12 @@ public class IssueAgentJobEventListener {
      */
     private void dispatchIssueEvent(
         ScmEventPayload.IssueData issueData,
+        @Nullable String labelName,
         EventContext context,
         String triggerEventName
     ) {
         try {
-            SignalKey key = signalKeyFor(issueData, triggerEventName);
+            SignalKey key = signalKeyFor(issueData, labelName, triggerEventName);
             if (key == null) {
                 return;
             }
@@ -167,9 +173,14 @@ public class IssueAgentJobEventListener {
     /**
      * The ledger identity of this event. An issue carries no commit, so its signals key on what the
      * author wrote — which is also what the issue-focused practices are about, so an edit is a fresh
-     * occurrence and gets re-measured.
+     * occurrence and gets re-measured. A labelling keys on the label as well, because three labels
+     * applied in one update are three occurrences and share every other part of the payload.
      */
-    private @Nullable SignalKey signalKeyFor(ScmEventPayload.IssueData issueData, String triggerEventName) {
+    private @Nullable SignalKey signalKeyFor(
+        ScmEventPayload.IssueData issueData,
+        @Nullable String labelName,
+        String triggerEventName
+    ) {
         Workspace workspace = workspaceResolver
             .resolveForRepository(issueData.repository().nameWithOwner())
             .orElse(null);
@@ -191,7 +202,7 @@ public class IssueAgentJobEventListener {
             signal,
             issueData.title(),
             issueData.body(),
-            issueData.updatedAt()
+            labelName
         ).orElse(null);
     }
 

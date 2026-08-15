@@ -149,24 +149,6 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     }
 
     @Test
-    void shouldStageEverySourceTheContractAppliesToTheReviewedKind() {
-        ArtifactSourceCatalogRegistry realCatalogs = new ClasspathArtifactSourceCatalogRegistry(
-            mapper,
-            Clock.systemUTC()
-        );
-
-        assertThat(builder.stagedSources(plan())).isEqualTo(
-            realCatalogs.requireSourcesFor(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST.value())
-        );
-        assertThat(builder.stagedSources(conversationPlan())).isEqualTo(
-            realCatalogs.requireSourcesFor(
-                new SourceContractVersion("1.0.0"),
-                ArtifactKinds.CONVERSATION_THREAD.value()
-            )
-        );
-    }
-
-    @Test
     void shouldAuthorizeCaptureForTheDetectionAudience() {
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
         ContextManifestBuilder target = new ContextManifestBuilder(cas, layout, mapper, catalogs, Clock.systemUTC());
@@ -191,7 +173,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                 Map.of(),
                 Map.of(),
                 Map.of(),
-                Map.of(COMMENTS, new SourceCaptureState.Redacted(SourceAbsenceReason.PRIVACY_POLICY)),
+                Map.of(COMMENTS, new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE)),
                 Set.of(COMMENTS)
             )
         );

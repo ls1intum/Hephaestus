@@ -1143,5 +1143,24 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             assertThat(eventCaptor.getValue().artifactKind()).isEqualTo(ArtifactKinds.ISSUE);
             assertThat(eventCaptor.getValue().artifactId()).isEqualTo(999L);
         }
+
+        /**
+         * A kind with no branch is named as such rather than falling through to the pull-request one,
+         * which would report it as a missing {@code pull_request_id} and send the reader after the wrong
+         * bug. {@code JobTypeReviewExecutionCatalog} keeps this unreachable in a shipped build; the throw
+         * is what makes an unshipped kind say so.
+         */
+        @Test
+        void refusesAKindWithNoDeliveryRoute() {
+            ObjectNode meta = new ObjectMapper().createObjectNode();
+            meta.put("artifact_kind", "wiki.page");
+            testJob.setMetadata(meta);
+
+            var findings = List.of(validFinding("pr-description-quality", Presence.ABSENT));
+
+            assertThatThrownBy(() -> service.deliver(testJob, findings))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("No delivery route for artifact kind: kind=wiki.page");
+        }
     }
 }

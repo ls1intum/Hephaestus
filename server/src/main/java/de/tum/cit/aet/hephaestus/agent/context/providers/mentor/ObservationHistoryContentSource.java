@@ -23,6 +23,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
@@ -90,9 +91,14 @@ public class ObservationHistoryContentSource implements ContentSource {
             PageRequest.of(0, MAX_RECENT_REVIEWS)
         );
 
+        Set<UUID> authorizedIds = visibilityPolicy.permitsAll(
+            workspaceId,
+            recent,
+            SourceUsePurpose.CONVERSATIONAL_MENTORING
+        );
         List<Observation> authorized = recent
             .stream()
-            .filter(o -> visibilityPolicy.permits(workspaceId, o, SourceUsePurpose.CONVERSATIONAL_MENTORING))
+            .filter(o -> authorizedIds.contains(o.getId()))
             .toList();
         Set<Long> activeThreadIds = conversationConsentGate.activeThreadIds(
             workspaceId,

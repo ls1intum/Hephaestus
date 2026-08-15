@@ -1,10 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import type { EvidenceCitation } from "@/api/types.gen";
-import {
-	evidenceSourceDef,
-	knownEvidenceSourceKinds,
-} from "@/components/practice-vocabulary/evidence-source-defs";
+import { knownEvidenceSourceKinds } from "@/components/practice-vocabulary/evidence-source-defs";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationEvidence } from "./ObservationEvidence";
 
@@ -142,29 +139,54 @@ export const Default: Story = {
 /**
  * Every source a review can quote from, one passage each.
  *
- * Built by walking the registry rather than by listing kinds here, so a kind added to the catalog
- * without words fails this story instead of shipping as a blank heading.
+ * The citations are built by walking the registry, so a kind added to the catalog is rendered here
+ * the day it lands. The expected headings are written out instead, because the registry falls back
+ * to the raw contract id for a kind it has no words for — asking it what the heading should say
+ * makes a missing label agree with itself, and `scm.pull-request.diff` passes as a heading.
  */
 export const EverySource: Story = {
 	args: {
 		evidence: { citations: knownEvidenceSourceKinds().map((kind) => citation(kind)) },
 	},
 	play: async ({ canvas }) => {
-		for (const kind of knownEvidenceSourceKinds()) {
-			canvas.getByRole("heading", { name: evidenceSourceDef(kind).label, level: 4 });
-		}
-		// Thirteen of the fifteen have no trustworthy line numbers, so none is printed for them.
+		// Compared whole rather than one `getByRole` per label, so a kind that arrives without words
+		// fails as an id this table does not list rather than going unasserted.
+		expect(
+			canvas
+				.getAllByRole("heading", { level: 4 })
+				.map((heading) => heading.textContent)
+				.sort(),
+		).toEqual(
+			[
+				"The pull request itself",
+				"The code changes",
+				"Comments on the pull request",
+				"Files in the repository",
+				"The issue itself",
+				"Comments on the issue",
+				"The document itself",
+				"The conversation",
+				"Linked issues and requests",
+				"Review threads on the code",
+				"Review comments",
+				"What this project contains",
+				"Referenced documents",
+				"Earlier observations",
+				"Feedback already sent",
+			].sort(),
+		);
+		// Only a `code` locator has trustworthy line numbers, so no other source prints one.
 		await expect(canvas.queryByText(/Message from Ada Lovelace:\d/)).not.toBeInTheDocument();
 	},
 };
 
 /**
- * Only the two code sources carry a `path:line` coordinate.
+ * Only a source with a `code` locator carries a `path:line` coordinate.
  *
- * For the other thirteen the range is an offset into the serialised context file the quote was
- * pulled from — line 12 of a JSON blob, not the twelfth message of a Slack thread — and the server
- * never checks that it points at the quote. Both citations here claim lines 12–13; only one of them
- * is a location a reader could open.
+ * Everywhere else the range is an offset into the serialised context file the quote was pulled from —
+ * line 12 of a JSON blob, not the twelfth message of a Slack thread — and the server never checks
+ * that it points at the quote. Both citations here claim lines 12–13; only one of them is a location
+ * a reader could open.
  */
 export const LineNumbersOnlyWhereTheyAreReal: Story = {
 	args: {

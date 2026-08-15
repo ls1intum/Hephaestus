@@ -9,7 +9,7 @@ import {
 	setReviewTierMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { PracticeArea } from "@/api/types.gen";
-import { usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf } from "@/lib/problem-detail";
 import type { ReviewTier } from "@/lib/review-tiers";
 
@@ -34,6 +34,7 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 	// that created them and would keep reading `null` for the whole run.
 	const bulkRunning = useRef(false);
 	const areaMutationKey = ["review-autonomy", workspaceSlug, "areas"] as const;
+	const practiceMutationKey = ["review-autonomy", workspaceSlug, "practices"] as const;
 
 	const invalidateResolved = () => {
 		void queryClient.invalidateQueries({
@@ -45,8 +46,7 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 	};
 
 	const setAreaTier = useMutation({
-		...setAreaReviewTierMutation(),
-		mutationKey: areaMutationKey,
+		...filedUnder(areaMutationKey, setAreaReviewTierMutation()),
 		onSuccess: (updated) => {
 			queryClient.setQueryData<PracticeArea[]>(
 				listAreasQueryKey({ path: { workspaceSlug } }),
@@ -69,7 +69,7 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 	});
 
 	const setPracticeTier = useMutation({
-		...setReviewTierMutation(),
+		...filedUnder(practiceMutationKey, setReviewTierMutation()),
 		onError: (error) =>
 			toast.error("Couldn't change the practice", { description: problemDetailOf(error) }),
 		// One write, one refetch — except inside a bulk run, which settles once at the end. Otherwise
@@ -134,10 +134,9 @@ export function useReviewAutonomyMutations(workspaceSlug: string) {
 		areaMutationKey,
 		(variables) => variables.path.areaSlug,
 	);
-	const pendingPracticeSlugs = new Set<string>(
-		setPracticeTier.isPending && setPracticeTier.variables
-			? [setPracticeTier.variables.path.practiceSlug]
-			: [],
+	const pendingPracticeSlugs = usePendingMutationIds<{ path: { practiceSlug?: string } }, string>(
+		practiceMutationKey,
+		(variables) => variables.path.practiceSlug,
 	);
 
 	return {

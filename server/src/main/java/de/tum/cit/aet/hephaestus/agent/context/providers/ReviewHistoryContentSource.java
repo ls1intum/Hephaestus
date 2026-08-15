@@ -28,6 +28,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -75,14 +76,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
 
     private static final Logger log = LoggerFactory.getLogger(ReviewHistoryContentSource.class);
 
-    /**
-     * What earlier reviews recorded about the person whose work is under review.
-     *
-     * <p>Declared as a static {@link SourceKind} field rather than only inside {@link #sourceKinds()}
-     * because that is how the catalog-coverage and completeness-reporting architecture rules discover
-     * which collector covers which catalog entry — a collector that names its kinds only through a method
-     * is invisible to both, and the catalog entry would read as uncollected.
-     */
+    /** What earlier reviews recorded about the person whose work is under review. */
     static final SourceKind OBSERVATION_HISTORY = new SourceKind("hephaestus.observation-history");
 
     /** What earlier reviews already said to that person, and through which channel. */
@@ -91,7 +85,16 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     static final String OBSERVATIONS_FILE = SandboxLayout.HISTORY_PREFIX + "observations.json";
     static final String FEEDBACK_FILE = SandboxLayout.HISTORY_PREFIX + "feedback.json";
 
+    /**
+     * How much of one named person's record may enter a prompt.
+     *
+     * <p>Exposure bounds, not cost bounds — a few dozen short rows are nothing beside a repository-tree
+     * capture. What these numbers decide is how far back a contributor's record follows them and how
+     * much of it is available to anchor a model that is supposed to be reading the work in front of it,
+     * which is the residual risk named at the top of this class. Widening either widens that risk.
+     */
     private static final int LOOKBACK_DAYS = 90;
+
     private static final int MAX_OBSERVATIONS = 50;
     private static final int MAX_FEEDBACK = 30;
 
@@ -179,15 +182,20 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         int feedbackCount = -1;
 
         if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<Observation> observations = observationRepository
-                .findRecentByDeveloperAndWorkspace(
-                    subjectUserId,
-                    workspaceId,
-                    since,
-                    PageRequest.of(0, MAX_OBSERVATIONS)
-                )
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                subjectUserId,
+                workspaceId,
+                since,
+                PageRequest.of(0, MAX_OBSERVATIONS)
+            );
+            Set<UUID> visible = visibilityPolicy.permitsAll(
+                workspaceId,
+                recent,
+                SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW
+            );
+            List<Observation> observations = recent
                 .stream()
-                .filter(o -> visibilityPolicy.permits(workspaceId, o, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW))
+                .filter(o -> visible.contains(o.getId()))
                 .toList();
             observationCount = observations.size();
             files.put(OBSERVATIONS_FILE, serialize(observationsPayload(observations, since), OBSERVATIONS_FILE));

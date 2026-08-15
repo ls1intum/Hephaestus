@@ -30,10 +30,13 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.core.Ordered;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.json.JsonMapper;
@@ -200,67 +203,22 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 .hasMessageContaining("must declare source kinds");
         }
 
-        @Test
-        void requiredEvidenceFailureIsPersistedForConservativeRefusal(@TempDir Path root) {
-            SourceKind comments = new SourceKind("scm.pull-request.comments");
-            EvidenceSource bad = new EvidenceSource() {
-                @Override
-                public boolean supports(ContextRequest request) {
-                    return true;
-                }
-
-                @Override
-                public boolean required() {
-                    return true;
-                }
-
-                @Override
-                public Set<SourceKind> sourceKinds() {
-                    return Set.of(comments);
-                }
-
-                @Override
-                public SourceKind sourceKindFor(String path) {
-                    return comments;
-                }
-
-                @Override
-                public void contribute(ContextRequest request, Map<String, byte[]> files) {
-                    throw new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure"));
-                }
-            };
-            JsonMapper mapper = JsonMapper.builder().build();
-            FabricLayout layout = new FabricLayout(root.toString());
-            ContextManifestBuilder manifestBuilder = new ContextManifestBuilder(
-                new ContentAddressedStore(layout),
-                layout,
-                mapper,
-                new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
-                Clock.systemUTC()
+        static Stream<RuntimeException> collectionFailures() {
+            return Stream.of(
+                new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure")),
+                // The shape a repository actually throws, and the reason the catch cannot be narrowed to
+                // the declared one: letting it escape would abort every source that had already succeeded.
+                new org.springframework.dao.QueryTimeoutException("statement timed out")
             );
-            var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
-            EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
-            ContextRequest.PracticeReviewRequest request = reviewRequest();
-
-            PreparedEvidence prepared = builder.prepare(request, plan);
-
-            var capture = prepared
-                .manifest()
-                .sources()
-                .stream()
-                .filter(source -> source.kind().equals(comments))
-                .findFirst()
-                .orElseThrow();
-            assertThat(capture.state()).isEqualTo(
-                new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE)
-            );
-            assertThat(
-                layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json")
-            ).exists();
         }
 
-        @Test
-        void untypedProviderFailureIsIsolatedToItsOwnSource(@TempDir Path root) {
+        /**
+         * A required source that fails costs its own source and nothing else, and the refusal is persisted:
+         * the manifest is what a later reader has to tell a conservative refusal from a clean review.
+         */
+        @ParameterizedTest
+        @MethodSource("collectionFailures")
+        void aFailedRequiredSourceIsRecordedAndIsolated(RuntimeException failure, @TempDir Path root) {
             SourceKind comments = new SourceKind("scm.pull-request.comments");
             EvidenceSource bad = new EvidenceSource() {
                 @Override
@@ -285,9 +243,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
 
                 @Override
                 public void contribute(ContextRequest request, Map<String, byte[]> files) {
-                    // The shape a repository actually throws. Letting it escape would abort every source
-                    // that had already succeeded, which is the opposite of per-source collection.
-                    throw new org.springframework.dao.QueryTimeoutException("statement timed out");
+                    throw failure;
                 }
             };
             JsonMapper mapper = JsonMapper.builder().build();

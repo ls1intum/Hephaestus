@@ -176,6 +176,22 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
         void refusesSomethingThatIsNotAnArtifactKindAtAll() {
             post("NotAKind", pullRequestId).expectStatus().isBadRequest();
         }
+
+        /**
+         * A body with no id at all. {@code @Positive} is satisfied by a missing value, so the request
+         * would otherwise pass validation and be unboxed into the loader — an NPE the endpoint reports
+         * as a 500 it never declares, in place of the 400 it does.
+         */
+        @Test
+        @WithUser
+        void namesTheMissingFieldWhenTheArtifactIdIsAbsent() {
+            postBody(Map.of("artifactKind", ArtifactKinds.PULL_REQUEST.value()))
+                .expectStatus()
+                .isBadRequest()
+                .expectBody()
+                .jsonPath("$.errors.artifactId")
+                .exists();
+        }
     }
 
     @Nested
@@ -306,11 +322,15 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
     }
 
     private WebTestClient.ResponseSpec post(String kind, long artifactId) {
+        return postBody(body(kind, artifactId));
+    }
+
+    private WebTestClient.ResponseSpec postBody(Map<String, Object> body) {
         return webTestClient
             .post()
             .uri(REQUESTS, workspace.getWorkspaceSlug())
             .headers(TestAuthUtils.withCurrentUser())
-            .bodyValue(body(kind, artifactId))
+            .bodyValue(body)
             .exchange();
     }
 

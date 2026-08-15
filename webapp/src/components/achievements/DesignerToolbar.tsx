@@ -12,16 +12,16 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
-const EDGE_DISPLAY_MODES: readonly EdgeDisplayMode[] = [
-	"achievement",
-	"synthwave",
-	"equalizer-traveling",
-	"equalizer-static",
-	"equalizer-chain",
-] as const;
+const EDGE_STYLE_ITEMS: { value: EdgeDisplayMode; label: string }[] = [
+	{ value: "achievement", label: "Standard Achievement" },
+	{ value: "synthwave", label: "Synthwave (Mono)" },
+	{ value: "equalizer-traveling", label: "Equalizer (Traveling)" },
+	{ value: "equalizer-static", label: "Equalizer (Static)" },
+	{ value: "equalizer-chain", label: "Equalizer (Chain)" },
+];
 
 function isEdgeDisplayMode(value: string): value is EdgeDisplayMode {
-	return (EDGE_DISPLAY_MODES as readonly string[]).includes(value);
+	return EDGE_STYLE_ITEMS.some((item) => item.value === value);
 }
 
 const SNAP_GRID_OPTIONS = [24, 48, 96] as const;
@@ -129,6 +129,7 @@ export function DesignerToolbar({
 					Edge style
 				</Label>
 				<Select
+					items={EDGE_STYLE_ITEMS}
 					value={edgeDisplayMode}
 					onValueChange={(val) => {
 						if (val && isEdgeDisplayMode(val)) onEdgeDisplayModeChange(val);
@@ -138,11 +139,11 @@ export function DesignerToolbar({
 						<SelectValue placeholder="Select Edge Style" />
 					</SelectTrigger>
 					<SelectContent>
-						<SelectItem value="achievement">Standard Achievement</SelectItem>
-						<SelectItem value="synthwave">Synthwave (Mono)</SelectItem>
-						<SelectItem value="equalizer-traveling">Equalizer (Traveling)</SelectItem>
-						<SelectItem value="equalizer-static">Equalizer (Static)</SelectItem>
-						<SelectItem value="equalizer-chain">Equalizer (Chain)</SelectItem>
+						{EDGE_STYLE_ITEMS.map((item) => (
+							<SelectItem key={item.value} value={item.value}>
+								{item.label}
+							</SelectItem>
+						))}
 					</SelectContent>
 				</Select>
 			</div>

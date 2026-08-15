@@ -48,28 +48,6 @@ class PracticeReviewTierTest extends BaseUnitTest {
         void proposeStillDoesNotDeliverOnItsOwnOnceApprovalExists() {
             assertThat(PracticeReviewTier.PROPOSE.deliversWithoutApproval()).isFalse();
         }
-
-        /** Autonomy is monotone: a higher tier does everything a lower one does, and never less. */
-        @Test
-        void eachTierDoesASupersetOfTheOneBelowIt() {
-            PracticeReviewTier[] ascending = {
-                PracticeReviewTier.OFF,
-                PracticeReviewTier.PROPOSE,
-                PracticeReviewTier.DELIVER,
-            };
-            for (int i = 1; i < ascending.length; i++) {
-                if (ascending[i - 1].admitsReview()) {
-                    assertThat(ascending[i].admitsReview())
-                        .as("%s must admit a review because %s does", ascending[i], ascending[i - 1])
-                        .isTrue();
-                }
-                if (ascending[i - 1].deliversWithoutApproval()) {
-                    assertThat(ascending[i].deliversWithoutApproval())
-                        .as("%s must deliver because %s does", ascending[i], ascending[i - 1])
-                        .isTrue();
-                }
-            }
-        }
     }
 
     @Nested

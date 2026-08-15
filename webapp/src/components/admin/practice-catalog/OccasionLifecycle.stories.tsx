@@ -65,14 +65,6 @@ export const PullRequest: Story = {
 	},
 };
 
-export const Issue: Story = {
-	args: { workType: mockIssueWorkType, selected: mockIssueBinding.signals },
-};
-
-export const Document: Story = {
-	args: { workType: mockDocumentWorkType, selected: mockDocumentBinding.signals },
-};
-
 /** One moment, so no bands to name and no rail to draw. The strip still reads as the same object. */
 export const Conversation: Story = {
 	args: { workType: mockConversationWorkType, selected: mockConversationBinding.signals },

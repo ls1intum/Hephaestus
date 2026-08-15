@@ -57,8 +57,7 @@ export const workspaceMembers: WorkspaceMembership[] = [
  * Five of the seven reviewed here are pull or merge requests because that is the shape of a real
  * workspace — the point is that the thread and the document sit beside them and read as the same
  * language. The eighth, {@link trackerIssue}, is reviewed by nothing and exists only so the fourth
- * kind is rendered somewhere; this comment claimed four kinds for a whole branch while shipping
- * three.
+ * kind is rendered somewhere.
  */
 export const reviewArtifact: ReviewArtifact = {
 	id: 42,

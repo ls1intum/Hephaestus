@@ -163,8 +163,9 @@ public class PracticeAreaService {
      * Sets — or clears — the tier this area imposes on the practices under it that hold no tier of their own.
      *
      * <p>The level that makes the chain worth having. An area is the grain a team reasons in, so one write
-     * here is the decision that forty per-practice writes used to be. Practices that set their own tier are
-     * untouched: they disagreed on purpose, and an area-wide setting is not a reason to overrule them.
+     * here settles what would otherwise be one write per practice under it. Practices that set their own
+     * tier are untouched: they disagreed on purpose, and an area-wide setting is not a reason to overrule
+     * them.
      *
      * @param reviewTier the tier to impose, or {@code null} to hold none and follow the workspace default
      */

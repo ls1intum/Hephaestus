@@ -59,9 +59,8 @@ public enum SignalStateReason {
      * discovery and submission.
      *
      * <p>Named for the model rather than the practice because that is what an operator has to go and
-     * fix: this is Administration &rarr; AI models, not the practice catalogue. It was once called
-     * {@code BINDING_DISABLED}, which read as a fact about a practice binding and sent every reader to
-     * the wrong screen.
+     * fix: this is Administration &rarr; AI models, not the practice catalogue. A name built around the
+     * binding reads as a fact about a practice binding and sends the reader to the wrong screen.
      */
     REVIEW_MODEL_UNBOUND(SignalState.PENDING),
 

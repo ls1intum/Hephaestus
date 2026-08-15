@@ -347,11 +347,9 @@
 										"DISABLED",
 										"NO_PROVIDER",
 										"EMPTY_NOT_VALID",
-										"PINNED_HEAD_MISSING",
 										"NO_WORKING_COPY",
 										"NOT_FOUND",
 										"CONTENT_EVICTED",
-										"PRIVACY_POLICY",
 										"CONSENT_NOT_ACTIVE",
 										"PROVIDER_FAILURE"
 									],
@@ -376,11 +374,9 @@
 										"DISABLED",
 										"NO_PROVIDER",
 										"EMPTY_NOT_VALID",
-										"PINNED_HEAD_MISSING",
 										"NO_WORKING_COPY",
 										"NOT_FOUND",
 										"CONTENT_EVICTED",
-										"PRIVACY_POLICY",
 										"CONSENT_NOT_ACTIVE",
 										"PROVIDER_FAILURE"
 									],

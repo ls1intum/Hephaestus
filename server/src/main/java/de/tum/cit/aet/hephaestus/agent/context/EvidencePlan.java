@@ -17,17 +17,12 @@ import java.util.Objects;
  * the linked work items, the rest of the project, the team's documentation, and what earlier reviews
  * found and said. Not a subset chosen for it.
  *
- * <p>It used to be a subset. The plan unioned the {@code needs} of the practices eligible for the signal
- * and the sandbox view was then cut back to that union, on the theory that a source no practice named was
- * a source nobody would read. Three things were wrong with it. It reduced nothing: every collector had
- * already run and every artifact was already in the content-addressed store before the cut happened, so
- * it withheld from the model without withholding from disk. It was far more than a trim — measured
- * against the shipped catalog, the repository tree reached 20 of 37 practices, documentation reached one,
- * and the project inventory reached none at all, which meant the orchestrator prompt told the model to
- * read a file that was never staged. And it conflated two different questions: what a practice
- * <em>needs</em> before it may be reviewed at all (readiness, which still refuses), and what the model
- * <em>can see</em> while reviewing it. An agent that can explore the whole workspace finds the thing the
- * practice author did not think to declare; one handed a pre-cut subset cannot.
+ * <p>Narrowing the staged set to what the eligible practices declare is not an option that was left on
+ * the table: it conflates what a practice <em>needs</em> before it may be reviewed at all (readiness,
+ * which still refuses) with what the model <em>can see</em> while reviewing it. An agent that can explore
+ * the whole workspace finds the thing the practice author did not think to declare; one handed a pre-cut
+ * subset cannot — and the cut buys nothing, since every collector has already run and every artifact is
+ * already in the content-addressed store by the time it would happen.
  *
  * <p>What still withholds is not relevance. A source with no unexpired use decision for this purpose is
  * refused as {@code GOVERNANCE_NOT_EFFECTIVE}, a source with no collector in this deployment is reported

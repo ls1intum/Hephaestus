@@ -33,6 +33,7 @@ describe("groupEvidenceSources", () => {
 						sourceKind,
 						displayName: sourceKind,
 						description: "",
+						selectionScope: "",
 						privacyClass: "INTERNAL",
 						requiredQuality: "ANY_CAPTURE",
 						supportsExhaustiveEvidence: false,
@@ -43,17 +44,19 @@ describe("groupEvidenceSources", () => {
 		expect(unfiled).toEqual([]);
 	});
 
-	it("splits a pull request's eleven sources into three short decisions", () => {
-		expect(
-			groupEvidenceSources(mockPullRequestWorkType.allowedSources).map((group) => [
-				group.family,
-				group.sources.length,
-			]),
-		).toEqual([
-			["work", 5],
-			["around", 4],
-			["history", 2],
-		]);
+	// Grouping is a partition, and both ways it can stop being one are silent: a source filed under no
+	// family disappears from the screen entirely, and a family emitted in source order buries "the
+	// work itself" under "this person's history". Asserted against the input's own keys rather than
+	// against a count, so adding a source to the catalogue does not have to be retyped here — a count
+	// that has to be retyped is a count that gets retyped without being read.
+	it("partitions a pull request's sources, the work itself first and history last", () => {
+		const groups = groupEvidenceSources(mockPullRequestWorkType.allowedSources);
+		const filed = groups.flatMap((group) => group.sources.map((source) => source.sourceKind));
+
+		expect(groups.map((group) => group.family)).toEqual(["work", "around", "history"]);
+		expect([...filed].sort()).toEqual(
+			mockPullRequestWorkType.allowedSources.map((source) => source.sourceKind).sort(),
+		);
 	});
 
 	it("drops a family the work type has no source for", () => {
@@ -68,6 +71,7 @@ describe("groupEvidenceSources", () => {
 				sourceKind: "wiki.page.body",
 				displayName: "Wiki page",
 				description: "A page of the wiki.",
+				selectionScope: "One page, whole.",
 				privacyClass: "INTERNAL",
 				requiredQuality: "ANY_CAPTURE",
 				supportsExhaustiveEvidence: false,

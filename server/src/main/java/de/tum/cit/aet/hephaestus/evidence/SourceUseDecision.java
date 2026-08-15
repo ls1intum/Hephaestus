@@ -33,15 +33,6 @@ public record SourceUseDecision(
         if (reviewer != null && reviewer.isBlank()) {
             throw new IllegalArgumentException("reviewer must be null or non-blank");
         }
-        if (basis == SourceUseBasis.ENGINEERING_BASELINE) {
-            if (outcome != SourceUseOutcome.ENGINEERING_APPROVED) {
-                throw new IllegalArgumentException("Engineering baseline must be engineering-approved: " + id);
-            }
-        } else {
-            if (outcome == SourceUseOutcome.ENGINEERING_APPROVED) {
-                throw new IllegalArgumentException("Controller decision must have a decided outcome: " + id);
-            }
-        }
         if (reviewer == null || decidedAt == null || expiresAt == null) {
             throw new IllegalArgumentException("Source-use decision requires review metadata: " + id);
         }
@@ -60,17 +51,8 @@ public record SourceUseDecision(
         if (purpose != requestedPurpose || instant.isBefore(recordedAt)) {
             return false;
         }
-        if (basis == SourceUseBasis.ENGINEERING_BASELINE) {
-            return (
-                outcome == SourceUseOutcome.ENGINEERING_APPROVED &&
-                !instant.isBefore(Objects.requireNonNull(decidedAt)) &&
-                instant.isBefore(Objects.requireNonNull(expiresAt))
-            );
-        }
         return (
-            outcome == SourceUseOutcome.APPROVED &&
-            !instant.isBefore(Objects.requireNonNull(decidedAt)) &&
-            instant.isBefore(Objects.requireNonNull(expiresAt))
+            !instant.isBefore(Objects.requireNonNull(decidedAt)) && instant.isBefore(Objects.requireNonNull(expiresAt))
         );
     }
 

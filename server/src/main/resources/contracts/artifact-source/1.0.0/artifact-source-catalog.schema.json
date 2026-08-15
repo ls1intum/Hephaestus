@@ -110,7 +110,6 @@
 				},
 				"privacyClass": {
 					"enum": [
-						"PUBLIC",
 						"INTERNAL",
 						"PERSONAL",
 						"SENSITIVE_PERSONAL"

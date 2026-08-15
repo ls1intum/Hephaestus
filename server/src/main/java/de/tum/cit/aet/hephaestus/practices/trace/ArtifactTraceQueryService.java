@@ -170,7 +170,7 @@ class ArtifactTraceQueryService {
      * practice somebody deliberately silenced is the single most useful row on the page.
      */
     private List<TracedPractice> tracedPractices(Long workspaceId, ArtifactKind artifactKind) {
-        Map<Long, String> dormancy = dormancyContradictedByTheLedger(workspaceId);
+        Map<Long, String> dormancy = dormancyContradictedByTheLedger(workspaceId, artifactKind);
         // The tier the trace shows is the EFFECTIVE one. A reader asking why a practice said nothing is
         // asking what is in force here, not which of the three levels happens to hold the row.
         PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultTier();
@@ -197,14 +197,18 @@ class ArtifactTraceQueryService {
      * <p>{@code PracticeSignalCoverage} answers from the connection registry, which is the right source
      * for "will this ever fire here" and the wrong one for "has this ever fired": a signal already in
      * this workspace's ledger demonstrably arrives, whatever the registry says.
+     *
+     * <p>Only this page's artifact kind is read back. Every practice this map is consulted for is one
+     * of that kind, and a practice's signals carry their kind in their own names, so a row filed under
+     * another kind could never have refuted one of these claims.
      */
-    private Map<Long, String> dormancyContradictedByTheLedger(Long workspaceId) {
+    private Map<Long, String> dormancyContradictedByTheLedger(Long workspaceId, ArtifactKind artifactKind) {
         List<DormantBinding> dormant = coverage.dormantBindings(workspaceId);
         if (dormant.isEmpty()) {
             return Map.of();
         }
         Set<SignalName> everRecorded = signals
-            .findRecordedSignalNames(workspaceId)
+            .findRecordedSignalNames(workspaceId, artifactKind.value())
             .stream()
             .map(SignalName::of)
             .collect(Collectors.toUnmodifiableSet());

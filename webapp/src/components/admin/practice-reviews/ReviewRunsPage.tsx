@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { WorkflowIcon } from "lucide-react";
-import { useEffect, useId } from "react";
+import { useId } from "react";
 import { listPracticeReviewsOptions } from "@/api/@tanstack/react-query.gen";
 import type { ReviewRunSummary } from "@/api/types.gen";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
@@ -33,14 +33,19 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
+import { useClampedPage } from "@/hooks/use-clamped-page";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { ReviewArtifactLabel } from "./ReviewArtifact";
 import { feedbackCountSlots, observationCountSlots, ReviewCountStrip } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { REVIEW_PAGE_SIZE, type RunsSearch, runsQuery } from "./review-search";
+import {
+	ACTIVE_REVIEW_POLL_MS,
+	REVIEW_PAGE_SIZE,
+	type RunsSearch,
+	runsQuery,
+} from "./review-search";
 
-const ACTIVE_REVIEW_POLL_MS = 5_000;
 const STATUSES = statusValues(REVIEW_STATUS_DEFS);
 /** The "no filter" sentinel. A `Select` has to hold some value, and `undefined` is not one. */
 const ALL_STATUSES = "ALL";
@@ -94,11 +99,7 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 	const reset = () =>
 		onSearchChange({ status: undefined, from: undefined, to: undefined, page: 0 });
 
-	useEffect(() => {
-		if (totalPages !== undefined && search.page && search.page >= totalPages) {
-			onSearchChange({ page: Math.max(0, totalPages - 1) });
-		}
-	}, [onSearchChange, search.page, totalPages]);
+	useClampedPage(search.page, totalPages, (page) => onSearchChange({ page }));
 
 	return (
 		<section aria-label="Practice reviews" className="space-y-4">

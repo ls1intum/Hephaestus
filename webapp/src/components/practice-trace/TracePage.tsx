@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, ArrowUpIcon, ExternalLinkIcon, RadarIcon } from "lucide-react";
-import { useState } from "react";
 import { toast } from "sonner";
 import {
 	getArtifactTraceOptions,
@@ -27,7 +26,6 @@ import {
 	DISCOVERED_VIA_LABELS,
 	deliveryLabel,
 	occurrenceDomId,
-	type RefusalReason,
 	SIGNAL_STATE_LABELS,
 	SIGNAL_STATE_REASON_LABELS,
 	WITHHELD_REASON_LABELS,
@@ -69,38 +67,23 @@ export function TracePage({
 	const query = useQuery({
 		...getArtifactTraceOptions({ path: { workspaceSlug, artifactKind, artifactId } }),
 	});
-	// Kept on the page rather than raised as a toast: a refusal is the answer to the question this
-	// whole page exists to answer, and a toast is gone before the reader has finished reading it.
-	// The coded reason rides along with the sentence, because it is what the fix link is keyed on —
-	// the sentence is prose the server owns and must not be matched against.
-	const [refusal, setRefusal] = useState<{
-		description: string;
-		reason?: RefusalReason;
-	} | null>(null);
 	const requestReview = useMutation({
 		...requestPracticeReviewMutation(),
-		onMutate: () => setRefusal(null),
 		onSuccess: (outcome) => {
-			if (outcome.status === "SUBMITTED") {
-				void queryClient.invalidateQueries({
-					queryKey: getArtifactTraceQueryKey({ path: { workspaceSlug, artifactKind, artifactId } }),
-				});
-				toast.success("Review started");
-				return;
-			}
-			// Printed exactly as the server phrased it. The sentence lives next to the reason it explains
-			// so that a screen, a bot comment and a support answer cannot come to say different things
-			// about the same refusal; re-wording it here is how that guarantee is lost.
-			setRefusal({
-				description: outcome.reasonDescription ?? "No review was started.",
-				reason: outcome.reason,
+			if (outcome.status !== "SUBMITTED") return;
+			void queryClient.invalidateQueries({
+				queryKey: getArtifactTraceQueryKey({ path: { workspaceSlug, artifactKind, artifactId } }),
 			});
+			toast.success("Review started");
 		},
 		onError: (error) =>
 			toast.error("Couldn't ask for a review", {
 				description: problemDetailOf(error, "Try again in a moment."),
 			}),
 	});
+	// Shown on the page rather than raised as a toast: a refusal is the answer to the question this
+	// whole page exists to answer, and a toast is gone before the reader has finished reading it.
+	const refusal = requestReview.data?.status === "REFUSED" ? requestReview.data : undefined;
 	const backLink = (
 		<Link
 			to="/w/$workspaceSlug/reviews"
@@ -201,10 +184,11 @@ export function TracePage({
 					<Alert variant="warning">
 						<AlertTitle>No review was started</AlertTitle>
 						<AlertDescription>
-							{/* The server's sentence, unchanged, and then the way out of it. Somebody who has
-							    just pressed a button and been told no is the reader with the most immediate
-							    use for the fix, and until now this alert was the one place that named none. */}
-							<span>{refusal.description}</span>
+							{/* Verbatim: the sentence is written next to the reason it explains so that a
+							    screen, a bot comment and a support answer cannot come to say different things
+							    about one refusal. The coded reason, not the prose, is what the fix link is
+							    keyed on — the prose is the server's to change. */}
+							<span>{refusal.reasonDescription ?? "No review was started."}</span>
 							{refusal.reason && (
 								<RefusalFixLink
 									workspaceSlug={workspaceSlug}

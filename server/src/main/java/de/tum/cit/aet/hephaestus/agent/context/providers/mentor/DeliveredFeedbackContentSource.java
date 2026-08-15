@@ -95,21 +95,18 @@ public class DeliveredFeedbackContentSource implements ContentSource {
                     Collectors.mapping(FeedbackObservationVisibility::getObservation, Collectors.toList())
                 )
             );
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+            workspaceId,
+            bindings.stream().map(FeedbackObservationVisibility::getObservation).toList(),
+            SourceUsePurpose.CONVERSATIONAL_MENTORING
+        );
         List<Feedback> delivered = candidates
             .stream()
             .filter(feedback -> {
                 List<Observation> observations = observationsByFeedback.getOrDefault(feedback.getId(), List.of());
                 return (
                     !observations.isEmpty() &&
-                    observations
-                        .stream()
-                        .allMatch(observation ->
-                            visibilityPolicy.permits(
-                                workspaceId,
-                                observation,
-                                SourceUsePurpose.CONVERSATIONAL_MENTORING
-                            )
-                        )
+                    observations.stream().allMatch(observation -> visible.contains(observation.getId()))
                 );
             })
             .toList();

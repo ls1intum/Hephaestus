@@ -1,15 +1,19 @@
 package de.tum.cit.aet.hephaestus.integration.schema;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.testconfig.TestAsyncConfiguration;
 import de.tum.cit.aet.hephaestus.testconfig.TestSecurityConfig;
+import java.util.Objects;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.ActiveProfiles;
@@ -114,6 +118,68 @@ class LiquibaseSchemaValidationIntegrationTest {
         assertColumnExists("identity_provider", "type"); // table renamed from git_provider
         assertIndexExists("idx_slack_thread_participants"); // GIN over the bigint[] participant set
         assertIndexExists("idx_slack_message_ingest"); // drives the bounded-retention sweep
+    }
+
+    /**
+     * {@code WorkspaceReviewScope} is a two-key vocabulary whose closure is enforced at the column, not by
+     * the deserializer: a reader configured to ignore unknown fields would drop a third key in silence and
+     * leave a workspace believing a restriction was in force. The column outlives every version of the code
+     * that reads it, so {@code chk_workspace_review_scope} is the thing that has to refuse the write — and
+     * only the Liquibase-built schema carries it, because the shared test profile builds the schema with
+     * Hibernate {@code ddl-auto: create} and never runs a changeset.
+     */
+    @Test
+    @DisplayName("The review-scope column refuses a scope key the vocabulary does not have")
+    void reviewScopeColumnRefusesAnythingOutsideItsVocabulary() {
+        long workspaceId = insertWorkspace("review-scope-check");
+
+        assertThatCode(() -> setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"repositories\": []}"))
+            .as("the two declared keys, each an array, are the shape the entity writes")
+            .doesNotThrowAnyException();
+
+        assertThatThrownBy(() ->
+            setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"paths\": [\"src/**\"]}")
+        )
+            .as("a third key would be read as no restriction at all on that axis")
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining("chk_workspace_review_scope");
+
+        assertThatThrownBy(() -> setReviewScope(workspaceId, "{\"targetBranches\": \"main\"}"))
+            .as("an axis that is not an array cannot be read as the list it claims to be")
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining("chk_workspace_review_scope");
+
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT practice_review_scope::text FROM workspace WHERE id = ?",
+                String.class,
+                workspaceId
+            )
+        )
+            .as("a refused write leaves the last accepted scope in force")
+            .contains("targetBranches")
+            .doesNotContain("paths");
+    }
+
+    /** A workspace row with only the columns the schema demands; every setting below is left at its default. */
+    private long insertWorkspace(String slug) {
+        Long id = jdbcTemplate.queryForObject(
+            "INSERT INTO workspace (slug, display_name, status, account_type, account_login, is_publicly_viewable) " +
+                "VALUES (?, ?, 'ACTIVE', 'ORG', ?, false) RETURNING id",
+            Long.class,
+            slug,
+            "Review scope constraint fixture",
+            slug
+        );
+        return Objects.requireNonNull(id, "workspace insert returned no id");
+    }
+
+    private void setReviewScope(long workspaceId, String json) {
+        jdbcTemplate.update(
+            "UPDATE workspace SET practice_review_scope = CAST(? AS jsonb) WHERE id = ?",
+            json,
+            workspaceId
+        );
     }
 
     private void assertIndexExists(String indexName) {

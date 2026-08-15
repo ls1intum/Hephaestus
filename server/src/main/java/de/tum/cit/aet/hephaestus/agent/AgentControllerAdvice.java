@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent;
 
 import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillConflictException;
+import de.tum.cit.aet.hephaestus.agent.backfill.ReviewSweepScheduleConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
@@ -33,6 +34,16 @@ public class AgentControllerAdvice {
     @ExceptionHandler(ReviewBackfillConflictException.class)
     ProblemDetail handleReviewBackfillConflict(ReviewBackfillConflictException exception) {
         return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
+    }
+
+    @ExceptionHandler(ReviewSweepScheduleConflictException.class)
+    ProblemDetail handleReviewSweepScheduleConflict(ReviewSweepScheduleConflictException exception) {
+        return problem(
+            HttpStatus.CONFLICT,
+            "review-sweep-schedule-conflict",
+            "Review sweep schedule conflict",
+            exception
+        );
     }
 
     /**

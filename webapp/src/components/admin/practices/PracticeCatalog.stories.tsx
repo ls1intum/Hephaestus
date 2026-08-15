@@ -40,6 +40,46 @@ const practices = [
 	},
 ];
 
+/**
+ * Eight areas of four practices, which is the size a workspace installs the shipped catalogue at.
+ *
+ * <p>Derived from one practice rather than written out, because what changes with scale is the count
+ * of rows and of per-row controls, not what any one of them says — and a hand-written thirty-two
+ * would be thirty-two chances to disagree with the shape the API sends.
+ */
+const scaleAreas = [
+	"Submitting review-ready work",
+	"Writing issues a maintainer can act on",
+	"Reviewing other people's work",
+	"Testing what changed",
+	"Documentation",
+	"Keeping the build green",
+	"Talking about work in the open",
+	"Dependencies and supply chain",
+].map((name, index) => ({
+	...mockAreas[0],
+	id: 100 + index,
+	slug: `scale-area-${index}`,
+	name,
+	displayOrder: index,
+}));
+
+const scalePractices = scaleAreas.flatMap((area, areaIndex) =>
+	[
+		"states the motivation",
+		"links the issue it closes",
+		"lists the steps a reviewer ran",
+		"keeps the change reviewable in one sitting",
+	].map((suffix, practiceIndex) => ({
+		...mockPractices[0],
+		id: 1000 + areaIndex * 10 + practiceIndex,
+		slug: `${area.slug}-${practiceIndex}`,
+		name: `${area.name}: ${suffix}`,
+		areaSlug: area.slug,
+		displayOrder: practiceIndex,
+	})),
+);
+
 const idlePending = {
 	areaSlugs: new Set<string>(),
 	practiceSlugs: new Set<string>(),
@@ -127,6 +167,26 @@ type Story = StoryObj<typeof meta>;
 
 export const Populated: Story = {
 	play: async () => {
+		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * The catalogue at the size it ships: eight areas, thirty-two practices, every one of them a row
+ * with its own reorder handle and actions menu.
+ *
+ * <p>Three practices over two areas is the size at which nothing on this screen can go wrong. What
+ * grows here is the per-row control count and the move menu, which lists every area in the workspace
+ * — the one control whose height is a function of the catalogue rather than of the row it belongs
+ * to, and the reason this story runs at 320px like the rest of the file.
+ */
+export const AtScale: Story = {
+	args: { areas: scaleAreas, practices: scalePractices },
+	parameters: { chromatic: { viewports: [320, 1440] } },
+	play: async ({ canvas }) => {
+		// Every practice is a row, and every row is reorderable: an area that failed to expand, or a
+		// bucket that dropped its contents, shows up here as a count and not as a broken screenshot.
+		await expect(canvas.getAllByRole("button", { name: /^Reorder / })).toHaveLength(40);
 		await expectNoPageOverflow();
 	},
 };

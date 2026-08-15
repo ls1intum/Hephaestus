@@ -14,6 +14,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +29,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 /**
  * Recurring sweeps: the standing instruction to review recent work whether or not anything announced it.
@@ -86,7 +88,12 @@ public class ReviewSweepScheduleController {
         WorkspaceContext workspaceContext,
         @Valid @RequestBody CreateReviewSweepScheduleRequestDTO request
     ) {
-        return ResponseEntity.status(201).body(reviewSweepScheduleService.create(workspaceContext, request));
+        ReviewSweepScheduleDTO schedule = reviewSweepScheduleService.create(workspaceContext, request);
+        URI location = ServletUriComponentsBuilder.fromCurrentRequest()
+            .path("/{scheduleId}")
+            .buildAndExpand(schedule.id())
+            .toUri();
+        return ResponseEntity.created(location).body(schedule);
     }
 
     @PutMapping("/{scheduleId}")

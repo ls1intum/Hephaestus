@@ -99,6 +99,58 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
 
+    /**
+     * Which evidence contract governed a run, without reading the snapshot it is recorded in.
+     *
+     * <p>A snapshot carries one entry per staged file, so a repository-tree capture makes it megabytes,
+     * and Postgres has no partial read for a TOASTed jsonb. Loading the job to take one string out of it
+     * therefore detoasts, ships and parses the whole document — and evidence authorization asks this
+     * question once per observation, on surfaces that list hundreds. Extracting the key in SQL keeps the
+     * detoast on the server and the answer to a few bytes.
+     *
+     * @return the contract version, or empty when this workspace has no such run or the run recorded no
+     *     evidence — both of which mean nothing may be cited from it
+     */
+    @Query(
+        value = "SELECT jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') " +
+            "FROM agent_job j WHERE j.id = :id AND j.workspace_id = :workspaceId",
+        nativeQuery = true
+    )
+    Optional<String> findEvidenceContractVersion(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
+
+    /**
+     * The same answer as {@link #findEvidenceContractVersion} for a whole set of runs, in one round trip.
+     *
+     * <p>Evidence authorization asks the question once per observation, and the surfaces that ask it list
+     * hundreds — a developer with forty pull requests across ten practices costs four hundred sequential
+     * round trips on one dashboard read. The per-row query is cheap; the latency is the count.
+     *
+     * <p>A run this workspace does not own yields no row, and a run that recorded no evidence yields a row
+     * whose value is {@code null}. Both mean nothing may be cited from it, exactly as the empty
+     * {@link Optional} does on the single-row query.
+     */
+    @Query(
+        value = """
+        SELECT j.id AS "id",
+               jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') AS "contractVersion"
+        FROM agent_job j
+        WHERE j.id IN :ids
+          AND j.workspace_id = :workspaceId
+        """,
+        nativeQuery = true
+    )
+    List<EvidenceContractVersionRow> findEvidenceContractVersions(
+        @Param("workspaceId") Long workspaceId,
+        @Param("ids") Collection<UUID> ids
+    );
+
+    interface EvidenceContractVersionRow {
+        UUID getId();
+
+        @Nullable
+        String getContractVersion();
+    }
+
     @Query(
         "SELECT CASE WHEN COUNT(j) > 0 THEN true ELSE false END FROM AgentJob j " +
             "WHERE j.workspace.id = :workspaceId AND (" +

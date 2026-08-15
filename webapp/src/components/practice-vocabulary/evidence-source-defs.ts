@@ -42,8 +42,8 @@ export interface EvidenceSourceDef extends StatusDef {
  * The registered inputs a review may quote from, in operator-facing words.
  *
  * <p>`sourceKind` is a `string` on the wire, but it is not free-form: the server admits a citation
- * only when its kind is in the shipped artifact-source catalog *and* was staged for that job, so
- * these fifteen are every value that can be written today. The registry is keyed by the constant and
+ * only when its kind is in the shipped artifact-source catalog *and* was staged for that job, so the
+ * registry below is every value that can be written today. It is keyed by the constant and
  * never shows it — `scm.pull-request.diff` is a contract id, and a screen that prints one has asked
  * its reader to learn the pipeline's filing system in order to read a quote.
  *
@@ -198,15 +198,25 @@ export const DIFF_SIDE_LABELS = {
 } satisfies Record<NonNullable<EvidenceCitation["side"]>, string>;
 
 /**
- * Where in a file a code citation was read, as the coordinate a developer would paste: `path:12–18`.
+ * A place in a file, as the coordinate a developer would paste: `path:12–18`.
  *
- * Only ever called for a `code` locator. `endLine` defaults to `startLine` server-side, so a single
- * line prints as one number rather than as `12–12`. The side stays out of the string — it is not
- * part of a file coordinate, and it renders beside this as its own tag.
+ * One spelling for two surfaces that both name a span of source — the citation an observation rests
+ * on, and the line an inline note was anchored to — because a reader comparing the two is comparing
+ * the same coordinate and a second formatter is a second en dash to get wrong.
+ *
+ * <p>A single line prints as one number rather than as `12–12`: the citation wire type defaults
+ * `endLine` to `startLine`, and a placement leaves it absent. The diff side stays out of the string —
+ * it is not part of a file coordinate, and it renders beside this as its own tag.
  */
-export function codeCitationLocator(citation: EvidenceCitation): string {
-	const { path, startLine, endLine } = citation;
-	return endLine > startLine ? `${path}:${startLine}–${endLine}` : `${path}:${startLine}`;
+export function codeCitationLocator(span: {
+	path: string;
+	startLine: number;
+	endLine?: number;
+}): string {
+	const { path, startLine, endLine } = span;
+	return endLine && endLine > startLine
+		? `${path}:${startLine}–${endLine}`
+		: `${path}:${startLine}`;
 }
 
 /**

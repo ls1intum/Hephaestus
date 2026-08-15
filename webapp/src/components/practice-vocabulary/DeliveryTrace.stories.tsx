@@ -46,28 +46,6 @@ export const Delivered: Story = {
 	},
 };
 
-/**
- * The precise spot, not the lane. An operator chasing a delivery wants the shape of the thing that
- * was posted; a piece of feedback can be both a summary and a set of inline notes.
- */
-export const DeliveredInlineAndSummary: Story = {
-	args: {
-		feedback: {
-			channel: "IN_CONTEXT",
-			deliveryState: "DELIVERED",
-			createdAt: composedAt,
-			deliveredAt,
-			placements: [
-				{ id: "p1", placementType: "SUMMARY" },
-				{ id: "p2", placementType: "INLINE" },
-			],
-		},
-	},
-	play: async ({ canvas }) => {
-		canvas.getByText(/As an inline note on the work/);
-	},
-};
-
 /** Three steps. The family names who decided; the sentence says what they decided. */
 export const Withheld: Story = {
 	args: {

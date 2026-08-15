@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { useEffect } from "react";
 import { listPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
 import { FacetMultiSelect } from "@/components/common/FacetMultiSelect";
@@ -16,6 +15,7 @@ import {
 } from "@/components/practice-vocabulary/delivery-place-defs";
 import { statusFacetOptions } from "@/components/practice-vocabulary/status-def";
 import { WITHHOLDING_FAMILY_DEFS } from "@/components/practice-vocabulary/withholding-defs";
+import { useClampedPage } from "@/hooks/use-clamped-page";
 import { fromDateRange, toDateRange } from "@/lib/date-range-search";
 import { nonEmpty } from "@/lib/search-params";
 import { AppliedFacetPills, facetPills } from "./AppliedFacetPills";
@@ -59,7 +59,9 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 	});
 	const feedback = query.data?.content ?? [];
 	const totalPages = query.data?.page?.totalPages;
-	const recipient = feedback[0]?.recipient;
+	// Guarded on the filter being set: see `ObservationsListPage`. Unfiltered, row zero is whoever
+	// sorts first, and their name would be shown against a different person's id.
+	const filteredRecipient = search.recipientUserId != null ? feedback[0]?.recipient : undefined;
 	const hasFilter = Boolean(
 		search.deliveryState?.length ||
 			search.withheldFamily?.length ||
@@ -85,11 +87,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 		});
 	const patchFilter = (patch: Partial<FeedbackSearch>) => onSearchChange({ ...patch, page: 0 });
 
-	useEffect(() => {
-		if (totalPages !== undefined && search.page && search.page >= totalPages) {
-			onSearchChange({ page: Math.max(0, totalPages - 1) });
-		}
-	}, [onSearchChange, search.page, totalPages]);
+	useClampedPage(search.page, totalPages, (page) => onSearchChange({ page }));
 
 	return (
 		<section aria-label="Feedback delivery" className="space-y-4">
@@ -128,7 +126,7 @@ export function FeedbackListPage({ workspaceSlug, search, onSearchChange }: Feed
 						title="Recipient"
 						selected={search.recipientUserId}
 						onChange={(recipientUserId) => patchFilter({ recipientUserId })}
-						fallbackName={recipient?.name ?? recipient?.login}
+						fallbackName={filteredRecipient?.name ?? filteredRecipient?.login}
 					/>
 					{/* "Composed" rather than "Date": this range filters when the feedback was written, which
 					    is not when it was delivered and not when the observation behind it was made. */}

@@ -380,7 +380,9 @@ function AdminNavSection({
 				</CollapsibleTrigger>
 			)}
 			<CollapsibleContent>
-				<SidebarMenuSub>{children}</SidebarMenuSub>
+				{/* The list carries the section's name: a screen reader jumping by list otherwise
+				    announces "list, 3 items" with nothing saying which section it landed in. */}
+				<SidebarMenuSub aria-label={label}>{children}</SidebarMenuSub>
 			</CollapsibleContent>
 		</Collapsible>
 	);

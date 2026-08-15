@@ -41,10 +41,9 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <h2>Every decision reaches the ledger</h2>
  * <p>A thread that passes the gates is recorded as one {@code chat.conversation_thread.settled} occurrence
  * before anything is submitted, and {@link ConversationReviewSubmitter} settles that row with what came of
- * it. This path used to submit with no signal key at all, which put conversations outside everything the
- * ledger provides: no row for the artifact trace to explain a silence with, no reaper coverage for a
- * thread refused because a budget was exhausted, and nothing in the "how many reviews did this instance
- * not run, and why" answer.
+ * it. Submitting with no signal key would put conversations outside everything the ledger provides: no row
+ * for the artifact trace to explain a silence with, no reaper coverage for a thread refused because a
+ * budget was exhausted, and nothing in the "how many reviews did this instance not run, and why" answer.
  *
  * <p>The three gates stay <em>in front of</em> the ledger rather than being replaced by the occurrence's
  * identity. They are not the same rule: the identity moves on a single new turn and {@link #MIN_GROWTH}

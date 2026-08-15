@@ -138,12 +138,20 @@ public class ObservationService {
         // latest-run-deduped within a 90-day window (so cardinality is bounded by a developer's distinct
         // latest-run findings, not their full history), and the per-practice caps below do the real trimming —
         // so every practice with at least one actionable finding gets a card regardless of overall volume.
-        List<Observation> observations = observationRepository
-            .findRecentByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId, since, Pageable.unpaged())
+        List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+            currentUser.get().getId(),
+            workspaceId,
+            since,
+            Pageable.unpaged()
+        );
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+            workspaceId,
+            recent,
+            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
+        );
+        List<Observation> observations = recent
             .stream()
-            .filter(observation ->
-                visibilityPolicy.permits(workspaceId, observation, SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY)
-            )
+            .filter(o -> visible.contains(o.getId()))
             .toList();
 
         // Advice lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the

@@ -418,6 +418,40 @@ hephaestus:
         deliver-to-merged: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:false}
         # minimum minutes between reviews for the same PR (0 = no cooldown)
         cooldown-minutes: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:15}
+        # How many reviews one person may ask for by hand, per workspace, per hour (0 = no limit).
+        # The only limit keyed on a person rather than on a piece of work, so it is the only one that
+        # catches somebody asking for one review each on twenty colleagues' merge requests. The cooldown
+        # above will not: those are twenty different PRs.
+        max-requests-per-requester-per-hour: ${PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR:5}
+        # Append the cross-run progress-delta footer and post the re-review notifying reply. Needs at
+        # least two runs on a target before it renders anything.
+        progress-footer: ${PRACTICE_REVIEW_PROGRESS_FOOTER:false}
+        # Stop re-raising a locus the student already disputed or marked not-applicable. Inert until a
+        # reaction exists for a recurring locus.
+        reaction-suppression: ${PRACTICE_REVIEW_REACTION_SUPPRESSION:false}
+        # Fleet-wide limits on backfill campaigns (ReviewBackfillProperties). max-window and
+        # max-artifacts are the spend guard rails: a campaign wider than either is refused at preflight,
+        # before anything is confirmed and before anything is paid for.
+        backfill:
+            # artifacts one driver tick offers to the review path; bounds how far a campaign can
+            # overshoot a budget cap it crosses mid-batch
+            batch-size: ${PRACTICE_REVIEW_BACKFILL_BATCH_SIZE:25}
+            max-window: ${PRACTICE_REVIEW_BACKFILL_MAX_WINDOW:400d}
+            max-artifacts: ${PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS:5000}
+            # how far back the estimator looks for completed reviews to price a new campaign from
+            cost-history-window: ${PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW:90d}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SIGNAL LEDGER (SignalLedgerProperties)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # The pending-signal reaper: what happens to a signal the review gate refused. The blockers are
+    # operator actions (re-activate a workspace, re-point a binding, wait for a budget month to roll
+    # over), so the retry interval is a human timescale — retrying fast only multiplies the refusal.
+    # A signal still refused after pending-lapse-after is retired rather than re-offered for ever.
+    signal-ledger:
+        pending-retry-after: ${SIGNAL_LEDGER_PENDING_RETRY_AFTER:1h}
+        pending-lapse-after: ${SIGNAL_LEDGER_PENDING_LAPSE_AFTER:7d}
+        sweep-batch-size: ${SIGNAL_LEDGER_SWEEP_BATCH_SIZE:200}
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}

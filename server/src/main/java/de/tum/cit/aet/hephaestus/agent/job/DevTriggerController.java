@@ -140,14 +140,6 @@ public class DevTriggerController {
         // The bypass mode carries the kind's manual-request key, so the run this endpoint starts leaves
         // the same trace any other requested review does — and the artifact trace can answer "why did a
         // review run here" instead of showing a job with no occasion behind it.
-        //
-        // It used to pass null with the argument that a per-click key disables the in-flight
-        // deduplication (AgentJobService only consults `findByWorkspaceIdAndIdempotencyKeyAndStatusIn`
-        // when `signalKey == null`). That is half true and the wrong half: the partial unique index
-        // `uk_agent_job_idempotency` still refuses the second concurrent insert on the same key, so a
-        // double click is answered with CONCURRENT_DUPLICATE rather than silently paying twice. The only
-        // thing lost is that the second click no longer reports the first click's job id, and it now
-        // reports a sentence saying why instead.
         return agentJobService.submitPrepared(
             workspaceId,
             prepared.jobType(),
@@ -208,7 +200,7 @@ public class DevTriggerController {
                         triggerSignal,
                         issue.getTitle(),
                         issue.getBody(),
-                        issue.getUpdatedAt()
+                        null
                     ).orElse(null),
                     skip
                 );

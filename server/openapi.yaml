@@ -10538,13 +10538,9 @@ components:
       - whenEvidenceIsInsufficient
     PracticeAutomatedReviewValidation:
       type: object
-      description: Independent validation status and provenance for automated review
-        requirements
+      description: "Who stands behind a practice's automated-review policy, and which\
+        \ exact policy"
       properties:
-        evaluatorProcedureFingerprint:
-          type: string
-          description: "Versioned fingerprint of the independently validated model,\
-            \ prompt, tools, and preprocessing"
         policyDigest:
           type: string
           description: SHA-256 digest of the exact automated-review policy
@@ -10553,26 +10549,14 @@ components:
           description: Versioned fingerprint of the exact review rules
         sourceContractVersion:
           type: string
-          description: Source contract used by the validated practice definition
+          description: Source contract the declared practice definition is written
+            against
         status:
           type: string
           description: Validation lifecycle; authors cannot mark their own review
             policy as independently validated
           enum:
           - AUTHOR_DECLARED
-          - INDEPENDENTLY_VALIDATED
-          - STALE
-          - SUPERSEDED
-        validatedAt:
-          type: string
-          format: date-time
-          description: Time the independent validation was completed
-        validationReference:
-          type: string
-          description: Traceable reference to the validation record
-        validator:
-          type: string
-          description: Independent validator identity
       required:
       - policyDigest
       - reviewRuleFingerprint
@@ -10710,7 +10694,6 @@ components:
         privacyClass:
           type: string
           enum:
-          - PUBLIC
           - INTERNAL
           - PERSONAL
           - SENSITIVE_PERSONAL
@@ -10722,6 +10705,10 @@ components:
           - ANY_CAPTURE
           - COMPLETE
           - COMPLETE_AND_NON_EMPTY
+        selectionScope:
+          type: string
+          description: "How much of the source one capture takes, and the bound past\
+            \ which it is no longer whole"
         sourceKind:
           type: string
         supportsExhaustiveEvidence:
@@ -10733,6 +10720,7 @@ components:
       - displayName
       - privacyClass
       - requiredQuality
+      - selectionScope
       - sourceKind
       - supportsExhaustiveEvidence
     PracticeReviewSettings:

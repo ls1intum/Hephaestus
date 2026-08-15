@@ -64,7 +64,7 @@ public class ReviewSweepScheduleService {
         ReviewBackfillService.jobTypeFor(kind);
         validateLookback(request.cadence(), request.lookbackDays());
         if (scheduleRepository.existsByWorkspaceIdAndArtifactKind(context.id(), kind.value())) {
-            throw new ReviewBackfillConflictException(
+            throw new ReviewSweepScheduleConflictException(
                 "This workspace already sweeps " + kind.value() + ". Change that schedule instead of adding a second."
             );
         }

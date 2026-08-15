@@ -28,7 +28,10 @@
           "outcome",
           "retentionPolicy",
           "erasurePolicy",
-          "recordedAt"
+          "recordedAt",
+          "reviewer",
+          "decidedAt",
+          "expiresAt"
         ],
         "properties": {
           "id": {
@@ -51,19 +54,12 @@
             "description": "Single product use governed by this decision."
           },
           "basis": {
-            "enum": [
-              "ENGINEERING_BASELINE",
-              "CONTROLLER_DECISION"
-            ],
-            "description": "Whether this is an engineering baseline or a controller decision."
+            "const": "ENGINEERING_BASELINE",
+            "description": "Authority this decision rests on. Engineering, never a controller or a data-protection officer."
           },
           "outcome": {
-            "enum": [
-              "ENGINEERING_APPROVED",
-              "APPROVED",
-              "DENIED"
-            ],
-            "description": "Recorded allow-or-deny outcome under the selected basis."
+            "const": "ENGINEERING_APPROVED",
+            "description": "Recorded outcome. A use nobody approved carries no entry rather than a recorded denial."
           },
           "modelProcessor": {
             "type": [
@@ -102,65 +98,6 @@
             "description": "Exclusive time after which this decision no longer permits use."
           }
         },
-        "allOf": [
-          {
-            "if": {
-              "properties": {
-                "basis": {
-                  "const": "ENGINEERING_BASELINE"
-                }
-              },
-              "required": [
-                "basis"
-              ]
-            },
-            "then": {
-              "required": [
-                "reviewer",
-                "decidedAt",
-                "expiresAt"
-              ],
-              "properties": {
-                "outcome": {
-                  "const": "ENGINEERING_APPROVED"
-                },
-                "reviewer": true,
-                "decidedAt": true,
-                "expiresAt": true
-              }
-            }
-          },
-          {
-            "if": {
-              "properties": {
-                "basis": {
-                  "const": "CONTROLLER_DECISION"
-                }
-              },
-              "required": [
-                "basis"
-              ]
-            },
-            "then": {
-              "required": [
-                "reviewer",
-                "decidedAt",
-                "expiresAt"
-              ],
-              "properties": {
-                "outcome": {
-                  "enum": [
-                    "APPROVED",
-                    "DENIED"
-                  ]
-                },
-                "reviewer": true,
-                "decidedAt": true,
-                "expiresAt": true
-              }
-            }
-          }
-        ],
         "description": "Reviewed decision for one logical source and one product use."
       },
       "description": "One purpose-specific governance decision per source use."

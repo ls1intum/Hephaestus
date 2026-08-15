@@ -32,10 +32,17 @@ public final class FeedbackAdmission {
      * this channel in a workspace with this reach.
      *
      * @param tier the practice's <em>effective</em> tier, already resolved through the practice → area →
-     *     workspace chain, or {@code null} when it could not be resolved — an unknown practice is admitted
-     *     on the tier axis, because withholding feedback a developer was owed on the strength of a lookup
-     *     miss is the worse failure. The other two axes still apply: both are known without any per-practice
-     *     lookup at all.
+     *     workspace chain, or {@code null} when the caller could not resolve one — a failed lookup, not an
+     *     unknown practice. An unknown practice slug does not get this far:
+     *     {@code PracticeDetectionDeliveryService#deliver} runs ahead of the in-context gate at both review
+     *     handlers and refuses any finding whose slug is not among the job's admitted revisions, and a
+     *     practice's slug is written once at creation, so the slug a caller looks up is the slug the
+     *     revision carries. What does arrive null is a caller that resolves tiers per observation and holds
+     *     no entry for one of them, as the conversational router does. Admitted on this axis either way,
+     *     because the measurement is already recorded by the time anyone asks — the only question left is
+     *     whether to say it out loud, and withholding feedback a developer was owed on the strength of a
+     *     lookup miss is the worse failure. The other two axes still apply: both are known without any
+     *     per-practice lookup at all.
      */
     public static boolean delivers(
         ObservationOrigin origin,

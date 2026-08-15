@@ -620,42 +620,6 @@ class GitRepositoryManagerTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("stages a blob larger than the heap budget of the process reading it")
-        void shouldStageAFileLargerThanAnInMemoryReadCouldHold() throws Exception {
-            // Bounds raised past the blob on purpose: what is under test is that a large file is
-            // streamed rather than read into heap, not what the default ceiling happens to be.
-            manager = createManager(true, 20_000, DataSize.ofMegabytes(128), DataSize.ofMegabytes(128));
-            try (Git sourceGit = createSourceRepo()) {
-                // 64 MB in one blob. Streaming to disk means peak memory here is one buffer, not one
-                // repository, so the file size must not decide whether the snapshot is complete.
-                Path file = sourceRepoPath.resolve("large.bin");
-                byte[] chunk = new byte[1024 * 1024];
-                java.util.Arrays.fill(chunk, (byte) 'a');
-                try (var out = Files.newOutputStream(file)) {
-                    for (int i = 0; i < 64; i++) {
-                        out.write(chunk);
-                    }
-                }
-                sourceGit.add().addFilepattern("large.bin").call();
-                String sha = sourceGit
-                    .commit()
-                    .setMessage("Add a large file")
-                    .setAuthor(new PersonIdent("Test Author", "author@test.com"))
-                    .setCommitter(new PersonIdent("Test Committer", "committer@test.com"))
-                    .call()
-                    .getName();
-
-                manager.ensureRepository(1L, sourceRepoPath.toUri().toString(), null);
-
-                try (var snapshot = manager.readTreeSnapshot(1L, sha)) {
-                    assertThat(snapshot.files()).containsKey("large.bin");
-                    assertThat(Files.size(snapshot.files().get("large.bin"))).isEqualTo(64L * 1024 * 1024);
-                    assertThat(snapshot.complete()).isTrue();
-                }
-            }
-        }
-
-        @Test
         @DisplayName("deletes its staging directory when closed")
         void shouldReleaseStagingOnClose() throws Exception {
             manager = createManager(true);

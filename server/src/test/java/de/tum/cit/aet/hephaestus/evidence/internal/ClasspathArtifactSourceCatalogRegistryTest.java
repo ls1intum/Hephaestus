@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.evidence.PrivacyClass;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -88,8 +89,6 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         );
         ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
         assertThat(decisions.values()).allSatisfy(decision -> {
-            assertThat(decision.basis()).isEqualTo(SourceUseBasis.ENGINEERING_BASELINE);
-            assertThat(decision.outcome()).isEqualTo(SourceUseOutcome.ENGINEERING_APPROVED);
             assertThat(decision.reviewer()).isNotBlank();
             assertThat(decision.decidedAt()).isNotNull();
             assertThat(decision.expiresAt()).isNotNull();
@@ -99,40 +98,6 @@ class ClasspathArtifactSourceCatalogRegistryTest {
             // and a source added later then fails this test for having a truthful date.
             assertThat(decision.permitsAt(decision.decidedAt().plusSeconds(1), purpose)).isTrue();
         });
-    }
-
-    @Test
-    void shouldKeepEngineeringBaselineFrozenToPreExistingSources() {
-        var registry = new ClasspathArtifactSourceCatalogRegistry(objectMapper, java.time.Clock.systemUTC());
-
-        assertThat(registry.current().sources())
-            .filteredOn(source ->
-                source
-                    .useDecisionIds()
-                    .stream()
-                    .map(id -> registry.requireUseDecision(registry.current().version(), id))
-                    .allMatch(decision -> decision.basis().equals(SourceUseBasis.ENGINEERING_BASELINE))
-            )
-            .extracting(source -> source.kind().value())
-            .containsExactlyInAnyOrder(
-                "scm.pull-request.core",
-                "scm.pull-request.diff",
-                "scm.pull-request.comments",
-                "scm.repository.tree",
-                "scm.issue.core",
-                "scm.issue.comments",
-                "slack.conversation.thread",
-                "docs.document.core",
-                "scm.linked-work-items",
-                "scm.review-threads",
-                "scm.general-review-comments",
-                "workspace.project-inventory",
-                "outline.documents",
-                // Staged for every review without any binding asking for them, so they carry the same
-                // engineering baseline as the sources a binding does ask for.
-                "hephaestus.observation-history",
-                "hephaestus.feedback-history"
-            );
     }
 
     @Test
@@ -200,26 +165,33 @@ class ClasspathArtifactSourceCatalogRegistryTest {
         ).isTrue();
     }
 
+    /**
+     * A decision stops permitting at its expiry, not after it. Every bundled decision expires a year
+     * after it was taken, so a review running on a stale contract is the case this boundary decides.
+     */
     @Test
-    void shouldKeepExpiredControllerDecisionStructurallyValidButIneligible() throws IOException {
-        JsonNode root = read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE).deepCopy();
-        var decision = (tools.jackson.databind.node.ObjectNode) root.path("decisions").get(0);
-        decision.put("basis", "CONTROLLER_DECISION");
-        decision.put("outcome", "APPROVED");
-        decision.put("reviewer", "test-reviewer");
-        decision.put("decidedAt", "2026-08-03T00:00:00Z");
-        decision.put("expiresAt", "2027-08-03T00:00:00Z");
-        var catalog = ClasspathArtifactSourceCatalogRegistry.parse(
-            read(ClasspathArtifactSourceCatalogRegistry.CATALOG_RESOURCE)
+    void shouldStopPermittingAtTheInstantOfExpiry() throws IOException {
+        var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+            read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
         );
-        var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(root);
+        var decision = decisions.get("use-docs-document-core-automated-review");
+        Instant expiry = Instant.parse("2027-08-07T00:00:00Z");
 
-        ClasspathArtifactSourceCatalogRegistry.validateUseDecisions(catalog, decisions);
-        assertThat(decisions.values()).anySatisfy(expired ->
-            assertThat(
-                expired.permitsAt(Instant.parse("2027-08-03T00:00:00Z"), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)
-            ).isFalse()
+        assertThat(decision.permitsAt(expiry.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();
+        assertThat(decision.permitsAt(expiry, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isFalse();
+    }
+
+    /** Symmetrically, a decision permits from the instant it was taken and not before it. */
+    @Test
+    void shouldStartPermittingAtTheInstantItWasDecided() throws IOException {
+        var decisions = ClasspathArtifactSourceCatalogRegistry.parseUseDecisions(
+            read(ClasspathArtifactSourceCatalogRegistry.USE_DECISIONS_RESOURCE)
         );
+        var decision = decisions.get("use-docs-document-core-automated-review");
+        Instant decided = Instant.parse("2026-08-07T00:00:00Z");
+
+        assertThat(decision.permitsAt(decided, SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isTrue();
+        assertThat(decision.permitsAt(decided.minusMillis(1), SourceUsePurpose.AUTOMATED_PRACTICE_REVIEW)).isFalse();
     }
 
     @Test
@@ -322,6 +294,43 @@ class ClasspathArtifactSourceCatalogRegistryTest {
                 .as("schema vocabulary vs SourceAbsenceReason.values()")
                 .containsExactlyInAnyOrderElementsOf(expected);
         }
+    }
+
+    /**
+     * The same hand-restatement problem as the absence reasons, on the three governance vocabularies.
+     * A constant nobody can produce goes on being advertised to anyone reading the published schema,
+     * and a constant the schema has not heard of makes the catalog we ship fail its own contract.
+     * Neither is caught by loading the catalog, because the loader reads the JSON and never the schema.
+     */
+    @Test
+    void shouldPinTheGovernanceVocabulariesToTheirJavaEnums() throws IOException {
+        JsonNode catalogSchema = read("contracts/artifact-source/1.0.0/artifact-source-catalog.schema.json");
+        JsonNode decisionsSchema = read("contracts/artifact-source/1.0.0/source-use-decisions.schema.json");
+        JsonNode source = catalogSchema.path("$defs").path("source").path("properties");
+        JsonNode decision = decisionsSchema.path("properties").path("decisions").path("items").path("properties");
+
+        assertThat(vocabularyOf(source.path("privacyClass"))).containsExactlyInAnyOrderElementsOf(
+            names(PrivacyClass.values())
+        );
+        assertThat(vocabularyOf(decision.path("basis"))).containsExactlyInAnyOrderElementsOf(
+            names(SourceUseBasis.values())
+        );
+        assertThat(vocabularyOf(decision.path("outcome"))).containsExactlyInAnyOrderElementsOf(
+            names(SourceUseOutcome.values())
+        );
+    }
+
+    /** A one-value vocabulary is written as {@code const}, a wider one as {@code enum}. */
+    private static List<String> vocabularyOf(JsonNode property) {
+        assertThat(property.isObject()).as("schema property to read a vocabulary from").isTrue();
+        if (property.has("const")) {
+            return List.of(property.path("const").asString());
+        }
+        return property.path("enum").valueStream().map(JsonNode::asString).toList();
+    }
+
+    private static List<String> names(Enum<?>[] constants) {
+        return Stream.of(constants).map(Enum::name).toList();
     }
 
     @Test

@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import { AlertCircle, CalendarClock } from "lucide-react";
 import { useState } from "react";
 import type {
@@ -78,10 +79,16 @@ const describeCadence = (schedule: ReviewSweepSchedule) => {
 	return `${every}, covering ${window}`;
 };
 
-// `nextRunAt`/`lastRunAt` are typed `Date` but arrive as ISO strings.
+/**
+ * A moment as it reads mid-sentence: "Next check 15 Aug 2026, 03:00."
+ *
+ * `nextRunAt`/`lastRunAt` are typed `Date` but arrive as ISO strings, so they go through `asDate`.
+ * The sentence is why `RelativeTime` does not fit: it renders a tooltip trigger, and this is one of
+ * three clauses joined into a plain description.
+ */
 const formatMoment = (value: Date | undefined) => {
 	const date = asDate(value);
-	return date ? date.toLocaleString() : undefined;
+	return date ? format(date, "d MMM yyyy, HH:mm") : undefined;
 };
 
 /**

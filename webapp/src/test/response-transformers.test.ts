@@ -11,7 +11,7 @@ import { server } from "@/mocks/server";
  * dropping that setting leaves a client that still compiles, still exports every hook, and still
  * types timestamps as `Date` — while handing components the raw ISO string. `pnpm typecheck` cannot
  * see the difference, because the types are identical either way. That is not a hypothetical: it
- * shipped, and `PracticeReviewBackfill` crashed on `run.fromAt.toLocaleDateString()` the first time
+ * shipped, and `PracticeReviewBackfill` crashed formatting `run.fromAt` the first time
  * an admin opened it, because every story fed it a `new Date(…)` the server never sent.
  *
  * These assertions go through the real SDK rather than reading `sdk.gen.ts` as text, so they fail for

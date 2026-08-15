@@ -76,7 +76,7 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
                 context(),
                 request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.valueOf(cadence), lookbackDays)
             )
-        ).isInstanceOf(ReviewBackfillConflictException.class);
+        ).isInstanceOf(ReviewSweepScheduleConflictException.class);
     }
 
     /**
@@ -102,7 +102,7 @@ class ReviewSweepScheduleServiceTest extends BaseUnitTest {
 
         assertThatThrownBy(() ->
             service().create(context(), request(ArtifactKinds.PULL_REQUEST, ReviewSweepCadence.DAILY, 2))
-        ).isInstanceOf(ReviewBackfillConflictException.class);
+        ).isInstanceOf(ReviewSweepScheduleConflictException.class);
 
         verify(scheduleRepository, never()).save(any());
     }

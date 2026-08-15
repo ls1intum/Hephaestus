@@ -18,14 +18,10 @@ const meta = {
 		signals: mockPracticeDefinitionOptions.workTypes[0].signals,
 		workTypeLabel: "Pull or merge request",
 		validation: {
-			status: "STALE",
+			status: "AUTHOR_DECLARED",
 			sourceContractVersion: "1.0.0",
 			policyDigest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 			reviewRuleFingerprint: `v2:${"0".repeat(64)}`,
-			evaluatorProcedureFingerprint: `v1:${"1".repeat(64)}`,
-			validatedAt: new Date("2026-01-15T10:00:00Z"),
-			validator: "Independent AI mentoring review",
-			validationReference: "review-1437",
 		},
 	},
 	parameters: { layout: "padded" },
@@ -36,20 +32,18 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * A validation that was independent and no longer answers for what ships.
+ * Every practice that ships is its author's declaration, and the badge says so rather than leaving a
+ * reader to assume somebody checked.
  *
- * Stale is the state an author is least likely to look for and most needs told: the badge said
- * somebody checked this, and the fingerprints it was checked against have since moved. It is warned
- * about rather than merely labelled, and the reference to the review that granted it stays, because
- * that is what an author has to go and repeat.
+ * The two digests stay beside it: they are what an author compares when a review claim is disputed,
+ * and they name the exact policy and rules the declaration is about.
  */
-export const StaleIndependentValidation: Story = {
+export const AuthorDeclared: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Validation is stale")).toBeVisible();
-		await expect(canvas.getByText(/Independent AI mentoring review/)).toHaveTextContent(
-			"review-1437",
+		await expect(canvas.getByText("Not independently validated")).toBeVisible();
+		await expect(canvas.getByText(/^Rules/)).toHaveTextContent(
+			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		);
-		await expect(canvas.getByText(/Validated for source contract 1\.0\.0/)).toBeVisible();
 	},
 };
 

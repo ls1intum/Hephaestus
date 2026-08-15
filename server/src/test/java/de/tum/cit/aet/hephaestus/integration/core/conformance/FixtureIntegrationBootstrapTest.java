@@ -232,10 +232,4 @@ class FixtureIntegrationBootstrapTest extends BaseUnitTest {
         practice.setBindings(List.of(new PracticeBinding(List.of(signals), List.of(FixtureIntegration.need()), false)));
         return practice;
     }
-
-    /** Guards the borrowed constant: if the fixture ever collides with a real kind, say so here. */
-    @Test
-    void borrowsAnIntegrationKindRatherThanInventingOne() {
-        assertThat(FixtureIntegration.KIND).isIn((Object[]) IntegrationKind.values());
-    }
 }

@@ -1,33 +1,34 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
-import de.tum.cit.aet.hephaestus.evidence.SourceKind;
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
 
+    /**
+     * The digest has to identify <em>this</em> policy. A validation carrying a digest that two different
+     * policies share would let a review claim survive the change that invalidated it.
+     */
     @Test
-    void shouldKeepAuthorDeclarationSeparateFromIndependentValidation() {
-        PracticeAutomatedReviewPolicy requirements = requirements();
-        PracticeDefinition definition = definition(requirements);
+    void shouldCarryADigestThatSeparatesOnePolicyFromAnother() {
+        PracticeDefinition declared = definition(requirements());
+        PracticeDefinition limited = definition(limitedRequirements());
 
         PracticeAutomatedReviewValidation validation = PracticeAutomatedReviewValidation.authorDeclared(
             "focused-review",
-            definition
+            declared
         );
 
         assertThat(validation.status()).isEqualTo(PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED);
-        assertThat(validation.policyDigest()).isEqualTo(PracticeAutomatedReviewPolicyDigest.digest(requirements));
-        assertThat(validation.reviewRuleFingerprint()).isEqualTo(definition.provenanceFingerprint("focused-review"));
-        assertThat(validation.validator()).isNull();
+        assertThat(validation.policyDigest()).isNotEqualTo(
+            PracticeAutomatedReviewValidation.authorDeclared("focused-review", limited).policyDigest()
+        );
+        assertThat(validation.reviewRuleFingerprint()).isEqualTo(declared.provenanceFingerprint("focused-review"));
     }
 
     @Test
@@ -49,25 +50,17 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
         );
     }
 
-    @Test
-    void shouldRejectSelfCertifiedAuthorValidation() {
-        assertThatThrownBy(() ->
-            new PracticeAutomatedReviewValidation(
-                PracticeAutomatedReviewValidationStatus.AUTHOR_DECLARED,
-                new SourceContractVersion("1.0.0"),
-                "0".repeat(64),
-                "v2:" + "0".repeat(64),
-                "v1:" + "1".repeat(64),
-                "author",
-                Instant.now(),
-                "self-review"
-            )
-        )
-            .isInstanceOf(IllegalArgumentException.class)
-            .hasMessageContaining("cannot carry validation provenance");
+    private static PracticeAutomatedReviewPolicy requirements() {
+        return requirements(List.of());
     }
 
-    private static PracticeAutomatedReviewPolicy requirements() {
+    private static PracticeAutomatedReviewPolicy limitedRequirements() {
+        return requirements(
+            List.of(new PracticeEvidenceLimitation("RUNTIME_NOT_OBSERVED", "Runtime is out of scope."))
+        );
+    }
+
+    private static PracticeAutomatedReviewPolicy requirements(List<PracticeEvidenceLimitation> knownLimitations) {
         return new PracticeAutomatedReviewPolicy(
             new SourceContractVersion("1.0.0"),
             new PracticeAutomatedReview(
@@ -75,7 +68,7 @@ class PracticeAutomatedReviewValidationTest extends BaseUnitTest {
                 PracticeEvidenceSufficiency.SUFFICIENT_WHEN_REQUIREMENTS_MET
             ),
             PracticeInsufficientEvidenceAction.SKIP_AUTOMATED_REVIEW,
-            List.of(),
+            knownLimitations,
             null
         );
     }

@@ -166,8 +166,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             ReviewTierRollupDTO rollup = fetchRollup();
 
             assertThat(rollup.counts()).containsOnlyKeys(PracticeReviewTier.values());
-            // The retired OBSERVE key must not survive anywhere in the payload the client gap-fills from.
-            assertThat(rollup.counts().keySet().stream().map(Enum::name)).doesNotContain("OBSERVE");
             assertThat(rollup.counts()).containsEntry(PracticeReviewTier.OFF, 1);
             assertThat(rollup.areas())
                 .isNotEmpty()

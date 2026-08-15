@@ -5,7 +5,24 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import type * as React from "react";
 import { cn } from "@/lib/utils";
 
-const Select = SelectPrimitive.Root;
+/**
+ * `items` is required here, where Base UI leaves it optional.
+ *
+ * A closed trigger renders `<SelectValue>` by resolving the selected value against `items`; with no
+ * `items` it prints the value itself, so a select over a wire enum shows `scm.pull_request` where
+ * the open list says "Pull or merge requests". Required rather than documented, because the failure
+ * is invisible while the popup is open — which is the state a play function opens and a screenshot
+ * captures, so it survives review.
+ *
+ * <https://base-ui.com/react/components/select>
+ */
+function Select<Value, Multiple extends boolean | undefined = false>(
+	props: Omit<SelectPrimitive.Root.Props<Value, Multiple>, "items"> & {
+		items: NonNullable<SelectPrimitive.Root.Props<Value, Multiple>["items"]>;
+	},
+) {
+	return <SelectPrimitive.Root {...props} />;
+}
 
 function SelectGroup({ className, ...props }: SelectPrimitive.Group.Props) {
 	return (
