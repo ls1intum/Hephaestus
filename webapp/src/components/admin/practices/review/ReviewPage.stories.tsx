@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, waitFor, within } from "storybook/test";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewPage } from "./ReviewPage";
@@ -136,6 +136,10 @@ export const SectionsAreRealTabs: Story = {
 		await userEvent.click(canvas.getByRole("tab", { name: "When and where" }));
 		await expect(args.onSectionChange).toHaveBeenCalledWith("when-and-where");
 		await expect(await canvas.findByText("Section body: when-and-where")).toBeVisible();
-		await expect(canvas.queryByText("Section body: how-much")).not.toBeInTheDocument();
+		// Waited for, not queried once: the panel being left behind stays mounted until its exit
+		// transition completes, so asking synchronously races the animation rather than the behaviour.
+		await waitFor(() =>
+			expect(canvas.queryByText("Section body: how-much")).not.toBeInTheDocument(),
+		);
 	},
 };
