@@ -15,7 +15,11 @@
  * shares a host — so a difference there is the point rather than a defect; those are listed, not failed.
  */
 import { readFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
+/** Resolved from this file, so the gate answers the same whatever the working directory is. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const APPLICATION_YML = "server/src/main/resources/application.yml";
 const COMPOSE_FILES = ["docker/compose.app.yaml"];
 const DELIBERATE_OVERRIDES = ["docker/preview/compose.app.yaml"];
@@ -27,14 +31,14 @@ const COMPOSE = /\$\{([A-Z0-9_]+):-([^}$]*)\}/g;
 
 const collect = (text, pattern) => new Map([...text.matchAll(pattern)].map((m) => [m[1], m[2]]));
 
-const application = collect(await readFile(APPLICATION_YML, "utf8"), SPRING);
+const application = collect(await readFile(join(REPO_ROOT, APPLICATION_YML), "utf8"), SPRING);
 
 let failed = false;
 const forwarded = new Set();
 for (const file of COMPOSE_FILES) {
 	let text;
 	try {
-		text = await readFile(file, "utf8");
+		text = await readFile(join(REPO_ROOT, file), "utf8");
 	} catch {
 		continue;
 	}
@@ -58,7 +62,7 @@ if (failed) {
 for (const file of DELIBERATE_OVERRIDES) {
 	let text;
 	try {
-		text = await readFile(file, "utf8");
+		text = await readFile(join(REPO_ROOT, file), "utf8");
 	} catch {
 		continue;
 	}

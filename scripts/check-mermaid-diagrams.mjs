@@ -12,10 +12,13 @@
  */
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 
-const ROOTS = ["docs"];
+/** Resolved from this file, so the gate answers the same whatever the working directory is. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const ROOTS = [join(REPO_ROOT, "docs")];
 
 const dom = new JSDOM("<!DOCTYPE html><body></body>", { pretendToBeVisual: true });
 globalThis.window = dom.window;

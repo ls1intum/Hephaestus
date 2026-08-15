@@ -10,9 +10,12 @@
  * scanning the whole tree inside a worker starves the route tests that share it.
  */
 import { readdir, readFile } from "node:fs/promises";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
-const STORIES = "webapp/src";
+/** Resolved from this file, so the gate answers the same from the repo root or from webapp/. */
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const STORIES = join(REPO_ROOT, "webapp/src");
 const HTML_PARAGRAPH = /<\/?p>/i;
 /** Only comment lines: inside a story's own JSX, `<p>` is an element and correct. */
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*)/;
@@ -32,7 +35,7 @@ for (const file of files) {
 	const lines = (await readFile(path, "utf8")).split("\n");
 	lines.forEach((line, index) => {
 		if (COMMENT_LINE.test(line) && HTML_PARAGRAPH.test(line.replace(CODE_SPAN, ""))) {
-			offenders.push(`${path}:${index + 1}`);
+			offenders.push(`webapp/src/${file}:${index + 1}`);
 		}
 	});
 }
