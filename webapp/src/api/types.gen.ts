@@ -2969,80 +2969,6 @@ export type ProfileReviewActivity = {
 };
 
 /**
- * A process-level message on the developer's own private view
- */
-export type ProfileFeedback = {
-    /**
-     * Area display name; null when the practice has none
-     */
-    areaName?: string;
-    /**
-     * Area the practice sits in; null when the practice has none
-     */
-    areaSlug?: string;
-    /**
-     * The message, as Markdown; ends with the habit to try next
-     */
-    body: string;
-    /**
-     * The pieces of work the habit was observed on, newest first
-     */
-    evidence: Array<ProfileEvidence>;
-    /**
-     * Short headline naming the habit, never the person
-     */
-    headline: string;
-    id: string;
-    /**
-     * How many pieces of work carry it — the length of the evidence list
-     */
-    occurrenceCount: number;
-    practiceName: string;
-    /**
-     * Practice this habit belongs to
-     */
-    practiceSlug: string;
-    /**
-     * When the message was composed
-     */
-    preparedAt: Date;
-    /**
-     * When this developer first opened it; null until they have
-     */
-    readAt?: Date;
-    /**
-     * What good looks like, in the learner's framing
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in the learner's framing
-     */
-    whyItMatters?: string;
-};
-
-/**
- * One piece of work the pattern was observed on
- */
-export type ProfileEvidence = {
-    /**
-     * Identifier of the work within its kind
-     */
-    artifactId: number;
-    /**
-     * Kind of work, e.g. scm.pull_request
-     */
-    artifactKind: string;
-    /**
-     * When the measurement behind this occurrence was taken
-     */
-    observedAt: Date;
-    /**
-     * What the review recorded on this piece of work
-     */
-    title?: string;
-};
-
-/**
  * Aggregated activity statistics with XP scores for a user profile
  */
 export type ProfileActivityStats = {
@@ -9430,27 +9356,6 @@ export type GetEngagementResponses = {
 };
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
-
-export type GetPrivateViewData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/profile';
-};
-
-export type GetPrivateViewResponses = {
-    /**
-     * Private-view messages returned, newest first
-     */
-    200: Array<ProfileFeedback>;
-};
-
-export type GetPrivateViewResponse = GetPrivateViewResponses[keyof GetPrivateViewResponses];
 
 export type GetReflectionFeedbackData = {
     body?: never;
