@@ -375,6 +375,32 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         verify(feedbackRepository, never()).markConversationDelivered(any(), any());
     }
 
+    /**
+     * The silent-mode ending refuses what the delivering ending refuses. Suppression is not a disclosure,
+     * so nothing leaks here — but it is the <em>irreversible</em> half: nothing ever writes a unit back to
+     * PREPARED, so burning one on a linked id the policy refuses spends coaching the turn was never allowed
+     * to raise, and records "the instance silenced this" about a unit silent mode did not decide. Left
+     * PREPARED, the same unit is still settled — by the TTL sweep, with a reason of its own.
+     */
+    @Test
+    void silentModeSuppressesNothingWhenTheLinkedObservationIsRefused() {
+        UUID observationId = UUID.randomUUID();
+        UUID feedbackId = UUID.randomUUID();
+        Observation observation = problem(null, null, 0.9f, observationId);
+        when(
+            feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
+        ).thenReturn(List.of(feedbackId));
+        doReturn(List.of(observation)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
+        doReturn(Set.of())
+            .when(visibilityPolicy)
+            .permitsAll(anyLong(), any(), eq(SourceUsePurpose.CONVERSATIONAL_MENTORING));
+
+        int suppressed = reconciler().suppressForSilentMode(WS, RECIPIENT, List.of(observationId));
+
+        assertThat(suppressed).isZero();
+        verify(feedbackRepository, never()).markConversationSuppressedBySilentMode(any());
+    }
+
     @Test
     void silentModeSuppressesOnePreparedUnitWithoutPlacement() {
         UUID observationId = UUID.randomUUID();

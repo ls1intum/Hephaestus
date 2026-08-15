@@ -110,4 +110,5 @@ These are settled, evidence-backed decisions — not open follow-ups. Each was p
 - [Spring Security PR #9208](https://github.com/spring-projects/spring-security/pull/9208) — `NimbusJwtEncoder` for self-issued JWTs.
 - [Spring Authorization Server SPA guidance (issue #297)](https://github.com/spring-projects/spring-authorization-server/issues/297) — explicit framing that the BFF-for-own-SPA case is the legacy edge for SAS.
 - [Descope — nOAuth (2023)](https://www.descope.com/blog/post/noauth) — account-takeover via mutable email claim; the threat model this ADR's `(provider, subject)` lookup discipline blocks.
-- Plan file: `/root/.claude/plans/alright-please-look-at-typed-quilt.md` (sources of truth for all 25 must-include scope items, dependency pins, and PR composition).
+The scope list, dependency pins and PR composition this decision was executed against are recorded in
+the pull request that implemented it, not in a separate plan.

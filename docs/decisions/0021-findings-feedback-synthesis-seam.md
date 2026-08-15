@@ -243,7 +243,22 @@ The in-context comment becomes an agent-synthesised, grouped, lifted, **granular
 
 ## Sources
 
-Grounded in the formative-assessment and feedback-uptake literature (feed-up / feed-back / feed-forward; feedback that changes the gap; the limits of person-level praise) and in SARIF / xAPI schema conventions. Schema precedents are distilled in `.context/schema-references/findings-feedback-precedents.md`.
+Grounded in the formative-assessment and feedback-uptake literature — feed-up / feed-back /
+feed-forward, feedback that closes the gap between current and desired performance, and the finding
+that person-level praise moves performance least:
+
+- Hattie & Timperley, [_The Power of Feedback_](https://doi.org/10.3102/003465430298487), Review of
+  Educational Research 77(1), 2007 — the three questions and the four levels, including why praise
+  directed at the person is the least effective level.
+- Sadler, [_Formative assessment and the design of instructional systems_](https://doi.org/10.1007/BF00117714),
+  Instructional Science 18, 1989 — feedback is only formative if the learner can use it to close the gap.
+
+The record shapes follow two published schema conventions:
+
+- [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html) — result, location
+  and rule identity for a static-analysis finding.
+- [xAPI](https://github.com/adlnet/xAPI-Spec/blob/master/xAPI-Data.md) — actor / verb / object for a
+  recorded learning event.
 
 ## Update — 2026-07-31 (issue #1423)
 

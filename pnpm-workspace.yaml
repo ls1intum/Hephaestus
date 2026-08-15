@@ -31,6 +31,11 @@ strictPeerDependencies: false
 #                versions with XSS via __proto__ (GHSA-1113686, GHSA-1115723).
 #                7.0.5 is the safe baseline.
 overrides:
+  # @docusaurus/theme-mermaid asks for >=11.6.0 and resolved 11.15.0, whose ER parser rejects a
+  # parenthesised column type. That is every NUMERIC(p,s) column, so the generated schema diagram
+  # rendered as an error on the docs site. Fixed upstream in 11.16.1; pinned here until Docusaurus
+  # floors it, and pinned rather than ranged so the diagram cannot regress on a transitive bump.
+  mermaid: 11.16.1
   vitest: 4.1.6
   '@vitest/browser': 4.1.6
   '@vitest/runner': 4.1.6

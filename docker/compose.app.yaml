@@ -1,3 +1,28 @@
+# Practice review reads these from both runtime roles: the app server answers the settings and
+# rate-limits a review asked for by hand, while the worker composes and delivers what a review found.
+# Anchored rather than repeated because forwarding a key to only one of them is silent — the role that
+# does not receive it falls back to the built-in default and the operator's setting does nothing.
+x-practice-review-env: &practice-review-env
+  # Auto-trigger is a per-workspace setting; this is the instance gate above it.
+  PRACTICE_REVIEW_RUN_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
+  PRACTICE_REVIEW_DELIVER_TO_MERGED: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:-false}
+  PRACTICE_REVIEW_COOLDOWN_MINUTES: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:-15}
+  # Feature visibility, separate from the review gate above.
+  PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
+  PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR: ${PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR:-5}
+  PRACTICE_REVIEW_PROGRESS_FOOTER: ${PRACTICE_REVIEW_PROGRESS_FOOTER:-false}
+  PRACTICE_REVIEW_REACTION_SUPPRESSION: ${PRACTICE_REVIEW_REACTION_SUPPRESSION:-false}
+  # Spend guardrails for reviewing past work. A campaign is priced before it runs; these bound what
+  # an administrator can confirm in one.
+  PRACTICE_REVIEW_BACKFILL_MAX_WINDOW: ${PRACTICE_REVIEW_BACKFILL_MAX_WINDOW:-400d}
+  PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS: ${PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS:-5000}
+  PRACTICE_REVIEW_BACKFILL_BATCH_SIZE: ${PRACTICE_REVIEW_BACKFILL_BATCH_SIZE:-25}
+  PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW: ${PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW:-90d}
+  # How long a recorded review opportunity may stay unsettled before it is retried, then given up on.
+  SIGNAL_LEDGER_PENDING_RETRY_AFTER: ${SIGNAL_LEDGER_PENDING_RETRY_AFTER:-1h}
+  SIGNAL_LEDGER_PENDING_LAPSE_AFTER: ${SIGNAL_LEDGER_PENDING_LAPSE_AFTER:-7d}
+  SIGNAL_LEDGER_SWEEP_BATCH_SIZE: ${SIGNAL_LEDGER_SWEEP_BATCH_SIZE:-200}
+
 services:
   webapp:
     image: "ghcr.io/ls1intum/hephaestus/webapp:${IMAGE_TAG}"
@@ -237,12 +262,7 @@ services:
       HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK: ${HEPHAESTUS_LLM_EGRESS_ALLOW_LOOPBACK:-false}
       # Git checkout (bind-mount repos into agent containers)
       GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
-      # Practice review gate (auto-trigger is now a per-workspace setting)
-      PRACTICE_REVIEW_RUN_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
-      PRACTICE_REVIEW_DELIVER_TO_MERGED: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:-false}
-      PRACTICE_REVIEW_COOLDOWN_MINUTES: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:-15}
-      # PRACTICE_REVIEW_FOR_ALL controls feature visibility and the separate review gate above.
-      PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
+      <<: *practice-review-env
       GITLAB_WORKSPACE_CREATION: ${GITLAB_WORKSPACE_CREATION:-false}
       # LLM providers are registered at runtime (Instance admin → AI models), not via env vars —
       # the proxy reads each connection's base URL/auth from the catalog per request.
@@ -324,6 +344,7 @@ services:
       JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       APP_VERSION: ${IMAGE_TAG}
       SPRING_PROFILES_ACTIVE: prod,worker
+      <<: *practice-review-env
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
       HEPHAESTUS_HUB_URL: ws://application-server:8080/api/workers/connect

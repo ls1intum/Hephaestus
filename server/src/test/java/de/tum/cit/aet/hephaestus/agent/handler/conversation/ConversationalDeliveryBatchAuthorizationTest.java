@@ -5,12 +5,14 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.adapter.EvidenceDeliveryAuthorization;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChannel.DeliveryOutcome;
 import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
@@ -31,7 +33,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
@@ -44,6 +47,13 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Only one direction of disagreement is visible to anyone. A turn that delivers less than it should
  * looks like a mentor with nothing to say. A turn that delivers more quotes evidence nobody may cite, and
  * no surface reports that it did.
+ *
+ * <p>Run once per ledger-writing turn ending, because the answer to "which linked findings may this turn
+ * act on" cannot depend on how the turn ended. The two endings write opposite things — DELIVERED raises the
+ * unit, INSTANCE_SILENCED burns it, and nothing ever writes a unit back to PREPARED — so an ending that
+ * admits an id the other refuses spends a developer's coaching on a finding the turn was never allowed to
+ * use. {@code MentorTurnPersistence#reconcileConversationalDelivery} is the switch these correspond to; a
+ * new outcome added there fails this file's switch to compile.
  */
 class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
 
@@ -63,8 +73,9 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
      * wrongly-admitted finding would deliver, so a batch that reads a missing key as anything other than
      * "refused" fails here instead of passing quietly.
      */
-    @Test
-    void deliversOnlyTheLinkedFindingEveryConjunctStillAdmits() {
+    @ParameterizedTest
+    @EnumSource(value = DeliveryOutcome.class, names = { "DELIVERED", "INSTANCE_SILENCED" })
+    void actsOnlyOnTheLinkedFindingEveryConjunctStillAdmits(DeliveryOutcome ending) {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
         FeedbackObservationRepository feedbackObservations = mock(FeedbackObservationRepository.class);
         FeedbackPlacementRepository placements = mock(FeedbackPlacementRepository.class);
@@ -120,14 +131,18 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         when(
             feedbackObservations.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, deliverable.getId())
         ).thenReturn(List.of(deliverableUnit));
-        // Lenient on purpose: the reconciler must never reach these lookups, and if it does, the unit it
-        // finds is what the assertion below catches it delivering.
+        // Lenient on purpose: neither ending may reach these lookups, and if one does, the unit it finds is
+        // what the assertion below catches it acting on.
         UUID deniedSourceUnit = trapUnit(feedbackObservations, deniedSource);
         UUID unreadableUnit = trapUnit(feedbackObservations, unreadable);
         UUID runWithoutRowUnit = trapUnit(feedbackObservations, runWithoutRow);
         UUID staleClaimUnit = trapUnit(feedbackObservations, staleClaim);
-        when(feedbackRepository.markConversationDelivered(eq(deliverableUnit), any())).thenReturn(1);
-        when(feedbackRepository.getReferenceById(deliverableUnit)).thenReturn(mock(Feedback.class));
+        // Answered for any unit, not just the deliverable one: a wrongly-admitted finding must fail on the
+        // assertion below, which names the unit it acted on, rather than on a stubbing mismatch.
+        Feedback deliveredRow = mock(Feedback.class);
+        lenient().when(feedbackRepository.markConversationDelivered(any(), any())).thenReturn(1);
+        lenient().when(feedbackRepository.markConversationSuppressedBySilentMode(any())).thenReturn(1);
+        lenient().when(feedbackRepository.getReferenceById(any())).thenReturn(deliveredRow);
 
         ConversationalDeliveryReconciler reconciler = new ConversationalDeliveryReconciler(
             feedbackRepository,
@@ -137,14 +152,31 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
             new ObservationVisibilityPolicy(new EvidenceDeliveryAuthorization(jobs, catalogs))
         );
 
-        int flips = reconciler.reconcile(WS, RECIPIENT, UUID.randomUUID(), linked);
+        UUID actedOn = switch (ending) {
+            case DELIVERED -> {
+                assertThat(reconciler.reconcile(WS, RECIPIENT, UUID.randomUUID(), linked)).isEqualTo(1);
+                ArgumentCaptor<UUID> flipped = ArgumentCaptor.forClass(UUID.class);
+                verify(feedbackRepository, times(1)).markConversationDelivered(flipped.capture(), any(Instant.class));
+                verify(feedbackRepository, never()).markConversationSuppressedBySilentMode(any());
+                verify(placements, times(1)).save(any());
+                yield flipped.getValue();
+            }
+            case INSTANCE_SILENCED -> {
+                assertThat(reconciler.suppressForSilentMode(WS, RECIPIENT, linked)).isEqualTo(1);
+                ArgumentCaptor<UUID> burned = ArgumentCaptor.forClass(UUID.class);
+                verify(feedbackRepository, times(1)).markConversationSuppressedBySilentMode(burned.capture());
+                verify(feedbackRepository, never()).markConversationDelivered(any(), any());
+                // Nothing was said, so nothing was placed.
+                verify(placements, never()).save(any());
+                yield burned.getValue();
+            }
+            case NOT_DELIVERED -> throw new AssertionError("NOT_DELIVERED writes no unit; @EnumSource excludes it");
+        };
 
-        assertThat(flips).isEqualTo(1);
-        ArgumentCaptor<UUID> delivered = ArgumentCaptor.forClass(UUID.class);
-        verify(feedbackRepository, times(1)).markConversationDelivered(delivered.capture(), any(Instant.class));
-        assertThat(delivered.getValue())
+        assertThat(actedOn)
             .as(
-                "delivered unit: denied=%s unreadable=%s noRun=%s stale=%s",
+                "unit acted on for %s: denied=%s unreadable=%s noRun=%s stale=%s",
+                ending,
                 deniedSourceUnit,
                 unreadableUnit,
                 runWithoutRowUnit,
