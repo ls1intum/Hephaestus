@@ -1,16 +1,14 @@
 import type { PracticeSignalOption, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
 import {
-	bindingFieldId,
-	bindingIdPrefix,
 	hasDrafts,
-	occasionLabel,
+	OCCASION_ID_PREFIX,
+	occasionFieldId,
 } from "@/components/admin/practice-catalog/bindings";
 import {
-	lifecycleSignals,
-	manualRequestSignal,
 	momentBands,
 	momentDef,
 	PHASE_LABEL,
+	withdrawnMoments,
 } from "@/components/admin/practice-catalog/occasion-moments";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -24,69 +22,50 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
-/**
- * Which occasion this is. Control ids, the focus target for a form-level error and the words naming
- * the group are all derived from the position, so no caller can spell one of them differently.
- */
-export interface OccasionIdentity {
-	/** The occasion's position among the practice's occasions, from zero. */
-	index: number;
-	/**
-	 * The id of the message describing what is wrong, passed only while *this* occasion is the one
-	 * failing validation; its presence is also what draws the moments in the invalid state. One field
-	 * rather than an `invalid` flag beside an id, so neither can be set without the other.
-	 */
-	errorId?: string;
-}
-
 export interface OccasionLifecycleProps {
 	/** The whole work type, not its `signals`: the artifact kind decides whether drafts can occur. */
 	workType: PracticeWorkTypeDefinitionOptions;
-	occasion: OccasionIdentity;
 	selected: readonly string[];
-	/** Moment id to the occasion number already holding it, since the server refuses a moment bound twice. */
-	heldElsewhere?: ReadonlyMap<string, number>;
 	onToggle: (signal: string, chosen: boolean) => void;
 	onDrafts: boolean;
 	onDraftsChange: (onDrafts: boolean) => void;
+	/**
+	 * The id of the message describing what is wrong, passed only while the moments are what fails
+	 * validation; its presence is also what draws them in the invalid state. One field rather than an
+	 * `invalid` flag beside an id, so neither can be set without the other.
+	 */
+	errorId?: string;
 	disabled?: boolean;
 }
 
 /**
- * The moments of one occasion, drawn as the life of the work rather than as a list of checkboxes.
+ * When a practice is reviewed, drawn as the life of the work rather than as a list of checkboxes.
  * Bands come from the moments the work type offers, so every kind renders from the same code.
  */
 export function OccasionLifecycle({
 	workType,
-	occasion,
 	selected,
-	heldElsewhere,
 	onToggle,
 	onDrafts,
 	onDraftsChange,
+	errorId,
 	disabled = false,
 }: OccasionLifecycleProps) {
-	const { index, errorId } = occasion;
-	const idPrefix = bindingIdPrefix(index);
 	const invalid = errorId !== undefined;
-	const draftsId = `${idPrefix}-on-drafts`;
+	const draftsId = `${OCCASION_ID_PREFIX}-on-drafts`;
 	const draftsHintId = `${draftsId}-hint`;
 	const chosen = new Set(selected);
-	// Off-lifecycle moments are not offered, but an already-saved one is still drawn: hiding it would
-	// leave a moment nobody can see and nobody can remove.
-	const offLifecycle = manualRequestSignal(workType.signals);
-	const strays = offLifecycle && chosen.has(offLifecycle.signal) ? [offLifecycle] : [];
-	const bands = momentBands([...lifecycleSignals(workType.signals), ...strays]);
+	const bands = momentBands([...workType.signals, ...withdrawnMoments(workType, selected)]);
 
 	return (
 		<FieldSet
-			id={bindingFieldId(index, "signals")}
+			id={occasionFieldId("signals")}
 			data-invalid={invalid || undefined}
 			aria-describedby={errorId}
-			// Focusable only programmatically: a form-level error sends focus here so the author lands in
-			// the occasion it names, but the group stays out of the tab order.
+			// Focusable only programmatically: a form-level error sends focus here so the author lands on
+			// the strip it names, but the group stays out of the tab order.
 			tabIndex={-1}
-			aria-label={`Reviews when, ${occasionLabel(index)}`}
+			aria-label="Reviews when"
 		>
 			<FieldLegend variant="label">Reviews when *</FieldLegend>
 			<div className="flex flex-wrap items-start gap-x-6 gap-y-4">
@@ -102,8 +81,7 @@ export function OccasionLifecycle({
 									moment={moment}
 									railed={railed}
 									chosen={chosen.has(moment.signal)}
-									heldBy={heldElsewhere?.get(moment.signal)}
-									controlId={`${idPrefix}-signal-${moment.signal}`}
+									controlId={`${OCCASION_ID_PREFIX}-signal-${moment.signal}`}
 									disabled={disabled}
 									invalid={invalid}
 									onToggle={(next) => onToggle(moment.signal, next)}
@@ -116,7 +94,7 @@ export function OccasionLifecycle({
 					if (bands.length === 1) return <div key={band.phase}>{rail}</div>;
 					// Named groups rather than loose headings: a reader who cannot see the bands would meet
 					// one run of checkboxes with stray words between them.
-					const headingId = `${idPrefix}-band-${band.phase}`;
+					const headingId = `${OCCASION_ID_PREFIX}-band-${band.phase}`;
 					return (
 						<div key={band.phase} role="group" aria-labelledby={headingId}>
 							<p
@@ -162,8 +140,6 @@ interface MomentNodeProps {
 	/** Draw the hairline reaching back to the moment before it, where the band is a progression. */
 	railed: boolean;
 	chosen: boolean;
-	/** The occasion number already holding this moment, if it is not this one. */
-	heldBy?: number;
 	controlId: string;
 	disabled: boolean;
 	invalid: boolean;
@@ -179,7 +155,6 @@ function MomentNode({
 	moment,
 	railed,
 	chosen,
-	heldBy,
 	controlId,
 	disabled,
 	invalid,
@@ -187,7 +162,6 @@ function MomentNode({
 }: MomentNodeProps) {
 	const def = momentDef(moment.signal);
 	const Icon = def.icon;
-	const locked = heldBy !== undefined;
 	return (
 		<label
 			htmlFor={controlId}
@@ -199,7 +173,7 @@ function MomentNode({
 				railed &&
 					"before:absolute before:top-5 before:-left-1/2 before:right-1/2 before:mr-4 before:ml-4 before:h-px before:bg-border first:before:hidden",
 				"rounded-md has-[:focus-visible]:ring-[3px] has-[:focus-visible]:ring-ring/50",
-				disabled || locked ? "cursor-not-allowed" : "cursor-pointer",
+				disabled ? "cursor-not-allowed" : "cursor-pointer",
 			)}
 		>
 			{/* Clipped, not hidden: the control stays in the accessibility tree and stays focusable. */}
@@ -207,7 +181,7 @@ function MomentNode({
 				<Checkbox
 					id={controlId}
 					checked={chosen}
-					disabled={disabled || locked}
+					disabled={disabled}
 					onCheckedChange={(next) => onToggle(next === true)}
 				/>
 			</span>
@@ -215,14 +189,12 @@ function MomentNode({
 				className={cn(
 					"grid size-8 shrink-0 place-items-center rounded-full border transition-colors",
 					chosen && "border-primary bg-primary text-primary-foreground",
-					!chosen && locked && "border-dashed border-border bg-muted text-muted-foreground",
-					!chosen && !locked && "border-border bg-background text-muted-foreground",
-					!chosen && !locked && invalid && "border-destructive/60",
+					!chosen && "border-border bg-background text-muted-foreground",
+					!chosen && invalid && "border-destructive/60",
 					!chosen &&
-						!locked &&
 						!disabled &&
 						"group-hover/moment:border-primary/60 group-hover/moment:text-foreground",
-					(disabled || locked) && "opacity-70",
+					disabled && "opacity-70",
 				)}
 			>
 				<Icon className="size-4" aria-hidden />
@@ -231,18 +203,13 @@ function MomentNode({
 				className={cn(
 					"text-xs leading-tight",
 					chosen ? "font-medium text-foreground" : "text-muted-foreground",
-					(disabled || locked) && "opacity-70",
+					disabled && "opacity-70",
 				)}
 			>
 				{moment.displayName}
 			</span>
 			{def.repeats && (
 				<span className="text-[0.65rem] leading-none text-muted-foreground">every time</span>
-			)}
-			{locked && (
-				<span className="text-[0.65rem] leading-none text-muted-foreground">
-					in occasion {heldBy}
-				</span>
 			)}
 		</label>
 	);

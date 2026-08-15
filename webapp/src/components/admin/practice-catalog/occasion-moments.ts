@@ -15,7 +15,7 @@ import {
 	MessagesSquareIcon,
 	TagIcon,
 } from "lucide-react";
-import type { PracticeSignalOption } from "@/api/types.gen";
+import type { PracticeSignalOption, PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
 
 /**
  * Where a moment sits in the life of one piece of work.
@@ -80,26 +80,27 @@ export function momentDef(signal: string): MomentDef {
 }
 
 /**
- * A review somebody asked for by hand, which the strip must not offer as a moment: on a manual
- * request the server matches any binding of the artifact's kind and ignores the draft filter rather
- * than matching the signal, so ticking this changes nothing while a binding holding only it looks
- * configured and never fires on its own.
+ * Moments a practice is already bound to that its work type no longer offers: a review asked for by
+ * hand, saved while that still counted as an occasion, or a signal a later build withdrew. Drawn
+ * rather than dropped — the form refuses to save while one is chosen, and a moment nobody can see is
+ * a moment nobody can untick.
  *
- * Recognised by the id's last segment because the wire does not carry the flag the server decides
- * this with; a domain that names its manual signal otherwise degrades to an ordinary node.
+ * A withdrawn moment has no `displayName` on the wire, so it is named by the hand-asked review where
+ * it is that, and by its bare id otherwise, which is at least something to search for.
  */
-export function isManualRequestSignal(signal: string): boolean {
-	return signal.endsWith(".manual_review");
-}
-
-export function manualRequestSignal(
-	signals: readonly PracticeSignalOption[],
-): PracticeSignalOption | undefined {
-	return signals.find((option) => isManualRequestSignal(option.signal));
-}
-
-export function lifecycleSignals(signals: readonly PracticeSignalOption[]): PracticeSignalOption[] {
-	return signals.filter((option) => !isManualRequestSignal(option.signal));
+export function withdrawnMoments(
+	workType: PracticeWorkTypeDefinitionOptions,
+	selected: readonly string[],
+): PracticeSignalOption[] {
+	const offered = new Set(workType.signals.map((option) => option.signal));
+	const manual = workType.manualReviewSignal;
+	return selected
+		.filter((signal) => !offered.has(signal))
+		.map((signal) => ({
+			signal,
+			displayName: manual?.signal === signal ? manual.displayName : signal,
+			recommended: false,
+		}));
 }
 
 export interface MomentBand {

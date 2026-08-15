@@ -1001,13 +1001,9 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     deliverToMerged?: boolean;
     /**
-     * Where feedback may go at all: CONVERSATION for the mentor conversation only, ON_THE_WORK to also place it on the work. Null leaves it unchanged; name FEEDBACK_REACH in 'reset' to clear it.
-     */
-    feedbackReach?: 'CONVERSATION' | 'ON_THE_WORK';
-    /**
      * Fields to reset back to inherit
      */
-    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_REVIEW_TIER' | 'FEEDBACK_REACH'>;
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_REVIEW_TIER'>;
     /**
      * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
      */
@@ -1031,9 +1027,11 @@ export type UpdatePracticeRequest = {
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
-     * Replacement occasions and their evidence; omit to leave them unchanged
+     * Replacement occasion and its evidence; omit to leave it unchanged
      */
-    bindings?: Array<PracticeBinding>;
+    bindings?: [
+        PracticeBinding
+    ];
     /**
      * Optional fields to clear before applying supplied values
      */
@@ -1872,10 +1870,6 @@ export type ReviewTierRollup = {
     counts: {
         [key: string]: number;
     };
-    /**
-     * Where feedback may go in this workspace at all, ANDed with every tier
-     */
-    feedbackReach: 'CONVERSATION' | 'ON_THE_WORK';
     /**
      * The workspace-level decision every area and practice falls back to
      */
@@ -3046,12 +3040,16 @@ export type PracticeWorkTypeDefinitionOptions = {
     allowedSources: Array<PracticeEvidenceSourceOption>;
     artifactKind: string;
     /**
+     * How a person asks for a review of this work type by hand, or absent where the work type admits no such request. Not an occasion to bind to: such a request reviews every practice on the work type whatever state the work is in.
+     */
+    manualReviewSignal?: PracticeManualReviewSignal;
+    /**
      * Evidence a new binding on this work type starts with when the author says nothing
      */
     recommendedNeeds: Array<PracticeEvidenceRequirement>;
     recommendedPolicy: PracticeAutomatedReviewPolicy;
     /**
-     * Signals a practice on this work type can be reviewed on
+     * The occasions a practice on this work type can be bound to. A review somebody asks for by hand is not among them — see manualReviewSignal.
      */
     signals: Array<PracticeSignalOption>;
     supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
@@ -3063,6 +3061,14 @@ export type PracticeWorkTypeDefinitionOptions = {
 export type PracticeSignalOption = {
     displayName: string;
     recommended: boolean;
+    signal: string;
+};
+
+/**
+ * The signal a person raises by asking for a review of this work type by hand
+ */
+export type PracticeManualReviewSignal = {
+    displayName: string;
     signal: string;
 };
 
@@ -3166,14 +3172,6 @@ export type PracticeReviewSettings = {
      */
     deliverToMergedOverride?: boolean;
     /**
-     * Effective: where feedback may go at all. CONVERSATION = the recipient's mentor conversation and nowhere else · ON_THE_WORK = also on the work itself, as pull-request summaries, inline notes and issue comments. ANDed with every practice's tier, so this cannot give a practice more autonomy than its own tier allows — it can only narrow where a practice that already delivers is allowed to deliver.
-     */
-    feedbackReach: 'CONVERSATION' | 'ON_THE_WORK';
-    /**
-     * Raw override; null = this workspace has never chosen, so ON_THE_WORK applies
-     */
-    feedbackReachOverride?: 'CONVERSATION' | 'ON_THE_WORK';
-    /**
      * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
      */
     reviewScope: WorkspaceReviewScope;
@@ -3228,9 +3226,13 @@ export type PracticeEvidenceBlocker = {
 };
 
 /**
- * Available and recommended authoring choices for each type of reviewed work
+ * What a practice author may choose, per type of reviewed work
  */
 export type PracticeDefinitionOptions = {
+    /**
+     * Source contract these options describe
+     */
+    sourceContractVersion: string;
     workTypes: Array<PracticeWorkTypeDefinitionOptions>;
 };
 
@@ -3337,7 +3339,7 @@ export type Practice = {
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
     /**
-     * Occasions this practice is reviewed on, each with the evidence that review reads
+     * The one occasion this practice is reviewed on, with the evidence that review reads
      */
     bindings: Array<PracticeBinding>;
     catalogOrigin?: CatalogOrigin;
@@ -4597,9 +4599,11 @@ export type CuratedPracticeRequest = {
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
-     * Occasions this practice is reviewed on; the kind of work is read off the signals
+     * The one occasion this practice is reviewed on; the kind of work is read off the signals
      */
-    bindings: Array<PracticeBinding>;
+    bindings: [
+        PracticeBinding
+    ];
     criteria: string;
     name: string;
     precomputeScript?: string;
@@ -4888,9 +4892,11 @@ export type CreatePracticeRequest = {
      */
     automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
-     * Occasions this practice is reviewed on, each with the evidence that review reads. The kind of work reviewed is read off the signals.
+     * The one occasion this practice is reviewed on, with the evidence that review reads. The kind of work reviewed is read off the signals.
      */
-    bindings: Array<PracticeBinding>;
+    bindings: [
+        PracticeBinding
+    ];
     /**
      * Practice review criteria
      */

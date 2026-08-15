@@ -12,9 +12,11 @@ import type {
 import {
 	artifactKindOfBindings,
 	bindingsProblem,
-	normalizeBindings,
+	EMPTY_BINDING,
+	normalizeBinding,
 	orderedWorkTypes,
 	recommendedBinding,
+	soleBinding,
 	workTypeOptionsFor,
 } from "@/components/admin/practice-catalog/bindings";
 import {
@@ -82,8 +84,11 @@ export interface PracticeDefinitionValue {
 	slug: string;
 	name: string;
 	areaSlug?: string;
-	/** The kind of work is read off these signals; it is not carried separately. */
-	bindings: PracticeBinding[];
+	/**
+	 * The one occasion this practice is reviewed on, in the list shape the wire carries. The kind of
+	 * work is read off its signals; it is not carried separately.
+	 */
+	bindings: [PracticeBinding];
 	criteria: string;
 	whyItMatters?: string;
 	whatGoodLooksLike?: string;
@@ -126,7 +131,13 @@ interface FormState {
 	name: string;
 	slug: string;
 	areaSlug: string;
-	bindings: PracticeBinding[];
+	/**
+	 * Held rather than read off the bindings: the occasion's signals are what the author is editing,
+	 * and unticking the last of them would otherwise take the kind of work — and with it the editor
+	 * that is the only way to tick one again — off the screen.
+	 */
+	artifactKind: string;
+	bindings: [PracticeBinding];
 	criteria: string;
 	whyItMatters: string;
 	whatGoodLooksLike: string;
@@ -136,7 +147,7 @@ interface FormState {
 
 /** Everything a work type owns, stashed so switching away and back does not discard the work. */
 interface WorkTypeDraft {
-	bindings: PracticeBinding[];
+	bindings: [PracticeBinding];
 	precomputeScript: string;
 	automatedReviewPolicy: PracticeAutomatedReviewPolicy;
 }
@@ -150,11 +161,15 @@ function initialState(
 		name: initialData?.name ?? "",
 		slug: initialData?.slug ?? "",
 		areaSlug: initialData?.areaSlug ?? NO_AREA,
-		bindings: initialData
-			? normalizeBindings(initialData.bindings)
-			: fallback
-				? [recommendedBinding(fallback)]
-				: [],
+		artifactKind:
+			artifactKindOfBindings(initialData?.bindings ?? []) ?? fallback?.artifactKind ?? "",
+		bindings: [
+			initialData
+				? normalizeBinding(soleBinding(initialData.bindings))
+				: fallback
+					? recommendedBinding(fallback)
+					: EMPTY_BINDING,
+		],
 		criteria: initialData?.criteria ?? "",
 		whyItMatters: initialData?.whyItMatters ?? "",
 		whatGoodLooksLike: initialData?.whatGoodLooksLike ?? "",
@@ -223,7 +238,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		{ value: NO_AREA, label: "Unassigned" },
 		...areas.map((area) => ({ value: area.slug, label: area.name })),
 	];
-	const artifactKind = artifactKindOfBindings(form.bindings);
+	const artifactKind = form.artifactKind;
 	const selectedWorkType = workTypeOptionsFor(definitionOptions, artifactKind);
 	// Recorded history belongs to the work type the practice was reviewed under: switching work type
 	// changes which sources are allowed, so the same rows would resolve to "Unknown source".
@@ -277,7 +292,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 	const selectWorkType = (next: PracticeWorkTypeDefinitionOptions) => {
 		setForm((previous) => {
-			const previousKind = artifactKindOfBindings(previous.bindings);
+			const previousKind = previous.artifactKind;
 			if (previousKind === next.artifactKind) return previous;
 			if (previousKind) {
 				workTypeDrafts.set(previousKind, {
@@ -290,34 +305,36 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			const automatedReviewPolicy =
 				draft?.automatedReviewPolicy ??
 				recommendedPolicyWithCurrentSupport(next.recommendedPolicy, previous.automatedReviewPolicy);
-			const bindings = draft?.bindings ?? [recommendedBinding(next)];
+			const binding = draft?.bindings[0] ?? recommendedBinding(next);
 			return {
 				...previous,
+				artifactKind: next.artifactKind,
 				automatedReviewPolicy,
-				bindings:
+				bindings: [
 					automatedReviewPolicy.automatedReview.mode === "NONE"
-						? withoutEvidence(bindings)
-						: bindings,
+						? withoutEvidence(binding)
+						: binding,
+				],
 				precomputeScript: draft?.precomputeScript ?? "",
 			};
 		});
 	};
 
 	// Evidence is forbidden while no review runs and mandatory as soon as one does, so the support
-	// choice has to reach into every occasion rather than leave the author to be refused on save.
+	// choice has to reach into the occasion rather than leave the author to be refused on save.
 	const updatePolicy = (automatedReviewPolicy: PracticeAutomatedReviewPolicy) => {
 		setForm((previous) => {
 			const nowGuidanceOnly = automatedReviewPolicy.automatedReview.mode === "NONE";
 			const wasGuidanceOnly = previous.automatedReviewPolicy.automatedReview.mode === "NONE";
-			const bindings = nowGuidanceOnly
-				? withoutEvidence(previous.bindings)
+			const binding = nowGuidanceOnly
+				? withoutEvidence(previous.bindings[0])
 				: wasGuidanceOnly && selectedWorkType
-					? withRecommendedEvidence(previous.bindings, selectedWorkType)
-					: previous.bindings;
+					? withRecommendedEvidence(previous.bindings[0], selectedWorkType)
+					: previous.bindings[0];
 			return {
 				...previous,
 				automatedReviewPolicy,
-				bindings,
+				bindings: [binding],
 				precomputeScript: nowGuidanceOnly ? "" : previous.precomputeScript,
 			};
 		});
@@ -335,7 +352,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			: undefined;
 	const policyError = practicePolicyError(form.automatedReviewPolicy);
 	const bindingsError = bindingsProblem(
-		form.bindings,
+		form.bindings[0],
 		form.automatedReviewPolicy,
 		selectedWorkType,
 	);
@@ -371,7 +388,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		const submission = props.onSubmit({
 			slug: form.slug,
 			name: form.name.trim(),
-			bindings: normalizeBindings(form.bindings),
+			bindings: [normalizeBinding(form.bindings[0])],
 			criteria: form.criteria.trim(),
 			...(form.areaSlug === NO_AREA ? {} : { areaSlug: form.areaSlug }),
 			...(form.whyItMatters.trim() ? { whyItMatters: form.whyItMatters.trim() } : {}),
@@ -566,21 +583,20 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								When this practice is reviewed
 							</h2>
 							<p className="text-sm text-muted-foreground">
-								A practice is reviewed on occasions. Each one says what starts a review and what
-								that review reads — and those differ: the review at the merge can say a thread was
-								never resolved, while the review when the work arrived can only describe what is in
-								front of it.
+								A practice is reviewed on one occasion: the moments that start a review, and what
+								that review reads. A habit worth judging differently at a different moment — what is
+								in front of you when the work arrives, what was never resolved by the merge — is a
+								second practice rather than a second occasion.
 							</p>
 						</div>
 
 						<FieldSet>
 							<FieldLegend variant="label">Review this kind of work</FieldLegend>
 							<FieldDescription>
-								Every occasion belongs to the same kind of work. Changing it starts the occasions
-								again from the recommended ones.
+								Changing this starts the moments and the evidence again from the recommended ones.
 							</FieldDescription>
 							<RadioGroup
-								value={artifactKind ?? ""}
+								value={artifactKind}
 								onValueChange={(value) => {
 									const next = workTypes.find((option) => option.artifactKind === value);
 									if (next) selectWorkType(next);
@@ -610,19 +626,21 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						{selectedWorkType ? (
 							<PracticeBindingsEditor
 								options={selectedWorkType}
-								bindings={form.bindings}
+								binding={form.bindings[0]}
 								canAttemptReview={canRunMentoring}
 								guidanceOnly={guidanceOnly}
 								outcome={workTypeUnchanged ? evidenceOutcome : undefined}
 								disabled={formDisabled}
 								error={submitted ? bindingsError?.message : undefined}
 								errorFocusId={submitted ? bindingsError?.focusId : undefined}
-								onChange={(bindings) => setForm((previous) => ({ ...previous, bindings }))}
+								onChange={(binding) =>
+									setForm((previous) => ({ ...previous, bindings: [binding] }))
+								}
 							/>
 						) : (
 							<p className="text-sm text-muted-foreground">
 								This practice reviews {artifactKindLabel(artifactKind)}, which this instance no
-								longer offers. Choose a kind of work above to edit its occasions.
+								longer offers. Choose a kind of work above to say when it is reviewed.
 							</p>
 						)}
 					</section>

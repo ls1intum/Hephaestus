@@ -41,14 +41,27 @@ public final class PracticeDefinitionValidator {
     }
 
     /**
-     * A practice may only bind to signals a registered domain declares — the boot cross-check that keeps
-     * a derived artifact kind honest, since a misspelled signal would otherwise invent a kind nothing can
-     * raise and the practice would sit in the catalog looking configured and never fire.
+     * A practice is reviewed on one occasion, and may only bind to signals a registered domain declares.
      *
-     * <p>A human-only practice is checked the same way: it must still name an occasion, which is where
-     * its artifact kind comes from.
+     * <p>The single-occasion rule is enforced here rather than in {@link PracticeDefinition} so that a
+     * stored definition stays readable whatever it holds: this refuses new writes without making an
+     * existing row unloadable, and the persisted shape stays a list so widening the rule again would be
+     * a change to this method rather than a data migration.
+     *
+     * <p>The signal check is the boot cross-check that keeps a derived artifact kind honest, since a
+     * misspelled signal would otherwise invent a kind nothing can raise and the practice would sit in
+     * the catalog looking configured and never fire. A human-only practice is checked the same way: it
+     * must still name an occasion, which is where its artifact kind comes from.
      */
     private void validateBindings(List<PracticeBinding> bindings) {
+        // Ahead of the kind check, so two occasions on two kinds of work are answered with the thing to
+        // do about them rather than with the kind mismatch that is a symptom of the same mistake.
+        if (bindings.size() > 1) {
+            throw new IllegalArgumentException(
+                "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
+                    "split this into two practices."
+            );
+        }
         ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         Set<SignalName> declared = signalOptions.eligibleFor(artifactKind);
         if (declared.isEmpty()) {
@@ -56,6 +69,13 @@ public final class PracticeDefinitionValidator {
         }
         for (PracticeBinding binding : bindings) {
             for (SignalName signal : binding.signals()) {
+                if (signalOptions.isManualRequest(signal)) {
+                    throw new IllegalArgumentException(
+                        "A review somebody asks for by hand already reviews every practice on this work type, " +
+                            "whatever state the work is in, so it is not an occasion to choose: remove " +
+                            signal
+                    );
+                }
                 if (!declared.contains(signal)) {
                     throw new IllegalArgumentException("Choose signals declared for the selected work type");
                 }

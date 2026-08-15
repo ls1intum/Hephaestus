@@ -29,11 +29,16 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
-    @NotNull(message = "At least one binding is required")
-    @Size(min = 1, max = 10, message = "A practice must declare between 1 and 10 bindings")
+    @NotNull(message = "An occasion is required")
+    @Size(
+        min = 1,
+        max = 1,
+        message = "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
+            "split this into two practices."
+    )
     @Valid
     @Schema(
-        description = "Occasions this practice is reviewed on, each with the evidence that review reads. " +
+        description = "The one occasion this practice is reviewed on, with the evidence that review reads. " +
             "The kind of work reviewed is read off the signals."
     )
     List<PracticeBinding> bindings,

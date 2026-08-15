@@ -9,7 +9,7 @@ export const REVIEW_SECTIONS = [
 		id: "how-much",
 		label: "How much",
 		description:
-			"How far Hephaestus may go on its own — once for the workspace, or as an exception for an area or a single practice.",
+			"How far reviews go without you — once for the workspace, or as an exception for an area or a single practice.",
 	},
 	{
 		id: "when-and-where",

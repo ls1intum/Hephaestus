@@ -24,13 +24,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import {
-	Field,
-	FieldContent,
-	FieldDescription,
-	FieldLabel,
-	FieldTitle,
-} from "@/components/ui/field";
+import { Field, FieldDescription, FieldTitle } from "@/components/ui/field";
 import {
 	Item,
 	ItemActions,
@@ -39,14 +33,9 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@/components/ui/item";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import {
-	FEEDBACK_REACH_DESCRIPTIONS,
-	FEEDBACK_REACH_LABELS,
-	FEEDBACK_REACH_ORDER,
-	type FeedbackReach,
 	inheritedTierSourceSentence,
 	REVIEW_TIER_LABELS,
 	REVIEW_TIER_ORDER,
@@ -101,8 +90,6 @@ export interface ReviewAutonomyPageProps {
 	onOverridesOnlyChange: (next: boolean) => void;
 	onSetWorkspaceDefault: (tier: ReviewTier) => void;
 	onClearWorkspaceDefault: () => void;
-	onSetFeedbackReach: (reach: FeedbackReach) => void;
-	onClearFeedbackReach: () => void;
 	onSetAreaTier: (areaSlug: string, tier: ReviewTier) => void;
 	onClearAreaTier: (areaSlug: string) => void;
 	onSetPracticeTier: (practiceSlug: string, tier: ReviewTier) => void;
@@ -121,8 +108,6 @@ export function ReviewAutonomyPage({
 	onOverridesOnlyChange,
 	onSetWorkspaceDefault,
 	onClearWorkspaceDefault,
-	onSetFeedbackReach,
-	onClearFeedbackReach,
 	onSetAreaTier,
 	onClearAreaTier,
 	onSetPracticeTier,
@@ -164,8 +149,6 @@ export function ReviewAutonomyPage({
 				saving={pending.workspace}
 				onSetWorkspaceDefault={onSetWorkspaceDefault}
 				onClearWorkspaceDefault={onClearWorkspaceDefault}
-				onSetFeedbackReach={onSetFeedbackReach}
-				onClearFeedbackReach={onClearFeedbackReach}
 			/>
 
 			{/* No horizontal padding: at the narrowest viewport a strip wider than its parent drags the
@@ -192,7 +175,7 @@ export function ReviewAutonomyPage({
 						<EmptyDescription>
 							{overridesOnly
 								? "Every area and practice follows the workspace default above. Switch the filter off to see them."
-								: "Add practices in Practice setup, then decide how much Hephaestus does with them."}
+								: "Add practices in Practice setup, then decide how far reviews go on them."}
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
@@ -237,39 +220,36 @@ function WorkspaceDecisionCard({
 	saving,
 	onSetWorkspaceDefault,
 	onClearWorkspaceDefault,
-	onSetFeedbackReach,
-	onClearFeedbackReach,
 }: {
 	settings: PracticeReviewSettings;
 	saving: boolean;
 	onSetWorkspaceDefault: (tier: ReviewTier) => void;
 	onClearWorkspaceDefault: () => void;
-	onSetFeedbackReach: (reach: FeedbackReach) => void;
-	onClearFeedbackReach: () => void;
 }) {
 	const tierChosen = settings.defaultReviewTierOverride != null;
-	const reachChosen = settings.feedbackReachOverride != null;
 
 	return (
 		<Card>
 			<CardHeader>
 				<CardTitle>
-					<h2>What Hephaestus does on its own</h2>
+					<h2>Workspace default</h2>
 				</CardTitle>
 				<CardDescription>
-					Two decisions for the whole workspace. Every area and every practice below follows them
+					One decision for the whole workspace. Every area and every practice below follows it
 					unless somebody says otherwise.
 				</CardDescription>
 			</CardHeader>
-			<CardContent className="space-y-6">
+			<CardContent>
 				<Field>
-					<FieldTitle>How far it may go without you</FieldTitle>
+					<FieldTitle>How far reviews go without you</FieldTitle>
+					{/* Not "everything to its left": below `sm` the ladder stacks, so the rung before this one
+					    is above it and no direction names both layouts. */}
 					<FieldDescription>
-						Each step keeps everything to its left and adds one thing. Turning this down leaves the
-						reviews running — it only changes what happens next.
+						Each step keeps everything the step before it does and adds one thing. Turning this down
+						leaves the reviews running — it only changes what happens next.
 					</FieldDescription>
 					<ReviewTierLadder
-						label="How far Hephaestus may go without you"
+						label="How far reviews go without you"
 						variant="full"
 						value={settings.defaultReviewTier}
 						disabled={saving}
@@ -281,52 +261,9 @@ function WorkspaceDecisionCard({
 								? null
 								: `Not chosen yet, so ${REVIEW_TIER_LABELS[settings.defaultReviewTier]} applies.`
 						}
-						resetLabel="Use the default for how far Hephaestus may go without you"
+						resetLabel="Use the default for how far reviews go without you"
 						disabled={saving}
 						onClear={onClearWorkspaceDefault}
-					/>
-				</Field>
-
-				<Field>
-					<FieldTitle>Where feedback may go</FieldTitle>
-					<FieldDescription>
-						Narrows where feedback can land. It never gives a practice more autonomy than its own
-						tier allows.
-					</FieldDescription>
-					<RadioGroup
-						aria-label="Where feedback may go"
-						value={settings.feedbackReach}
-						disabled={saving}
-						onValueChange={(next) => {
-							const reach = next as FeedbackReach;
-							if (reach && reach !== settings.feedbackReach) onSetFeedbackReach(reach);
-						}}
-						className="gap-3"
-					>
-						{/* The dot leads rather than trails: its hit area is an `::after` box hanging past the
-						    control's own edge, which drags the page sideways when it sits against the right
-						    margin. */}
-						{FEEDBACK_REACH_ORDER.map((reach) => (
-							<FieldLabel key={reach}>
-								<Field orientation="horizontal">
-									<RadioGroupItem value={reach} aria-label={FEEDBACK_REACH_LABELS[reach]} />
-									<FieldContent>
-										<span className="font-medium text-sm">{FEEDBACK_REACH_LABELS[reach]}</span>
-										<FieldDescription>{FEEDBACK_REACH_DESCRIPTIONS[reach]}</FieldDescription>
-									</FieldContent>
-								</Field>
-							</FieldLabel>
-						))}
-					</RadioGroup>
-					<DecisionNote
-						follows={
-							reachChosen
-								? null
-								: `Not chosen yet, so ${FEEDBACK_REACH_LABELS[settings.feedbackReach].toLowerCase()} applies.`
-						}
-						resetLabel="Use the default for where feedback may go"
-						disabled={saving}
-						onClear={onClearFeedbackReach}
 					/>
 				</Field>
 			</CardContent>
@@ -510,7 +447,7 @@ function AreaGroup({
 				) : (
 					<div className={cn("min-w-0 space-y-1", DECISION_COLUMN)}>
 						<ReviewTierLadder
-							label={`How far Hephaestus may go in ${group.name}`}
+							label={`How far reviews go in ${group.name}`}
 							value={group.reviewTier.effective}
 							muted={!isOverridden(group.reviewTier)}
 							disabled={areaPending}
@@ -633,7 +570,7 @@ function PracticeAutonomyRow({
 				)}
 			>
 				<ReviewTierLadder
-					label={`How far Hephaestus may go on ${practice.name}`}
+					label={`How far reviews go on ${practice.name}`}
 					value={practice.reviewTier.effective}
 					muted={!isOverridden(practice.reviewTier)}
 					disabled={pending || !reviewable}
@@ -651,7 +588,7 @@ function PracticeAutonomyRow({
 					/>
 				) : (
 					<p className="text-muted-foreground text-xs">
-						Hephaestus can't review this practice, so it stays off.
+						This practice can't be reviewed automatically, so it stays off.
 					</p>
 				)}
 			</ItemActions>

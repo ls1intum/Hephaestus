@@ -15,8 +15,8 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Every field is nullable on purpose: {@code null} means "this workspace has not decided". Scalars
  * resolve to the fleet default ({@code hephaestus.practice-review.*}) via the {@code resolveX(fallback)}
- * accessors; {@link #reviewScope}, {@link #defaultReviewTier} and {@link #feedbackReach} have no fleet
- * default and resolve {@code null} to a constant instead, documented at each field.
+ * accessors; {@link #reviewScope} and {@link #defaultReviewTier} have no fleet default and resolve
+ * {@code null} to a constant instead, documented at each field.
  *
  * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
  * {@code reset} set (see {@link #reset(java.util.Set)}).
@@ -72,16 +72,6 @@ public class PracticeReviewSettings {
     @Nullable
     private String defaultReviewTier;
 
-    /**
-     * Where this workspace's practice feedback may go at all: the mentor conversation only, or also on the
-     * work itself. A {@code FeedbackReach} name, or {@code null} for that enum's default; ANDed with the
-     * resolved tier at every delivery site. Stored as a name for the same module-boundary reason as
-     * {@link #defaultReviewTier}, constrained by {@code chk_workspace_feedback_reach}.
-     */
-    @Column(name = "practice_feedback_reach", length = 16)
-    @Nullable
-    private String feedbackReach;
-
     public boolean resolveRunForAllUsers(boolean fallback) {
         return runForAllUsers != null ? runForAllUsers : fallback;
     }
@@ -130,13 +120,6 @@ public class PracticeReviewSettings {
         }
     }
 
-    /** PATCH semantics, same as above; clear via {@link PracticeReviewField#FEEDBACK_REACH}. */
-    public void applyFeedbackReach(@Nullable String reachName) {
-        if (reachName != null) {
-            this.feedbackReach = reachName;
-        }
-    }
-
     /** Clear the named fields back to {@code null} (inherit the fleet default). */
     public void reset(@Nullable Set<PracticeReviewField> fields) {
         if (fields == null) {
@@ -169,10 +152,6 @@ public class PracticeReviewSettings {
                 }
                 case DEFAULT_REVIEW_TIER -> {
                     this.defaultReviewTier = null;
-                    yield true;
-                }
-                case FEEDBACK_REACH -> {
-                    this.feedbackReach = null;
                     yield true;
                 }
             };

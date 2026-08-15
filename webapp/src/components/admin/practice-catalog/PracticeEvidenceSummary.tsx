@@ -57,8 +57,10 @@ function OccasionSummary({ binding, sources, signals }: OccasionSummaryProps) {
 						required.map((need) => (
 							<Badge key={need.sourceKind} variant="secondary">
 								{evidenceSourceLabel(need.sourceKind, sources)}
+								{/* "captured whole", never "nothing in the world is missing": completeness is a
+								    property of one capture of one source. */}
 								{need.stance === "EXHAUSTIVE" && (
-									<span className="text-muted-foreground">· whole</span>
+									<span className="text-muted-foreground">· captured whole</span>
 								)}
 							</Badge>
 						))

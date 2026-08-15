@@ -53,7 +53,7 @@ const meta = {
 		viewport: { defaultViewport: "desktop" },
 	},
 	args: {
-		label: "How far Hephaestus may go without you",
+		label: "How far reviews go without you",
 		value: "DELIVER",
 		onChange: fn(),
 	},
@@ -93,7 +93,7 @@ export const Full: Story = {
 		// should say "Deliver, selected, 3 of 3" rather than "Off, not pressed" twice over.
 		await expect(radios).toHaveLength(3);
 		await expect(canvas.getByRole("radiogroup")).toHaveAccessibleName(
-			"How far Hephaestus may go without you",
+			"How far reviews go without you",
 		);
 		// The chosen rung is announced, not merely tinted (WCAG 2.2 SC 1.4.1), and it is announced under
 		// the word the reader can see (SC 2.5.3) with the sentence beside it as its description.

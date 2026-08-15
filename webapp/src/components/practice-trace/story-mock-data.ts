@@ -173,7 +173,9 @@ export const practiceTraceEntries = [
 		outcome: "PENDING",
 		explanation:
 			"Queued behind the reviews already running for this workspace. It will start on its own; nothing is needed from you.",
-		watches: ["scm.pull_request.ready", "scm.pull_request.manual_review"],
+		// Only lifecycle moments are watched: asking by hand is not one of them, and it still ran this
+		// review, because such a request reviews every practice on the work type.
+		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.manual_review",
 		occasionedById: "sig-review-requested",
 		observationCount: 0,

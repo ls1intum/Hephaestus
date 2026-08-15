@@ -11,9 +11,9 @@ package de.tum.cit.aet.hephaestus.practices.model;
  *   <tr><td>{@link #DELIVER}</td> <td>yes</td> <td>yes</td> <td>yes, without asking</td></tr>
  * </table>
  *
- * <p>Autonomy is not reach. <em>Where</em> feedback may go is carried separately by
- * {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach}, which does not order and so cannot join
- * this ladder.
+ * <p>This is the whole delivery decision. {@link #DELIVER} delivers on every channel the observation's
+ * provenance admits, and nothing narrows a delivering practice to one of them — "review on its own but say
+ * it only in the mentor conversation" is not expressible, and adding it means adding an axis here.
  *
  * <p>A tier is resolved, never read raw: a practice may inherit its area's, and an area the workspace's. See
  * {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
@@ -44,7 +44,7 @@ public enum PracticeReviewTier {
         return this != OFF;
     }
 
-    /** The autonomy half of the delivery gate; {@link FeedbackAdmission} joins it with reach and origin. */
+    /** The autonomy half of the delivery gate; {@link FeedbackAdmission} joins it with the observation's origin. */
     public boolean deliversWithoutApproval() {
         return this == DELIVER;
     }

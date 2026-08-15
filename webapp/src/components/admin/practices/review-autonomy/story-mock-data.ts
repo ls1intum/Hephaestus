@@ -23,7 +23,7 @@ export interface PracticeSpec {
 	name: string;
 	/** The tier held on the practice itself; absent means it inherits. */
 	override?: ReviewTier;
-	/** False for a practice Hephaestus cannot review — the server pins those to Off. */
+	/** False for a practice that cannot be reviewed automatically — the server pins those to Off. */
 	reviewable?: boolean;
 	/** Optional on the API: a locally written practice carries none, and the row has to read without it. */
 	whyItMatters?: string;
@@ -60,12 +60,10 @@ function assignment(
 
 export function buildAutonomyFixture({
 	workspaceDefault,
-	feedbackReach,
 	areas,
 }: {
 	/** Absent means this workspace has never chosen, so Deliver applies. */
 	workspaceDefault?: ReviewTier;
-	feedbackReach?: PracticeReviewSettings["feedbackReach"];
 	areas: AreaSpec[];
 }): AutonomyFixture {
 	const effectiveDefault: ReviewTier = workspaceDefault ?? "DELIVER";
@@ -132,13 +130,10 @@ export function buildAutonomyFixture({
 		settings: mockReviewSettings({
 			defaultReviewTier: effectiveDefault,
 			defaultReviewTierOverride: workspaceDefault,
-			feedbackReach: feedbackReach ?? "ON_THE_WORK",
-			feedbackReachOverride: feedbackReach,
 		}),
 		rollup: {
 			counts: workspaceCounts,
 			areas: rollupAreas,
-			feedbackReach: feedbackReach ?? "ON_THE_WORK",
 			workspaceDefault: assignment(workspaceDefault, effectiveDefault, "WORKSPACE"),
 		},
 		practices,

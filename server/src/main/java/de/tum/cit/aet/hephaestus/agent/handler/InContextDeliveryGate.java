@@ -107,7 +107,7 @@ class InContextDeliveryGate {
                     job.getId()
                 );
             }
-            if (FeedbackAdmission.delivers(origin, tier, defaults.reach(), FeedbackChannel.IN_CONTEXT)) {
+            if (FeedbackAdmission.delivers(origin, tier, FeedbackChannel.IN_CONTEXT)) {
                 admitted.add(finding);
             } else {
                 withheld.add(finding);

@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -58,7 +57,6 @@ public class FeedbackChannelRouter {
             ConversationRoutingDecision decision = route(
                 observation,
                 tiers.get(observation.getId()),
-                defaults.reach(),
                 workspaceId,
                 context
             );
@@ -78,18 +76,16 @@ public class FeedbackChannelRouter {
      *     here would make the routing rule depend on whether the caller happens to hold a session. A null
      *     tier lets the remaining rules decide rather than silently withholding coaching the developer was
      *     owed.
-     * @param reach where this workspace lets feedback go at all
      */
     public ConversationRoutingDecision route(
         Observation observation,
         @Nullable PracticeReviewTier tier,
-        FeedbackReach reach,
         long workspaceId,
         RoutingContext context
     ) {
-        // Provenance, tier and reach in one predicate, so this path and the in-context one cannot drift on
-        // what "may we say this here" means.
-        if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, reach, FeedbackChannel.CONVERSATION)) {
+        // Provenance and tier in one predicate, so this path and the in-context one cannot drift on what
+        // "may we say this here" means.
+        if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, FeedbackChannel.CONVERSATION)) {
             return observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)
                 ? ConversationRoutingDecision.PRACTICE_TIER_QUIET
                 : ConversationRoutingDecision.BACKFILL_QUIET;

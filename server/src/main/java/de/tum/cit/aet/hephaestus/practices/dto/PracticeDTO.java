@@ -20,7 +20,7 @@ public record PracticeDTO(
     @NonNull @Schema(description = "URL-safe identifier unique within workspace") String slug,
     @NonNull @Schema(description = "Human-readable name") String name,
     @NonNull
-    @Schema(description = "Occasions this practice is reviewed on, each with the evidence that review reads")
+    @Schema(description = "The one occasion this practice is reviewed on, with the evidence that review reads")
     List<PracticeBinding> bindings,
     @NonNull @Schema(description = "Practice review criteria") String criteria,
     @Nullable

@@ -166,6 +166,7 @@ const feedbackHistorySource = {
 } satisfies PracticeEvidenceSourceOption;
 
 export const mockPracticeDefinitionOptions = {
+	sourceContractVersion: "1.0.0",
 	workTypes: [
 		{
 			artifactKind: "scm.pull_request",
@@ -192,12 +193,11 @@ export const mockPracticeDefinitionOptions = {
 					displayName: "Closed without merging",
 					recommended: false,
 				},
-				{
-					signal: "scm.pull_request.manual_review",
-					displayName: "Review requested by hand",
-					recommended: false,
-				},
 			],
+			manualReviewSignal: {
+				signal: "scm.pull_request.manual_review",
+				displayName: "Review requested by hand",
+			},
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedPolicy: mockPullRequestPolicy,
 			recommendedNeeds: mockPullRequestBinding.needs,
@@ -288,12 +288,11 @@ export const mockPracticeDefinitionOptions = {
 				{ signal: "scm.issue.opened", displayName: "Opened", recommended: true },
 				{ signal: "scm.issue.labeled", displayName: "Labeled", recommended: true },
 				{ signal: "scm.issue.closed", displayName: "Closed", recommended: false },
-				{
-					signal: "scm.issue.manual_review",
-					displayName: "Review requested by hand",
-					recommended: false,
-				},
 			],
+			manualReviewSignal: {
+				signal: "scm.issue.manual_review",
+				displayName: "Review requested by hand",
+			},
 			supportedAutomatedReviewModes: ["LANGUAGE_MODEL"],
 			recommendedPolicy: mockIssuePolicy,
 			recommendedNeeds: mockIssueBinding.needs,

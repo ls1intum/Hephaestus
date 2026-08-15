@@ -2,25 +2,24 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import {
 	mockAuthorDeclaredEvidenceValidation,
-	mockMergeBinding,
 	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { CuratedPracticeForm } from "./CuratedPracticeForm";
+import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
 
 const areas = [
 	{ slug: "communication", name: "Communication" },
 	{ slug: "version-control", name: "Version control" },
 ];
 
-const initialData = {
+const initialData: CuratedPracticeFormInitialValue = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
 	areaSlug: "communication",
-	bindings: [mockPullRequestBinding, mockMergeBinding],
+	bindings: [mockPullRequestBinding],
 	criteria: "Review whether the description explains the purpose, approach, and testing.",
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
 	whatGoodLooksLike: "The description states why, what changed, and how it was verified.",

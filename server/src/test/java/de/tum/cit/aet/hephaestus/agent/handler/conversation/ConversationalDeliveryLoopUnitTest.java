@@ -26,7 +26,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacementRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
@@ -213,9 +212,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             }
         };
 
-        assertThat(router().route(obs, PracticeReviewTier.DELIVER, FeedbackReach.ON_THE_WORK, WS, ctx)).isEqualTo(
-            expected
-        );
+        assertThat(router().route(obs, PracticeReviewTier.DELIVER, WS, ctx)).isEqualTo(expected);
     }
 
     /**
@@ -228,9 +225,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         Observation obs = problem(null, null);
         lenient().when(obs.getOrigin()).thenReturn(ObservationOrigin.BACKFILL);
 
-        assertThat(
-            router().route(obs, PracticeReviewTier.DELIVER, FeedbackReach.ON_THE_WORK, WS, RoutingContext.author())
-        ).isEqualTo(ConversationRoutingDecision.BACKFILL_QUIET);
+        assertThat(router().route(obs, PracticeReviewTier.DELIVER, WS, RoutingContext.author())).isEqualTo(
+            ConversationRoutingDecision.BACKFILL_QUIET
+        );
     }
 
     @Test
@@ -469,9 +466,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void routerAppliesTheAutonomyTierBeforeAnythingElse(PracticeReviewTier tier, ConversationRoutingDecision expected) {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, tier, FeedbackReach.ON_THE_WORK, WS, RoutingContext.author())).isEqualTo(
-            expected
-        );
+        assertThat(router().route(observation, tier, WS, RoutingContext.author())).isEqualTo(expected);
     }
 
     static Stream<Arguments> tierRoutingCases() {
@@ -483,25 +478,6 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     /**
-     * The reach axis is orthogonal to the tier: a workspace that keeps feedback out of the work still
-     * coaches in the mentor conversation, which is the whole point of narrowing reach rather than turning
-     * practices down. Both reaches therefore admit here.
-     */
-    @ParameterizedTest
-    @MethodSource("reachRoutingCases")
-    void everyReachStillOpensTheMentorConversation(FeedbackReach reach) {
-        Observation observation = problem(null, null);
-
-        assertThat(
-            router().route(observation, PracticeReviewTier.DELIVER, reach, WS, RoutingContext.author())
-        ).isEqualTo(ConversationRoutingDecision.ADMIT);
-    }
-
-    static Stream<Arguments> reachRoutingCases() {
-        return Stream.of(arguments(FeedbackReach.CONVERSATION), arguments(FeedbackReach.ON_THE_WORK));
-    }
-
-    /**
      * A tier-quiet observation is refused even when it is reviewer-targeted, i.e. the tier is asked first.
      * That ordering matters for the trace view: the standing workspace policy is the more useful answer.
      */
@@ -509,15 +485,9 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void tierIsAskedBeforeTheReviewerDeferral() {
         Observation observation = problem(null, null);
 
-        assertThat(
-            router().route(
-                observation,
-                PracticeReviewTier.PROPOSE,
-                FeedbackReach.ON_THE_WORK,
-                WS,
-                RoutingContext.reviewer()
-            )
-        ).isEqualTo(ConversationRoutingDecision.PRACTICE_TIER_QUIET);
+        assertThat(router().route(observation, PracticeReviewTier.PROPOSE, WS, RoutingContext.reviewer())).isEqualTo(
+            ConversationRoutingDecision.PRACTICE_TIER_QUIET
+        );
     }
 
     /**
@@ -528,7 +498,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void anUnresolvedTierLeavesTheRemainingRulesInCharge() {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, null, FeedbackReach.ON_THE_WORK, WS, RoutingContext.author())).isEqualTo(
+        assertThat(router().route(observation, null, WS, RoutingContext.author())).isEqualTo(
             ConversationRoutingDecision.ADMIT
         );
     }

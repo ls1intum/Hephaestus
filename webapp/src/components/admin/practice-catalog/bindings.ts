@@ -5,7 +5,6 @@ import type {
 	PracticeEvidenceRequirement,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
-import { lifecycleSignals } from "@/components/admin/practice-catalog/occasion-moments";
 import { ARTIFACT_KIND, ARTIFACT_KIND_VALUES } from "@/lib/artifact-kinds";
 
 export type EvidenceStance = PracticeEvidenceRequirement["stance"];
@@ -21,12 +20,24 @@ export function artifactKindOfSignal(signal: string): string {
 }
 
 /**
- * Reads the first signal only. A practice whose bindings disagree is not representable server-side
- * and the form never builds one, so guessing a winner here would only hide the disagreement.
+ * Reads the first signal only. A practice is reviewed on one occasion, so there is nothing else to
+ * read; a stored practice whose bindings disagree is no longer representable server-side either.
  */
 export function artifactKindOfBindings(bindings: readonly PracticeBinding[]): string | undefined {
 	const signal = bindings.find((binding) => binding.signals.length > 0)?.signals[0];
 	return signal ? artifactKindOfSignal(signal) : undefined;
+}
+
+/** An occasion with nothing chosen yet: a strip the author can tick, rather than no strip at all. */
+export const EMPTY_BINDING: PracticeBinding = { signals: [], needs: [] };
+
+/**
+ * The one occasion a practice is reviewed on, read out of the list the wire carries. A stored
+ * practice holding more than one — only writable before the server settled on one — is read as its
+ * first, which is what saving it again leaves behind.
+ */
+export function soleBinding(bindings: readonly PracticeBinding[]): PracticeBinding {
+	return bindings[0] ?? EMPTY_BINDING;
 }
 
 /**
@@ -42,10 +53,6 @@ export function normalizeBinding(binding: PracticeBinding): PracticeBinding {
 		),
 		...(binding.onDrafts ? { onDrafts: true } : {}),
 	};
-}
-
-export function normalizeBindings(bindings: readonly PracticeBinding[]): PracticeBinding[] {
-	return bindings.map(normalizeBinding);
 }
 
 export function roleOf(
@@ -65,46 +72,13 @@ export function withRole(
 	return remaining.sort((left, right) => left.sourceKind.localeCompare(right.sourceKind));
 }
 
-export function recommendedBinding(
-	options: PracticeWorkTypeDefinitionOptions,
-	usedSignals: readonly string[] = [],
-): PracticeBinding {
-	const taken = new Set(usedSignals);
-	// Lifecycle moments only: an occasion seeded with the hand-asked review never fires on its own.
-	const free = lifecycleSignals(options.signals).filter((option) => !taken.has(option.signal));
-	const recommended = free.filter((option) => option.recommended);
-	const signals = (recommended.length > 0 ? recommended : free.slice(0, 1)).map(
+/** The occasion a practice on this work type starts out on: its recommended moments and evidence. */
+export function recommendedBinding(options: PracticeWorkTypeDefinitionOptions): PracticeBinding {
+	const recommended = options.signals.filter((option) => option.recommended);
+	const signals = (recommended.length > 0 ? recommended : options.signals.slice(0, 1)).map(
 		(option) => option.signal,
 	);
 	return normalizeBinding({ signals, needs: options.recommendedNeeds });
-}
-
-export function claimedSignals(bindings: readonly PracticeBinding[]): Set<string> {
-	return new Set(bindings.flatMap((binding) => binding.signals));
-}
-
-/**
- * Which occasion holds each moment, numbered as the author sees them, skipping the occasion being
- * edited. The number and not just the fact, so the author is told which card to change.
- */
-export function signalOwners(
-	bindings: readonly PracticeBinding[],
-	exceptIndex: number,
-): Map<string, number> {
-	const owners = new Map<string, number>();
-	bindings.forEach((binding, index) => {
-		if (index === exceptIndex) return;
-		for (const signal of binding.signals) owners.set(signal, index + 1);
-	});
-	return owners;
-}
-
-/** True once no moment on this kind's lifecycle is left for another occasion to start on. */
-export function everyMomentClaimed(
-	options: PracticeWorkTypeDefinitionOptions,
-	claimed: ReadonlySet<string>,
-): boolean {
-	return lifecycleSignals(options.signals).every((option) => claimed.has(option.signal));
 }
 
 export function workTypeOptionsFor(
@@ -135,21 +109,11 @@ export function hasDrafts(artifactKind: string | undefined): boolean {
 	return artifactKind === ARTIFACT_KIND.pullRequest;
 }
 
-export function bindingIdPrefix(index: number): string {
-	return `practice-binding-${index}`;
-}
+/** A practice has one occasion, so its controls are named rather than numbered. */
+export const OCCASION_ID_PREFIX = "practice-occasion";
 
-export function bindingFieldId(index: number, field: string): string {
-	return `${bindingIdPrefix(index)}-${field}`;
-}
-
-/** Occasions present identically shaped groups, so every accessible name inside one ends with this. */
-export function occasionLabel(index: number): string {
-	return `occasion ${index + 1}`;
-}
-
-export function belongsToBinding(focusId: string | undefined, index: number): boolean {
-	return focusId?.startsWith(`${bindingIdPrefix(index)}-`) ?? false;
+export function occasionFieldId(field: string): string {
+	return `${OCCASION_ID_PREFIX}-${field}`;
 }
 
 export interface BindingsProblem {
@@ -164,73 +128,51 @@ export interface BindingsProblem {
  * they can be explained.
  */
 export function bindingsProblem(
-	bindings: readonly PracticeBinding[],
+	binding: PracticeBinding,
 	policy: PracticeAutomatedReviewPolicy,
 	options: PracticeWorkTypeDefinitionOptions | undefined,
 ): BindingsProblem | undefined {
-	if (bindings.length === 0) {
-		return { message: "Add at least one occasion that starts a review.", focusId: ADD_BINDING_ID };
-	}
-	if (bindings.length > MAX_BINDINGS) {
+	if (binding.signals.length === 0) {
 		return {
-			message: `A practice can have at most ${MAX_BINDINGS} occasions.`,
-			focusId: bindingFieldId(MAX_BINDINGS, "signals"),
+			message: "Choose when this practice is reviewed.",
+			focusId: occasionFieldId("signals"),
 		};
 	}
 	const declared = new Set(options?.signals.map((option) => option.signal));
-	const seen = new Set<string>();
 	const noAutomatedReview = policy.automatedReview.mode === "NONE";
-	for (const [index, binding] of bindings.entries()) {
-		if (binding.signals.length === 0) {
+	for (const signal of binding.signals) {
+		if (declared.size > 0 && !declared.has(signal)) {
 			return {
-				message: "Choose when this occasion starts a review.",
-				focusId: bindingFieldId(index, "signals"),
-			};
-		}
-		for (const signal of binding.signals) {
-			if (declared.size > 0 && !declared.has(signal)) {
-				return {
-					message: "One of the chosen moments does not apply to this kind of work.",
-					focusId: bindingFieldId(index, "signals"),
-				};
-			}
-			if (seen.has(signal)) {
-				return {
-					message: "Two occasions start on the same moment. Merge them or change one.",
-					focusId: bindingFieldId(index, "signals"),
-				};
-			}
-			seen.add(signal);
-		}
-		if (noAutomatedReview && binding.needs.length > 0) {
-			return {
-				message: "Guidance only cannot read any evidence.",
-				focusId: bindingFieldId(index, "evidence"),
-			};
-		}
-		if (!noAutomatedReview && !binding.needs.some((need) => need.stance !== "CONTEXTUAL")) {
-			return {
-				message: "Every occasion needs at least one source the review cannot run without.",
-				focusId: bindingFieldId(index, "evidence"),
-			};
-		}
-		const exhaustiveBlocked = binding.needs.find(
-			(need) =>
-				need.stance === "EXHAUSTIVE" &&
-				options?.allowedSources.some(
-					(source) => source.sourceKind === need.sourceKind && !source.supportsExhaustiveEvidence,
-				),
-		);
-		if (exhaustiveBlocked) {
-			return {
-				message:
-					"One source can never be captured whole, so nothing this review says about what is missing from it can rest on it.",
-				focusId: bindingFieldId(index, "evidence"),
+				message: "One of the chosen moments does not apply to this kind of work.",
+				focusId: occasionFieldId("signals"),
 			};
 		}
 	}
+	if (noAutomatedReview && binding.needs.length > 0) {
+		return {
+			message: "Guidance only cannot read any evidence.",
+			focusId: occasionFieldId("evidence"),
+		};
+	}
+	if (!noAutomatedReview && !binding.needs.some((need) => need.stance !== "CONTEXTUAL")) {
+		return {
+			message: "This review needs at least one source it cannot run without.",
+			focusId: occasionFieldId("evidence"),
+		};
+	}
+	const exhaustiveBlocked = binding.needs.find(
+		(need) =>
+			need.stance === "EXHAUSTIVE" &&
+			options?.allowedSources.some(
+				(source) => source.sourceKind === need.sourceKind && !source.supportsExhaustiveEvidence,
+			),
+	);
+	if (exhaustiveBlocked) {
+		return {
+			message:
+				"One source can never be captured whole, so nothing this review says about what is absent from it can rest on it.",
+			focusId: occasionFieldId("evidence"),
+		};
+	}
 	return undefined;
 }
-
-export const MAX_BINDINGS = 10;
-export const ADD_BINDING_ID = "practice-add-binding";

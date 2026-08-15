@@ -23,8 +23,7 @@ const meta = {
 	args: {
 		options: mockPullRequestWorkType,
 		needs: mockPullRequestBinding.needs,
-		idPrefix: "practice-binding-0",
-		occasionLabel: "occasion 1",
+		idPrefix: "practice-occasion",
 		onChange: fn(),
 	},
 	parameters: { layout: "padded" },
@@ -55,9 +54,7 @@ export const EveryChoiceIsVisible: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
 
-		const diff = within(
-			canvas.getByRole("radiogroup", { name: "How Code changes is used, occasion 1" }),
-		);
+		const diff = within(canvas.getByRole("radiogroup", { name: "How Code changes is used" }));
 		await expect(diff.getByRole("radio", { name: "Required" })).toBeChecked();
 		await expect(diff.getByRole("radio", { name: "Context" })).toBeVisible();
 		await expect(diff.getByRole("radio", { name: "Off" })).toBeVisible();
@@ -65,10 +62,10 @@ export const EveryChoiceIsVisible: Story = {
 		// Offered only where the contract can promise a whole capture. Linked work items never can, so
 		// the control is absent rather than present-and-refused on save.
 		await expect(
-			canvas.getByRole("checkbox", { name: /missing from Code changes/ }),
+			canvas.getByRole("checkbox", { name: /absent from Code changes/ }),
 		).not.toBeChecked();
 		await expect(
-			canvas.queryByRole("checkbox", { name: /missing from Linked work items/ }),
+			canvas.queryByRole("checkbox", { name: /absent from Linked work items/ }),
 		).toBeNull();
 	},
 };
@@ -78,16 +75,16 @@ export const AbsenceClaimNeedsARequiredSource: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
 		const comments = within(
-			canvas.getByRole("radiogroup", { name: "How Inline review comments is used, occasion 1" }),
+			canvas.getByRole("radiogroup", { name: "How Inline review comments is used" }),
 		);
 		await expect(
-			canvas.getByRole("checkbox", { name: /missing from Inline review comments/ }),
+			canvas.getByRole("checkbox", { name: /absent from Inline review comments/ }),
 		).toBeVisible();
 
 		await userEvent.click(comments.getByRole("radio", { name: "Context" }));
 
 		await expect(
-			canvas.queryByRole("checkbox", { name: /missing from Inline review comments/ }),
+			canvas.queryByRole("checkbox", { name: /absent from Inline review comments/ }),
 		).toBeNull();
 	},
 };
@@ -101,9 +98,33 @@ export const ReadsASourceExhaustively: Story = {
 		],
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("· whole")).toBeVisible();
+		// "captured whole", not "nothing is missing anywhere": the claim is about this capture of this
+		// source, which is the only thing completeness is ever measured against.
+		await expect(canvas.getByText("· captured whole")).toBeVisible();
 		await expect(canvas.getByText("Repository files")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Use recommended evidence" })).toBeVisible();
+	},
+};
+
+/**
+ * What the stance does and what it costs, both on screen: the bound one capture is taken under is
+ * there before it is ticked, and the refusal it buys arrives with the tick rather than with the
+ * review that was skipped.
+ */
+export const TheAbsenceClaimStatesItsBound: Story = {
+	render: (args) => <ControlledEvidence {...args} />,
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Choose sources" }));
+		const claim = canvas.getByRole("checkbox", {
+			name: "May claim something is absent from Inline review comments",
+		});
+		await expect(claim).toHaveAccessibleDescription(/Up to the 500 most recent inline comments/);
+		await expect(claim).not.toHaveAccessibleDescription(/refuses the review/);
+
+		await userEvent.click(claim);
+
+		await expect(claim).toHaveAccessibleDescription(/A partial capture then refuses the review/);
+		await expect(claim).toHaveAccessibleDescription(/Up to the 500 most recent inline comments/);
 	},
 };
 
@@ -115,7 +136,7 @@ export const ADocumentOffersLess: Story = {
 		await expect(canvas.getByText("The work itself")).toBeVisible();
 		await expect(canvas.queryByText("Around the work")).toBeNull();
 		await expect(
-			canvas.getByRole("radiogroup", { name: "How Document under review is used, occasion 1" }),
+			canvas.getByRole("radiogroup", { name: "How Document under review is used" }),
 		).toBeVisible();
 	},
 };
@@ -135,7 +156,7 @@ export const NothingRequiredYet: Story = {
 		await expect(canvas.getByText("Nothing yet")).toBeVisible();
 		// The invalid state opens the source list, because the fix is not reachable from the summary.
 		await expect(
-			canvas.getByRole("radiogroup", { name: "How Code changes is used, occasion 1" }),
+			canvas.getByRole("radiogroup", { name: "How Code changes is used" }),
 		).toBeVisible();
 	},
 };
@@ -165,7 +186,7 @@ export const SubmittingRevealsTheSources: Story = {
 	args: { needs: [] },
 	render: (args) => <SubmittedIntoInvalid {...args} />,
 	play: async ({ canvas, userEvent }) => {
-		const sources = { name: "How Code changes is used, occasion 1" };
+		const sources = { name: "How Code changes is used" };
 		await expect(canvas.queryByRole("radiogroup", sources)).toBeNull();
 
 		await userEvent.click(canvas.getByRole("button", { name: "Submit the form" }));

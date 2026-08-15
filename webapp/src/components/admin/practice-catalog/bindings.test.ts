@@ -4,13 +4,11 @@ import {
 	artifactKindOfBindings,
 	artifactKindOfSignal,
 	bindingsProblem,
-	claimedSignals,
-	everyMomentClaimed,
 	normalizeBinding,
 	orderedWorkTypes,
 	recommendedBinding,
 	roleOf,
-	signalOwners,
+	soleBinding,
 	withRole,
 } from "@/components/admin/practice-catalog/bindings";
 import { mockMergeBinding, mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
@@ -42,6 +40,20 @@ describe("artifactKindOfSignal", () => {
 	it("does not invent a kind for a set of bindings that names no signal", () => {
 		expect(artifactKindOfBindings([])).toBeUndefined();
 		expect(artifactKindOfBindings([binding({ signals: [] })])).toBeUndefined();
+	});
+});
+
+describe("soleBinding", () => {
+	it("reads the one occasion a practice is reviewed on", () => {
+		expect(soleBinding([mockMergeBinding])).toBe(mockMergeBinding);
+	});
+
+	it("answers a practice with no occasion with an empty one, so there is still a strip to tick", () => {
+		expect(soleBinding([])).toEqual({ signals: [], needs: [] });
+	});
+
+	it("reads a practice stored with two occasions as its first, which is what saving it leaves", () => {
+		expect(soleBinding([binding(), mockMergeBinding])).toEqual(binding());
 	});
 });
 
@@ -91,7 +103,7 @@ describe("withRole", () => {
 });
 
 describe("recommendedBinding", () => {
-	it("starts a new occasion on the recommended moments with the recommended evidence", () => {
+	it("starts a practice on the recommended moments with the recommended evidence", () => {
 		const fresh = recommendedBinding(pullRequests);
 
 		expect(fresh.signals).toEqual([
@@ -99,30 +111,31 @@ describe("recommendedBinding", () => {
 			"scm.pull_request.ready",
 			"scm.pull_request.synchronized",
 		]);
+		expect(fresh.needs).toEqual(pullRequests.recommendedNeeds);
 	});
 
-	it("never claims a moment an existing occasion already owns", () => {
-		const first = recommendedBinding(pullRequests);
-		const second = recommendedBinding(pullRequests, [...claimedSignals([first])]);
+	it("falls back to the first moment on a work type that recommends none", () => {
+		const nothingRecommended = {
+			...pullRequests,
+			signals: pullRequests.signals.map((option) => ({ ...option, recommended: false })),
+		};
 
-		expect(second.signals).not.toHaveLength(0);
-		expect(second.signals.some((signal) => first.signals.includes(signal))).toBe(false);
+		expect(recommendedBinding(nothingRecommended).signals).toEqual(["scm.pull_request.opened"]);
 	});
 
-	it("falls back to the first free moment when none of them is recommended", () => {
-		const recommended = pullRequests.signals
-			.filter((option) => option.recommended)
-			.map((option) => option.signal);
-
-		expect(recommendedBinding(pullRequests, recommended).signals).toEqual([
-			"scm.pull_request.reviewed",
-		]);
+	// The hand-asked review is carried apart from the moments on the wire, so nothing has to filter it
+	// back out here — a binding seeded with it would never fire on its own.
+	it("never seeds the occasion with the hand-asked review", () => {
+		expect(recommendedBinding(pullRequests).signals).not.toContain(
+			"scm.pull_request.manual_review",
+		);
 	});
 });
 
 describe("orderedWorkTypes", () => {
 	it("leads with the kinds this build knows, in the order it offers them", () => {
 		const shuffled = {
+			...mockPracticeDefinitionOptions,
 			workTypes: [...mockPracticeDefinitionOptions.workTypes].sort((left, right) =>
 				left.artifactKind.localeCompare(right.artifactKind),
 			),
@@ -138,6 +151,7 @@ describe("orderedWorkTypes", () => {
 
 	it("keeps a kind it has never heard of rather than dropping it", () => {
 		const withUnknown = {
+			...mockPracticeDefinitionOptions,
 			workTypes: [
 				{ ...pullRequests, artifactKind: "docs.page" },
 				...mockPracticeDefinitionOptions.workTypes,
@@ -157,66 +171,49 @@ describe("orderedWorkTypes", () => {
 describe("bindingsProblem", () => {
 	it("accepts the shape a new practice starts in", () => {
 		expect(
-			bindingsProblem([recommendedBinding(pullRequests)], aiSupported, pullRequests),
+			bindingsProblem(recommendedBinding(pullRequests), aiSupported, pullRequests),
 		).toBeUndefined();
 	});
 
-	it("refuses a practice with nothing to start it", () => {
-		expect(bindingsProblem([], aiSupported, pullRequests)?.message).toBe(
-			"Add at least one occasion that starts a review.",
-		);
-	});
+	it("refuses a practice with nothing to start it, which the server answers with a 500", () => {
+		const problem = bindingsProblem(binding({ signals: [] }), aiSupported, pullRequests);
 
-	it("refuses an occasion with no moment, which the server answers with a 500", () => {
-		const problem = bindingsProblem([binding({ signals: [] })], aiSupported, pullRequests);
-
-		expect(problem?.message).toBe("Choose when this occasion starts a review.");
-		expect(problem?.focusId).toBe("practice-binding-0-signals");
-	});
-
-	it("refuses the same moment claimed twice, which the server rejects outright", () => {
-		const problem = bindingsProblem([binding(), binding()], aiSupported, pullRequests);
-
-		expect(problem?.message).toBe(
-			"Two occasions start on the same moment. Merge them or change one.",
-		);
-		expect(problem?.focusId).toBe("practice-binding-1-signals");
+		expect(problem?.message).toBe("Choose when this practice is reviewed.");
+		expect(problem?.focusId).toBe("practice-occasion-signals");
 	});
 
 	it("refuses a moment that belongs to another kind of work", () => {
 		expect(
-			bindingsProblem([binding({ signals: ["scm.issue.opened"] })], aiSupported, pullRequests)
+			bindingsProblem(binding({ signals: ["scm.issue.opened"] }), aiSupported, pullRequests)
 				?.message,
 		).toBe("One of the chosen moments does not apply to this kind of work.");
 	});
 
-	it("holds every occasion to naming evidence the review cannot run without", () => {
+	it("refuses the hand-asked review, which the wire no longer offers as a moment", () => {
+		expect(
+			bindingsProblem(
+				binding({ signals: ["scm.pull_request.manual_review"] }),
+				aiSupported,
+				pullRequests,
+			)?.message,
+		).toBe("One of the chosen moments does not apply to this kind of work.");
+	});
+
+	it("holds the review to naming evidence it cannot run without", () => {
 		const problem = bindingsProblem(
-			[
-				binding(),
-				binding({
-					signals: ["scm.pull_request.merged"],
-					needs: [{ sourceKind: "scm.pull-request.core", stance: "CONTEXTUAL" }],
-				}),
-			],
+			binding({ needs: [{ sourceKind: "scm.pull-request.core", stance: "CONTEXTUAL" }] }),
 			aiSupported,
 			pullRequests,
 		);
 
-		expect(problem?.message).toBe(
-			"Every occasion needs at least one source the review cannot run without.",
-		);
-		expect(problem?.focusId).toBe("practice-binding-1-evidence");
+		expect(problem?.message).toBe("This review needs at least one source it cannot run without.");
+		expect(problem?.focusId).toBe("practice-occasion-evidence");
 	});
 
 	it("counts an exhaustive stance as evidence the review cannot run without", () => {
 		expect(
 			bindingsProblem(
-				[
-					binding({
-						needs: [{ sourceKind: "scm.review-threads", stance: "EXHAUSTIVE" }],
-					}),
-				],
+				binding({ needs: [{ sourceKind: "scm.review-threads", stance: "EXHAUSTIVE" }] }),
 				aiSupported,
 				pullRequests,
 			),
@@ -226,42 +223,19 @@ describe("bindingsProblem", () => {
 	it("refuses an absence claim resting on a source that can never be captured whole", () => {
 		expect(
 			bindingsProblem(
-				[binding({ needs: [{ sourceKind: "scm.linked-work-items", stance: "EXHAUSTIVE" }] })],
+				binding({ needs: [{ sourceKind: "scm.linked-work-items", stance: "EXHAUSTIVE" }] }),
 				aiSupported,
 				pullRequests,
 			)?.message,
 		).toBe(
-			"One source can never be captured whole, so nothing this review says about what is missing from it can rest on it.",
+			"One source can never be captured whole, so nothing this review says about what is absent from it can rest on it.",
 		);
 	});
 
 	it("refuses evidence on a practice that runs no automated review", () => {
-		expect(bindingsProblem([binding()], guidanceOnly, pullRequests)?.message).toBe(
+		expect(bindingsProblem(binding(), guidanceOnly, pullRequests)?.message).toBe(
 			"Guidance only cannot read any evidence.",
 		);
-		expect(bindingsProblem([binding({ needs: [] })], guidanceOnly, pullRequests)).toBeUndefined();
-	});
-});
-
-describe("signalOwners", () => {
-	it("names the occasion holding each moment, so the author knows which card to change", () => {
-		const owners = signalOwners(
-			[{ signals: ["scm.pull_request.opened"], needs: [] }, mockMergeBinding],
-			1,
-		);
-
-		expect(owners.get("scm.pull_request.opened")).toBe(1);
-		expect(owners.get("scm.pull_request.merged")).toBeUndefined();
-	});
-});
-
-describe("everyMomentClaimed", () => {
-	it("ignores the hand-asked review, which no occasion can claim", () => {
-		const lifecycle = pullRequests.signals
-			.filter((option) => option.signal !== "scm.pull_request.manual_review")
-			.map((option) => option.signal);
-
-		expect(everyMomentClaimed(pullRequests, new Set(lifecycle))).toBe(true);
-		expect(everyMomentClaimed(pullRequests, new Set(lifecycle.slice(1)))).toBe(false);
+		expect(bindingsProblem(binding({ needs: [] }), guidanceOnly, pullRequests)).toBeUndefined();
 	});
 });

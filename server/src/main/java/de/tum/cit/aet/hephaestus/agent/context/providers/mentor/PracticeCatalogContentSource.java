@@ -92,9 +92,8 @@ public class PracticeCatalogContentSource implements ContentSource {
 
         // Only the practices this workspace may actually raise in a conversation. A PROPOSE practice is
         // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
-        // subject it is not allowed to raise; an OFF practice is not reviewed at all; and a workspace whose
-        // reach excludes the conversation has no conversational catalogue at all. Tier is the effective one,
-        // resolved through the practice -> area -> workspace chain.
+        // subject it is not allowed to raise, and an OFF practice is not reviewed at all. Tier is the
+        // effective one, resolved through the practice -> area -> workspace chain.
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
         List<Practice> practices = practiceRepository
             .findByWorkspaceId(workspaceId)
@@ -103,7 +102,6 @@ public class PracticeCatalogContentSource implements ContentSource {
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,
                     ReviewTierResolver.effectiveTierOf(p, defaults.defaultTier()),
-                    defaults.reach(),
                     FeedbackChannel.CONVERSATION
                 )
             )

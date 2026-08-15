@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Practice } from "@/api/types.gen";
+import type { Practice, PracticeBinding } from "@/api/types.gen";
 import {
 	chosenTier,
 	inheritedTier,
@@ -138,10 +138,11 @@ describe("practice catalog cache updates", () => {
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});
-		// Replacing the occasions can move the practice to a different kind of work, and with it to that
+		// Replacing the occasion can move the practice to a different kind of work, and with it to that
 		// kind's recommended review settings — so the optimistic patch carries those too.
-		expect(selectPracticePatch(updated, { bindings: updated.bindings })).toEqual({
-			bindings: updated.bindings,
+		const occasion: [PracticeBinding] = [updated.bindings[0]];
+		expect(selectPracticePatch(updated, { bindings: occasion })).toEqual({
+			bindings: occasion,
 			artifactKind: updated.artifactKind,
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,

@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -45,7 +44,6 @@ public class PracticeReviewSettingsService {
         settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
         settings.applyScope(req.reviewScope());
         settings.applyDefaultReviewTier(req.defaultReviewTier() == null ? null : req.defaultReviewTier().name());
-        settings.applyFeedbackReach(req.feedbackReach() == null ? null : req.feedbackReach().name());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
@@ -86,9 +84,7 @@ public class PracticeReviewSettingsService {
             s.getCooldownMinutes(),
             s.resolveReviewScope(),
             defaults.defaultTier(),
-            s.getDefaultReviewTier() == null ? null : PracticeReviewTier.valueOf(s.getDefaultReviewTier()),
-            defaults.reach(),
-            s.getFeedbackReach() == null ? null : FeedbackReach.valueOf(s.getFeedbackReach())
+            s.getDefaultReviewTier() == null ? null : PracticeReviewTier.valueOf(s.getDefaultReviewTier())
         );
     }
 }

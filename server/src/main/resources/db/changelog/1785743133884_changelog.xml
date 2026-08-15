@@ -2780,4 +2780,21 @@
         ]]></rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-readiness" id="1785743133884-51">
+        <preConditions onFail="MARK_RAN" onFailMessage="workspace has no feedback-reach column">
+            <columnExists tableName="workspace" columnName="practice_feedback_reach"/>
+        </preConditions>
+        <comment>Drop the workspace feedback-reach decision: delivering feedback is now one decision, the autonomy tier.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE workspace DROP CONSTRAINT IF EXISTS chk_workspace_feedback_reach;
+            ALTER TABLE workspace DROP COLUMN IF EXISTS practice_feedback_reach;
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE workspace ADD COLUMN practice_feedback_reach VARCHAR(16);
+            ALTER TABLE workspace ADD CONSTRAINT chk_workspace_feedback_reach
+                CHECK (practice_feedback_reach IS NULL
+                    OR practice_feedback_reach IN ('CONVERSATION', 'ON_THE_WORK'));
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

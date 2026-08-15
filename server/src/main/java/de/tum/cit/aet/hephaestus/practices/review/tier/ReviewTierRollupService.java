@@ -66,7 +66,6 @@ public class ReviewTierRollupService {
                 new EffectiveReviewTier(workspaceDefault, ReviewTierSource.WORKSPACE),
                 workspaceDefaults.rawDefaultTier(workspaceId)
             ),
-            defaults.reach(),
             workspaceCounts,
             List.copyOf(areas)
         );

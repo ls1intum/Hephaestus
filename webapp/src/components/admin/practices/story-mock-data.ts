@@ -22,7 +22,6 @@ export function mockReviewSettings(
 		cooldownMinutes: 30,
 		defaultReviewTier: "DELIVER",
 		deliverToMerged: true,
-		feedbackReach: "ON_THE_WORK",
 		reviewScope: { targetBranches: [], repositories: [] },
 		runForAllUsers: true,
 		...overrides,

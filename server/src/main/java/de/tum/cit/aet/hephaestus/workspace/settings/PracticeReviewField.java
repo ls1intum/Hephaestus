@@ -13,6 +13,4 @@ public enum PracticeReviewField {
      * fall back to the tier vocabulary's default rather than to a workspace decision.
      */
     DEFAULT_REVIEW_TIER,
-    /** Clears where feedback may go, back to the reach vocabulary's default. */
-    FEEDBACK_REACH,
 }

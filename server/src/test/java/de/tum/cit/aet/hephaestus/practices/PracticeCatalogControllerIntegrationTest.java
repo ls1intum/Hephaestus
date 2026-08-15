@@ -809,6 +809,59 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .containsKeys("slug", "name", "criteria");
         }
 
+        /**
+         * The authoring API refuses a second occasion at the request boundary, so the answer names the
+         * alternative — split the practice — instead of a generic list-size complaint.
+         */
+        @Test
+        @WithAdminUser
+        void shouldReturn400ForASecondOccasion() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "two-occasions",
+                "Two occasions",
+                List.of(
+                    PracticeBinding.on(
+                        ScmSignals.PULL_REQUEST_OPENED,
+                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
+                    ),
+                    PracticeBinding.on(
+                        ScmSignals.PULL_REQUEST_MERGED,
+                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
+                    )
+                ),
+                "Reviewable criteria",
+                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
+                null,
+                null,
+                null
+            );
+
+            ProblemDetail problem = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getProperties().get("errors"))
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .hasEntrySatisfying("bindings", messages ->
+                    assertThat(messages)
+                        .asInstanceOf(InstanceOfAssertFactories.list(String.class))
+                        .anySatisfy(message -> assertThat(message).contains("split this into two practices"))
+                );
+        }
+
         @Test
         @WithAdminUser
         void shouldReturn400ForNameTooShort() {

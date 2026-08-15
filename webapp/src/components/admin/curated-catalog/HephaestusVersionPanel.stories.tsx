@@ -5,7 +5,6 @@ import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockMergeBinding,
 	mockPracticeDefinitionOptions,
-	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
@@ -21,7 +20,7 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 const shipped = {
 	name: "Say what changed and why",
 	artifactKind: "scm.pull_request" as const,
-	bindings: [mockPullRequestBinding, mockMergeBinding],
+	bindings: [mockMergeBinding],
 	criteria: "The updated default criteria.",
 	whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 	automatedReviewPolicy: mockPullRequestPolicy,
@@ -76,11 +75,10 @@ export const UpdateChangesReviewBehavior: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
 		await expect(canvas.getByText("How it is reviewed")).toBeVisible();
-		// Both occasions, each with its own evidence — a merged list would claim the practice always
-		// reads the review threads whole, which only the review at the merge does.
-		await expect(canvas.getAllByText("Marked ready for review").length).toBeGreaterThan(0);
+		// The one occasion, with the evidence that review reads: at the merge the threads are read
+		// whole, which is what licenses a claim that nobody ever resolved one.
 		await expect(canvas.getAllByText("Merged").length).toBeGreaterThan(0);
-		await expect(canvas.getAllByText("· whole").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("· captured whole").length).toBeGreaterThan(0);
 		expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Pull request details").length).toBeGreaterThan(0);
 		await expect(canvas.getByText("Not independently validated")).toBeVisible();

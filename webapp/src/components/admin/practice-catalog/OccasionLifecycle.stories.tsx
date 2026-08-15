@@ -42,7 +42,6 @@ const meta = {
 		onToggle: fn(),
 		onDrafts: false,
 		onDraftsChange: fn(),
-		occasion: { index: 0 },
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
@@ -81,44 +80,48 @@ const ALL_WORK_TYPES: Array<{
 export const EveryWorkType: Story = {
 	render: (args) => (
 		<div className="space-y-8">
-			{ALL_WORK_TYPES.map(({ workType, selected }, index) => (
+			{ALL_WORK_TYPES.map(({ workType, selected }) => (
 				<section key={workType.artifactKind} className="space-y-2">
 					<h3 className="text-sm font-semibold">{artifactKindLabel(workType.artifactKind)}</h3>
-					<OccasionLifecycle
-						{...args}
-						workType={workType}
-						selected={selected}
-						occasion={{ index }}
-					/>
+					<OccasionLifecycle {...args} workType={workType} selected={selected} />
 				</section>
 			))}
 		</div>
 	),
 };
 
-/** The server refuses a moment bound twice, and discovering that on save costs the whole form. */
-export const MomentsHeldByAnotherOccasion: Story = {
-	args: {
-		selected: ["scm.pull_request.merged"],
-		occasion: { index: 1 },
-		heldElsewhere: new Map([
-			["scm.pull_request.opened", 1],
-			["scm.pull_request.ready", 1],
-		]),
-	},
+/**
+ * Asking for a review by hand is not a moment: the wire carries it apart from the occasions, so the
+ * strip has nothing to filter out and nothing to apologise for.
+ */
+export const TheHandAskedReviewIsNotOnTheStrip: Story = {
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 2" }));
-		await expect(strip.getByRole("checkbox", { name: /^Opened/ })).toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
-		await expect(strip.getAllByText("in occasion 1")).toHaveLength(2);
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
+		await expect(strip.queryByRole("checkbox", { name: /by hand/ })).toBeNull();
+		await expect(strip.getAllByRole("checkbox")).toHaveLength(6);
+	},
+};
+
+/**
+ * A moment saved before the work type stopped offering it, drawn from what was saved: the form
+ * refuses to save while it is set, so it has to be here to be unticked.
+ */
+export const AMomentTheWorkTypeNoLongerOffers: Story = {
+	args: {
+		selected: [...mockPullRequestBinding.signals, "scm.pull_request.manual_review"],
+	},
+	play: async ({ canvas, userEvent }) => {
+		const stray = canvas.getByRole("checkbox", { name: /^Review requested by hand/ });
+		await expect(stray).toBeChecked();
+
+		await userEvent.click(stray);
+		await expect(canvas.queryByRole("checkbox", { name: /^Review requested by hand/ })).toBeNull();
 	},
 };
 
 /** The fault is drawn on the strip, not only in the message. */
 export const NoMomentChosen: Story = {
-	args: { selected: [], occasion: { index: 0, errorId: "practice-bindings-error" } },
+	args: { selected: [], errorId: "practice-bindings-error" },
 };
 
 export const Disabled: Story = {

@@ -19,13 +19,18 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * One occasion on which a practice is reviewed, and the evidence a review occasioned that way needs.
+ * The occasion on which a practice is reviewed, and the evidence that review needs.
  *
- * <p>Evidence sits on the occasion rather than on the practice because what a review needs is a
- * function of what occasioned it: reviewed at merge, a practice may have to establish that no decision
- * was ever recorded; reviewed at open, the same practice only reads what is in front of it. Evidence
- * named once and shared across practices was rejected: it made adding a source to one practice a
- * mutation invisible in that practice's diff.
+ * <p>A practice declares exactly one of these — {@code PracticeDefinitionValidator} refuses a second.
+ * One occasion may name several signals, which is how a practice judged all the way along a piece of
+ * work is written; a practice that must read <em>different</em> evidence at a different moment is a
+ * second practice, which is what the shipped catalogue does and what keeps one row, one tier setting
+ * and one feedback history describing one habit.
+ *
+ * <p>The evidence therefore travels with the occasion rather than being named once and shared across
+ * practices: shared evidence made adding a source to one practice a mutation invisible in that
+ * practice's diff. The list shape survives the single-occasion rule so that relaxing the rule stays a
+ * validator change rather than a data migration.
  *
  * @param signals  the signals that occasion this review; at least one, and all of one artifact kind
  * @param onDrafts whether a draft artifact occasions this review; defaults to false since most

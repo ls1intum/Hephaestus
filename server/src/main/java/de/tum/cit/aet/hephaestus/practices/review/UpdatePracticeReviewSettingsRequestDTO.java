@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
@@ -33,11 +32,5 @@ public record UpdatePracticeReviewSettingsRequestDTO(
             "unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet."
     )
     PracticeReviewTier defaultReviewTier,
-    @Schema(
-        description = "Where feedback may go at all: CONVERSATION for the mentor conversation only, " +
-            "ON_THE_WORK to also place it on the work. Null leaves it unchanged; name FEEDBACK_REACH in " +
-            "'reset' to clear it."
-    )
-    FeedbackReach feedbackReach,
     @Schema(description = "Fields to reset back to inherit") Set<PracticeReviewField> reset
 ) {}

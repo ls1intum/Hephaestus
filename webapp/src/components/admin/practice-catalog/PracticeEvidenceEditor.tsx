@@ -56,25 +56,22 @@ function selectedRole(role: EvidenceRole): string {
 
 export interface PracticeEvidenceEditorProps {
 	options: PracticeWorkTypeDefinitionOptions;
-	/** One occasion's evidence, not the practice's. */
+	/** What this practice's review reads. */
 	needs: PracticeEvidenceRequirement[];
 	onChange: (needs: PracticeEvidenceRequirement[]) => void;
-	/** Prefix for control ids, so a form-level error can send focus into the right occasion. */
+	/** Prefix for control ids, so a form-level error can send focus to the control that failed. */
 	idPrefix: string;
-	/** Appended to every group's accessible name, since occasions present identically named groups. */
-	occasionLabel: string;
 	disabled?: boolean;
 	invalid?: boolean;
 	errorId?: string;
 }
 
-/** What one occasion reads: collapsed, the answer is the chips; open, a source is one line. */
+/** What the review reads: collapsed, the answer is the chips; open, a source is one line. */
 export function PracticeEvidenceEditor({
 	options,
 	needs,
 	onChange,
 	idPrefix,
-	occasionLabel,
 	disabled = false,
 	invalid = false,
 	errorId,
@@ -101,7 +98,7 @@ export function PracticeEvidenceEditor({
 			id={`${idPrefix}-evidence`}
 			data-invalid={invalid || undefined}
 			aria-describedby={errorId}
-			aria-label={`What this review reads, ${occasionLabel}`}
+			aria-label="What this review reads"
 			// A focus target for a form-level error, not a Tab stop.
 			tabIndex={-1}
 		>
@@ -113,8 +110,10 @@ export function PracticeEvidenceEditor({
 						required.map((source) => (
 							<Badge key={source.sourceKind} variant="secondary">
 								{source.displayName}
+								{/* "captured whole", never "nothing in the world is missing": the claim is about
+								    this capture of this source, which is all the review can see. */}
 								{roleOf(needs, source.sourceKind) === "EXHAUSTIVE" && (
-									<span className="text-muted-foreground">· whole</span>
+									<span className="text-muted-foreground">· captured whole</span>
 								)}
 							</Badge>
 						))
@@ -178,7 +177,6 @@ export function PracticeEvidenceEditor({
 										source={source}
 										role={roleOf(needs, source.sourceKind)}
 										idPrefix={idPrefix}
-										occasionLabel={occasionLabel}
 										disabled={disabled}
 										onRoleChange={(role) => onChange(withRole(needs, source.sourceKind, role))}
 									/>
@@ -203,19 +201,11 @@ interface SourceRowProps {
 	source: PracticeEvidenceSourceOption;
 	role: EvidenceRole;
 	idPrefix: string;
-	occasionLabel: string;
 	disabled: boolean;
 	onRoleChange: (role: EvidenceRole) => void;
 }
 
-function SourceRow({
-	source,
-	role,
-	idPrefix,
-	occasionLabel,
-	disabled,
-	onRoleChange,
-}: SourceRowProps) {
+function SourceRow({ source, role, idPrefix, disabled, onRoleChange }: SourceRowProps) {
 	const controlId = `${idPrefix}-source-${source.sourceKind}`;
 	const inUse = role !== "NOT_USED";
 	const quality = evidenceQualityRequirement(source.requiredQuality);
@@ -240,7 +230,7 @@ function SourceRow({
 			<RadioGroup
 				className="flex w-fit shrink-0 gap-0 overflow-hidden rounded-lg border"
 				disabled={disabled}
-				aria-label={`How ${source.displayName} is used, ${occasionLabel}`}
+				aria-label={`How ${source.displayName} is used`}
 				value={selectedRole(role)}
 				onValueChange={(next) => {
 					if (next) onRoleChange(next as EvidenceRole);
@@ -283,6 +273,11 @@ interface AbsenceClaimProps {
 }
 
 /**
+ * The stance, named by what it lets the review do and what it costs. Not "can say what is missing":
+ * completeness is measured against one capture of one source, so the claim never reaches beyond that
+ * source — which is why the bound the capture is taken under is on screen whether or not it is
+ * ticked, rather than left to be discovered on the review that refused.
+ *
  * Absent — not present-and-unselectable — where the source contract can never promise a whole
  * capture, since choosing it there is a request the server refuses.
  */
@@ -291,7 +286,7 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 	if (!source.supportsExhaustiveEvidence) return null;
 	const checkboxId = `${controlId}-exhaustive`;
 	const claimed = role === "EXHAUSTIVE";
-	const consequenceId = `${checkboxId}-consequence`;
+	const scopeId = `${checkboxId}-scope`;
 	return (
 		<Field orientation="horizontal" className="mt-1.5 gap-2" data-disabled={disabled}>
 			<Checkbox
@@ -299,20 +294,23 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 				disabled={disabled}
 				checked={claimed}
 				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
-				aria-describedby={claimed ? consequenceId : undefined}
+				aria-describedby={scopeId}
 			/>
 			{/* Label and description are siblings, never nested: a `<label>` takes phrasing content only,
 			    and a description inside it joins the checkbox's accessible name. */}
 			<FieldContent>
 				<FieldLabel htmlFor={checkboxId} className="text-xs font-normal">
-					Can say what is missing from {source.displayName}
+					May claim something is absent from {source.displayName}
 				</FieldLabel>
-				{claimed && (
-					<FieldDescription id={consequenceId}>
-						A partial capture then refuses the review: an incomplete list cannot tell “it is not
-						there” apart from “we did not fetch it”. {source.selectionScope}
-					</FieldDescription>
-				)}
+				<FieldDescription id={scopeId}>
+					{claimed && (
+						<>
+							A partial capture then refuses the review: an incomplete list cannot tell “it is not
+							there” apart from “we did not fetch it”.{" "}
+						</>
+					)}
+					{source.selectionScope}
+				</FieldDescription>
 			</FieldContent>
 		</Field>
 	);

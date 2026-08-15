@@ -72,14 +72,18 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
             .hasMessage("Evidence source is not available for the selected work type");
     }
 
-    /** Checked per binding, so a second occasion cannot quietly read something the kind cannot have. */
+    /**
+     * A second occasion is refused rather than merged, and the refusal names the alternative — the one
+     * the shipped catalogue already takes, where a habit judged differently at a different moment is a
+     * separate practice with its own tier, history and copy.
+     */
     @Test
-    void rejectsEvidenceThatCannotExistOnASecondOccasion() {
+    void rejectsASecondOccasion() {
         PracticeDefinition definition = new PracticeDefinition(
             "Focused review",
             List.of(
                 PracticeBinding.on(ScmSignals.PULL_REQUEST_OPENED, List.of(need(DIFF))),
-                PracticeBinding.on(ScmSignals.PULL_REQUEST_MERGED, List.of(need(FOR_ANOTHER_KIND)))
+                PracticeBinding.on(ScmSignals.PULL_REQUEST_MERGED, List.of(need(DIFF)))
             ),
             "Assess the review",
             null,
@@ -91,7 +95,49 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
 
         assertThatThrownBy(() -> validator.validate(definition))
             .isInstanceOf(IllegalArgumentException.class)
-            .hasMessage("Evidence source is not available for the selected work type");
+            .hasMessage(
+                "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
+                    "split this into two practices."
+            );
+    }
+
+    /** Several signals on the one occasion stay legal: that is how a practice judged all along is written. */
+    @Test
+    void acceptsSeveralSignalsOnTheOneOccasion() {
+        PracticeDefinition definition = new PracticeDefinition(
+            "Focused review",
+            List.of(
+                new PracticeBinding(
+                    List.of(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_MERGED),
+                    List.of(need(DIFF)),
+                    false
+                )
+            ),
+            "Assess the review",
+            null,
+            languageModel(),
+            null,
+            null,
+            null
+        );
+
+        assertThatCode(() -> validator.validate(definition)).doesNotThrowAnyException();
+    }
+
+    /**
+     * Binding to the hand-request signal decides nothing — the gate matches such a request by artifact
+     * kind and ignores the signal — so a practice holding only it would look configured and never fire.
+     */
+    @Test
+    void rejectsBindingToAReviewSomebodyAsksForByHand() {
+        assertThatThrownBy(() ->
+            validator.validate(
+                definition(ScmSignals.PULL_REQUEST_MANUAL_REVIEW, null, List.of(need(DIFF)), languageModel())
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("not an occasion to choose")
+            .hasMessageContaining("scm.pull_request.manual_review");
     }
 
     /**

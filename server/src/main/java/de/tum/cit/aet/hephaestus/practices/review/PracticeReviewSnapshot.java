@@ -16,8 +16,7 @@ record PracticeReviewSnapshot(
     @Nullable Boolean deliverToMerged,
     @Nullable Integer cooldownMinutes,
     @Nullable WorkspaceReviewScope reviewScope,
-    @Nullable String defaultReviewTier,
-    @Nullable String feedbackReach
+    @Nullable String defaultReviewTier
 ) implements ConfigAuditSnapshot {
     static PracticeReviewSnapshot of(PracticeReviewSettings s) {
         return new PracticeReviewSnapshot(
@@ -25,8 +24,7 @@ record PracticeReviewSnapshot(
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
             s.getReviewScope(),
-            s.getDefaultReviewTier(),
-            s.getFeedbackReach()
+            s.getDefaultReviewTier()
         );
     }
 }

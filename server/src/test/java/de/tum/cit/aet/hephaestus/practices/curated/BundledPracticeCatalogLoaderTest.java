@@ -38,6 +38,18 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
             .satisfies(practice -> assertThat(practice.definition().precomputeScript()).isNotBlank());
     }
 
+    /**
+     * The loader runs every shipped practice through {@link PracticeDefinitionValidator}, so a second
+     * {@code on} entry would fail the boot rather than reach a workspace. Asserted on the composed
+     * definitions as well, because a bare-string entry expands into a binding without looking like one.
+     */
+    @Test
+    void shouldShipOneOccasionPerPractice() {
+        assertThat(loader.catalog().practices()).allSatisfy(practice ->
+            assertThat(practice.definition().bindings()).as("occasions of '%s'", practice.slug()).hasSize(1)
+        );
+    }
+
     @Test
     void shouldKeepDetectorVocabularyOutOfLearnerCopy() {
         Pattern detectorVocabulary = Pattern.compile("\\b(?:PRESENT|ABSENT|GOOD|BAD|NOT_APPLICABLE)\\b");

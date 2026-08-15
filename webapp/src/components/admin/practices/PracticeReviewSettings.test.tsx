@@ -20,7 +20,6 @@ const settings: PracticeReviewSettingsData = {
 	cooldownMinutes: 15,
 	reviewScope: { targetBranches: [], repositories: [] },
 	defaultReviewTier: "DELIVER",
-	feedbackReach: "ON_THE_WORK",
 };
 
 function renderSettings(props: Partial<React.ComponentProps<typeof PracticeReviewSettings>> = {}) {

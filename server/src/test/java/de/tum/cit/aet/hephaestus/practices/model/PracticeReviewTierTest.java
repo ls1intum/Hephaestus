@@ -28,9 +28,7 @@ class PracticeReviewTierTest extends BaseUnitTest {
     class Autonomy {
 
         /**
-         * The whole axis in one assertion: only the top tier may act without a person. The tier says how
-         * far the system may go on its own; it says nothing about <em>where</em>, which is
-         * {@code FeedbackReach}'s question and is asked separately.
+         * The whole axis in one assertion: only the top tier may act without a person.
          */
         @Test
         void onlyDeliverActsWithoutAHuman() {

@@ -10,7 +10,6 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.dto.AreaReviewTierRollupDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReviewTierRollupDTO;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
@@ -85,10 +84,9 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         return practiceRepository.save(practice);
     }
 
-    private void workspaceDefaultsTo(@Nullable PracticeReviewTier tier, @Nullable FeedbackReach reach) {
+    private void workspaceDefaultsTo(@Nullable PracticeReviewTier tier) {
         Workspace stored = workspaceRepository.findById(workspace.getId()).orElseThrow();
         stored.getReviewSettings().applyDefaultReviewTier(tier == null ? null : tier.name());
-        stored.getReviewSettings().applyFeedbackReach(reach == null ? null : reach.name());
         workspaceRepository.save(stored);
     }
 
@@ -129,7 +127,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @BeforeEach
         void seedCatalogue() {
             ensureAdminMembership(workspace);
-            workspaceDefaultsTo(PracticeReviewTier.PROPOSE, FeedbackReach.CONVERSATION);
+            workspaceDefaultsTo(PracticeReviewTier.PROPOSE);
 
             PracticeArea alpha = persistArea("alpha", 0, PracticeReviewTier.OFF);
             persistPractice("alpha-inherits", alpha, null);
@@ -266,13 +264,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         }
 
         @Test
-        @WithAdminUser
-        @DisplayName("carries the workspace's feedback reach alongside the counts")
-        void carriesTheWorkspacesReach() {
-            assertThat(fetchRollup().feedbackReach()).isEqualTo(FeedbackReach.CONVERSATION);
-        }
-
-        @Test
         @WithMentorUser
         @DisplayName("forbids a plain workspace member")
         void shouldReturn403ForNonAdmin() {
@@ -312,7 +303,6 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(rollup.workspaceDefault().override()).isNull();
             assertThat(rollup.workspaceDefault().inherited()).isTrue();
             assertThat(rollup.workspaceDefault().source()).isEqualTo(ReviewTierSource.WORKSPACE);
-            assertThat(rollup.feedbackReach()).isEqualTo(FeedbackReach.DEFAULT);
             assertThat(rollup.counts()).containsEntry(PracticeReviewTier.DELIVER, 1);
         }
 
@@ -322,7 +312,7 @@ class ReviewTierRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         @DisplayName("a workspace that chose reports its own decision, and every unopinionated practice moves")
         void aWorkspaceThatChoseIsNotInheriting() {
             ensureAdminMembership(workspace);
-            workspaceDefaultsTo(PracticeReviewTier.OFF, null);
+            workspaceDefaultsTo(PracticeReviewTier.OFF);
             persistPractice("solo", null, null);
 
             ReviewTierRollupDTO rollup = fetchRollup();

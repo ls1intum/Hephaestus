@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeEvidenceSourceOptionDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeManualReviewSignalDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeSignalOptionDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeWorkTypeDefinitionOptionsDTO;
 import java.util.List;
@@ -32,6 +33,7 @@ public class PracticeDefinitionOptionsService {
     public PracticeDefinitionOptionsDTO options() {
         ArtifactSourceCatalog catalog = catalogs.current();
         return new PracticeDefinitionOptionsDTO(
+            catalog.version(),
             signalOptions
                 .authorableKinds()
                 .stream()
@@ -45,10 +47,14 @@ public class PracticeDefinitionOptionsService {
         return new PracticeWorkTypeDefinitionOptionsDTO(
             artifact,
             signalOptions
-                .optionsFor(artifact)
+                .bindableOptionsFor(artifact)
                 .stream()
                 .map(option -> new PracticeSignalOptionDTO(option.signal(), option.displayName(), option.recommended()))
                 .toList(),
+            signalOptions
+                .manualRequestOptionFor(artifact)
+                .map(option -> new PracticeManualReviewSignalDTO(option.signal(), option.displayName()))
+                .orElse(null),
             defaults.policyFor(artifact),
             defaults.needsFor(artifact),
             List.of(PracticeAutomatedReviewMode.LANGUAGE_MODEL),

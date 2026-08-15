@@ -1,4 +1,4 @@
-import type { Practice, PracticeReviewSettings, ReviewTierAssignment } from "@/api/types.gen";
+import type { Practice, ReviewTierAssignment } from "@/api/types.gen";
 
 /**
  * How much autonomy the system has over one practice, in the words every surface has to use.
@@ -12,8 +12,8 @@ export type ReviewTier = Practice["reviewTier"]["effective"];
 
 /**
  * Ascending autonomy, and load-bearing: every surface lays the tiers out in this order. Each tier
- * above Off runs the review and they differ only in how far the system may act on its own — where
- * feedback goes is the separate, workspace-level {@link FeedbackReach}.
+ * above Off runs the review and they differ only in how far a review may act on its own. There is no
+ * second axis: at Deliver, feedback goes wherever the practice's channel allows.
  */
 export const REVIEW_TIER_ORDER = [
 	"OFF",
@@ -28,9 +28,8 @@ export const REVIEW_TIER_LABELS: Record<ReviewTier, string> = {
 };
 
 /**
- * Two constraints on anything written here. Each sentence has to stand alone, because a surface may
- * show one tier with nothing to compare it against; and none of them may say *where* feedback goes,
- * which is the reach setting and not this one.
+ * Each sentence has to stand alone, because a surface may show one tier with nothing to compare it
+ * against.
  *
  * One short line each: these are printed inside a menu that is already tall, and a sentence long
  * enough to wrap turns it into a scrollable region a keyboard cannot reach, which the a11y gate fails.
@@ -78,30 +77,6 @@ export function inheritedTierSourceSentence(
 	if (assignment.source === "WORKSPACE") return `Follows ${WORKSPACE_DEFAULT_SOURCE}`;
 	return `Follows ${inheritedFrom ?? "its area"}`;
 }
-
-/** Where a workspace lets feedback go at all. ANDed with every tier, so it can only ever silence. */
-export type FeedbackReach = PracticeReviewSettings["feedbackReach"];
-
-/** Narrowest first, so the pair reads the way the tier ladder does — left is less. */
-export const FEEDBACK_REACH_ORDER = [
-	"CONVERSATION",
-	"ON_THE_WORK",
-] as const satisfies readonly FeedbackReach[];
-
-export const FEEDBACK_REACH_LABELS: Record<FeedbackReach, string> = {
-	CONVERSATION: "In the mentor conversation",
-	ON_THE_WORK: "On the work as well",
-};
-
-/**
- * Neither sentence may promise feedback: reach is ANDed with the tier, so it can stop a practice
- * speaking in a place but never make a quiet one speak.
- */
-export const FEEDBACK_REACH_DESCRIPTIONS: Record<FeedbackReach, string> = {
-	CONVERSATION: "Feedback reaches the person in their mentor conversation and nowhere else.",
-	ON_THE_WORK:
-		"Feedback also lands on the work itself — pull request summaries, inline notes and issue comments.",
-};
 
 export interface ReviewTierCount {
 	tier: ReviewTier;

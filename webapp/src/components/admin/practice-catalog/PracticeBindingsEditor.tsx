@@ -1,28 +1,18 @@
-import { HandIcon, PlusIcon, Trash2Icon } from "lucide-react";
+import { HandIcon } from "lucide-react";
 import type {
 	PracticeBinding,
 	PracticeEvidenceOutcome,
 	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
 import {
-	ADD_BINDING_ID,
-	belongsToBinding,
-	bindingFieldId,
-	bindingIdPrefix,
-	claimedSignals,
-	everyMomentClaimed,
 	hasDrafts,
-	MAX_BINDINGS,
 	normalizeBinding,
-	occasionLabel,
-	recommendedBinding,
-	signalOwners,
+	OCCASION_ID_PREFIX,
+	occasionFieldId,
 } from "@/components/admin/practice-catalog/bindings";
 import { OccasionLifecycle } from "@/components/admin/practice-catalog/OccasionLifecycle";
-import { manualRequestSignal } from "@/components/admin/practice-catalog/occasion-moments";
 import { PracticeEvidenceEditor } from "@/components/admin/practice-catalog/PracticeEvidenceEditor";
 import { PracticeEvidenceOutcomeSummary } from "@/components/admin/practice-catalog/PracticeEvidenceOutcomeSummary";
-import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 
@@ -31,22 +21,32 @@ const BINDINGS_ERROR_ID = "practice-bindings-error";
 
 export interface PracticeBindingsEditorProps {
 	options: PracticeWorkTypeDefinitionOptions;
-	bindings: PracticeBinding[];
-	onChange: (bindings: PracticeBinding[]) => void;
+	/**
+	 * The one occasion this practice is reviewed on. A practice has exactly one: to read different
+	 * evidence at a different moment, the server asks for a second practice rather than a second
+	 * occasion, so there is nothing here to add to or remove.
+	 */
+	binding: PracticeBinding;
+	onChange: (binding: PracticeBinding) => void;
 	/** When false, evidence is still recorded but never checked. */
 	canAttemptReview?: boolean;
 	/** True while the practice runs no automated review, which forbids evidence outright. */
 	guidanceOnly?: boolean;
 	outcome?: PracticeEvidenceOutcome;
 	error?: string;
-	/** The control the error points at, so the invalid occasion is the one that opens. */
+	/** The control the error points at, so the field it names is the one that opens. */
 	errorFocusId?: string;
 	disabled?: boolean;
 }
 
+/**
+ * When a practice is reviewed and what that review reads: a moment strip, the draft question, and
+ * one evidence list. Deliberately not a card — it is the body of the form's own section, and a
+ * border around it would say there is a second one of these somewhere.
+ */
 export function PracticeBindingsEditor({
 	options,
-	bindings,
+	binding,
 	onChange,
 	canAttemptReview = true,
 	guidanceOnly = false,
@@ -55,132 +55,12 @@ export function PracticeBindingsEditor({
 	errorFocusId,
 	disabled = false,
 }: PracticeBindingsEditorProps) {
-	const claimed = claimedSignals(bindings);
-	const allClaimed = everyMomentClaimed(options, claimed);
-	const canAdd = bindings.length < MAX_BINDINGS && !allClaimed;
 	const WorkIcon = artifactKindIcon(options.artifactKind);
-	const handAsked = manualRequestSignal(options.signals) !== undefined;
-	const replaceAt = (index: number, binding: PracticeBinding) =>
-		onChange(bindings.map((item, itemIndex) => (itemIndex === index ? binding : item)));
-
-	return (
-		<div className="space-y-4">
-			{/* Everything true of the work type rather than of one occasion sits here once. */}
-			<div className="space-y-1.5">
-				<p className="flex items-center gap-2 text-sm font-medium">
-					<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
-					{artifactKindLabel(options.artifactKind)}
-				</p>
-				{!guidanceOnly && (
-					<p className="text-sm text-muted-foreground">
-						{canAttemptReview
-							? "Each occasion is checked for the evidence it must have before its review runs. Missing or incomplete evidence skips the practice rather than guessing."
-							: "Evidence is recorded for each occasion, but nothing is reviewed while the practice asks for a human."}
-					</p>
-				)}
-				{handAsked && (
-					<p className="flex items-start gap-2 text-sm text-muted-foreground">
-						<HandIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
-						<span>
-							Anyone can also ask for a review by hand. That reviews this practice whatever state
-							the work is in
-							{hasDrafts(options.artifactKind) && ", drafts included"}, so it is not a moment to
-							choose here.
-						</span>
-					</p>
-				)}
-			</div>
-			{outcome && (
-				<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
-			)}
-			<ol className="space-y-4">
-				{bindings.map((binding, index) => (
-					<li
-						// Position is the only identity an occasion has: its signals are what the author is
-						// editing, so keying on them would remount the card mid-edit.
-						key={index}
-						className="rounded-lg border p-4"
-					>
-						<BindingCard
-							options={options}
-							binding={binding}
-							index={index}
-							total={bindings.length}
-							heldElsewhere={signalOwners(bindings, index)}
-							guidanceOnly={guidanceOnly}
-							errorFocusId={belongsToBinding(errorFocusId, index) ? errorFocusId : undefined}
-							errorId={error ? BINDINGS_ERROR_ID : undefined}
-							disabled={disabled}
-							onChange={(next) => replaceAt(index, next)}
-							onRemove={() => onChange(bindings.filter((_, other) => other !== index))}
-						/>
-					</li>
-				))}
-			</ol>
-			<div className="flex flex-wrap items-center gap-3">
-				<Button
-					id={ADD_BINDING_ID}
-					type="button"
-					variant="outline"
-					size="sm"
-					aria-describedby={
-						error && errorFocusId === ADD_BINDING_ID ? BINDINGS_ERROR_ID : undefined
-					}
-					disabled={disabled || !canAdd}
-					onClick={() =>
-						onChange([
-							...bindings,
-							guidanceOnly
-								? { ...recommendedBinding(options, [...claimed]), needs: [] }
-								: recommendedBinding(options, [...claimed]),
-						])
-					}
-				>
-					<PlusIcon className="size-4" />
-					Add occasion
-				</Button>
-				{allClaimed && bindings.length > 0 && (
-					<p className="text-sm text-muted-foreground">
-						Every moment this kind of work offers is already claimed by an occasion.
-					</p>
-				)}
-			</div>
-			{error && <FieldError id={BINDINGS_ERROR_ID}>{error}</FieldError>}
-		</div>
-	);
-}
-
-interface BindingCardProps {
-	options: PracticeWorkTypeDefinitionOptions;
-	binding: PracticeBinding;
-	index: number;
-	total: number;
-	heldElsewhere: ReadonlyMap<string, number>;
-	guidanceOnly: boolean;
-	errorFocusId?: string;
-	errorId?: string;
-	disabled: boolean;
-	onChange: (binding: PracticeBinding) => void;
-	onRemove: () => void;
-}
-
-function BindingCard({
-	options,
-	binding,
-	index,
-	total,
-	heldElsewhere,
-	guidanceOnly,
-	errorFocusId,
-	errorId,
-	disabled,
-	onChange,
-	onRemove,
-}: BindingCardProps) {
-	const idPrefix = bindingIdPrefix(index);
-	const label = occasionLabel(index);
-	const signalsInvalid = errorFocusId === bindingFieldId(index, "signals");
-	const evidenceInvalid = errorFocusId === bindingFieldId(index, "evidence");
+	const signalsInvalid = errorFocusId === occasionFieldId("signals");
+	const evidenceInvalid = errorFocusId === occasionFieldId("evidence");
+	// A review asked for by hand runs a practice the workspace lets run: guidance-only and
+	// human-review-needed practices sit at OFF, so promising one here would be a promise nothing keeps.
+	const handAsked = options.manualReviewSignal !== undefined && canAttemptReview && !guidanceOnly;
 	const toggleSignal = (signal: string, chosen: boolean) =>
 		onChange(
 			normalizeBinding({
@@ -193,63 +73,76 @@ function BindingCard({
 
 	return (
 		<div className="space-y-4">
-			{total > 1 && (
-				<div className="flex items-start justify-between gap-3">
-					<p className="font-medium">Occasion {index + 1}</p>
-					<Button
-						type="button"
-						variant="ghost"
-						size="icon-sm"
-						disabled={disabled}
-						onClick={onRemove}
-						aria-label={`Remove occasion ${index + 1}`}
-					>
-						<Trash2Icon className="size-4" />
-					</Button>
-				</div>
+			<div className="space-y-1.5">
+				<p className="flex items-center gap-2 text-sm font-medium">
+					<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
+					{artifactKindLabel(options.artifactKind)}
+				</p>
+				{!guidanceOnly && (
+					<p className="text-sm text-muted-foreground">
+						{canAttemptReview
+							? "Every review is checked for the evidence it must have before it runs. Missing or incomplete evidence skips the practice rather than guessing."
+							: "Evidence is recorded, but nothing is reviewed while the practice asks for a human."}
+					</p>
+				)}
+			</div>
+
+			{outcome && (
+				<PracticeEvidenceOutcomeSummary outcome={outcome} sources={options.allowedSources} />
 			)}
 
 			<OccasionLifecycle
 				workType={options}
-				occasion={{ index, errorId: signalsInvalid ? errorId : undefined }}
 				selected={binding.signals}
-				heldElsewhere={heldElsewhere}
 				onToggle={toggleSignal}
 				onDrafts={binding.onDrafts === true}
 				onDraftsChange={(onDrafts) => onChange(normalizeBinding({ ...binding, onDrafts }))}
+				errorId={signalsInvalid && error ? BINDINGS_ERROR_ID : undefined}
 				disabled={disabled}
 			/>
 
 			{guidanceOnly ? (
 				<p className="text-sm text-muted-foreground">
-					Guidance only: this occasion reads nothing, because no review runs.
+					Guidance only: this practice reads nothing, because no review runs.
 				</p>
 			) : (
 				<PracticeEvidenceEditor
 					options={options}
 					needs={binding.needs}
-					idPrefix={idPrefix}
-					occasionLabel={label}
+					idPrefix={OCCASION_ID_PREFIX}
 					disabled={disabled}
 					invalid={evidenceInvalid}
-					errorId={evidenceInvalid ? errorId : undefined}
+					errorId={evidenceInvalid && error ? BINDINGS_ERROR_ID : undefined}
 					onChange={(needs) => onChange({ ...binding, needs })}
 				/>
 			)}
+
+			{/* Under the evidence rather than over the moments: asking by hand is a second way in, not a
+			    moment nobody is allowed to tick, and what it reads is the list directly above. */}
+			{handAsked && (
+				<p className="flex items-start gap-2 text-sm text-muted-foreground">
+					<HandIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+					<span>
+						Anyone can also ask for this review by hand, with “Review this now” on the work itself.
+						It reads the same evidence and runs whatever state the work is in
+						{hasDrafts(options.artifactKind) && ", drafts included"}.
+					</span>
+				</p>
+			)}
+
+			{error && <FieldError id={BINDINGS_ERROR_ID}>{error}</FieldError>}
 		</div>
 	);
 }
 
-/** Strips every occasion's evidence, which is what "guidance only" means server-side. */
-export function withoutEvidence(bindings: readonly PracticeBinding[]): PracticeBinding[] {
-	return bindings.map((binding) => ({ ...binding, needs: [] }));
+/** Strips the occasion's evidence, which is what "guidance only" means server-side. */
+export function withoutEvidence(binding: PracticeBinding): PracticeBinding {
+	return { ...binding, needs: [] };
 }
 
 export function withRecommendedEvidence(
-	bindings: readonly PracticeBinding[],
+	binding: PracticeBinding,
 	options: PracticeWorkTypeDefinitionOptions,
-): PracticeBinding[] {
-	return bindings.map((binding) =>
-		binding.needs.length > 0 ? binding : { ...binding, needs: [...options.recommendedNeeds] },
-	);
+): PracticeBinding {
+	return binding.needs.length > 0 ? binding : { ...binding, needs: [...options.recommendedNeeds] };
 }

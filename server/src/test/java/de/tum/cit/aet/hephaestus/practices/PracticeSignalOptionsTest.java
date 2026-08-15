@@ -24,9 +24,9 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
     private final PracticeSignalOptions options = PracticeSignalOptionsFixture.real();
 
     @Test
-    @DisplayName("a kind offers exactly the signals its descriptor declares")
+    @DisplayName("a kind offers exactly the lifecycle signals its descriptor declares")
     void offersWhatTheDomainDeclares() {
-        assertThat(options.optionsFor(ArtifactKinds.PULL_REQUEST))
+        assertThat(options.bindableOptionsFor(ArtifactKinds.PULL_REQUEST))
             .extracting(SignalOption::signal)
             .containsExactly(
                 ScmSignals.PULL_REQUEST_OPENED,
@@ -34,23 +34,37 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
                 ScmSignals.PULL_REQUEST_SYNCHRONIZED,
                 ScmSignals.PULL_REQUEST_REVIEWED,
                 ScmSignals.PULL_REQUEST_MERGED,
-                ScmSignals.PULL_REQUEST_CLOSED,
-                ScmSignals.PULL_REQUEST_MANUAL_REVIEW
+                ScmSignals.PULL_REQUEST_CLOSED
             );
-        assertThat(options.optionsFor(ArtifactKinds.ISSUE))
+        assertThat(options.bindableOptionsFor(ArtifactKinds.ISSUE))
             .extracting(SignalOption::signal)
-            .containsExactly(
-                ScmSignals.ISSUE_OPENED,
-                ScmSignals.ISSUE_LABELED,
-                ScmSignals.ISSUE_CLOSED,
-                ScmSignals.ISSUE_MANUAL_REVIEW
-            );
+            .containsExactly(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED);
+    }
+
+    /**
+     * A review somebody asks for reviews every practice on the kind whatever state the work is in, so
+     * an author who ticked it would be deciding nothing while a practice holding only it would look
+     * configured and never fire.
+     */
+    @Test
+    @DisplayName("asking for a review by hand is not offered as an occasion, but is still named")
+    void keepsTheHandRequestOutOfTheOccasions() {
+        assertThat(options.bindableOptionsFor(ArtifactKinds.PULL_REQUEST))
+            .extracting(SignalOption::signal)
+            .doesNotContain(ScmSignals.PULL_REQUEST_MANUAL_REVIEW);
+        assertThat(options.eligibleFor(ArtifactKinds.ISSUE)).doesNotContain(ScmSignals.ISSUE_MANUAL_REVIEW);
+
+        assertThat(options.manualRequestOptionFor(ArtifactKinds.PULL_REQUEST).map(SignalOption::signal)).contains(
+            ScmSignals.PULL_REQUEST_MANUAL_REVIEW
+        );
+        // A kind whose descriptor declares no such signal says so by absence, not by an invented name.
+        assertThat(options.manualRequestOptionFor(ArtifactKinds.CONVERSATION_THREAD)).isEmpty();
     }
 
     @Test
     @DisplayName("a conversation thread is authorable now that a descriptor declares what happens to it")
     void offersTheConversationSignal() {
-        assertThat(options.optionsFor(ArtifactKinds.CONVERSATION_THREAD))
+        assertThat(options.bindableOptionsFor(ArtifactKinds.CONVERSATION_THREAD))
             .extracting(SignalOption::signal)
             .containsExactly(ChatSignals.CONVERSATION_THREAD_SETTLED);
     }
@@ -63,7 +77,7 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
             new IssueArtifactDescriptor()
         );
 
-        assertThat(scmOnly.optionsFor(ArtifactKinds.CONVERSATION_THREAD)).isEmpty();
+        assertThat(scmOnly.bindableOptionsFor(ArtifactKinds.CONVERSATION_THREAD)).isEmpty();
         assertThat(scmOnly.eligibleFor(ArtifactKinds.CONVERSATION_THREAD)).isEmpty();
         assertThat(scmOnly.authorableKinds()).doesNotContain(ArtifactKinds.CONVERSATION_THREAD);
     }
@@ -72,7 +86,7 @@ class PracticeSignalOptionsTest extends BaseUnitTest {
     @DisplayName("the domain's recommendation reaches the authoring surface")
     void carriesTheDomainsRecommendation() {
         List<SignalName> recommended = options
-            .optionsFor(ArtifactKinds.PULL_REQUEST)
+            .bindableOptionsFor(ArtifactKinds.PULL_REQUEST)
             .stream()
             .filter(SignalOption::recommended)
             .map(SignalOption::signal)

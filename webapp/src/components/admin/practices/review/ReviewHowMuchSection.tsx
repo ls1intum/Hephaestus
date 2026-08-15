@@ -89,12 +89,6 @@ export function ReviewHowMuchSection({
 							body: { reset: ["DEFAULT_REVIEW_TIER"] },
 						})
 					}
-					onSetFeedbackReach={(feedbackReach) =>
-						updateSettings.mutate({ path: { workspaceSlug }, body: { feedbackReach } })
-					}
-					onClearFeedbackReach={() =>
-						updateSettings.mutate({ path: { workspaceSlug }, body: { reset: ["FEEDBACK_REACH"] } })
-					}
 					onSetAreaTier={(areaSlug, reviewTier) =>
 						autonomy.setAreaTier.mutate({ path: { workspaceSlug, areaSlug }, body: { reviewTier } })
 					}

@@ -12,7 +12,6 @@ import {
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { Stateful } from "@/stories/stateful";
-import { ADD_BINDING_ID } from "./bindings";
 import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
 import { outcome } from "./story-mock-data";
 
@@ -21,20 +20,20 @@ const meta = {
 	component: PracticeBindingsEditor,
 	args: {
 		options: mockPullRequestWorkType,
-		bindings: [mockPullRequestBinding],
+		binding: mockPullRequestBinding,
 		onChange: fn(),
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
 	render: (args) => (
-		<Stateful initial={args.bindings}>
-			{(bindings, setBindings) => (
+		<Stateful initial={args.binding}>
+			{(binding, setBinding) => (
 				<PracticeBindingsEditor
 					{...args}
-					bindings={bindings}
+					binding={binding}
 					onChange={(next) => {
 						args.onChange(next);
-						setBindings(next);
+						setBinding(next);
 					}}
 				/>
 			)}
@@ -45,23 +44,25 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** One occasion: the moments, the draft question, and one evidence list — no card around them. */
 export const PullRequestLifecycle: Story = {
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await expect(strip.getByRole("checkbox", { name: /^Opened/ })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: /^Merged/ })).not.toBeChecked();
 		await expect(
 			strip.getByRole("checkbox", { name: "New commits pushed every time" }),
 		).toBeVisible();
-		// Nothing to remove when there is only one: a practice with no occasion cannot be saved.
-		await expect(canvas.queryByRole("button", { name: "Remove occasion 1" })).toBeNull();
+		// Nothing numbers the occasion, because a practice only ever has the one.
+		await expect(canvas.queryByText(/Occasion 1/)).toBeNull();
+		await expect(canvas.queryByRole("button", { name: /Add occasion/ })).toBeNull();
 	},
 };
 
 export const IssueLifecycle: Story = {
-	args: { options: mockIssueWorkType, bindings: [mockIssueBinding] },
+	args: { options: mockIssueWorkType, binding: mockIssueBinding },
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await expect(strip.getByRole("checkbox", { name: "Labeled every time" })).toBeChecked();
 		// An issue is never a draft, so the question is not asked.
 		await expect(canvas.queryByRole("switch", { name: /^Include drafts/ })).toBeNull();
@@ -69,75 +70,68 @@ export const IssueLifecycle: Story = {
 };
 
 export const DocumentLifecycle: Story = {
-	args: { options: mockDocumentWorkType, bindings: [mockDocumentBinding] },
+	args: { options: mockDocumentWorkType, binding: mockDocumentBinding },
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await expect(strip.getByRole("checkbox", { name: /^Published/ })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: "Content changed every time" })).toBeChecked();
 		await expect(strip.getByRole("checkbox", { name: /^Archived/ })).not.toBeChecked();
 	},
 };
 
-/** A second occasion is refused because there is no moment left for it to start on. */
+/** A conversation offers one moment, so the strip is one node and there are no bands to tell apart. */
 export const ConversationHasOneMoment: Story = {
-	args: { options: mockConversationWorkType, bindings: [mockConversationBinding] },
+	args: { options: mockConversationWorkType, binding: mockConversationBinding },
 	play: async ({ canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await expect(strip.getAllByRole("checkbox")).toHaveLength(1);
 		await expect(canvas.queryByText("Along the way")).toBeNull();
-		await expect(canvas.getByRole("button", { name: "Add occasion" })).toBeDisabled();
-		await expect(canvas.getByText(/already claimed by an occasion/)).toBeVisible();
 	},
 };
 
 /**
- * Only the review at the merge reads the threads whole, which is what licenses it to say nobody ever
- * resolved one.
+ * At the merge the threads are read whole, which is what licenses the review to say nobody ever
+ * resolved one. A practice that wants a cheaper read at a different moment is a second practice.
  */
-export const TwoOccasionsReadingDifferentThings: Story = {
-	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
+export const ReadingASourceWhole: Story = {
+	args: { binding: mockMergeBinding },
 	play: async ({ canvas }) => {
-		const second = within(canvas.getByRole("group", { name: "Reviews when, occasion 2" }));
-		await expect(second.getByRole("checkbox", { name: /^Merged/ })).toBeChecked();
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
+		await expect(strip.getByRole("checkbox", { name: /^Merged/ })).toBeChecked();
 		await expect(
-			within(canvas.getByRole("group", { name: "What this review reads, occasion 2" })).getByText(
-				/whole/,
+			within(canvas.getByRole("group", { name: "What this review reads" })).getByText(
+				"· captured whole",
 			),
 		).toBeVisible();
 	},
 };
 
 /**
- * The server rejects a moment bound twice, and the refusal would otherwise arrive as a failed save
- * with nothing on screen explaining it.
+ * Asking by hand is a second way in, not a moment nobody is allowed to tick: it is stated once, under
+ * the evidence it reads, and never offered on the strip.
  */
-export const AMomentBelongsToOneOccasion: Story = {
-	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
-	play: async ({ canvas }) => {
-		const second = within(canvas.getByRole("group", { name: "Reviews when, occasion 2" }));
-		await expect(second.getByRole("checkbox", { name: /^Opened/ })).toHaveAttribute(
-			"aria-disabled",
-			"true",
-		);
-		await expect(second.getAllByText("in occasion 1")).toHaveLength(3);
-	},
-};
-
 export const AskingByHandIsNotAMoment: Story = {
 	play: async ({ canvas }) => {
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await expect(canvas.queryByRole("checkbox", { name: /Review requested by hand/ })).toBeNull();
-		await expect(canvas.getByText(/Anyone can also ask for a review by hand/)).toBeVisible();
+		await expect(strip.queryByText(/ask for this review by hand/)).toBeNull();
+		await expect(canvas.getByText(/ask for this review by hand/)).toBeVisible();
 	},
 };
 
-export const DraftsAreAPropertyOfTheOccasion: Story = {
-	args: {
-		bindings: [{ ...mockPullRequestBinding, onDrafts: true }, mockMergeBinding],
-	},
+/** Nothing reviews a practice that runs no review, so nothing promises a hand-asked one either. */
+export const GuidanceOnlyPromisesNoHandAskedReview: Story = {
+	args: { guidanceOnly: true, binding: { ...mockPullRequestBinding, needs: [] } },
 	play: async ({ canvas }) => {
-		const drafts = canvas.getAllByRole("switch", { name: /^Include drafts/ });
-		await expect(drafts[0]).toBeChecked();
-		await expect(drafts[1]).not.toBeChecked();
+		await expect(canvas.getByText(/reads nothing, because no review runs/)).toBeVisible();
+		await expect(canvas.queryByText(/ask for this review by hand/)).toBeNull();
+	},
+};
+
+export const IncludingDrafts: Story = {
+	args: { binding: { ...mockPullRequestBinding, onDrafts: true } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("switch", { name: "Include drafts" })).toBeChecked();
 	},
 };
 
@@ -145,16 +139,8 @@ export const RecordedButNotReviewed: Story = {
 	args: { canAttemptReview: false },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/nothing is reviewed while the practice asks/)).toBeVisible();
-	},
-};
-
-export const GuidanceOnly: Story = {
-	args: {
-		guidanceOnly: true,
-		bindings: [{ ...mockPullRequestBinding, needs: [] }],
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByText(/reads nothing, because no review runs/)).toBeVisible();
+		// Asking by hand would not review it either while it waits for a human.
+		await expect(canvas.queryByText(/ask for this review by hand/)).toBeNull();
 	},
 };
 
@@ -185,85 +171,59 @@ export const WithRecentOutcomes: Story = {
  */
 export const Invalid: Story = {
 	args: {
-		bindings: [{ signals: [], needs: [] }],
-		error: "Choose when this occasion starts a review.",
-		errorFocusId: "practice-binding-0-signals",
+		binding: { signals: [], needs: [] },
+		error: "Choose when this practice is reviewed.",
+		errorFocusId: "practice-occasion-signals",
 	},
 	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("group", { name: "Reviews when, occasion 1" }),
-		).toHaveAccessibleDescription("Choose when this occasion starts a review.");
-		// Describing every group would make the message mean "something on this form is wrong".
-		await expect(
-			canvas.getByRole("group", { name: "What this review reads, occasion 1" }),
-		).not.toHaveAccessibleDescription("Choose when this occasion starts a review.");
-	},
-};
-
-/** With no occasion at all there is no group to fault, so the message rides the action that fixes it. */
-export const NoOccasionAtAll: Story = {
-	args: {
-		bindings: [],
-		error: "Add at least one occasion that starts a review.",
-		errorFocusId: ADD_BINDING_ID,
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Add occasion" })).toHaveAccessibleDescription(
-			"Add at least one occasion that starts a review.",
+		await expect(canvas.getByRole("group", { name: "Reviews when" })).toHaveAccessibleDescription(
+			"Choose when this practice is reviewed.",
 		);
+		// Describing both groups would make the message mean "something on this form is wrong".
+		await expect(
+			canvas.getByRole("group", { name: "What this review reads" }),
+		).not.toHaveAccessibleDescription("Choose when this practice is reviewed.");
 	},
 };
 
 /**
- * The shared fixture aliases the work type's recommended evidence to the first occasion's, which
- * would let seeding from either satisfy the assertion below, so this gives the work type its own.
+ * A practice saved while asking by hand still counted as an occasion. The moment is no longer
+ * offered, so it is drawn from what was saved — hiding it would leave nobody able to untick it.
  */
-export const AddingAnOccasion: Story = {
+export const AMomentTheWorkTypeNoLongerOffers: Story = {
 	args: {
-		options: {
-			...mockPullRequestWorkType,
-			recommendedNeeds: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }],
+		binding: {
+			...mockPullRequestBinding,
+			signals: [...mockPullRequestBinding.signals, "scm.pull_request.manual_review"],
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Add occasion" }));
+		const stray = canvas.getByRole("checkbox", { name: /^Review requested by hand/ });
+		await expect(stray).toBeChecked();
 
-		// Every recommended moment already belongs to occasion 1, so the new one takes the first free.
-		await expect(args.onChange).toHaveBeenCalledWith([
-			mockPullRequestBinding,
-			{
-				signals: ["scm.pull_request.reviewed"],
-				needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }],
-			},
-		]);
+		await userEvent.click(stray);
+
+		await expect(args.onChange).toHaveBeenCalledWith({
+			signals: mockPullRequestBinding.signals,
+			needs: mockPullRequestBinding.needs,
+		});
 	},
 };
 
 export const ChoosingAMoment: Story = {
 	play: async ({ args, canvas }) => {
-		const strip = within(canvas.getByRole("group", { name: "Reviews when, occasion 1" }));
+		const strip = within(canvas.getByRole("group", { name: "Reviews when" }));
 		await userEvent.click(strip.getByRole("checkbox", { name: /^Review submitted/ }));
 
 		// Sorted on the way out, so an untouched practice does not come back looking edited.
-		await expect(args.onChange).toHaveBeenCalledWith([
-			{
-				signals: [
-					"scm.pull_request.opened",
-					"scm.pull_request.ready",
-					"scm.pull_request.reviewed",
-					"scm.pull_request.synchronized",
-				],
-				needs: mockPullRequestBinding.needs,
-			},
-		]);
-	},
-};
-
-export const RemovingAnOccasion: Story = {
-	args: { bindings: [mockPullRequestBinding, mockMergeBinding] },
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Remove occasion 2" }));
-
-		await expect(args.onChange).toHaveBeenCalledWith([mockPullRequestBinding]);
+		await expect(args.onChange).toHaveBeenCalledWith({
+			signals: [
+				"scm.pull_request.opened",
+				"scm.pull_request.ready",
+				"scm.pull_request.reviewed",
+				"scm.pull_request.synchronized",
+			],
+			needs: mockPullRequestBinding.needs,
+		});
 	},
 };

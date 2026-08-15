@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
@@ -19,9 +18,6 @@ public record ReviewTierRollupDTO(
     @NonNull
     @Schema(description = "The workspace-level decision every area and practice falls back to")
     ReviewTierAssignmentDTO workspaceDefault,
-    @NonNull
-    @Schema(description = "Where feedback may go in this workspace at all, ANDed with every tier")
-    FeedbackReach feedbackReach,
     @NonNull
     @Schema(description = "Practice count per effective tier across the whole workspace; every tier is a key")
     Map<PracticeReviewTier, Integer> counts,

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.springframework.stereotype.Component;
 
 /**
@@ -37,29 +38,28 @@ public class PracticeSignalOptions {
             .toList();
     }
 
-    /** The signals a practice on this kind may bind to, in the order its descriptor declares them. */
-    public List<SignalOption> optionsFor(ArtifactKind kind) {
-        Optional<ArtifactDescriptor> descriptor = artifacts.descriptorFor(kind);
-        if (descriptor.isEmpty()) {
-            return List.of();
-        }
-        return descriptor
-            .get()
-            .signals()
-            .stream()
-            .map(signal -> new SignalOption(signal.name(), signal.displayName(), signal.recommendedForAuthoring()))
+    /**
+     * The occasions a practice on this kind may bind to, in the order its descriptor declares them.
+     *
+     * <p>A review somebody asks for by hand is not among them. It reviews every practice on the kind
+     * whatever state the work is in, so binding to it decides nothing, while a practice holding only it
+     * would look configured and never fire on its own.
+     */
+    public List<SignalOption> bindableOptionsFor(ArtifactKind kind) {
+        return declaredOptions(kind)
+            .filter(signal -> !signal.requestedByHand())
+            .map(SignalOption::of)
             .toList();
+    }
+
+    /** The occasion a person raises by asking for a review of this kind, if the kind admits one. */
+    public Optional<SignalOption> manualRequestOptionFor(ArtifactKind kind) {
+        return declaredOptions(kind).filter(Signal::requestedByHand).map(SignalOption::of).findFirst();
     }
 
     /** The signal a person's explicit "review this now" raises for this kind, if the kind admits one. */
     public Optional<SignalName> manualRequestSignalFor(ArtifactKind kind) {
-        return artifacts
-            .descriptorFor(kind)
-            .stream()
-            .flatMap(descriptor -> descriptor.signals().stream())
-            .filter(Signal::requestedByHand)
-            .map(Signal::name)
-            .findFirst();
+        return manualRequestOptionFor(kind).map(SignalOption::signal);
     }
 
     /**
@@ -72,7 +72,7 @@ public class PracticeSignalOptions {
     }
 
     public Set<SignalName> eligibleFor(ArtifactKind kind) {
-        return optionsFor(kind).stream().map(SignalOption::signal).collect(Collectors.toUnmodifiableSet());
+        return bindableOptionsFor(kind).stream().map(SignalOption::signal).collect(Collectors.toUnmodifiableSet());
     }
 
     /**
@@ -88,6 +88,14 @@ public class PracticeSignalOptions {
             .isPresent();
     }
 
+    private Stream<Signal> declaredOptions(ArtifactKind kind) {
+        return artifacts.descriptorFor(kind).map(ArtifactDescriptor::signals).orElseGet(List::of).stream();
+    }
+
     /** One authoring choice: the signal stored, the label shown, and whether a new practice starts on it. */
-    public record SignalOption(SignalName signal, String displayName, boolean recommended) {}
+    public record SignalOption(SignalName signal, String displayName, boolean recommended) {
+        static SignalOption of(Signal signal) {
+            return new SignalOption(signal.name(), signal.displayName(), signal.recommendedForAuthoring());
+        }
+    }
 }

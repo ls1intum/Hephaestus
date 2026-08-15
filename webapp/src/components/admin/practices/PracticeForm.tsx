@@ -8,6 +8,7 @@ import type {
 	PracticeEvidenceOutcome,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
+import { soleBinding } from "@/components/admin/practice-catalog/bindings";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
@@ -60,7 +61,7 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 	return {
 		slug: practice.slug,
 		name: practice.name,
-		bindings: practice.bindings,
+		bindings: [soleBinding(practice.bindings)],
 		criteria: practice.criteria,
 		...(practice.areaSlug ? { areaSlug: practice.areaSlug } : {}),
 		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),

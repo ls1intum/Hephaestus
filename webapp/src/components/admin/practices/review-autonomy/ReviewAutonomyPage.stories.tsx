@@ -43,7 +43,6 @@ const small = buildAutonomyFixture({
 
 const chosenByTheWorkspace = buildAutonomyFixture({
 	workspaceDefault: "PROPOSE",
-	feedbackReach: "CONVERSATION",
 	areas: [
 		{
 			slug: "pull-request-hygiene",
@@ -129,8 +128,6 @@ const meta = {
 		onOverridesOnlyChange: fn(),
 		onSetWorkspaceDefault: fn(),
 		onClearWorkspaceDefault: fn(),
-		onSetFeedbackReach: fn(),
-		onClearFeedbackReach: fn(),
 		onSetAreaTier: fn(),
 		onClearAreaTier: fn(),
 		onSetPracticeTier: fn(),
@@ -166,11 +163,15 @@ type Story = StoryObj<typeof meta>;
 
 export const WorkspaceDefaultUnset: Story = {
 	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Workspace default" })).toBeVisible();
 		await expect(canvas.getByText("Not chosen yet, so Deliver applies.")).toBeVisible();
 		await expect(
-			canvas.getByRole("radiogroup", { name: "How far Hephaestus may go without you" }),
+			canvas.getByRole("radiogroup", { name: "How far reviews go without you" }),
 		).toBeVisible();
-		await expect(canvas.queryByText(/How loud/i)).not.toBeInTheDocument();
+		// The workspace makes one decision, not two: how far a review goes is the only axis, and
+		// Deliver means delivered wherever the practice's channel allows.
+		await expect(canvas.queryByText(/feedback may go/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/mentor conversation/i)).not.toBeInTheDocument();
 		await expectNoPageOverflow();
 	},
 };
@@ -179,18 +180,15 @@ export const WorkspaceDefaultSet: Story = {
 	args: from(chosenByTheWorkspace),
 	play: async ({ args, canvas, userEvent }) => {
 		await expect(
-			within(
-				canvas.getByRole("radiogroup", { name: "How far Hephaestus may go without you" }),
-			).getByRole("radio", { name: "Propose" }),
-		).toBeChecked();
-		await expect(
-			within(canvas.getByRole("radiogroup", { name: "Where feedback may go" })).getByRole("radio", {
-				name: /In the mentor conversation/,
-			}),
+			within(canvas.getByRole("radiogroup", { name: "How far reviews go without you" })).getByRole(
+				"radio",
+				{ name: "Propose" },
+			),
 		).toBeChecked();
 
-		const resets = canvas.getAllByRole("button", { name: /^Use the default/ });
-		await userEvent.click(resets[0]);
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Use the default for how far reviews go without you" }),
+		);
 		await expect(args.onClearWorkspaceDefault).toHaveBeenCalled();
 	},
 };
@@ -198,7 +196,7 @@ export const WorkspaceDefaultSet: Story = {
 export const AreaOverride: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		const testing = canvas.getByRole("radiogroup", {
-			name: "How far Hephaestus may go in Testing",
+			name: "How far reviews go in Testing",
 		});
 		await expect(within(testing).getByRole("radio", { name: "Off" })).toBeChecked();
 		await userEvent.click(within(testing).getByRole("radio", { name: "Deliver" }));
@@ -209,7 +207,7 @@ export const AreaOverride: Story = {
 		if (!(unassigned instanceof HTMLElement)) throw new Error("No-area group not rendered");
 		await expect(within(unassigned).getByText("Follows the workspace default")).toBeVisible();
 		await expect(
-			within(unassigned).queryByRole("radiogroup", { name: /How far Hephaestus may go in/ }),
+			within(unassigned).queryByRole("radiogroup", { name: /How far reviews go in/ }),
 		).not.toBeInTheDocument();
 	},
 };
@@ -225,7 +223,7 @@ export const PracticeOverrideWithReset: Story = {
 		await expect(within(row).getByText("Set here.")).toBeVisible();
 		await expect(
 			within(row).getByRole("radiogroup", {
-				name: "How far Hephaestus may go on Links the issue it closes",
+				name: "How far reviews go on Links the issue it closes",
 			}),
 		).toBeVisible();
 
@@ -380,7 +378,9 @@ export const AtScale: Story = {
 				/^100 practices: 6 off, 89 propose and 5 deliver\. \d+ practices and \d+ areas set by hand\.$/,
 			),
 		).toBeVisible();
-		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(27);
+		// One ladder for the workspace and one per area, and nothing else on the screen is a
+		// radiogroup: every area is shut, so no practice ladder is rendered.
+		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(26);
 		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
 		await expectNoPageOverflow();
 	},
@@ -403,7 +403,7 @@ export const DecisionsShareOneColumn: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: /^Pull request hygiene/ }));
 
 		const lefts = canvas
-			.getAllByRole("radiogroup", { name: /^How far Hephaestus may go (in|on) / })
+			.getAllByRole("radiogroup", { name: /^How far reviews go (in|on) / })
 			.map((group) => Math.round(group.getBoundingClientRect().left));
 
 		await expect(lefts.length).toBeGreaterThan(25);
@@ -426,7 +426,7 @@ export const NotReviewable: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Observability/ }));
 		await expect(
-			canvas.getByText("Hephaestus can't review this practice, so it stays off."),
+			canvas.getByText("This practice can't be reviewed automatically, so it stays off."),
 		).toBeVisible();
 		await expect(canvas.getByRole("checkbox", { name: /^Select / })).toHaveAttribute(
 			"aria-disabled",

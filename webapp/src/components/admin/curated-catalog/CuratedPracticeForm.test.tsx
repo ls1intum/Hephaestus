@@ -44,8 +44,8 @@ function renderForm(overrides: Partial<CuratedPracticeFormInitialValue> = {}, on
 	);
 }
 
-function occasion(index: number) {
-	return within(screen.getByRole("group", { name: `Reviews when, occasion ${index}` }));
+function occasion() {
+	return within(screen.getByRole("group", { name: "Reviews when" }));
 }
 
 /**
@@ -82,7 +82,7 @@ describe("CuratedPracticeForm", () => {
 		expect(screen.queryByRole("textbox", { name: "Identifier" })).toBeNull();
 	});
 
-	it("starts a new practice on the recommended occasion rather than an empty one", async () => {
+	it("starts a new practice on the recommended moments rather than an empty occasion", async () => {
 		await renderWithRouter(
 			<CuratedPracticeForm
 				mode="create"
@@ -99,7 +99,7 @@ describe("CuratedPracticeForm", () => {
 			screen.getByRole("radio", { name: /Pull or merge request/ }).getAttribute("aria-checked"),
 		).toBe("true");
 		expect(
-			occasion(1)
+			occasion()
 				.getByRole("checkbox", { name: /^Opened/ })
 				.getAttribute("aria-checked"),
 		).toBe("true");
@@ -188,86 +188,62 @@ describe("CuratedPracticeForm", () => {
 		).toBe(false);
 	});
 
-	it("submits an occasion the author added, with its own evidence", async () => {
+	it("submits the one occasion the practice is reviewed on", async () => {
 		const user = userEvent.setup();
 		const onSubmit = vi.fn();
 		await renderForm({}, onSubmit);
 
-		await user.click(screen.getByRole("button", { name: "Add occasion" }));
-		// Checked, not merely offered: an occasion with nothing to start it cannot be saved.
-		expect(
-			occasion(2)
-				.getByRole("checkbox", { name: /^Review submitted/ })
-				.getAttribute("aria-checked"),
-		).toBe("true");
-		await user.click(occasion(2).getByRole("checkbox", { name: /^Merged/ }));
-		await user.click(occasion(2).getByRole("checkbox", { name: /^Review submitted/ }));
+		// Nothing adds a second: a practice that would read different evidence at a different moment is
+		// a second practice, which is what the server asks for.
+		expect(screen.queryByRole("button", { name: /Add occasion/ })).toBeNull();
+		await user.click(occasion().getByRole("checkbox", { name: /^Merged/ }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		const submitted = onSubmit.mock.calls[0]?.[0];
-		expect(submitted.bindings).toHaveLength(2);
-		expect(submitted.bindings[0].signals).toEqual(mockPullRequestBinding.signals);
-		expect(submitted.bindings[1].signals).toEqual(["scm.pull_request.merged"]);
+		expect(submitted.bindings).toHaveLength(1);
+		// Sorted the way the server stores them, so an untouched practice is not dirty on the way back.
+		expect(submitted.bindings[0].signals).toEqual(
+			["scm.pull_request.merged", ...mockPullRequestBinding.signals].sort(),
+		);
 	});
 
-	it("sends focus into the occasion that is wrong, not to the top of the form", async () => {
+	it("sends focus to the moments when none is chosen, not to the top of the form", async () => {
 		const user = userEvent.setup();
 		const onSubmit = vi.fn();
 		await renderForm({}, onSubmit);
 
-		await user.click(screen.getByRole("button", { name: "Add occasion" }));
 		for (const signal of mockPullRequestBinding.signals) {
-			await user.click(occasion(1).getByRole("checkbox", { name: moment(signal) }));
+			await user.click(occasion().getByRole("checkbox", { name: moment(signal) }));
 		}
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).not.toHaveBeenCalled();
-		expect(screen.getByRole("alert").textContent).toBe(
-			"Choose when this occasion starts a review.",
-		);
-		// With two occasions on screen, a message at the bottom of the section says nothing about which
-		// one to fix; landing in it does.
-		await waitFor(() => expect(document.activeElement?.id).toBe("practice-binding-0-signals"));
+		expect(screen.getByRole("alert").textContent).toBe("Choose when this practice is reviewed.");
+		// The strip stays on screen with nothing ticked, rather than taking the kind of work — and the
+		// only way to tick one again — with it. A message at the bottom of a long form is not the fix.
+		expect(occasion().getAllByRole("checkbox")).toHaveLength(6);
+		await waitFor(() => expect(document.activeElement?.id).toBe("practice-occasion-signals"));
 	});
 
-	it("refuses to let two occasions start on the same moment", async () => {
-		const user = userEvent.setup();
-		await renderForm();
-
-		await user.click(screen.getByRole("button", { name: "Add occasion" }));
-
-		// `aria-disabled`, not `data-disabled`: Base UI renders the checkbox as a non-native element,
-		// so `data-disabled` is only the CSS hook while `aria-disabled` is what the accessibility tree
-		// exposes. A regression that keeps the styling and drops the semantics leaves the first alone.
-		expect(
-			occasion(2)
-				.getByRole("checkbox", { name: /^Opened/ })
-				.getAttribute("aria-disabled"),
-		).toBe("true");
-		// The hint names the occasion holding the moment, rather than leaving the author to hunt.
-		expect(occasion(2).getAllByText("in occasion 1")).toHaveLength(3);
-	});
-
-	it("lets one occasion say what is missing and another stay silent about it", async () => {
+	it("lets the review claim something is absent from a source it reads whole", async () => {
 		const user = userEvent.setup();
 		const onSubmit = vi.fn();
 		await renderForm({}, onSubmit);
 
 		await user.click(
-			within(screen.getByRole("group", { name: "What this review reads, occasion 1" })).getByRole(
-				"button",
-				{ name: "Choose sources" },
-			),
+			within(screen.getByRole("group", { name: "What this review reads" })).getByRole("button", {
+				name: "Choose sources",
+			}),
 		);
 		await user.click(
 			within(
 				screen.getByRole("radiogroup", {
-					name: "How Review threads and decisions is used, occasion 1",
+					name: "How Review threads and decisions is used",
 				}),
 			).getByRole("radio", { name: "Required" }),
 		);
 		await user.click(
-			screen.getByRole("checkbox", { name: /missing from Review threads and decisions/ }),
+			screen.getByRole("checkbox", { name: /absent from Review threads and decisions/ }),
 		);
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
@@ -282,23 +258,23 @@ describe("CuratedPracticeForm", () => {
 		await renderForm();
 
 		await user.click(
-			within(screen.getByRole("group", { name: "What this review reads, occasion 1" })).getByRole(
-				"button",
-				{ name: "Choose sources" },
-			),
+			within(screen.getByRole("group", { name: "What this review reads" })).getByRole("button", {
+				name: "Choose sources",
+			}),
 		);
 		await user.click(
-			within(
-				screen.getByRole("radiogroup", { name: "How Linked work items is used, occasion 1" }),
-			).getByRole("radio", { name: "Required" }),
+			within(screen.getByRole("radiogroup", { name: "How Linked work items is used" })).getByRole(
+				"radio",
+				{ name: "Required" },
+			),
 		);
 
 		// Absent rather than present-and-refused on save: the source contract cannot promise a whole
-		// capture of the linked work items, so no claim about what is missing from them can rest on it.
-		expect(screen.queryByRole("checkbox", { name: /missing from Linked work items/ })).toBeNull();
+		// capture of the linked work items, so no claim about what is absent from them can rest on it.
+		expect(screen.queryByRole("checkbox", { name: /absent from Linked work items/ })).toBeNull();
 	});
 
-	it("strips every occasion's evidence when the practice stops being reviewed", async () => {
+	it("strips the occasion's evidence when the practice stops being reviewed", async () => {
 		const user = userEvent.setup();
 		const onSubmit = vi.fn();
 		await renderForm({}, onSubmit);
@@ -319,7 +295,7 @@ describe("CuratedPracticeForm", () => {
 		expect(screen.queryByText("Static analysis")).toBeNull();
 	});
 
-	it("gives every occasion its evidence back when review resumes", async () => {
+	it("gives the occasion its evidence back when review resumes", async () => {
 		const user = userEvent.setup();
 		const onSubmit = vi.fn();
 		await renderForm({}, onSubmit);
@@ -333,7 +309,7 @@ describe("CuratedPracticeForm", () => {
 		const submitted = onSubmit.mock.calls[0]?.[0];
 		expect(
 			bindingsProblem(
-				submitted.bindings,
+				submitted.bindings[0],
 				submitted.automatedReviewPolicy,
 				mockPracticeDefinitionOptions.workTypes[0],
 			),
@@ -388,23 +364,23 @@ describe("CuratedPracticeForm", () => {
 		);
 	});
 
-	it("keeps each work type's occasions to itself", async () => {
+	it("keeps each work type's moments to itself", async () => {
 		const user = userEvent.setup();
 		await renderForm();
 
 		await user.click(screen.getByRole("radio", { name: /^Issue/ }));
-		await user.click(occasion(1).getByRole("checkbox", { name: /^Closed$/ }));
+		await user.click(occasion().getByRole("checkbox", { name: /^Closed$/ }));
 		await user.click(screen.getByRole("radio", { name: /Pull or merge request/ }));
 		expect(
-			occasion(1)
+			occasion()
 				.getByRole("checkbox", { name: /^Opened/ })
 				.getAttribute("aria-checked"),
 		).toBe("true");
-		expect(occasion(1).queryByRole("checkbox", { name: /^Closed$/ })).toBeNull();
+		expect(occasion().queryByRole("checkbox", { name: /^Closed$/ })).toBeNull();
 
 		await user.click(screen.getByRole("radio", { name: /^Issue/ }));
 		expect(
-			occasion(1)
+			occasion()
 				.getByRole("checkbox", { name: /^Closed$/ })
 				.getAttribute("aria-checked"),
 		).toBe("true");

@@ -19,9 +19,14 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     String name,
 
-    @Size(min = 1, max = 10, message = "A practice must declare between 1 and 10 bindings")
+    @Size(
+        min = 1,
+        max = 1,
+        message = "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
+            "split this into two practices."
+    )
     @Valid
-    @Schema(description = "Replacement occasions and their evidence; omit to leave them unchanged")
+    @Schema(description = "Replacement occasion and its evidence; omit to leave it unchanged")
     @Nullable
     List<PracticeBinding> bindings,
 

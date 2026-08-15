@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -36,16 +35,5 @@ public record PracticeReviewSettingsDTO(
     )
     PracticeReviewTier defaultReviewTier,
     @Schema(description = "Raw override; null = this workspace has never chosen, so DELIVER applies")
-    PracticeReviewTier defaultReviewTierOverride,
-    @NonNull
-    @Schema(
-        description = "Effective: where feedback may go at all. CONVERSATION = the recipient's mentor " +
-            "conversation and nowhere else · ON_THE_WORK = also on the work itself, as pull-request " +
-            "summaries, inline notes and issue comments. ANDed with every practice's tier, so this cannot " +
-            "give a practice more autonomy than its own tier allows — it can only narrow where a practice " +
-            "that already delivers is allowed to deliver."
-    )
-    FeedbackReach feedbackReach,
-    @Schema(description = "Raw override; null = this workspace has never chosen, so ON_THE_WORK applies")
-    FeedbackReach feedbackReachOverride
+    PracticeReviewTier defaultReviewTierOverride
 ) {}

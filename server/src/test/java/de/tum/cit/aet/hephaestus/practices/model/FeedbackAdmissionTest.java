@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.practices.model;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackReach;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Arrays;
 import org.junit.jupiter.api.DisplayName;
@@ -21,20 +20,20 @@ class FeedbackAdmissionTest extends BaseUnitTest {
     class Provenance {
 
         /**
-         * Written as a derivation rather than as a constant: a backfilled observation is entitled to
-         * PROFILE and to nothing else, and PROFILE has no producer anywhere in {@code src/main} — so a
-         * backfill is measured and delivered nowhere. This fails the day a PROFILE producer appears,
-         * forcing a deliberate decision rather than silently inheriting the old answer.
+         * A backfilled observation is refused on both channels a producer writes to today, at every tier —
+         * so a campaign is measured and delivered nowhere. The other half of that claim, that nothing
+         * produces a {@code PROFILE} unit, is pinned by {@code ProfileChannelUnwrittenArchTest}.
          */
         @Test
-        void aBackfilledObservationReachesNoChannelThatAnyoneCanWriteToToday() {
+        void aBackfilledObservationIsRefusedOnEveryChannelAProducerWritesToday() {
             for (PracticeReviewTier tier : PracticeReviewTier.values()) {
-                for (FeedbackReach reach : FeedbackReach.values()) {
-                    for (FeedbackChannel channel : FeedbackChannel.values()) {
-                        assertThat(FeedbackAdmission.delivers(ObservationOrigin.BACKFILL, tier, reach, channel))
-                            .as("BACKFILL at tier %s, reach %s, on channel %s", tier, reach, channel)
-                            .isFalse();
-                    }
+                for (FeedbackChannel channel : new FeedbackChannel[] {
+                    FeedbackChannel.IN_CONTEXT,
+                    FeedbackChannel.CONVERSATION,
+                }) {
+                    assertThat(FeedbackAdmission.delivers(ObservationOrigin.BACKFILL, tier, channel))
+                        .as("BACKFILL at tier %s, on channel %s", tier, channel)
+                        .isFalse();
                 }
             }
         }
@@ -59,13 +58,12 @@ class FeedbackAdmissionTest extends BaseUnitTest {
     class Conjunction {
 
         @Test
-        void allThreeAxesMustAdmitAChannel() {
+        void bothAxesMustAdmitAChannel() {
             // Everything says yes.
             assertThat(
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,
                     PracticeReviewTier.DELIVER,
-                    FeedbackReach.ON_THE_WORK,
                     FeedbackChannel.IN_CONTEXT
                 )
             ).isTrue();
@@ -74,16 +72,6 @@ class FeedbackAdmissionTest extends BaseUnitTest {
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,
                     PracticeReviewTier.PROPOSE,
-                    FeedbackReach.ON_THE_WORK,
-                    FeedbackChannel.IN_CONTEXT
-                )
-            ).isFalse();
-            // The reach alone refuses: this workspace does not speak on the work.
-            assertThat(
-                FeedbackAdmission.delivers(
-                    ObservationOrigin.LIVE,
-                    PracticeReviewTier.DELIVER,
-                    FeedbackReach.CONVERSATION,
                     FeedbackChannel.IN_CONTEXT
                 )
             ).isFalse();
@@ -92,69 +80,39 @@ class FeedbackAdmissionTest extends BaseUnitTest {
                 FeedbackAdmission.delivers(
                     ObservationOrigin.BACKFILL,
                     PracticeReviewTier.DELIVER,
-                    FeedbackReach.ON_THE_WORK,
                     FeedbackChannel.IN_CONTEXT
                 )
             ).isFalse();
         }
 
         /**
-         * The two configurable axes are genuinely independent: narrowing reach must not silence a channel
-         * the tier still owns, and lowering the tier must not be undoable by widening reach.
+         * The tier is a decision about how much, never about where: a practice that is allowed to speak is
+         * allowed to speak on every channel its provenance admits, and one that is not is silent on all of
+         * them.
          */
         @Test
-        void reachCannotMakeAQuietPracticeSpeakAndTheTierCannotChooseWhere() {
-            assertThat(
-                FeedbackAdmission.delivers(
-                    ObservationOrigin.LIVE,
-                    PracticeReviewTier.PROPOSE,
-                    FeedbackReach.ON_THE_WORK,
-                    FeedbackChannel.CONVERSATION
-                )
-            ).isFalse();
-            assertThat(
-                FeedbackAdmission.delivers(
-                    ObservationOrigin.LIVE,
-                    PracticeReviewTier.DELIVER,
-                    FeedbackReach.CONVERSATION,
-                    FeedbackChannel.CONVERSATION
-                )
-            ).isTrue();
+        void theTierAppliesUniformlyToEveryChannel() {
+            for (FeedbackChannel channel : FeedbackChannel.values()) {
+                assertThat(FeedbackAdmission.delivers(ObservationOrigin.LIVE, PracticeReviewTier.PROPOSE, channel))
+                    .as("PROPOSE on channel %s", channel)
+                    .isFalse();
+                assertThat(FeedbackAdmission.delivers(ObservationOrigin.LIVE, PracticeReviewTier.DELIVER, channel))
+                    .as("DELIVER on channel %s", channel)
+                    .isTrue();
+            }
         }
 
         /**
          * An unresolved tier admits <em>on its own axis</em>, because withholding feedback a developer was
-         * owed on the strength of a lookup miss is the worse failure. Neither of the other two rules has such
-         * an escape hatch — both are known without a per-practice lookup, so a null tier cannot smuggle a
-         * backfill, or a comment in a conversation-only workspace, onto the artifact.
+         * owed on the strength of a lookup miss is the worse failure. The provenance rule has no such escape
+         * hatch — it is known without a per-practice lookup, so a null tier cannot smuggle a backfill onto
+         * the artifact.
          */
         @Test
-        void anUnresolvedTierDoesNotUndoTheOtherTwoRules() {
+        void anUnresolvedTierDoesNotUndoTheProvenanceRule() {
+            assertThat(FeedbackAdmission.delivers(ObservationOrigin.LIVE, null, FeedbackChannel.IN_CONTEXT)).isTrue();
             assertThat(
-                FeedbackAdmission.delivers(
-                    ObservationOrigin.LIVE,
-                    null,
-                    FeedbackReach.ON_THE_WORK,
-                    FeedbackChannel.IN_CONTEXT
-                )
-            ).isTrue();
-            assertThat(
-                FeedbackAdmission.delivers(
-                    ObservationOrigin.BACKFILL,
-                    null,
-                    FeedbackReach.ON_THE_WORK,
-                    FeedbackChannel.IN_CONTEXT
-                )
-            ).isFalse();
-            // Reach has no escape hatch either: a failed tier lookup must not put a comment on the work of
-            // a workspace that asked us never to comment on work.
-            assertThat(
-                FeedbackAdmission.delivers(
-                    ObservationOrigin.LIVE,
-                    null,
-                    FeedbackReach.CONVERSATION,
-                    FeedbackChannel.IN_CONTEXT
-                )
+                FeedbackAdmission.delivers(ObservationOrigin.BACKFILL, null, FeedbackChannel.IN_CONTEXT)
             ).isFalse();
         }
     }

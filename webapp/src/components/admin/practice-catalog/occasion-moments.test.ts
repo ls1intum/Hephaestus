@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
-	isManualRequestSignal,
-	lifecycleSignals,
-	manualRequestSignal,
 	momentBands,
 	momentDef,
+	withdrawnMoments,
 } from "@/components/admin/practice-catalog/occasion-moments";
 import {
 	mockConversationWorkType,
 	mockDocumentWorkType,
-	mockIssueWorkType,
 	mockPracticeDefinitionOptions,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
@@ -17,9 +14,7 @@ import {
 describe("momentDef", () => {
 	it("gives every moment of a work type its own glyph, so the strip reads in greyscale", () => {
 		for (const workType of mockPracticeDefinitionOptions.workTypes) {
-			const icons = lifecycleSignals(workType.signals).map(
-				(option) => momentDef(option.signal).icon,
-			);
+			const icons = workType.signals.map((option) => momentDef(option.signal).icon);
 
 			expect(new Set(icons).size, workType.artifactKind).toBe(icons.length);
 		}
@@ -35,7 +30,7 @@ describe("momentDef", () => {
 
 describe("momentBands", () => {
 	it("reads a pull request as start, churn, and two ways to end", () => {
-		const bands = momentBands(lifecycleSignals(mockPullRequestWorkType.signals));
+		const bands = momentBands(mockPullRequestWorkType.signals);
 
 		expect(bands.map((band) => [band.phase, band.moments.map((moment) => moment.signal)])).toEqual([
 			["start", ["scm.pull_request.opened"]],
@@ -48,7 +43,7 @@ describe("momentBands", () => {
 	});
 
 	it("gives a document its own three moments under the same three bands", () => {
-		const bands = momentBands(lifecycleSignals(mockDocumentWorkType.signals));
+		const bands = momentBands(mockDocumentWorkType.signals);
 
 		expect(bands.map((band) => band.moments.map((moment) => moment.signal))).toEqual([
 			["docs.document.published"],
@@ -58,35 +53,43 @@ describe("momentBands", () => {
 	});
 
 	it("drops the bands a work type has nothing in, rather than rendering them empty", () => {
-		const bands = momentBands(lifecycleSignals(mockConversationWorkType.signals));
+		const bands = momentBands(mockConversationWorkType.signals);
 
 		expect(bands).toHaveLength(1);
 		expect(bands[0].phase).toBe("end");
 	});
 });
 
-describe("isManualRequestSignal", () => {
-	it("recognises the hand-asked review on every kind that offers one", () => {
-		expect(isManualRequestSignal("scm.pull_request.manual_review")).toBe(true);
-		expect(isManualRequestSignal("scm.issue.manual_review")).toBe(true);
+describe("withdrawnMoments", () => {
+	it("finds nothing while every chosen moment is one the work type offers", () => {
+		expect(
+			withdrawnMoments(mockPullRequestWorkType, [
+				"scm.pull_request.opened",
+				"scm.pull_request.merged",
+			]),
+		).toEqual([]);
 	});
 
-	it("does not mistake a lifecycle moment for one", () => {
-		expect(isManualRequestSignal("scm.pull_request.reviewed")).toBe(false);
-		expect(isManualRequestSignal("docs.document.published")).toBe(false);
+	it("keeps a saved hand-asked review visible, under the name the wire gives it", () => {
+		// A practice saved while asking by hand still counted as an occasion. It cannot be saved again
+		// until it goes, so it has to be on screen to be unticked.
+		expect(
+			withdrawnMoments(mockPullRequestWorkType, [
+				"scm.pull_request.opened",
+				"scm.pull_request.manual_review",
+			]),
+		).toEqual([
+			{
+				signal: "scm.pull_request.manual_review",
+				displayName: "Review requested by hand",
+				recommended: false,
+			},
+		]);
 	});
-});
 
-describe("lifecycleSignals", () => {
-	it("keeps the hand-asked review off the strip, because binding it decides nothing", () => {
-		expect(lifecycleSignals(mockPullRequestWorkType.signals).map((o) => o.signal)).not.toContain(
-			"scm.pull_request.manual_review",
-		);
-		expect(manualRequestSignal(mockIssueWorkType.signals)?.signal).toBe("scm.issue.manual_review");
-	});
-
-	it("leaves a work type that offers no such review untouched", () => {
-		expect(lifecycleSignals(mockDocumentWorkType.signals)).toHaveLength(3);
-		expect(manualRequestSignal(mockDocumentWorkType.signals)).toBeUndefined();
+	it("names a moment nothing on the wire explains by its id, which is at least searchable", () => {
+		expect(withdrawnMoments(mockDocumentWorkType, ["docs.document.forked"])).toEqual([
+			{ signal: "docs.document.forked", displayName: "docs.document.forked", recommended: false },
+		]);
 	});
 });

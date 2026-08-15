@@ -102,12 +102,6 @@ export function patchReviewSettings(
 					defaultReviewTier: patch.defaultReviewTier,
 					defaultReviewTierOverride: patch.defaultReviewTier,
 				}),
-		...(patch.feedbackReach === undefined
-			? {}
-			: {
-					feedbackReach: patch.feedbackReach,
-					feedbackReachOverride: patch.feedbackReach,
-				}),
 		// The scope has no separate "override" key: it replaces wholesale and an empty scope already
 		// means "unrestricted", so the effective value is the only value there is.
 		...(patch.reviewScope === undefined ? {} : { reviewScope: patch.reviewScope }),
