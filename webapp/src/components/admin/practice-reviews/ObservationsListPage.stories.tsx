@@ -1,22 +1,109 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
+import type { ListPracticeReviewObservationsResponse, ReviewObservation } from "@/api/types.gen";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
+import { areaFacetOptions, type FacetSource, practiceFacetOptions } from "./ObservationFilters";
 import { ObservationsListPage } from "./ObservationsListPage";
-import { manyMembers, manyObservations } from "./story-mock-data";
-import { reviewHandlers } from "./story-mock-server";
+import type { ReviewPeople } from "./ReviewPersonFacet";
+import { type ObservationsSearch, observationsQuery, REVIEW_PAGE_SIZE } from "./review-search";
+import {
+	manyObservations,
+	practiceAreas,
+	reviewObservations,
+	workspaceMembers,
+	workspacePractices,
+} from "./story-mock-data";
+
+const PEOPLE: ReviewPeople = {
+	options: workspaceMembers
+		.filter((member): member is typeof member & { userId: number } => member.userId != null)
+		.map((member) => ({
+			userId: member.userId,
+			label: member.userName ?? `#${member.userId}`,
+			secondary: member.userLogin,
+		})),
+	capped: false,
+	isLoading: false,
+	isError: false,
+};
+const AREAS: FacetSource = { options: areaFacetOptions(practiceAreas) };
+const PRACTICES: FacetSource = {
+	options: practiceFacetOptions(workspacePractices, practiceAreas),
+};
+
+/**
+ * Every row a story has to choose from. It travels in the `observations` arg because that is the
+ * prop the screen reads, and {@link observationPage} narrows it to one page before the screen sees
+ * it — so an arg set in Controls is a pool to filter, not a page already cut.
+ */
+function pool(rows: ReviewObservation[]): ListPracticeReviewObservationsResponse {
+	return {
+		content: rows,
+		page: {
+			number: 0,
+			size: REVIEW_PAGE_SIZE,
+			totalElements: rows.length,
+			totalPages: Math.max(1, Math.ceil(rows.length / REVIEW_PAGE_SIZE)),
+		},
+	};
+}
+
+/**
+ * The route fetches; this screen only draws what it is handed. To keep the facets live in a story
+ * without a network, the filtering the server does is applied here — over the query object the route
+ * would actually send, so a facet that stopped reaching the request would stop working here too.
+ * What the *endpoint* names those parameters is a separate contract, pinned by the route test.
+ */
+function observationPage(
+	candidates: ReviewObservation[],
+	search: ObservationsSearch,
+): ListPracticeReviewObservationsResponse {
+	const query = observationsQuery(search, REVIEW_PAGE_SIZE);
+	const selects = (selected: string[] | undefined, actual: string | undefined) =>
+		!selected?.length || (actual !== undefined && selected.includes(actual));
+	const rows = candidates.filter(
+		(row) =>
+			(!query.from || row.observedAt >= new Date(query.from)) &&
+			(!query.to || row.observedAt < new Date(query.to)) &&
+			selects(query.areaSlug, row.area?.slug) &&
+			selects(query.practiceSlug, row.practiceSlug) &&
+			selects(query.presence, row.presence) &&
+			selects(query.assessment, row.assessment) &&
+			selects(query.severity, row.severity) &&
+			(query.subjectUserId === undefined || row.subject?.id === query.subjectUserId),
+	);
+	const ordered = query.sort === "ACTIONABILITY" ? [...rows].sort(byActionability) : rows;
+	const number = query.page ?? 0;
+	return {
+		content: ordered.slice(number * REVIEW_PAGE_SIZE, (number + 1) * REVIEW_PAGE_SIZE),
+		page: {
+			number,
+			size: REVIEW_PAGE_SIZE,
+			totalElements: ordered.length,
+			totalPages: Math.max(1, Math.ceil(ordered.length / REVIEW_PAGE_SIZE)),
+		},
+	};
+}
+
+/** Shortfalls worst-first, then strengths, then the observations that judged nothing. */
+const ACTIONABILITY_RANK: Record<string, number> = { CRITICAL: 0, MAJOR: 1, MINOR: 2, INFO: 3 };
+const actionability = (row: ReviewObservation) =>
+	row.assessment === "BAD"
+		? (ACTIONABILITY_RANK[row.severity ?? "INFO"] ?? 4)
+		: row.assessment === "GOOD"
+			? 5
+			: 6;
+const byActionability = (a: ReviewObservation, b: ReviewObservation) =>
+	actionability(a) - actionability(b) || b.observedAt.getTime() - a.observedAt.getTime();
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Observations",
 	component: ObservationsListPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: { handlers: reviewHandlers() },
 	},
 	decorators: [withWidePage, withStandardPage],
 	tags: ["autodocs"],
@@ -24,13 +111,30 @@ const meta = {
 		workspaceSlug: "demo",
 		search: { presence: undefined, assessment: undefined, severity: undefined },
 		onSearchChange: fn(),
+		observations: pool(reviewObservations),
+		isLoading: false,
+		error: undefined,
+		onRetry: fn(),
+		areas: AREAS,
+		practices: PRACTICES,
+		// The facet needs a label per slug; the hover card on a row's practice name needs the record.
+		practiceRecords: workspacePractices,
+		people: PEOPLE,
 	},
 	// The screen is controlled: with a frozen `search` prop every facet reads as dead, because
-	// `selected` comes back through the same prop the choice was reported on.
+	// `selected` comes back through the same prop the choice was reported on. The rows are recomputed
+	// from that search the way the route's query would be re-run.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
-				<ObservationsListPage {...args} search={search} onSearchChange={onSearchChange} />
+				<ObservationsListPage
+					{...args}
+					search={search}
+					onSearchChange={onSearchChange}
+					observations={
+						args.observations && observationPage(args.observations.content ?? [], search)
+					}
+				/>
 			)}
 		</StatefulPatch>
 	),
@@ -109,9 +213,10 @@ export const FilteredToNothing: Story = {
 };
 
 /**
- * `sort=ACTIONABILITY` is the server's ordering, not one the browser applies: shortfalls worst-first,
- * then strengths, then the observations that judged nothing. The mock has to answer it the same way
- * or this story proves nothing.
+ * `ACTIONABILITY` is the server's ordering, not one the browser applies: shortfalls worst-first, then
+ * strengths, then the observations that judged nothing. The control's only job is to put the choice
+ * in the search the route turns into a request — that the endpoint spells it `sort` is pinned by
+ * `-lists-route.test.tsx`, which is the only place the wire name can be checked.
  */
 export const SortByActionability: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
@@ -193,40 +298,17 @@ export const MoreThanOnePage: Story = {
 	// Pagination is real links so a page can be bookmarked, which means the page travels through the
 	// router rather than `onSearchChange`. Storybook mounts this screen under a single bare route, so
 	// a click would go nowhere and the page has to be set in `args`.
-	args: { search: { page: 1, presence: undefined, assessment: undefined, severity: undefined } },
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: { handlers: reviewHandlers({ observations: manyObservations(64) }) },
+	args: {
+		search: { page: 1, presence: undefined, assessment: undefined, severity: undefined },
+		observations: pool(manyObservations(64)),
 	},
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("64 observations.");
 		const current = await canvas.findByRole("link", { name: "Go to page 2" });
 		await expect(current).toHaveAttribute("aria-current", "page");
 		canvas.getByRole("link", { name: "Go to previous page" });
 		canvas.getByRole("link", { name: "Go to next page" });
-	},
-};
-
-/**
- * The members endpoint takes `page` and `size` and no name filter, so this control fetches one page
- * and matches within it. Past that page the search box would otherwise answer "No matches", which
- * reads as "that person is not in this workspace"; lifting the cap needs a server-side name query.
- */
-export const MorePeopleThanTheFacetCanList: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/members", () => HttpResponse.json(manyMembers(100))),
-				...reviewHandlers(),
-			],
-		},
-	},
-	play: async ({ canvas, userEvent }) => {
-		await canvas.findByText("12 observations.");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Developer" }));
-		await screen.findByRole("listbox");
-		await screen.findByText(/Showing the first 100 members/);
 	},
 };
 
@@ -241,20 +323,34 @@ export const Mobile: Story = {
 	},
 };
 
+/**
+ * The error arrives as a prop, so nothing here depends on a request failing at the right moment. A
+ * status-less error is the one that reads "check your connection" — see `QueryErrorAlert`.
+ */
 export const LoadFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/observations",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(),
-			],
-		},
+	parameters: { chromatic: { viewports: [1440] } },
+	args: {
+		observations: undefined,
+		error: { status: 500, detail: "Something went wrong." },
 	},
 	play: async ({ canvas }) => {
 		await canvas.findByText("Couldn't load observations");
+	},
+};
+
+export const Loading: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	args: { observations: undefined, isLoading: true },
+	play: async ({ canvas }) => {
+		await canvas.findByText("Loading observations");
+	},
+};
+
+/** Nothing has been observed yet, which is not the same as a filter that matched nothing. */
+export const NoObservationsYet: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	args: { observations: pool([]) },
+	play: async ({ canvas }) => {
+		await canvas.findByText("No observations yet");
 	},
 };

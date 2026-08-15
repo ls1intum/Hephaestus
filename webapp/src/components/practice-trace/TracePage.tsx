@@ -1,79 +1,42 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ArrowLeftIcon, ArrowUpIcon, ExternalLinkIcon, RadarIcon } from "lucide-react";
-import { toast } from "sonner";
-import {
-	getArtifactTraceOptions,
-	getArtifactTraceQueryKey,
-	requestPracticeReviewMutation,
-} from "@/api/@tanstack/react-query.gen";
+import { ArrowLeftIcon, RadarIcon } from "lucide-react";
+import type { GetArtifactTraceResponse, ReviewRequestOutcome } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { RelativeTime } from "@/components/common/RelativeTime";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ARTIFACT_KIND, artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
-import { problemDetailOf } from "@/lib/problem-detail";
-import { REVIEW_TIER_DESCRIPTIONS, REVIEW_TIER_LABELS } from "@/lib/review-tiers";
-import { RefusalFixLink } from "./RefusalFixLink";
-import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
-import {
-	DISCOVERED_VIA_DESCRIPTIONS,
-	DISCOVERED_VIA_LABELS,
-	deliveryLabel,
-	occurrenceDomId,
-	SIGNAL_STATE_LABELS,
-	SIGNAL_STATE_REASON_LABELS,
-	WITHHELD_REASON_LABELS,
-} from "./trace-format";
+import { TraceHeader } from "./TraceHeader";
+import { TracePracticeList } from "./TracePracticeList";
+import { TraceRefusalAlert } from "./TraceRefusalAlert";
+import { TraceSignalTimeline } from "./TraceSignalTimeline";
 
 export interface TracePageProps {
 	workspaceSlug: string;
-	artifactKind: string;
-	artifactId: number;
 	/** Resolved by the route from the membership its guard already fetched. */
 	canAdminister: boolean;
+	trace: GetArtifactTraceResponse | undefined;
+	isLoading: boolean;
+	error: unknown;
+	onRetry: () => void;
+	onRequestReview: () => void;
+	requestPending: boolean;
+	/**
+	 * The refused outcome of the last ask, if the last ask was refused. Derived by the route from the
+	 * mutation's own result rather than mirrored into state, so a later success clears it by itself.
+	 */
+	refusal: ReviewRequestOutcome | undefined;
 }
-
-/**
- * The kinds the request endpoint accepts. A conversation thread and a document are reviewed on the
- * occasion their source produces, and asking for one by hand is refused. Kept here because nothing
- * on the wire says which kinds have a front door; being wrong in this direction costs a missing
- * button rather than a broken one.
- */
-const REVIEWABLE_ON_DEMAND: readonly string[] = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue];
 
 /** One piece of work and every practice's answer, the quiet ones included. */
 export function TracePage({
 	workspaceSlug,
-	artifactKind,
-	artifactId,
 	canAdminister,
+	trace,
+	isLoading,
+	error,
+	onRetry,
+	onRequestReview,
+	requestPending,
+	refusal,
 }: TracePageProps) {
-	const queryClient = useQueryClient();
-	const query = useQuery({
-		...getArtifactTraceOptions({ path: { workspaceSlug, artifactKind, artifactId } }),
-	});
-	const requestReview = useMutation({
-		...requestPracticeReviewMutation(),
-		onSuccess: (outcome) => {
-			if (outcome.status !== "SUBMITTED") return;
-			void queryClient.invalidateQueries({
-				queryKey: getArtifactTraceQueryKey({ path: { workspaceSlug, artifactKind, artifactId } }),
-			});
-			toast.success("Review started");
-		},
-		onError: (error) =>
-			toast.error("Couldn't ask for a review", {
-				description: problemDetailOf(error, "Try again in a moment."),
-			}),
-	});
-	// On the page rather than in a toast: a toast is gone before the reader has finished reading it.
-	const refusal = requestReview.data?.status === "REFUSED" ? requestReview.data : undefined;
 	const backLink = (
 		<Link
 			to="/w/$workspaceSlug/reviews"
@@ -85,7 +48,7 @@ export function TracePage({
 		</Link>
 	);
 
-	if (query.isLoading) {
+	if (isLoading) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{backLink}
@@ -98,291 +61,49 @@ export function TracePage({
 			</article>
 		);
 	}
-	if (query.isError || !query.data) {
+	if (error || !trace) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{backLink}
 				<QueryErrorAlert
-					error={query.error}
+					error={error}
 					title="Couldn't load this work's review activity"
-					onRetry={() => void query.refetch()}
+					onRetry={onRetry}
 				/>
 			</article>
 		);
 	}
-
-	const trace = query.data;
-	const KindIcon = artifactKindIcon(trace.artifactKind);
-	// The same signal name recurs on every revision, so only the id says which occurrence an answer
-	// rests on.
-	const signalsById = new Map(trace.signals.map((signal) => [signal.id, signal]));
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{backLink}
 
 			<header className="min-w-0 space-y-4">
-				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-					<div className="min-w-0 space-y-3">
-						<p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground">
-							<KindIcon className="size-4 shrink-0" aria-hidden />
-							{artifactKindLabel(trace.artifactKind)}
-						</p>
-						<h1 className="break-words text-2xl font-semibold tracking-tight">
-							{trace.title}
-							{trace.number != null && (
-								<span className="ml-2 font-normal text-muted-foreground tabular-nums">
-									#{trace.number}
-								</span>
-							)}
-						</h1>
-						<div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
-							{trace.container && <span className="break-all">{trace.container}</span>}
-							{trace.url && (
-								<a
-									href={trace.url}
-									target="_blank"
-									rel="noopener noreferrer"
-									className="inline-flex items-center gap-1 font-medium text-foreground hover:underline"
-								>
-									Open the original
-									<ExternalLinkIcon className="size-3.5 shrink-0" aria-hidden />
-									<span className="sr-only"> (opens in a new tab)</span>
-								</a>
-							)}
-						</div>
-					</div>
-					{REVIEWABLE_ON_DEMAND.includes(trace.artifactKind) && (
-						<Button
-							variant="outline"
-							className="shrink-0 sm:self-start"
-							disabled={requestReview.isPending}
-							onClick={() =>
-								requestReview.mutate({
-									path: { workspaceSlug },
-									body: { artifactKind, artifactId },
-								})
-							}
-						>
-							{requestReview.isPending ? "Asking…" : "Review this now"}
-						</Button>
-					)}
-				</div>
+				<TraceHeader
+					trace={trace}
+					onRequestReview={onRequestReview}
+					requestPending={requestPending}
+				/>
 				{refusal && (
-					<Alert variant="warning">
-						<AlertTitle>No review was started</AlertTitle>
-						<AlertDescription>
-							{/* Verbatim, and the fix link is keyed on the coded reason rather than the prose:
-							    the prose is the server's to change. */}
-							<span>{refusal.reasonDescription ?? "No review was started."}</span>
-							{refusal.reason && (
-								<RefusalFixLink
-									workspaceSlug={workspaceSlug}
-									reason={refusal.reason}
-									canAdminister={canAdminister}
-								/>
-							)}
-						</AlertDescription>
-					</Alert>
+					<TraceRefusalAlert
+						refusal={refusal}
+						workspaceSlug={workspaceSlug}
+						canAdminister={canAdminister}
+					/>
 				)}
 			</header>
 
-			<section aria-labelledby="trace-signals-heading" className="min-w-0 space-y-3">
-				<div className="space-y-1">
-					<h2 id="trace-signals-heading" className="text-lg font-semibold">
-						What we noticed
-					</h2>
-					<p className="text-sm text-muted-foreground">
-						Everything recorded about this work, oldest first.
-					</p>
-				</div>
-				{trace.signals.length === 0 ? (
-					<Empty className="border">
-						<EmptyHeader>
-							<EmptyTitle>Nothing was recorded about this work</EmptyTitle>
-							<EmptyDescription>
-								Without an occurrence to react to, no practice was ever asked a question about it.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<ol className="min-w-0 space-y-0 border-l pl-4">
-						{trace.signals.map((signal) => (
-							// `tabIndex={-1}` is what makes the jump land: following the fragment moves focus
-							// here, so a keyboard or screen-reader user arrives at the occurrence itself.
-							<li
-								key={signal.id}
-								id={occurrenceDomId(signal.id)}
-								tabIndex={-1}
-								className="relative min-w-0 scroll-mt-24 rounded-md py-2.5 outline-none target:bg-muted focus:bg-muted"
-							>
-								<span
-									className="absolute -left-[1.3125rem] top-4 size-2 rounded-full bg-border ring-4 ring-background"
-									aria-hidden
-								/>
-								<p className="break-words text-sm font-medium">{signal.displayName}</p>
-								<p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
-									<RelativeTime value={signal.occurredAt} className="text-xs" />
-									<span aria-hidden>·</span>
-									<Tooltip>
-										<TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-4">
-											{DISCOVERED_VIA_LABELS[signal.discoveredVia]}
-										</TooltipTrigger>
-										<TooltipContent>
-											{DISCOVERED_VIA_DESCRIPTIONS[signal.discoveredVia]}
-										</TooltipContent>
-									</Tooltip>
-									<span aria-hidden>·</span>
-									<span>{SIGNAL_STATE_LABELS[signal.state]}</span>
-								</p>
-								{signal.stateReason && (
-									<p className="mt-1 flex flex-wrap items-baseline gap-x-1.5 break-words text-xs text-muted-foreground">
-										<span>{SIGNAL_STATE_REASON_LABELS[signal.stateReason]}.</span>
-										<RefusalFixLink
-											workspaceSlug={workspaceSlug}
-											reason={signal.stateReason}
-											canAdminister={canAdminister}
-											className="font-medium text-foreground underline underline-offset-4 hover:no-underline"
-										/>
-									</p>
-								)}
-							</li>
-						))}
-					</ol>
-				)}
-			</section>
+			<TraceSignalTimeline
+				signals={trace.signals}
+				workspaceSlug={workspaceSlug}
+				canAdminister={canAdminister}
+			/>
 
-			<section aria-labelledby="trace-practices-heading" className="min-w-0 space-y-3">
-				<div className="space-y-1">
-					<h2 id="trace-practices-heading" className="text-lg font-semibold">
-						What each practice made of it
-					</h2>
-					<p className="max-w-2xl text-sm text-muted-foreground">
-						Every practice this workspace runs against this kind of work is listed, including the
-						ones that stayed quiet. Whether a practice was measured and whether anything was said
-						are two separate things — a practice can be reviewed and still, by design, say nothing.
-					</p>
-				</div>
-				{trace.practices.length === 0 ? (
-					<Empty className="border">
-						<EmptyHeader>
-							<EmptyTitle>No practice covers this kind of work</EmptyTitle>
-							<EmptyDescription>
-								This workspace runs no practice against{" "}
-								{artifactKindLabel(trace.artifactKind).toLowerCase()}, so nothing was ever going to
-								be said about it.
-							</EmptyDescription>
-						</EmptyHeader>
-					</Empty>
-				) : (
-					<ItemGroup>
-						{trace.practices.map((entry) => {
-							const occurrence = entry.occasionedById
-								? signalsById.get(entry.occasionedById)
-								: undefined;
-							return (
-								<div key={entry.practiceSlug} role="listitem">
-									<Item variant="outline" className="items-start">
-										<ItemContent className="min-w-0 gap-2">
-											<div className="flex w-full min-w-0 flex-wrap items-center gap-2">
-												<TraceOutcomeBadge outcome={entry.outcome} />
-												<ItemTitle className="min-w-0 line-clamp-none break-words">
-													{entry.practiceName}
-												</ItemTitle>
-											</div>
-											<p className="break-words text-sm text-muted-foreground">
-												{entry.explanation}
-											</p>
-											<dl className="flex w-full min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-												<div className="flex min-w-0 items-center gap-1">
-													<dt className="sr-only">Feedback delivered</dt>
-													<dd className="break-words">{deliveryLabel(entry)}</dd>
-												</div>
-												<div className="flex min-w-0 items-center gap-1">
-													<dt className="sr-only">Loudness tier</dt>
-													<dd>
-														<Tooltip>
-															<TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-4">
-																{REVIEW_TIER_LABELS[entry.reviewTier]}
-															</TooltipTrigger>
-															<TooltipContent>
-																{REVIEW_TIER_DESCRIPTIONS[entry.reviewTier]}
-															</TooltipContent>
-														</Tooltip>
-													</dd>
-												</div>
-												{entry.decidedAt && (
-													<div className="flex min-w-0 items-center gap-1">
-														<dt className="sr-only">Decided</dt>
-														<dd>
-															<RelativeTime value={entry.decidedAt} className="text-xs" />
-														</dd>
-													</div>
-												)}
-												{(occurrence || entry.occasionedBy) && (
-													<div className="flex min-w-0 items-center gap-1">
-														<dt>Rests on</dt>
-														<dd className="min-w-0">
-															{occurrence ? (
-																// The accessible name contains the visible label verbatim, so a
-																// speech-control user can activate the link by the words they
-																// can see (WCAG 2.2 SC 2.5.3).
-																<a
-																	href={`#${occurrenceDomId(occurrence.id)}`}
-																	className="inline-flex max-w-full items-center gap-1 font-medium text-foreground underline underline-offset-4 hover:no-underline"
-																>
-																	<span className="sr-only">Jump to: </span>
-																	<span className="truncate">{occurrence.displayName}</span>
-																	<ArrowUpIcon className="size-3 shrink-0" aria-hidden />
-																</a>
-															) : (
-																// The id names an occurrence this trace does not carry — a skew
-																// between the recorder and this endpoint.
-																<span className="break-all">{entry.occasionedBy}</span>
-															)}
-														</dd>
-													</div>
-												)}
-											</dl>
-											{entry.withheldReasons.length > 0 && (
-												<ul
-													className="flex w-full min-w-0 flex-wrap gap-1.5"
-													aria-label="Held back because"
-												>
-													{entry.withheldReasons.map((reason) => (
-														// `min-w-0`, or the badge cannot truncate: a `truncate` span is
-														// `white-space: nowrap`, so its min-content width is the whole
-														// sentence, and a flex item's automatic minimum size would hold
-														// the list open to it and push the page wider than the viewport.
-														<li key={reason} className="min-w-0">
-															<Badge variant="outline" className="max-w-full">
-																<span className="truncate">{WITHHELD_REASON_LABELS[reason]}</span>
-															</Badge>
-														</li>
-													))}
-												</ul>
-											)}
-											{entry.watches.length > 0 && (
-												// Identifiers, because this endpoint sends signal names and no display
-												// names; inventing labels here would disagree with the timeline above.
-												<p className="w-full min-w-0 break-words text-xs text-muted-foreground">
-													Starts a review on:{" "}
-													{entry.watches.map((signal, index) => (
-														<span key={signal}>
-															{index > 0 && ", "}
-															<code className="break-all">{signal}</code>
-														</span>
-													))}
-												</p>
-											)}
-										</ItemContent>
-									</Item>
-								</div>
-							);
-						})}
-					</ItemGroup>
-				)}
-			</section>
+			<TracePracticeList
+				practices={trace.practices}
+				signals={trace.signals}
+				artifactKind={trace.artifactKind}
+			/>
 
 			<p className="flex items-center gap-1.5 text-xs text-muted-foreground">
 				<RadarIcon className="size-3.5 shrink-0" aria-hidden />

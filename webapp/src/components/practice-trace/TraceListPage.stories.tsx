@@ -1,26 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { tracedArtifactPage, tracedArtifacts } from "./story-mock-data";
-import { TraceListPage } from "./TraceListPage";
+import { TRACE_PAGE_SIZE, TraceListPage } from "./TraceListPage";
 
-const TRACE_LIST_URL = "*/workspaces/:workspaceSlug/practices/trace";
-
+/**
+ * The member-facing list of everything this workspace recorded. The route asks for the page; this
+ * screen only shows it, so every state below is a prop rather than a mocked response.
+ */
 const meta = {
 	title: "Practice trace/Review activity list",
 	component: TraceListPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: {
-			handlers: [http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage()))],
-		},
 	},
 	decorators: [withWidePage, withStandardPage],
 	tags: ["autodocs"],
@@ -28,6 +24,10 @@ const meta = {
 		workspaceSlug: "demo",
 		search: {},
 		onSearchChange: fn(),
+		artifacts: tracedArtifactPage(),
+		isLoading: false,
+		error: undefined,
+		onRetry: fn(),
 	},
 	/**
 	 * The picker and the pager are controlled, so a story passing only `fn()` could not show a chosen
@@ -63,13 +63,7 @@ export const Default: Story = {
 };
 
 export const UnlinkableArtifact: Story = {
-	parameters: {
-		msw: {
-			handlers: [
-				http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([tracedArtifacts[3]]))),
-			],
-		},
-	},
+	args: { artifacts: tracedArtifactPage([tracedArtifacts[3]]) },
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("1 piece of work.")).toBeVisible();
 		await expect(canvas.getByText("1 moment recorded · 0 started a review")).toBeVisible();
@@ -88,23 +82,30 @@ export const EveryKindIsNamed: Story = {
 	},
 };
 
-export const NothingRecorded: Story = {
-	parameters: {
-		msw: { handlers: [http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([])))] },
+/** The skeleton shows the page it is standing in for, so the rows land where the bars were. */
+export const Loading: Story = {
+	args: { isLoading: true, artifacts: undefined },
+	play: async ({ canvas }) => {
+		const status = (await canvas.findByText("Loading review activity")).closest('[role="status"]');
+		if (!(status instanceof HTMLElement)) throw new Error("The skeleton is not a live region");
+		// Counted, not eyeballed: a skeleton of four bars for a page of twenty is the jump a skeleton
+		// exists to prevent.
+		await expect(status.querySelectorAll(":scope > div")).toHaveLength(TRACE_PAGE_SIZE);
 	},
+};
+
+export const NothingRecorded: Story = {
+	args: { artifacts: tracedArtifactPage([]) },
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Nothing has been recorded here yet")).toBeVisible();
 	},
 };
 
 export const FilteredToOneKind: Story = {
-	args: { search: { kind: "scm.issue" }, onSearchChange: fn() },
-	parameters: {
-		msw: {
-			handlers: [
-				http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([tracedArtifacts[2]]))),
-			],
-		},
+	args: {
+		search: { kind: "scm.issue" },
+		onSearchChange: fn(),
+		artifacts: tracedArtifactPage([tracedArtifacts[2]]),
 	},
 	play: async ({ args, canvas }) => {
 		await expect(await canvas.findByRole("combobox", { name: "Show" })).toHaveTextContent("Issues");
@@ -127,9 +128,10 @@ export const ClearingTheFilterFromThePicker: Story = {
 };
 
 export const NoWorkOfThatKind: Story = {
-	args: { search: { kind: "chat.conversation_thread" }, onSearchChange: fn() },
-	parameters: {
-		msw: { handlers: [http.get(TRACE_LIST_URL, () => HttpResponse.json(tracedArtifactPage([])))] },
+	args: {
+		search: { kind: "chat.conversation_thread" },
+		onSearchChange: fn(),
+		artifacts: tracedArtifactPage([]),
 	},
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("No conversations recorded yet")).toBeVisible();
@@ -138,20 +140,26 @@ export const NoWorkOfThatKind: Story = {
 };
 
 export const LoadFailed: Story = {
-	parameters: {
-		msw: {
-			handlers: [
-				http.get(TRACE_LIST_URL, () =>
-					HttpResponse.json(
-						{ status: 400, title: "Bad Request", detail: "Unknown artifact kind." },
-						{ status: 400, headers: { "Content-Type": "application/problem+json" } },
-					),
-				),
-			],
-		},
+	args: {
+		artifacts: undefined,
+		error: { status: 400, title: "Bad Request", detail: "Unknown artifact kind." },
 	},
-	play: async ({ canvas }) => {
+	play: async ({ args, canvas }) => {
 		await expect(await canvas.findByText("Couldn't load review activity")).toBeVisible();
+		await expect(canvas.getByText(/Unknown artifact kind/)).toBeVisible();
+		// A 400 is not retryable, so the alert withholds the button even though a handler was passed.
+		await expect(canvas.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
+		await expect(args.onRetry).not.toHaveBeenCalled();
+	},
+};
+
+/** No answer at all — offline, or a request that never landed. Retrying is exactly right. */
+export const LoadFailedWithoutAnAnswer: Story = {
+	args: { artifacts: undefined, error: new TypeError("Failed to fetch") },
+	play: async ({ args, canvas }) => {
+		await expect(await canvas.findByText("Couldn't load review activity")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(args.onRetry).toHaveBeenCalledTimes(1);
 	},
 };
 

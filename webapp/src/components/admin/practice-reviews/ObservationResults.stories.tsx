@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn, screen, within } from "storybook/test";
 import type { ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationResults } from "./ObservationResults";
@@ -21,28 +20,24 @@ const longContent = {
 /** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
 const clearFilters = fn();
 
+/** The practice several of the fixture's observations name, and the one the hover card is read on. */
+const THIN_CONTROLLERS = workspacePractices[0];
+
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Observation results",
 	component: ObservationResults,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		chromatic: { viewports: [320, 768, 1440] },
-		// The practice name is a link with the practice's own prose behind it, so the rows own one
-		// query between them; every story that renders a row has to answer it.
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/practices", () =>
-					HttpResponse.json(workspacePractices),
-				),
-			],
-		},
 	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
 		state: { status: "ready", observations: reviewObservations },
+		// A row names its practice but carries none of its prose, so the screen hands the list down and
+		// each row reads its own record out of it. Handed over as a prop, not fetched: see
+		// `ReviewPracticeLink`.
+		practices: workspacePractices,
 	},
 } satisfies Meta<typeof ObservationResults>;
 
@@ -64,14 +59,39 @@ export const Default: Story = {
 	},
 };
 
+/**
+ * The practice on a row does two things: it opens the practice, and it says what the practice is
+ * without leaving the list. Both are checked, because the card is the half that goes quiet on its
+ * own — a row that stops being handed its practice record still renders a perfectly good link.
+ */
 export const PracticeOpensItsDefinition: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas }) => {
+	play: async ({ canvas, userEvent }) => {
 		// Several observations name this practice, and every one of them reaches the same definition.
 		const links = await canvas.findAllByRole("link", { name: /Thin controllers/ });
 		for (const link of links) {
 			await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
 		}
+		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
+		await userEvent.hover(links[0]);
+		await screen.findByText(THIN_CONTROLLERS.whyItMatters ?? "");
+		await screen.findByText(THIN_CONTROLLERS.whatGoodLooksLike ?? "");
+	},
+};
+
+/**
+ * A caller that has no practice list — one still loading, or a screen that never fetched it — keeps
+ * every link and simply shows no card. Nothing the card holds is load-bearing: the name and the area
+ * are on the row, and the rest is a field on the page the link opens.
+ */
+export const WithoutPracticeRecords: Story = {
+	args: { practices: undefined },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		const link = (await canvas.findAllByRole("link", { name: /Thin controllers/ }))[0];
+		await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
+		await userEvent.hover(link);
+		await expect(screen.queryByText(THIN_CONTROLLERS.whyItMatters ?? "")).not.toBeInTheDocument();
 	},
 };
 

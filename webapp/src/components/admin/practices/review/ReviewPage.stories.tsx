@@ -1,86 +1,62 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
 import { expect, fn, within } from "storybook/test";
-import { buildAutonomyFixture } from "@/components/admin/practices/review-autonomy/story-mock-data";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewPage } from "./ReviewPage";
-
-const fixture = buildAutonomyFixture({
-	workspaceDefault: "PROPOSE",
-	areas: [
-		{
-			slug: "hygiene",
-			name: "Hygiene",
-			practices: [{ name: "States the motivation" }, { name: "Links the issue", override: "OFF" }],
-		},
-	],
-});
-
-const workspace = {
-	practicesEnabled: true,
-	practiceReviewAutoTriggerEnabled: true,
-	practiceReviewManualTriggerEnabled: true,
-};
-
-const readyBinding = { purpose: "PRACTICE_REVIEW", enabled: true, ready: true };
-
-const WORKSPACE_URL = "*/workspaces/:workspaceSlug";
-const AGENTS_URL = "*/workspaces/:workspaceSlug/agents";
+import type { ReviewSectionId } from "./review-sections";
 
 /**
- * Every request all three sections can make: stubbing only the open section would pass for the
- * wrong reason the moment a panel stopped unmounting.
+ * The shell only ever receives its section bodies; it never builds them. Standing in for each one is
+ * a marker that names itself, which is what lets these stories assert the property the real page
+ * depends on: the two sections nobody opened are not in the document, so their data was never asked
+ * for.
+ *
+ * The bodies themselves have their own stories — see `Review autonomy`, `Practice review settings`,
+ * `Sweep schedule` and `Backfill` under Workspace admin/Practices.
  */
-const handlers = (overrides: { workspace?: object; agents?: unknown[] } = {}) => [
-	http.get(WORKSPACE_URL, () => HttpResponse.json({ ...workspace, ...overrides.workspace })),
-	http.get(AGENTS_URL, () => HttpResponse.json(overrides.agents ?? [readyBinding])),
-	http.get("*/workspaces/:workspaceSlug/practices/review-settings", () =>
-		HttpResponse.json(fixture.settings),
-	),
-	http.get("*/workspaces/:workspaceSlug/practices/review-tiers", () =>
-		HttpResponse.json(fixture.rollup),
-	),
-	http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(fixture.practices)),
-	http.get("*/workspaces/:workspaceSlug/practices/sweep-schedules", () => HttpResponse.json([])),
-	http.get("*/workspaces/:workspaceSlug/practices/backfill-runs", () => HttpResponse.json([])),
-];
+const sectionBody = (id: ReviewSectionId) => (
+	<p className="rounded-md border border-dashed p-6 text-muted-foreground text-sm">
+		Section body: {id}
+	</p>
+);
+
+const sections = {
+	"how-much": sectionBody("how-much"),
+	"when-and-where": sectionBody("when-and-where"),
+	"past-work": sectionBody("past-work"),
+};
+
+const readyBinding = { purpose: "PRACTICE_REVIEW", enabled: true, ready: true } as const;
 
 const meta = {
 	title: "Workspace admin/Practices/Review/Overview",
 	component: ReviewPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		chromatic: { viewports: [320, 1440] },
 		viewport: { defaultViewport: "reflow" },
-		msw: { handlers: handlers() },
 	},
 	tags: ["autodocs"],
 	args: {
-		workspaceSlug: "demo",
 		section: "how-much",
 		onSectionChange: fn(),
-		overridesOnly: false,
-		onOverridesOnlyChange: fn(),
+		running: {
+			enabled: true,
+			model: { binding: readyBinding, isLoading: false, isError: false },
+		},
+		sections,
 	},
-	// The tab and the scope switch are controlled by the route's URL state, so a story has to write
-	// the change back for either of them to move.
+	// The open tab is URL state on the real page, so a story has to write the change back for the
+	// tabs to move at all.
 	render: (args) => (
-		<StatefulPatch initial={{ section: args.section, overridesOnly: args.overridesOnly }}>
+		<StatefulPatch initial={{ section: args.section }}>
 			{(view, patch) => (
 				<ReviewPage
 					{...args}
 					section={view.section}
-					overridesOnly={view.overridesOnly}
 					onSectionChange={(section) => {
 						args.onSectionChange(section);
 						patch({ section });
-					}}
-					onOverridesOnlyChange={(overridesOnly) => {
-						args.onOverridesOnlyChange(overridesOnly);
-						patch({ overridesOnly });
 					}}
 				/>
 			)}
@@ -93,22 +69,11 @@ type Story = StoryObj<typeof meta>;
 
 export const HowMuch: Story = {
 	play: async ({ canvas }) => {
-		await expect(
-			await canvas.findByRole("tab", { name: "How much" }, { timeout: 5000 }),
-		).toHaveAttribute("aria-selected", "true");
-		await expect(
-			await canvas.findByText("Reviews are running", {}, { timeout: 5000 }),
-		).toBeVisible();
-		await expect(
-			canvas.getByText(
-				"Practice reviews are on and a review model is ready, so new work gets reviewed.",
-			),
-		).toBeVisible();
-		await expect(await canvas.findByText("Ready to run reviews.")).toBeVisible();
-		await expect(canvas.getByRole("link", { name: "Change on AI models" })).toHaveAttribute(
-			"href",
-			"/w/demo/admin/models",
+		await expect(canvas.getByRole("tab", { name: "How much" })).toHaveAttribute(
+			"aria-selected",
+			"true",
 		);
+		await expect(canvas.getByText("Section body: how-much")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -116,11 +81,7 @@ export const HowMuch: Story = {
 export const WhenAndWhere: Story = {
 	args: { section: "when-and-where" },
 	play: async ({ canvas }) => {
-		await expect(
-			await canvas.findByRole("heading", { name: "Practice reviews" }, { timeout: 5000 }),
-		).toBeVisible();
-		// A standing check over recent work is a trigger, not a campaign over history.
-		await expect(canvas.getByRole("heading", { name: "Keep checking new work" })).toBeVisible();
+		await expect(canvas.getByText("Section body: when-and-where")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -128,41 +89,25 @@ export const WhenAndWhere: Story = {
 export const PastWork: Story = {
 	args: { section: "past-work" },
 	play: async ({ canvas }) => {
-		await expect(
-			await canvas.findByRole("tab", { name: "Past work" }, { timeout: 5000 }),
-		).toHaveAttribute("aria-selected", "true");
-		await expect(
-			canvas.queryByRole("heading", { name: "Keep checking new work" }),
-		).not.toBeInTheDocument();
+		await expect(canvas.getByText("Section body: past-work")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
 
-export const ReviewsAreOff: Story = {
-	parameters: { msw: { handlers: handlers({ workspace: { practicesEnabled: false } }) } },
+/** Reviews are on and no model can run them: the settings below are a plan, not a behaviour. */
+export const NoModelIsReady: Story = {
+	args: { running: { enabled: true, model: { isLoading: false, isError: false } } },
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("Reviews are off", {}, { timeout: 5000 })).toBeVisible();
-		await expect(
-			canvas.getByText(
-				"Practice reviews are off in this workspace, so nothing below takes effect yet.",
-			),
-		).toBeVisible();
+		await expect(canvas.getByRole("status")).toHaveTextContent("Reviews can't start");
 	},
 };
 
-export const NoModelIsReady: Story = {
-	parameters: { msw: { handlers: handlers({ agents: [] }) } },
+/** The workspace is still loading: the tabs are there, and nothing is claimed about them yet. */
+export const StateNotKnownYet: Story = {
+	args: { running: undefined },
 	play: async ({ canvas }) => {
-		await expect(
-			await canvas.findByText("Reviews can't start", {}, { timeout: 5000 }),
-		).toBeVisible();
-		await expect(
-			canvas.getByText("Practice reviews are on, but no review model is ready, so none can start."),
-		).toBeVisible();
-		await expect(
-			canvas.getByText("No model is bound, so no review can run at any tier below."),
-		).toBeVisible();
-		await expect(canvas.getByRole("link", { name: "Set up on AI models" })).toBeVisible();
+		await expect(canvas.queryByRole("status")).not.toBeInTheDocument();
+		await expect(canvas.getByRole("tablist")).toBeVisible();
 	},
 };
 
@@ -170,22 +115,27 @@ export const NoModelIsReady: Story = {
  * `role="tablist"` is what buys a screen reader the position announcement and the whole list as one
  * arrow-key stop instead of a tab stop each. Every accessible name is the visible label exactly,
  * which is what lets a voice-control user say "When and where" and mean this control (WCAG 2.5.3).
+ *
+ * The other half of what this asserts is the page's performance contract: only the open panel is
+ * in the document, so the section a reader has not opened has not rendered — and therefore has run
+ * no hooks and made no request. `-review-route.test.tsx` pins the same fact at the network.
  */
 export const SectionsAreRealTabs: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ args, canvas, userEvent }) => {
-		await canvas.findByRole("tab", { name: "How much" }, { timeout: 5000 });
 		const list = canvas.getByRole("tablist");
 		await expect(
 			within(list)
 				.getAllByRole("tab")
 				.map((tab) => tab.textContent),
 		).toEqual(["How much", "When and where", "Past work"]);
-		// Only the open section is in the document, which is what keeps the other sections' queries
-		// from firing and the autonomy strip from sticking over a panel nobody opened.
 		await expect(canvas.getAllByRole("tabpanel")).toHaveLength(1);
+		await expect(canvas.queryByText("Section body: when-and-where")).not.toBeInTheDocument();
+		await expect(canvas.queryByText("Section body: past-work")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("tab", { name: "When and where" }));
 		await expect(args.onSectionChange).toHaveBeenCalledWith("when-and-where");
+		await expect(await canvas.findByText("Section body: when-and-where")).toBeVisible();
+		await expect(canvas.queryByText("Section body: how-much")).not.toBeInTheDocument();
 	},
 };

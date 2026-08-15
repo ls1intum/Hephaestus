@@ -1,20 +1,47 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
+import type { ListPracticeReviewsResponse } from "@/api/types.gen";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ReviewRunsPage } from "./ReviewRunsPage";
-import { reviewHandlers } from "./story-mock-server";
+import { REVIEW_PAGE_SIZE, type RunsSearch, runsQuery } from "./review-search";
+import { reviewRuns } from "./story-mock-data";
+
+/**
+ * The page of reviews the endpoint would return for a search, computed from the fixture instead of
+ * mocked over HTTP. The screen takes its rows as a prop, so a story that wants to prove a facet
+ * narrows the list has to answer it — and answering it in a function keeps the whole file
+ * network-free, which is what stops one story's failure from becoming every story's failure on the
+ * shared Docs page.
+ *
+ * It filters through `runsQuery`, the very transformation the route sends, so a story cannot
+ * "prove" a window the screen never asks for.
+ */
+function reviewsFor(search: RunsSearch): ListPracticeReviewsResponse {
+	const query = runsQuery(search, REVIEW_PAGE_SIZE);
+	const rows = reviewRuns.filter(
+		(run) =>
+			(!query.status || run.status === query.status) &&
+			(!query.from || run.createdAt >= query.from) &&
+			(!query.to || run.createdAt < query.to),
+	);
+	return {
+		content: rows.slice(query.page * query.size, query.page * query.size + query.size),
+		page: {
+			number: query.page,
+			size: query.size,
+			totalElements: rows.length,
+			totalPages: Math.max(1, Math.ceil(rows.length / query.size)),
+		},
+	};
+}
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Reviews",
 	component: ReviewRunsPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
-		msw: { handlers: reviewHandlers() },
 		chromatic: { viewports: [320, 768, 1440] },
 	},
 	decorators: [withWidePage, withStandardPage],
@@ -23,12 +50,22 @@ const meta = {
 		workspaceSlug: "demo",
 		search: {},
 		onSearchChange: fn(),
+		reviews: reviewsFor({}),
+		isLoading: false,
+		error: null,
+		onRetry: fn(),
 	},
-	// The screen is controlled: with a frozen `search` prop every facet reads as dead.
+	// The screen is controlled: with a frozen `search` prop every facet reads as dead. The rows
+	// follow the search the same way the route's query would.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
-				<ReviewRunsPage {...args} search={search} onSearchChange={onSearchChange} />
+				<ReviewRunsPage
+					{...args}
+					search={search}
+					onSearchChange={onSearchChange}
+					reviews={reviewsFor(search)}
+				/>
 			)}
 		</StatefulPatch>
 	),
@@ -189,21 +226,26 @@ export const MobileAppliedDateRange: Story = {
 	},
 };
 
+/** The skeleton draws `REVIEW_PAGE_SIZE` rows, so results replace it without moving the pager. */
+export const Loading: Story = {
+	args: { reviews: undefined, isLoading: true },
+	parameters: { chromatic: { viewports: [1440] } },
+	render: (args) => <ReviewRunsPage {...args} />,
+	play: async ({ canvas }) => {
+		await canvas.findByText("Loading reviews");
+		await expect(canvas.queryByRole("list", { name: /Practice reviews/ })).not.toBeInTheDocument();
+	},
+};
+
 export const NoReviewsYet: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/practices/reviews", () =>
-					HttpResponse.json({
-						content: [],
-						page: { number: 0, size: 20, totalElements: 0, totalPages: 1 },
-					}),
-				),
-				...reviewHandlers(),
-			],
+	args: {
+		reviews: {
+			content: [],
+			page: { number: 0, size: REVIEW_PAGE_SIZE, totalElements: 0, totalPages: 1 },
 		},
 	},
+	parameters: { chromatic: { viewports: [1440] } },
+	render: (args) => <ReviewRunsPage {...args} />,
 	play: async ({ canvas }) => {
 		await canvas.findByText("No reviews found");
 		// Nothing is filtered, so the empty state must not offer an action that would change nothing.
@@ -213,20 +255,17 @@ export const NoReviewsYet: Story = {
 	},
 };
 
+/** The status decides the wording and whether Retry is offered; this screen only forwards it. */
 export const LoadFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(),
-			],
-		},
+	args: {
+		reviews: undefined,
+		error: { status: 500, detail: "The review index is unavailable." },
 	},
-	play: async ({ canvas }) => {
+	parameters: { chromatic: { viewports: [1440] } },
+	render: (args) => <ReviewRunsPage {...args} />,
+	play: async ({ args, canvas, userEvent }) => {
 		await canvas.findByText("Couldn't load reviews");
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(args.onRetry).toHaveBeenCalled();
 	},
 };

@@ -1,34 +1,36 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
-import { expect, within } from "storybook/test";
+import { expect, screen } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationDetailPage } from "./ObservationDetailPage";
-import { reviewObservationDetail } from "./story-mock-data";
-import { reviewHandlers } from "./story-mock-server";
+import { observationDetail, reviewObservationDetail, workspacePractices } from "./story-mock-data";
 
-// Every story opens a record that exists in the fixture, by id. A hand-patched copy of one detail
-// — `{...detail, claimCurrentness: "STALE"}` — can describe a record no review could have produced.
+/**
+ * The route fetches the record and the workspace's practice list; this screen only draws what it is
+ * handed. Every story opens a record that exists in the fixture, by id — a hand-patched copy of one
+ * detail, `{...detail, claimCurrentness: "STALE"}`, can describe a record no review could have
+ * produced.
+ */
 const meta = {
 	title: "Workspace admin/Practice reviews/Observation details",
 	component: ObservationDetailPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: { handlers: reviewHandlers() },
 	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		observationId: reviewObservationDetail.id,
 		search: {
 			agentJobId: reviewObservationDetail.agentJobId,
 			presence: undefined,
 			assessment: undefined,
 			severity: undefined,
 		},
+		observation: reviewObservationDetail,
+		isLoading: false,
+		error: undefined,
+		practices: workspacePractices,
 	},
 } satisfies Meta<typeof ObservationDetailPage>;
 
@@ -79,7 +81,7 @@ export const LinkedFeedback: Story = {
 };
 
 export const SupportsAnotherObservation: Story = {
-	args: { observationId: "77777777-7777-7777-7777-777777777777" },
+	args: { observation: observationDetail("77777777-7777-7777-7777-777777777777") },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("link", { name: "Feedback this observation supports" });
@@ -91,7 +93,7 @@ export const SupportsAnotherObservation: Story = {
  * a reader does not measure today's rules against yesterday's answer.
  */
 export const FeedbackWasWithheld: Story = {
-	args: { observationId: "bbbbbbbb-2222-2222-2222-222222222222" },
+	args: { observation: observationDetail("bbbbbbbb-2222-2222-2222-222222222222") },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("link", { name: "Feedback about this observation" });
@@ -101,7 +103,7 @@ export const FeedbackWasWithheld: Story = {
 };
 
 export const NoFeedbackComposed: Story = {
-	args: { observationId: "cccccccc-2222-2222-2222-222222222222" },
+	args: { observation: observationDetail("cccccccc-2222-2222-2222-222222222222") },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Nothing was said to anybody about this");
@@ -113,7 +115,7 @@ export const NoFeedbackComposed: Story = {
  * read is a chat thread with no revision to compare.
  */
 export const CannotTellWhichRulesApplied: Story = {
-	args: { observationId: "eeeeeeee-3333-3333-3333-333333333333" },
+	args: { observation: observationDetail("eeeeeeee-3333-3333-3333-333333333333") },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", {
@@ -124,20 +126,38 @@ export const CannotTellWhichRulesApplied: Story = {
 	},
 };
 
-export const LoadFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/observations/:observationId",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(),
-			],
-		},
+/**
+ * The practice this was judged against says what it is without leaving the page. The card is the
+ * half that goes quiet on its own: a page that stops being handed the practice list still renders a
+ * perfectly good link.
+ */
+export const PracticeSaysWhatItIs: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		const errorsCarryContext = workspacePractices[2];
+		await userEvent.hover(await canvas.findByRole("link", { name: /Errors carry their context/ }));
+		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
+		await screen.findByText(errorsCarryContext.whyItMatters ?? "");
 	},
-	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByText("Couldn't load this observation");
+};
+
+export const Loading: Story = {
+	args: { observation: undefined, isLoading: true },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("link", { name: "Observations" });
+		await expect(canvas.queryByText("Couldn't load this observation")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The error arrives as a prop, so nothing here depends on a request failing at the right moment. A
+ * status-less error is the one that reads "check your connection" — see `QueryErrorAlert`.
+ */
+export const LoadFailed: Story = {
+	args: { observation: undefined, error: { status: 500, detail: "Something went wrong." } },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await canvas.findByText("Couldn't load this observation");
 	},
 };

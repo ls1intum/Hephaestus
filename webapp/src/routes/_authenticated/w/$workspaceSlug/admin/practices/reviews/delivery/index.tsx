@@ -1,6 +1,14 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { listPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
 import { FeedbackListPage } from "@/components/admin/practice-reviews/FeedbackListPage";
-import type { FeedbackSearch } from "@/components/admin/practice-reviews/review-search";
+import {
+	type FeedbackSearch,
+	feedbackQuery,
+	REVIEW_PAGE_SIZE,
+} from "@/components/admin/practice-reviews/review-search";
+import { useClampedPage } from "@/hooks/use-clamped-page";
+import { useReviewPeople } from "@/hooks/use-review-people";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute(
@@ -23,7 +31,30 @@ function FeedbackListRoute() {
 			replace: true,
 		});
 
+	const feedbackQueryResult = useQuery({
+		...listPracticeReviewFeedbackOptions({
+			path: { workspaceSlug },
+			query: feedbackQuery(search, REVIEW_PAGE_SIZE),
+		}),
+	});
+	const people = useReviewPeople(workspaceSlug);
+
+	// Reconciles the page in the URL with the page the server actually has, so it belongs beside the
+	// query rather than on the screen that only draws what it is handed.
+	useClampedPage(search.page, feedbackQueryResult.data?.page?.totalPages, (page) =>
+		updateSearch({ page }),
+	);
+
 	return (
-		<FeedbackListPage workspaceSlug={workspaceSlug} search={search} onSearchChange={updateSearch} />
+		<FeedbackListPage
+			workspaceSlug={workspaceSlug}
+			search={search}
+			onSearchChange={updateSearch}
+			feedback={feedbackQueryResult.data}
+			isLoading={feedbackQueryResult.isLoading}
+			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
+			onRetry={() => feedbackQueryResult.refetch()}
+			people={people}
+		/>
 	);
 }

@@ -1,28 +1,61 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
-import { expect, within } from "storybook/test";
+import { expect, fn, screen, within } from "storybook/test";
+import type { ReviewArtifact } from "@/api/types.gen";
+import type { KnownArtifactKind } from "@/lib/artifact-kinds";
 import { expectNoPageOverflow } from "@/test/reflow";
+import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewTargetPage } from "./ReviewTargetPage";
-import { reviewHandlers } from "./story-mock-server";
+import {
+	gitlabMergeRequest,
+	outlineDocument,
+	reviewArtifact,
+	reviewFeedback,
+	reviewObservations,
+	slackConversation,
+	workspacePractices,
+} from "./story-mock-data";
 
-// The mock filters by `artifactKind` and `artifactId`, so a story only names the work and gets back
-// what the endpoints would return for it. Hand-picked rows can put one work's observation on
-// another's page.
+/**
+ * The page shows one work's review output, so a story names the work and takes the rows the
+ * endpoints would return for it: hand-picked rows can put one work's observation on another's page.
+ * The section shows a preview and links on to the full list, so `total` is the whole count while
+ * `items` is only the first page of it.
+ */
+const outputFor = <T extends { artifact?: ReviewArtifact }>(
+	rows: T[],
+	artifact: ReviewArtifact,
+): ReviewSectionState<T> => {
+	const matching = rows.filter((row) => row.artifact?.id === artifact.id);
+	return {
+		status: "ready",
+		items: matching.slice(0, REVIEW_PREVIEW_SIZE),
+		total: matching.length,
+	};
+};
+
+const empty = <T,>(): ReviewSectionState<T> => ({ status: "ready", items: [], total: 0 });
+
+/** The practice one of this work's observations names, and the one the card is read on. */
+const THIN_CONTROLLERS = workspacePractices[0];
+
+const argsFor = (artifact: ReviewArtifact) => ({
+	artifactKind: artifact.type as KnownArtifactKind,
+	artifactId: artifact.id,
+	feedback: outputFor(reviewFeedback, artifact),
+	observations: outputFor(reviewObservations, artifact),
+});
+
 const meta = {
 	title: "Workspace admin/Practice reviews/Reviewed work",
 	component: ReviewTargetPage,
-	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
-		layout: "padded",
-		msw: { handlers: reviewHandlers() },
-		chromatic: { viewports: [320, 768, 1440] },
-	},
+	parameters: { layout: "padded", chromatic: { viewports: [320, 768, 1440] } },
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		artifactKind: "scm.pull_request",
-		artifactId: 42,
+		...argsFor(reviewArtifact),
+		// An observation row names its practice but carries none of its prose, so the screen is handed
+		// the list and each row reads its own record out of it. See `ReviewPracticeLink`.
+		practices: workspacePractices,
 	},
 } satisfies Meta<typeof ReviewTargetPage>;
 
@@ -40,14 +73,30 @@ export const PullRequest: Story = {
 		// work names itself.
 		await expect(canvas.queryAllByText("Reviewed work")).toHaveLength(0);
 		expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
-		await canvas.findByText(/2 issues to tighten in this change/);
-		await canvas.findByText("A cache miss and a permission failure come back as the same 404");
 		await expectNoPageOverflow();
 	},
 };
 
+/**
+ * A practice named on an observation row does two things here as well: it opens the practice, and it
+ * says what the practice is without leaving this work. The card is the half that goes quiet on its
+ * own — a row that stops being handed its practice record still renders a perfectly good link.
+ */
+export const PracticeOpensItsDefinition: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		const link = await canvas.findByRole("link", { name: /Thin controllers/ });
+		await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
+		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
+		await userEvent.hover(link);
+		await screen.findByText(THIN_CONTROLLERS.whyItMatters ?? "");
+		await screen.findByText(THIN_CONTROLLERS.whatGoodLooksLike ?? "");
+	},
+};
+
+/** A merge request is the same kind of work on another provider, and says so in its own words. */
 export const MergeRequest: Story = {
-	args: { artifactId: 43 },
+	args: argsFor(gitlabMergeRequest),
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", {
@@ -59,7 +108,7 @@ export const MergeRequest: Story = {
 };
 
 export const Conversation: Story = {
-	args: { artifactKind: "chat.conversation_thread", artifactId: 81 },
+	args: argsFor(slackConversation),
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", {
@@ -67,51 +116,63 @@ export const Conversation: Story = {
 			level: 2,
 		});
 		expect(canvas.getAllByText("#engineering").length).toBeGreaterThan(0);
-		await canvas.findByText("The thread ends without naming what was chosen");
 	},
 };
 
 /** A document's label is its kind, because it has no number to be known by. */
 export const Document: Story = {
-	args: { artifactKind: "docs.document", artifactId: 96 },
+	args: argsFor(outlineDocument),
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", {
 			name: "Runbook: restoring a workspace from backup",
 			level: 2,
 		});
-		await canvas.findByText("The runbook opens with the one step that cannot be undone");
 	},
 };
 
+/**
+ * Both sections answered and both are empty. Nothing here names the work, because nothing that ever
+ * looked at it came back — the route knows an id and a kind, and says only that much.
+ */
 export const NothingReviewed: Story = {
-	args: { artifactId: 45 },
+	args: { artifactId: 45, feedback: empty(), observations: empty() },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvasElement }) => {
 		await within(canvasElement).findByText("Nothing has been reviewed on this work");
 	},
 };
 
-/** One section failing does not take the other down with it. */
-export const ObservationsFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/observations",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(),
-			],
-		},
+/** Neither section has answered yet: the heading is a skeleton rather than a guess at the title. */
+export const Loading: Story = {
+	args: { feedback: { status: "loading" }, observations: { status: "loading" } },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.queryByText("Nothing has been reviewed on this work"),
+		).not.toBeInTheDocument();
+		await canvas.findByText("Loading feedback");
+		await canvas.findByText("Loading observations");
 	},
+};
+
+/**
+ * One section failing does not take the other down with it, and — the reason the empty state is
+ * gated on both — a failure is never read as "nothing was found".
+ */
+export const ObservationsFailed: Story = {
+	args: {
+		observations: { status: "error", error: { status: 500 }, onRetry: fn() },
+	},
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", {
 			name: "Cache the workspace member lookup on the review path",
 			level: 2,
 		});
 		await canvas.findByText("Couldn't load observations");
-		await canvas.findByText(/2 issues to tighten in this change/);
+		await expect(
+			canvas.queryByText("Nothing has been reviewed on this work"),
+		).not.toBeInTheDocument();
 	},
 };

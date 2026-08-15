@@ -19,8 +19,10 @@ const fixture = buildAutonomyFixture({
 	],
 });
 
+/** `extra` goes first: MSW answers with the first handler that matches, so a test can override one. */
 function stubWorkspace(extra: Parameters<typeof server.use>) {
 	server.use(
+		...extra,
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
 			HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 		),
@@ -31,7 +33,6 @@ function stubWorkspace(extra: Parameters<typeof server.use>) {
 			HttpResponse.json(fixture.rollup),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(fixture.practices)),
-		...extra,
 	);
 }
 
@@ -72,6 +73,40 @@ describe("review route", () => {
 		const { router } = renderRouteAtWithRouter(from);
 
 		await waitFor(() => expect(router.state.location.href).toBe(to), ROUTE_RENDER_WAIT);
+	});
+
+	/**
+	 * The whole reason the page hands its section bodies down as elements instead of composing them:
+	 * an element that is never mounted runs no hooks, so a reader who opens one tab pays for one
+	 * tab's data. Asserted at the network, because the DOM assertion below cannot tell a section that
+	 * rendered nothing from one that never ran.
+	 */
+	it("asks for a section's data only once its tab is opened", async () => {
+		const requested: string[] = [];
+		const recorded = (path: string, body: Parameters<typeof HttpResponse.json>[0]) =>
+			http.get(path, ({ request }) => {
+				requested.push(new URL(request.url).pathname);
+				return HttpResponse.json(body);
+			});
+		stubWorkspace([
+			recorded("*/workspaces/:workspaceSlug/practices/review-tiers", fixture.rollup),
+			recorded("*/workspaces/:workspaceSlug/practices/backfill-runs", []),
+		]);
+
+		renderRouteAt("/w/acme/admin/practices/review?section=past-work");
+
+		await waitFor(
+			() => expect(requested.some((path) => path.endsWith("/backfill-runs"))).toBe(true),
+			ROUTE_RENDER_WAIT,
+		);
+		expect(requested.some((path) => path.endsWith("/review-tiers"))).toBe(false);
+
+		await userEvent.click(screen.getByRole("tab", { name: "How much" }));
+
+		await waitFor(
+			() => expect(requested.some((path) => path.endsWith("/review-tiers"))).toBe(true),
+			ROUTE_RENDER_WAIT,
+		);
 	});
 
 	it("opens the section a deep link names", async () => {

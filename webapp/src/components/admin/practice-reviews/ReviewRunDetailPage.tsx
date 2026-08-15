@@ -1,18 +1,6 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { WorkflowIcon } from "lucide-react";
-import { toast } from "sonner";
-import {
-	cancelAgentJobMutation,
-	getAgentJobOptions,
-	getAgentJobQueryKey,
-	listPracticeReviewFeedbackOptions,
-	listPracticeReviewObservationsOptions,
-	listPracticeReviewsQueryKey,
-	retryAgentJobDeliveryMutation,
-} from "@/api/@tanstack/react-query.gen";
-import type { AgentJob } from "@/api/types.gen";
-import { holdReasonCopy, jobWait } from "@/components/admin/ai/job-utils";
+import type { AgentJob, Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import {
@@ -20,7 +8,6 @@ import {
 	SUMMARY_POST_DEFS,
 } from "@/components/practice-vocabulary/review-status-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
 	Empty,
 	EmptyDescription,
@@ -29,73 +16,63 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
-import { problemDetailOf } from "@/lib/problem-detail";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";
-import { REVIEW_PREVIEW_SIZE, ReviewOutputSections } from "./ReviewOutputSections";
+import { ReviewOutputSections, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
 import { ReviewRunCard } from "./ReviewRunCard";
-import { ACTIVE_REVIEW_POLL_MS, type RunsSearch } from "./review-search";
+import { ReviewRunNotices } from "./ReviewRunNotices";
+import type { RunsSearch } from "./review-search";
 
 export interface ReviewRunDetailPageProps {
 	workspaceSlug: string;
 	jobId: string;
+	/** The list's search, carried back into the breadcrumb so "Reviews" returns the reader to the
+	 * filtered page they came from. */
 	search: RunsSearch;
+	job: AgentJob | undefined;
+	isLoading: boolean;
+	error: unknown;
+	onRetry: () => void;
+	/**
+	 * Already-resolved output. A `pending` section is a review still in flight — this screen is told
+	 * that as a state, not as a fact about how often anything is re-asked for.
+	 */
+	observations: ReviewSectionState<ReviewObservation>;
+	feedback: ReviewSectionState<ReviewFeedback>;
+	/**
+	 * The workspace's practices, which each observation row's practice link shows as a hover card.
+	 * Optional: the card is the only thing that needs them, and nothing it holds is load-bearing.
+	 */
+	practices?: Practice[];
+	onCancel: () => void;
+	cancelPending: boolean;
+	onRetryDelivery: () => void;
+	retryDeliveryPending: boolean;
 }
 
-export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunDetailPageProps) {
-	const queryClient = useQueryClient();
-	const jobQuery = useQuery({
-		...getAgentJobOptions({ path: { workspaceSlug, jobId } }),
-		refetchInterval: (result) =>
-			result.state.data?.status === "QUEUED" || result.state.data?.status === "RUNNING"
-				? ACTIVE_REVIEW_POLL_MS
-				: false,
-	});
-	const runIsActive = jobQuery.data?.status === "QUEUED" || jobQuery.data?.status === "RUNNING";
-	const findingsQuery = useQuery({
-		...listPracticeReviewObservationsOptions({
-			path: { workspaceSlug },
-			query: { agentJobId: jobId, sort: "ACTIONABILITY", size: REVIEW_PREVIEW_SIZE },
-		}),
-		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
-	});
-	const feedbackQuery = useQuery({
-		...listPracticeReviewFeedbackOptions({
-			path: { workspaceSlug },
-			query: { agentJobId: jobId, size: REVIEW_PREVIEW_SIZE },
-		}),
-		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
-	});
-	const updateJob = (job: AgentJob) => {
-		queryClient.setQueryData(getAgentJobQueryKey({ path: { workspaceSlug, jobId } }), job);
-		queryClient.invalidateQueries({
-			queryKey: listPracticeReviewsQueryKey({ path: { workspaceSlug } }),
-		});
-	};
-	const cancelJob = useMutation({
-		...cancelAgentJobMutation(),
-		onSuccess: (job) => {
-			updateJob(job);
-			toast.success("Review cancelled");
-		},
-		onError: (error) =>
-			toast.error("Couldn't cancel the review", {
-				description: problemDetailOf(error, "Try again in a moment."),
-			}),
-	});
-	const retryDelivery = useMutation({
-		...retryAgentJobDeliveryMutation(),
-		onSuccess: (job) => {
-			updateJob(job);
-			toast.success("Summary comment queued for retry");
-		},
-		onError: (error) =>
-			toast.error("Couldn't retry the summary comment", {
-				description: problemDetailOf(error, "Try again in a moment."),
-			}),
-	});
+/** A section that has finished loading and holds nothing, as opposed to one still waiting. */
+function isEmptyResult(state: ReviewSectionState<unknown>): boolean {
+	return state.status === "ready" && state.items.length === 0;
+}
+
+export function ReviewRunDetailPage({
+	workspaceSlug,
+	jobId,
+	search,
+	job,
+	isLoading,
+	error,
+	onRetry,
+	observations,
+	feedback,
+	practices,
+	onCancel,
+	cancelPending,
+	onRetryDelivery,
+	retryDeliveryPending,
+}: ReviewRunDetailPageProps) {
 	const breadcrumbs = (
 		<ReviewBreadcrumbs
 			workspaceSlug={workspaceSlug}
@@ -115,7 +92,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 		/>
 	);
 
-	if (jobQuery.isLoading)
+	if (isLoading)
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
@@ -124,33 +101,18 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				</div>
 			</article>
 		);
-	if (jobQuery.isError || !jobQuery.data) {
+	if (error != null || !job) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
-				<QueryErrorAlert
-					error={jobQuery.error}
-					title="Couldn't load this review"
-					onRetry={() => jobQuery.refetch()}
-				/>
+				<QueryErrorAlert error={error} title="Couldn't load this review" onRetry={onRetry} />
 			</article>
 		);
 	}
-	const job = jobQuery.data;
-	const wait = jobWait(job);
-	const hold = wait?.kind === "hold" ? holdReasonCopy(wait.reason) : undefined;
-	const findings = findingsQuery.data?.content ?? [];
-	const feedback = feedbackQuery.data?.content ?? [];
 	const reviewEndedEarly =
 		job.status === "FAILED" || job.status === "TIMED_OUT" || job.status === "CANCELLED";
 	const endedWithoutOutput =
-		reviewEndedEarly &&
-		!findingsQuery.isLoading &&
-		!feedbackQuery.isLoading &&
-		!findingsQuery.isError &&
-		!feedbackQuery.isError &&
-		findings.length === 0 &&
-		feedback.length === 0;
+		reviewEndedEarly && isEmptyResult(observations) && isEmptyResult(feedback);
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
@@ -175,26 +137,18 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				actions={
 					<ReviewRunActions
 						job={job}
-						isCancelling={cancelJob.isPending}
-						isRetrying={retryDelivery.isPending}
-						onCancel={() => cancelJob.mutate({ path: { workspaceSlug, jobId } })}
-						onRetry={() => retryDelivery.mutate({ path: { workspaceSlug, jobId } })}
+						isCancelling={cancelPending}
+						isRetrying={retryDeliveryPending}
+						onCancel={onCancel}
+						onRetry={onRetryDelivery}
 					/>
 				}
 			/>
 			<div className="space-y-4">
-				{reviewEndedEarly && !endedWithoutOutput && (
-					<Alert variant={job.status === "FAILED" ? "destructive" : "default"}>
-						<AlertTitle>Review output may be incomplete</AlertTitle>
-						<AlertDescription>The review ended before it completed.</AlertDescription>
-					</Alert>
-				)}
-				{hold && (
-					<Alert variant="warning">
-						<AlertTitle>{hold.label}</AlertTitle>
-						<AlertDescription>{hold.detail}</AlertDescription>
-					</Alert>
-				)}
+				<ReviewRunNotices
+					job={job}
+					outputMayBeIncomplete={reviewEndedEarly && !endedWithoutOutput}
+				/>
 			</div>
 
 			{endedWithoutOutput ? (
@@ -214,40 +168,9 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 					workspaceSlug={workspaceSlug}
 					scope={{ agentJobId: jobId }}
 					outcome={job.reviewOutcome}
-					feedback={
-						feedbackQuery.isLoading
-							? { status: "loading" }
-							: feedbackQuery.isError
-								? {
-										status: "error",
-										error: feedbackQuery.error,
-										onRetry: () => void feedbackQuery.refetch(),
-									}
-								: runIsActive && feedback.length === 0
-									? { status: "pending" }
-									: {
-											status: "ready",
-											items: feedback,
-											total: feedbackQuery.data?.page?.totalElements ?? 0,
-										}
-					}
-					observations={
-						findingsQuery.isLoading
-							? { status: "loading" }
-							: findingsQuery.isError
-								? {
-										status: "error",
-										error: findingsQuery.error,
-										onRetry: () => void findingsQuery.refetch(),
-									}
-								: runIsActive && findings.length === 0
-									? { status: "pending" }
-									: {
-											status: "ready",
-											items: findings,
-											total: findingsQuery.data?.page?.totalElements ?? 0,
-										}
-					}
+					feedback={feedback}
+					observations={observations}
+					practices={practices}
 				/>
 			)}
 

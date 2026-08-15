@@ -1,7 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { listPracticesOptions } from "@/api/@tanstack/react-query.gen";
-import type { ReviewPracticeArea } from "@/api/types.gen";
+import type { Practice, ReviewPracticeArea } from "@/api/types.gen";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import { cn } from "@/lib/utils";
@@ -12,27 +10,29 @@ export interface ReviewPracticeLinkProps {
 	practiceName: string;
 	/** Absent when the practice is Unassigned, which is a real state and not a missing value. */
 	area: ReviewPracticeArea | undefined;
+	/**
+	 * The full practice record behind `practiceSlug`, which the screen holding this link fetched with
+	 * the rest of its data. Optional because nothing the hover card shows is load-bearing — the name
+	 * and area are on the row, and the rest is a field on the page the link goes to — so a caller
+	 * without the record, like a reader on a touchscreen who gets no card either way, loses nothing.
+	 */
+	practice?: Practice;
 	className?: string;
 }
 
 /**
  * The review read models carry a practice's slug and name but not its prose, so the workspace's
- * practice list is the join the hover card needs. Querying it per row is not the waste it looks:
- * TanStack Query deduplicates by key, so one request serves every row on the page.
- *
- * <p>Nothing the card shows is load-bearing — the practice's name and area are on the row, and the
- * rest is a field on the page the link goes to — so a reader on a touchscreen, who gets no card,
- * loses nothing.
+ * practice list is the join the hover card needs. That list is fetched once by the screen and handed
+ * down rather than asked for per row.
  */
 export function ReviewPracticeLink({
 	workspaceSlug,
 	practiceSlug,
 	practiceName,
 	area,
+	practice,
 	className,
 }: ReviewPracticeLinkProps) {
-	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
-	const practice = practicesQuery.data?.find((candidate) => candidate.slug === practiceSlug);
 	// `relative` lifts this above the stretched title link of `ReviewRow`, which otherwise covers the
 	// whole row and would swallow the click.
 	const link = (

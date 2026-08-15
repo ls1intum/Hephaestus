@@ -9,19 +9,18 @@ export const REVIEW_SECTIONS = [
 		id: "how-much",
 		label: "How much",
 		description:
-			"How far reviews go without you — once for the workspace, or as an exception for an area or a single practice.",
+			"How far reviews go without you: one setting for the whole workspace, overridden only where an area or a single practice needs something different.",
 	},
 	{
 		id: "when-and-where",
 		label: "When and where",
-		description:
-			"What starts a review, how often, and which repositories and branches are in scope.",
+		description: "What starts a review, which work it may look at, and how often to keep checking.",
 	},
 	{
 		id: "past-work",
 		label: "Past work",
 		description:
-			"Measure work that existed before practice reviews were switched on. This is a one-off campaign you price and confirm.",
+			"Catch up on work that was already there before reviews were switched on. You get an estimate first, then decide whether to run it.",
 	},
 ] as const;
 

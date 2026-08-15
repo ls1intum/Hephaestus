@@ -1,0 +1,110 @@
+import { useId } from "react";
+import { DateRangeFacet } from "@/components/common/DateRangeFacet";
+import { FilterToolbar } from "@/components/common/FilterToolbar";
+import { ResultCount } from "@/components/common/ResultCount";
+import {
+	REVIEW_STATUS_DEFS,
+	type ReviewStatus,
+} from "@/components/practice-vocabulary/review-status-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { statusValues } from "@/components/practice-vocabulary/status-def";
+import { Field, FieldLabel } from "@/components/ui/field";
+import {
+	Select,
+	SelectContent,
+	SelectItem,
+	SelectTrigger,
+	SelectValue,
+} from "@/components/ui/select";
+import { fromDateRange, toDateRange } from "@/lib/date-range-search";
+import type { RunsSearch } from "./review-search";
+
+const STATUSES = statusValues(REVIEW_STATUS_DEFS);
+/** The "no filter" sentinel. A `Select` has to hold some value, and `undefined` is not one. */
+const ALL_STATUSES = "ALL";
+const STATUS_ITEMS: { value: string; label: string }[] = [
+	{ value: ALL_STATUSES, label: "All statuses" },
+	...STATUSES.map((status) => ({ value: status, label: REVIEW_STATUS_DEFS[status].label })),
+];
+
+function isReviewStatus(value: string | null): value is ReviewStatus {
+	return STATUSES.some((status) => status === value);
+}
+
+/** True when the reader has narrowed the list, which decides both the count's wording and whether
+ * the empty state offers to clear anything. Derived here so the toolbar and the page it sits above
+ * cannot disagree about what "filtered" means. */
+export function hasRunFilter(search: RunsSearch): boolean {
+	return Boolean(search.status || search.from || search.to);
+}
+
+/**
+ * Renders the row's own `StatusBadge` rather than a lookalike, so choosing a filter never means
+ * matching a word to a tag from memory.
+ */
+function StatusItemLabel({ value }: { value: string }) {
+	if (!isReviewStatus(value)) return <span className="text-muted-foreground">All statuses</span>;
+	return <StatusBadge def={REVIEW_STATUS_DEFS[value]} />;
+}
+
+export interface ReviewRunFiltersProps {
+	search: RunsSearch;
+	/** Reports a patch, never a whole search: the route merges it into the URL. */
+	onPatch: (patch: Partial<RunsSearch>) => void;
+	onReset: () => void;
+	hasFilter: boolean;
+	/** How many reviews the current filters match. Absent while the answer is still on its way. */
+	total: number | undefined;
+}
+
+export function ReviewRunFilters({
+	search,
+	onPatch,
+	onReset,
+	hasFilter,
+	total,
+}: ReviewRunFiltersProps) {
+	const statusId = useId();
+	return (
+		<FilterToolbar
+			hasFilter={hasFilter}
+			onReset={onReset}
+			actions={<ResultCount total={total} noun={["review", "reviews"]} hasFilter={hasFilter} />}
+		>
+			<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
+				<FieldLabel htmlFor={statusId} className="text-muted-foreground">
+					Status
+				</FieldLabel>
+				<Select
+					items={STATUS_ITEMS}
+					value={search.status ?? ALL_STATUSES}
+					onValueChange={(value) =>
+						onPatch({
+							status: isReviewStatus(value) ? value : undefined,
+							page: 0,
+						})
+					}
+				>
+					<SelectTrigger id={statusId} size="sm" className="w-48 max-w-full">
+						<SelectValue>{(value: string) => <StatusItemLabel value={value} />}</SelectValue>
+					</SelectTrigger>
+					<SelectContent>
+						{STATUS_ITEMS.map((item) => (
+							<SelectItem key={item.value} value={item.value}>
+								<StatusItemLabel value={item.value} />
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+			</Field>
+			{/* "Requested", not "Started": the timestamp the rows show and this filters is the review's
+			    `createdAt`, which is when it was enqueued, and a review can sit queued before a worker
+			    claims it. */}
+			<DateRangeFacet
+				title="Requested"
+				value={toDateRange(search)}
+				onChange={(range) => onPatch({ ...fromDateRange(range), page: 0 })}
+			/>
+		</FilterToolbar>
+	);
+}

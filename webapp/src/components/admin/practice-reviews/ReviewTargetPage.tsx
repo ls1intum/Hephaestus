@@ -1,9 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
 import { FileQuestionIcon } from "lucide-react";
-import {
-	listPracticeReviewFeedbackOptions,
-	listPracticeReviewObservationsOptions,
-} from "@/api/@tanstack/react-query.gen";
+import type { Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import {
 	Empty,
 	EmptyDescription,
@@ -16,46 +12,52 @@ import { artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds"
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";
-import { REVIEW_PREVIEW_SIZE, ReviewOutputSections } from "./ReviewOutputSections";
+import { ReviewOutputSections, type ReviewSectionState } from "./ReviewOutputSections";
 
 export interface ReviewTargetPageProps {
 	workspaceSlug: string;
 	artifactKind: KnownArtifactKind;
 	artifactId: number;
+	feedback: ReviewSectionState<ReviewFeedback>;
+	observations: ReviewSectionState<ReviewObservation>;
+	/**
+	 * The workspace's practices, which each observation row's practice link shows as a hover card.
+	 * Optional: the card is the only thing that needs them, and nothing it holds is load-bearing.
+	 */
+	practices?: Practice[];
 }
+
+const itemsOf = <T,>(state: ReviewSectionState<T>): T[] =>
+	state.status === "ready" ? state.items : [];
 
 /**
  * No eyebrow above the heading: the link's own mark and words say what kind of work this is, which
  * is a fact about *this* work, while a label for the page restates the breadcrumb one line above it.
+ *
+ * <p>The work is not fetched by name — nothing on this route knows its title until a review of it
+ * comes back — so the heading is read off whichever section answered first, and is a skeleton until
+ * one of them does.
  */
 export function ReviewTargetPage({
 	workspaceSlug,
 	artifactKind,
 	artifactId,
+	feedback,
+	observations,
+	practices,
 }: ReviewTargetPageProps) {
 	const scope = { artifactKind, artifactId };
-	const feedbackQuery = useQuery({
-		...listPracticeReviewFeedbackOptions({
-			path: { workspaceSlug },
-			query: { ...scope, size: REVIEW_PREVIEW_SIZE },
-		}),
-	});
-	const observationsQuery = useQuery({
-		...listPracticeReviewObservationsOptions({
-			path: { workspaceSlug },
-			query: { ...scope, size: REVIEW_PREVIEW_SIZE },
-		}),
-	});
-	const feedback = feedbackQuery.data?.content ?? [];
-	const observations = observationsQuery.data?.content ?? [];
-	const artifact = feedback[0]?.artifact ?? observations[0]?.artifact;
-	const stillLoading = feedbackQuery.isLoading || observationsQuery.isLoading;
+	const feedbackItems = itemsOf(feedback);
+	const observationItems = itemsOf(observations);
+	const artifact = feedbackItems[0]?.artifact ?? observationItems[0]?.artifact;
+	const stillLoading = feedback.status === "loading" || observations.status === "loading";
+	// Both sections have to have answered before "nothing here" is an honest thing to say: one of them
+	// failing is not evidence that the other found nothing.
 	const noOutput =
-		!stillLoading &&
-		!feedbackQuery.isError &&
-		!observationsQuery.isError &&
-		feedback.length === 0 &&
-		observations.length === 0;
+		feedback.status === "ready" &&
+		observations.status === "ready" &&
+		feedbackItems.length === 0 &&
+		observationItems.length === 0;
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
@@ -79,7 +81,12 @@ export function ReviewTargetPage({
 					<ReviewDetailHeader
 						title={
 							!artifact && stillLoading ? (
-								<Skeleton className="h-8 w-72 max-w-full" />
+								// A heading whose only content is a skeleton is an empty heading to a screen
+								// reader, which is a landmark that announces nothing at all.
+								<>
+									<span className="sr-only">Loading the reviewed work</span>
+									<Skeleton className="h-8 w-72 max-w-full" />
+								</>
 							) : (
 								(artifact?.title ?? artifactKindLabel(artifactKind))
 							)
@@ -90,36 +97,9 @@ export function ReviewTargetPage({
 					<ReviewOutputSections
 						workspaceSlug={workspaceSlug}
 						scope={scope}
-						feedback={
-							feedbackQuery.isLoading
-								? { status: "loading" }
-								: feedbackQuery.isError
-									? {
-											status: "error",
-											error: feedbackQuery.error,
-											onRetry: () => void feedbackQuery.refetch(),
-										}
-									: {
-											status: "ready",
-											items: feedback,
-											total: feedbackQuery.data?.page?.totalElements ?? 0,
-										}
-						}
-						observations={
-							observationsQuery.isLoading
-								? { status: "loading" }
-								: observationsQuery.isError
-									? {
-											status: "error",
-											error: observationsQuery.error,
-											onRetry: () => void observationsQuery.refetch(),
-										}
-									: {
-											status: "ready",
-											items: observations,
-											total: observationsQuery.data?.page?.totalElements ?? 0,
-										}
-						}
+						feedback={feedback}
+						observations={observations}
+						practices={practices}
 					/>
 				</>
 			)}

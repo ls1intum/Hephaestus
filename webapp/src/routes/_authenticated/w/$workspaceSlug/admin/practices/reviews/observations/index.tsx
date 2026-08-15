@@ -1,6 +1,22 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import {
+	listAreasOptions,
+	listPracticeReviewObservationsOptions,
+	listPracticesOptions,
+} from "@/api/@tanstack/react-query.gen";
+import {
+	areaFacetOptions,
+	practiceFacetOptions,
+} from "@/components/admin/practice-reviews/ObservationFilters";
 import { ObservationsListPage } from "@/components/admin/practice-reviews/ObservationsListPage";
-import type { ObservationsSearch } from "@/components/admin/practice-reviews/review-search";
+import {
+	type ObservationsSearch,
+	observationsQuery,
+	REVIEW_PAGE_SIZE,
+} from "@/components/admin/practice-reviews/review-search";
+import { useClampedPage } from "@/hooks/use-clamped-page";
+import { useReviewPeople } from "@/hooks/use-review-people";
 import { workspaceAdminHead } from "@/lib/page-title";
 
 export const Route = createFileRoute(
@@ -23,11 +39,47 @@ function ObservationsListRoute() {
 			replace: true,
 		});
 
+	const observationsQueryResult = useQuery({
+		...listPracticeReviewObservationsOptions({
+			path: { workspaceSlug },
+			// `observationsQuery` renames the URL's `order` to the `sort` the endpoint takes; the route
+			// test pins that, because the two words are one typo apart and the list looks fine either way.
+			query: observationsQuery(search, REVIEW_PAGE_SIZE),
+		}),
+	});
+	const areasQuery = useQuery({ ...listAreasOptions({ path: { workspaceSlug } }) });
+	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
+	const people = useReviewPeople(workspaceSlug);
+
+	// Reconciles the page in the URL with the page the server actually has, so it belongs beside the
+	// query rather than on the screen that only draws what it is handed.
+	useClampedPage(search.page, observationsQueryResult.data?.page?.totalPages, (page) =>
+		updateSearch({ page }),
+	);
+
 	return (
 		<ObservationsListPage
 			workspaceSlug={workspaceSlug}
 			search={search}
 			onSearchChange={updateSearch}
+			observations={observationsQueryResult.data}
+			isLoading={observationsQueryResult.isLoading}
+			error={observationsQueryResult.isError ? observationsQueryResult.error : undefined}
+			onRetry={() => observationsQueryResult.refetch()}
+			areas={{
+				options: areaFacetOptions(areasQuery.data),
+				isLoading: areasQuery.isLoading,
+				isError: areasQuery.isError,
+			}}
+			practices={{
+				options: practiceFacetOptions(practicesQuery.data, areasQuery.data),
+				isLoading: practicesQuery.isLoading,
+				isError: practicesQuery.isError,
+			}}
+			// The same list a second time, unreduced: the facet needs a label per slug, while the hover
+			// card on a row's practice name needs the record's prose.
+			practiceRecords={practicesQuery.data}
+			people={people}
 		/>
 	);
 }

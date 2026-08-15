@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ScanSearchIcon } from "lucide-react";
-import type { ReviewObservation } from "@/api/types.gen";
+import type { Practice, ReviewObservation } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { observationResult } from "@/components/practice-vocabulary/observation-result";
 import { Button } from "@/components/ui/button";
@@ -38,9 +38,16 @@ export type ObservationResultsState =
 export interface ObservationResultsProps {
 	workspaceSlug: string;
 	state: ObservationResultsState;
+	/**
+	 * The workspace's practices, which the rows' practice links show as a hover card. A row carries a
+	 * practice's slug, name and area but not its prose, so the list is the join the card needs; the
+	 * screen fetches it once and every row reads the record it names out of it. Optional because
+	 * nothing the card shows is load-bearing — a caller without the list still gets working links.
+	 */
+	practices?: Practice[];
 }
 
-export function ObservationResults({ workspaceSlug, state }: ObservationResultsProps) {
+export function ObservationResults({ workspaceSlug, state, practices }: ObservationResultsProps) {
 	if (state.status === "loading")
 		return <ReviewResultsSkeleton label="Loading observations" rows={REVIEW_PAGE_SIZE} />;
 	if (state.status === "empty") {
@@ -79,6 +86,7 @@ export function ObservationResults({ workspaceSlug, state }: ObservationResultsP
 					key={observation.id}
 					workspaceSlug={workspaceSlug}
 					observation={observation}
+					practice={practices?.find((practice) => practice.slug === observation.practiceSlug)}
 				/>
 			))}
 		</ReviewRowList>
@@ -88,6 +96,8 @@ export function ObservationResults({ workspaceSlug, state }: ObservationResultsP
 export interface ObservationRowProps {
 	workspaceSlug: string;
 	observation: ReviewObservation;
+	/** The record behind `observation.practiceSlug`, which the practice link shows as a hover card. */
+	practice?: Practice;
 	/**
 	 * What the link carries into the detail screen. Omitted on the Observations list, where the whole
 	 * current search is carried forward so the reader's filters survive the round trip; passed on the
@@ -101,7 +111,12 @@ export interface ObservationRowProps {
  * on every row would drown the two badges that mean something — a shortfall's severity, and an
  * observation judged against a practice that has since changed.
  */
-export function ObservationRow({ workspaceSlug, observation, scope }: ObservationRowProps) {
+export function ObservationRow({
+	workspaceSlug,
+	observation,
+	practice,
+	scope,
+}: ObservationRowProps) {
 	return (
 		<ReviewRow
 			status={observationResult(observation)}
@@ -124,6 +139,7 @@ export function ObservationRow({ workspaceSlug, observation, scope }: Observatio
 								practiceSlug={observation.practiceSlug}
 								practiceName={observation.practiceName}
 								area={observation.area}
+								practice={practice}
 							/>,
 							<ReviewArtifactLabel key="work" artifact={observation.artifact} />,
 							// No tooltip inside a row: the title link is stretched over the whole row, so a

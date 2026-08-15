@@ -1,9 +1,6 @@
-import { QueryClientProvider } from "@tanstack/react-query";
 import { screen } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { server } from "@/mocks/server";
-import { renderWithRouter, testQueryClient } from "@/test/router-harness";
+import { renderWithRouter } from "@/test/router-harness";
 import { tracedArtifacts } from "./story-mock-data";
 import { TraceListPage } from "./TraceListPage";
 
@@ -14,22 +11,19 @@ import { TraceListPage } from "./TraceListPage";
  */
 describe("paging a filtered list", () => {
 	function renderAtPage(page: number) {
-		server.use(
-			http.get("*/workspaces/:workspaceSlug/practices/trace", () =>
-				HttpResponse.json({
+		return renderWithRouter(
+			<TraceListPage
+				workspaceSlug="demo"
+				search={{ kind: "scm.issue", page: page || undefined }}
+				onSearchChange={vi.fn()}
+				artifacts={{
 					content: tracedArtifacts.slice(0, 2),
 					page: { number: page, size: 2, totalElements: 6, totalPages: 3 },
-				}),
-			),
-		);
-		return renderWithRouter(
-			<QueryClientProvider client={testQueryClient()}>
-				<TraceListPage
-					workspaceSlug="demo"
-					search={{ kind: "scm.issue", page: page || undefined }}
-					onSearchChange={vi.fn()}
-				/>
-			</QueryClientProvider>,
+				}}
+				isLoading={false}
+				error={undefined}
+				onRetry={vi.fn()}
+			/>,
 			`/w/demo/reviews?kind=scm.issue${page ? `&page=${page}` : ""}`,
 		);
 	}

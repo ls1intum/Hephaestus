@@ -1,7 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon } from "lucide-react";
-import { getPracticeReviewObservationOptions } from "@/api/@tanstack/react-query.gen";
+import type { GetPracticeReviewObservationResponse, Practice } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
@@ -37,18 +36,29 @@ import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 
 export interface ObservationDetailPageProps {
 	workspaceSlug: string;
-	observationId: string;
+	/** What the reader was filtering on the Observations list, carried into the links out of here. */
 	search: ObservationsSearch;
+	/** The record this page is about, or `undefined` while it is unknown. */
+	observation: GetPracticeReviewObservationResponse | undefined;
+	isLoading: boolean;
+	error: unknown;
+	onRetry?: () => void;
+	/**
+	 * The workspace's practices, which the practice this was judged against shows as a hover card.
+	 * Optional in effect: a page without it still links, it just cannot show the prose.
+	 */
+	practices: Practice[] | undefined;
 }
 
 export function ObservationDetailPage({
 	workspaceSlug,
-	observationId,
 	search,
+	observation,
+	isLoading,
+	error,
+	onRetry,
+	practices,
 }: ObservationDetailPageProps) {
-	const query = useQuery({
-		...getPracticeReviewObservationOptions({ path: { workspaceSlug, observationId } }),
-	});
 	const breadcrumbs = (
 		<ReviewBreadcrumbs
 			workspaceSlug={workspaceSlug}
@@ -65,7 +75,7 @@ export function ObservationDetailPage({
 		/>
 	);
 
-	if (query.isLoading)
+	if (isLoading)
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
@@ -74,19 +84,16 @@ export function ObservationDetailPage({
 				</div>
 			</article>
 		);
-	if (query.isError || !query.data) {
+	// No record and no error is still nothing to draw, so both land on the alert rather than on a
+	// header with empty facts under it.
+	if (error || !observation) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
-				<QueryErrorAlert
-					error={query.error}
-					title="Couldn't load this observation"
-					onRetry={() => query.refetch()}
-				/>
+				<QueryErrorAlert error={error} title="Couldn't load this observation" onRetry={onRetry} />
 			</article>
 		);
 	}
-	const observation = query.data;
 	// No slug means a kind this build has no route for; the artifact still renders, unlinked.
 	const artifactSlug = observation.artifact
 		? reviewArtifactTypeSlug(observation.artifact.type)
@@ -121,6 +128,7 @@ export function ObservationDetailPage({
 						practiceSlug={observation.practiceSlug}
 						practiceName={observation.practiceName}
 						area={observation.area}
+						practice={practices?.find((practice) => practice.slug === observation.practiceSlug)}
 					/>
 				</ReviewFact>
 				<ReviewFact label="Developer">

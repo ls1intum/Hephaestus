@@ -1,35 +1,78 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
-import { expect, waitFor, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
+import type { ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
+import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewRunDetailPage } from "./ReviewRunDetailPage";
-import { manyObservations, reviewJob } from "./story-mock-data";
-import { reviewHandlers } from "./story-mock-server";
+import {
+	manyObservations,
+	reviewFeedback,
+	reviewJob,
+	reviewObservations,
+	workspacePractices,
+} from "./story-mock-data";
 
 const COMPLETED_RUN = "11111111-1111-1111-1111-111111111111";
+const CONVERSATION_RUN = "33333333-3333-3333-3333-333333333333";
 const RUNNING_RUN = "aaaaaaaa-8888-8888-8888-888888888888";
 const FAILED_RUN = "bbbbbbbb-8888-8888-8888-888888888888";
 
-const sorted = { requireObservationSort: "ACTIONABILITY" };
+/**
+ * A finished section: the first page of what a run produced, plus how many there are in all. The
+ * total is not the length of the preview — the section links out to the full list precisely when the
+ * two differ.
+ */
+function ready<T>(items: T[], total = items.length): ReviewSectionState<T> {
+	return { status: "ready", items: items.slice(0, REVIEW_PREVIEW_SIZE), total };
+}
 
-// The heading comes from the job endpoint and the rows from the review ones, so both are served from
-// one fixture — otherwise the header can name one pull request above rows naming another.
+function observationsOf(jobId: string): ReviewObservation[] {
+	return reviewObservations.filter((observation) => observation.agentJobId === jobId);
+}
+
+function feedbackOf(jobId: string): ReviewFeedback[] {
+	return reviewFeedback.filter((item) => item.agentJobId === jobId);
+}
+
+const NOTHING: ReviewSectionState<never> = { status: "ready", items: [], total: 0 };
+const NOT_YET: ReviewSectionState<never> = { status: "pending" };
+
+/** The practice one of the completed run's observations names, and the one the card is read on. */
+const THIN_CONTROLLERS = workspacePractices[0];
+
+/**
+ * One review, end to end: what it looked at, what it concluded, what it said, and how it ran.
+ *
+ * The screen is handed its data. It is the route that keeps asking while a run is in flight, so
+ * every state below — mid-flight, finished, stopped early, refused for want of evidence — is a
+ * prop here rather than a moment you have to catch.
+ */
 const meta = {
 	title: "Workspace admin/Practice reviews/Review details",
 	component: ReviewRunDetailPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: { handlers: reviewHandlers(sorted) },
 	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
 		jobId: COMPLETED_RUN,
 		search: {},
+		job: reviewJob(COMPLETED_RUN),
+		isLoading: false,
+		error: null,
+		onRetry: fn(),
+		observations: ready(observationsOf(COMPLETED_RUN)),
+		feedback: ready(feedbackOf(COMPLETED_RUN)),
+		// An observation row names its practice but carries none of its prose, so the screen is handed
+		// the list and each row reads its own record out of it. See `ReviewPracticeLink`.
+		practices: workspacePractices,
+		onCancel: fn(),
+		cancelPending: false,
+		onRetryDelivery: fn(),
+		retryDeliveryPending: false,
 	},
 } satisfies Meta<typeof ReviewRunDetailPage>;
 
@@ -53,19 +96,35 @@ export const CompletedWithMixedOutput: Story = {
 	},
 };
 
-export const MoreObservationsThanItShows: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: reviewHandlers({
-				...sorted,
-				observations: manyObservations(64).map((observation) => ({
-					...observation,
-					agentJobId: COMPLETED_RUN,
-				})),
-			}),
-		},
+/**
+ * A practice named on an observation row does two things here as well: it opens the practice, and it
+ * says what the practice is without leaving the review. The card is the half that goes quiet on its
+ * own — a row that stops being handed its practice record still renders a perfectly good link.
+ */
+export const PracticeOpensItsDefinition: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		const link = await canvas.findByRole("link", { name: /Thin controllers/ });
+		await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
+		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
+		await userEvent.hover(link);
+		await screen.findByText(THIN_CONTROLLERS.whyItMatters ?? "");
+		await screen.findByText(THIN_CONTROLLERS.whatGoodLooksLike ?? "");
 	},
+};
+
+/** The preview shows five; the section says how many there are and links to the rest. */
+export const MoreObservationsThanItShows: Story = {
+	args: {
+		observations: ready(
+			manyObservations(64).map((observation) => ({
+				...observation,
+				agentJobId: COMPLETED_RUN,
+			})),
+			64,
+		),
+	},
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("link", { name: "See all 64 observations" });
 	},
@@ -77,18 +136,10 @@ export const MoreObservationsThanItShows: Story = {
  * must distinguish the two.
  */
 export const DeclinedForInsufficientEvidence: Story = {
-	parameters: {
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () =>
-					HttpResponse.json({
-						...reviewJob(COMPLETED_RUN),
-						reviewOutcome: "INSUFFICIENT_EVIDENCE",
-					}),
-				),
-				...reviewHandlers({ ...sorted, observations: [], feedback: [] }),
-			],
-		},
+	args: {
+		job: { ...reviewJob(COMPLETED_RUN), reviewOutcome: "INSUFFICIENT_EVIDENCE" },
+		observations: NOTHING,
+		feedback: NOTHING,
 	},
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -105,8 +156,14 @@ export const DeclinedForInsufficientEvidence: Story = {
 	},
 };
 
+/** Nothing yet, and the reason is that the review is still going — not that it found nothing. */
 export const InProgressWithoutOutput: Story = {
-	args: { jobId: RUNNING_RUN },
+	args: {
+		jobId: RUNNING_RUN,
+		job: reviewJob(RUNNING_RUN),
+		observations: NOT_YET,
+		feedback: NOT_YET,
+	},
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -119,11 +176,19 @@ export const InProgressWithoutOutput: Story = {
 		).toBeVisible();
 		await expect(canvas.queryByText("No observations were recorded")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("No feedback")).not.toBeInTheDocument();
+		// A run in flight is the one that can be stopped.
+		canvas.getByRole("button", { name: "Cancel review" });
 	},
 };
 
+/** Nothing at all, and it never will: the empty state answers the question the sections would. */
 export const FailedWithoutOutput: Story = {
-	args: { jobId: FAILED_RUN },
+	args: {
+		jobId: FAILED_RUN,
+		job: reviewJob(FAILED_RUN),
+		observations: NOTHING,
+		feedback: NOTHING,
+	},
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
@@ -138,26 +203,17 @@ export const FailedWithoutOutput: Story = {
 	},
 };
 
+/** Something, but not everything — so the sections stay and a banner says what they are. */
 export const FailedWithPartialOutput: Story = {
-	args: { jobId: FAILED_RUN },
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get("*/workspaces/:workspaceSlug/agents/jobs/:jobId", () =>
-					HttpResponse.json(reviewJob(FAILED_RUN)),
-				),
-				...reviewHandlers({
-					...sorted,
-					feedback: [],
-					observations: manyObservations(1).map((observation) => ({
-						...observation,
-						agentJobId: FAILED_RUN,
-					})),
-				}),
-			],
-		},
+	args: {
+		jobId: FAILED_RUN,
+		job: reviewJob(FAILED_RUN),
+		observations: ready(
+			manyObservations(1).map((observation) => ({ ...observation, agentJobId: FAILED_RUN })),
+		),
+		feedback: NOTHING,
 	},
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		await expect(await canvas.findByText("Review output may be incomplete")).toBeVisible();
@@ -165,30 +221,73 @@ export const FailedWithPartialOutput: Story = {
 	},
 };
 
+/** Not every review reads a pull request; the header names whatever was reviewed. */
 export const ReviewOfAConversation: Story = {
-	args: { jobId: "33333333-3333-3333-3333-333333333333" },
+	args: {
+		jobId: CONVERSATION_RUN,
+		job: reviewJob(CONVERSATION_RUN),
+		observations: ready(observationsOf(CONVERSATION_RUN)),
+		feedback: ready(feedbackOf(CONVERSATION_RUN)),
+	},
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", { name: "How should we roll back the pricing migration?" });
-		// The heading comes from the job and the rows from a second query, so the rows are awaited.
 		await canvas.findByText("The thread ends without naming what was chosen");
 	},
 };
 
+/** The run is in, its output is not. The sections draw their own skeletons, not the page's. */
+export const OutputStillLoading: Story = {
+	args: { observations: { status: "loading" }, feedback: { status: "loading" } },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("heading", {
+			name: "Cache the workspace member lookup on the review path",
+		});
+		canvas.getByText("Loading observations");
+		canvas.getByText("Loading feedback");
+	},
+};
+
+/** Nothing to show above the breadcrumb until the run itself is in. */
+export const Loading: Story = {
+	args: { job: undefined, isLoading: true },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		canvas.getByRole("status", { name: "Loading" });
+		canvas.getByRole("link", { name: "Reviews" });
+		await expect(canvas.queryByRole("heading", { level: 2 })).not.toBeInTheDocument();
+	},
+};
+
+/** The breadcrumb survives the failure, so a reader who cannot see this review can still leave. */
 export const LoadFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/agents/jobs/:jobId",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(sorted),
-			],
+	args: {
+		job: undefined,
+		error: { status: 500, detail: "The review could not be read." },
+	},
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ args, canvas, userEvent }) => {
+		await canvas.findByText("Couldn't load this review");
+		canvas.getByRole("link", { name: "Reviews" });
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(args.onRetry).toHaveBeenCalled();
+	},
+};
+
+/** One section can fail while the other answers; each carries its own retry. */
+export const OneSectionFailed: Story = {
+	args: {
+		observations: {
+			status: "error",
+			error: { status: 503, detail: "The observation index is unavailable." },
+			onRetry: fn(),
 		},
 	},
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
-		await canvas.findByText("Couldn't load this review");
+		await canvas.findByText("Couldn't load observations");
+		// The other section is unaffected, which is the whole point of two states rather than one.
+		await canvas.findByText(/2 issues to tighten in this change/);
 	},
 };

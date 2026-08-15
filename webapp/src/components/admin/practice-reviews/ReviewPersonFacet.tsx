@@ -1,6 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
 import { UserRoundIcon } from "lucide-react";
-import { listMembersOptions } from "@/api/@tanstack/react-query.gen";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,19 +22,38 @@ import { getInitials } from "@/lib/avatar";
  * search box here filters what has already arrived and cannot reach anyone past this page. A larger
  * workspace has people who are unselectable *and* whom the search answers "No matches" for, which
  * reads as "that person does not exist here", so the popover states the limit rather than hiding it.
+ *
+ * <p>Exported because `useReviewPeople`, which does the fetching, has to ask for exactly the page
+ * this sentence promises.
  */
-const MEMBER_PAGE_SIZE = 100;
+export const MEMBER_PAGE_SIZE = 100;
 
-interface PersonOption {
+export interface PersonOption {
 	userId: number;
 	label: string;
 	secondary?: string;
 }
 
+/**
+ * The member list this facet offers, already reduced to what it draws. Whoever fetches it —
+ * `useReviewPeople` in the app, a fixture in a story — owes the same four fields, so the facet never
+ * learns where its people came from.
+ */
+export interface ReviewPeople {
+	options: PersonOption[];
+	/**
+	 * The list is one page long and that page came back full, so there are probably people missing.
+	 * The endpoint returns a bare array with no total, so a full page is the only signal there is.
+	 */
+	capped: boolean;
+	isLoading: boolean;
+	isError: boolean;
+}
+
 export interface ReviewPersonFacetProps {
-	workspaceSlug: string;
 	/** "Developer" on Observations, "Recipient" on Delivery — the two are not always the same person. */
 	title: string;
+	people: ReviewPeople;
 	selected: number | undefined;
 	onChange: (userId: number | undefined) => void;
 	/**
@@ -53,29 +70,17 @@ export interface ReviewPersonFacetProps {
  * multi-select trigger that silently kept only the last choice would lie about what it did.
  */
 export function ReviewPersonFacet({
-	workspaceSlug,
 	title,
+	people,
 	selected,
 	onChange,
 	fallbackName,
 }: ReviewPersonFacetProps) {
-	const membersQuery = useQuery({
-		...listMembersOptions({ path: { workspaceSlug }, query: { size: MEMBER_PAGE_SIZE } }),
-	});
 	const { contains } = useComboboxFilter({ sensitivity: "base" });
-	const options: PersonOption[] = (membersQuery.data ?? [])
-		.filter((member): member is typeof member & { userId: number } => member.userId != null)
-		.map((member) => ({
-			userId: member.userId,
-			label: member.userName || member.userLogin || `#${member.userId}`,
-			secondary: member.userName && member.userLogin ? member.userLogin : undefined,
-		}));
+	const { options, capped } = people;
 	const selectedOption =
 		options.find((option) => option.userId === selected) ??
 		(selected != null ? { userId: selected, label: fallbackName ?? `#${selected}` } : null);
-	// A full page is the only signal the endpoint gives that there may be more; it returns a bare
-	// array, so there is no total to compare against.
-	const capped = (membersQuery.data?.length ?? 0) >= MEMBER_PAGE_SIZE;
 
 	return (
 		<Combobox
@@ -89,11 +94,11 @@ export function ReviewPersonFacet({
 				contains(option, query, (o) => (o.secondary ? `${o.label} ${o.secondary}` : o.label))
 			}
 			itemToStringLabel={(option: PersonOption) => option.label}
-			disabled={membersQuery.isLoading}
+			disabled={people.isLoading}
 		>
 			<ComboboxTrigger
 				type="button"
-				disabled={membersQuery.isLoading}
+				disabled={people.isLoading}
 				aria-label={selectedOption ? `${title}: ${selectedOption.label}` : title}
 				className="h-8 max-w-full border-dashed font-normal"
 			>
@@ -115,7 +120,7 @@ export function ReviewPersonFacet({
 					aria-label={`Search ${title.toLowerCase()} options`}
 				/>
 				<ComboboxEmpty>
-					{membersQuery.isError
+					{people.isError
 						? "Could not load people"
 						: options.length === 0
 							? "No people in this workspace"

@@ -1,5 +1,7 @@
+import { useQuery } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { TraceListPage } from "@/components/practice-trace/TraceListPage";
+import { listTracedArtifactsOptions } from "@/api/@tanstack/react-query.gen";
+import { TRACE_PAGE_SIZE, TraceListPage } from "@/components/practice-trace/TraceListPage";
 import { type TraceSearch, traceSearchSchema } from "@/components/practice-trace/trace-search";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/reviews/")({
@@ -20,7 +22,22 @@ function ReviewActivityListRoute() {
 			replace: true,
 		});
 
+	const query = useQuery({
+		...listTracedArtifactsOptions({
+			path: { workspaceSlug },
+			query: { page: search.page ?? 0, size: TRACE_PAGE_SIZE, artifactKind: search.kind },
+		}),
+	});
+
 	return (
-		<TraceListPage workspaceSlug={workspaceSlug} search={search} onSearchChange={updateSearch} />
+		<TraceListPage
+			workspaceSlug={workspaceSlug}
+			search={search}
+			onSearchChange={updateSearch}
+			artifacts={query.data}
+			isLoading={query.isLoading}
+			error={query.isError ? query.error : undefined}
+			onRetry={() => void query.refetch()}
+		/>
 	);
 }

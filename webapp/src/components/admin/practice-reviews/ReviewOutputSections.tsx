@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon, ScanSearchIcon } from "lucide-react";
 import { useId } from "react";
-import type { AgentJob, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
+import type { AgentJob, Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
 	Empty,
@@ -49,6 +49,13 @@ export interface ReviewOutputSectionsProps {
 	feedback: ReviewSectionState<ReviewFeedback>;
 	observations: ReviewSectionState<ReviewObservation>;
 	/**
+	 * The workspace's practices, which the observation rows' practice links show as a hover card. A
+	 * row names its practice but carries none of its prose, so the list is the join the card needs;
+	 * the screen fetches it once and every row reads the record it names out of it. Optional because
+	 * nothing the card shows is load-bearing — a caller without the list still gets working links.
+	 */
+	practices?: Practice[];
+	/**
 	 * Distinguishes "looked and found nothing" from "declined to look". Omitted by aggregate views,
 	 * which span several runs and so have no single outcome.
 	 */
@@ -65,6 +72,7 @@ export function ReviewOutputSections({
 	scope,
 	feedback,
 	observations,
+	practices,
 	outcome,
 }: ReviewOutputSectionsProps) {
 	return (
@@ -73,6 +81,7 @@ export function ReviewOutputSections({
 				workspaceSlug={workspaceSlug}
 				scope={scope}
 				state={observations}
+				practices={practices}
 				outcome={outcome}
 			/>
 			<FeedbackSection
@@ -155,12 +164,14 @@ function ObservationsSection({
 	workspaceSlug,
 	scope,
 	state,
+	practices,
 	outcome,
 }: {
 	outcome?: AgentJob["reviewOutcome"];
 	workspaceSlug: string;
 	scope: ReviewOutputScope;
 	state: ReviewSectionState<ReviewObservation>;
+	practices?: Practice[];
 }) {
 	const items = state.status === "ready" ? state.items : [];
 	const headingId = useId();
@@ -210,6 +221,7 @@ function ObservationsSection({
 							key={observation.id}
 							workspaceSlug={workspaceSlug}
 							observation={observation}
+							practice={practices?.find((practice) => practice.slug === observation.practiceSlug)}
 							scope={scope}
 						/>
 					))}

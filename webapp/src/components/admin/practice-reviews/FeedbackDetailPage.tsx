@@ -1,8 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { ScanSearchIcon } from "lucide-react";
-import { getPracticeReviewFeedbackOptions } from "@/api/@tanstack/react-query.gen";
-import type { ReviewPlacement } from "@/api/types.gen";
+import type { GetPracticeReviewFeedbackResponse, Practice, ReviewPlacement } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DeliveryTrace } from "@/components/practice-vocabulary/DeliveryTrace";
 import { codeCitationLocator } from "@/components/practice-vocabulary/evidence-source-defs";
@@ -34,14 +32,29 @@ import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 
 export interface FeedbackDetailPageProps {
 	workspaceSlug: string;
-	feedbackId: string;
+	/** What the reader was filtering on the Delivery list, carried into the links back out of here. */
 	search: FeedbackSearch;
+	/** The record this page is about, or `undefined` while it is unknown. */
+	feedback: GetPracticeReviewFeedbackResponse | undefined;
+	isLoading: boolean;
+	error: unknown;
+	onRetry?: () => void;
+	/**
+	 * The workspace's practices, which the source observations' practice links show as a hover card.
+	 * Optional in effect: a page without it still links, it just cannot show the prose.
+	 */
+	practices: Practice[] | undefined;
 }
 
-export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: FeedbackDetailPageProps) {
-	const query = useQuery({
-		...getPracticeReviewFeedbackOptions({ path: { workspaceSlug, feedbackId } }),
-	});
+export function FeedbackDetailPage({
+	workspaceSlug,
+	search,
+	feedback,
+	isLoading,
+	error,
+	onRetry,
+	practices,
+}: FeedbackDetailPageProps) {
 	const breadcrumbs = (
 		<ReviewBreadcrumbs
 			workspaceSlug={workspaceSlug}
@@ -58,7 +71,7 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 		/>
 	);
 
-	if (query.isLoading)
+	if (isLoading)
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
@@ -67,19 +80,16 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 				</div>
 			</article>
 		);
-	if (query.isError || !query.data) {
+	// No record and no error is still nothing to draw, so both land on the alert rather than on a
+	// header with empty facts under it.
+	if (error || !feedback) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
-				<QueryErrorAlert
-					error={query.error}
-					title="Couldn't load this feedback"
-					onRetry={() => query.refetch()}
-				/>
+				<QueryErrorAlert error={error} title="Couldn't load this feedback" onRetry={onRetry} />
 			</article>
 		);
 	}
-	const feedback = query.data;
 	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
 	// No slug means a kind this build has no route for; the artifact still renders, unlinked.
 	const artifactSlug = feedback.artifact
@@ -214,6 +224,9 @@ export function FeedbackDetailPage({ workspaceSlug, feedbackId, search }: Feedba
 												practiceSlug={observation.practiceSlug}
 												practiceName={observation.practiceName}
 												area={observation.area}
+												practice={practices?.find(
+													(practice) => practice.slug === observation.practiceSlug,
+												)}
 											/>,
 											observation.role === "PRIMARY"
 												? "What this feedback is about"

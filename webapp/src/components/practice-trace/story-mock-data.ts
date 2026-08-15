@@ -1,10 +1,17 @@
 import type {
 	ArtifactTrace,
+	PagedModelTracedArtifact,
 	PracticeTraceEntry,
 	TracedArtifact,
 	TracedSignal,
 } from "@/api/types.gen";
-import type { Wire } from "@/lib/dates";
+
+/**
+ * Typed as the generated views rather than as `Wire<…>` of them, with real `Date`s: these fixtures
+ * are handed straight to props now that the trace screens take their data that way. Route tests
+ * still serve them through MSW, and `HttpResponse.json` stringifies a `Date` back into the ISO
+ * string the wire carries — the same value the client's transformer revives on the way in.
+ */
 
 export const tracedArtifacts = [
 	{
@@ -14,7 +21,7 @@ export const tracedArtifacts = [
 		number: 1423,
 		container: "ls1intum/Hephaestus",
 		url: "https://github.com/ls1intum/Hephaestus/pull/1423",
-		lastSignalAt: "2026-08-07T09:12:00Z",
+		lastSignalAt: new Date("2026-08-07T09:12:00Z"),
 		signalCount: 6,
 		reviewedSignalCount: 2,
 	},
@@ -25,7 +32,7 @@ export const tracedArtifacts = [
 		number: 1418,
 		container: "ls1intum/Hephaestus",
 		url: "https://github.com/ls1intum/Hephaestus/pull/1418",
-		lastSignalAt: "2026-08-06T16:40:00Z",
+		lastSignalAt: new Date("2026-08-06T16:40:00Z"),
 		signalCount: 3,
 		reviewedSignalCount: 1,
 	},
@@ -36,7 +43,7 @@ export const tracedArtifacts = [
 		number: 1430,
 		container: "ls1intum/Hephaestus",
 		url: "https://github.com/ls1intum/Hephaestus/issues/1430",
-		lastSignalAt: "2026-08-05T11:02:00Z",
+		lastSignalAt: new Date("2026-08-05T11:02:00Z"),
 		signalCount: 2,
 		reviewedSignalCount: 0,
 	},
@@ -45,7 +52,7 @@ export const tracedArtifacts = [
 		artifactKind: "chat.conversation_thread",
 		artifactId: 88,
 		title: "Conversation",
-		lastSignalAt: "2026-08-04T08:30:00Z",
+		lastSignalAt: new Date("2026-08-04T08:30:00Z"),
 		signalCount: 1,
 		reviewedSignalCount: 0,
 	},
@@ -55,11 +62,11 @@ export const tracedArtifacts = [
 		title: "Onboarding: your first week",
 		container: "Engineering handbook",
 		url: "https://outline.example.com/doc/onboarding-your-first-week",
-		lastSignalAt: "2026-08-03T14:15:00Z",
+		lastSignalAt: new Date("2026-08-03T14:15:00Z"),
 		signalCount: 2,
 		reviewedSignalCount: 1,
 	},
-] satisfies Wire<TracedArtifact>[];
+] satisfies TracedArtifact[];
 
 /**
  * `scm.pull_request.synchronized` appears twice at different revisions. That collision is the
@@ -71,7 +78,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.opened",
 		displayName: "Opened as a draft",
 		revision: "27f4e88c",
-		occurredAt: "2026-08-05T08:02:00Z",
+		occurredAt: new Date("2026-08-05T08:02:00Z"),
 		discoveredVia: "EVENT",
 		state: "SUPPRESSED",
 		stateReason: "GATE_SKIPPED",
@@ -81,7 +88,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.ready",
 		displayName: "Marked ready for review",
 		revision: "27f4e88c",
-		occurredAt: "2026-08-06T10:15:00Z",
+		occurredAt: new Date("2026-08-06T10:15:00Z"),
 		discoveredVia: "EVENT",
 		state: "TRIGGERED",
 		reviewId: "11111111-1111-1111-1111-111111111111",
@@ -91,7 +98,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.synchronized",
 		displayName: "New commits pushed",
 		revision: "9ab3c410",
-		occurredAt: "2026-08-06T14:48:00Z",
+		occurredAt: new Date("2026-08-06T14:48:00Z"),
 		discoveredVia: "SYNC",
 		state: "SUPPRESSED",
 		stateReason: "COOLDOWN_ACTIVE",
@@ -101,7 +108,7 @@ export const tracedSignals = [
 		signal: "scm.pull_request.manual_review",
 		displayName: "Review requested",
 		revision: "9ab3c410",
-		occurredAt: "2026-08-07T08:30:00Z",
+		occurredAt: new Date("2026-08-07T08:30:00Z"),
 		discoveredVia: "MANUAL",
 		state: "PENDING",
 	},
@@ -110,12 +117,12 @@ export const tracedSignals = [
 		signal: "scm.pull_request.synchronized",
 		displayName: "New commits pushed",
 		revision: "b71d0a52",
-		occurredAt: "2026-08-07T09:12:00Z",
+		occurredAt: new Date("2026-08-07T09:12:00Z"),
 		discoveredVia: "BACKFILL",
 		state: "LAPSED",
 		stateReason: "PENDING_DEADLINE_EXCEEDED",
 	},
-] satisfies Wire<TracedSignal>[];
+] satisfies TracedSignal[];
 
 /** One entry per `outcome`, plus the measured-but-deliberately-silent case that the tiers create. */
 export const practiceTraceEntries = [
@@ -129,7 +136,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready", "scm.pull_request.synchronized"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: "2026-08-06T10:19:00Z",
+		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 3,
 		deliveredCount: 1,
@@ -145,7 +152,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: "2026-08-06T10:19:00Z",
+		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 2,
 		deliveredCount: 0,
@@ -192,7 +199,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.synchronized"],
 		occasionedBy: "scm.pull_request.synchronized",
 		occasionedById: "sig-sync-9ab3c410",
-		decidedAt: "2026-08-06T14:48:00Z",
+		decidedAt: new Date("2026-08-06T14:48:00Z"),
 		observationCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
@@ -207,7 +214,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: "2026-08-06T10:19:00Z",
+		decidedAt: new Date("2026-08-06T10:19:00Z"),
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 0,
 		deliveredCount: 0,
@@ -259,7 +266,7 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.synchronized"],
 		occasionedBy: "scm.pull_request.synchronized",
 		occasionedById: "sig-sync-b71d0a52",
-		decidedAt: "2026-08-07T09:42:00Z",
+		decidedAt: new Date("2026-08-07T09:42:00Z"),
 		observationCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
@@ -274,13 +281,13 @@ export const practiceTraceEntries = [
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
-		decidedAt: "2026-08-06T10:21:00Z",
+		decidedAt: new Date("2026-08-06T10:21:00Z"),
 		reviewId: "33333333-3333-3333-3333-333333333333",
 		observationCount: 0,
 		deliveredCount: 0,
 		withheldReasons: [],
 	},
-] satisfies Wire<PracticeTraceEntry>[];
+] satisfies PracticeTraceEntry[];
 
 export const artifactTrace = {
 	artifactKind: "scm.pull_request",
@@ -291,7 +298,7 @@ export const artifactTrace = {
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
 	signals: tracedSignals,
 	practices: practiceTraceEntries,
-} satisfies Wire<ArtifactTrace>;
+} satisfies ArtifactTrace;
 
 export const untouchedArtifactTrace = {
 	artifactKind: "scm.issue",
@@ -306,7 +313,7 @@ export const untouchedArtifactTrace = {
 			signal: "scm.issue.opened",
 			displayName: "Opened",
 			revision: "1",
-			occurredAt: "2026-08-05T11:02:00Z",
+			occurredAt: new Date("2026-08-05T11:02:00Z"),
 			discoveredVia: "SYNC",
 			state: "SUPPRESSED",
 			stateReason: "NO_ACTIVE_PRACTICE",
@@ -326,7 +333,7 @@ export const untouchedArtifactTrace = {
 			withheldReasons: [],
 		},
 	],
-} satisfies Wire<ArtifactTrace>;
+} satisfies ArtifactTrace;
 
 /** A kind the request endpoint refuses, so its trace must not offer the button. */
 export const documentArtifactTrace = {
@@ -341,7 +348,7 @@ export const documentArtifactTrace = {
 			signal: "docs.document.published",
 			displayName: "Published",
 			revision: "4",
-			occurredAt: "2026-08-03T14:15:00Z",
+			occurredAt: new Date("2026-08-03T14:15:00Z"),
 			discoveredVia: "EVENT",
 			state: "TRIGGERED",
 		},
@@ -356,15 +363,18 @@ export const documentArtifactTrace = {
 			watches: ["docs.document.published"],
 			occasionedBy: "sig-doc-published",
 			occasionedById: "sig-doc-published",
-			decidedAt: "2026-08-03T14:19:00Z",
+			decidedAt: new Date("2026-08-03T14:19:00Z"),
 			observationCount: 3,
 			deliveredCount: 0,
 			withheldReasons: ["PRACTICE_TIER_QUIET"],
 		},
 	],
-} satisfies Wire<ArtifactTrace>;
+} satisfies ArtifactTrace;
 
-export function tracedArtifactPage(content: Wire<TracedArtifact>[] = tracedArtifacts, size = 20) {
+export function tracedArtifactPage(
+	content: TracedArtifact[] = tracedArtifacts,
+	size = 20,
+): PagedModelTracedArtifact {
 	return {
 		content,
 		page: {

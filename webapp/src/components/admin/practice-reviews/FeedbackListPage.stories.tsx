@@ -1,22 +1,85 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
+import type { ListPracticeReviewFeedbackResponse, ReviewFeedback } from "@/api/types.gen";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackListPage } from "./FeedbackListPage";
-import { manyFeedback } from "./story-mock-data";
-import { reviewHandlers } from "./story-mock-server";
+import type { ReviewPeople } from "./ReviewPersonFacet";
+import { type FeedbackSearch, feedbackQuery, REVIEW_PAGE_SIZE } from "./review-search";
+import { manyFeedback, reviewFeedback, workspaceMembers } from "./story-mock-data";
+
+const PEOPLE: ReviewPeople = {
+	options: workspaceMembers
+		.filter((member): member is typeof member & { userId: number } => member.userId != null)
+		.map((member) => ({
+			userId: member.userId,
+			label: member.userName ?? `#${member.userId}`,
+			secondary: member.userLogin,
+		})),
+	capped: false,
+	isLoading: false,
+	isError: false,
+};
+
+/**
+ * Every row a story has to choose from. It travels in the `feedback` arg because that is the prop
+ * the screen reads, and {@link feedbackPage} narrows it to one page before the screen sees it — so
+ * an arg set in Controls is a pool to filter, not a page already cut.
+ */
+function pool(rows: ReviewFeedback[]): ListPracticeReviewFeedbackResponse {
+	return {
+		content: rows,
+		page: {
+			number: 0,
+			size: REVIEW_PAGE_SIZE,
+			totalElements: rows.length,
+			totalPages: Math.max(1, Math.ceil(rows.length / REVIEW_PAGE_SIZE)),
+		},
+	};
+}
+
+/**
+ * The route fetches; this screen only draws what it is handed. To keep the facets live in a story
+ * without a network, the filtering the server does is applied here — over the query object the route
+ * would actually send. That is what keeps the "Why withheld" facet honest: the URL carries families
+ * and `feedbackQuery` expands them to the individual reasons rows actually carry, so a story that
+ * filtered on the family name would pass while the real request returned nothing.
+ */
+function feedbackPage(
+	candidates: ReviewFeedback[],
+	search: FeedbackSearch,
+): ListPracticeReviewFeedbackResponse {
+	const query = feedbackQuery(search, REVIEW_PAGE_SIZE);
+	const selects = (selected: string[] | undefined, actual: string | undefined) =>
+		!selected?.length || (actual !== undefined && selected.includes(actual));
+	const rows = candidates.filter(
+		(row) =>
+			(!query.from || row.createdAt >= new Date(query.from)) &&
+			(!query.to || row.createdAt < new Date(query.to)) &&
+			selects(query.deliveryState, row.deliveryState) &&
+			selects(query.channel, row.channel) &&
+			selects(query.suppressionReason, row.suppressionReason) &&
+			(query.recipientUserId === undefined || row.recipient?.id === query.recipientUserId),
+	);
+	const number = query.page ?? 0;
+	return {
+		content: rows.slice(number * REVIEW_PAGE_SIZE, (number + 1) * REVIEW_PAGE_SIZE),
+		page: {
+			number,
+			size: REVIEW_PAGE_SIZE,
+			totalElements: rows.length,
+			totalPages: Math.max(1, Math.ceil(rows.length / REVIEW_PAGE_SIZE)),
+		},
+	};
+}
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Delivery",
 	component: FeedbackListPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: { handlers: reviewHandlers() },
 	},
 	decorators: [withWidePage, withStandardPage],
 	tags: ["autodocs"],
@@ -24,12 +87,23 @@ const meta = {
 		workspaceSlug: "demo",
 		search: { deliveryState: undefined, withheldFamily: undefined, channel: undefined },
 		onSearchChange: fn(),
+		feedback: pool(reviewFeedback),
+		isLoading: false,
+		error: undefined,
+		onRetry: fn(),
+		people: PEOPLE,
 	},
-	// The screen is controlled: with a frozen `search` prop every facet reads as dead.
+	// The screen is controlled: with a frozen `search` prop every facet reads as dead. The rows are
+	// recomputed from that search the way the route's query would be re-run.
 	render: (args) => (
 		<StatefulPatch initial={args.search}>
 			{(search, onSearchChange) => (
-				<FeedbackListPage {...args} search={search} onSearchChange={onSearchChange} />
+				<FeedbackListPage
+					{...args}
+					search={search}
+					onSearchChange={onSearchChange}
+					feedback={args.feedback && feedbackPage(args.feedback.content ?? [], search)}
+				/>
 			)}
 		</StatefulPatch>
 	),
@@ -135,11 +209,9 @@ export const MoreThanOnePage: Story = {
 			withheldFamily: undefined,
 			channel: undefined,
 		},
+		feedback: pool(manyFeedback(60)),
 	},
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: { handlers: reviewHandlers({ feedback: manyFeedback(60) }) },
-	},
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("60 pieces of feedback.");
 		const current = await canvas.findByRole("link", { name: "Go to page 2" });
@@ -158,20 +230,31 @@ export const Mobile: Story = {
 	},
 };
 
+/**
+ * The error arrives as a prop, so nothing here depends on a request failing at the right moment. A
+ * status-less error is the one that reads "check your connection" — see `QueryErrorAlert`.
+ */
 export const LoadFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/feedback",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(),
-			],
-		},
-	},
+	parameters: { chromatic: { viewports: [1440] } },
+	args: { feedback: undefined, error: { status: 500, detail: "Something went wrong." } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Couldn't load feedback");
+	},
+};
+
+export const Loading: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	args: { feedback: undefined, isLoading: true },
+	play: async ({ canvas }) => {
+		await canvas.findByText("Loading feedback");
+	},
+};
+
+/** Nothing has been composed yet, which is not the same as a filter that matched nothing. */
+export const NoFeedbackYet: Story = {
+	parameters: { chromatic: { viewports: [1440] } },
+	args: { feedback: pool([]) },
+	play: async ({ canvas }) => {
+		await canvas.findByText("No feedback yet");
 	},
 };

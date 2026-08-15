@@ -1,32 +1,41 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { HttpResponse, http } from "msw";
-import { expect, within } from "storybook/test";
+import { expect, screen, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackDetailPage } from "./FeedbackDetailPage";
-import { longFeedbackDetail, reviewFeedbackDetail } from "./story-mock-data";
-import { reviewHandlers } from "./story-mock-server";
+import {
+	feedbackDetail,
+	longFeedbackDetail,
+	reviewFeedbackDetail,
+	workspacePractices,
+} from "./story-mock-data";
 
+/**
+ * The route fetches the record and the workspace's practice list; this screen only draws what it is
+ * handed, so every story here is a record and nothing else. Each record comes out of the fixture by
+ * id rather than being patched by hand — a hand-patched copy can describe a feedback no composer
+ * could have produced.
+ */
 const meta = {
 	title: "Workspace admin/Practice reviews/Feedback details",
 	component: FeedbackDetailPage,
 	parameters: {
-		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
-		docs: { story: { inline: false, height: "600px" } },
 		layout: "padded",
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 768, 1440] },
-		msw: { handlers: reviewHandlers() },
 	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo",
-		feedbackId: reviewFeedbackDetail.id,
 		search: {
 			agentJobId: reviewFeedbackDetail.agentJobId,
 			deliveryState: undefined,
 			withheldFamily: undefined,
 			channel: undefined,
 		},
+		feedback: reviewFeedbackDetail,
+		isLoading: false,
+		error: undefined,
+		practices: workspacePractices,
 	},
 } satisfies Meta<typeof FeedbackDetailPage>;
 
@@ -49,7 +58,7 @@ export const NotDelivered: Story = {
 };
 
 export const Delivered: Story = {
-	args: { feedbackId: "99999999-6666-6666-6666-666666666666" },
+	args: { feedback: feedbackDetail("99999999-6666-6666-6666-666666666666") },
 	play: async ({ canvasElement }) => {
 		const canvas = within(canvasElement);
 		// Exactly one "Delivered": the trace's terminal step. The composed text carries no badge,
@@ -65,7 +74,7 @@ export const Delivered: Story = {
  * operator sees in the delivery list is a list preview and stops there.
  */
 export const LongFeedback: Story = {
-	args: { feedbackId: longFeedbackDetail.id },
+	args: { feedback: longFeedbackDetail },
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText(/2 issues to tighten in this change/);
@@ -86,7 +95,7 @@ export const LongFeedback: Story = {
 };
 
 export const PreparedForConversation: Story = {
-	args: { feedbackId: "11111111-4444-4444-4444-444444444444" },
+	args: { feedback: feedbackDetail("11111111-4444-4444-4444-444444444444") },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		// The lane, not the exact wording: the `PREPARED` label lives in `delivery-outcome-defs`.
@@ -96,7 +105,7 @@ export const PreparedForConversation: Story = {
 };
 
 export const RenderedAndSource: Story = {
-	args: { feedbackId: "44444444-4444-4444-4444-444444444444" },
+	args: { feedback: longFeedbackDetail },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas, userEvent }) => {
 		await canvas.findByRole("link", { name: "See the feedback this replaced" });
@@ -113,19 +122,37 @@ export const RenderedAndSource: Story = {
 	},
 };
 
-export const LoadFailed: Story = {
-	parameters: {
-		chromatic: { viewports: [1440] },
-		msw: {
-			handlers: [
-				http.get(
-					"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId",
-					() => new HttpResponse(null, { status: 500 }),
-				),
-				...reviewHandlers(),
-			],
-		},
+/**
+ * A source observation names the practice it was judged against, and the name says what the practice
+ * is without leaving the page. The card is the half that goes quiet on its own: a page that stops
+ * being handed the practice list still renders a perfectly good link.
+ */
+export const PracticeSaysWhatItIs: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		const productLanguage = workspacePractices[1];
+		await userEvent.hover(await canvas.findByRole("link", { name: /Product language/ }));
+		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
+		await screen.findByText(productLanguage.whyItMatters ?? "");
 	},
+};
+
+export const Loading: Story = {
+	args: { feedback: undefined, isLoading: true },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await canvas.findByRole("link", { name: "Delivery" });
+		await expect(canvas.queryByText("Couldn't load this feedback")).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The error arrives as a prop, so nothing here depends on a request failing at the right moment. A
+ * status-less error is the one that reads "check your connection" — see `QueryErrorAlert`.
+ */
+export const LoadFailed: Story = {
+	args: { feedback: undefined, error: { status: 500, detail: "Something went wrong." } },
+	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Couldn't load this feedback");
 	},
