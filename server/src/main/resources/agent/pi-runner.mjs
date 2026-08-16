@@ -24,6 +24,12 @@ import {
     validateInapplicabilityScope,
 } from "./pi-finding-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
+import {
+    COMPOSITION_MIN_BUDGET_MS,
+    compositionBudgetMs,
+    deriveTimeouts,
+    shouldCompose,
+} from "./pi-runner-timings.mjs";
 
 const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
@@ -43,13 +49,14 @@ const AGENT_DIR = process.env.PI_CODING_AGENT_DIR;
 if (!AGENT_DIR) {
     throw new Error("PI_CODING_AGENT_DIR env var is required");
 }
-// 85% initial / 15% retry; soft nudge at 50% of initial.
-const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
-const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
-const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5));
-// Ceiling for the feedback-composition stage. Never additive to the review's own allowance: the stage
-// runs only from what is left over, and skips itself when the review used its time (see main()).
-const COMPOSITION_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.15));
+const {
+    initialMs: INITIAL_TIMEOUT_MS,
+    retryMs: RETRY_TIMEOUT_MS,
+    softNudgeMs: SOFT_TIMEOUT_MS,
+    // Ceiling for the feedback-composition stage. Never additive to the review's own allowance: the
+    // stage runs only from what the review left unspent, and only when that clears the floor (see main()).
+    compositionCeilingMs: COMPOSITION_TIMEOUT_MS,
+} = deriveTimeouts(AGENT_BUDGET_MS);
 
 // Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
@@ -533,10 +540,6 @@ async function runCompositionStage(sharedDeps, budgetMs) {
     }
     if (!existsSync(COMPOSER_PROMPT_PATH)) {
         console.error(`[pi-runner] Composition stage: ${COMPOSER_PROMPT_PATH} missing, skipping`);
-        return null;
-    }
-    if (budgetMs < 30_000) {
-        console.error(`[pi-runner] Composition stage: only ${budgetMs}ms left, skipping`);
         return null;
     }
     const practiceSlugs = composablePracticeSlugs();
@@ -1035,16 +1038,30 @@ async function main() {
     // ── Feedback composition ─────────────────────────────────────────────────
     //
     // The second LLM step: observations were the measurement, this turns them into an intervention for
-    // the developer's reflection surface. Runs only when the review already has durable state, only from time
-    // the review did not need, and never when the review was itself short of time — a review that had to
-    // be nudged or aborted needs its retry allowance more than the reflection surface needs a message today.
+    // the developer's reflection surface. Three conditions, and the last is the whole rule: durable review
+    // state to compose from; no hard abort, because a review that lost its turn needs its retry allowance
+    // more than the reflection surface needs a message today; and, once that allowance is set aside, enough
+    // of the budget still unspent to finish a turn. Whether the soft nudge fired is not a condition — it is
+    // a steer that fires at 42.5% of the budget and says nothing about what is left.
     // Isolated: any failure is logged and this review's outcome is untouched.
-    if (hasPersistedReviewState() && !softTimeoutFired && !hardAborted) {
+    const reviewStatePersisted = hasPersistedReviewState();
+    const leftoverForCompositionMs = compositionBudgetMs({
+        agentBudgetMs: AGENT_BUDGET_MS,
+        elapsedMs: Date.now() - startMs,
+        retryMs: RETRY_TIMEOUT_MS,
+        compositionCeilingMs: COMPOSITION_TIMEOUT_MS,
+    });
+    if (
+        shouldCompose({
+            hasPersistedReviewState: reviewStatePersisted,
+            hardAborted,
+            budgetMs: leftoverForCompositionMs,
+        })
+    ) {
         try {
-            const remainingMs = AGENT_BUDGET_MS - (Date.now() - startMs);
             const composeSession = await runCompositionStage(
                 { settingsManager, authStorage, modelRegistry },
-                Math.min(COMPOSITION_TIMEOUT_MS, Math.max(0, remainingMs - RETRY_TIMEOUT_MS)),
+                leftoverForCompositionMs,
             );
             if (composeSession) {
                 accumulateUsage(null, extractUsageFromSession(composeSession.state));
@@ -1053,6 +1070,11 @@ async function main() {
         } catch (err) {
             console.error(`[pi-runner] Composition stage failed (review unaffected): ${err.message}`);
         }
+    } else {
+        console.error(
+            `[pi-runner] Composition stage skipped: reviewState=${reviewStatePersisted}, hardAbort=${hardAborted}, ` +
+                `budget=${leftoverForCompositionMs}ms (floor ${COMPOSITION_MIN_BUDGET_MS}ms)`,
+        );
     }
 
     if (checkResultFile()) {

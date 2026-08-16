@@ -114,10 +114,14 @@ class SlackConversationSchemaContractIntegrationTest {
         ObjectNode forParticipant = projector.buildPayload(WS, 100L);
         assertThat(conversations(forParticipant)).as("a participant (100) sees the thread").hasSize(1);
         assertThat(conversations(forParticipant).get(0).get("channelName").asString()).isEqualTo("engineering");
-        assertThat(conversations(forParticipant).get(0).get("messages")).hasSize(2);
-        assertThat(
-            conversations(forParticipant).get(0).get("messages").get(0).get("authorMemberId").asLong()
-        ).isEqualTo(100L);
+        ArrayNode messages = (ArrayNode) conversations(forParticipant).get(0).get("messages");
+        assertThat(messages).hasSize(2);
+        assertThat(messages).allSatisfy(message -> {
+            assertThat(message.get("text").asString()).isIn("root", "reply");
+            // The member id that drove the firewall is deliberately absent from the payload: nothing a model
+            // reads may carry a row id. It is pinned by the participant match above, not by being handed over.
+            assertThat(message.has("authorMemberId")).isFalse();
+        });
 
         // …a non-participant sees nothing. If changeset 1782980500800-12 drifted off bigint[], the array-literal
         // seed above or the ANY(...) match itself would fail (a type mismatch or a broken membership test), so the

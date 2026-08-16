@@ -13,12 +13,15 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.StagedArtifactNames;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
 import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
 import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactIdentity;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -26,6 +29,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -35,7 +39,9 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPoli
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
 import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -63,6 +69,23 @@ class ReviewHistoryContentSourceTest {
     private static final long PR_ID = 42L;
     private static final long AUTHOR_ID = 99L;
 
+    /** The row id of the merge request an entry was filed against — what a person never sees. */
+    private static final long OBSERVED_ARTIFACT_ROW_ID = 306L;
+    private static final long DELIVERED_ARTIFACT_ROW_ID = 307L;
+
+    /** What the same merge request is called where the developer works. */
+    private static final int OBSERVED_ARTIFACT_NUMBER = 22;
+    private static final int DELIVERED_ARTIFACT_NUMBER = 23;
+
+    /** Filed against a kind no resolver names, so the row id is all a leaking payload could offer. */
+    private static final long UNNAMEABLE_ARTIFACT_ROW_ID = 909L;
+
+    private static final Set<Long> ROW_IDS = Set.of(
+        OBSERVED_ARTIFACT_ROW_ID,
+        DELIVERED_ARTIFACT_ROW_ID,
+        UNNAMEABLE_ARTIFACT_ROW_ID
+    );
+
     private final ObjectMapper objectMapper = new ObjectMapper();
     private ObservationRepository observationRepository;
     private FeedbackRepository feedbackRepository;
@@ -84,6 +107,7 @@ class ReviewHistoryContentSourceTest {
             visibilityPolicy,
             pullRequestRepository,
             issueRepository,
+            new StagedArtifactNames(ReviewHistoryContentSourceTest::identitiesOf),
             objectMapper
         );
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(List.of());
@@ -267,6 +291,97 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
+    /**
+     * The number the developer can type, never the row it is stored in.
+     *
+     * <p>A composed reflection message quotes this file back to the person it is about. Handed 306 — the
+     * primary key behind merge request !22 — a model writes "in PR #306", and the developer follows the
+     * reference to unrelated work or to nothing at all.
+     */
+    @Nested
+    class NamingTheWorkAnEntryIsAbout {
+
+        @Test
+        void anObservationCarriesTheHandleOfTheWorkItWasFiledAgainst() {
+            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
+                List.of(observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID))
+            );
+
+            JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
+                .get("observations")
+                .get(0)
+                .get("artifact");
+
+            assertThat(artifact.get("kind").asString()).isEqualTo("scm.pull_request");
+            assertThat(artifact.get("number").asInt()).isEqualTo(OBSERVED_ARTIFACT_NUMBER);
+            assertThat(artifact.get("title").asString()).isEqualTo("Batch the practice reads");
+            assertThat(artifact.get("container").asString()).isEqualTo("acme/web");
+            assertThat(artifact.get("url").asString()).endsWith("/merge_requests/" + OBSERVED_ARTIFACT_NUMBER);
+        }
+
+        @Test
+        void deliveredFeedbackCarriesTheSameHandle() {
+            when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(
+                List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
+            );
+
+            JsonNode artifact = read(captureFeedbackHistory().files().get("inputs/history/feedback.json"))
+                .get("feedback")
+                .get(0)
+                .get("artifact");
+
+            assertThat(artifact.get("number").asInt()).isEqualTo(DELIVERED_ARTIFACT_NUMBER);
+            assertThat(artifact.get("container").asString()).isEqualTo("acme/web");
+        }
+
+        /**
+         * Work nobody can name is named by its kind. "A conversation thread" is true of it; its row id is
+         * not something anyone could look up, so offering the id would only invite a fabricated citation.
+         */
+        @Test
+        void workNoResolverCanNameIsStagedAsItsKindWithoutANumber() {
+            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
+                List.of(observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID))
+            );
+
+            JsonNode artifact = read(captureObservationHistory().files().get("inputs/history/observations.json"))
+                .get("observations")
+                .get(0)
+                .get("artifact");
+
+            assertThat(artifact.get("kind").asString()).isEqualTo("chat.conversation_thread");
+            assertThat(artifact.get("title").asString()).isEqualTo("Conversation thread");
+            assertThat(artifact.has("number")).isFalse();
+            assertThat(artifact.has("url")).isFalse();
+        }
+
+        /**
+         * The invariant, checked over the whole document rather than over the one field that leaked: a
+         * staged history holds no number the developer could not have typed themselves.
+         */
+        @Test
+        void neitherHistoryFileCarriesARowIdAnywhere() {
+            when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
+                List.of(
+                    observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
+                    observationAgainst(ArtifactKinds.CONVERSATION_THREAD, UNNAMEABLE_ARTIFACT_ROW_ID)
+                )
+            );
+            when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(
+                List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
+            );
+
+            assertCarriesNoRowId(
+                read(captureObservationHistory().files().get("inputs/history/observations.json")),
+                "observations.json"
+            );
+            assertCarriesNoRowId(
+                read(captureFeedbackHistory().files().get("inputs/history/feedback.json")),
+                "feedback.json"
+            );
+        }
+    }
+
     /** History is about the person; the mentor chat has its own context sources and its own consent gate. */
     @Test
     void doesNotSupportTheMentorChat() {
@@ -307,7 +422,85 @@ class ReviewHistoryContentSourceTest {
         return pullRequest;
     }
 
+    /**
+     * Stands in for the registered resolvers: names the merge requests, and answers for a kind nobody
+     * resolves exactly as {@code RegisteredArtifactIdentities} does — by its kind, with no number.
+     */
+    private static Map<Long, ArtifactIdentity> identitiesOf(long workspaceId, ArtifactKind kind, Collection<Long> ids) {
+        Map<Long, ArtifactIdentity> named = new LinkedHashMap<>();
+        for (Long id : ids) {
+            named.put(id, identityOf(kind, id));
+        }
+        return named;
+    }
+
+    private static ArtifactIdentity identityOf(ArtifactKind kind, Long id) {
+        if (id == OBSERVED_ARTIFACT_ROW_ID) {
+            return mergeRequest(kind, id, OBSERVED_ARTIFACT_NUMBER, "Batch the practice reads");
+        }
+        if (id == DELIVERED_ARTIFACT_ROW_ID) {
+            return mergeRequest(kind, id, DELIVERED_ARTIFACT_NUMBER, "Drop the duplicate visibility read");
+        }
+        return ArtifactIdentity.unresolved(kind, id, "Conversation thread");
+    }
+
+    private static ArtifactIdentity mergeRequest(ArtifactKind kind, Long id, int number, String title) {
+        return new ArtifactIdentity(
+            kind,
+            id,
+            number,
+            title,
+            "acme/web",
+            "https://gitlab.example.com/acme/web/-/merge_requests/" + number
+        );
+    }
+
+    private static void assertCarriesNoRowId(JsonNode node, String path) {
+        if (node.isObject()) {
+            node
+                .properties()
+                .forEach(entry -> {
+                    assertThat(entry.getKey()).as("staged field at %s", path).isNotEqualTo("artifactId");
+                    assertCarriesNoRowId(entry.getValue(), path + "." + entry.getKey());
+                });
+            return;
+        }
+        if (node.isArray()) {
+            for (int index = 0; index < node.size(); index++) {
+                assertCarriesNoRowId(node.get(index), path + "[" + index + "]");
+            }
+            return;
+        }
+        if (node.isNumber()) {
+            assertThat(ROW_IDS.contains(node.asLong())).as("a row id reached the staged history at %s", path).isFalse();
+        }
+    }
+
+    private static Observation observationAgainst(ArtifactKind kind, long artifactId) {
+        return observation("swallows-errors", "rec-1", "Caught and ignored", kind, artifactId);
+    }
+
+    private static Feedback deliveredAgainst(ArtifactKind kind, long artifactId) {
+        return Feedback.builder()
+            .channel(FeedbackChannel.IN_CONTEXT)
+            .artifactKind(kind)
+            .artifactId(artifactId)
+            .body("Consider handling this error rather than logging it.")
+            .deliveredAt(Instant.parse("2026-07-01T09:00:00Z"))
+            .build();
+    }
+
     private static Observation observation(String practiceSlug, String recurrenceKey, String title) {
+        return observation(practiceSlug, recurrenceKey, title, null, null);
+    }
+
+    private static Observation observation(
+        String practiceSlug,
+        String recurrenceKey,
+        String title,
+        ArtifactKind artifactKind,
+        Long artifactId
+    ) {
         Practice practice = new Practice();
         practice.setSlug(practiceSlug);
         return Observation.builder()
@@ -317,6 +510,8 @@ class ReviewHistoryContentSourceTest {
             .title(title)
             .presence(Presence.PRESENT)
             .assessment(Assessment.BAD)
+            .artifactKind(artifactKind)
+            .artifactId(artifactId)
             .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
             .reasoning("The catch block logs and continues.")
             .build();

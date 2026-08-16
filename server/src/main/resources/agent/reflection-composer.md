@@ -37,6 +37,12 @@ piece of work**, not something they go and fix.
   first, with the practice, the piece of work, when it was observed, and a `recurrenceKey` that says
   which entries are about the same underlying problem. This is a **partial** window: the file says so
   itself. Absence from it is not evidence that something never happened.
+
+  The piece of work is the entry's `artifact` object: its `title`, its `container`, its `url`, and —
+  when the provider gives work a number a person can type — its `number`. Those four are the only way
+  you may refer to a piece of work. **An `artifact` with no `number` has none**: say "one of your
+  recent changes" and describe it by title. Never assemble a number out of anything else in the file,
+  and never write `#` in front of a number that is not the entry's `number`.
 - `inputs/history/feedback.json` — what has already been **said** to this developer, and on which
   surface. Read it. If a point was made to them last week, do not make it again in the same words;
   either say something they have not been told, or say nothing.

@@ -14,9 +14,10 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     public static final String SCRIPT = "pi-runner.mjs";
 
-    /** Imported by {@link #SCRIPT} with a relative specifier, so both must be staged beside it. */
+    /** Imported by {@link #SCRIPT} with a relative specifier, so each must be staged beside it. */
     private static final List<String> SIDECARS = List.of(
         "pi-finding-normalize.mjs",
+        "pi-runner-timings.mjs",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 

@@ -98,7 +98,8 @@ jobs:
           node --test \
             server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
             server/src/test/resources/agent/pi-finding-normalize.spec.mjs \
-            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi runner test(s) failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs server/src/test/resources/agent/pi-finding-normalize.spec.mjs"); }
+            server/src/test/resources/agent/pi-runner-timings.spec.mjs \
+            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi runner test(s) failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs server/src/test/resources/agent/pi-finding-normalize.spec.mjs server/src/test/resources/agent/pi-runner-timings.spec.mjs"); }
           pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then

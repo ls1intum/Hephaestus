@@ -4,6 +4,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
+import de.tum.cit.aet.hephaestus.agent.context.StagedArtifactNames;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
@@ -82,6 +83,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
     private final ObservationVisibilityPolicy visibilityPolicy;
     private final PullRequestRepository pullRequestRepository;
     private final IssueRepository issueRepository;
+    private final StagedArtifactNames artifactNames;
     private final ObjectMapper objectMapper;
 
     public ReviewHistoryContentSource(
@@ -90,6 +92,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         ObservationVisibilityPolicy visibilityPolicy,
         PullRequestRepository pullRequestRepository,
         IssueRepository issueRepository,
+        StagedArtifactNames artifactNames,
         ObjectMapper objectMapper
     ) {
         this.observationRepository = observationRepository;
@@ -97,6 +100,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         this.visibilityPolicy = visibilityPolicy;
         this.pullRequestRepository = pullRequestRepository;
         this.issueRepository = issueRepository;
+        this.artifactNames = artifactNames;
         this.objectMapper = objectMapper;
     }
 
@@ -172,7 +176,10 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 .filter(o -> visible.contains(o.getId()))
                 .toList();
             observationCount = observations.size();
-            files.put(OBSERVATIONS_FILE, serialize(observationsPayload(observations, since), OBSERVATIONS_FILE));
+            files.put(
+                OBSERVATIONS_FILE,
+                serialize(observationsPayload(workspaceId, observations, since), OBSERVATIONS_FILE)
+            );
             completeness.put(OBSERVATION_HISTORY, SourceCompleteness.PARTIAL);
             // Reported explicitly rather than inferred from file presence: the file is always written,
             // so "there is a file" would wrongly answer NON_EMPTY for a person with no history.
@@ -190,7 +197,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 PageRequest.of(0, MAX_FEEDBACK)
             );
             feedbackCount = delivered.size();
-            files.put(FEEDBACK_FILE, serialize(feedbackPayload(delivered, since), FEEDBACK_FILE));
+            files.put(FEEDBACK_FILE, serialize(feedbackPayload(workspaceId, delivered, since), FEEDBACK_FILE));
             completeness.put(FEEDBACK_HISTORY, SourceCompleteness.PARTIAL);
             contentStates.put(
                 FEEDBACK_HISTORY,
@@ -215,7 +222,7 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         );
     }
 
-    private ObjectNode observationsPayload(List<Observation> observations, Instant since) {
+    private ObjectNode observationsPayload(long workspaceId, List<Observation> observations, Instant since) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("window", "observations recorded since " + since + ", newest first");
         root.put("count", observations.size());
@@ -227,6 +234,13 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 MAX_OBSERVATIONS +
                 " observations within the window. An observation absent here may still have been recorded."
         );
+        StagedArtifactNames.Resolved names = artifactNames.resolve(
+            workspaceId,
+            observations
+                .stream()
+                .map(o -> new StagedArtifactNames.Reference(o.getArtifactKind(), o.getArtifactId()))
+                .toList()
+        );
         ArrayNode items = root.putArray("observations");
         for (Observation o : observations) {
             ObjectNode node = items.addObject();
@@ -236,15 +250,14 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             node.put("presence", o.getPresence() == null ? null : o.getPresence().name());
             node.put("assessment", o.getAssessment() == null ? null : o.getAssessment().name());
             node.put("severity", o.getSeverity() == null ? null : o.getSeverity().name());
-            node.put("artifactKind", o.getArtifactKind() == null ? null : o.getArtifactKind().value());
-            node.put("artifactId", o.getArtifactId());
+            names.stageInto(node, o.getArtifactKind(), o.getArtifactId());
             node.put("observedAt", o.getObservedAt() == null ? null : o.getObservedAt().toString());
             node.put("reasoning", StudentTextSanitizer.sanitize(o.getReasoning()));
         }
         return root;
     }
 
-    private ObjectNode feedbackPayload(List<Feedback> delivered, Instant since) {
+    private ObjectNode feedbackPayload(long workspaceId, List<Feedback> delivered, Instant since) {
         ObjectNode root = objectMapper.createObjectNode();
         root.put("window", "feedback delivered since " + since + ", newest first");
         root.put("count", delivered.size());
@@ -254,12 +267,18 @@ public class ReviewHistoryContentSource implements EvidenceSource {
                 MAX_FEEDBACK +
                 " delivered items within the window. Feedback absent here may still have been delivered."
         );
+        StagedArtifactNames.Resolved names = artifactNames.resolve(
+            workspaceId,
+            delivered
+                .stream()
+                .map(f -> new StagedArtifactNames.Reference(f.getArtifactKind(), f.getArtifactId()))
+                .toList()
+        );
         ArrayNode items = root.putArray("feedback");
         for (Feedback f : delivered) {
             ObjectNode node = items.addObject();
             node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
-            node.put("artifactKind", f.getArtifactKind() == null ? null : f.getArtifactKind().value());
-            node.put("artifactId", f.getArtifactId());
+            names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
             node.put("deliveredAt", f.getDeliveredAt() == null ? null : f.getDeliveredAt().toString());
             node.put("body", StudentTextSanitizer.sanitize(f.getBody()));
         }
