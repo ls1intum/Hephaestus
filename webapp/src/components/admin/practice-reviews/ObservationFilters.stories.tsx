@@ -1,13 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
+import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
-import {
-	areaFacetOptions,
-	type FacetSource,
-	ObservationFilters,
-	practiceFacetOptions,
-} from "./ObservationFilters";
+import { areaFacetOptions, ObservationFilters, practiceFacetOptions } from "./ObservationFilters";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import type { ObservationsSearch } from "./review-search";
 import {
@@ -29,8 +25,16 @@ const PEOPLE: ReviewPeople = {
 	isLoading: false,
 	isError: false,
 };
-const AREAS: FacetSource = { options: areaFacetOptions(practiceAreas) };
-const PRACTICES: FacetSource = { options: practiceFacetOptions(workspacePractices, practiceAreas) };
+const AREAS: FacetSource = {
+	options: areaFacetOptions(practiceAreas),
+	isLoading: false,
+	isError: false,
+};
+const PRACTICES: FacetSource = {
+	options: practiceFacetOptions(workspacePractices, practiceAreas),
+	isLoading: false,
+	isError: false,
+};
 
 /**
  * The Observations list's toolbar, on its own. Area and Practice are the workspace's own catalogue
@@ -135,8 +139,8 @@ export const SortIsNotAFilter: Story = {
 /** The catalogue is still on its way, so the facet is disabled rather than offering nothing. */
 export const WhileTheCatalogueLoads: Story = {
 	args: {
-		areas: { options: [], isLoading: true },
-		practices: { options: [], isLoading: true },
+		areas: { options: [], isLoading: true, isError: false },
+		practices: { options: [], isLoading: true, isError: false },
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("combobox", { name: "Area" })).toBeDisabled();
@@ -150,8 +154,8 @@ export const WhileTheCatalogueLoads: Story = {
  */
 export const TheCatalogueCouldNotBeLoaded: Story = {
 	args: {
-		areas: { options: [], isError: true },
-		practices: { options: [], isError: true },
+		areas: { options: [], isLoading: false, isError: true },
+		practices: { options: [], isLoading: false, isError: true },
 	},
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Area" }));
@@ -188,7 +192,7 @@ export const Mobile: Story = {
 		total: 2,
 	},
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
-	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByTitle("Severity: Major");
+	play: async ({ canvas }) => {
+		await canvas.findByTitle("Severity: Major");
 	},
 };

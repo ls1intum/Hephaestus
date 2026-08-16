@@ -2,7 +2,7 @@
  * Rating survey question capturing scaled feedback with number or emoji display.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { QuestionRating } from "./question-rating";
 
 const meta = {
@@ -49,8 +49,7 @@ type Story = StoryObj<typeof meta>;
  * a scale whose selection has to be repainted locally is a scale whose kit is broken.
  */
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const selected = canvas.getByRole("button", { name: "Rating 4 out of 5" });
 		await expect(selected).toHaveAttribute("data-pressed");
 		const unselected = canvas.getByRole("button", { name: "Rating 3 out of 5" });

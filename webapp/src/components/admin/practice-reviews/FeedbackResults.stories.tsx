@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackResults } from "./FeedbackResults";
 import { reviewFeedback } from "./story-mock-data";
@@ -68,8 +68,8 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		expect(within(canvasElement).getAllByText("Withheld")).toHaveLength(4);
+	play: async ({ canvas }) => {
+		expect(canvas.getAllByText("Withheld")).toHaveLength(4);
 		await expectNoPageOverflow();
 	},
 };

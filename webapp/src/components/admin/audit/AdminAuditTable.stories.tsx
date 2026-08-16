@@ -64,8 +64,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// The table's own rendering of `result`, not `args.events` read back.
 		canvas.getByText("Failure");
 	},
@@ -84,15 +83,13 @@ export const DeletedAccountFallback: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("#1234");
 	},
 };
 
 export const RowDetail: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
 		await expectSettledVisible(await screen.findByText("User agent"));
@@ -102,8 +99,7 @@ export const RowDetail: Story = {
 
 export const EmptyInitial: Story = {
 	args: { events: [], hasFilter: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("No events yet");
 		canvas.getByText(/Sign-ins, impersonation, role changes/i);
 	},
@@ -111,32 +107,28 @@ export const EmptyInitial: Story = {
 
 export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("No events match your filters");
 	},
 };
 
 export const ErrorState: Story = {
 	args: { events: [], isError: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/Couldn’t load the audit log/i);
 	},
 };
 
 export const Loading: Story = {
 	args: { events: [], isLoading: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByRole("columnheader", { name: "Event" });
 	},
 };
 
 export const ColumnCountMatchesHeader: Story = {
 	args: {},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const headers = canvas.getAllByRole("columnheader");
 		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
 		await expect(headers).toHaveLength(cells.length);

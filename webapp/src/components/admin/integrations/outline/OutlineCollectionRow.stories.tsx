@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { OutlineCollection } from "@/api/types.gen";
 import { Table, TableBody } from "@/components/ui/table";
 import { expectSettledVisible } from "@/test/overlay";
@@ -54,8 +54,7 @@ const base: OutlineCollection = {
 /** Steady state — mirroring, up to date, Pause offered in the row menu. */
 export const Mirroring: Story = {
 	args: { collection: base },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Mirroring");
 		canvas.getByText(/up to date/i);
 		canvas.getByText("engineering-4nZ3x");
@@ -73,8 +72,7 @@ export const Paused: Story = {
 	args: {
 		collection: { ...base, id: 2, collectionId: "col-handbook", name: "Handbook", state: "PAUSED" },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Paused");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for handbook/i }));
@@ -98,8 +96,7 @@ export const Syncing: Story = {
 			lastSyncedAt: undefined,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/syncing…/i);
 		// No urlId ⇒ no subtitle; the raw UUID is never shown.
 		await expect(canvas.queryByText(/col-decisions/)).not.toBeInTheDocument();
@@ -122,8 +119,7 @@ export const SyncError: Story = {
 			lastSyncError: "Outline API returned 403 for collections.info — the bot user lost access.",
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /sync error for legacy wiki/i }));
 		await expectSettledVisible(await screen.findByText(/the bot user lost access/i));
 	},
@@ -148,8 +144,7 @@ export const BudgetSkipped: Story = {
 			lastSyncedAt: ago(30),
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// The coverage pair is the ledger's; the warning that qualifies it stays with the pass.
 		await expect(canvas.queryByText("480")).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/\/ 512/)).not.toBeInTheDocument();

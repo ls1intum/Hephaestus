@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.ReflectionFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import java.time.Instant;
@@ -23,19 +22,9 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * Writes the REFLECTION feedback units for one cycle's admitted messages.
  *
- * <p>Unlike a conversational unit, a reflection unit carries its body at write time. The conversation lane
- * stores a NULL body because a later actor — the mentor's turn — writes the words at delivery; on this
- * lane there is no later actor, the read <em>is</em> the delivery, and the words were already written by
- * the composition stage. What both lanes share is the shape that matters: the observation is the
- * measurement, a separate LLM turn is the intervention, and this class only decides where the result of
- * that turn is allowed to land.
- *
  * <p>{@code PREPARED} on write and {@code DELIVERED} on the recipient's first read (the compare-and-set
  * in {@code FeedbackRepository#markReflectionDelivered}). We own this surface, so "delivered" can be an
  * observation instead of an assumption.
- *
- * <p>Bounded per recipient per cycle. Over-cap messages get a {@code SUPPRESSED / VOLUME_CAPPED} row
- * rather than being dropped, so a withheld message never reads as one nobody bothered to make.
  *
  * <p>No {@code OutboundEgressGuard} check, deliberately, and unlike every other preparer here: that
  * guard is the last gate before an <em>external</em> write, and Silent Mode means Hephaestus stops
@@ -51,8 +40,11 @@ public class ReflectionFeedbackPreparer {
     /**
      * Cap on reflection units per recipient per cycle. Two, not the conversation lane's three: a
      * process-level message asks the developer to change a habit, and being handed three habits at once
-     * is how none of them get changed. It is also the volume bound on the day this ships — see
-     * {@link ReflectionRoutingDecision#BACKFILL_HELD} for the provenance bound that sits beside it.
+     * is how none of them get changed.
+     *
+     * <p>The composer is told the same number ({@link ReflectionCompositionInputs}) and its tool refuses
+     * a call past it, so in a normal run nothing arrives here to cap. The bound is kept as the last one
+     * standing: a runaway turn must not be able to fill a recipient's page.
      */
     public static final int TOP_N_PER_RECIPIENT = 2;
 
@@ -71,8 +63,7 @@ public class ReflectionFeedbackPreparer {
      * One routed message and the evidence the router weighed, ready to be written.
      *
      * @param decision {@link ReflectionRoutingDecision#ADMIT} for a message the recipient will see; any
-     *     other value is written as a SUPPRESSED row only when it is a volume cap, and skipped
-     *     otherwise — a refusal that is a property of the evidence rather than of our budget is not a
+     *     other value is skipped without a row — a refusal that is a property of the evidence is not a
      *     withholding to explain, it is a message that was never owed.
      */
     public record RoutedMessage(
@@ -130,14 +121,10 @@ public class ReflectionFeedbackPreparer {
         int prepared = 0;
         for (RoutedMessage routedMessage : routed) {
             int unitPosition = position++;
-            boolean overCap =
-                routedMessage.decision() == ReflectionRoutingDecision.ADMIT && admitted >= TOP_N_PER_RECIPIENT;
-            if (routedMessage.decision() != ReflectionRoutingDecision.ADMIT && !overCap) {
+            if (routedMessage.decision() != ReflectionRoutingDecision.ADMIT || admitted >= TOP_N_PER_RECIPIENT) {
                 continue;
             }
-            if (!overCap) {
-                admitted++;
-            }
+            admitted++;
             if (feedbackRepository.existsByAgentJobIdAndPosition(agentJobId, unitPosition)) {
                 continue;
             }
@@ -152,8 +139,7 @@ public class ReflectionFeedbackPreparer {
                     .aboutUserId(recipientUserId)
                     .channel(FeedbackChannel.REFLECTION)
                     .position(unitPosition)
-                    .deliveryState(overCap ? FeedbackDeliveryState.SUPPRESSED : FeedbackDeliveryState.PREPARED)
-                    .suppressionReason(overCap ? FeedbackSuppressionReason.VOLUME_CAPPED : null)
+                    .deliveryState(FeedbackDeliveryState.PREPARED)
                     .source(FeedbackSource.AGENT)
                     .body(body(routedMessage.message()))
                     // Cross-run identity for this habit, so a later message about the same practice can
@@ -174,9 +160,7 @@ public class ReflectionFeedbackPreparer {
                     ordinal++
                 );
             }
-            if (!overCap) {
-                prepared++;
-            }
+            prepared++;
         }
         if (prepared > 0) {
             log.info(

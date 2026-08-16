@@ -30,6 +30,24 @@ export interface FacetOption<TValue extends string | number = string> {
 	iconClassName?: string;
 }
 
+/**
+ * A facet whose options are fetched — the workspace's own catalogue rather than a fixed registry —
+ * so it can be empty for two different reasons and has to say which.
+ *
+ * Whoever fetches owes all three fields; the control never learns where they came from. The flags
+ * are required rather than optional on purpose: "absent" and `false` would otherwise be two
+ * spellings of "loaded fine", and a caller that forgot one would render an empty facet as a
+ * finished one.
+ *
+ * Generic over the option, because a facet that offers people offers a person
+ * (`ReviewPeople extends FacetSource<PersonOption>`), not a `{value, label}`.
+ */
+export interface FacetSource<TOption = FacetOption> {
+	options: TOption[];
+	isLoading: boolean;
+	isError: boolean;
+}
+
 export interface FacetMultiSelectProps<TValue extends string | number> {
 	title: string;
 	options: FacetOption<TValue>[];

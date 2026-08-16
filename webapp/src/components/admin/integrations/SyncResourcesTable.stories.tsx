@@ -314,8 +314,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		for (const name of ["Issues", "PRs", "Reviews", "Comments", "Commits"]) {
 			canvas.getByRole("columnheader", { name });
 		}
@@ -332,8 +331,7 @@ export const Default: Story = {
 
 export const WatermarkDivergence: Story = {
 	args: { resources: divergent },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByLabelText(/further behind/);
 
 		await userEvent.hover(canvas.getByText(/ago$/));
@@ -343,8 +341,7 @@ export const WatermarkDivergence: Story = {
 
 export const ZeroCommentsAgainstManyIssues: Story = {
 	args: { resources: zeroCommentsFleet },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const totals = canvas.getByRole("row", { name: /All repositories/ });
 		await userEvent.hover(within(totals).getByText("0"));
 		await expectSettledVisible(await screen.findByText(/pipeline may not be running/i));
@@ -353,9 +350,7 @@ export const ZeroCommentsAgainstManyIssues: Story = {
 
 export const SeventyOneRepositories: Story = {
 	args: { resources: manyRepos },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ canvas, canvasElement }) => {
 		const container = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
 		await expect(container).not.toBeNull();
 		if (container) {
@@ -386,8 +381,7 @@ export const NeverSynced: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("0 Issues");
 
 		canvas.getByText("Never");
@@ -398,8 +392,7 @@ export const NeverSynced: Story = {
 
 export const Backfilling: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/backfilling · 62%/i);
 		canvas.getByRole("progressbar", { name: /backfill progress for ls1intum\/aeolus/i });
 	},
@@ -407,8 +400,7 @@ export const Backfilling: Story = {
 
 export const RowHover: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.hover(canvas.getByText("ls1intum/Artemis"));
 		await expectSettledVisible(await screen.findByText("Items"));
 		await expectSettledVisible(await screen.findByText(/no backfill has run/i));
@@ -422,8 +414,7 @@ export const SlackChannels: Story = {
 		resourceNounPlural: "channels",
 		expectedClassKeys: ["messages"],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByRole("columnheader", { name: "Messages" });
 		await expect(canvas.queryByRole("columnheader", { name: "Issues" })).toBeNull();
 		canvas.getByText("#engineering");
@@ -442,8 +433,7 @@ export const OutlineCollections: Story = {
 		resourceNounPlural: "collections",
 		expectedClassKeys: ["documents"],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByRole("columnheader", { name: "Documents" });
 		canvas.getByText("Engineering Handbook");
 		canvas.getByText("col_handbook");
@@ -469,8 +459,7 @@ export const NoCadence: Story = {
 
 export const FilteredEmpty: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.type(canvas.getByRole("searchbox"), "zzz-no-such-repo");
 		canvas.getByText(/no repositories match/i);
 
@@ -481,8 +470,7 @@ export const FilteredEmpty: Story = {
 
 export const AttentionFilter: Story = {
 	args: { resources: facetMix },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("acme/fresh-service");
 		canvas.getByText("acme/stale-service");
 
@@ -499,9 +487,7 @@ export const AttentionFilter: Story = {
 export const AttentionFacetFallsBackWhenCleared: Story = {
 	args: { resources: [] },
 	render: ({ resources: _ownedByTheHarness, ...args }) => <FacetFallbackHarness {...args} />,
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
 		canvas.getByText("acme/stale-service");
 		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();

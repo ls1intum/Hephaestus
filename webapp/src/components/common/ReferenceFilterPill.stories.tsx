@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import { ReferenceFilterPill } from "./ReferenceFilterPill";
 
 const meta = {
@@ -15,24 +15,21 @@ type Story = StoryObj<typeof meta>;
 
 export const WithName: Story = {
 	args: { name: "Grace Hopper" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Actor: Grace Hopper");
 	},
 };
 
 export const IdOnly: Story = {
 	args: {},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Actor: #7");
 	},
 };
 
 export const ClearsTheFilter: Story = {
 	args: { name: "Grace Hopper" },
-	play: async ({ canvasElement, args }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas, args }) => {
 		await userEvent.click(
 			canvas.getByRole("button", { name: /clear actor filter \(Grace Hopper\)/i }),
 		);

@@ -95,8 +95,7 @@ export const EveryOutcomeInOneList: Story = {
 			))}
 		</>
 	),
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getAllByRole("listitem").length).toBeGreaterThanOrEqual(4);
 		await expectNoPageOverflow();
 	},

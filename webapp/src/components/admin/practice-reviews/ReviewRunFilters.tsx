@@ -39,6 +39,15 @@ export function hasRunFilter(search: RunsSearch): boolean {
 }
 
 /**
+ * Every field this toolbar can set, cleared. Exported so the list's empty state can offer the same
+ * "clear all" the toolbar's Reset does without the two drifting into clearing different things —
+ * and so a field added above cannot be forgotten in one of them.
+ */
+export function clearedRunFilters(): Partial<RunsSearch> {
+	return { page: 0, status: undefined, from: undefined, to: undefined };
+}
+
+/**
  * Renders the row's own `StatusBadge` rather than a lookalike, so choosing a filter never means
  * matching a word to a tag from memory.
  */
@@ -49,22 +58,18 @@ function StatusItemLabel({ value }: { value: string }) {
 
 export interface ReviewRunFiltersProps {
 	search: RunsSearch;
-	/** Reports a patch, never a whole search: the route merges it into the URL. */
+	/** Reports one changed facet. The caller sends the reader back to page one. */
 	onPatch: (patch: Partial<RunsSearch>) => void;
 	onReset: () => void;
-	hasFilter: boolean;
 	/** How many reviews the current filters match. Absent while the answer is still on its way. */
 	total: number | undefined;
 }
 
-export function ReviewRunFilters({
-	search,
-	onPatch,
-	onReset,
-	hasFilter,
-	total,
-}: ReviewRunFiltersProps) {
+export function ReviewRunFilters({ search, onPatch, onReset, total }: ReviewRunFiltersProps) {
 	const statusId = useId();
+	// Derived, not taken as a prop: the caller has `search` and nothing else, so a `hasFilter` it
+	// computed could only ever be this same call — or a wrong one.
+	const hasFilter = hasRunFilter(search);
 	return (
 		<FilterToolbar
 			hasFilter={hasFilter}
@@ -78,12 +83,7 @@ export function ReviewRunFilters({
 				<Select
 					items={STATUS_ITEMS}
 					value={search.status ?? ALL_STATUSES}
-					onValueChange={(value) =>
-						onPatch({
-							status: isReviewStatus(value) ? value : undefined,
-							page: 0,
-						})
-					}
+					onValueChange={(value) => onPatch({ status: isReviewStatus(value) ? value : undefined })}
 				>
 					<SelectTrigger id={statusId} size="sm" className="w-48 max-w-full">
 						<SelectValue>{(value: string) => <StatusItemLabel value={value} />}</SelectValue>
@@ -103,7 +103,7 @@ export function ReviewRunFilters({
 			<DateRangeFacet
 				title="Requested"
 				value={toDateRange(search)}
-				onChange={(range) => onPatch({ ...fromDateRange(range), page: 0 })}
+				onChange={(range) => onPatch(fromDateRange(range))}
 			/>
 		</FilterToolbar>
 	);

@@ -16,8 +16,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const MatchesCatalog: Story = {
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByText(/catalog/)).not.toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByText(/catalog/)).not.toBeInTheDocument();
 	},
 };
 
@@ -29,8 +29,7 @@ export const CatalogChanged: Story = {
 			sourceOffered: true,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: "Instance catalog changed" }).focus();
 		const tooltip = await within(document.body).findByText(
 			"The instance catalog now has different review rules. This workspace keeps its current version.",
@@ -57,8 +56,7 @@ export const NoLongerIncluded: Story = {
 			sourceOffered: false,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const status = canvas.getByRole("button", {
 			name: "Not in the current instance catalog",
 		});
@@ -79,8 +77,8 @@ export const AreaChanged: Story = {
 			sourceOffered: true,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const status = within(canvasElement).getByRole("button", {
+	play: async ({ canvas }) => {
+		const status = canvas.getByRole("button", {
 			name: "Instance catalog changed",
 		});
 		status.focus();

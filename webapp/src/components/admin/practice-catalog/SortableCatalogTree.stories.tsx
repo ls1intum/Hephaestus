@@ -237,8 +237,7 @@ export const Default: Story = {};
  * at the top of the page after every move (WCAG 2.2 SC 2.4.3 Focus Order).
  */
 export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Small, reviewable changes");
 
 		await userEvent.click(menu.getByRole("menuitem", { name: "Move to Quality" }));
@@ -252,8 +251,7 @@ export const MovingBetweenAreasKeepsFocusOnTheRow: Story = {
 
 export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 	args: { blockedDestinations: ["quality"] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
 		const blocked = menu.getByRole("menuitem", { name: "Move to Quality" });
 
@@ -276,8 +274,7 @@ export const AnAreaWithAMoveInFlightIsNotADestination: Story = {
 
 export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
 	args: { blockedOrderBuckets: ["delivery"] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
 
 		await expect(menu.getByRole("menuitem", { name: "Move up" })).toHaveAttribute(
@@ -300,8 +297,7 @@ export const AnAreaWithAReorderInFlightStillAcceptsArrivals: Story = {
 
 /** The move itself refuses too, because the caller renders the control and may leave it reachable. */
 export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const first = await openActions(canvas, "Small, reviewable changes");
 		const up = first.getByRole("menuitem", { name: "Move up" });
 		await expect(up).toHaveAttribute("aria-disabled", "true");
@@ -317,8 +313,7 @@ export const TheEndsOfAnAreaHaveNowhereToGo: Story = {
 };
 
 export const ReorderingInsideAnArea: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const menu = await openActions(canvas, "Explain what changed and why");
 
 		await userEvent.click(menu.getByRole("menuitem", { name: "Move down" }));
@@ -329,9 +324,7 @@ export const ReorderingInsideAnArea: Story = {
 
 export const AnAreaWithItsOwnMoveInFlightHoldsItsPosition: Story = {
 	args: { disabledAreas: ["delivery"] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ args, canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Move Delivery down" })).toHaveAttribute(
 			"aria-disabled",
 			"true",
@@ -349,8 +342,7 @@ export const AnAreaWithItsOwnMoveInFlightHoldsItsPosition: Story = {
 
 export const ARowWithItsOwnMoveInFlightCannotLeaveEither: Story = {
 	args: { disabledEntries: ["explain-why"] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const pinned = await openActions(canvas, "Explain what changed and why");
 
 		for (const name of ["Move up", "Move down", "Move to Quality", "Move to Unassigned"]) {
@@ -374,9 +366,7 @@ export const ARowWithItsOwnMoveInFlightCannotLeaveEither: Story = {
 
 export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 	args: { visible: ["explain-why", "tests-with-changes"] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ canvas }) => {
 		const delivery = canvas.getByRole("button", { name: /^Delivery/ });
 		await expect(delivery).toHaveTextContent("3");
 		await expect(canvas.getByText("Explain what changed and why")).toBeVisible();
@@ -390,8 +380,7 @@ export const FilteringHidesRowsWithoutShrinkingTheCounts: Story = {
 
 /** Every drop that reaches the server costs a round trip and a re-render of the whole catalog. */
 export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const next = rowOf(canvas, "Explain what changed and why").getBoundingClientRect();
 
 		// Onto the next row but short of its midpoint, which resolves to "before it" — the position
@@ -411,8 +400,7 @@ export const DroppingARowWhereItAlreadyIsIsNotAMove: Story = {
 };
 
 export const DraggingARowPastTheNextRowsMidpoint: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const next = rowOf(canvas, "Explain what changed and why").getBoundingClientRect();
 
 		await dragTo(

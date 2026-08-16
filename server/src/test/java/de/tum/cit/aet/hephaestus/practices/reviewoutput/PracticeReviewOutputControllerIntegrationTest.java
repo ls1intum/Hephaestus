@@ -1076,6 +1076,63 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), unit.getId()).jsonPath("$.body").isEqualTo(body);
         }
 
+        /**
+         * In a course deployment the workspace admin is the instructor, and a reflection body is the only
+         * feedback text whose audience is the developer alone. Run against the real projection, because the
+         * withholding lives in the SQL: a mapper-level assertion would pass on a query that selected the body.
+         */
+        @Test
+        @WithAdminUser
+        @DisplayName("an operator read cannot return a reflection body, on either route")
+        void withholdsAReflectionBodyFromEveryOperatorRoute() {
+            String reflectionBody =
+                "### You keep shipping untested changes\n\n" + "y".repeat(FeedbackRepository.BODY_PREVIEW_LENGTH + 200);
+            Feedback reflection = feedbackRepository.save(
+                Feedback.builder()
+                    .agentJobId(job.getId())
+                    .workspaceId(workspace.getId())
+                    .recipientUserId(alice.getId())
+                    .aboutUserId(alice.getId())
+                    .channel(FeedbackChannel.REFLECTION)
+                    .position(7000)
+                    .deliveryState(FeedbackDeliveryState.DELIVERED)
+                    .body(reflectionBody)
+                    .source(FeedbackSource.AGENT)
+                    .createdAt(Instant.now())
+                    .deliveredAt(Instant.now())
+                    .build()
+            );
+            String inContextBody = "z".repeat(FeedbackRepository.BODY_PREVIEW_LENGTH + 200);
+            persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, inContextBody);
+
+            getOk(FEEDBACK + "?channel=REFLECTION", workspace.getWorkspaceSlug())
+                .jsonPath("$.page.totalElements")
+                .isEqualTo(1)
+                // Everything needed to audit the pipeline still travels — only the words do not.
+                .jsonPath("$.content[0].deliveryState")
+                .isEqualTo("DELIVERED")
+                .jsonPath("$.content[0].recipient.login")
+                .isEqualTo("alice")
+                .jsonPath("$.content[0].bodyPreview")
+                .doesNotExist()
+                .jsonPath("$.content[0].bodyTruncated")
+                .isEqualTo(false);
+
+            getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), reflection.getId())
+                .jsonPath("$.channel")
+                .isEqualTo("REFLECTION")
+                .jsonPath("$.body")
+                .doesNotExist();
+
+            // The positive control: the same projection on a lane the developer can already be read on
+            // still previews and still flags truncation, so the assertions above are about the channel.
+            getOk(FEEDBACK + "?channel=IN_CONTEXT", workspace.getWorkspaceSlug())
+                .jsonPath("$.content[0].bodyPreview")
+                .isEqualTo(inContextBody.substring(0, FeedbackRepository.BODY_PREVIEW_LENGTH))
+                .jsonPath("$.content[0].bodyTruncated")
+                .isEqualTo(true);
+        }
+
         @Test
         @WithAdminUser
         void detailOfAWithheldUnitCarriesTheComposedBody() {

@@ -10,17 +10,16 @@ import org.junit.jupiter.api.Test;
 /**
  * Keeps the reflection lane's blast radius small enough to review.
  *
- * <p>This rule replaces {@code ReflectionChannelUnwrittenArchTest}, whose stated reason — "no producer
- * writes a REFLECTION feedback unit" — stopped being true the moment one did. A guard whose justification
- * is false is worse than no guard, because the next person reads the reason rather than the code and
- * exempts themselves from a rule they think is vestigial. So the rule is inverted rather than extended:
- * it no longer says the lane is unwritten, it says <em>who</em> may write it.
+ * <p>What makes this lane worth a rule at all is that a REFLECTION body is the only text the system
+ * composes about a named person that the person is the sole audience for — {@code IN_CONTEXT} bodies are
+ * already public on the work, {@code CONVERSATION} bodies are NULL until the mentor speaks them. A class
+ * that can put a unit on this channel, or take a body off it, is a class that can leak private text, so
+ * that set should be small, named, and stable.
  *
- * <p>What makes this lane worth a rule at all is not that it is new. It is that a REFLECTION body is the
- * only text the system composes about a named person that the person is the sole audience for —
- * {@code IN_CONTEXT} bodies are already public on the work, {@code CONVERSATION} bodies are NULL until
- * the mentor speaks them. Every class that can put a unit on this channel, or take a body off it, is
- * therefore a class that can leak private text, and that set should be small, named, and stable.
+ * <p><b>What the rule reaches.</b> Classes that name the {@link FeedbackChannel#REFLECTION} constant.
+ * {@code FeedbackRepository} both writes and withholds the channel through the string literal
+ * {@code 'REFLECTION'} inside native SQL, which no bytecode rule can see — which is why it carries no
+ * allowlist entry here, and why its own queries are pinned by integration tests instead.
  */
 class ReflectionChannelProducerArchTest extends HephaestusArchitectureTest {
 

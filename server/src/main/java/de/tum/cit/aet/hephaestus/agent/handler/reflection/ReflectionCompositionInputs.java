@@ -23,8 +23,6 @@ import java.util.Map;
  * {@code docs.document}. A document review's only declared lane is REFLECTION, so turning composition on
  * for it would ship the Outline subsystem's first feedback of any kind in the same change that ships the
  * lane — two untested things at once, on a surface whose whole point is that its text is private.
- * {@code DocumentReviewHandler} is one call to {@link #stage} away from it, once the lane has run for a
- * release on the kinds that already deliver.
  */
 public final class ReflectionCompositionInputs {
 

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
 import { AuthAuditPanel } from "./AuthAuditPanel";
 
@@ -75,8 +75,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Sign-in")).toBeVisible();
 		await expect(await canvas.findByText("Failed sign-in")).toBeVisible();
 		await expect(await canvas.findByText("Instance role changed")).toBeVisible();

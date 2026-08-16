@@ -6,11 +6,6 @@ import java.util.Objects;
  * One process-level message the composition stage wrote, before the server has decided whether the
  * recipient may see it.
  *
- * <p>Deliberately NOT a measurement: it carries no {@code presence}, no {@code assessment}, no
- * {@code severity} and no {@code confidence}, and it cites no artifact location. Those belong to an
- * observation, which is the measurement; this is the intervention. Keeping the two shapes structurally
- * different is what stops a composed message from being read back as evidence for itself.
- *
  * <p>It names a practice, not a set of observations. The model reads a bounded, sanitised window of the
  * recipient's record and cannot know observation ids; the server resolves the practice to the
  * recipient's own measurements, so what a message is evidenced by is never the model's to assert.
@@ -34,11 +29,7 @@ public record ComposedReflectionMessage(String practiceSlug, String title, Strin
         Objects.requireNonNull(nextStep, "nextStep");
     }
 
-    /**
-     * Whether the message says enough to be feedback at all: something to read, and something to do.
-     * Both halves are required — evidence without a next step is a verdict, and a next step without the
-     * pattern it follows from is an instruction.
-     */
+    /** Whether the message says enough to be feedback at all: something to read, and something to do. */
     public boolean isComplete() {
         return !practiceSlug.isBlank() && !title.isBlank() && !body.isBlank() && !nextStep.isBlank();
     }

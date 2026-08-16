@@ -20,12 +20,12 @@ class FeedbackAdmissionTest extends BaseUnitTest {
     class Provenance {
 
         /**
-         * A backfilled observation is refused on both channels a producer writes to today, at every tier —
-         * so a campaign is measured and delivered nowhere. The other half of that claim, that nothing
-         * produces a {@code REFLECTION} unit, is pinned by {@code ReflectionChannelUnwrittenArchTest}.
+         * A backfilled observation is refused on the two in-place channels at every tier. REFLECTION is the
+         * exception this predicate deliberately leaves open (see the test below); the lane refuses a
+         * backfill on its own terms, in {@code ReflectionFeedbackRouter}, not here.
          */
         @Test
-        void aBackfilledObservationIsRefusedOnEveryChannelAProducerWritesToday() {
+        void aBackfilledObservationIsRefusedOnBothInPlaceChannels() {
             for (PracticeReviewTier tier : PracticeReviewTier.values()) {
                 for (FeedbackChannel channel : new FeedbackChannel[] {
                     FeedbackChannel.IN_CONTEXT,

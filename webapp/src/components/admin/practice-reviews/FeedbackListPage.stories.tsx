@@ -224,8 +224,8 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByText("11 pieces of feedback.");
+	play: async ({ canvas }) => {
+		await canvas.findByText("11 pieces of feedback.");
 		await expectNoPageOverflow();
 	},
 };

@@ -397,9 +397,10 @@ const reportFindingTool = defineTool({
 // about this developer ACROSS pieces of work into process-level messages for their reflection surface.
 // Observation and feedback are separate acts; this is where the separation lives in the runtime.
 //
-// Strictly additive. It runs only after result.json is on disk and valid, in its OWN session, and
-// every failure inside it is swallowed: a review that measured correctly is a successful review
-// whether or not anything was composed from it. Nothing here can touch reviewState or the exit code.
+// Strictly additive. It runs in its OWN session, only once the review has durable state and only from
+// time the review did not need, and every failure inside it is swallowed: a review that measured
+// correctly is a successful review whether or not anything was composed from it. Nothing here can
+// touch reviewState or the exit code.
 
 const composedFeedback = { messages: [] };
 

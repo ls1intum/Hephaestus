@@ -28,8 +28,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const input = canvas.getByLabelText("Add a repository");
 		const addButton = canvas.getByRole("button", { name: /^add$/i });
 
@@ -51,9 +50,7 @@ export const ManyRepositories: Story = {
 			nameWithOwner: `ls1intum/repository-number-${index + 1}`,
 		})),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ canvas, canvasElement }) => {
 		const viewport = canvasElement.querySelector<HTMLElement>('[data-slot="scroll-area-viewport"]');
 		await expect(viewport).not.toBeNull();
 		if (!viewport) return;
@@ -66,8 +63,7 @@ export const ManyRepositories: Story = {
 };
 
 export const RemoveConfirm: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /remove octocat\/Hello-World/i }));
 
 		const dialog = await screen.findByRole("alertdialog");
@@ -83,8 +79,7 @@ export const RemoveInProgress: Story = {
 	args: {
 		isRemovingRepository: true,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /remove microsoft\/vscode/i }));
 
 		const dialog = await screen.findByRole("alertdialog");
@@ -95,8 +90,7 @@ export const RemoveInProgress: Story = {
 };
 
 export const RemoveHoldsDialogOpen: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /remove facebook\/react/i }));
 
 		const dialog = await screen.findByRole("alertdialog");
@@ -118,8 +112,7 @@ export const Empty: Story = {
 	args: {
 		repositories: [],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/no repositories monitored yet/i);
 	},
 };
@@ -134,8 +127,7 @@ export const LoadError: Story = {
 		}),
 		onRetry: fn(),
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		canvas.getByText(/couldn't load the monitored repositories/i);
 		canvas.getByText(/repositories service is unavailable/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
@@ -150,8 +142,7 @@ export const AddValidationError: Story = {
 			detail: "Repository owner/name was not found, or the token cannot see it.",
 		}),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/was not found, or the token cannot see it/i);
 		await expect(
 			canvas.queryByText(/an error occurred while adding the repository/i),

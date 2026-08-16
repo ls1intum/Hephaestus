@@ -38,6 +38,7 @@ import tools.jackson.databind.ObjectMapper;
 class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final List<String> IN_CONTEXT_ONLY = List.of(FeedbackChannel.IN_CONTEXT.name());
 
     @Autowired
     private FeedbackObservationRepository feedbackObservationRepository;
@@ -143,7 +144,8 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
         List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
-            List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId())
+            List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId()),
+            IN_CONTEXT_ONLY
         );
 
         assertThat(bodies).hasSize(2);
@@ -166,10 +168,64 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(higherId, 11, FeedbackDeliveryState.DELIVERED, "Latest identity", createdAt), observation);
 
         List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
-            List.of(observation.getId())
+            List.of(observation.getId()),
+            IN_CONTEXT_ONLY
         );
 
         assertThat(bodies).singleElement().extracting(ObservationAdviceBody::getBody).isEqualTo("Latest identity");
+    }
+
+    @Test
+    @DisplayName(
+        "a newer REFLECTION unit bound to the same observation does not become its advice: the per-finding " +
+            "surfaces keep showing what was said about that finding"
+    )
+    void findLatestAdviceBodiesAnswersOnlyForTheChannelsTheCallerNames() {
+        Observation observation = saveObservation("obs-both-lanes");
+        bind(
+            saveFeedback(
+                null,
+                20,
+                FeedbackDeliveryState.DELIVERED,
+                "The note posted on the pull request",
+                Instant.parse("2026-01-01T00:00:00Z")
+            ),
+            observation
+        );
+        // The reflection unit is newer, DELIVERED and non-null-bodied, so it wins every other clause of
+        // the query — the channel predicate is the only thing keeping it off a per-finding surface.
+        bind(
+            saveFeedback(
+                null,
+                7000,
+                FeedbackDeliveryState.DELIVERED,
+                "### You keep shipping untested changes\n\nAcross three pull requests…\n\n**Try next:** …",
+                Instant.parse("2026-02-01T00:00:00Z"),
+                FeedbackChannel.REFLECTION
+            ),
+            observation
+        );
+
+        assertThat(
+            feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+                List.of(observation.getId()),
+                IN_CONTEXT_ONLY
+            )
+        )
+            .singleElement()
+            .extracting(ObservationAdviceBody::getBody)
+            .isEqualTo("The note posted on the pull request");
+
+        assertThat(
+            feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+                List.of(observation.getId()),
+                List.of(FeedbackChannel.REFLECTION.name())
+            )
+        )
+            .singleElement()
+            .extracting(ObservationAdviceBody::getBody)
+            .asString()
+            .startsWith("### You keep shipping untested changes");
     }
 
     @Test
@@ -196,16 +252,28 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private Feedback saveFeedback(UUID id, int position, FeedbackDeliveryState state, String body, Instant createdAt) {
+        return saveFeedback(id, position, state, body, createdAt, FeedbackChannel.IN_CONTEXT);
+    }
+
+    private Feedback saveFeedback(
+        UUID id,
+        int position,
+        FeedbackDeliveryState state,
+        String body,
+        Instant createdAt,
+        FeedbackChannel channel
+    ) {
+        boolean anchored = channel == FeedbackChannel.IN_CONTEXT;
         return feedbackRepository.save(
             Feedback.builder()
                 .id(id)
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
-                .artifactKind(ArtifactKinds.PULL_REQUEST)
-                .artifactId(42L)
+                .artifactKind(anchored ? ArtifactKinds.PULL_REQUEST : null)
+                .artifactId(anchored ? 42L : null)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
+                .channel(channel)
                 .position(position)
                 .deliveryState(state)
                 .body(body)

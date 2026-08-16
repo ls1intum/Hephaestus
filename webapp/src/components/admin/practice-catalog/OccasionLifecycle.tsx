@@ -27,8 +27,13 @@ export interface OccasionLifecycleProps {
 	workType: PracticeWorkTypeDefinitionOptions;
 	selected: readonly string[];
 	onToggle: (signal: string, chosen: boolean) => void;
-	onDrafts: boolean;
-	onDraftsChange: (onDrafts: boolean) => void;
+	/**
+	 * Named for what it is rather than for the wire field it ends up in (`PracticeBinding.onDrafts`):
+	 * `on*` is a callback everywhere else in this kit, so `onDrafts` beside `onDraftsChange` read as
+	 * two handlers at the only call site.
+	 */
+	includeDrafts: boolean;
+	onIncludeDraftsChange: (includeDrafts: boolean) => void;
 	/**
 	 * The id of the message describing what is wrong, passed only while the moments are what fails
 	 * validation; its presence is also what draws them in the invalid state. One field rather than an
@@ -46,8 +51,8 @@ export function OccasionLifecycle({
 	workType,
 	selected,
 	onToggle,
-	onDrafts,
-	onDraftsChange,
+	includeDrafts,
+	onIncludeDraftsChange,
 	errorId,
 	disabled = false,
 }: OccasionLifecycleProps) {
@@ -114,8 +119,8 @@ export function OccasionLifecycle({
 					<Switch
 						id={draftsId}
 						disabled={disabled}
-						checked={onDrafts}
-						onCheckedChange={onDraftsChange}
+						checked={includeDrafts}
+						onCheckedChange={onIncludeDraftsChange}
 						aria-describedby={draftsHintId}
 					/>
 					{/* Label and description are siblings, never nested: a `<label>` takes phrasing content

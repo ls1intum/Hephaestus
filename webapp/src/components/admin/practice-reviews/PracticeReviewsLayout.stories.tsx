@@ -34,8 +34,8 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-async function expectOnlyCurrent(canvasElement: HTMLElement, name: string) {
-	const nav = within(canvasElement).getByRole("navigation", {
+async function expectOnlyCurrent(canvas: ReturnType<typeof within>, name: string) {
+	const nav = canvas.getByRole("navigation", {
 		name: "Practice review sections",
 	});
 	expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
@@ -43,22 +43,22 @@ async function expectOnlyCurrent(canvasElement: HTMLElement, name: string) {
 }
 
 export const Reviews: Story = {
-	play: async ({ canvasElement }) => {
-		await expectOnlyCurrent(canvasElement, "Reviews");
+	play: async ({ canvas }) => {
+		await expectOnlyCurrent(canvas, "Reviews");
 	},
 };
 
 export const Observations: Story = {
 	args: { activeSection: "observations" },
-	play: async ({ canvasElement }) => {
-		await expectOnlyCurrent(canvasElement, "Observations");
+	play: async ({ canvas }) => {
+		await expectOnlyCurrent(canvas, "Observations");
 	},
 };
 
 export const Delivery: Story = {
 	args: { activeSection: "delivery" },
-	play: async ({ canvasElement }) => {
-		await expectOnlyCurrent(canvasElement, "Delivery");
+	play: async ({ canvas }) => {
+		await expectOnlyCurrent(canvas, "Delivery");
 	},
 };
 
@@ -68,8 +68,8 @@ export const Delivery: Story = {
  */
 export const ReviewedWork: Story = {
 	args: { activeSection: undefined },
-	play: async ({ canvasElement }) => {
-		const nav = within(canvasElement).getByRole("navigation", {
+	play: async ({ canvas }) => {
+		const nav = canvas.getByRole("navigation", {
 			name: "Practice review sections",
 		});
 		expect(within(nav).queryAllByRole("link", { current: "page" })).toHaveLength(0);

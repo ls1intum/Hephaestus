@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import type { InstanceLlmSettings } from "@/api/types.gen";
 import { InstanceLlmSettingsCard } from "./InstanceLlmSettingsCard";
 
@@ -43,8 +43,7 @@ export const Loading: Story = {
 };
 
 export const EditedButUnsaved: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const ownProvider = canvas.getByRole("switch", {
 			name: /let workspaces add providers and models/i,
 		});

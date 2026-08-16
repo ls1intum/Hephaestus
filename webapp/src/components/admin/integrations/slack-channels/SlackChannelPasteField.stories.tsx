@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import { SlackChannelPasteField } from "./SlackChannelPasteField";
 
 /**
@@ -28,8 +28,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Empty — typing reports each change up to the caller, which owns parsing. */
 export const Default: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.type(canvas.getByLabelText(/paste a channel link or id/i), "C");
 		await expect(args.onChange).toHaveBeenCalled();
 	},
@@ -38,8 +37,7 @@ export const Default: Story = {
 /** A valid paste — no error is shown while the text parses to a channel reference. */
 export const Valid: Story = {
 	args: { value: "https://acme.slack.com/archives/C0974LJBPBK" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			canvas.queryByText(/paste a slack channel url, mention, or/i),
 		).not.toBeInTheDocument();
@@ -49,8 +47,7 @@ export const Valid: Story = {
 /** Invalid — a stated, non-silent error appears in place. */
 export const Invalid: Story = {
 	args: { value: "not-a-channel", invalid: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/paste a slack channel url, mention, or/i);
 		await expect(canvas.getByLabelText(/paste a channel link or id/i)).toHaveAttribute(
 			"aria-invalid",

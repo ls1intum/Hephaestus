@@ -1,6 +1,10 @@
 import type { ReviewArtifact } from "@/api/types.gen";
 import { DateRangeFacet } from "@/components/common/DateRangeFacet";
-import { FacetMultiSelect, type FacetOption } from "@/components/common/FacetMultiSelect";
+import {
+	FacetMultiSelect,
+	type FacetOption,
+	type FacetSource,
+} from "@/components/common/FacetMultiSelect";
 import { FilterToolbar } from "@/components/common/FilterToolbar";
 import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { ResultCount } from "@/components/common/ResultCount";
@@ -57,17 +61,6 @@ export function hasObservationFilter(search: ObservationsSearch): boolean {
 			search.from ||
 			search.to,
 	);
-}
-
-/**
- * A facet whose options are the workspace's own catalogue rather than a fixed registry, so it can be
- * empty for two different reasons and has to say which. Same shape as {@link ReviewPeople}: whoever
- * fetches owes the options and the two flags, and the control never learns where they came from.
- */
-export interface FacetSource {
-	options: FacetOption[];
-	isLoading?: boolean;
-	isError?: boolean;
 }
 
 /**

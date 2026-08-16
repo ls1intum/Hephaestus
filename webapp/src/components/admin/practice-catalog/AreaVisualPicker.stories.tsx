@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { StatefulPatch } from "@/stories/stateful";
 import { AreaVisualPicker, type AreaVisualPickerProps } from "./AreaVisualPicker";
@@ -37,8 +37,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
 		);
@@ -65,8 +64,7 @@ function DisableWhileOpen(props: AreaVisualPickerProps) {
 
 export const DisabledWhileOpen: Story = {
 	render: (args) => <DisableWhileOpen {...args} />,
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
 		);

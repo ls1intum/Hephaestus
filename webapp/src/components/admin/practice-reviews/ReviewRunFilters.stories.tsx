@@ -21,10 +21,11 @@ const meta = {
 		search: {},
 		onPatch: fn(),
 		onReset: fn(),
-		hasFilter: false,
 		total: 7,
 	},
 	// Controlled, so a frozen `search` would leave every control inert while nothing looks broken.
+	// Nothing here recomputes "is anything filtered" — the toolbar derives that from the `search` it
+	// is already given, so a story cannot hand it a search and a contradicting answer about it.
 	render: (args) => (
 		<StatefulPatch initial={args.search as RunsSearch}>
 			{(search, onPatch) => (
@@ -35,7 +36,6 @@ const meta = {
 						args.onPatch(patch);
 						onPatch(patch);
 					}}
-					hasFilter={Boolean(search.status || search.from || search.to)}
 				/>
 			)}
 		</StatefulPatch>
@@ -82,15 +82,31 @@ export const CountNotInYet: Story = {
 	},
 };
 
-/** Choosing a status reports the patch — and resets the page, since page 4 of a new filter is not
- * a page anybody asked for. */
+/**
+ * Choosing a status reports the facet the reader changed, and only that. Sending them back to page
+ * one is the screen's job — it owns the URL, and its two siblings already did it there, so a
+ * `page: 0` folded in here would be one toolbar in three with a second contract.
+ */
 export const ChoosingAStatus: Story = {
 	play: async ({ args, canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 		const listbox = await screen.findByRole("listbox");
 		await userEvent.click(within(listbox).getByRole("option", { name: /Failed/ }));
 
-		await expect(args.onPatch).toHaveBeenCalledWith({ status: "FAILED", page: 0 });
+		await expect(args.onPatch).toHaveBeenCalledWith({ status: "FAILED" });
 		await expect(canvas.getByRole("combobox")).toHaveTextContent("Failed");
+	},
+};
+
+/**
+ * Reset clears every field the toolbar can set. The list's empty state offers the same button, and
+ * both call `clearedRunFilters()` — a field added to the toolbar and forgotten in one of them would
+ * leave "clear all filters" quietly keeping one.
+ */
+export const ResettingClearsEveryField: Story = {
+	args: { search: { status: "FAILED", from: "2026-07-28", to: "2026-07-29" }, total: 2 },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Reset/ }));
+		await expect(args.onReset).toHaveBeenCalledTimes(1);
 	},
 };

@@ -364,7 +364,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             " f.created_at AS \"createdAt\"," +
             " f.delivered_at AS \"deliveredAt\"," +
             // REFLECTION bodies are withheld from the operator surface in SQL rather than in a mapper, so a
-            // second projection cannot forget. Pinned by ReviewFeedbackReflectionBodyTest.
+            // second projection cannot forget. Executed against a real database by
+            // PracticeReviewOutputControllerIntegrationTest#withholdsAReflectionBodyFromEveryOperatorRoute.
             " CASE WHEN f.channel = 'REFLECTION' THEN NULL ELSE left(f.body, " +
             BODY_PREVIEW_LENGTH +
             ") END AS \"bodyPreview\"," +
@@ -498,9 +499,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
      * When a REFLECTION unit about this practice was last written for this recipient, whatever became of it
      * — the cooldown that stops one habit being restated on every pull request.
      *
-     * <p>Counts SUPPRESSED rows too: a volume-capped or backfill-held row still records that the cycle
-     * considered this habit, and re-considering it the next day would produce the same answer at the
-     * same cost.
+     * <p>Deliberately unfiltered by delivery state: the question is when we last said this, and a unit
+     * that was written and then superseded still said it.
      */
     @Query(
         """

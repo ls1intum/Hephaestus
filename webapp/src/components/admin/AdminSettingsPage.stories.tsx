@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { HttpResponse, http } from "msw";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { withStandardPage } from "@/stories/decorators";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
@@ -44,8 +44,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
 		await canvas.findByRole("button", { name: /^delete workspace$/i });
 	},

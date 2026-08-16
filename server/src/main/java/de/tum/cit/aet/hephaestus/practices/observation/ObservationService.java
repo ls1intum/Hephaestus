@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -111,6 +112,18 @@ public class ObservationService {
     private static final float QUARANTINE_CONFIDENCE = 0.5f;
     /** Distinct targets at which a low-confidence gap is corroborated enough to rank as a normal priority. */
     private static final int CORROBORATION_TARGETS = 2;
+
+    /**
+     * The lanes whose text this read model's {@code guidance} means: the ones that speak about the one
+     * observation they are bound to. A {@code REFLECTION} unit is excluded because it is a message about a
+     * habit across several pieces of work — it binds every problem behind it as evidence, so it would
+     * answer "what did you tell me about this finding" with a paragraph that is explicitly not about it.
+     * Named here rather than defaulted in the query so a fourth lane has to be admitted deliberately.
+     */
+    private static final List<String> GUIDANCE_CHANNELS = List.of(
+        FeedbackChannel.IN_CONTEXT.name(),
+        FeedbackChannel.CONVERSATION.name()
+    );
 
     /**
      * The reflective-dashboard read-model for the current developer: per-practice cards they can READ —
@@ -344,7 +357,7 @@ public class ObservationService {
             return Map.of();
         }
         return feedbackObservationRepository
-            .findLatestAdviceBodiesByObservationIds(observationIds)
+            .findLatestAdviceBodiesByObservationIds(observationIds, GUIDANCE_CHANNELS)
             .stream()
             .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
     }

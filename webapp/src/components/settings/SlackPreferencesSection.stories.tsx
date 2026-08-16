@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import { SlackPreferencesSection } from "./SlackPreferencesSection";
 
 const meta = {
@@ -47,8 +47,7 @@ export const ConfirmTurningOff: Story = {
 		isSlackLinked: true,
 		canConnectSlack: true,
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("switch", { name: /use my new channel messages/i }));
 		// Flipping the switch alone must not delete anything.
 		await expect(args.onToggleChannelMessages).not.toHaveBeenCalled();
@@ -66,8 +65,7 @@ export const MessageUseOff: Story = {
 		isSlackLinked: true,
 		canConnectSlack: true,
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("switch", { name: /use my new channel messages/i }));
 		await expect(args.onToggleChannelMessages).toHaveBeenCalledWith("hephaestustest", true);
 	},
@@ -107,8 +105,7 @@ export const ErrorState: Story = {
 		isError: true,
 		error: { detail: "Slack is not responding." },
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		canvas.getByText(/could not load your slack preferences/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalled();

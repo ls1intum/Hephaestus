@@ -69,9 +69,43 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
             false,
             ActorRole.AUTHOR
         );
+        PracticeBinding reviewerSide = new PracticeBinding(
+            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
+            List.of(),
+            false,
+            ActorRole.REVIEWER
+        );
 
         assertThat(PracticeBinding.subjectRoleOf(List.of(authorSide), ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(
             ActorRole.AUTHOR
+        );
+        assertThat(PracticeBinding.subjectRoleOf(List.of(reviewerSide), ScmSignals.PULL_REQUEST_REVIEWED)).isEqualTo(
+            ActorRole.REVIEWER
+        );
+    }
+
+    /**
+     * Bindings that disagree about the subject resolve to the role that withholds. Reachable only for a
+     * practice declaring several occasions, which the single-occasion rule makes rare — but the cost of
+     * guessing wrong is showing a reviewer's conduct to the author.
+     */
+    @Test
+    void leansToTheNonAuthorRoleWhenTwoOccasionsDisagree() {
+        PracticeBinding authorSide = new PracticeBinding(
+            List.of(ScmSignals.PULL_REQUEST_MERGED),
+            List.of(),
+            false,
+            ActorRole.AUTHOR
+        );
+        PracticeBinding reviewerSide = new PracticeBinding(
+            List.of(ScmSignals.PULL_REQUEST_REVIEWED),
+            List.of(),
+            false,
+            ActorRole.REVIEWER
+        );
+
+        assertThat(PracticeBinding.subjectRoleOf(List.of(authorSide, reviewerSide), (SignalName) null)).isEqualTo(
+            ActorRole.REVIEWER
         );
     }
 

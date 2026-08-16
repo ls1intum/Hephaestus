@@ -35,17 +35,11 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Turns a finished review's composed process-level messages into REFLECTION feedback units.
  *
- * <p>Same shape as {@code ConversationalDeliveryListener}, and for the same reasons: {@code @Async}
- * {@code @TransactionalEventListener(AFTER_COMMIT)} in its own {@code REQUIRES_NEW} transaction, so it
- * never blocks the delivery path and reads the cycle's observations only once they are committed;
- * best-effort, so any failure is logged and the feedback the developer already received is unaffected.
+ * <p>Best-effort: a failure here is logged and the feedback the developer already received is unaffected.
  *
- * <p><b>What the LLM did and what this does.</b> The words were written by a separate composition turn
- * inside the review's sandbox, over the recipient's own bounded record — that turn is the "another
- * agentic step between observation and feedback". This class writes none of them. It decides, per
- * message, whether the recipient may see it, and it resolves what the message is evidenced by: the
- * composer names a practice, and the server — not the model — answers which of that person's
- * measurements stand behind it. Evidence a model asserts about itself is not evidence.
+ * <p>Writes none of the words. The composer names a practice; the server — not the model — resolves
+ * which of that person's measurements stand behind it, because evidence a model asserts about itself is
+ * not evidence.
  */
 @Component
 public class ReflectionCompositionListener {

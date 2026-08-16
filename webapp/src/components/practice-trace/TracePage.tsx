@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeftIcon, RadarIcon } from "lucide-react";
 import type { GetArtifactTraceResponse, ReviewRequestOutcome } from "@/api/types.gen";
+import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TraceHeader } from "./TraceHeader";
@@ -61,7 +62,7 @@ export function TracePage({
 			</article>
 		);
 	}
-	if (error || !trace) {
+	if (error) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{backLink}
@@ -70,6 +71,16 @@ export function TracePage({
 					title="Couldn't load this work's review activity"
 					onRetry={onRetry}
 				/>
+			</article>
+		);
+	}
+	// Not the alert: no record and no error is a query that never came back, and the alert would read
+	// the absent status as a lost connection. See `MissingRecordEmpty`.
+	if (!trace) {
+		return (
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{backLink}
+				<MissingRecordEmpty title="This work's review activity hasn't loaded" onRetry={onRetry} />
 			</article>
 		);
 	}

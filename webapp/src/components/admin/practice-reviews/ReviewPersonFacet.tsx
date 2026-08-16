@@ -1,4 +1,5 @@
 import { UserRoundIcon } from "lucide-react";
+import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -38,16 +39,17 @@ export interface PersonOption {
  * The member list this facet offers, already reduced to what it draws. Whoever fetches it —
  * `useReviewPeople` in the app, a fixture in a story — owes the same four fields, so the facet never
  * learns where its people came from.
+ *
+ * A `FacetSource` and one field more, by extension rather than by resemblance: the two used to be
+ * declared separately with a comment claiming they were the same shape, and they were not — the
+ * flags were optional on one and required on the other.
  */
-export interface ReviewPeople {
-	options: PersonOption[];
+export interface ReviewPeople extends FacetSource<PersonOption> {
 	/**
 	 * The list is one page long and that page came back full, so there are probably people missing.
 	 * The endpoint returns a bare array with no total, so a full page is the only signal there is.
 	 */
 	capped: boolean;
-	isLoading: boolean;
-	isError: boolean;
 }
 
 export interface ReviewPersonFacetProps {

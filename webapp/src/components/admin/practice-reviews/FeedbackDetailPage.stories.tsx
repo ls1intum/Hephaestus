@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, screen, within } from "storybook/test";
+import { expect, screen } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackDetailPage } from "./FeedbackDetailPage";
 import {
@@ -43,8 +43,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const NotDelivered: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// Twice, and deliberately: once on the card around the text — so a body that never reached
 		// anybody cannot be quoted as though it had — and once as the trace's terminal step.
 		await expect(await canvas.findAllByText("Withheld")).toHaveLength(2);
@@ -59,8 +58,7 @@ export const NotDelivered: Story = {
 
 export const Delivered: Story = {
 	args: { feedback: feedbackDetail("99999999-6666-6666-6666-666666666666") },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// Exactly one "Delivered": the trace's terminal step. The composed text carries no badge,
 		// because reaching the developer is the ordinary case.
 		await expect(await canvas.findAllByText("Delivered")).toHaveLength(1);
@@ -155,5 +153,22 @@ export const LoadFailed: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Couldn't load this feedback");
+	},
+};
+
+/**
+ * No record and nothing that failed — a fetch that never came back, which is what being offline
+ * looks like here. It is deliberately not the error alert: with no status to classify, the alert
+ * would name a lost connection as the cause on no evidence, and a reader who *has* lost the record
+ * (it was deleted) never reaches this branch, because a 404 is an error.
+ */
+export const NeverArrived: Story = {
+	args: { feedback: undefined, error: undefined },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("This feedback hasn't loaded")).toBeVisible();
+		await expect(canvas.queryByText("Couldn't load this feedback")).toBeNull();
+		// The way back out is still on the page, so this is never a dead end.
+		await expect(canvas.getByRole("link", { name: "Delivery" })).toBeVisible();
 	},
 };

@@ -12,7 +12,7 @@ import {
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { Stateful } from "@/stories/stateful";
-import { PracticeBindingsEditor } from "./PracticeBindingsEditor";
+import { PracticeBindingsEditor, type PracticeOccasionMode } from "./PracticeBindingsEditor";
 import { outcome } from "./story-mock-data";
 
 const meta = {
@@ -21,7 +21,17 @@ const meta = {
 	args: {
 		options: mockPullRequestWorkType,
 		binding: mockPullRequestBinding,
+		mode: "reviewed",
 		onChange: fn(),
+	},
+	// Storybook's default docgen (`react-docgen`) does no type resolution, so a locally declared
+	// string union arrives as an unknown type and infers a JSON object editor. Naming the three
+	// states here is the difference between a control that switches the editor and a text box.
+	argTypes: {
+		mode: {
+			control: "radio",
+			options: ["reviewed", "human-review", "guidance-only"] satisfies PracticeOccasionMode[],
+		},
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
@@ -121,7 +131,7 @@ export const AskingByHandIsNotAMoment: Story = {
 
 /** Nothing reviews a practice that runs no review, so nothing promises a hand-asked one either. */
 export const GuidanceOnlyPromisesNoHandAskedReview: Story = {
-	args: { guidanceOnly: true, binding: { ...mockPullRequestBinding, needs: [] } },
+	args: { mode: "guidance-only", binding: { ...mockPullRequestBinding, needs: [] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/reads nothing, because no review runs/)).toBeVisible();
 		await expect(canvas.queryByText(/ask for this review by hand/)).toBeNull();
@@ -136,7 +146,7 @@ export const IncludingDrafts: Story = {
 };
 
 export const RecordedButNotReviewed: Story = {
-	args: { canAttemptReview: false },
+	args: { mode: "human-review" },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/nothing is reviewed while the practice asks/)).toBeVisible();
 		// Asking by hand would not review it either while it waits for a human.

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 import type { ExtendedUserTeams } from "./types";
 
@@ -47,8 +47,7 @@ export const NoMembers: Story = {
 
 export const Recalculating: Story = {
 	args: { recalculatingUsers: new Set(["member2"]) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /Recalculating/ })).toBeDisabled();
 		await expect(canvas.getAllByRole("button", { name: "Recalculate" })[0]).toBeEnabled();
 	},

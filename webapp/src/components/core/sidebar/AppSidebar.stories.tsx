@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import type { ChatThreadSummary } from "@/api/types.gen";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
@@ -56,8 +56,7 @@ export const RegularUser: Story = {
 		context: "main",
 		activeWorkspace: mockWorkspace,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText("Administration")).not.toBeInTheDocument();
 	},
 };
@@ -71,8 +70,7 @@ export const WorkspaceAdminUser: Story = {
 		context: "main",
 		activeWorkspace: mockWorkspace,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Administration");
 		await expect(canvas.queryByText("Instance admin")).not.toBeInTheDocument();
 	},
@@ -87,8 +85,7 @@ export const AdminUser: Story = {
 		context: "main",
 		activeWorkspace: mockWorkspace,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Administration");
 	},
 };
@@ -100,8 +97,7 @@ export const AdminContext: Story = {
 		context: "admin",
 		activeWorkspace: mockWorkspace,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas, canvasElement }) => {
 		canvas.getByText("Practice catalog");
 		const content = canvasElement.querySelector<HTMLElement>('[data-slot="sidebar-content"]');
 		if (!content) throw new Error("sidebar content not found");
@@ -117,8 +113,7 @@ export const AdminContextNoWorkspace: Story = {
 		workspaces: [],
 		activeWorkspace: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Instance administration");
 		canvas.getByText("Back to app");
 		await expect(canvas.queryByText(/no workspace/i)).not.toBeInTheDocument();

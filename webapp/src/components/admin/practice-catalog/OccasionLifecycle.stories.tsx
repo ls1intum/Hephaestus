@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
 import { expect, fn, within } from "storybook/test";
 import type { PracticeWorkTypeDefinitionOptions } from "@/api/types.gen";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
@@ -13,25 +12,8 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
+import { StatefulPatch } from "@/stories/stateful";
 import { OccasionLifecycle } from "./OccasionLifecycle";
-
-function ControlledLifecycle(args: React.ComponentProps<typeof OccasionLifecycle>) {
-	const [selected, setSelected] = useState<string[]>([...args.selected]);
-	const [onDrafts, setOnDrafts] = useState(args.onDrafts);
-	return (
-		<OccasionLifecycle
-			{...args}
-			selected={selected}
-			onDrafts={onDrafts}
-			onDraftsChange={setOnDrafts}
-			onToggle={(signal, chosen) =>
-				setSelected((current) =>
-					chosen ? [...current, signal] : current.filter((value) => value !== signal),
-				)
-			}
-		/>
-	);
-}
 
 const meta = {
 	title: "Workspace admin/Practices/Occasion lifecycle",
@@ -40,12 +22,38 @@ const meta = {
 		workType: mockPullRequestWorkType,
 		selected: mockPullRequestBinding.signals,
 		onToggle: fn(),
-		onDrafts: false,
-		onDraftsChange: fn(),
+		includeDrafts: false,
+		onIncludeDraftsChange: fn(),
 	},
 	parameters: { layout: "padded" },
 	tags: ["autodocs"],
-	render: (args) => <ControlledLifecycle {...args} />,
+	// The strip is controlled, so a story has to hold its state — but the handler it holds calls the
+	// spy from `args` before it stores anything. A wrapper that *replaces* `onToggle` instead makes
+	// `meta.args`'s `fn()` unreachable: the Actions panel stays empty for a component whose whole job
+	// is reporting changes, and no play function in the file can assert what was reported.
+	render: (args) => (
+		<StatefulPatch initial={{ selected: [...args.selected], includeDrafts: args.includeDrafts }}>
+			{(state, patch) => (
+				<OccasionLifecycle
+					{...args}
+					selected={state.selected}
+					includeDrafts={state.includeDrafts}
+					onToggle={(signal, chosen) => {
+						args.onToggle(signal, chosen);
+						patch({
+							selected: chosen
+								? [...state.selected, signal]
+								: state.selected.filter((value) => value !== signal),
+						});
+					}}
+					onIncludeDraftsChange={(includeDrafts) => {
+						args.onIncludeDraftsChange(includeDrafts);
+						patch({ includeDrafts });
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 } satisfies Meta<typeof OccasionLifecycle>;
 
 export default meta;
@@ -110,11 +118,12 @@ export const AMomentTheWorkTypeNoLongerOffers: Story = {
 	args: {
 		selected: [...mockPullRequestBinding.signals, "scm.pull_request.manual_review"],
 	},
-	play: async ({ canvas, userEvent }) => {
+	play: async ({ args, canvas, userEvent }) => {
 		const stray = canvas.getByRole("checkbox", { name: /^Review requested by hand/ });
 		await expect(stray).toBeChecked();
 
 		await userEvent.click(stray);
+		await expect(args.onToggle).toHaveBeenCalledWith("scm.pull_request.manual_review", false);
 		await expect(canvas.queryByRole("checkbox", { name: /^Review requested by hand/ })).toBeNull();
 	},
 };
@@ -128,18 +137,25 @@ export const Disabled: Story = {
 	args: { disabled: true },
 };
 
-/** Clicking anywhere on a node toggles it, because the node is the label of a real checkbox. */
+/**
+ * Clicking anywhere on a node toggles it, because the node is the label of a real checkbox.
+ *
+ * What each control reports is asserted as well as what it draws: the strip talks in signal ids the
+ * reader never sees, so a node wired to its neighbour's id would still look right.
+ */
 export const TogglingMoments: Story = {
-	play: async ({ canvas, userEvent }) => {
+	play: async ({ args, canvas, userEvent }) => {
 		const merged = canvas.getByRole("checkbox", { name: /^Merged/ });
 		await expect(merged).not.toBeChecked();
 
 		await userEvent.click(canvas.getByText("Merged"));
 		await expect(canvas.getByRole("checkbox", { name: /^Merged/ })).toBeChecked();
+		await expect(args.onToggle).toHaveBeenCalledWith("scm.pull_request.merged", true);
 
 		const drafts = canvas.getByRole("switch", { name: /^Include drafts/ });
 		await userEvent.click(drafts);
 		await expect(canvas.getByRole("switch", { name: /^Include drafts/ })).toBeChecked();
+		await expect(args.onIncludeDraftsChange).toHaveBeenCalledWith(true);
 	},
 };
 

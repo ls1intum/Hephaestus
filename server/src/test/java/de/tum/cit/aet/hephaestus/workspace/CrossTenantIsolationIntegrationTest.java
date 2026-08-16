@@ -21,15 +21,19 @@ import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.feedback.ReflectionFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -83,6 +87,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SHARED_LOGIN = "shared-org";
+    private static final String DIFF_EVIDENCE_JSON =
+        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
+        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
+        "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -98,6 +106,12 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Autowired
     private FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private FeedbackObservationRepository feedbackObservationRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -317,6 +331,100 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             expectDetailStatus("/practices/feedback/{key}/reactions", tenantA.feedbackId()).isNoContent();
             expectDetailStatus("/practices/feedback/{key}/reactions", tenantB.feedbackId()).isNotFound();
         }
+    }
+
+    @Nested
+    @DisplayName("Reflection feedback (the developer's own page)")
+    class ReflectionFeedback {
+
+        /**
+         * The reflection lane is recipient-scoped rather than slug-scoped in its own right — the same person
+         * is a member of both tenants here — so the workspace predicate on the query is the only thing
+         * keeping tenant B's private text off tenant A's page.
+         */
+        @Test
+        @WithMentorUser
+        void readsOnlyTheMessagesPreparedInThisWorkspace() {
+            seedReflection(workspaceA, "A habit measured in tenant A");
+            seedReflection(workspaceB, "A habit measured in tenant B");
+
+            webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/feedback/reflection", workspaceA.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].headline")
+                .isEqualTo("A habit measured in tenant A");
+        }
+    }
+
+    /**
+     * A REFLECTION unit for {@link #overlapUser} in one tenant, with the evidence a read has to clear:
+     * a practice revision to pin the claim to, and cited evidence the delivery purpose admits.
+     */
+    private void seedReflection(Workspace ws, String headline) {
+        Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
+        practice.setWorkspace(ws);
+        practice.setSlug("reflection-" + ws.getWorkspaceSlug());
+        practice.setName("Reflection practice of " + ws.getWorkspaceSlug());
+        practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice = practiceRepository.saveAndFlush(practice);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
+
+        AgentJob job = new AgentJob();
+        job.setWorkspace(ws);
+        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+        job.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.0.0"))));
+        job = agentJobRepository.save(job);
+
+        UUID observationId = UUID.randomUUID();
+        observationRepository.insertIfAbsent(
+            observationId,
+            "reflection-occ-" + observationId,
+            job.getId(),
+            practice.getId(),
+            revision.getId(),
+            "scm.pull_request",
+            2L,
+            overlapUser.getId(),
+            "Reflection evidence in " + ws.getWorkspaceSlug(),
+            "ABSENT",
+            "BAD",
+            "MAJOR",
+            0.9f,
+            DIFF_EVIDENCE_JSON,
+            "reasoning",
+            null,
+            Instant.now(),
+            "LIVE"
+        );
+
+        Feedback unit = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(ws.getId())
+                .recipientUserId(overlapUser.getId())
+                .aboutUserId(overlapUser.getId())
+                .channel(FeedbackChannel.REFLECTION)
+                .position(7000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body(ReflectionFeedbackBody.render(headline, "The message.", "The habit to try."))
+                .source(FeedbackSource.AGENT)
+                .createdAt(Instant.now())
+                .build()
+        );
+        feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
     }
 
     @Nested

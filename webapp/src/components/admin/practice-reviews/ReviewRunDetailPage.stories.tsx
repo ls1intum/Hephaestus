@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { expect, fn, screen, waitFor } from "storybook/test";
 import type { ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
@@ -80,8 +80,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const CompletedWithMixedOutput: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await canvas.findByRole("heading", {
 			name: "Cache the workspace member lookup on the review path",
 		});
@@ -141,8 +140,7 @@ export const DeclinedForInsufficientEvidence: Story = {
 		observations: NOTHING,
 		feedback: NOTHING,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// `findAllByText` resolves on the first match, so asserting a count on it races the second
 		// panel's render.
 		await waitFor(async () =>
@@ -165,8 +163,7 @@ export const InProgressWithoutOutput: Story = {
 		feedback: NOT_YET,
 	},
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Running")).toBeVisible();
 		await expect(
 			await canvas.findByText("Observations will appear when the review finishes."),
@@ -190,8 +187,7 @@ export const FailedWithoutOutput: Story = {
 		feedback: NOTHING,
 	},
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Review couldn't be completed")).toBeVisible();
 		await expect(
 			await canvas.findByText("This review ended before it produced observations or feedback."),
@@ -214,8 +210,7 @@ export const FailedWithPartialOutput: Story = {
 		feedback: NOTHING,
 	},
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Review output may be incomplete")).toBeVisible();
 		await canvas.findByText("A dropped delivery is logged at debug and never counted");
 	},

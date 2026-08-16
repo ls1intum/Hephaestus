@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen } from "storybook/test";
 import type { ReviewArtifact } from "@/api/types.gen";
 import type { KnownArtifactKind } from "@/lib/artifact-kinds";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -138,8 +138,8 @@ export const Document: Story = {
 export const NothingReviewed: Story = {
 	args: { artifactId: 45, feedback: empty(), observations: empty() },
 	parameters: { chromatic: { viewports: [1440] } },
-	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByText("Nothing has been reviewed on this work");
+	play: async ({ canvas }) => {
+		await canvas.findByText("Nothing has been reviewed on this work");
 	},
 };
 

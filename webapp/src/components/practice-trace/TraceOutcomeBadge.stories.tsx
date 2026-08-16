@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import { OUTCOMES } from "./trace-format";
@@ -49,8 +49,8 @@ const everyOutcome = () => (
 export const EveryOutcome: Story = {
 	parameters: { layout: "padded" },
 	render: everyOutcome,
-	play: async ({ canvasElement }) => {
-		const badges = within(canvasElement).getAllByRole("listitem");
+	play: async ({ canvas }) => {
+		const badges = canvas.getAllByRole("listitem");
 		await expect(badges.map((badge) => badge.textContent?.trim())).toEqual(EVERY_LABEL);
 		// WCAG 2.2 SC 1.4.1: every outcome is told apart by an icon as well as words, never by colour.
 		for (const badge of badges) {

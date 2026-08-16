@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, screen } from "storybook/test";
+import { expect, screen, within } from "storybook/test";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationDetailPage } from "./ObservationDetailPage";
 import { observationDetail, reviewObservationDetail, workspacePractices } from "./story-mock-data";
@@ -64,8 +64,12 @@ export const EvidenceAcrossSources: Story = {
 };
 
 /**
- * A row is named by what the feedback is to the observation, and wears two tags because they answer
- * two questions: *where* it was placed, and *what became of it*.
+ * A row is named by what the feedback is to the observation. Where it went reads as plain text in
+ * the meta line and only what became of it is a tag — the same division `FeedbackRow` makes on the
+ * Delivery list, so two rows built from one record have one layout.
+ *
+ * As two badges they said one thing twice: on the conversation lane the place and the outcome
+ * resolve to the same icon under "In conversation" and "Delivered in conversation".
  */
 export const LinkedFeedback: Story = {
 	play: async ({ canvas }) => {
@@ -159,5 +163,40 @@ export const LoadFailed: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await canvas.findByText("Couldn't load this observation");
+	},
+};
+
+/**
+ * No record and nothing that failed. A deleted observation answers 404 and reads as an error; this
+ * is the other case — a fetch that never came back — and it says so rather than guessing a cause.
+ */
+export const NeverArrived: Story = {
+	args: { observation: undefined, error: undefined },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("This observation hasn't loaded")).toBeVisible();
+		await expect(canvas.queryByText("Couldn't load this observation")).toBeNull();
+		await expect(canvas.getByRole("link", { name: "Observations" })).toBeVisible();
+	},
+};
+
+/**
+ * The row shape this page used to get wrong. A unit raised in the mentor conversation has a place
+ * and an outcome that resolve to the *same* icon, and "Delivered in conversation" is word for word a
+ * refinement of "In conversation" — every lane-specific outcome label must begin with the state it
+ * refines, so a place badge beside it can only ever restate it.
+ *
+ * So the place is text and the outcome is the badge, which is also how the Delivery list draws it.
+ */
+export const RaisedInConversation: Story = {
+	args: { observation: observationDetail("ffffffff-3333-3333-3333-333333333333") },
+	parameters: { chromatic: { viewports: [1440] } },
+	play: async ({ canvas }) => {
+		const row = within(await canvas.findByRole("list", { name: "Feedback from this observation" }));
+		// Tag names, not text: both strings were on the row before this change too — as two badges.
+		// The place is prose in the meta line now, so it is the paragraph itself; the outcome is the
+		// badge's own label span. A row that put the place back in a badge would fail here.
+		await expect(row.getByText("In conversation").tagName).toBe("P");
+		await expect(row.getByText("Delivered in conversation").tagName).toBe("SPAN");
 	},
 };

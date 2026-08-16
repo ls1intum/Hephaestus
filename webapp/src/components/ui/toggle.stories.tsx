@@ -132,6 +132,9 @@ async function expectSegmentsJoinOnce(canvas: ReturnType<typeof within>) {
 
 /** Every state side by side, so a treatment that collides with another one is visible at a glance. */
 export const States: Story = {
+	// A board of fixed states, not one toggle: there is no single set of args for the panel to drive,
+	// so it says so rather than offering controls that edit nothing.
+	parameters: { controls: { disable: true } },
 	render: () => <StateBoard />,
 	play: async ({ canvas }) => {
 		await expectOneChannelPerState(canvas);
@@ -145,6 +148,7 @@ export const States: Story = {
  * once instead of repainting itself.
  */
 export const StatesOnDark: Story = {
+	parameters: { controls: { disable: true } },
 	render: () => (
 		<div className="dark rounded-lg border border-border bg-background p-4 text-foreground">
 			<StateBoard />

@@ -87,8 +87,7 @@ export const Default: Story = {
 /** First run — no channels yet; the empty state offers an Add affordance. */
 export const Empty: Story = {
 	args: { channels: [] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/no channels monitored yet/i);
 		// Both the header button and the empty-state CTA are labelled "Add channel", so an empty
 		// list must offer two of them — the CTA is not a relabelled header button.
@@ -99,8 +98,7 @@ export const Empty: Story = {
 /** Every consent state visible at once — badge word+icon per state. */
 export const AllStates: Story = {
 	args: { channels: [pending, active, paused, revoked] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("Not started").length).toBeGreaterThan(0);
 		canvas.getByText("Monitoring");
 		canvas.getByText("Paused");
@@ -111,8 +109,7 @@ export const AllStates: Story = {
 /** Opted-out members are surfaced as a count per channel — including a visible 0. */
 export const WithOptOuts: Story = {
 	args: { channels: [pending, active] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// Scope each count to its own row (via the deterministic action-button label): a bare
 		// getByText("2") would be satisfied by a stray "2" rendered anywhere in the table.
 		const activeRow = canvas
@@ -140,8 +137,7 @@ export const NoChannelName: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("C09NONAMED09").length).toBeGreaterThan(0);
 	},
 };
@@ -153,8 +149,7 @@ export const NoChannelName: Story = {
  */
 export const NotConnected: Story = {
 	args: { hasSlackConnection: false, channels: [pending] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /add channel/i })).not.toBeInTheDocument();
 		canvas.getByText(/connect slack to monitor channels/i);
 		// The passed-in channel must not render while disconnected: the inert section shows only the
@@ -166,8 +161,7 @@ export const NotConnected: Story = {
 /** Activation is a deliberate confirm step — the row menu opens a consequences Dialog. */
 export const ActivateConfirm: Story = {
 	args: { channels: [pending] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /activate monitoring/i }));
 		const dialog = await screen.findByRole("dialog");
@@ -187,8 +181,7 @@ export const ActivateConfirm: Story = {
 /** Revoke is gated by a type-to-confirm AlertDialog that validates on submit. */
 export const RevokeTypeToConfirm: Story = {
 	args: { channels: [active] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
 		const dialog = await screen.findByRole("alertdialog");
@@ -215,8 +208,7 @@ export const RevokeTypeToConfirm: Story = {
 /** Loading — skeleton rows while the channel list resolves. */
 export const Loading: Story = {
 	args: { isLoading: true, channels: [] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/monitored channels have their/i);
 	},
 };
@@ -224,8 +216,7 @@ export const Loading: Story = {
 /** The channel-list query failed — a distinct error panel with Retry, not the friendly empty state. */
 export const LoadError: Story = {
 	args: { channels: [], isError: true, onRetry: fn() },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await expect(canvas.queryByText(/no channels monitored yet/i)).not.toBeInTheDocument();
 		await expect(canvas.getByRole("alert")).toHaveTextContent(
 			/couldn't load the monitored channels/i,
@@ -240,8 +231,7 @@ export const LoadError: Story = {
 /** Removing a PENDING channel that never got past setup: no type-to-confirm, accurate copy. */
 export const RemovePendingNothingCollected: Story = {
 	args: { channels: [pending] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
 		const dialog = await screen.findByRole("alertdialog");
@@ -281,8 +271,7 @@ export const AddChannelPicker: Story = {
 			},
 		],
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");
 
@@ -323,8 +312,7 @@ export const MutationError: Story = {
 			throw new Error("slack rejected the channel");
 		}),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// Empty list ⇒ both a header button and an empty-state CTA; open via the header one.
 		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
 		const dialog = await screen.findByRole("dialog");

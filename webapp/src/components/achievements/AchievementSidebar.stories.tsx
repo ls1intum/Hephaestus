@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { AchievementSidebar } from "@/components/achievements/AchievementSidebar";
 import { mockUser, mythicAchievementsUI } from "@/components/achievements/story-mock-data";
 
@@ -49,8 +49,7 @@ export const Default: Story = {
 		isOwnProfile: true,
 		targetUsername: mockUser.name,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// The active segment must be visibly raised. Base UI's ToggleGroupItem emits `data-pressed`, so
 		// the `data-pressed:bg-background data-pressed:shadow-sm` classes style it (a `data-[state=on]`
 		// selector would match nothing).
@@ -104,8 +103,7 @@ export const Loading: Story = {
 		isOwnProfile: true,
 		targetUsername: mockUser.name,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// The loading pill uses the vendored <Spinner/> (role="status"), not a bare Loader2 icon.
 		await expect(await canvas.findByRole("status", { name: "Loading" })).toBeVisible();
 	},

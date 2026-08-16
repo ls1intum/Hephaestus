@@ -147,8 +147,7 @@ type Story = StoryObj<typeof meta>;
 export const Everything: Story = {};
 
 export const MentoringLimitsAreVisible: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Guidance only")).toBeVisible();
 		await expect(canvas.getByText("Human review needed")).toBeVisible();
 	},
@@ -156,8 +155,7 @@ export const MentoringLimitsAreVisible: Story = {
 
 export const CustomOrder: Story = {
 	args: { customOrder: true },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Use Hephaestus order" }));
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(dialog).toHaveAccessibleDescription(/Definitions and inclusion will not change/);
@@ -169,8 +167,7 @@ export const CustomOrder: Story = {
 export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 
 export const APracticeWhoseAreaIsGone: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await canvas.findByText("Outlived the area it was filed under");
 		await canvas.findByText("Area no longer exists");
 		await expect(
@@ -201,8 +198,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 
 export const UnavailableMoveDestinationIsNamed: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(
 			canvas.getByRole("button", { name: "More actions for Link the issue the change closes" }),
 		);
@@ -221,8 +217,7 @@ function FilterTransition(props: ComponentProps<typeof CuratedCatalog>) {
 export const FilteringOpensMatchingAreas: Story = {
 	render: (args) => <FilterTransition {...args} />,
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const area = canvas.getByRole("button", { name: /^Packaging work for review 3$/ });
 		await userEvent.click(area);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Filter by work type" }));
@@ -235,8 +230,7 @@ export const FilteringOpensMatchingAreas: Story = {
 
 export const SearchOpensTheAreaHoldingTheMatch: Story = {
 	args: { search: { q: "release note" } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await canvas.findByText("Write the release note with the change");
 	},
 };
@@ -260,8 +254,7 @@ export const NothingHasBeenChanged: Story = {
 
 export const ExcludingAnAreaListsItsPractices: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
 				name: "Include Packaging work for review in new workspaces",
@@ -290,8 +283,7 @@ export const PracticeInsideExcludedArea: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const inheritedSwitch = await canvas.findByRole("switch", {
 			name: "Keep a change to one concern is excluded because its area is excluded",
 		});
@@ -318,9 +310,9 @@ export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
+	play: async ({ canvas }) => {
 		await userEvent.click(
-			await within(canvasElement).findByRole("switch", {
+			await canvas.findByRole("switch", {
 				name: "Include Packaging work for review in new workspaces",
 			}),
 		);
@@ -351,8 +343,7 @@ export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
 		},
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
 				name: "Include Packaging work for review in new workspaces",

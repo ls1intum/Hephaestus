@@ -4,11 +4,6 @@ package de.tum.cit.aet.hephaestus.agent.handler.reflection;
  * The outcome of routing one composed message for the reflection surface. Only {@link #ADMIT} becomes a
  * PREPARED REFLECTION feedback unit; every other value is a named, testable reason the developer is not
  * shown it.
- *
- * <p>One refusal vocabulary per stage — this is the reflection lane's, as
- * {@code ConversationRoutingDecision} is the conversation lane's. A refusal that means the same thing on
- * both lanes still gets its own constant here, because the two stages answer to different rules and a
- * shared enum would make every future divergence look like a bug.
  */
 public enum ReflectionRoutingDecision {
     /** A corroborated, live, tier-admitted pattern the developer has not been shown lately — prepare it. */
@@ -55,10 +50,4 @@ public enum ReflectionRoutingDecision {
 
     /** The composed message arrived without a body or a next step, so there is nothing to deliver. */
     INCOMPLETE,
-
-    /**
-     * Over the per-cycle cap for this recipient. Written as a SUPPRESSED row rather than dropped, so
-     * "withheld" never reads as "ignored".
-     */
-    VOLUME_CAPPED,
 }

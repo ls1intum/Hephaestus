@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { MessageSquareTextIcon } from "lucide-react";
 import type { GetPracticeReviewObservationResponse, Practice } from "@/api/types.gen";
+import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
 import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
@@ -30,7 +31,7 @@ import {
 } from "./ReviewDetailHeader";
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
-import { ReviewRow, ReviewRowList } from "./ReviewRow";
+import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
 import { confidenceLabel } from "./review-format";
 import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 
@@ -84,13 +85,21 @@ export function ObservationDetailPage({
 				</div>
 			</article>
 		);
-	// No record and no error is still nothing to draw, so both land on the alert rather than on a
-	// header with empty facts under it.
-	if (error || !observation) {
+	if (error) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
 				<QueryErrorAlert error={error} title="Couldn't load this observation" onRetry={onRetry} />
+			</article>
+		);
+	}
+	// Not the alert: no record and no error is a query that never came back, and the alert would read
+	// the absent status as a lost connection. See `MissingRecordEmpty`.
+	if (!observation) {
+		return (
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<MissingRecordEmpty title="This observation hasn't loaded" onRetry={onRetry} />
 			</article>
 		);
 	}
@@ -205,25 +214,28 @@ export function ObservationDetailPage({
 									>
 										{/* Named by what it is to *this* observation. Titling it with the delivery
 										    place would say nothing about the thing the link opens, and repeat
-										    the fact the chip beside it already carries. */}
+										    the fact the meta line beside it already carries. */}
 										{feedback.role === "PRIMARY"
 											? "Feedback about this observation"
 											: "Feedback this observation supports"}
 									</Link>
 								}
+								// The place is plain text in the meta line, exactly where `FeedbackRow` puts it,
+								// and only the outcome is a chip. Side by side the two collided: on the
+								// conversation lane a delivered unit drew `BotMessageSquareIcon` twice, under
+								// "In conversation" and "Delivered in conversation" — and the second is word for
+								// word a refinement of the first, because every lane-specific outcome label must
+								// begin with the state it refines. Two rows built from one record should not have
+								// two layouts either.
 								meta={
-									feedback.suppressionReason ? (
-										<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
-									) : undefined
+									<>
+										<ReviewRowMeta items={[DELIVERY_PLACE_DEFS[feedback.channel].label]} />
+										{feedback.suppressionReason && (
+											<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
+										)}
+									</>
 								}
-								// Where it went is a tag rather than prose: it is one of a closed set, and the
-								// registry already gives each value a mark and a tone to be recognised by.
 								chips={[
-									{
-										key: "place",
-										width: "lg:w-40",
-										node: <StatusBadge def={DELIVERY_PLACE_DEFS[feedback.channel]} />,
-									},
 									{
 										key: "outcome",
 										width: "lg:w-48",

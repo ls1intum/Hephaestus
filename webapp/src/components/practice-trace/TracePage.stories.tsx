@@ -161,3 +161,18 @@ export const Mobile: Story = {
 		await expectNoPageOverflow();
 	},
 };
+
+/**
+ * No trace and nothing that failed. `NotFound` above is the other shape — a 404 is an answer, and it
+ * reads as one; this is a request that never got an answer at all.
+ */
+export const NeverArrived: Story = {
+	args: { trace: undefined, error: undefined },
+	play: async ({ args, canvas }) => {
+		await expect(canvas.getByText("This work's review activity hasn't loaded")).toBeVisible();
+		await expect(canvas.queryByText("Couldn't load this work's review activity")).toBeNull();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Try again" }));
+		await expect(args.onRetry).toHaveBeenCalledTimes(1);
+	},
+};

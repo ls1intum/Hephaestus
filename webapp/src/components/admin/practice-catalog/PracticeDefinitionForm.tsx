@@ -27,6 +27,7 @@ import {
 import { canAttemptAutomatedReview } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	PracticeBindingsEditor,
+	type PracticeOccasionMode,
 	withoutEvidence,
 	withRecommendedEvidence,
 } from "@/components/admin/practice-catalog/PracticeBindingsEditor";
@@ -266,7 +267,14 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		form.automatedReviewPolicy,
 		selectedWorkType?.supportedAutomatedReviewModes ?? [],
 	);
-	const guidanceOnly = form.automatedReviewPolicy.automatedReview.mode === "NONE";
+	// Guidance-only leads, because it is the only one of the three that forbids evidence outright —
+	// and `canAttemptAutomatedReview` can still say yes to a policy whose mode is NONE.
+	const occasionMode: PracticeOccasionMode =
+		form.automatedReviewPolicy.automatedReview.mode === "NONE"
+			? "guidance-only"
+			: canRunMentoring
+				? "reviewed"
+				: "human-review";
 	const isDirty = !deepEqual(form, initialState(definitionOptions, initialData));
 	// Down from the moment a save is dispatched until the caller says it failed. `isPending` drops
 	// before the caller navigates, so releasing the guard on it races that navigation.
@@ -627,8 +635,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							<PracticeBindingsEditor
 								options={selectedWorkType}
 								binding={form.bindings[0]}
-								canAttemptReview={canRunMentoring}
-								guidanceOnly={guidanceOnly}
+								mode={occasionMode}
 								outcome={workTypeUnchanged ? evidenceOutcome : undefined}
 								disabled={formDisabled}
 								error={submitted ? bindingsError?.message : undefined}

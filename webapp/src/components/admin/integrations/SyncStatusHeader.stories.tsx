@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ExternalLinkIcon } from "lucide-react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { buttonVariants } from "@/components/ui/button";
 import { expectSettledVisible } from "@/test/overlay";
@@ -65,8 +65,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Healthy: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Healthy");
 	},
 };
@@ -85,8 +84,7 @@ export const VeryStaleFreshness: Story = {
 
 export const NextRunDue: Story = {
 	args: { status: { ...baseStatus, nextScheduledSyncAt: minutesAgo(2) } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/next run due/i);
 	},
 };
@@ -101,8 +99,7 @@ export const UnknownCadence: Story = {
 			lastEventProcessedAt: undefined,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /stale/i })).not.toBeInTheDocument();
 		canvas.getByText(/ago$/);
 	},
@@ -112,8 +109,7 @@ export const NeverSynced: Story = {
 	args: {
 		status: { ...baseStatus, health: "PENDING", lastSuccessfulSyncAt: undefined },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Never synced");
 	},
 };
@@ -131,8 +127,7 @@ export const NothingToSyncYet: Story = {
 			resourceCounts: { total: 0, errored: 0, pending: 0, stale: 0 },
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/no resources to sync yet/i);
 		await expect(canvas.queryByText(/never synced/i)).not.toBeInTheDocument();
 	},
@@ -140,16 +135,14 @@ export const NothingToSyncYet: Story = {
 
 export const WebhookNotRegistered: Story = {
 	args: { status: { ...baseStatus, webhookRegistered: false } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/not registered/i);
 	},
 };
 
 export const NoWebhookEventsYet: Story = {
 	args: { status: { ...baseStatus, lastEventProcessedAt: undefined } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/no events yet/i);
 	},
 };
@@ -163,8 +156,7 @@ export const WebhookNotTracked: Story = {
 			lastEventProcessedAt: undefined,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText(/^webhook$/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/no events yet/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/not registered/i)).not.toBeInTheDocument();
@@ -185,8 +177,7 @@ export const NoDiagnosticsAtAll: Story = {
 		},
 		onBackfill: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("listitem")).not.toBeInTheDocument();
 	},
 };
@@ -207,8 +198,7 @@ export const RateLimitNearlyExhausted: Story = {
 };
 
 export const RateLimitResetTooltip: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.hover(canvas.getByText("4,812"));
 		await expectSettledVisible(await screen.findByText(/resets in/i));
 	},
@@ -226,8 +216,7 @@ export const RateLimitThrottled: Story = {
 		},
 		onBackfill: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const reading = canvas.getByText(/throttled/i);
 		await expect(reading).toHaveTextContent(/retry in/i);
 		await expect(canvas.queryByText(/^\/\s*[\d,]+$/)).not.toBeInTheDocument();
@@ -241,8 +230,7 @@ export const RateLimitCeilingOnly: Story = {
 			rateLimit: { limit: 5000, observedAt: minutesAgo(90) },
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/limit 5,000/i);
 		await expect(canvas.queryByText(/^\/\s*[\d,]+$/)).not.toBeInTheDocument();
 	},
@@ -255,8 +243,7 @@ export const RateLimitNotReported: Story = {
 			rateLimit: { observedAt: minutesAgo(90), throttledUntil: minutesAgo(30) },
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText(/rate limit/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/throttled/i)).not.toBeInTheDocument();
 	},
@@ -264,16 +251,14 @@ export const RateLimitNotReported: Story = {
 
 export const ScheduledBackfill: Story = {
 	args: { status: { ...baseStatus, backfill: { state: "IN_PROGRESS", percent: 40 } } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("In Progress");
 		await expect(canvas.queryByText(/IN_PROGRESS/)).not.toBeInTheDocument();
 	},
 };
 
 export const BackfillFromSplitMenu: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /more sync options/i }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: /run backfill/i }));
 		await expect(args.onBackfill).toHaveBeenCalledTimes(1);
@@ -282,8 +267,7 @@ export const BackfillFromSplitMenu: Story = {
 
 export const BackfillUnsupported: Story = {
 	args: { status: { ...baseStatus, backfillSupported: false } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			canvas.queryByRole("button", { name: /more sync options/i }),
 		).not.toBeInTheDocument();
@@ -292,8 +276,7 @@ export const BackfillUnsupported: Story = {
 
 export const SyncTriggerPending: Story = {
 	args: { triggeringType: "RECONCILIATION" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /starting…/i })).toBeDisabled();
 		await expect(canvas.getByRole("button", { name: /more sync options/i })).toBeDisabled();
 	},
@@ -301,8 +284,7 @@ export const SyncTriggerPending: Story = {
 
 export const ActiveJobRunning: Story = {
 	args: { status: { ...baseStatus, activeJob: runningJob } },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Syncing");
 		const cancel = canvas.getByRole("button", { name: /^cancel$/i });
 		await expect(cancel).toBeEnabled();
@@ -316,8 +298,7 @@ export const Cancelling: Story = {
 		isCancelling: true,
 		status: { ...baseStatus, activeJob: { ...runningJob, cancelRequested: true } },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByRole("button", { name: /stopping after current step/i }),
 		).toBeDisabled();
@@ -337,8 +318,7 @@ export const Slack: Story = {
 		},
 		onBackfill: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText(/rate limit/i)).not.toBeInTheDocument();
 		canvas.getByText(/^webhook$/i);
 		await expect(canvas.queryByText(/not registered/i)).not.toBeInTheDocument();
@@ -359,8 +339,7 @@ export const WithActions: Story = {
 			</a>
 		),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const link = canvas.getByText(/manage installation on github/i).closest("a");
 		await expect(link).toHaveAttribute("href", "https://github.com/settings/installations");
 	},
@@ -371,8 +350,7 @@ export const ConnectionInactive: Story = {
 		isConnectionActive: false,
 		status: { ...baseStatus, connectionState: "SUSPENDED", health: "SUSPENDED" },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /sync now/i })).not.toBeInTheDocument();
 	},
 };
@@ -383,8 +361,7 @@ export const Missing: Story = { args: { status: undefined, isConnectionActive: f
 
 export const LoadError: Story = {
 	args: { status: undefined, error: new Error("503 Service Unavailable") },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		canvas.getByText(/couldn't load the github connection/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetry).toHaveBeenCalledTimes(1);

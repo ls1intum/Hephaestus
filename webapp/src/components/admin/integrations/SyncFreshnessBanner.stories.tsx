@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { onlineManager } from "@tanstack/react-query";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { SyncFreshnessBanner } from "./SyncFreshnessBanner";
 
@@ -40,8 +40,8 @@ export const Healthy: Story = {
 	beforeEach: () => {
 		onlineManager.setOnline(true);
 	},
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByRole("status")).not.toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("status")).not.toBeInTheDocument();
 	},
 };
 
@@ -60,8 +60,7 @@ export const LivePushUnavailable: Story = {
 			</SyncLivenessProvider>
 		),
 	],
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/live updates are unavailable/i);
 		canvas.getByText(/refreshing periodically/i);
 	},
@@ -76,8 +75,7 @@ export const Offline: Story = {
 	beforeEach: () => {
 		onlineManager.setOnline(false);
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/you're offline/i);
 		canvas.getByText(/snapshot/i);
 		// Announced politely: the reader shouldn't be interrupted, but must not be left guessing.
@@ -100,8 +98,7 @@ export const OfflineOutranksLivePush: Story = {
 			</SyncLivenessProvider>
 		),
 	],
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/you're offline/i);
 		await expect(canvas.queryByText(/live updates are unavailable/i)).not.toBeInTheDocument();
 	},

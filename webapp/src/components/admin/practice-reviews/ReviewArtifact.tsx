@@ -6,6 +6,7 @@ import {
 	ARTIFACT_KIND,
 	artifactKindIcon,
 	artifactKindLabel,
+	artifactKindPluralLabel,
 	isKnownArtifactKind,
 	type KnownArtifactKind,
 } from "@/lib/artifact-kinds";
@@ -84,15 +85,12 @@ export function reviewArtifactScopeLabel(
 	if (id != null && artifact) {
 		return qualifiedLabel(artifact);
 	}
-	const labels: Record<KnownArtifactKind, readonly [string, string]> = {
-		[ARTIFACT_KIND.pullRequest]: ["pull or merge request", "pull or merge requests"],
-		[ARTIFACT_KIND.issue]: ["issue", "issues"],
-		[ARTIFACT_KIND.conversationThread]: ["conversation", "conversations"],
-		[ARTIFACT_KIND.document]: ["document", "documents"],
-	};
-	const scope = isKnownArtifactKind(kind)
-		? labels[kind][id == null ? 1 : 0]
-		: artifactKindLabel(kind).toLowerCase();
+	// Lower-cased from the registry rather than spelled out again here: a fifth artifact kind is one
+	// edit to `lib/artifact-kinds.ts` and its ten call sites, and a local copy is the one that would
+	// be missed. Mid-sentence is the only reason the case differs at all.
+	const scope = (
+		id == null ? artifactKindPluralLabel(kind) : artifactKindLabel(kind)
+	).toLowerCase();
 	return `${id == null ? "All" : "One"} ${scope}`;
 }
 

@@ -156,7 +156,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -188,7 +188,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(lowConfCritical, confidentMinor));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -217,7 +217,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(q1, q2));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -242,7 +242,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(minorTargetB, criticalTargetA));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -270,7 +270,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -300,7 +300,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(locusOnA, locusOnB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 

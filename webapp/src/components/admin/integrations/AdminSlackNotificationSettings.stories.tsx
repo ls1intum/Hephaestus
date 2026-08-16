@@ -31,8 +31,7 @@ type Story = StoryObj<typeof meta>;
 /** Cold start — admin hasn't connected the workspace yet. */
 export const NotConnected: Story = {
 	args: { hasSlackConnection: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByRole("button", { name: /connect slack workspace/i });
 	},
 };
@@ -40,8 +39,7 @@ export const NotConnected: Story = {
 /** OAuth completed, but no digest channel is selected yet. */
 export const ConnectedNoChannel: Story = {
 	args: { hasSlackConnection: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeEnabled();
 		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeDisabled();
 	},
@@ -55,8 +53,7 @@ export const ConnectedConfigured: Story = {
 		teamLabel: "engineering",
 		enabled: true,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeEnabled();
 		await expect(canvas.getByRole("button", { name: /send test message/i })).toBeEnabled();
 	},
@@ -70,8 +67,7 @@ export const ToggleDigestOff: Story = {
 		teamLabel: "engineering",
 		enabled: true,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const digest = canvas.getByRole("switch", { name: /send weekly digest/i });
 		await expect(digest).toBeChecked();
 		await userEvent.click(digest);
@@ -104,9 +100,7 @@ export const WithChannelPicker: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ canvas }) => {
 		// The options live in a portalled popover — open the combobox, then query the document.
 		// Scope by name: the schedule Day <Select> is also exposed as role="combobox".
 		const trigger = canvas.getByRole("combobox", { name: /digest channel/i });
@@ -135,8 +129,7 @@ export const WithChannelPicker: Story = {
 /** A channel Slack never listed is still reachable — the paste escape hatch resolves a link. */
 export const PasteChannelLink: Story = {
 	args: { hasSlackConnection: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// With no candidates the paste path is the only path, so it is already open.
 		await userEvent.type(
 			canvas.getByLabelText(/paste a channel link or id/i),
@@ -155,8 +148,7 @@ export const NonDefaultDay: Story = {
 		scheduleDay: 4,
 		scheduleTime: "14:30",
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Thursday");
 	},
 };
@@ -168,8 +160,7 @@ export const InvalidChannel: Story = {
 		channelId: "not-a-channel",
 		enabled: true,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/Paste a Slack channel URL/i)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeDisabled();
 	},
@@ -183,8 +174,7 @@ export const InvalidTime: Story = {
 		enabled: true,
 		scheduleTime: "9am",
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/Time must be in HH:mm format\./i)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: /^save$/i })).toBeDisabled();
 	},
@@ -201,8 +191,7 @@ export const ConnectedWithDisconnect: Story = {
 		teamLabel: "engineering",
 		enabled: true,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const trigger = canvas.getByRole("button", { name: /disconnect slack/i });
 		await expect(trigger).toBeVisible();
 		await userEvent.click(trigger);

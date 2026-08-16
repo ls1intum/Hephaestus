@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import type { EvidenceCitation } from "@/api/types.gen";
 import { knownEvidenceSourceKinds } from "@/components/practice-vocabulary/evidence-source-defs";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -254,8 +254,8 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		within(canvasElement).getByRole("heading", { name: "The code changes", level: 4 });
+	play: async ({ canvas }) => {
+		canvas.getByRole("heading", { name: "The code changes", level: 4 });
 		await expectNoPageOverflow();
 	},
 };

@@ -70,8 +70,7 @@ export const Empty: Story = {
 };
 
 export const DeleteConfirm: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /delete openai production/i }));
 		const dialog = await screen.findByRole("alertdialog");
 		within(dialog).getByText(/still on it/i);

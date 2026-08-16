@@ -83,7 +83,22 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     )
     List<UUID> findObservationIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 
-    /** Private reflection uses the newest available body, including {@code FAILED}; other states are ineligible. */
+    /**
+     * The newest body said to this observation's subject <em>about this observation</em>, per observation,
+     * on the lanes the caller names. {@code FAILED} counts: the words were composed and the developer may
+     * have seen them on the artifact; only states where nothing was ever said are ineligible.
+     *
+     * <p><b>{@code channels} is required, and deliberately has no default.</b> A {@link Feedback} body is
+     * "what we told them", but three lanes can tell them something and they are not interchangeable: an
+     * IN_CONTEXT note and a mentor turn are about the one finding they are bound to, while a REFLECTION
+     * unit is a cross-artifact message that binds every problem behind it as PRIMARY evidence and is
+     * about none of them individually. With no channel predicate this query's newest-first tie-break
+     * hands a per-finding surface the process message instead — so the lane a caller means is a fact only
+     * the caller holds, and it has to state it.
+     *
+     * <p>Bound as names rather than as {@link FeedbackChannel} values because this is a native query, where
+     * an enum parameter's JDBC mapping is not the string the column stores.
+     */
     @Query(
         value = """
         SELECT DISTINCT ON (fo.observation_id)
@@ -92,6 +107,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         FROM feedback_observation fo
         JOIN feedback f ON f.id = fo.feedback_id
         WHERE fo.observation_id IN (:observationIds)
+          AND f.channel IN (:channels)
           AND f.delivery_state IN ('DELIVERED', 'FAILED')
           AND f.body IS NOT NULL
         ORDER BY fo.observation_id, f.created_at DESC, f.id DESC
@@ -99,7 +115,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         nativeQuery = true
     )
     List<ObservationAdviceBody> findLatestAdviceBodiesByObservationIds(
-        @Param("observationIds") Collection<UUID> observationIds
+        @Param("observationIds") Collection<UUID> observationIds,
+        @Param("channels") Collection<String> channels
     );
 
     interface ObservationAdviceBody {

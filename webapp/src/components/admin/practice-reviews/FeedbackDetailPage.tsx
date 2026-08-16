@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { ScanSearchIcon } from "lucide-react";
 import type { GetPracticeReviewFeedbackResponse, Practice, ReviewPlacement } from "@/api/types.gen";
+import { MissingRecordEmpty } from "@/components/common/MissingRecordEmpty";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DeliveryTrace } from "@/components/practice-vocabulary/DeliveryTrace";
 import { codeCitationLocator } from "@/components/practice-vocabulary/evidence-source-defs";
@@ -80,13 +81,22 @@ export function FeedbackDetailPage({
 				</div>
 			</article>
 		);
-	// No record and no error is still nothing to draw, so both land on the alert rather than on a
-	// header with empty facts under it.
-	if (error || !feedback) {
+	if (error) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
 				<QueryErrorAlert error={error} title="Couldn't load this feedback" onRetry={onRetry} />
+			</article>
+		);
+	}
+	// No record and no error is still nothing to draw, but it is not a failure either: it is a query
+	// that never came back. Routing it through the alert made it `error={undefined}`, which the alert
+	// classifies as a lost connection — a cause it has no evidence for.
+	if (!feedback) {
+		return (
+			<article className="min-w-0 max-w-4xl space-y-8">
+				{breadcrumbs}
+				<MissingRecordEmpty title="This feedback hasn't loaded" onRetry={onRetry} />
 			</article>
 		);
 	}

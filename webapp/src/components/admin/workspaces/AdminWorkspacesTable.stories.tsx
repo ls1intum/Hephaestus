@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { within } from "storybook/test";
 import type { AdminWorkspaceView } from "@/api/types.gen";
 import { AdminWorkspacesTable } from "./AdminWorkspacesTable";
 
@@ -39,8 +38,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Metadata-only rows: provider, owner, member count, status. */
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("AET");
 		canvas.getByText("SUSPENDED");
 		// Owner falls back to an em dash when there is no OWNER member.
@@ -51,8 +49,7 @@ export const Default: Story = {
 /** Empty state under an active search filter. */
 export const EmptyWithSearch: Story = {
 	args: { workspaces: [], hasSearch: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("No matching workspaces.");
 	},
 };

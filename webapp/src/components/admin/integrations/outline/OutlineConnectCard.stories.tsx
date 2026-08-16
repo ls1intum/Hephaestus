@@ -38,8 +38,7 @@ const healthyToken = {
 /** Cold start — no prefilled server URL (a prefill would ship a self-host token to Outline Cloud). */
 export const Disconnected: Story = {
 	args: { connected: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByLabelText(/server url/i)).toHaveValue("");
 		await expect(canvas.getByRole("button", { name: /connect outline/i })).toBeDisabled();
 	},
@@ -48,8 +47,7 @@ export const Disconnected: Story = {
 /** Both fields have to be filled — the token alone leaves connect disabled. */
 export const DisconnectedReadyToConnect: Story = {
 	args: { connected: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.type(canvas.getByLabelText(/api token/i), "ol_api_secret");
 		await expect(canvas.getByRole("button", { name: /connect outline/i })).toBeDisabled();
 
@@ -61,8 +59,7 @@ export const DisconnectedReadyToConnect: Story = {
 /** Edge: a non-https server URL surfaces the format error and keeps connect disabled. */
 export const InvalidServerUrl: Story = {
 	args: { connected: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.type(canvas.getByLabelText(/server url/i), "ftp://internal");
 		await expect(canvas.getByText(/enter an https:\/\/ url/i)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: /connect outline/i })).toBeDisabled();
@@ -75,8 +72,7 @@ export const ConnectError: Story = {
 		connected: false,
 		errorMessage: "The Outline API rejected the token (401).",
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/rejected the token/i)).toBeVisible();
 	},
 };
@@ -92,8 +88,7 @@ export const ConnectUnavailable: Story = {
 		errorMessage: "No ConnectionStrategy registered for kind=OUTLINE",
 		connectUnavailable: true,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/no connectionstrategy registered/i)).toBeVisible();
 		await expect(canvas.getByText(/outline may not be enabled on this instance/i)).toBeVisible();
 		await expect(canvas.getByText(/ask your server administrator/i)).toBeVisible();
@@ -111,8 +106,7 @@ export const Connected: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: healthyToken,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/outline connected — acme wiki/i);
 		canvas.getByText(/outline accepts this token/i);
 		canvas.getByText(/hephaestus mirror/i);
@@ -131,8 +125,7 @@ export const TokenNeverExpires: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: { accepted: true, name: "Hephaestus mirror", last4: "9f2c" },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/never expires/i);
 		await expect(canvas.queryByText(/cannot be rotated/i)).not.toBeInTheDocument();
 	},
@@ -148,8 +141,7 @@ export const TokenExpiringSoon: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: { ...healthyToken, expiresAt: inDays(5) },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/this api key expires in [45] days/i);
 		canvas.getByText(/cannot be rotated through the api/i);
 		canvas.getByText(/settings → api keys/i);
@@ -163,8 +155,7 @@ export const TokenRejected: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: { accepted: false },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/outline no longer accepts this token — reconnect with a new one/i);
 		await expect(canvas.queryByText(/expires in/i)).not.toBeInTheDocument();
 	},
@@ -180,8 +171,7 @@ export const TokenMetadataUnavailable: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: { accepted: true },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/outline accepts this token/i);
 		await expect(canvas.queryByText(/never expires/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/expires in/i)).not.toBeInTheDocument();
@@ -196,8 +186,7 @@ export const ConnectedDisconnectDialog: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: healthyToken,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /disconnect outline/i }));
 		// AlertDialog renders in a portal — query the whole document.
 		const dialog = await screen.findByRole("alertdialog", { name: /disconnect outline\?/i });
@@ -218,8 +207,7 @@ export const ConnectedButSuspended: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: healthyToken,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/outline suspended — acme wiki/i);
 		// The token panel still reports the stored key even while syncing is paused.
 		canvas.getByText(/outline accepts this token/i);
@@ -234,8 +222,7 @@ export const ConnectedButPending: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: healthyToken,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/outline finishing setup — acme wiki/i);
 	},
 };
@@ -248,8 +235,7 @@ export const ConnectedActiveState: Story = {
 		connectionLabel: "Acme Wiki",
 		tokenStatus: healthyToken,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/outline connected — acme wiki/i);
 	},
 };

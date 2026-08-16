@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { AvailableLlmModel } from "@/api/types.gen";
 import { Label } from "@/components/ui/label";
 import { ModelPicker } from "./ModelPicker";
@@ -85,8 +85,7 @@ export const Invalid: Story = {
 };
 
 export const OpensAndListsGroups: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 		await expect(await screen.findByRole("option", { name: /GPT-5/ })).toBeVisible();
 		await expect(await screen.findByRole("option", { name: /My OpenAI key/ })).toBeVisible();

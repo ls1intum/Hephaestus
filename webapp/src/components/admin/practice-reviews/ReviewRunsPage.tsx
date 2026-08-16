@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/empty";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
 import { ReviewRowList } from "./ReviewRow";
-import { hasRunFilter, ReviewRunFilters } from "./ReviewRunFilters";
+import { clearedRunFilters, hasRunFilter, ReviewRunFilters } from "./ReviewRunFilters";
 import { ReviewRunRow } from "./ReviewRunRow";
 import { REVIEW_PAGE_SIZE, type RunsSearch } from "./review-search";
 
@@ -47,16 +47,18 @@ export function ReviewRunsPage({
 	const rows = reviews?.content ?? [];
 	const hasFilter = hasRunFilter(search);
 	// The toolbar's Reset and the empty state's button are one action, not two copies of it.
-	const reset = () =>
-		onSearchChange({ status: undefined, from: undefined, to: undefined, page: 0 });
+	const reset = () => onSearchChange(clearedRunFilters());
+	// Page one, because a narrowed list is a different list: page 4 of the old one is very likely
+	// past the end of the new one. The screen owns the URL, so the screen owns this — the toolbar
+	// reports the facet the reader changed and nothing else.
+	const patchFilter = (patch: Partial<RunsSearch>) => onSearchChange({ ...patch, page: 0 });
 
 	return (
 		<section aria-label="Practice reviews" className="space-y-4">
 			<ReviewRunFilters
 				search={search}
-				onPatch={onSearchChange}
+				onPatch={patchFilter}
 				onReset={reset}
-				hasFilter={hasFilter}
 				total={reviews?.page?.totalElements}
 			/>
 			{error != null ? (

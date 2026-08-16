@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -47,8 +47,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const UsesDefault: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Uses Hephaestus default")).toBeVisible();
 		await expect(
 			canvas.queryByRole("button", { name: "Apply Hephaestus update" }),
@@ -58,8 +57,7 @@ export const UsesDefault: Story = {
 
 export const Customized: Story = {
 	args: { status: status({ state: "EDITED_HERE" }) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Restore Hephaestus default" })).toBeVisible();
 		await expect(
 			canvas.queryByRole("button", { name: "Keep saved version" }),
@@ -69,8 +67,7 @@ export const Customized: Story = {
 
 export const UpdateChangesReviewBehavior: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }), shipped },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Review Hephaestus update" }));
 		await expect(await canvas.findByText("The updated default criteria.")).toBeVisible();
@@ -93,8 +90,7 @@ export const UpdateChangesReviewBehavior: Story = {
 
 export const WordingOnlyUpdate: Story = {
 	args: { status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }), shipped },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/review behavior would stay the same/i)).toBeVisible();
 	},
 };
@@ -110,8 +106,7 @@ export const AreaAppearanceUpdate: Story = {
 			color: "sky",
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(/would change the area's name, description, icon, or color/),
 		).toBeVisible();
@@ -125,8 +120,7 @@ export const NoHephaestusDefault: Story = {
 
 export const RemovedFromDefaults: Story = {
 	args: { status: status({ state: "NO_LONGER_SHIPPED" }) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByRole("button", { name: "Keep saved version as custom" }),
 		).toBeVisible();

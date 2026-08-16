@@ -17,10 +17,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -101,23 +99,6 @@ class ReflectionFeedbackPreparerTest extends BaseUnitTest {
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
-    }
-
-    /** Over the cap the message is withheld, not ignored — and the row says which. */
-    @Test
-    void recordsAnOverCapMessageAsSuppressedRatherThanDroppingIt() {
-        stubSave();
-        List<ReflectionFeedbackPreparer.RoutedMessage> routed = new ArrayList<>();
-        for (int i = 0; i <= ReflectionFeedbackPreparer.TOP_N_PER_RECIPIENT; i++) {
-            routed.add(admitted("practice-" + i));
-        }
-
-        int prepared = preparer.prepare(JOB_ID, WORKSPACE_ID, 11L, routed, BASE);
-
-        assertThat(prepared).isEqualTo(ReflectionFeedbackPreparer.TOP_N_PER_RECIPIENT);
-        Feedback last = captureSaved().getLast();
-        assertThat(last.getDeliveryState()).isEqualTo(FeedbackDeliveryState.SUPPRESSED);
-        assertThat(last.getSuppressionReason()).isEqualTo(FeedbackSuppressionReason.VOLUME_CAPPED);
     }
 
     @Test

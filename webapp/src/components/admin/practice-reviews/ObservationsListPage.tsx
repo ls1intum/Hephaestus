@@ -1,10 +1,10 @@
 import { Link } from "@tanstack/react-router";
 import type { ListPracticeReviewObservationsResponse, Practice } from "@/api/types.gen";
+import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { TablePagination } from "@/components/common/TablePagination";
 import {
 	clearedObservationFilters,
-	type FacetSource,
 	hasObservationFilter,
 	ObservationFilters,
 } from "./ObservationFilters";

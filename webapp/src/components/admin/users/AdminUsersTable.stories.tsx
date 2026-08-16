@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { AdminAccountView } from "@/api/types.gen";
 import { AdminUsersTable } from "./AdminUsersTable";
 
@@ -54,8 +54,7 @@ type Story = StoryObj<typeof meta>;
 
 /** A signed-in admin (id 1) cannot revoke their own admin or impersonate themselves. */
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await canvas.findByText("Ada Admin");
 
 		// Open the signed-in admin's own action menu (row id 1).
@@ -75,8 +74,7 @@ export const Default: Story = {
 
 /** Acting on another account fires the role-change callback. */
 export const ChangeAnotherUsersRole: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Actions for Bob User" }));
 		await userEvent.click(await screen.findByRole("menuitem", { name: "Change role" }));
 		await expect(args.onChangeRole).toHaveBeenCalledWith(user);
@@ -87,31 +85,31 @@ export const Loading: Story = { args: { users: [], isLoading: true } };
 
 export const Empty: Story = {
 	args: { users: [], totalLoaded: 0 },
-	play: async ({ canvasElement }) => {
-		within(canvasElement).getByText("No users found");
+	play: async ({ canvas }) => {
+		canvas.getByText("No users found");
 	},
 };
 
 /** Empty because a search matched nothing — copy nudges adjusting the term. */
 export const EmptySearch: Story = {
 	args: { users: [], hasSearch: true, totalLoaded: 3 },
-	play: async ({ canvasElement }) => {
-		within(canvasElement).getByText(/adjusting your search/i);
+	play: async ({ canvas }) => {
+		canvas.getByText(/adjusting your search/i);
 	},
 };
 
 export const ErrorState: Story = {
 	args: { users: [], isError: true },
-	play: async ({ canvasElement }) => {
-		within(canvasElement).getByText(/failed to load users/i);
+	play: async ({ canvas }) => {
+		canvas.getByText(/failed to load users/i);
 	},
 };
 
 /** More pages available — the "Load more" control is offered. */
 export const HasMore: Story = {
 	args: { hasNextPage: true },
-	play: async ({ args, canvasElement }) => {
-		await userEvent.click(within(canvasElement).getByRole("button", { name: "Load more" }));
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Load more" }));
 		await expect(args.onLoadMore).toHaveBeenCalled();
 	},
 };

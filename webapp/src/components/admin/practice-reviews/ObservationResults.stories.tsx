@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen } from "storybook/test";
 import type { ReviewObservation } from "@/api/types.gen";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationResults } from "./ObservationResults";
@@ -100,8 +100,8 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		within(canvasElement).getByRole("link", {
+	play: async ({ canvas }) => {
+		canvas.getByRole("link", {
 			name: "The queue is called the outbox everywhere except in the config",
 		});
 		await expectNoPageOverflow();

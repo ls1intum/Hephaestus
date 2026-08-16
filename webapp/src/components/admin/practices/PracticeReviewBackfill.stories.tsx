@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { expectClosedSelectShows } from "@/test/controls";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewBackfill } from "./PracticeReviewBackfill";
@@ -41,8 +41,7 @@ export const ChooseARange: Story = {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/nothing is reviewed until you confirm/i);
 		await expectClosedSelectShows(canvas, /Kind of work/, "Pull or merge requests");
 		await expectClosedSelectShows(canvas, /How far back/, "The last 30 days");
@@ -52,8 +51,7 @@ export const ChooseARange: Story = {
 
 export const AwaitingConfirmation: Story = {
 	args: { runs: [run()] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("128 pull or merge requests");
 		canvas.getByText("$15.36");
 		canvas.getByRole("button", { name: /review 128 pull or merge requests/i });
@@ -66,16 +64,14 @@ export const AwaitingConfirmation: Story = {
  */
 export const CostUnknown: Story = {
 	args: { runs: [run({ estimatedCostUsd: undefined })] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Unknown");
 	},
 };
 
 export const NothingInRange: Story = {
 	args: { runs: [run({ estimatedArtifacts: 0, estimatedCostUsd: 0 })] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /nothing to review/i })).toBeDisabled();
 		canvas.getByText(/discard this and try a longer one/i);
 	},
@@ -105,8 +101,7 @@ export const SomeCouldNotBeRead: Story = {
 			}),
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText(/3 could not be read, and stay unmeasured/i)).toBeVisible();
 		await expect(canvas.getByText(/12 already measured/i)).toBeVisible();
 	},
@@ -128,8 +123,7 @@ export const PausedOnBudget: Story = {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/nothing has been skipped/i);
 		await expectNoPageOverflow();
 	},
@@ -170,8 +164,7 @@ export const Loading: Story = {
  */
 export const LoadFailed: Story = {
 	args: { isError: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/backfills couldn't be loaded/i);
 		canvas.getByText(/already running is unaffected/i);
 	},

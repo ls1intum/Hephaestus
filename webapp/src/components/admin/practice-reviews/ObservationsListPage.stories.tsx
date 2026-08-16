@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 import type { ListPracticeReviewObservationsResponse, ReviewObservation } from "@/api/types.gen";
+import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { areaFacetOptions, type FacetSource, practiceFacetOptions } from "./ObservationFilters";
+import { areaFacetOptions, practiceFacetOptions } from "./ObservationFilters";
 import { ObservationsListPage } from "./ObservationsListPage";
 import type { ReviewPeople } from "./ReviewPersonFacet";
 import { type ObservationsSearch, observationsQuery, REVIEW_PAGE_SIZE } from "./review-search";
@@ -28,9 +29,15 @@ const PEOPLE: ReviewPeople = {
 	isLoading: false,
 	isError: false,
 };
-const AREAS: FacetSource = { options: areaFacetOptions(practiceAreas) };
+const AREAS: FacetSource = {
+	options: areaFacetOptions(practiceAreas),
+	isLoading: false,
+	isError: false,
+};
 const PRACTICES: FacetSource = {
 	options: practiceFacetOptions(workspacePractices, practiceAreas),
+	isLoading: false,
+	isError: false,
 };
 
 /**
@@ -253,8 +260,7 @@ export const MobileAppliedFilters: Story = {
 		chromatic: { viewports: [320] },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement, userEvent }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas, userEvent }) => {
 		await canvas.findByText("12 observations.");
 		await pickFacet(canvas, userEvent, "Severity", /Major/);
 		await canvas.findByText("2 observations match your filters.");
@@ -317,8 +323,8 @@ export const Mobile: Story = {
 		chromatic: { disableSnapshot: true },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByText("12 observations.");
+	play: async ({ canvas }) => {
+		await canvas.findByText("12 observations.");
 		await expectNoPageOverflow();
 	},
 };

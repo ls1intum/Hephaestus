@@ -90,8 +90,7 @@ export const Empty: Story = {
 };
 
 export const DeleteConfirm: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /delete gpt-5/i }));
 		const dialog = await screen.findByRole("alertdialog");
 		within(dialog).getByText(/can't be deleted/i);

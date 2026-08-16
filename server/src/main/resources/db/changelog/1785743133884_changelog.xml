@@ -2830,4 +2830,68 @@
         ]]></rollback>
     </changeSet>
 
+    <!-- The three constructive-code-review practices judge how somebody REVIEWS a teammate's change, so
+         their bundled occasions now declare subject=REVIEWER and the injector withholds them until a review
+         can name which reviewer an observation is about.
+
+         Needed because DefaultPracticeCatalogSeeder installs the bundle once per workspace and never
+         revisits it (it returns early on the practice_catalog_installation marker), and no read path
+         overlays the bundle onto a stored row. Without this, only workspaces created after the release get
+         the corrected subject and every existing workspace keeps filing a reviewer's conduct against the
+         author of the change.
+
+         Scoped to rows stamped as coming from the bundle (source_curated_slug), and safe to write over: the
+         subject key did not exist before this release, so no stored binding carries one anybody chose.
+         Every binding of those three is rewritten rather than only the one on scm.pull_request.reviewed:
+         all three practices judge the reviewer whatever occasions them, and matching the signal would let a
+         serialisation change turn this migration into a silent no-op.
+         practice_revision is deliberately untouched — a revision is a snapshot of the rules a past
+         measurement was taken under, and rewriting it would falsify that record. subject is not part of
+         ReviewRuleFingerprint, so no existing observation becomes stale here and no reflective surface
+         empties. -->
+    <changeSet author="hephaestus-terminology" id="1785743133884-53">
+        <preConditions onFail="MARK_RAN" onFailMessage="Reviewer-side curated practices already name their subject">
+            <not>
+                <sqlCheck expectedResult="0"><![CDATA[
+                    SELECT count(*) FROM practice p
+                    WHERE p.source_curated_slug IN (
+                            'leaves-useful-specific-review-comments',
+                            'reviews-respectfully-asks-rather-than-demands',
+                            'reviews-substantively-with-understanding')
+                      AND EXISTS (
+                          SELECT 1 FROM jsonb_array_elements(p.bindings) AS b
+                          WHERE b ->> 'subject' IS DISTINCT FROM 'REVIEWER')
+                ]]></sqlCheck>
+            </not>
+        </preConditions>
+        <comment>Re-sync subject=REVIEWER onto already-installed copies of the three reviewer-side practices.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            UPDATE practice p
+            SET bindings = (
+                SELECT jsonb_agg(b || '{"subject": "REVIEWER"}'::jsonb ORDER BY ord)
+                FROM jsonb_array_elements(p.bindings) WITH ORDINALITY AS t(b, ord)
+            )
+            WHERE p.source_curated_slug IN (
+                    'leaves-useful-specific-review-comments',
+                    'reviews-respectfully-asks-rather-than-demands',
+                    'reviews-substantively-with-understanding')
+              AND jsonb_array_length(p.bindings) > 0
+              AND EXISTS (
+                  SELECT 1 FROM jsonb_array_elements(p.bindings) AS b
+                  WHERE b ->> 'subject' IS DISTINCT FROM 'REVIEWER');
+        ]]></sql>
+        <rollback><![CDATA[
+            UPDATE practice p
+            SET bindings = (
+                SELECT jsonb_agg(b - 'subject' ORDER BY ord)
+                FROM jsonb_array_elements(p.bindings) WITH ORDINALITY AS t(b, ord)
+            )
+            WHERE p.source_curated_slug IN (
+                    'leaves-useful-specific-review-comments',
+                    'reviews-respectfully-asks-rather-than-demands',
+                    'reviews-substantively-with-understanding')
+              AND jsonb_array_length(p.bindings) > 0;
+        ]]></rollback>
+    </changeSet>
+
 </databaseChangeLog>

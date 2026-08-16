@@ -19,6 +19,19 @@ import { artifactKindIcon, artifactKindLabel } from "@/lib/artifact-kinds";
 /** Also the `aria-describedby` target: focus lands on the control, not on the rendered message. */
 const BINDINGS_ERROR_ID = "practice-bindings-error";
 
+/**
+ * What the review on this occasion amounts to — the one thing that changes what this editor offers.
+ *
+ * One value rather than the `canAttemptReview` + `guidanceOnly` pair it replaces: that pair could
+ * spell four states for three real ones, and `guidanceOnly` silently won every disagreement, so
+ * `guidanceOnly && canAttemptReview` and `guidanceOnly && !canAttemptReview` rendered identically.
+ *
+ * `human-review` is named for what the author sees — evidence recorded, nothing checked — and so
+ * also covers a policy the instance cannot run at all (`automatedReviewUnavailableLabel` calls that
+ * one "AI support unavailable"). Those two differ in why, never in what this editor draws.
+ */
+export type PracticeOccasionMode = "reviewed" | "human-review" | "guidance-only";
+
 export interface PracticeBindingsEditorProps {
 	options: PracticeWorkTypeDefinitionOptions;
 	/**
@@ -28,10 +41,7 @@ export interface PracticeBindingsEditorProps {
 	 */
 	binding: PracticeBinding;
 	onChange: (binding: PracticeBinding) => void;
-	/** When false, evidence is still recorded but never checked. */
-	canAttemptReview?: boolean;
-	/** True while the practice runs no automated review, which forbids evidence outright. */
-	guidanceOnly?: boolean;
+	mode?: PracticeOccasionMode;
 	outcome?: PracticeEvidenceOutcome;
 	error?: string;
 	/** The control the error points at, so the field it names is the one that opens. */
@@ -48,8 +58,7 @@ export function PracticeBindingsEditor({
 	options,
 	binding,
 	onChange,
-	canAttemptReview = true,
-	guidanceOnly = false,
+	mode = "reviewed",
 	outcome,
 	error,
 	errorFocusId,
@@ -60,7 +69,7 @@ export function PracticeBindingsEditor({
 	const evidenceInvalid = errorFocusId === occasionFieldId("evidence");
 	// A review asked for by hand runs a practice the workspace lets run: guidance-only and
 	// human-review-needed practices sit at OFF, so promising one here would be a promise nothing keeps.
-	const handAsked = options.manualReviewSignal !== undefined && canAttemptReview && !guidanceOnly;
+	const handAsked = options.manualReviewSignal !== undefined && mode === "reviewed";
 	const toggleSignal = (signal: string, chosen: boolean) =>
 		onChange(
 			normalizeBinding({
@@ -78,9 +87,9 @@ export function PracticeBindingsEditor({
 					<WorkIcon className="size-4 text-muted-foreground" aria-hidden />
 					{artifactKindLabel(options.artifactKind)}
 				</p>
-				{!guidanceOnly && (
+				{mode !== "guidance-only" && (
 					<p className="text-sm text-muted-foreground">
-						{canAttemptReview
+						{mode === "reviewed"
 							? "Every review is checked for the evidence it must have before it runs. Missing or incomplete evidence skips the practice rather than guessing."
 							: "Evidence is recorded, but nothing is reviewed while the practice asks for a human."}
 					</p>
@@ -95,13 +104,15 @@ export function PracticeBindingsEditor({
 				workType={options}
 				selected={binding.signals}
 				onToggle={toggleSignal}
-				onDrafts={binding.onDrafts === true}
-				onDraftsChange={(onDrafts) => onChange(normalizeBinding({ ...binding, onDrafts }))}
+				includeDrafts={binding.onDrafts === true}
+				onIncludeDraftsChange={(includeDrafts) =>
+					onChange(normalizeBinding({ ...binding, onDrafts: includeDrafts }))
+				}
 				errorId={signalsInvalid && error ? BINDINGS_ERROR_ID : undefined}
 				disabled={disabled}
 			/>
 
-			{guidanceOnly ? (
+			{mode === "guidance-only" ? (
 				<p className="text-sm text-muted-foreground">
 					Guidance only: this practice reads nothing, because no review runs.
 				</p>

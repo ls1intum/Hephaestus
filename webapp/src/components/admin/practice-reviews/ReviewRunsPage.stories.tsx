@@ -204,8 +204,7 @@ export const Mobile: Story = {
 		chromatic: { viewports: [320, 768] },
 		viewport: { defaultViewport: "reflow" },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const list = await canvas.findByRole("list", { name: /Practice reviews/ });
 		await within(list).findByRole("link", { name: /Retry webhook deliveries with backoff/ });
 		await expectNoPageOverflow();
@@ -220,8 +219,7 @@ export const Mobile: Story = {
 export const MobileAppliedDateRange: Story = {
 	args: { search: { from: "2026-07-28", to: "2026-07-29" } },
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await canvas.findByText("3 reviews match your filters.");
 		canvas.getByRole("button", { name: "Requested: Jul 28 – Jul 29, 2026" });
 		await expectNoPageOverflow();

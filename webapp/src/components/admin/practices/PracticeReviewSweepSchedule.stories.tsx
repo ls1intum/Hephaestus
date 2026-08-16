@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen } from "storybook/test";
 import { expectClosedSelectShows } from "@/test/controls";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSweepSchedule } from "./PracticeReviewSweepSchedule";
@@ -40,8 +40,7 @@ export const NothingScheduled: Story = {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/nothing is checked on a schedule/i);
 		await expectClosedSelectShows(canvas, /Kind of work/, "Pull or merge requests");
 		await expectClosedSelectShows(canvas, /How often/, "Every day");
@@ -56,8 +55,7 @@ export const NothingScheduled: Story = {
  * 400 explaining a rule the form should have expressed.
  */
 export const WeeklyOffersAFullWeek: Story = {
-	play: async ({ canvasElement, userEvent }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: /How often/ }));
 		await userEvent.click(await screen.findByRole("option", { name: "Every week" }));
 
@@ -71,8 +69,7 @@ export const Running: Story = {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/every day, covering the last 2 days/i);
 		canvas.getByRole("button", { name: "Pause checking pull or merge requests" });
 		canvas.getByRole("button", { name: "Remove the recurring check on pull or merge requests" });
@@ -82,16 +79,14 @@ export const Running: Story = {
 
 export const NotRunYet: Story = {
 	args: { schedules: [schedule({ lastRunAt: undefined })] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/has not checked anything yet/i);
 	},
 };
 
 export const Paused: Story = {
 	args: { schedules: [schedule({ enabled: false })] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/nothing is being checked/i);
 		canvas.getByRole("button", { name: "Resume checking pull or merge requests" });
 	},
@@ -103,8 +98,7 @@ export const Paused: Story = {
  */
 export const PausedBeforeItEverRan: Story = {
 	args: { schedules: [schedule({ enabled: false, lastRunAt: undefined })] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(
 			canvas.getByText(
 				"Every day, covering the last 2 days. Paused, so nothing is being checked. It has not checked anything yet.",
@@ -125,16 +119,14 @@ export const EveryKindScheduled: Story = {
 			}),
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /start checking/i })).not.toBeInTheDocument();
 	},
 };
 
 export const CouldNotLoad: Story = {
 	args: { isError: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText(/recurring checks couldn't be loaded/i);
 		// The failure is about this screen, not the workspace: read as "stopped", it costs a second
 		// check scheduled over the same work.

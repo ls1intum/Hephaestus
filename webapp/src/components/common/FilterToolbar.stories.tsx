@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import { FilterToolbar } from "./FilterToolbar";
 
 const meta = {
@@ -18,8 +18,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByText("Filter controls");
 		await expect(canvas.queryByRole("button", { name: "Reset" })).not.toBeInTheDocument();
 	},
@@ -27,8 +26,8 @@ export const Default: Story = {
 
 export const Filtered: Story = {
 	args: { hasFilter: true },
-	play: async ({ args, canvasElement }) => {
-		await userEvent.click(within(canvasElement).getByRole("button", { name: "Reset" }));
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Reset" }));
 		await expect(args.onReset).toHaveBeenCalledOnce();
 	},
 };

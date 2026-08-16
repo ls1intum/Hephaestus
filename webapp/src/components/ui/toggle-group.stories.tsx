@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { CodeIcon, TextIcon } from "lucide-react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
 /**
@@ -56,9 +56,12 @@ function ViewSwitch({ orientation }: { orientation?: "horizontal" | "vertical" }
  * visual axis stays readable from `data-orientation` for styling.
  */
 export const HorizontalHasNoAriaOrientation: Story = {
+	// The point of these three is a whole configured group, so `args` never reaches the primitive and
+	// the panel would edit nothing. Disabled rather than left to look live.
+	parameters: { controls: { disable: true } },
 	render: () => <ViewSwitch />,
-	play: async ({ canvasElement }) => {
-		const group = within(canvasElement).getByRole("group", {
+	play: async ({ canvas }) => {
+		const group = canvas.getByRole("group", {
 			name: "How to show the feedback",
 		});
 		await expect(group).not.toHaveAttribute("aria-orientation");
@@ -71,9 +74,10 @@ export const HorizontalHasNoAriaOrientation: Story = {
  * moves focus with Up/Down rather than Left/Right — without the attribute coming back.
  */
 export const VerticalHasNoAriaOrientation: Story = {
+	parameters: { controls: { disable: true } },
 	render: () => <ViewSwitch orientation="vertical" />,
-	play: async ({ canvasElement }) => {
-		const group = within(canvasElement).getByRole("group", {
+	play: async ({ canvas }) => {
+		const group = canvas.getByRole("group", {
 			name: "How to show the feedback",
 		});
 		await expect(group).not.toHaveAttribute("aria-orientation");
@@ -86,6 +90,7 @@ export const VerticalHasNoAriaOrientation: Story = {
  * suppression sits before the prop spread, so it is a default and not a lock.
  */
 export const ExplicitAriaOrientationSurvives: Story = {
+	parameters: { controls: { disable: true } },
 	render: () => (
 		<ToggleGroup
 			role="toolbar"
@@ -99,8 +104,8 @@ export const ExplicitAriaOrientationSurvives: Story = {
 			<ToggleGroupItem value="source">Source</ToggleGroupItem>
 		</ToggleGroup>
 	),
-	play: async ({ canvasElement }) => {
-		const group = within(canvasElement).getByRole("toolbar", {
+	play: async ({ canvas }) => {
+		const group = canvas.getByRole("toolbar", {
 			name: "How to show the feedback",
 		});
 		await expect(group).toHaveAttribute("aria-orientation", "horizontal");

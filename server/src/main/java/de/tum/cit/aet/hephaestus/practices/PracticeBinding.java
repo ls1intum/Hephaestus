@@ -136,16 +136,12 @@ public record PracticeBinding(
      * this method exists to prevent and the reverse merely withholds.
      */
     public static ActorRole subjectRoleOf(List<PracticeBinding> bindings, @Nullable SignalName signal) {
-        ActorRole role = ActorRole.AUTHOR;
         for (PracticeBinding binding : bindings) {
-            if (signal == null || binding.matches(signal)) {
-                if (binding.subject() != ActorRole.AUTHOR) {
-                    return binding.subject();
-                }
-                role = binding.subject();
+            if ((signal == null || binding.matches(signal)) && binding.subject() != ActorRole.AUTHOR) {
+                return binding.subject();
             }
         }
-        return role;
+        return ActorRole.AUTHOR;
     }
 
     /**

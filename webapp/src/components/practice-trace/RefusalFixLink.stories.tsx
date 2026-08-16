@@ -72,8 +72,8 @@ export const ASectionOfTheReviewPage: Story = {
 /** A cooldown expires on its own, so there is nothing to send an admin to. */
 export const NoFixForThisReason: Story = {
 	args: { reason: "COOLDOWN_ACTIVE" },
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByRole("link")).toBeNull();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("link")).toBeNull();
 	},
 };
 

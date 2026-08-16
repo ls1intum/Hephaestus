@@ -178,7 +178,7 @@ export const Mobile: Story = {
 		total: 7,
 	},
 	parameters: { chromatic: { viewports: [320] }, viewport: { defaultViewport: "reflow" } },
-	play: async ({ canvasElement }) => {
-		await within(canvasElement).findByTitle("Outcome: Delivered");
+	play: async ({ canvas }) => {
+		await canvas.findByTitle("Outcome: Delivered");
 	},
 };

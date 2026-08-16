@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, screen, userEvent, within } from "storybook/test";
+import { expect, screen, userEvent } from "storybook/test";
 import { CookieConsentBanner } from "@/components/consent/CookieConsentBanner";
 import {
 	CONSENT_STORAGE_KEY,
@@ -41,8 +41,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Shows the current choice and re-opens the consent banner on demand. */
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		canvas.getByRole("heading", { name: /^privacy$/i });
 		// The banner is hidden while a decision is stored.
 		await expect(screen.queryByRole("region", { name: /your privacy/i })).not.toBeInTheDocument();
