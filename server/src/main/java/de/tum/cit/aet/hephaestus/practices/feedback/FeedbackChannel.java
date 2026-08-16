@@ -8,10 +8,32 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * ({@link Feedback#getRecipientUserId()}), never to a mentor, instructor, or grader. The system has no
  * facilitator/evaluative delivery channel.
  *
- * <p>Constrained at the DB by {@code chk_feedback_channel}. {@code REFLECTION} names how the developer
- * engages with the feedback, not where it is stored — the three values are the task, self-regulation and
- * process levels of Hattie &amp; Timperley's model. It was briefly {@code REFLECTION_DASHBOARD} (dropped
- * for naming a page) and then {@code PROFILE} (dropped for colliding with the public user profile).
+ * <p><b>All three names sit on one axis: where the unit lands.</b> Not what the developer is supposed to
+ * do with it, not what cognitive level it addresses. The one question a reader raises here is that the
+ * mentor also renders inside the app, so read the two private values this way:
+ *
+ * <ul>
+ *   <li>{@link #IN_CHAT} is the <b>dialogic</b> channel — a turn in a conversation, wherever that
+ *       conversation runs: the in-app mentor at {@code /w/:slug/mentor}, or Slack. The surface it renders
+ *       on is not what makes it {@code IN_CHAT}; being a turn is.</li>
+ *   <li>{@link #IN_APP} is the <b>non-dialogic</b> practice surface — the developer's own practice pages.
+ *       Nobody replies to it.</li>
+ * </ul>
+ *
+ * <p>Ask <em>is it a turn?</em> before <em>which screen?</em>, and the two never overlap.
+ *
+ * <p>Constrained at the DB by {@code chk_feedback_channel}. The three values happen to line up with the
+ * task, self-regulation and process levels of Hattie &amp; Timperley's model (ADR 0029), but they are not
+ * named for it: a channel is a destination, and a level is a claim about content that the destination
+ * does not enforce.
+ *
+ * <p><b>{@code IN_APP} has been renamed three times; this is the last one.</b> It was
+ * {@code REFLECTION_DASHBOARD} (dropped for naming a page), then {@code PROFILE} (dropped for colliding
+ * with the public user profile), then {@code REFLECTION} — dropped because it named what the developer is
+ * supposed to <em>do</em> rather than where the feedback lands, because it asserted an outcome the system
+ * cannot observe (nothing here can tell whether anyone reflected), and because two Java packages named
+ * {@code reflection} collide with {@code java.lang.reflect} in every reader's head. A future value goes on
+ * this same axis or not at all.
  *
  * <p>This is the destination a delivery is recorded against, not the thing that does the delivering:
  * the vendor pipes are {@code integration.core.spi.SummaryChannel}, {@code InlineFindingChannel} and
@@ -22,8 +44,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 public enum FeedbackChannel {
     /** Placed directly on the work artifact (PR summary / inline note, issue comment). */
     IN_CONTEXT,
-    /** A turn in an ongoing mentor conversation with the recipient. */
-    CONVERSATION,
-    /** Aggregated onto the recipient's own reflection surface inside Hephaestus. */
-    REFLECTION,
+    /** A turn in an ongoing mentor conversation with the recipient — the in-app mentor, or Slack. */
+    IN_CHAT,
+    /** Aggregated onto the recipient's own practice pages inside Hephaestus. Nobody replies to it. */
+    IN_APP,
 }

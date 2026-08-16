@@ -96,7 +96,7 @@ public class ObservationService {
         return observationRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
     }
 
-    /** Look-back for the reflection surface — mirrors the mentor's findings window. */
+    /** Look-back for the reflection read model — mirrors the mentor's findings window. */
     private static final int REFLECTION_LOOKBACK_DAYS = 90;
     /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
@@ -115,14 +115,14 @@ public class ObservationService {
 
     /**
      * The lanes whose text this read model's {@code guidance} means: the ones that speak about the one
-     * observation they are bound to. A {@code REFLECTION} unit is excluded because it is a message about a
+     * observation they are bound to. A {@code IN_APP} unit is excluded because it is a message about a
      * habit across several pieces of work — it binds every problem behind it as evidence, so it would
      * answer "what did you tell me about this finding" with a paragraph that is explicitly not about it.
      * Named here rather than defaulted in the query so a fourth lane has to be admitted deliberately.
      */
     private static final List<String> GUIDANCE_CHANNELS = List.of(
         FeedbackChannel.IN_CONTEXT.name(),
-        FeedbackChannel.CONVERSATION.name()
+        FeedbackChannel.IN_CHAT.name()
     );
 
     /**
@@ -171,6 +171,7 @@ public class ObservationService {
         // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can
         // show what was actually delivered (null when nothing was). One query, not N+1.
         Map<UUID, String> deliveredGuidance = deliveredGuidanceByObservation(
+            workspaceId,
             observations.stream().map(Observation::getId).collect(Collectors.toSet())
         );
 
@@ -346,18 +347,23 @@ public class ObservationService {
      * The delivered feedback body for a single observation — the developer's advice source for the detail view
      * (ADR 0021: advice lives on the delivered {@code Feedback}, not the immutable observation). Null when the
      * observation was never delivered. Callers pass this into {@code ObservationDetailDTO.from}.
+     *
+     * <p>Takes the workspace even though the observation id alone identifies a row: the body it returns
+     * belongs to a feedback unit, and feedback is tenant-scoped whatever the observation is.
      */
     @Transactional(readOnly = true)
-    public Optional<String> getDeliveredGuidance(UUID observationId) {
-        return Optional.ofNullable(deliveredGuidanceByObservation(Set.of(observationId)).get(observationId));
+    public Optional<String> getDeliveredGuidance(Long workspaceId, UUID observationId) {
+        return Optional.ofNullable(
+            deliveredGuidanceByObservation(workspaceId, Set.of(observationId)).get(observationId)
+        );
     }
 
-    private Map<UUID, String> deliveredGuidanceByObservation(Set<UUID> observationIds) {
+    private Map<UUID, String> deliveredGuidanceByObservation(Long workspaceId, Set<UUID> observationIds) {
         if (observationIds.isEmpty()) {
             return Map.of();
         }
         return feedbackObservationRepository
-            .findLatestAdviceBodiesByObservationIds(observationIds, GUIDANCE_CHANNELS)
+            .findLatestAdviceBodiesByObservationIds(workspaceId, observationIds, GUIDANCE_CHANNELS)
             .stream()
             .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
     }

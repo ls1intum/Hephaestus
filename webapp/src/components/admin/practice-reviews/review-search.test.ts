@@ -12,7 +12,7 @@ describe("practice review search", () => {
 	it("canonicalizes invalid URL filters", () => {
 		const feedback = feedbackSearchSchema.parse({
 			deliveryState: ["DELIVERED", "made-up"],
-			channel: ["REFLECTION", "CONVERSATION", "made-up"],
+			channel: ["IN_APP", "IN_CHAT", "made-up"],
 			from: "not-a-date",
 			page: -4,
 		});
@@ -24,10 +24,10 @@ describe("practice review search", () => {
 		});
 
 		expect(feedback).toMatchObject({ deliveryState: ["DELIVERED"] });
-		// REFLECTION survives now that the reflection lane has a producer and the toolbar offers the place:
+		// IN_APP survives now that the in-app lane has a producer and the toolbar offers the place:
 		// a filter the toolbar cannot show would be applied with nothing on screen saying so and no way
 		// to clear it short of a full reset, which is why `made-up` still goes.
-		expect(feedback.channel).toEqual(["REFLECTION", "CONVERSATION"]);
+		expect(feedback.channel).toEqual(["IN_APP", "IN_CHAT"]);
 		expect(feedback.from).toBeUndefined();
 		expect(feedback.page).toBeUndefined();
 		expect(findings).toMatchObject({ assessment: ["GOOD"], severity: ["MAJOR"] });

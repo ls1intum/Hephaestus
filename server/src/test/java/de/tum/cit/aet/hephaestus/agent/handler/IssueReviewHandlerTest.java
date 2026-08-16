@@ -15,8 +15,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
@@ -26,7 +28,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
@@ -34,8 +39,11 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -151,6 +159,45 @@ class IssueReviewHandlerTest extends BaseUnitTest {
         @Test
         void returnsIssueReview() {
             assertThat(handler.jobType()).isEqualTo(AgentJobType.ISSUE_REVIEW);
+        }
+    }
+
+    /**
+     * Which surfaces the composition turn is told it may write for. An in-context unit is a note on a line
+     * and the runner refuses one that is not anchored inside a diff, so a lane an issue cannot reach is
+     * closed here, at the occasion — the alternative, loosening what counts as anchorable, would invent
+     * placements rather than remove them.
+     */
+    @Nested
+    class ComposableLanes {
+
+        @Test
+        void anIssueHasNoInlineLaneAndSoComposesNoInContextNote() {
+            assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.ISSUE)).isFalse();
+            assertThat(IssueReviewHandler.ISSUE_REVIEW_CHANNELS).doesNotContain(FeedbackChannel.IN_CONTEXT);
+        }
+
+        /** The two longitudinal lanes are the point of composing on an issue at all, so both stay open. */
+        @Test
+        void theLongitudinalLanesStayOpen() {
+            assertThat(IssueReviewHandler.ISSUE_REVIEW_CHANNELS).containsExactlyInAnyOrder(
+                FeedbackChannel.IN_APP,
+                FeedbackChannel.IN_CHAT
+            );
+        }
+
+        /** Closed by being named and disabled, so the composer is told the surface exists and is shut. */
+        @Test
+        void theClosedLaneIsStillNamedInTheStagedRequest() {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            FeedbackCompositionInputs.stage(files, ObservationOrigin.LIVE, IssueReviewHandler.ISSUE_REVIEW_CHANNELS);
+
+            JsonNode channels = objectMapper
+                .readTree(new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8))
+                .get("channels");
+            assertThat(channels.get(FeedbackChannel.IN_CONTEXT.name()).get("enabled").asBoolean()).isFalse();
+            assertThat(channels.get(FeedbackChannel.IN_APP.name()).get("enabled").asBoolean()).isTrue();
+            assertThat(channels.get(FeedbackChannel.IN_CHAT.name()).get("enabled").asBoolean()).isTrue();
         }
     }
 

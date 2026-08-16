@@ -23,7 +23,7 @@ import tools.jackson.databind.JsonNode;
 
 /**
  * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
- * {@link ConversationRoutingDecision#ADMIT admitted} to the CONVERSATION channel iff ALL of: its provenance admits the
+ * {@link ConversationRoutingDecision#ADMIT admitted} to the IN_CHAT channel iff ALL of: its provenance admits the
  * conversation channel, its practice's autonomy tier admits the conversation channel, author-targeted, a
  * {@link Assessment#BAD} problem, has no natural inline anchor, and does not share a {@code recurrence_key} with a
  * DELIVERED IN_CONTEXT unit for the same recipient. Every other case is a named, testable non-admission reason.
@@ -85,8 +85,8 @@ public class FeedbackChannelRouter {
     ) {
         // Provenance and tier in one predicate, so this path and the in-context one cannot drift on what
         // "may we say this here" means.
-        if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, FeedbackChannel.CONVERSATION)) {
-            return observation.getOrigin().delivers(FeedbackChannel.CONVERSATION)
+        if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, FeedbackChannel.IN_CHAT)) {
+            return observation.getOrigin().delivers(FeedbackChannel.IN_CHAT)
                 ? ConversationRoutingDecision.PRACTICE_TIER_QUIET
                 : ConversationRoutingDecision.BACKFILL_QUIET;
         }

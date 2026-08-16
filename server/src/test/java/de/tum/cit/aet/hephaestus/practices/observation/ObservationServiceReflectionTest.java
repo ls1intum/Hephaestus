@@ -38,7 +38,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Pageable;
 
 /**
- * Guards the reflection surface's severity sort, which orders a card's "to work on" items CRITICAL-first.
+ * Guards the reflection read model's severity sort, which orders a card's "to work on" items CRITICAL-first.
  * A BAD observation can legitimately carry a {@code null} severity (the band is only meaningful when the
  * detector assigned one); a naive {@code Comparator.comparingInt(severity::ordinal)} NPEs the whole
  * {@code /reflection} endpoint. The sort treats {@code null} as least-severe, so it must not throw and the
@@ -156,7 +156,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -188,7 +190,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(lowConfCritical, confidentMinor));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -217,7 +221,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(q1, q2));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -242,7 +248,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(minorTargetB, criticalTargetA));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -270,7 +278,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 
@@ -300,7 +310,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(locusOnA, locusOnB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
 

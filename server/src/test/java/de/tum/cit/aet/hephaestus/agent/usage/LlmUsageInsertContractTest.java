@@ -154,6 +154,20 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         return columns;
     }
 
+    /**
+     * A {@code <rollback>} states how to undo a change, not what the table holds. Its {@code dropColumn}
+     * describes removing the column the same changeSet just added, so replaying it would cancel the add
+     * and leave the reader believing a shipped column does not exist.
+     */
+    private static boolean insideRollback(Element element) {
+        for (Node node = element.getParentNode(); node != null; node = node.getParentNode()) {
+            if ("rollback".equals(node.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static List<Resource> changelogsInApplyOrder() {
         Resource[] found;
         try {
@@ -185,7 +199,7 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         NodeList elements = parse(bytes, changelog).getElementsByTagName("*");
         for (int i = 0; i < elements.getLength(); i++) {
             Element element = (Element) elements.item(i);
-            if (!TABLE.equals(element.getAttribute("tableName"))) {
+            if (!TABLE.equals(element.getAttribute("tableName")) || insideRollback(element)) {
                 continue;
             }
             switch (element.getNodeName()) {

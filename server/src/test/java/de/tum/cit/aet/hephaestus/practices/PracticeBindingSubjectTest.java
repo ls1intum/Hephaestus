@@ -12,7 +12,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Whose conduct an occasion judges — the fact that decides which person an observation is filed
- * against, and therefore whose reflection surface it can reach.
+ * against, and therefore whose practice pages it can reach.
  */
 class PracticeBindingSubjectTest extends BaseUnitTest {
 

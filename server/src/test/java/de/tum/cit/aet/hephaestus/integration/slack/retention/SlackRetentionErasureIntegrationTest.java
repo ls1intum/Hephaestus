@@ -250,7 +250,7 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
                 .artifactId(threadId)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
-                .channel(FeedbackChannel.CONVERSATION)
+                .channel(FeedbackChannel.IN_CHAT)
                 .position((int) (threadId % 1000))
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)

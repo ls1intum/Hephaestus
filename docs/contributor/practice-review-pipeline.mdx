@@ -2,7 +2,7 @@
 id: practice-review-pipeline
 sidebar_position: 1
 title: Practice review pipeline
-description: The four stages a practice review passes through, the refusal vocabulary each one owns, and where the work actually runs.
+description: The four stages a practice review passes through, the refusal vocabulary each one owns, the seam between measuring and saying something, and where the work actually runs.
 ---
 
 A practice review passes through four stages, in this order: **Occasion**, **Capture**, **Observation**,
@@ -182,13 +182,234 @@ Identity is assigned at persistence, not by the detector: an occurrence key dedu
 (`insertIfAbsent`, `ON CONFLICT DO NOTHING`), and a recurrence key hashes the locus so the same observation
 is recognisable across runs.
 
-**Guidance is authored inline by the detector, and Delivery is not where wording is decided.**
-`DeliveryComposer`'s own contract says so: an observation's reasoning and guidance are written by the
-detector, and the renderer only sanitises and lays them out. The composer reads
-`guidance()` and never writes one. There is exactly one delivery-time-authored layer — the catalogue's
-transferable principle (`Practice.whyItMatters`), which the server supplies verbatim precisely because the
-model is told not to write it and so cannot fabricate or drift it. If feedback reads badly, the prompt and
-the catalogue are where you look; the composer will not save you.
+**An observation carries `reasoning` and no advice.** `reasoning` is the measurement's own
+justification — *"the change adds a tax-exempt branch, and no test file in this diff calls `total`"* —
+and it is the only prose the observation persists. The detector also emits a `guidance` string, but
+that string is not a column and never becomes one: advice is a property of a *delivery*, so it lives on
+the feedback ledger instead (ADR 0021, ADR 0022). What `guidance` is still for is the subject of the
+next section.
+
+## Measurement and intervention
+
+Everything above this line is the system taking a reading. Everything below it is the system deciding
+to say something to a person. Those are two different acts, they run as two separate model turns
+inside one agent job, and keeping them apart is the reason one fact can read three different ways.
+
+**A measurement is falsifiable.** *"This change adds a tax-exempt branch, and nothing in the change
+tests it"* is either true or false, and you check it by opening the file. It says nothing about what
+anybody should do, and like any instrument reading it is kept forever, unedited, so later readings can
+be compared with it.
+
+**An intervention cannot be true or false.** *"Write the assertion that distinguishes the new branch
+before you write the branch"* is only useful or useless, and whether it is useful depends entirely on
+who is reading it, where they are reading it, what they were told last week, and whether anybody has
+said it to them already.
+
+The line the code draws, stated once so it fits in a prompt: **if you can check it by reading the
+artifact, it is measurement; if you can only check it by watching what the person does next, it is
+intervention.**
+
+They are separated because the good version of each ruins the other. A measurement authored as advice
+starts bending toward whatever makes good advice — the finding you can write a nice tip about gets
+reported, the one you cannot gets quietly dropped. And advice written at the moment of measurement can
+only ever be about the one thing just measured: it cannot know that this is the third time, it cannot
+know the developer was already told, and it cannot decide to stay quiet.
+
+```mermaid
+flowchart TB
+    work["A piece of work"] --> measure
+
+    subgraph phase1["Phase 1 — measurement"]
+        measure["Read the work against each practice"]
+        measure --> obs["Observations: what is there,<br/>with the citation that proves it.<br/>Kept forever, never edited."]
+    end
+
+    obs --> compose
+    record["Everything measured before<br/>about this person"] --> compose
+    said["Everything already said to them,<br/>and everything queued but unread"] --> compose
+
+    subgraph phase2["Phase 2 — intervention"]
+        compose["Decide what is worth saying now,<br/>to whom, and on which surface"]
+        compose --> incontext["IN_CONTEXT: this change, one edit"]
+        compose --> page["IN_APP: the habit, one thing to try"]
+        compose --> chat["IN_CHAT: a question, then the evidence"]
+        compose --> quiet["WITHHOLD: say nothing,<br/>recorded with a reason"]
+    end
+
+    incontext --> gate{"Admission, tier, routers, caps"}
+    page --> gate
+    chat --> gate
+    gate --> ledger["The feedback ledger"]
+```
+
+Note where the arrows converge. **The model proposes; the server admits.** Every gate that existed
+before composition still sits after it — `FeedbackAdmission.delivers(origin, tier, channel)`,
+`FeedbackChannelRouter`, `InAppFeedbackRouter`, the in-context admission gate and every per-lane
+cap. Giving the model more context is not a reason to relax the gate; it is a reason the gate has more
+to refuse.
+
+### Phase 2, concretely
+
+`runCompositionStage` in `pi-runner.mjs` opens a **separate in-memory session** with exactly three
+tools — `read`, `grep` and `report_feedback`. No `bash`, and no `report_finding`, so the stage cannot
+touch the review's own result file. It is a separate session rather than another turn on the review's
+for two reasons worth keeping: re-using the review's session would re-bill the whole conversation, and
+it would invite the composer to treat its own reasoning as evidence.
+
+It is prompted with `agent/feedback-composer.md` and reads:
+
+| Input | Where | Staged by |
+| --- | --- | --- |
+| This run's observations, projected | `work/composition/observations.json` | the runner itself, from the review's result file |
+| Prior observations about this person | `inputs/history/observations.json` | `ReviewHistoryContentSource` — 90 days, at most 50 |
+| Feedback already delivered | `inputs/history/feedback.json` | the same, at most 30 |
+| Feedback prepared but not yet read | `inputs/history/prepared.json` | the same, at most 20 |
+| How each measured locus moved | `inputs/history/delta.json` | the same, computed by `ObservationDelta` |
+| The practices, by slug | `inputs/practices/index.json`, `inputs/practices/<slug>.md` | `PracticeCatalogInjector` |
+| Which lanes are open, and how many messages each may carry | `inputs/feedback-composition.json` | `FeedbackCompositionInputs` |
+
+Output is `out/feedback.json`, parsed by `FeedbackCompositionResultParser` into `ComposedFeedbackUnit`s.
+
+Three properties of that list matter more than the paths:
+
+- **Presence of `inputs/feedback-composition.json` is the on switch, and it carries the lane set.**
+  Only `PullRequestReviewHandler` and `IssueReviewHandler` stage it, and never for a `BACKFILL` origin.
+  A document or conversation-thread review composes nothing at all, which is not an oversight — the
+  file's absence is how a handler says "review, but do not compose", and that is what every review did
+  before this existed. The lane set is carried rather than inferred so that a stage with no artifact in
+  hand can disable `IN_CONTEXT` from the outside; that is the seam a scheduled workspace sweep will use.
+- **The history window is never reported `COMPLETE`.** It is a bounded read of a record that keeps
+  growing, so it can show that something recurred but never that something has never happened before.
+- **The delta is arithmetic, not judgement.** `ObservationDelta.classify` groups a person's window by
+  artifact, treats the newest run of each artifact as "now", and returns `NEW`, `RECURRING` (still
+  there and the assessment or severity moved), `UNCHANGED` (still there, nothing moved) or `RESOLVED`.
+  `RESOLVED` is the whole reason it exists: *"the gap from last week is closed"* originates from a locus
+  that is in the prior set and absent from the newest run, so no mapping that walks this run's
+  observations can ever reach it. A vanished *strength* is deliberately not `RESOLVED` — that would
+  credit somebody with fixing what was already right. And because the recurrence key folds the artifact
+  id, the delta can never say "this keeps happening across your work"; that claim comes from the staged
+  observation history, and the composer has to clear a distinct-artifact floor to make it.
+
+### The three channels are three levels
+
+`FeedbackChannel` is not three renderers of one message. Each value is a different level of Hattie &
+Timperley's model, which is why the mapping from observations to feedback is not 1:1 in either
+direction. All three names answer one question — *where does this land?* — and
+[ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)
+records why the lane once called `REFLECTION` is not named for what the developer is meant to do with it.
+
+| | `IN_CONTEXT` | `IN_APP` | `IN_CHAT` |
+| --- | --- | --- | --- |
+| Lands | on the work artifact — pull request summary or inline note, issue comment | on the developer's own practice pages | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
+| Level | task | process | self-regulation |
+| Answers | "what is wrong here?" | "what keeps happening in how I work?" | "how would I have caught this myself?" |
+| Audience | public — the team reads it | private, to the developer alone | private, in a live mentor turn |
+| Evidence is | a quoted line, spliced by the server from the citation | several pieces of work, named | the same, held back until they answer |
+| Next step is | one edit, in this change | a habit, for next time | a self-check they commit to |
+| `whyItMatters` | appended verbatim by the server | situated by the composer, never appended | not used |
+| Anchor | required, and only onto this change's diff | forbidden | forbidden |
+| Messages per run | at most 3 | at most 2 | at most 3 |
+
+**The mentor renders in the app too, and that does not make it `IN_APP`.** `IN_CHAT` is the *dialogic*
+channel — the unit becomes a turn the developer can answer — wherever the conversation runs. `IN_APP` is
+the *non-dialogic* practice surface — the unit is written down, and reading it is the whole interaction.
+Ask *is it a turn?* before asking *which screen?*: a new written surface inside Hephaestus is `IN_APP`,
+and a mentor that moves to another chat product is still `IN_CHAT`.
+
+Two of the rows are the load-bearing ones. The public lane never says *"you keep doing this"* — that
+is a performance review in front of the team — even though the composer knows it. The private lanes
+never re-quote a line of code, because the line is already on the merge request where it can be read
+in context. Neither rule is achievable by templating one advice string over three surfaces, which is
+what the system did before.
+
+An issue review has no diff to anchor to, so `IssueReviewHandler.ISSUE_REVIEW_CHANNELS` is written as
+the complement of `IN_CONTEXT` rather than as a list — a fourth channel would join it by default, which
+is the safe direction. The per-lane message caps above restate caps the lanes themselves own;
+`FeedbackCompositionCapsTest` is what stops the two copies drifting.
+
+`IN_CHAT` is composed as a **move**, not a script: an `opener` (a question asked before anything
+is told), the `evidence` (shown only once they answer), and the `target` (what the turn should leave
+them able to do). It is stored as JSON on `feedback.body` via `ConversationBriefBody` and handed to the
+mentor under a `move` key by `PreparedConversationFeedbackContentSource` — deliberately never under
+`body` or `message`, because it is not text to speak. The mentor still writes the words of the turn, so
+nothing goes stale waiting to be raised. A unit with no composed move has that key **missing**, not
+empty, so "the composer said nothing here" cannot read as "the composer had nothing to say".
+
+### What the composer is not allowed to do
+
+The tool schema and `FeedbackCompositionResultParser` refuse the same four things, once in the sandbox
+and once on the server, for the reason every other guard on this pipeline is doubled — a guard the
+constrained party can skip is advice, not a boundary. The parser never throws; a unit it cannot accept
+is dropped and logged.
+
+- **No verdict fields.** `report_feedback` takes no presence, assessment, severity or confidence. An
+  intervention that could carry a verdict would eventually be read back as one.
+- **No typed citation, path or line number.** An `IN_CONTEXT` unit names `{ observationId,
+  citationIndex }` and the server resolves the file, side and line from that observation's own
+  citation — and refuses a citation whose `anchorable` flag is false, meaning it does not fall inside
+  this change's diff. The composer therefore *cannot* invent an anchor, which retires the class of
+  failure that grounding checks previously had to catch after the fact.
+- **No invented supersession target.** `action: "SUPERSEDE"` must name a `threadKey` that was staged in
+  `prepared.json`.
+- **No second message on the same lane about the same practice.** One unit per `(channel,
+  practiceSlug)`; the rest are dropped.
+
+Staying quiet is the fourth action, not a gap: `action: "WITHHOLD"` with `NO_MATERIAL_CHANGE`,
+`ALREADY_SAID` or `BELOW_BAR`. That enum is deliberately **not** `FeedbackSuppressionReason` — a
+withhold reason is the composer's own judgement, and `FeedbackSuppressionReason` is a database check
+constraint listing reasons the *server* refused. Merging them would make "we had nothing worth saying"
+indistinguishable from "the tier held it back".
+
+### Supersession — nothing received may be un-said
+
+`FeedbackThreadKey` is one hash over `kind ␟ locus ␟ recipient ␟ channel`. The longitudinal lanes call
+`forPractice(practiceSlug, recipientUserId, channel)`, because a habit claim is about the practice
+rather than about one merge request: a second card about the same habit should replace the queued
+first, not stack beside it. The in-context lane keys on the artifact, as it always did.
+
+`FeedbackSupersession` is a per-channel compare-and-swap. It finds the latest row on the thread, then
+runs `UPDATE feedback SET delivery_state='SUPERSEDED' WHERE id = ? AND delivery_state='PREPARED'`,
+retrying a bounded number of times while the head of the thread keeps moving. There are three outcomes
+and **the new unit is written in all three**:
+
+| Outcome | What happened | `replaces_id` |
+| --- | --- | --- |
+| `SUPERSEDED` | A queued message was claimed and retired | the retired row |
+| `CONTINUED` | The recipient read it first; it keeps `DELIVERED` | the row that was read |
+| `NEW` | Nothing live on the thread | not set |
+
+`DELIVERED` is never retired on the longitudinal lanes, because on those lanes delivered means *read*.
+The in-context lane still retires a `DELIVERED` summary, and that is not an exception to the rule: the
+provider comment is **edited in place**, so the old text stops being visible and the ledger has to say
+so.
+
+`thread_key` stays non-unique. A thread is a chain of rows over time; the uniqueness that matters — at
+most one live `PREPARED` per thread — is the compare-and-swap's job, not a constraint's. And the two
+mechanisms here have two different jobs that should not be merged: **the compare-and-swap protects the
+ledger's integrity, and the per-practice cooldown protects the developer's inbox.** The swap cannot
+stop a near-duplicate and is not meant to.
+
+### When composition does not run
+
+It is allowed to fail, and the design leans on that. The stage runs on whatever budget the review left
+over, ceilinged at `max(60s, 15% of the agent budget)` with a 30-second floor below which it is skipped
+outright; a prompt error is caught and logged, a watchdog abort is logged, and the review's exit code
+is unaffected. `out/feedback.json` is rewritten on every accepted tool call, so a stage killed
+mid-flight still leaves behind what it had already decided — and it is written even when empty, because
+"the composer looked and composed nothing" is a different fact from "the stage never ran".
+
+Each lane absorbs that differently, and the difference is the design:
+
+- **In context has a fallback, so it needs no durability.** `DeliveryComposer` prefers the composed
+  unit for a practice and otherwise renders the finding's own `reasoning` and `guidance`. That fallback
+  is not a degraded stub — it is exactly the comment that shipped before composition existed. **This is
+  why `report_finding` still requires `guidance` even though `guidance` is still not a column:** it is
+  the floor under a stage that is permitted to fail.
+- **The longitudinal lanes have no fallback, so they are made durable instead.** `agent_job` carries a
+  per-lane preparation mark recording that a lane ran at all, and
+  `FeedbackLanePreparationSweeper` re-runs any lane whose async listener did not. It selects on the
+  **missing mark**, never on missing feedback rows, because both lanes legitimately prepare nothing —
+  and it leaves a short settling window so it does not race a submission still queued in the async pool.
 
 ## Delivery
 
@@ -216,8 +437,6 @@ flowchart LR
     AND -->|yes| S["composed and sent"]
 ```
 
-
-
 - **`PracticeReviewTier`** — how much autonomy the system has over this practice: `OFF`, `PROPOSE`,
   `DELIVER`. Only `DELIVER` delivers. `PROPOSE` runs the review and records every observation, and those
   observations are dropped before a body is composed, so nothing is sent and nothing is stored to send later.
@@ -226,15 +445,17 @@ flowchart LR
   axis narrowing *where* a delivering practice may speak: `DELIVER` delivers wherever the reviewed work
   allows, and that is the whole decision.
 - **`ObservationOrigin`** — `LIVE` and `MANUAL` deliver everywhere; `BACKFILL` is entitled only to
-  `REFLECTION`. Withheld here means `BACKFILL_QUIET`.
+  `IN_APP`. Withheld here means `BACKFILL_QUIET`.
 
-`FeedbackChannel.REFLECTION` is the developer's own **My feedback** page: the process level of the three,
-where a habit that recurs across several pieces of their work is named along with what to do differently
-next time. Its body is the only text the system composes about a named person that the person is the sole
-audience for — `IN_CONTEXT` bodies are already public on the work, `CONVERSATION` bodies are NULL until
-the mentor speaks them — so an ArchUnit rule (`ReflectionChannelProducerArchTest`) keeps the set of
-classes that may write one or read one back small and named, and `ReviewFeedbackQueryService` withholds
-the body from every operator surface. The `BACKFILL` entitlement is a ceiling, not an instruction: a
+`FeedbackChannel.IN_APP` is the developer's own practice feedback: the process level of the three, where
+a habit that recurs across several pieces of their work is named along with what to do differently next
+time. It is composed, admitted and stored per developer and served to that developer alone from
+`GET /practices/feedback/in-app`; the developer's practice pages are where it will surface. Its body is
+the only text the system composes that is read verbatim by a named person who is its sole audience —
+`IN_CONTEXT` bodies are already public on the work, and an `IN_CHAT` body holds a *move* for the mentor
+rather than words for the developer (and is NULL when nothing was composed for the lane) — so an
+ArchUnit rule (`InAppChannelProducerArchTest`) keeps the set of classes that may write one or read one
+back small and named, and `ReviewFeedbackQueryService` withholds the body from every operator surface. The `BACKFILL` entitlement is a ceiling, not an instruction: a
 backfilled observation may reach only this channel, and the router refuses a cluster made entirely of
 backfilled measurements, so it is still measured and not delivered — by construction, not by
 configuration. `BACKFILL_QUIET` is deliberately distinct from `PRACTICE_TIER_QUIET` because a tier is a
@@ -305,8 +526,10 @@ The durable boundaries, which the implementation may reschedule freely behind:
 - **Observations** — the agent reports through `report_finding` (the sandbox contract keeps the older word);
   `PracticeDetectionResultParser` validates and never throws, and persistence assigns occurrence and
   recurrence identity.
-- **Feedback** — server-side composition, with every attempt, withholding, replacement and placement
-  recorded in the ledger.
+- **Feedback** — the agent reports through `report_feedback` in a second session;
+  `FeedbackCompositionResultParser` validates and never throws, and every attempt, withholding,
+  replacement and placement is recorded in the ledger. The seam itself is
+  [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md).
 
 When changing sandbox inputs or outputs: update the owning runtime type or parser first; update the ABI
 page only for a durable ABI change; add a behavioural test at the narrowest owning boundary; regenerate

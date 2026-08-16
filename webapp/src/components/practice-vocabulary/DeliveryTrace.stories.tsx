@@ -52,7 +52,7 @@ export const Withheld: Story = {
 export const PreparedForConversation: Story = {
 	args: {
 		feedback: {
-			channel: "CONVERSATION",
+			channel: "IN_CHAT",
 			deliveryState: "PREPARED",
 			createdAt: composedAt,
 		},
@@ -64,28 +64,28 @@ export const PreparedForConversation: Story = {
 };
 
 /**
- * The reflection lane waits on nobody: the developer opening their own feedback page is what delivers
+ * The in-app lane waits on nobody: the developer opening their own practice pages is what delivers
  * it, so the row must not borrow the conversation lane's words and promise a chat that will never
  * happen to it. The operator sees this much; the composed text is withheld from them.
  */
-export const PreparedForTheReflectionSurface: Story = {
+export const PreparedForThePracticePages: Story = {
 	args: {
 		feedback: {
-			channel: "REFLECTION",
+			channel: "IN_APP",
 			deliveryState: "PREPARED",
 			createdAt: composedAt,
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByText("Prepared for their feedback page");
-		canvas.getByText("On their feedback page");
+		canvas.getByText("Prepared for their practice pages");
+		canvas.getByText("On their practice pages");
 	},
 };
 
 export const DeliveredInConversation: Story = {
 	args: {
 		feedback: {
-			channel: "CONVERSATION",
+			channel: "IN_CHAT",
 			deliveryState: "DELIVERED",
 			createdAt: composedAt,
 			deliveredAt,
@@ -102,7 +102,7 @@ export const DeliveredInConversation: Story = {
 export const WithheldNeverRaised: Story = {
 	args: {
 		feedback: {
-			channel: "CONVERSATION",
+			channel: "IN_CHAT",
 			deliveryState: "SUPPRESSED",
 			suppressionReason: "CONVERSATION_EXPIRED",
 			createdAt: composedAt,

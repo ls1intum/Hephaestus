@@ -108,6 +108,7 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             0,
             1,
             price,
+            UsageProvenance.RUNNER,
             Instant.now()
         );
     }
@@ -569,6 +570,120 @@ class LlmUsageLedgerIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(
                 workspaceRepository.findById(workspace.getId()).orElseThrow().getMonthlyByoLlmBudgetUsd()
             ).isNull();
+        }
+    }
+
+    /**
+     * The one UPDATE the ledger allows, against the real table.
+     *
+     * <p>Its eight assignments are bound out of a single {@link LlmPriceSnapshot} by accessor name, and
+     * only a live database can say that each name reached the column it was meant for: a pair swapped
+     * between two same-typed rates costs money and is invisible to a mock. Each rate below is therefore a
+     * different number.
+     */
+    @Nested
+    @DisplayName("Applying a resolved price to an unpriced row")
+    class ApplyResolvedPrice {
+
+        private LlmUsageEvent unpricedRow(String slug) {
+            Workspace workspace = setupWorkspace(slug);
+            recordUnverifiable(
+                workspace.getId(),
+                agentSample(UUID.randomUUID(), 1, 1_000_000, pricedInstance("3.00", "9.00"))
+            );
+            LlmUsageEvent row = eventsOf(workspace).getFirst();
+            assertThat(row.getPricingState()).isEqualTo(PricingState.UNPRICED);
+            return row;
+        }
+
+        private int reprice(UUID eventId, BigDecimal costUsd, LlmPriceSnapshot price) {
+            Integer updated = transactionTemplate.execute(status ->
+                usageRepository.applyResolvedPrice(eventId, costUsd, price)
+            );
+            return updated == null ? 0 : updated;
+        }
+
+        private LlmUsageEvent reload(UUID eventId) {
+            return usageRepository.findById(eventId).orElseThrow();
+        }
+
+        @Test
+        @DisplayName("every part of the resolved price lands in its own column")
+        void theResolvedPriceIsWrittenColumnForColumn() {
+            LlmUsageEvent row = unpricedRow("reprice-columns");
+
+            int updated = reprice(
+                row.getId(),
+                new BigDecimal("1.234567"),
+                new LlmPriceSnapshot(
+                    FundingSource.INSTANCE,
+                    PricingState.PRICED,
+                    42L,
+                    84L,
+                    new BigDecimal("1.11"),
+                    new BigDecimal("2.22"),
+                    new BigDecimal("3.33"),
+                    new BigDecimal("4.44")
+                )
+            );
+
+            assertThat(updated).isEqualTo(1);
+            LlmUsageEvent repriced = reload(row.getId());
+            assertThat(repriced.getPricingState()).isEqualTo(PricingState.PRICED);
+            assertThat(repriced.getCostUsd()).isEqualByComparingTo("1.234567");
+            assertThat(repriced.getAppliedPriceId()).isEqualTo(42L);
+            assertThat(repriced.getAppliedWorkspaceModelId()).isEqualTo(84L);
+            assertThat(repriced.getAppliedPer1mInputUsd()).isEqualByComparingTo("1.11");
+            assertThat(repriced.getAppliedPer1mOutputUsd()).isEqualByComparingTo("2.22");
+            assertThat(repriced.getAppliedPer1mCacheReadUsd()).isEqualByComparingTo("3.33");
+            assertThat(repriced.getAppliedPer1mCacheWriteUsd()).isEqualByComparingTo("4.44");
+            // The measurement was never in question, and the purse that paid is not repriceable.
+            assertThat(repriced.getInputTokens()).isEqualTo(1_000_000L);
+            assertThat(repriced.getFundingSource()).isEqualTo(FundingSource.INSTANCE);
+        }
+
+        @Test
+        @DisplayName("a free model settles as a real zero, with no rate invented and none left behind")
+        void aNoChargePriceStoresZeroAndClearsEveryRate() {
+            LlmUsageEvent row = unpricedRow("reprice-no-charge");
+
+            int updated = reprice(
+                row.getId(),
+                BigDecimal.ZERO,
+                new LlmPriceSnapshot(FundingSource.INSTANCE, PricingState.NO_CHARGE, null, null, null, null, null, null)
+            );
+
+            assertThat(updated).isEqualTo(1);
+            LlmUsageEvent settled = reload(row.getId());
+            assertThat(settled.getPricingState()).isEqualTo(PricingState.NO_CHARGE);
+            assertThat(settled.getCostUsd()).isEqualByComparingTo("0");
+            // The provenance the admission guessed at is gone, not left pointing at a price nobody applied.
+            assertThat(settled.getAppliedPriceId()).isNull();
+            assertThat(settled.getAppliedPer1mInputUsd()).isNull();
+            assertThat(settled.getAppliedPer1mOutputUsd()).isNull();
+        }
+
+        @Test
+        @DisplayName("a row that is no longer unpriced is left exactly as it was")
+        void theUnpricedFenceHoldsAgainstASecondApplication() {
+            LlmUsageEvent row = unpricedRow("reprice-fence");
+            LlmPriceSnapshot resolved = new LlmPriceSnapshot(
+                FundingSource.INSTANCE,
+                PricingState.PRICED,
+                42L,
+                null,
+                new BigDecimal("1.11"),
+                null,
+                null,
+                null
+            );
+            assertThat(reprice(row.getId(), new BigDecimal("1.234567"), resolved)).isEqualTo(1);
+
+            // What a second pod, or a later sweep, would try: the amount somebody was charged is frozen.
+            int again = reprice(row.getId(), new BigDecimal("99.999999"), resolved);
+
+            assertThat(again).isZero();
+            assertThat(reload(row.getId()).getCostUsd()).isEqualByComparingTo("1.234567");
         }
     }
 }

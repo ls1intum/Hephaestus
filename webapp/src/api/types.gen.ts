@@ -2157,7 +2157,7 @@ export type ReviewObservationDetail = {
  */
 export type ReviewBoundFeedback = {
     agentJobId: string;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION';
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
     createdAt: Date;
     /**
      * When the message was placed; null if it was not delivered
@@ -2312,10 +2312,10 @@ export type ReviewFeedbackDetail = {
      */
     artifact?: ReviewArtifact;
     /**
-     * Stored composed body; null when none was produced, and always null on the REFLECTION channel — the developer's reflection surface is not readable by an operator
+     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's queued move is readable by an operator
      */
     body?: string;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION';
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
     createdAt: Date;
     /**
      * When the feedback was placed; null if it was not delivered
@@ -2404,7 +2404,7 @@ export type ReviewFeedback = {
      */
     bodyPreview?: string;
     bodyTruncated: boolean;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION';
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
     createdAt: Date;
     /**
      * When the feedback was placed; null if it was not delivered
@@ -2642,80 +2642,6 @@ export type ReflectionItem = {
      * The headline of the feedback
      */
     title: string;
-};
-
-/**
- * A process-level message on the developer's own reflection surface
- */
-export type ReflectionFeedback = {
-    /**
-     * Area display name; null when the practice has none
-     */
-    areaName?: string;
-    /**
-     * Area the practice sits in; null when the practice has none
-     */
-    areaSlug?: string;
-    /**
-     * The message, as Markdown; ends with the habit to try next
-     */
-    body: string;
-    /**
-     * The pieces of work the habit was observed on, newest first
-     */
-    evidence: Array<ReflectionEvidence>;
-    /**
-     * Short headline naming the habit, never the person
-     */
-    headline: string;
-    id: string;
-    /**
-     * How many pieces of work carry it — the length of the evidence list
-     */
-    occurrenceCount: number;
-    practiceName: string;
-    /**
-     * Practice this habit belongs to
-     */
-    practiceSlug: string;
-    /**
-     * When the message was composed
-     */
-    preparedAt: Date;
-    /**
-     * When this developer first opened it; null until they have
-     */
-    readAt?: Date;
-    /**
-     * What good looks like, in the learner's framing
-     */
-    whatGoodLooksLike?: string;
-    /**
-     * Why this practice matters, in the learner's framing
-     */
-    whyItMatters?: string;
-};
-
-/**
- * One piece of work the pattern was observed on
- */
-export type ReflectionEvidence = {
-    /**
-     * Identifier of the work within its kind
-     */
-    artifactId: number;
-    /**
-     * Kind of work, e.g. scm.pull_request
-     */
-    artifactKind: string;
-    /**
-     * When the measurement behind this occurrence was taken
-     */
-    observedAt: Date;
-    /**
-     * What the review recorded on this piece of work
-     */
-    title?: string;
 };
 
 /**
@@ -4443,6 +4369,80 @@ export type InitiateConnectionRequest = {
     userInput?: {
         [key: string]: string;
     };
+};
+
+/**
+ * A process-level message on the developer's own practice pages
+ */
+export type InAppFeedback = {
+    /**
+     * Area display name; null when the practice has none
+     */
+    areaName?: string;
+    /**
+     * Area the practice sits in; null when the practice has none
+     */
+    areaSlug?: string;
+    /**
+     * The message, as Markdown; ends with the habit to try next
+     */
+    body: string;
+    /**
+     * The pieces of work the habit was observed on, newest first
+     */
+    evidence: Array<InAppEvidence>;
+    /**
+     * Short headline naming the habit, never the person
+     */
+    headline: string;
+    id: string;
+    /**
+     * How many pieces of work carry it — the length of the evidence list
+     */
+    occurrenceCount: number;
+    practiceName: string;
+    /**
+     * Practice this habit belongs to
+     */
+    practiceSlug: string;
+    /**
+     * When the message was composed
+     */
+    preparedAt: Date;
+    /**
+     * When this developer first opened it; null until they have
+     */
+    readAt?: Date;
+    /**
+     * What good looks like, in the learner's framing
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in the learner's framing
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * One piece of work the pattern was observed on
+ */
+export type InAppEvidence = {
+    /**
+     * Identifier of the work within its kind
+     */
+    artifactId: number;
+    /**
+     * Kind of work, e.g. scm.pull_request
+     */
+    artifactKind: string;
+    /**
+     * When the measurement behind this occurrence was taken
+     */
+    observedAt: Date;
+    /**
+     * What the review recorded on this piece of work
+     */
+    title?: string;
 };
 
 export type ImpersonateRequest = {
@@ -9357,7 +9357,7 @@ export type GetEngagementResponses = {
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
 
-export type GetReflectionFeedbackData = {
+export type GetInAppFeedbackData = {
     body?: never;
     path: {
         /**
@@ -9366,17 +9366,17 @@ export type GetReflectionFeedbackData = {
         workspaceSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/reflection';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/in-app';
 };
 
-export type GetReflectionFeedbackResponses = {
+export type GetInAppFeedbackResponses = {
     /**
-     * Reflection messages returned, newest first
+     * In-app messages returned, newest first
      */
-    200: Array<ReflectionFeedback>;
+    200: Array<InAppFeedback>;
 };
 
-export type GetReflectionFeedbackResponse = GetReflectionFeedbackResponses[keyof GetReflectionFeedbackResponses];
+export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
 export type GetLatestReactionData = {
     body?: never;
@@ -9801,7 +9801,7 @@ export type ListPracticeReviewFeedbackData = {
         size?: number;
         deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
         suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
-        channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'REFLECTION'>;
+        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;
         /**
          * Kind of reviewed work, e.g. scm.pull_request

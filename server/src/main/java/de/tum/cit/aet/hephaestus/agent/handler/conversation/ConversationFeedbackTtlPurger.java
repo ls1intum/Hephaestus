@@ -22,7 +22,7 @@ public class ConversationFeedbackTtlPurger {
     }
 
     /**
-     * Age out every PREPARED CONVERSATION unit for {@code workspaceId} created strictly before {@code cutoff} to
+     * Age out every PREPARED IN_CHAT unit for {@code workspaceId} created strictly before {@code cutoff} to
      * SUPPRESSED / CONVERSATION_EXPIRED, in a fresh transaction isolated from the other workspaces in the sweep.
      *
      * @return the number of units expired

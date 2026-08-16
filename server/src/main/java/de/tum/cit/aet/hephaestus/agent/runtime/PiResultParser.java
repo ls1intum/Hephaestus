@@ -51,7 +51,7 @@ public class PiResultParser {
         // Before the result-file branches below, which early-return: the composition stage's output is
         // independent of whether the review's own findings parsed, and losing it because the findings
         // were malformed would silently couple two things that must not be coupled.
-        addReflectionFeedback(output, sandboxResult.outputFiles().get(SandboxLayout.REFLECTION_FEEDBACK_FILENAME));
+        addComposedFeedback(output, sandboxResult.outputFiles().get(SandboxLayout.FEEDBACK_FILENAME));
 
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile == null) {
@@ -125,18 +125,18 @@ public class PiResultParser {
     }
 
     /**
-     * Surfaces the feedback-composition stage's payload under {@code reflectionFeedback}, for the
-     * reflection lane's producer to read off the job. Best-effort like its siblings: a malformed payload costs the
-     * reflection surface one cycle's messages and costs the review nothing.
+     * Surfaces the feedback-composition stage's payload under {@code feedback}, for each lane's producer to
+     * read off the job. Best-effort like its siblings: a malformed payload costs the surfaces one cycle's
+     * messages and costs the review nothing.
      */
-    void addReflectionFeedback(Map<String, Object> output, byte[] reflectionFeedbackFile) {
-        if (reflectionFeedbackFile == null || reflectionFeedbackFile.length == 0) {
+    void addComposedFeedback(Map<String, Object> output, byte[] feedbackFile) {
+        if (feedbackFile == null || feedbackFile.length == 0) {
             return;
         }
         try {
-            output.put("reflectionFeedback", objectMapper.readValue(reflectionFeedbackFile, Object.class));
+            output.put("feedback", objectMapper.readValue(feedbackFile, Object.class));
         } catch (JacksonException e) {
-            recordFailure("reflection_feedback", e);
+            recordFailure("composed_feedback", e);
         }
     }
 

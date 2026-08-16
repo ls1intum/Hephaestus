@@ -56,6 +56,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             workspaceContextBuilder,
             envelopeWriter,
             parser,
+            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
             feedbackService,
             new SecretDiffScanner(),

@@ -127,9 +127,7 @@ class DeliveredFeedbackContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName(
-        "omits artifactKind/artifactId for a reflection-style unit with no artifact, still ships surface + body"
-    )
+    @DisplayName("omits artifactKind/artifactId for an in-app-style unit with no artifact, still ships surface + body")
     void omitsNullArtifactFields() throws Exception {
         User user = new User();
         user.setLogin("octo");

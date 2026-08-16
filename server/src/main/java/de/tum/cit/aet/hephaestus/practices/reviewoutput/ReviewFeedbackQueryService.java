@@ -108,14 +108,21 @@ class ReviewFeedbackQueryService {
     /**
      * Whether an operator may read this unit's composed text.
      *
-     * <p>No for {@link FeedbackChannel#REFLECTION}, and only for it. That body is the developer's private
-     * view — the one place the system writes about a named person where the person is the sole audience,
-     * and in the course deployment a workspace admin is their instructor. Everything else about the unit
-     * still shows: that it exists, its state, why it was withheld, who it was for, how many observations
-     * fed it. See {@code FeedbackRepository#findForWorkspace}, which withholds the same body from the
-     * list projection in SQL.
+     * <p>No on the two private lanes, and only on those. A {@link FeedbackChannel#IN_APP} body is the
+     * developer's private view — the one place the system writes about a named person where the person is
+     * the sole audience, and in the course deployment a workspace admin is their instructor. A
+     * {@link FeedbackChannel#IN_CHAT} body is the composer's coaching move for the mentor, and its
+     * evidence part is the same kind of thing: a pattern claim about a named person, drawn across their
+     * work, written to be shown to them alone and only once they have answered for themselves. It used to
+     * be safe to return because it was always NULL; now that a move is stored on it, returning it would
+     * hand the instructor the plan without the conversation that makes it a coaching move rather than a
+     * verdict.
+     *
+     * <p>Everything else about the unit still shows: that it exists, its state, why it was withheld, who it
+     * was for, how many observations fed it. See {@code FeedbackRepository#findForWorkspace}, which
+     * withholds the same bodies from the list projection in SQL.
      */
     private static boolean bodyVisibleToOperator(Feedback feedback) {
-        return feedback.getChannel() != FeedbackChannel.REFLECTION;
+        return (feedback.getChannel() != FeedbackChannel.IN_APP && feedback.getChannel() != FeedbackChannel.IN_CHAT);
     }
 }

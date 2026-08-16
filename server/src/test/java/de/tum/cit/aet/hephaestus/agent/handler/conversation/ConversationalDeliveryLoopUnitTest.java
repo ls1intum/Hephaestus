@@ -82,6 +82,13 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
+    /**
+     * Never asked to claim anything here: these cases compose nothing, and a move that is not a SUPERSEDE
+     * never reaches it. Present so the preparer can be built.
+     */
+    @Mock
+    private de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession supersession;
+
     @Mock
     private ObservationVisibilityPolicy visibilityPolicy;
 
@@ -130,6 +137,8 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         return new ConversationalFeedbackPreparer(
             feedbackRepository,
             feedbackObservationRepository,
+            observationRepository,
+            supersession,
             eventPublisher,
             egressGuard
         );
@@ -150,7 +159,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         ConversationalFeedbackPreparer preparer = preparer();
         when(egressGuard.deliveryAllowed(any())).thenReturn(false);
 
-        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, "rk-silent")));
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, "rk-silent")), List.of());
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
@@ -238,7 +247,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             admitted.add(problem(null, null, 0.9f - i * 0.1f));
         }
 
-        int prepared = preparer().prepare(job, WS, admitted);
+        int prepared = preparer().prepare(job, WS, admitted, List.of());
 
         // Three are raised; the two over the cap are withheld — and a withheld locus the router admitted still
         // gets a row, or it would read as feedback the developer saw and ignored.
@@ -246,7 +255,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         ArgumentCaptor<Feedback> saved = ArgumentCaptor.forClass(Feedback.class);
         verify(feedbackRepository, times(5)).save(saved.capture());
         assertThat(saved.getAllValues()).allSatisfy(f -> {
-            assertThat(f.getChannel()).isEqualTo(FeedbackChannel.CONVERSATION);
+            assertThat(f.getChannel()).isEqualTo(FeedbackChannel.IN_CHAT);
             assertThat(f.getBody()).isNull();
             assertThat(f.getRecipientUserId()).isEqualTo(RECIPIENT);
         });
@@ -272,7 +281,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             admitted.add(problem(null, null, 0.5f));
         }
 
-        assertThatThrownBy(() -> preparer().prepare(job, WS, admitted))
+        assertThatThrownBy(() -> preparer().prepare(job, WS, admitted, List.of()))
             .isInstanceOf(IllegalStateException.class)
             .hasMessageContaining("ordinal band");
         verify(feedbackRepository, never()).save(any());
@@ -286,7 +295,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             admitted.add(problem(null, null, 0.9f - i * 0.1f)); // single recipient, capped at 3
         }
 
-        preparer().prepare(job, WS, admitted);
+        preparer().prepare(job, WS, admitted, List.of());
 
         ArgumentCaptor<ConversationFeedbackPreparedEvent> event = ArgumentCaptor.forClass(
             ConversationFeedbackPreparedEvent.class
@@ -301,7 +310,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         // Every (job, position) already exists → pure idempotent re-run, nothing newly prepared.
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
 
-        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, null, 0.9f)));
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, null, 0.9f)), List.of());
 
         assertThat(prepared).isZero();
         // any(Object.class), not any(): binds the publishEvent(Object) overload the record actually dispatches to.

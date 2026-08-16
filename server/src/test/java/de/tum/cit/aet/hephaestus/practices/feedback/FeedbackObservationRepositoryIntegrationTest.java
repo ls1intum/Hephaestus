@@ -144,6 +144,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
         List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+            workspace.getId(),
             List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId()),
             IN_CONTEXT_ONLY
         );
@@ -168,6 +169,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(higherId, 11, FeedbackDeliveryState.DELIVERED, "Latest identity", createdAt), observation);
 
         List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+            workspace.getId(),
             List.of(observation.getId()),
             IN_CONTEXT_ONLY
         );
@@ -177,7 +179,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "a newer REFLECTION unit bound to the same observation does not become its advice: the per-finding " +
+        "a newer IN_APP unit bound to the same observation does not become its advice: the per-finding " +
             "surfaces keep showing what was said about that finding"
     )
     void findLatestAdviceBodiesAnswersOnlyForTheChannelsTheCallerNames() {
@@ -192,7 +194,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             ),
             observation
         );
-        // The reflection unit is newer, DELIVERED and non-null-bodied, so it wins every other clause of
+        // The in-app unit is newer, DELIVERED and non-null-bodied, so it wins every other clause of
         // the query — the channel predicate is the only thing keeping it off a per-finding surface.
         bind(
             saveFeedback(
@@ -201,13 +203,14 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 FeedbackDeliveryState.DELIVERED,
                 "### You keep shipping untested changes\n\nAcross three pull requests…\n\n**Try next:** …",
                 Instant.parse("2026-02-01T00:00:00Z"),
-                FeedbackChannel.REFLECTION
+                FeedbackChannel.IN_APP
             ),
             observation
         );
 
         assertThat(
             feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+                workspace.getId(),
                 List.of(observation.getId()),
                 IN_CONTEXT_ONLY
             )
@@ -218,8 +221,9 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
         assertThat(
             feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+                workspace.getId(),
                 List.of(observation.getId()),
-                List.of(FeedbackChannel.REFLECTION.name())
+                List.of(FeedbackChannel.IN_APP.name())
             )
         )
             .singleElement()

@@ -27,8 +27,9 @@ public record ReviewFeedbackDetailDTO(
     @NonNull Instant createdAt,
     @Schema(description = "When the feedback was placed; null if it was not delivered") Instant deliveredAt,
     @Schema(
-        description = "Stored composed body; null when none was produced, and always null on the REFLECTION " +
-            "channel — the developer's reflection surface is not readable by an operator"
+        description = "Stored composed body; null when none was produced, and always null on the IN_APP " +
+            "and IN_CHAT channels — neither the developer's practice pages nor the mentor's " +
+            "queued move is readable by an operator"
     )
     String body,
     @NonNull @Schema(description = "Source observations in render order") List<ReviewBoundObservationDTO> observations,

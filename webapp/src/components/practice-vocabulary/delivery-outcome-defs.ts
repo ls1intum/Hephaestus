@@ -68,7 +68,7 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
  * offer the stored states, so a badge whose words share no stem with any option leaves a reader
  * unable to find the filter for the row in front of them.
  */
-const CONVERSATION_OVERRIDES = {
+const IN_CHAT_OVERRIDES = {
 	PREPARED: {
 		label: "Prepared for conversation",
 		icon: MessageSquareDashedIcon,
@@ -90,29 +90,29 @@ const CONVERSATION_OVERRIDES = {
 } as const satisfies Record<string, StatusDef>;
 
 /**
- * The same, on the reflection lane. A prepared unit here is not waiting on the mentor: nothing sends
- * it, and the developer opening their own feedback page is the delivery. Saying "waiting for their
+ * The same, on the in-app lane. A prepared unit here is not waiting on the mentor: nothing sends
+ * it, and the developer opening their own practice pages is the delivery. Saying "waiting for their
  * next chat" about one of these rows would describe an event that will never happen to it.
  */
-const REFLECTION_OVERRIDES = {
+const IN_APP_OVERRIDES = {
 	PREPARED: {
-		label: "Prepared for their feedback page",
+		label: "Prepared for their practice pages",
 		icon: UserRoundIcon,
 		badgeVariant: "secondary",
-		description: "Waiting on the developer's own feedback page; opening it is what delivers it.",
+		description: "Waiting on the developer's own practice pages; opening it is what delivers it.",
 	},
 } as const satisfies Record<string, StatusDef>;
 
 /** What a row should say became of this feedback. */
 export function deliveryOutcome(feedback: DeliveryFacts): StatusDef {
 	const { channel, deliveryState, suppressionReason } = feedback;
-	if (channel === "CONVERSATION") {
-		if (deliveryState === "PREPARED") return CONVERSATION_OVERRIDES.PREPARED;
-		if (deliveryState === "DELIVERED") return CONVERSATION_OVERRIDES.RAISED;
-		if (suppressionReason === "CONVERSATION_EXPIRED") return CONVERSATION_OVERRIDES.EXPIRED;
+	if (channel === "IN_CHAT") {
+		if (deliveryState === "PREPARED") return IN_CHAT_OVERRIDES.PREPARED;
+		if (deliveryState === "DELIVERED") return IN_CHAT_OVERRIDES.RAISED;
+		if (suppressionReason === "CONVERSATION_EXPIRED") return IN_CHAT_OVERRIDES.EXPIRED;
 	}
-	if (channel === "REFLECTION" && deliveryState === "PREPARED") {
-		return REFLECTION_OVERRIDES.PREPARED;
+	if (channel === "IN_APP" && deliveryState === "PREPARED") {
+		return IN_APP_OVERRIDES.PREPARED;
 	}
 	return DELIVERY_STATE_DEFS[deliveryState];
 }

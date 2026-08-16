@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.context.providers.mentor;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.FeedbackChannelRouter;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.RoutingContext;
@@ -15,6 +16,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
@@ -143,6 +145,71 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("scm.pull_request");
     }
 
+    /**
+     * The composer's move has to reach the mentor's sandbox in its three parts, and it has to arrive as
+     * {@code move} rather than as anything a prompt could read as text to paste. The fallback is a missing
+     * key, not an empty object, so "nothing was composed" cannot read as "the composer had nothing to say".
+     */
+    @Test
+    @DisplayName("a composed move reaches the mentor as a move, and an uncomposed unit carries none")
+    void stagesTheComposedMove() {
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 2));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
+
+        AgentJob job = newJob();
+        savePullRequestObservation(job, "occ-composed", 4242L);
+        List<Observation> admitted = router.admit(
+            observationRepository.findByAgentJobId(job.getId()),
+            workspace.getId(),
+            RoutingContext.author()
+        );
+        preparer.prepare(
+            job.getId(),
+            workspace.getId(),
+            admitted,
+            List.of(
+                new ComposedFeedbackUnit(
+                    FeedbackChannel.IN_CHAT,
+                    practice.getSlug(),
+                    List.of("obs-0"),
+                    ComposedFeedbackUnit.Action.NEW,
+                    null,
+                    null,
+                    "The test arrives after the review",
+                    null,
+                    null,
+                    new ComposedFeedbackUnit.ConversationBrief(
+                        "At what point do you decide the test is done?",
+                        "On !18, !20 and !22 the test arrived a push later.",
+                        "They name a check they could run before pushing."
+                    ),
+                    null
+                )
+            )
+        );
+
+        JsonNode item = contribute().get("preparedConversationFeedback").get(0);
+        assertThat(item.has("body")).isFalse();
+        JsonNode move = item.get("move");
+        assertThat(move.get("opener").asString()).isEqualTo("At what point do you decide the test is done?");
+        assertThat(move.get("evidence").asString()).isEqualTo("On !18, !20 and !22 the test arrived a push later.");
+        assertThat(move.get("target").asString()).isEqualTo("They name a check they could run before pushing.");
+
+        // The same surface, prepared with nothing composed: no move key at all, on that item alone.
+        AgentJob uncomposed = newJob();
+        savePullRequestObservation(uncomposed, "occ-uncomposed", 4343L);
+        prepareFor(uncomposed);
+
+        JsonNode both = contribute().get("preparedConversationFeedback");
+        assertThat(both).hasSize(2);
+        assertThat(both)
+            .filteredOn(node -> node.has("move"))
+            .hasSize(1);
+    }
+
     private JsonNode contribute() {
         Map<String, byte[]> files = new HashMap<>();
         contentSource.contribute(
@@ -155,7 +222,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     private void prepareFor(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
-        preparer.prepare(job.getId(), workspace.getId(), admitted);
+        preparer.prepare(job.getId(), workspace.getId(), admitted, List.of());
     }
 
     private Observation saveConversationObservation(AgentJob job, String occurrenceKey, long threadId) {

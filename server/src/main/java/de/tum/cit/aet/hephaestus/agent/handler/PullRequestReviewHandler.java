@@ -11,7 +11,9 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.handler.reflection.ReflectionCompositionInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
@@ -29,6 +31,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -91,6 +94,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
     private final PracticeDetectionResultParser resultParser;
+    private final FeedbackCompositionResultParser compositionResultParser;
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
     private final SecretDiffScanner secretDiffScanner;
@@ -104,6 +108,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
         PracticeDetectionResultParser resultParser,
+        FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
@@ -116,6 +121,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
         this.resultParser = resultParser;
+        this.compositionResultParser = compositionResultParser;
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
         this.secretDiffScanner = secretDiffScanner;
@@ -240,10 +246,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
         practiceCatalogInjector.inject(files, job, ArtifactKinds.PULL_REQUEST, practices);
-        // Asks the run for a second, separate turn after its measurements are final: process-level
-        // feedback for this developer's reflection surface, composed over their record rather than over this
-        // diff. Absent for a backfill sweep — see ReflectionCompositionInputs.
-        ReflectionCompositionInputs.stage(files, PracticeDetectionDeliveryService.originOf(metadata));
+        // Asks the run for a second, separate turn once its measurements are final: the feedback to say
+        // now, on every lane this occasion can reach, composed over this person's record rather than over
+        // this diff alone. Absent for a backfill sweep — see FeedbackCompositionInputs.
+        FeedbackCompositionInputs.stage(files, PracticeDetectionDeliveryService.originOf(metadata));
         ContextMapWriter.write(files);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
@@ -468,13 +474,23 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             job.getWorkspace() == null
                 ? Map.of()
                 : practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
+        // The intervention, written after the measurements by a stage that could read the whole record of
+        // this person's work and everything already said to them. It arrives in the same job output, is
+        // parsed in the same transaction and is recorded by the same ledger call: only authorship moved,
+        // and the most visible lane never touches the async pool. A practice the stage wrote nothing for
+        // keeps the words the detector wrote at measurement time.
+        List<ComposedFeedbackUnit> composed = compositionResultParser.parse(
+            job.getOutput(),
+            FeedbackChannel.IN_CONTEXT
+        );
         // unifiedDiff is the substrate for both the grounding guard (drop a hallucinated inline anchor
         // before it lands on a student) and the line-position validator below.
         PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
             deliverable,
             ArtifactKinds.PULL_REQUEST,
             whyBySlug,
-            unifiedDiff
+            unifiedDiff,
+            composed
         );
         if (delivery != null) {
             log.info("Server-side delivery composed from {} findings: jobId={}", deliverable.size(), job.getId());
@@ -498,7 +514,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         // for every finding whose comment actually landed. Keeps FeedbackDeliveryService free of the
         // composition inputs — it only hands back the delivered keys.
         feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
-            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, whyBySlug, deliveredKeys)
+            DeliveryComposer.recomposeMrNote(
+                deliverable,
+                ArtifactKinds.PULL_REQUEST,
+                whyBySlug,
+                deliveredKeys,
+                composed
+            )
         );
     }
 

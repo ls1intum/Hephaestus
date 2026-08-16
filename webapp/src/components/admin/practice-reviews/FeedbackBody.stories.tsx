@@ -90,7 +90,7 @@ export const FailedToDeliver: Story = {
 
 /** `PREPARED` only ever exists on the conversation lane, so the badge can name the lane it waits on. */
 export const PreparedForConversation: Story = {
-	args: { feedback: { body, channel: "CONVERSATION", deliveryState: "PREPARED" } },
+	args: { feedback: { body, channel: "IN_CHAT", deliveryState: "PREPARED" } },
 	play: async ({ canvas }) => {
 		// The lane, not the exact wording: the `PREPARED` label lives in `delivery-outcome-defs`.
 		canvas.getByText(/for conversation/);

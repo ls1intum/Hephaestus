@@ -162,7 +162,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         );
         assertThat(prepared).hasSize(2);
         assertThat(prepared).allSatisfy(f -> {
-            assertThat(f.getChannel()).isEqualTo(FeedbackChannel.CONVERSATION);
+            assertThat(f.getChannel()).isEqualTo(FeedbackChannel.IN_CHAT);
             assertThat(f.getDeliveryState()).isEqualTo(FeedbackDeliveryState.PREPARED);
             assertThat(f.getBody()).isNull();
         });
@@ -257,14 +257,14 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     private void prepareFor(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
-        preparer.prepare(job.getId(), workspace.getId(), admitted);
+        preparer.prepare(job.getId(), workspace.getId(), admitted, List.of());
     }
 
     private List<Feedback> conversationUnits() {
         return feedbackRepository
             .findAll()
             .stream()
-            .filter(f -> f.getChannel() == FeedbackChannel.CONVERSATION)
+            .filter(f -> f.getChannel() == FeedbackChannel.IN_CHAT)
             .toList();
     }
 

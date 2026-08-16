@@ -667,7 +667,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "11111111-4444-4444-4444-444444444444",
 				body: "Before this thread scrolls away, drop the chosen strategy and who chose it into the runbook — a reader tomorrow cannot tell the thumbs-up from the end of the day.",
-				channel: "CONVERSATION",
+				channel: "IN_CHAT",
 				outcome: "PREPARED",
 				recipient: grace,
 				composedAt: "2026-07-26T16:05:00Z",
@@ -676,7 +676,7 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			{
 				id: "22222222-4444-4444-4444-444444444444",
 				body: "You described the rollback in terms of what a customer would see rather than which tables move. That is the version somebody paged at 2am can act on.",
-				channel: "CONVERSATION",
+				channel: "IN_CHAT",
 				outcome: "DELIVERED",
 				recipient: grace,
 				composedAt: "2026-07-26T16:06:00Z",

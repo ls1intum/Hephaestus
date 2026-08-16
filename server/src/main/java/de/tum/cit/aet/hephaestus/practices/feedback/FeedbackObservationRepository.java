@@ -90,7 +90,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
      *
      * <p><b>{@code channels} is required, and deliberately has no default.</b> A {@link Feedback} body is
      * "what we told them", but three lanes can tell them something and they are not interchangeable: an
-     * IN_CONTEXT note and a mentor turn are about the one finding they are bound to, while a REFLECTION
+     * IN_CONTEXT note and a mentor turn are about the one finding they are bound to, while an IN_APP
      * unit is a cross-artifact message that binds every problem behind it as PRIMARY evidence and is
      * about none of them individually. With no channel predicate this query's newest-first tie-break
      * hands a per-finding surface the process message instead — so the lane a caller means is a fact only
@@ -98,6 +98,11 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
      *
      * <p>Bound as names rather than as {@link FeedbackChannel} values because this is a native query, where
      * an enum parameter's JDBC mapping is not the string the column stores.
+     *
+     * <p><b>Scoped by {@code workspace_id}, like every other read here.</b> An observation id is a UUID
+     * and looks unguessable, but this join row is written by native SQL with no tenancy check of its own,
+     * so the only thing standing between one tenant's private advice and another tenant's detail page is
+     * this predicate. Without it the newest-first tie-break decides which tenant's words a reader gets.
      */
     @Query(
         value = """
@@ -107,6 +112,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         FROM feedback_observation fo
         JOIN feedback f ON f.id = fo.feedback_id
         WHERE fo.observation_id IN (:observationIds)
+          AND f.workspace_id = :workspaceId
           AND f.channel IN (:channels)
           AND f.delivery_state IN ('DELIVERED', 'FAILED')
           AND f.body IS NOT NULL
@@ -115,6 +121,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         nativeQuery = true
     )
     List<ObservationAdviceBody> findLatestAdviceBodiesByObservationIds(
+        @Param("workspaceId") Long workspaceId,
         @Param("observationIds") Collection<UUID> observationIds,
         @Param("channels") Collection<String> channels
     );
@@ -127,7 +134,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     // --- conversational feedback delivery loop ---
 
     /**
-     * The id(s) of the PREPARED CONVERSATION feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
+     * The id(s) of the PREPARED IN_CHAT feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
      * given observation. Maps a mentor {@code link_finding} observation id back to the unit to flip to DELIVERED.
      * Ordered newest-first so a caller can take the first; the reconciler's CAS makes any duplicate flip a no-op.
      */
@@ -139,7 +146,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
           AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
           AND fo.feedback.workspaceId = :workspaceId
           AND fo.feedback.recipientUserId = :recipientUserId
-          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
           AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
         ORDER BY fo.feedback.createdAt DESC
         """
@@ -151,9 +158,14 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     );
 
     /**
-     * Facts + practice (NO body) for the newest PREPARED CONVERSATION units of a recipient - the payload the
-     * {@code PreparedConversationFeedbackContentSource} ships to the mentor. Body is deliberately absent (the mentor
-     * composes the words at delivery). Ordered newest-first, bounded by the caller's {@code Pageable}.
+     * Facts + practice + the composer's move for the newest PREPARED IN_CHAT units of a recipient - the payload
+     * the {@code PreparedConversationFeedbackContentSource} ships to the mentor. Ordered newest-first, bounded by the
+     * caller's {@code Pageable}.
+     *
+     * <p>{@code body} is never the mentor's script. It is either NULL - the fallback selection, where the mentor
+     * composes everything at delivery as it always has - or a {@link ConversationBriefBody} brief: the question to
+     * open with, the evidence to hold back, and the target. Read it through that class, which answers null for
+     * anything it did not write, rather than as text to speak.
      */
     @Query(
         """
@@ -164,6 +176,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
                o.title AS title,
                o.reasoning AS reasoning,
                o.severity AS severity,
+               fo.feedback.body AS body,
                fo.feedback.artifactKind AS artifactKind,
                fo.feedback.artifactId AS artifactId,
                fo.feedback.createdAt AS preparedAt
@@ -173,7 +186,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         WHERE fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
           AND fo.feedback.workspaceId = :workspaceId
           AND fo.feedback.recipientUserId = :recipientUserId
-          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
           AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
         ORDER BY fo.feedback.createdAt DESC
         """
@@ -267,6 +280,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getPracticeName();
         String getTitle();
         String getReasoning();
+        /** The composer's move, or null when nothing was composed for this unit. See {@link ConversationBriefBody}. */
+        String getBody();
         Severity getSeverity();
         ArtifactKind getArtifactKind();
         Long getArtifactId();

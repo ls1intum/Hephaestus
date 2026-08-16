@@ -20,16 +20,16 @@ class FeedbackAdmissionTest extends BaseUnitTest {
     class Provenance {
 
         /**
-         * A backfilled observation is refused on the two in-place channels at every tier. REFLECTION is the
+         * A backfilled observation is refused on the two in-place channels at every tier. IN_APP is the
          * exception this predicate deliberately leaves open (see the test below); the lane refuses a
-         * backfill on its own terms, in {@code ReflectionFeedbackRouter}, not here.
+         * backfill on its own terms, in {@code InAppFeedbackRouter}, not here.
          */
         @Test
         void aBackfilledObservationIsRefusedOnBothInPlaceChannels() {
             for (PracticeReviewTier tier : PracticeReviewTier.values()) {
                 for (FeedbackChannel channel : new FeedbackChannel[] {
                     FeedbackChannel.IN_CONTEXT,
-                    FeedbackChannel.CONVERSATION,
+                    FeedbackChannel.IN_CHAT,
                 }) {
                     assertThat(FeedbackAdmission.delivers(ObservationOrigin.BACKFILL, tier, channel))
                         .as("BACKFILL at tier %s, on channel %s", tier, channel)
@@ -38,12 +38,12 @@ class FeedbackAdmissionTest extends BaseUnitTest {
             }
         }
 
-        /** …and the reason is specifically REFLECTION's, not a blanket refusal we would forget to revisit. */
+        /** …and the reason is specifically IN_APP's, not a blanket refusal we would forget to revisit. */
         @Test
-        void aBackfillIsEntitledToTheReflectionChannelAndOnlyThat() {
-            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.REFLECTION)).isTrue();
+        void aBackfillIsEntitledToTheInAppChannelAndOnlyThat() {
+            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_APP)).isTrue();
             assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_CONTEXT)).isFalse();
-            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.CONVERSATION)).isFalse();
+            assertThat(ObservationOrigin.BACKFILL.delivers(FeedbackChannel.IN_CHAT)).isFalse();
         }
 
         @ParameterizedTest

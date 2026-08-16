@@ -942,7 +942,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .workspaceId(workspace.getId())
                     .recipientUserId(alice.getId())
                     .aboutUserId(alice.getId())
-                    .channel(FeedbackChannel.CONVERSATION)
+                    .channel(FeedbackChannel.IN_CHAT)
                     .position(3000)
                     .deliveryState(FeedbackDeliveryState.PREPARED)
                     .source(FeedbackSource.AGENT)
@@ -950,7 +950,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     .build()
             );
 
-            getOk(FEEDBACK + "?channel=CONVERSATION", workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?channel=IN_CHAT", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 .jsonPath("$.content[0].deliveryState")
@@ -1077,26 +1077,26 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
         }
 
         /**
-         * In a course deployment the workspace admin is the instructor, and a reflection body is the only
+         * In a course deployment the workspace admin is the instructor, and an in-app body is the only
          * feedback text whose audience is the developer alone. Run against the real projection, because the
          * withholding lives in the SQL: a mapper-level assertion would pass on a query that selected the body.
          */
         @Test
         @WithAdminUser
-        @DisplayName("an operator read cannot return a reflection body, on either route")
-        void withholdsAReflectionBodyFromEveryOperatorRoute() {
-            String reflectionBody =
+        @DisplayName("an operator read cannot return an in-app body, on either route")
+        void withholdsAnInAppBodyFromEveryOperatorRoute() {
+            String inAppBody =
                 "### You keep shipping untested changes\n\n" + "y".repeat(FeedbackRepository.BODY_PREVIEW_LENGTH + 200);
-            Feedback reflection = feedbackRepository.save(
+            Feedback inApp = feedbackRepository.save(
                 Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
                     .recipientUserId(alice.getId())
                     .aboutUserId(alice.getId())
-                    .channel(FeedbackChannel.REFLECTION)
+                    .channel(FeedbackChannel.IN_APP)
                     .position(7000)
                     .deliveryState(FeedbackDeliveryState.DELIVERED)
-                    .body(reflectionBody)
+                    .body(inAppBody)
                     .source(FeedbackSource.AGENT)
                     .createdAt(Instant.now())
                     .deliveredAt(Instant.now())
@@ -1105,7 +1105,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             String inContextBody = "z".repeat(FeedbackRepository.BODY_PREVIEW_LENGTH + 200);
             persistUnit(workspace, job, alice, 0, FeedbackDeliveryState.DELIVERED, null, inContextBody);
 
-            getOk(FEEDBACK + "?channel=REFLECTION", workspace.getWorkspaceSlug())
+            getOk(FEEDBACK + "?channel=IN_APP", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
                 // Everything needed to audit the pipeline still travels — only the words do not.
@@ -1118,9 +1118,9 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .jsonPath("$.content[0].bodyTruncated")
                 .isEqualTo(false);
 
-            getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), reflection.getId())
+            getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), inApp.getId())
                 .jsonPath("$.channel")
-                .isEqualTo("REFLECTION")
+                .isEqualTo("IN_APP")
                 .jsonPath("$.body")
                 .doesNotExist();
 

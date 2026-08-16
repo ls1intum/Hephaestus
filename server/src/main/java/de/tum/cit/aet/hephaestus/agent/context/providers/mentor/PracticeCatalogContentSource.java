@@ -102,7 +102,7 @@ public class PracticeCatalogContentSource implements ContentSource {
                 FeedbackAdmission.delivers(
                     ObservationOrigin.LIVE,
                     ReviewTierResolver.effectiveTierOf(p, defaults.defaultTier()),
-                    FeedbackChannel.CONVERSATION
+                    FeedbackChannel.IN_CHAT
                 )
             )
             .toList();

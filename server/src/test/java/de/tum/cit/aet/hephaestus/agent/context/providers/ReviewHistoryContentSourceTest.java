@@ -112,6 +112,7 @@ class ReviewHistoryContentSourceTest {
         );
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(List.of());
         when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(List.of());
+        when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(List.of());
         when(visibilityPolicy.permitsAll(anyLong(), any(), any())).thenAnswer(invocation -> {
             Collection<Observation> batch = invocation.getArgument(1);
             return batch.stream().map(Observation::getId).collect(Collectors.toSet());
@@ -147,7 +148,12 @@ class ReviewHistoryContentSourceTest {
         void observationHistoryAloneAnswersForObservationHistoryOnly() {
             var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
 
-            assertThat(captured.files()).containsOnlyKeys("inputs/history/observations.json");
+            // The delta is arithmetic over the observations and carries no other reading, so it rides on
+            // the kind it is derived from rather than asking an operator to authorize it separately.
+            assertThat(captured.files()).containsOnlyKeys(
+                "inputs/history/observations.json",
+                "inputs/history/delta.json"
+            );
             assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
             assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.OBSERVATION_HISTORY);
         }
@@ -156,7 +162,10 @@ class ReviewHistoryContentSourceTest {
         void feedbackHistoryAloneAnswersForFeedbackHistoryOnly() {
             var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.FEEDBACK_HISTORY));
 
-            assertThat(captured.files()).containsOnlyKeys("inputs/history/feedback.json");
+            assertThat(captured.files()).containsOnlyKeys(
+                "inputs/history/feedback.json",
+                "inputs/history/prepared.json"
+            );
             assertThat(captured.completeness()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
             assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
         }
@@ -167,6 +176,7 @@ class ReviewHistoryContentSourceTest {
             provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
 
             verify(feedbackRepository, never()).findRecentDeliveredForRecipient(any(), any(), any(), any());
+            verify(feedbackRepository, never()).findPreparedForRecipient(any(), any(), any());
         }
     }
 
@@ -238,6 +248,63 @@ class ReviewHistoryContentSourceTest {
     }
 
     /**
+     * Without this file a composer deciding to replace a queued message is guessing at what it is
+     * replacing, so the key it must name is staged rather than left to be inferred.
+     */
+    @Test
+    void stagesWhatIsQueuedAndUnreadWithTheKeyThatIdentifiesIt() {
+        when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(
+            List.of(
+                Feedback.builder()
+                    .channel(FeedbackChannel.IN_APP)
+                    .threadKey("in-app:99:swallows-errors")
+                    .body("A habit nobody has read yet.")
+                    .createdAt(Instant.parse("2026-07-02T09:00:00Z"))
+                    .build()
+            )
+        );
+
+        JsonNode entry = read(captureFeedbackHistory().files().get("inputs/history/prepared.json"))
+            .get("prepared")
+            .get(0);
+
+        assertThat(entry.get("threadKey").asString()).isEqualTo("in-app:99:swallows-errors");
+        assertThat(entry.get("channel").asString()).isEqualTo("IN_APP");
+        assertThat(entry.get("body").asString()).contains("nobody has read yet");
+    }
+
+    /**
+     * The delta names practices and statuses. The recurrence key itself must not cross: it is a hash of
+     * the subject and the artifact's row id, so it is meaningless to a reader and is the one field here a
+     * model could quote back at somebody as if it named their work.
+     */
+    @Test
+    void stagesHowEachLocusMovedWithoutStagingTheKeyItMovedAt() {
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
+            List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
+        );
+
+        JsonNode delta = read(captureObservationHistory().files().get("inputs/history/delta.json"));
+
+        assertThat(delta.get("loci")).hasSize(1);
+        JsonNode locus = delta.get("loci").get(0);
+        assertThat(locus.get("practiceSlug").asString()).isEqualTo("swallows-errors");
+        assertThat(locus.get("status").asString()).isEqualTo("NEW");
+        assertThat(locus.has("recurrenceKey")).isFalse();
+    }
+
+    /** The delta is computed from what was staged, so a withheld observation cannot reappear inside it. */
+    @Test
+    void theDeltaHoldsNothingTheVisibilityPolicyRefused() {
+        when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
+            List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
+        );
+        doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
+
+        assertThat(read(captureObservationHistory().files().get("inputs/history/delta.json")).get("loci")).isEmpty();
+    }
+
+    /**
      * A window over a growing record can show that something recurred and can never show that something
      * never happened, so COMPLETE is not a state this source is allowed to report.
      */
@@ -294,7 +361,7 @@ class ReviewHistoryContentSourceTest {
     /**
      * The number the developer can type, never the row it is stored in.
      *
-     * <p>A composed reflection message quotes this file back to the person it is about. Handed 306 — the
+     * <p>A composed in-app message quotes this file back to the person it is about. Handed 306 — the
      * primary key behind merge request !22 — a model writes "in PR #306", and the developer follows the
      * reference to unrelated work or to nothing at all.
      */
@@ -360,7 +427,7 @@ class ReviewHistoryContentSourceTest {
          * staged history holds no number the developer could not have typed themselves.
          */
         @Test
-        void neitherHistoryFileCarriesARowIdAnywhere() {
+        void noHistoryFileCarriesARowIdAnywhere() {
             when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
                 List.of(
                     observationAgainst(ArtifactKinds.PULL_REQUEST, OBSERVED_ARTIFACT_ROW_ID),
@@ -370,15 +437,19 @@ class ReviewHistoryContentSourceTest {
             when(feedbackRepository.findRecentDeliveredForRecipient(any(), any(), any(), any())).thenReturn(
                 List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
             );
+            when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(
+                List.of(deliveredAgainst(ArtifactKinds.PULL_REQUEST, DELIVERED_ARTIFACT_ROW_ID))
+            );
 
+            var observationCapture = captureObservationHistory();
+            var feedbackCapture = captureFeedbackHistory();
             assertCarriesNoRowId(
-                read(captureObservationHistory().files().get("inputs/history/observations.json")),
+                read(observationCapture.files().get("inputs/history/observations.json")),
                 "observations.json"
             );
-            assertCarriesNoRowId(
-                read(captureFeedbackHistory().files().get("inputs/history/feedback.json")),
-                "feedback.json"
-            );
+            assertCarriesNoRowId(read(observationCapture.files().get("inputs/history/delta.json")), "delta.json");
+            assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/feedback.json")), "feedback.json");
+            assertCarriesNoRowId(read(feedbackCapture.files().get("inputs/history/prepared.json")), "prepared.json");
         }
     }
 

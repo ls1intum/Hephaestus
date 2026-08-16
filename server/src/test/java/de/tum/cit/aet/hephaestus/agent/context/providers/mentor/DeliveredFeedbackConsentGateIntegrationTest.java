@@ -89,9 +89,9 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
         long pausedThreadId = seedThread("C-paused", "200.0", ConsentState.PAUSED);
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
 
-        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, activeThreadId, FeedbackChannel.CONVERSATION, "active-body");
-        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, pausedThreadId, FeedbackChannel.CONVERSATION, "paused-body");
-        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, activeThreadId, FeedbackChannel.IN_CHAT, "active-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, pausedThreadId, FeedbackChannel.IN_CHAT, "paused-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.IN_CHAT, "revoked-body");
         saveDelivered(ArtifactKinds.PULL_REQUEST, 4242L, FeedbackChannel.IN_CONTEXT, "pr-body");
 
         JsonNode root = contribute();
@@ -118,7 +118,7 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
     @DisplayName("revoked conversation feedback does not suppress authorized PR feedback")
     void prSurvivesWhenAllConversationRevoked() {
         long revokedThreadId = seedThread("C-revoked", "300.0", ConsentState.REVOKED);
-        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.CONVERSATION, "revoked-body");
+        saveDelivered(ArtifactKinds.CONVERSATION_THREAD, revokedThreadId, FeedbackChannel.IN_CHAT, "revoked-body");
         saveDelivered(ArtifactKinds.PULL_REQUEST, 909L, FeedbackChannel.IN_CONTEXT, "pr-body");
 
         JsonNode root = contribute();

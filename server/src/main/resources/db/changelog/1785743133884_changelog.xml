@@ -2803,7 +2803,7 @@
 
          No data migration: nothing ever wrote this channel. Until -67 the released CHECK admitted only
          'REFLECTION_DASHBOARD', so 'PROFILE' was unwritable at the database; after -67 an ArchUnit rule
-         (ProfileChannelUnwrittenArchTest, now ReflectionChannelProducerArchTest) held the lane producerless
+         (ProfileChannelUnwrittenArchTest, now InAppChannelProducerArchTest) held the lane producerless
          until this branch added the first producer, which already writes 'REFLECTION'. The ADD CONSTRAINT
          below validates existing rows, so if that premise is ever wrong the migration fails loudly here
          instead of leaving an unreadable row behind. -->
@@ -2848,5 +2848,217 @@
          measurement was taken under, and rewriting it would falsify that record. subject is not part of
          ReviewRuleFingerprint, so no existing observation becomes stale here and no reflective surface
          empties. -->
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-53">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job.conversation_prepared_at already present">
+            <not><columnExists tableName="agent_job" columnName="conversation_prepared_at"/></not>
+        </preConditions>
+        <comment>
+            Record that a job's feedback-preparation lanes ran, so work a rejected async submission
+            dropped can be found again.
+
+            Both lanes hang off one AFTER_COMMIT @Async event. The event is published once, the executor
+            is bounded, and a rejection lands in a transaction-synchronisation callback where no lane code
+            runs — so a saturated pool silently prepared nothing for whoever happened to finish during it.
+            Absence of feedback rows cannot stand in for these columns: both lanes legitimately prepare
+            nothing very often, so "no rows" does not distinguish a lane that decided from a lane that
+            never ran, and a sweep built on it would re-route every recent job on every pass forever.
+
+            Deliberately NOT backfilled. Every row is left null, and the recovery sweep only looks back a
+            bounded window, so exactly one thing happens on the first pass after this migration: jobs that
+            finished inside that window are re-offered to both lanes once. That is the desired outcome, not
+            a cost — the preparers are idempotent on (agent_job_id, position), so a job whose lanes did run
+            writes nothing, and one whose lanes were dropped by the deploy itself is recovered. Everything
+            older is outside the window and never selected.
+        </comment>
+        <addColumn tableName="agent_job">
+            <column name="conversation_prepared_at" type="TIMESTAMPTZ"/>
+            <column name="reflection_prepared_at" type="TIMESTAMPTZ"/>
+        </addColumn>
+        <rollback>
+            <dropColumn tableName="agent_job" columnName="conversation_prepared_at"/>
+            <dropColumn tableName="agent_job" columnName="reflection_prepared_at"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-54">
+        <preConditions onFail="MARK_RAN" onFailMessage="idx_agent_job_unprepared_lanes already present">
+            <not><indexExists indexName="idx_agent_job_unprepared_lanes"/></not>
+        </preConditions>
+        <comment>
+            The recovery sweep's index. Partial on purpose: the predicate it serves is "finished and at
+            least one lane unmarked", which is the empty set on a healthy instance and a handful of rows
+            after an incident. A row leaves the index the moment its lanes are marked, so this stays
+            kilobytes on an agent_job table of any size — where a plain index on completed_at would grow
+            with the whole job history to answer a question about a few rows, and no index at all would put
+            a sequential scan of that history on an hourly schedule.
+        </comment>
+        <sql><![CDATA[
+            CREATE INDEX idx_agent_job_unprepared_lanes ON agent_job (completed_at)
+            WHERE status = 'COMPLETED'
+              AND (conversation_prepared_at IS NULL OR reflection_prepared_at IS NULL);
+        ]]></sql>
+        <rollback>
+            <dropIndex tableName="agent_job" indexName="idx_agent_job_unprepared_lanes"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-55">
+        <preConditions onFail="MARK_RAN" onFailMessage="llm_usage_event.usage_provenance already present">
+            <not><columnExists tableName="llm_usage_event" columnName="usage_provenance"/></not>
+        </preConditions>
+        <comment>
+            Say which of the two spend records a ledger row's token counts came from.
+
+            An attempt is billed the per-bucket maximum of the runner's own report and the proxy's
+            per-call accumulation, because neither is complete: compaction deletes calls from the
+            runner's report, and the proxy sees no streamed call and no cache write. That maximum is the
+            right amount, but it means a MERGED row matches neither source's own number, so without this
+            column an amount cannot be reconciled against anything. It is equally the signal for the
+            defect that forced the change — a run of PROXY rows where RUNNER is expected is compaction
+            eating calls, which had the ledger booking a quarter of real spend while the budget cap read
+            it.
+
+            Nullable, and rows written before it are left null rather than guessed at: the old code
+            preferred the runner's report whenever it was non-zero, so an existing row is 'whatever that
+            rule produced', which is not one of these values.
+        </comment>
+        <addColumn tableName="llm_usage_event">
+            <column name="usage_provenance" type="VARCHAR(16)"/>
+        </addColumn>
+        <sql>
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_usage_provenance
+                CHECK (usage_provenance IS NULL OR usage_provenance IN ('RUNNER', 'PROXY', 'MERGED', 'NONE'));
+        </sql>
+        <rollback>
+            <dropColumn tableName="llm_usage_event" columnName="usage_provenance"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-readiness" id="1785743133884-56">
+        <preConditions onFail="MARK_RAN" onFailMessage="ck_llm_usage_event_unpriced_has_no_cost already present">
+            <not>
+                <sqlCheck expectedResult="1">
+                    SELECT CASE WHEN EXISTS (
+                        SELECT 1 FROM pg_constraint WHERE conname = 'ck_llm_usage_event_unpriced_has_no_cost'
+                    ) THEN 1 ELSE 0 END
+                </sqlCheck>
+            </not>
+        </preConditions>
+        <comment>
+            Make "unpriced" mean one thing.
+
+            Two live queries asked whether a month had unresolvable spend and disagreed:
+            existsUnpricedInstanceFunded — the one that blocks every job in the workspace — reads
+            pricing_state, while countUncosted — the number the operator sees — read cost_usd IS NULL.
+            Every path in the application writes rows where those agree. The 1785015307013 ledger
+            backfill did not: it classified a zero-cost row that had burned real tokens as UNPRICED and
+            stored the zero. Such a row blocks the cap and is invisible to the count, which is how an
+            operator came to read "1 unpriced event" off a month with nineteen holding the cap shut.
+
+            The repair sets cost_usd back to NULL on exactly those rows, which is what an unresolvable
+            price has always meant. It moves no total: every sum filters on pricing_state = 'PRICED', so
+            these rows contributed nothing before and contribute nothing now. It is deliberately narrow —
+            only rows that are UNPRICED with a cost — so a PRICED or NO_CHARGE amount is never touched.
+
+            The constraint is the part that lasts. With it the two columns cannot part again, and the
+            reprice path (which is the only UPDATE the ledger permits) cannot leave a row half-moved:
+            setting pricing_state without a cost, or a cost without the state, now fails loudly instead of
+            producing another invisible blocker.
+        </comment>
+        <sql><![CDATA[
+            UPDATE llm_usage_event SET cost_usd = NULL
+            WHERE pricing_state = 'UNPRICED' AND cost_usd IS NOT NULL;
+
+            ALTER TABLE llm_usage_event ADD CONSTRAINT ck_llm_usage_event_unpriced_has_no_cost
+                CHECK ((pricing_state = 'UNPRICED') = (cost_usd IS NULL));
+        ]]></sql>
+        <rollback>
+            <!-- Only the constraint comes off. The UPDATE has no inverse worth writing: the zeros it
+                 replaced were a misclassification, not data, and restoring them would put the invisible
+                 blockers back. -->
+            <sql>
+                ALTER TABLE llm_usage_event DROP CONSTRAINT ck_llm_usage_event_unpriced_has_no_cost;
+            </sql>
+        </rollback>
+    </changeSet>
+
+    <!-- FeedbackChannel's three values now sit on one axis — where the unit lands — so CONVERSATION becomes
+         IN_CHAT (the dialogic channel, wherever it runs: the in-app mentor or Slack) and REFLECTION becomes
+         IN_APP (the non-dialogic practice surface, the developer's own practice pages). IN_CONTEXT is
+         unchanged. REFLECTION named what the developer was supposed to *do* rather than where the feedback
+         landed, and asserted an outcome nothing here can observe; see ADR 0029.
+
+         -52 is unreleased but has already been applied to a running instance, so it is immutable in
+         practice and the re-alignment is made forward here, exactly as -52 itself did for 1781092589259-67.
+
+         Correcting -52's premise rather than -52: its comment says "No data migration: nothing ever wrote
+         this channel." That was true when it was written and is now historical. The producer this branch
+         added has since run against a deployed instance, so rows exist on both renamed values and this
+         changeSet does migrate data. The UPDATEs run with the CHECK dropped, because the old constraint
+         would reject the new spelling and the new one would reject the old.
+
+         thread_key is deliberately NOT recomputed, and the migrated rows are therefore orphaned for
+         supersession. FeedbackThreadKey digests the channel's name, so a renamed row's stored key no
+         longer matches the key the next run computes: the next message about that habit for that person
+         is written beside the old one instead of replacing it. Recomputing it here would mean
+         reproducing a Java canonicalisation (0x1F separators, UTF-8, SHA-256) in SQL over a
+         feedback -> feedback_observation -> observation -> practice join to recover the slug, untested,
+         where a mistake writes a *wrong* key rather than an absent one — and a wrong key can collide
+         with another habit's thread and let one card retire a card about something else, which is the
+         one failure FeedbackThreadKey#PRACTICE_SCOPE exists to prevent. An orphaned thread costs one
+         duplicate card that ages out; a collided thread destroys a message. The lanes carry single-digit
+         row counts, so the cheaper repair is to drop those rows by hand on any instance that has them. -->
+    <changeSet author="hephaestus-terminology" id="1785743133884-57">
+        <preConditions onFail="MARK_RAN" onFailMessage="chk_feedback_channel already names IN_CHAT and IN_APP">
+            <sqlCheck expectedResult="1">
+                SELECT count(*) FROM pg_constraint
+                WHERE conname = 'chk_feedback_channel'
+                  AND conrelid = 'feedback'::regclass
+                  AND pg_get_constraintdef(oid) LIKE '%REFLECTION%'
+            </sqlCheck>
+        </preConditions>
+        <comment>Put the feedback channels on one axis: CONVERSATION becomes IN_CHAT, REFLECTION becomes IN_APP.</comment>
+        <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_channel;
+
+            UPDATE feedback SET channel = 'IN_CHAT' WHERE channel = 'CONVERSATION';
+            UPDATE feedback SET channel = 'IN_APP'  WHERE channel = 'REFLECTION';
+
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_channel
+                CHECK (channel IN ('IN_CONTEXT', 'IN_CHAT', 'IN_APP'));
+        ]]></sql>
+        <rollback><![CDATA[
+            ALTER TABLE feedback DROP CONSTRAINT chk_feedback_channel;
+
+            UPDATE feedback SET channel = 'CONVERSATION' WHERE channel = 'IN_CHAT';
+            UPDATE feedback SET channel = 'REFLECTION'   WHERE channel = 'IN_APP';
+
+            ALTER TABLE feedback ADD CONSTRAINT chk_feedback_channel
+                CHECK (channel IN ('IN_CONTEXT', 'CONVERSATION', 'REFLECTION'));
+        ]]></rollback>
+    </changeSet>
+
+    <!-- The two lane-preparation marks added by -53 are named after the lanes, so they carry the old names
+         with them. Kept separate from -57 so the channel migration and this cosmetic rename can be reverted
+         independently.
+
+         The partial index from -54 has both columns in its predicate; PostgreSQL rewrites an index
+         definition on RENAME COLUMN, so it follows the rename and is not re-created here. -->
+    <changeSet author="hephaestus-terminology" id="1785743133884-58">
+        <preConditions onFail="MARK_RAN" onFailMessage="agent_job lane marks already renamed">
+            <and>
+                <columnExists tableName="agent_job" columnName="conversation_prepared_at"/>
+                <columnExists tableName="agent_job" columnName="reflection_prepared_at"/>
+            </and>
+        </preConditions>
+        <comment>Rename the agent_job lane-preparation marks to match the renamed channels.</comment>
+        <renameColumn tableName="agent_job" oldColumnName="conversation_prepared_at" newColumnName="in_chat_prepared_at"/>
+        <renameColumn tableName="agent_job" oldColumnName="reflection_prepared_at" newColumnName="in_app_prepared_at"/>
+        <rollback>
+            <renameColumn tableName="agent_job" oldColumnName="in_chat_prepared_at" newColumnName="conversation_prepared_at"/>
+            <renameColumn tableName="agent_job" oldColumnName="in_app_prepared_at" newColumnName="reflection_prepared_at"/>
+        </rollback>
+    </changeSet>
 
 </databaseChangeLog>

@@ -58,7 +58,7 @@ export interface UntrustedMarkdownProps {
 /**
  * Markdown a model wrote, rendered with no HTML passthrough, no remote images and no link the
  * renderer has not checked. Shared rather than copied, so the safety decisions are made once: the
- * operator's feedback preview and the developer's own reflection surface show the same text, and a
+ * operator's feedback preview and the developer's own practice pages show the same text, and a
  * hardening applied to one must not be able to miss the other.
  *
  * <p>Brings no wrapper of its own. Callers put {@link UNTRUSTED_MARKDOWN_PROSE} on whichever element

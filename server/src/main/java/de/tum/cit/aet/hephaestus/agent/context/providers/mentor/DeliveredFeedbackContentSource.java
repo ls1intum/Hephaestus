@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.FeedbackObservationVisibility;
@@ -130,6 +131,13 @@ public class DeliveredFeedbackContentSource implements ContentSource {
         for (Feedback f : delivered) {
             String body = f.getBody();
             if (body == null || body.isBlank()) {
+                continue;
+            }
+            // A conversational unit's body is the composer's move, never the words the mentor spoke — those
+            // live in the chat transcript. Staging one here would show the mentor its own unspoken plan as
+            // something the developer has already been told, and the evidence it was told to hold back is
+            // exactly the part it would then believe it had already shown.
+            if (ConversationBriefBody.isBrief(body)) {
                 continue;
             }
             if (

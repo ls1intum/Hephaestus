@@ -1,10 +1,11 @@
 # ADR 0021: Findings vs feedback — the agent produces evidence *and* granular feedback; we deliver feedback, never findings
 
-**Status:** Accepted (amended 2026-07-31 — several decisions below did not ship; see the update)
+**Status:** Accepted (amended 2026-07-31 — several decisions below did not ship; amended 2026-08-16 — `report_feedback` now ships; see the updates)
 **Date:** 2026-06-14
 **Authors:** Felix T.J. Dietrich
 **Builds on:** [ADR 0020](0020-context-fabric-everything-is-an-integration.md) (the content-fabric / `ContentSource` seam and history-in-sandbox), [ADR 0007](0007-sandbox-spi-shape.md) (the Pi agent sandbox)
 **Partially superseded by:** [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) (F-6 / F-13 / F-24)
+**Completed by:** [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md) (the measurement/intervention seam, and the lane→level mapping this ADR left as an open call)
 
 > [!IMPORTANT]
 > **The title asserts something that did not ship.** The agent does not author feedback; there is no
@@ -12,6 +13,12 @@
 > did ship, and the ledger below is broadly what the code holds. Read the
 > [2026-07-31 update](#update--2026-07-31-issue-1423) for the shipped/not-shipped split before you
 > take any decision below as current, and never take the schema block as current.
+>
+> **That paragraph was true on 2026-07-31 and is not true now.** A `report_feedback` tool ships as of
+> 2026-08-16 and the agent does author feedback, in a second turn after measurement. The paragraph is
+> left standing because it is the record of where the design stood for a year; the
+> [2026-08-16 update](#update--2026-08-16-issue-1430) and
+> [ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md) are current.
 
 > [!NOTE]
 > This ADR captures the **decision and rationale**. Some field/enum names below were renamed during
@@ -313,3 +320,51 @@ This ADR is historical rationale, not a field or enum inventory. For what the co
   `FeedbackSuppressionReason` value list;
 - the [generated database schema](../contributor/database-schema.mdx);
 - the Java domain model and the generated OpenAPI specification.
+
+## Update — 2026-08-16 (issue #1430)
+
+Two things this ADR left open are now closed, and one thing it recorded as *not shipped* has shipped.
+The decision and rationale are in
+[ADR 0029](0029-measurement-intervention-seam-and-channel-levels.md); what follows is only what changes
+about the text above.
+
+### F-2 / F-10 — agent-authored feedback — now ships
+
+The [2026-07-31 update](#update--2026-07-31-issue-1423) listed *"agent-authored feedback through a
+`report_feedback` tool"* under **Decisions that did not ship**, and the note at the top of this file
+says there is no such tool. Both are now historical. A `report_feedback` tool exists, called from a
+second in-sandbox session that runs after the review's measurements are final, and its output is parsed
+into `ComposedFeedbackUnit`s that the existing routers and admission gate then accept or refuse.
+
+Two differences from F-2's shape, so nobody reads the register above as the contract:
+
+- **It is a separate session, not a terminal turn on the review's.** Re-using the review's session
+  would re-bill the whole conversation and would invite the composer to treat its own reasoning as
+  evidence.
+- **The `origin {AGENT, POLICY_FLOOR, FALLBACK}` column of F-11 stays unbuilt.** The degradation path
+  is not a second author writing weaker text; it is `DeliveryComposer` falling back to the detector's
+  own `reasoning` and `guidance`, which is the rendering that shipped before composition existed. There
+  is one feedback author and one pre-existing renderer, so there is nothing for an origin column to
+  discriminate.
+
+### "Hattie `level` derived, not stored" — answered
+
+The **Open calls for the owner** section parked this with no mapping recorded. ADR 0029 records the
+mapping — `IN_CONTEXT` = task, `REFLECTION` = process, `CONVERSATION` = self-regulation — and keeps the
+recommendation: **derived, not stored.** `feedback` gains no `level` column, because the level is a
+function of `channel` and a stored copy is a second truth that can disagree with it.
+
+Leaving the mapping unrecorded turned out to have a cost, which is worth stating for the next open
+call: for a year the three lanes were authored by three different mechanisms at three different times,
+and with no written statement that they are three *levels* rather than three renderers, they drifted
+into three vocabularies. Recording a mapping is cheaper than persisting one.
+
+### What is unchanged
+
+Everything in the **Principle**, **Decision register** and **Deliberately NOT adopted** sections stands
+as written, including F-1's rejection of a whole-comment row, F-9's reaction-blind firewall (still
+pinned by `DetectionReactionFirewallTest`, and the composition stage is inside it — it reads
+observations and feedback, never reactions), F-12's subject/recipient split, and F-14's deletion of
+`FeedbackPost`. Advice is still **not** persisted per observation: `Observation` carries `reasoning` and
+no `guidance` column, and ADR 0029 is the reason it should stay that way — advice is a property of a
+delivery, and it now has a durable home on `feedback.body` for every channel.

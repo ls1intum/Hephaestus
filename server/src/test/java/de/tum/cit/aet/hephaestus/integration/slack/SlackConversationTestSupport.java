@@ -192,7 +192,7 @@ public final class SlackConversationTestSupport {
                 .artifactId(threadId)
                 .recipientUserId(aboutUserId)
                 .aboutUserId(aboutUserId)
-                .channel(FeedbackChannel.CONVERSATION)
+                .channel(FeedbackChannel.IN_CHAT)
                 .position((int) ((threadId * 10 + aboutUserId) % 1000))
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)

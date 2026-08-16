@@ -17,7 +17,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Staged input is read by a model that quotes it back to the person it is about, so a row id in it
  * becomes a number the model presents as one they can look up: work recorded against merge request !22
- * is stored under primary key 306 and reaches the reflection page as "PR #306", pointing at unrelated
+ * is stored under primary key 306 and reaches the practice pages as "PR #306", pointing at unrelated
  * work or at nothing. Only the number, title, container and link cross into the sandbox — the row id
  * stops here, and a staged file therefore carries no number that is not a number a person can type.
  *

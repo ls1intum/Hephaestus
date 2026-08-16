@@ -49,7 +49,7 @@ import org.springframework.stereotype.Component;
 public class ReviewContractValidator {
 
     /**
-     * Which capability a vendor must own to claim a lane. {@link FeedbackLane#REFLECTION} maps to no
+     * Which capability a vendor must own to claim a lane. {@link FeedbackLane#IN_APP} maps to no
      * capability because it is ours — no integration can reach it.
      */
     static final Map<FeedbackLane, Capability> LANE_CAPABILITIES = new EnumMap<>(
@@ -58,7 +58,7 @@ public class ReviewContractValidator {
             Capability.FEEDBACK_DELIVERY,
             FeedbackLane.IN_CONTEXT_INLINE,
             Capability.INLINE_FINDINGS,
-            FeedbackLane.CONVERSATION,
+            FeedbackLane.IN_CHAT,
             Capability.FEEDBACK_DELIVERY
         )
     );
@@ -70,7 +70,7 @@ public class ReviewContractValidator {
      * missing from both would go unenforced until some vendor declared it. {@code ReviewContractLaneRulesTest}
      * asserts the exhaustiveness.
      */
-    static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.REFLECTION);
+    static final Set<FeedbackLane> HEPHAESTUS_OWNED_LANES = EnumSet.of(FeedbackLane.IN_APP);
 
     private final ArtifactDescriptorRegistry descriptors;
     private final IntegrationMessageHandlerRegistry handlers;

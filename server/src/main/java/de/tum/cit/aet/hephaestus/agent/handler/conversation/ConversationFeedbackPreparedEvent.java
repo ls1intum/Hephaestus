@@ -4,7 +4,7 @@ import org.springframework.modulith.NamedInterface;
 
 /**
  * Published by {@link ConversationalFeedbackPreparer} once per recipient that received newly PREPARED
- * CONVERSATION units this cycle, from inside the preparer's REQUIRES_NEW transaction — so an
+ * IN_CHAT units this cycle, from inside the preparer's REQUIRES_NEW transaction — so an
  * {@code AFTER_COMMIT} listener only ever sees units that are actually persisted. Carries a count, never
  * finding content: the consumer's job is a push signal ("something is waiting"), not delivery.
  *

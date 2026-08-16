@@ -6,7 +6,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.Del
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.WithheldFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -2349,5 +2351,359 @@ class DeliveryComposerTest extends BaseUnitTest {
         assertThat(result.withheld()).containsExactly(
             new WithheldFinding("occ-rk-checkable", FeedbackSuppressionReason.COMPOSER_DEDUPED)
         );
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // The composed in-context message: the intervention a second, separate pass wrote after the
+    // measurements. It is preferred over the measurement-time reasoning + guidance wherever a practice
+    // has one, and the run that composed nothing must still produce exactly today's comment.
+    // ---------------------------------------------------------------------------------------------
+
+    private static final String COMPOSED_BODY = "Nothing in this change exercises the tax-exempt branch you added.";
+    private static final String COMPOSED_NEXT_STEP =
+        "Write the assertion that distinguishes the exempt case, then run the suite.";
+
+    private ComposedFeedbackUnit inContextUnit(String slug, String title, String body, String nextStep) {
+        return new ComposedFeedbackUnit(
+            FeedbackChannel.IN_CONTEXT,
+            slug,
+            List.of("obs-0"),
+            ComposedFeedbackUnit.Action.NEW,
+            null,
+            null,
+            title,
+            body,
+            nextStep,
+            null,
+            // Resolved in Java from the observation's own citation — the composer never names a file.
+            new ComposedFeedbackUnit.ResolvedAnchor("obs-0", 0, "Billing/Invoice.java", "NEW", 42, 42)
+        );
+    }
+
+    private ValidatedFinding untestedBranchFinding() {
+        return negativeFinding(
+            "ships-tests-with-the-change",
+            "New branch ships without a test",
+            Severity.MAJOR,
+            List.of(new LocationSpec("Billing/Invoice.java", 42)),
+            List.of("if (customer.isTaxExempt()) {"),
+            "MEASURED REASONING: the change adds a branch and no test covers it.",
+            "MEASURED GUIDANCE: add a test for the new branch."
+        );
+    }
+
+    @Test
+    void compose_composedInContextUnit_replacesTheMeasurementTimeWordsOnTheInlineNote() {
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(untestedBranchFinding()),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(inContextUnit("ships-tests-with-the-change", "Untested branch", COMPOSED_BODY, COMPOSED_NEXT_STEP))
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        String note = result.diffNotes().get(0).body();
+        assertThat(note).contains(COMPOSED_BODY).contains(COMPOSED_NEXT_STEP);
+        assertThat(note).doesNotContain("MEASURED REASONING").doesNotContain("MEASURED GUIDANCE");
+        // The composer names the issue; the severity emoji stays the measurement's, since a unit carries
+        // no verdict and may not restate one.
+        assertThat(note).contains("Untested branch").doesNotContain("New branch ships without a test");
+        assertThat(note).contains("🟠");
+        // The summary points at the same note by the same name, so it cannot read as a second problem.
+        assertThat(result.mrNote()).contains("Untested branch").doesNotContain("New branch ships without a test");
+    }
+
+    @Test
+    void compose_noComposedUnit_fallsBackToTheMeasurementTimeReasoningAndGuidance() {
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(untestedBranchFinding()),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of()
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).body())
+            .contains("MEASURED REASONING")
+            .contains("MEASURED GUIDANCE")
+            .contains("New branch ships without a test");
+    }
+
+    @Test
+    void compose_composedBodyThatTheScrubEmpties_fallsBackRatherThanPostingAnEmptyNote() {
+        // Pure grading-meta: the sanitiser drops the whole sentence, leaving no message at all. The
+        // developer must still be told, so the practice reverts to what the detector wrote.
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(untestedBranchFinding()),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(
+                inContextUnit(
+                    "ships-tests-with-the-change",
+                    "Untested branch",
+                    "The practice requires an assertion for every new branch.",
+                    COMPOSED_NEXT_STEP
+                )
+            )
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        String note = result.diffNotes().get(0).body();
+        assertThat(note).contains("MEASURED REASONING").contains("MEASURED GUIDANCE");
+        assertThat(note).doesNotContain("The practice requires");
+        // Title and next step do not survive a body that did not: the whole unit is unusable.
+        assertThat(note).contains("New branch ships without a test").doesNotContain(COMPOSED_NEXT_STEP);
+    }
+
+    @Test
+    void compose_composedBodyCarryingGradingMeta_isScrubbedSentenceBySentenceLikeGuidance() {
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(untestedBranchFinding()),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(
+                inContextUnit(
+                    "ships-tests-with-the-change",
+                    "Untested branch",
+                    COMPOSED_BODY + " The practice requires an assertion for every new branch.",
+                    COMPOSED_NEXT_STEP
+                )
+            )
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).body()).contains(COMPOSED_BODY).doesNotContain("The practice requires");
+    }
+
+    @Test
+    void compose_composedUnitForAPracticeThatCannotBeAnchored_landsInTheSummaryInsteadOfInventingAPlacement() {
+        // An author-side process practice has no meaningful line to point at, so there is no inline lane
+        // for its message to take. The words still reach the developer, in the summary.
+        ValidatedFinding f = negativeFinding(
+            "describe-what-and-why",
+            "Description does not say why",
+            Severity.MAJOR,
+            List.of(),
+            null,
+            "MEASURED REASONING: the description lists what changed only.",
+            "MEASURED GUIDANCE: say why the change was needed."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(f),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(inContextUnit("describe-what-and-why", "Unexplained change", COMPOSED_BODY, COMPOSED_NEXT_STEP))
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).isEmpty();
+        assertThat(result.mrNote())
+            .contains("Unexplained change")
+            .contains(COMPOSED_BODY)
+            .contains(COMPOSED_NEXT_STEP)
+            .doesNotContain("MEASURED REASONING");
+    }
+
+    @Test
+    void compose_twoLociOfOnePractice_rendersItsSingleComposedMessageOnceAtTheMostSevereLocus() {
+        ValidatedFinding severe = untestedBranchFinding();
+        ValidatedFinding lesser = negativeFinding(
+            "ships-tests-with-the-change",
+            "Second untested branch",
+            Severity.MINOR,
+            List.of(new LocationSpec("Billing/Refund.java", 9)),
+            List.of("if (order.isRefundable()) {"),
+            "SECOND LOCUS REASONING: another branch with no test.",
+            "SECOND LOCUS GUIDANCE: cover it too."
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(lesser, severe),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(inContextUnit("ships-tests-with-the-change", "Untested branch", COMPOSED_BODY, COMPOSED_NEXT_STEP))
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(2);
+        assertThat(
+            result
+                .diffNotes()
+                .stream()
+                .filter(n -> n.body().contains(COMPOSED_BODY))
+                .count()
+        ).isEqualTo(1);
+        // The MAJOR locus leads the severity sort, so it is the one the single message is written for.
+        assertThat(result.diffNotes().get(0).filePath()).isEqualTo("Billing/Invoice.java");
+        assertThat(result.diffNotes().get(0).body()).contains(COMPOSED_BODY);
+        assertThat(result.diffNotes().get(1).body()).contains("SECOND LOCUS REASONING");
+    }
+
+    @Test
+    void compose_withholdUnit_leavesThePracticeOnTodaysRenderingRatherThanSilencingIt() {
+        // Silencing an in-context note is the server's decision and owes the ledger a reason of its own;
+        // acting on the composer's here would drop the note with no row to explain it.
+        ComposedFeedbackUnit withheld = new ComposedFeedbackUnit(
+            FeedbackChannel.IN_CONTEXT,
+            "ships-tests-with-the-change",
+            List.of("obs-0"),
+            ComposedFeedbackUnit.Action.WITHHOLD,
+            null,
+            ComposedFeedbackUnit.WithholdReason.ALREADY_SAID,
+            null,
+            null,
+            null,
+            null,
+            null
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(untestedBranchFinding()),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(withheld)
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).body()).contains("MEASURED REASONING").contains("MEASURED GUIDANCE");
+    }
+
+    @Test
+    void compose_inAppUnitForTheSamePractice_isNotBorrowedByTheInContextLane() {
+        ComposedFeedbackUnit inApp = new ComposedFeedbackUnit(
+            FeedbackChannel.IN_APP,
+            "ships-tests-with-the-change",
+            List.of("prior:ships-tests-with-the-change"),
+            ComposedFeedbackUnit.Action.NEW,
+            null,
+            null,
+            "A habit across three changes",
+            "IN_APP BODY: this keeps happening.",
+            "IN_APP NEXT STEP: write the test first next time.",
+            null,
+            null
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(untestedBranchFinding()),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(inApp)
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        assertThat(result.diffNotes().get(0).body()).contains("MEASURED REASONING").doesNotContain("IN_APP BODY");
+    }
+
+    @Test
+    void compose_composedUnitOnTheAgentsOwnSuggestedAnchor_keepsThePlacementAndTakesTheWords() {
+        ValidatedFinding f = new ValidatedFinding(
+            "ships-tests-with-the-change",
+            "New branch ships without a test",
+            Presence.ABSENT,
+            Assessment.BAD,
+            Severity.MAJOR,
+            0.92f,
+            buildEvidence(
+                List.of(new LocationSpec("Billing/Invoice.java", 42)),
+                List.of("if (customer.isTaxExempt()) {")
+            ),
+            "MEASURED REASONING: the change adds a branch and no test covers it.",
+            "MEASURED GUIDANCE: add a test for the new branch.",
+            List.of(new DiffNote("Billing/Invoice.java", 42, 44, "SUGGESTED NOTE BODY", null))
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(f),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(inContextUnit("ships-tests-with-the-change", "Untested branch", COMPOSED_BODY, COMPOSED_NEXT_STEP))
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).hasSize(1);
+        DiffNote note = result.diffNotes().get(0);
+        assertThat(note.filePath()).isEqualTo("Billing/Invoice.java");
+        assertThat(note.startLine()).isEqualTo(42);
+        assertThat(note.endLine()).isEqualTo(44);
+        assertThat(note.body())
+            .contains(COMPOSED_BODY)
+            .contains(COMPOSED_NEXT_STEP)
+            .doesNotContain("SUGGESTED NOTE BODY");
+    }
+
+    @Test
+    void compose_strengthsOnlyRun_prefersTheComposedMessageInTheBullet() {
+        ValidatedFinding good = new ValidatedFinding(
+            "ships-tests-with-the-change",
+            "Tests ship with the change",
+            Presence.PRESENT,
+            Assessment.GOOD,
+            Severity.INFO,
+            0.95f,
+            null,
+            "MEASURED REASONING: the new branch is covered.",
+            "MEASURED GUIDANCE: keep doing that.",
+            List.of()
+        );
+
+        DeliveryContent result = DeliveryComposer.compose(
+            List.of(good),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            null,
+            List.of(
+                inContextUnit("ships-tests-with-the-change", "Tests landed with it", COMPOSED_BODY, COMPOSED_NEXT_STEP)
+            )
+        );
+
+        assertThat(result).isNotNull();
+        assertThat(result.diffNotes()).isEmpty();
+        assertThat(result.mrNote())
+            .contains(COMPOSED_BODY)
+            .contains(COMPOSED_NEXT_STEP)
+            .doesNotContain("MEASURED REASONING");
+    }
+
+    @Test
+    void recomposeMrNote_withTheSameComposedUnits_namesTheSameThingTheFirstPassDid() {
+        ValidatedFinding f = untestedBranchFinding().withKeys(new ObservationKeys("occ-1", "rk-1"));
+        List<ComposedFeedbackUnit> composed = List.of(
+            inContextUnit("ships-tests-with-the-change", "Untested branch", COMPOSED_BODY, COMPOSED_NEXT_STEP)
+        );
+
+        String firstPass = DeliveryComposer.recomposeMrNote(
+            List.of(f),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            Set.of(),
+            composed
+        );
+        String demoted = DeliveryComposer.recomposeMrNote(
+            List.of(f),
+            ArtifactKinds.PULL_REQUEST,
+            Map.of(),
+            Set.of("rk-1"),
+            composed
+        );
+
+        assertThat(firstPass).contains("Untested branch");
+        assertThat(demoted).contains("see the 1 inline comment below.").doesNotContain("Untested branch");
     }
 }

@@ -92,6 +92,29 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     );
 
     /**
+     * Everything already composed for a recipient that they have not received yet — every lane, newest
+     * first.
+     *
+     * <p>Deliberately not filtered by {@code createdAt}: a queued message is queued however long ago it
+     * was written, and a window that hid the old ones would let composition write a second message about
+     * a habit whose first message is still waiting to be read.
+     */
+    @Query(
+        """
+        SELECT f FROM Feedback f
+        WHERE f.workspaceId = :workspaceId
+          AND f.recipientUserId = :recipientUserId
+          AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
+        ORDER BY f.createdAt DESC
+        """
+    )
+    List<Feedback> findPreparedForRecipient(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        Pageable pageable
+    );
+
+    /**
      * Marks a prior DELIVERED summary superseded when a new one replaces it; inline-only deliveries stay
      * DELIVERED on the same thread. The state predicate makes concurrent retries idempotent.
      */
@@ -102,6 +125,117 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         nativeQuery = true
     )
     int updateState(@Param("id") UUID id, @Param("state") String state);
+
+    // --- supersession ---
+    //
+    // A thread is a CHAIN of rows over time, so `thread_key` is deliberately not unique. The uniqueness
+    // that matters is "at most one live PREPARED unit per thread", and it is held by the compare-and-set
+    // below rather than by a constraint — a constraint would have to refuse the second write, and the
+    // right answer to a second write is to retire the first.
+
+    /**
+     * The newest unit on one continuity thread, whatever became of it — the row a supersession is aimed
+     * at.
+     *
+     * <p><b>Newest, not newest-still-queued.</b> Deliberately unfiltered by delivery state, because the
+     * caller has to be able to tell the three zero-row outcomes apart: the thread was read, the thread was
+     * already retired by a run racing this one, or the thread does not exist. A query that pre-filtered to
+     * {@code PREPARED} would answer all three with the same empty optional.
+     *
+     * <p>Recipient-scoped as well as workspace-scoped even though the key digests both: a key is a hash,
+     * and a predicate is what makes "one person's queue is never another's" a property of the SQL rather
+     * than of the digest holding.
+     */
+    @Query(
+        value = """
+        SELECT f.id FROM feedback f
+        WHERE f.workspace_id = :workspaceId
+          AND f.recipient_user_id = :recipientUserId
+          AND f.channel = :channel
+          AND f.thread_key = :threadKey
+        ORDER BY f.created_at DESC, f.id DESC
+        LIMIT 1
+        """,
+        nativeQuery = true
+    )
+    Optional<UUID> findLatestOnThread(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("channel") String channel,
+        @Param("threadKey") String threadKey
+    );
+
+    /**
+     * Retires a queued unit so a newer one can take its place (compare-and-set).
+     *
+     * <p><b>The {@code PREPARED} predicate is the whole rule, and it lives here rather than in a prior
+     * read on purpose.</b> A read-then-write cannot express "only if nobody has read it yet": the
+     * recipient's own page flips the row to DELIVERED in an unrelated transaction, and between a check and
+     * an update there is room for exactly that. Two runs racing therefore both aim at the same row and
+     * exactly one is told it won; the loser sees rowcount 0 and treats it as an ordinary outcome. It also
+     * follows that a DELIVERED unit can never be retired by this path — nothing that has been received may
+     * be un-said.
+     *
+     * <p>Native because {@link Feedback} is {@code @Immutable} — the ORM cannot update it.
+     *
+     * @return {@code 1} when this caller retired the unit, {@code 0} when it was no longer queued
+     */
+    @Modifying(flushAutomatically = true)
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPERSEDED' " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markSuperseded(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    /**
+     * Whether a unit has been received. Asked only after a supersession compare-and-set matched nothing,
+     * to tell "the recipient read it first" — a thread that continues, so the replacement still points
+     * back at what it follows — from "the thread already moved on", where pointing back would fork the
+     * chain onto a row some other run has already claimed.
+     *
+     * <p>Native and by primary key so it reads the row rather than the persistence context, which still
+     * holds the pre-CAS state.
+     */
+    @Query(
+        value = "SELECT EXISTS (SELECT 1 FROM feedback f " +
+            "WHERE f.id = :id AND f.workspace_id = :workspaceId AND f.delivery_state = 'DELIVERED')",
+        nativeQuery = true
+    )
+    boolean isDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    /**
+     * The practice each of these units is about, read off its headline observation.
+     *
+     * <p>Staged onto {@code prepared.json} so a composer choosing to replace a queued message can tell
+     * <em>which habit</em> each queued message is about. Without it the thread keys on that file are
+     * opaque digests and the composer would be picking one blind — and on the conversation lane, whose
+     * body is composed at the turn, there is not even a body to guess from.
+     *
+     * <p>Both sides of the join carry {@code workspaceId}: the unit's own scalar and the practice behind
+     * the observation. One predicate is the tenancy boundary for one table, and this query spans two.
+     */
+    @Query(
+        """
+        SELECT fo.feedback.id AS feedbackId, fo.observation.practice.slug AS practiceSlug
+        FROM FeedbackObservation fo
+        WHERE fo.feedback.id IN :feedbackIds
+          AND fo.feedback.workspaceId = :workspaceId
+          AND fo.observation.practice.workspace.id = :workspaceId
+          AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
+          AND fo.ordinal = 0
+        """
+    )
+    List<HeadlinePracticeRow> findHeadlinePractices(
+        @Param("workspaceId") Long workspaceId,
+        @Param("feedbackIds") Collection<UUID> feedbackIds
+    );
+
+    interface HeadlinePracticeRow {
+        UUID getFeedbackId();
+        String getPracticeSlug();
+    }
 
     /**
      * A workspace purge soft-deletes rather than dropping rows, so it never fires the RESTRICT FK on
@@ -252,15 +386,16 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int markConversationSuppressedBySilentMode(@Param("id") UUID id);
 
     /**
-     * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. Body is null
-     * on these rows; it is composed at delivery.
+     * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. The body on
+     * these rows is never the mentor's script: it is null, or the composer's move ({@link ConversationBriefBody}),
+     * and the words of the turn are composed at delivery either way.
      */
     @Query(
         """
         SELECT f FROM Feedback f
         WHERE f.workspaceId = :workspaceId
           AND f.recipientUserId = :recipientUserId
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
           AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
         ORDER BY f.createdAt DESC
         """
@@ -296,7 +431,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Query(
         """
         SELECT DISTINCT f.workspaceId FROM Feedback f
-        WHERE f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+        WHERE f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
           AND f.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
         """
     )
@@ -312,7 +447,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Transactional
     @Query(
         value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = 'CONVERSATION_EXPIRED' " +
-            "WHERE workspace_id = :workspaceId AND channel = 'CONVERSATION' " +
+            "WHERE workspace_id = :workspaceId AND channel = 'IN_CHAT' " +
             "AND delivery_state = 'PREPARED' AND created_at < :cutoff",
         nativeQuery = true
     )
@@ -335,9 +470,9 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     /**
      * The operator's page of feedback units.
      *
-     * <p><b>REFLECTION bodies are never returned here.</b> {@code IN_CONTEXT} bodies are already public on
-     * the pull request and {@code CONVERSATION} bodies are NULL by construction, so until now "operators
-     * can read feedback bodies" exposed nothing private. A {@code REFLECTION} body is the first
+     * <p><b>IN_APP bodies are never returned here.</b> {@code IN_CONTEXT} bodies are already public on
+     * the pull request and {@code IN_CHAT} bodies are NULL by construction, so until now "operators
+     * can read feedback bodies" exposed nothing private. A {@code IN_APP} body is the first
      * system-authored text about a named person that lives nowhere else — and in the course deployment
      * the workspace admin is the instructor. {@link FeedbackChannel}'s own contract says every channel is
      * developer-facing, "never to a mentor, instructor, or grader"; handing this one to an admin would
@@ -363,13 +498,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
             " f.replaces_id AS \"replacesId\"," +
             " f.created_at AS \"createdAt\"," +
             " f.delivered_at AS \"deliveredAt\"," +
-            // REFLECTION bodies are withheld from the operator surface in SQL rather than in a mapper, so a
-            // second projection cannot forget. Executed against a real database by
-            // PracticeReviewOutputControllerIntegrationTest#withholdsAReflectionBodyFromEveryOperatorRoute.
-            " CASE WHEN f.channel = 'REFLECTION' THEN NULL ELSE left(f.body, " +
+            // IN_APP and IN_CHAT bodies are withheld from the operator surface in SQL rather than in
+            // a mapper, so a second projection cannot forget. One is the developer's private page, the other
+            // is the mentor's unspoken coaching move about them; see
+            // ReviewFeedbackQueryService#bodyVisibleToOperator. Executed against a real database by
+            // PracticeReviewOutputControllerIntegrationTest#withholdsAnInAppBodyFromEveryOperatorRoute.
+            " CASE WHEN f.channel IN ('IN_APP', 'IN_CHAT') THEN NULL ELSE left(f.body, " +
             BODY_PREVIEW_LENGTH +
             ") END AS \"bodyPreview\"," +
-            " (f.channel <> 'REFLECTION' AND f.body IS NOT NULL AND length(f.body) > " +
+            " (f.channel NOT IN ('IN_APP', 'IN_CHAT') AND f.body IS NOT NULL AND length(f.body) > " +
             BODY_PREVIEW_LENGTH +
             ") AS \"bodyTruncated\"," +
             " (SELECT count(*) FROM feedback_observation fo" +
@@ -441,7 +578,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         long getUnits();
     }
 
-    // --- the reflection lane ---
+    // --- the in-app lane ---
     //
     // Every query below carries `workspace_id` by hand. `feedback` is scoped by a raw scalar with no
     // Hibernate tenancy filter (see the @WorkspaceAgnostic reason on this interface), so on this table
@@ -449,7 +586,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     // system-authored text about a named person, so a missing one leaks more than a count.
 
     /**
-     * What the recipient may read on their own reflection surface: their REFLECTION units that were prepared or
+     * What the recipient may read on their own practice pages: their IN_APP units that were prepared or
      * already read, newest first. Suppressed and superseded rows are excluded — the operator surface is
      * where "we withheld this, and here is why" is answered; the developer's own surface shows what was
      * actually said to them.
@@ -459,7 +596,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         SELECT f FROM Feedback f
         WHERE f.workspaceId = :workspaceId
           AND f.recipientUserId = :recipientUserId
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.REFLECTION
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_APP
           AND f.deliveryState IN (
               de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED,
               de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.DELIVERED
@@ -467,14 +604,14 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         ORDER BY f.createdAt DESC, f.id DESC
         """
     )
-    List<Feedback> findReadableReflectionForRecipient(
+    List<Feedback> findReadableInAppForRecipient(
         @Param("workspaceId") Long workspaceId,
         @Param("recipientUserId") Long recipientUserId,
         Pageable pageable
     );
 
     /**
-     * Flips a PREPARED reflection unit to DELIVERED at the moment its recipient actually reads it
+     * Flips a PREPARED in-app unit to DELIVERED at the moment its recipient actually reads it
      * (compare-and-set, so two concurrent page loads cannot both claim the flip and the second sees
      * rowcount 0).
      *
@@ -490,13 +627,13 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     @Transactional
     @Query(
         value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = :at " +
-            "WHERE id = :id AND workspace_id = :workspaceId AND channel = 'REFLECTION' AND delivery_state = 'PREPARED'",
+            "WHERE id = :id AND workspace_id = :workspaceId AND channel = 'IN_APP' AND delivery_state = 'PREPARED'",
         nativeQuery = true
     )
-    int markReflectionDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("at") Instant at);
+    int markInAppDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("at") Instant at);
 
     /**
-     * When a REFLECTION unit about this practice was last written for this recipient, whatever became of it
+     * When an IN_APP unit about this practice was last written for this recipient, whatever became of it
      * — the cooldown that stops one habit being restated on every pull request.
      *
      * <p>Deliberately unfiltered by delivery state: the question is when we last said this, and a unit
@@ -510,10 +647,10 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
           AND fo.observation.practice.workspace.id = :workspaceId
           AND f.workspaceId = :workspaceId
           AND f.recipientUserId = :recipientUserId
-          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.REFLECTION
+          AND f.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_APP
         """
     )
-    Optional<Instant> lastReflectionSurfacedAt(
+    Optional<Instant> lastInAppSurfacedAt(
         @Param("workspaceId") Long workspaceId,
         @Param("recipientUserId") Long recipientUserId,
         @Param("practiceSlug") String practiceSlug

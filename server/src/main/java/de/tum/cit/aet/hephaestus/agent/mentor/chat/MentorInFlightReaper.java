@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.mentor.ChatMessage;
@@ -155,6 +156,10 @@ public class MentorInFlightReaper {
             observed.reasoningTokens(),
             Math.max(1, observed.totalCalls()),
             price,
+            // The turn never came back to report anything, so the proxy's per-call accumulation is the
+            // only record that exists for it — or, when it died before its first call returned, there is
+            // no record at all and the row says so rather than naming a source it did not have.
+            observed.hasBillableUsage() ? UsageProvenance.PROXY : UsageProvenance.NONE,
             Instant.now()
         );
         if (observed.hasBillableUsage()) {

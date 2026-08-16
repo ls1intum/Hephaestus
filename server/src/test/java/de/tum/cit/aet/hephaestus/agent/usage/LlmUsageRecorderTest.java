@@ -33,6 +33,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             900_000,
             1,
             price,
+            UsageProvenance.RUNNER,
             Instant.now()
         );
     }
@@ -216,6 +217,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             -9,
             0,
             priced(),
+            UsageProvenance.RUNNER,
             Instant.now()
         );
 
@@ -313,6 +315,7 @@ class LlmUsageRecorderTest extends BaseUnitTest {
             0,
             1,
             price,
+            UsageProvenance.RUNNER,
             Instant.now()
         );
     }

@@ -21,11 +21,11 @@ public enum FeedbackLane {
     IN_CONTEXT_INLINE,
 
     /** A turn in an ongoing mentor conversation with the recipient, on a messaging integration. */
-    CONVERSATION,
+    IN_CHAT,
 
     /**
-     * The recipient's private reflection surface inside Hephaestus. Deliberately not deliverable by an
+     * The recipient's private practice pages inside Hephaestus. Deliberately not deliverable by an
      * integration — it is ours, and a vendor claiming it would be claiming a surface it cannot reach.
      */
-    REFLECTION,
+    IN_APP,
 }

@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.PreparedConversationFact;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -125,6 +126,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (fact.getPreparedAt() != null) {
                 node.put("preparedAt", fact.getPreparedAt().toString());
             }
+            writeMove(node, fact.getBody());
         }
         root.put("totalPrepared", arr.size());
         try {
@@ -132,6 +134,29 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         } catch (JacksonException e) {
             throw new IllegalStateException("Failed to serialize prepared conversation feedback context", e);
         }
+    }
+
+    /**
+     * The composer's move for one prepared unit, when there is one.
+     *
+     * <p>Written under {@code move}, and never under {@code body} or {@code message}, because it is not text
+     * to speak: {@code opener} is the question to ask before anything is told, {@code evidence} is what to
+     * show only once the developer has answered, and {@code target} is what the turn is trying to leave them
+     * able to do for themselves. The mentor still writes the words of the turn.
+     *
+     * <p>A unit prepared without a move simply has none, and the mentor composes from the fact as it always
+     * has - the fallback is a missing key, not an empty object, so "nothing was composed" cannot read as "the
+     * composer had nothing to say".
+     */
+    private static void writeMove(ObjectNode node, String body) {
+        ConversationBriefBody.Brief brief = ConversationBriefBody.parse(body);
+        if (brief == null) {
+            return;
+        }
+        ObjectNode move = node.putObject("move");
+        move.put("opener", brief.opener());
+        move.put("evidence", brief.evidence());
+        move.put("target", brief.target());
     }
 
     /**

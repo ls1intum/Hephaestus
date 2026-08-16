@@ -456,7 +456,7 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
             any(),
             anyInt()
         );
-        // The conversational/reflection surfaces are signalled despite the failed direct delivery.
+        // The chat and in-app lanes are signalled despite the failed direct delivery.
         verify(eventPublisher).publishEvent(
             any(de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent.class)
         );

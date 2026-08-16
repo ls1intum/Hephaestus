@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 /**
  * The outcome of routing one observation for conversational delivery. Only {@link #ADMIT} is prepared as a PREPARED
- * CONVERSATION feedback unit; every other value is a named, testable reason the observation is NOT raised in a mentor
+ * IN_CHAT feedback unit; every other value is a named, testable reason the observation is NOT raised in a mentor
  * turn.
  */
 public enum ConversationRoutingDecision {

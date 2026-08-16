@@ -159,4 +159,14 @@ public class LlmUsageEvent {
     @Nullable
     @Column(name = "applied_per_1m_cache_write_usd", precision = 18, scale = 8)
     private BigDecimal appliedPer1mCacheWriteUsd;
+
+    /**
+     * Which of the two independent spend records these token counts came from — see
+     * {@link UsageProvenance}. Nullable only because rows written before this column existed have no
+     * honest answer; every row this application writes carries one.
+     */
+    @Nullable
+    @Enumerated(EnumType.STRING)
+    @Column(name = "usage_provenance", length = 16)
+    private UsageProvenance usageProvenance;
 }

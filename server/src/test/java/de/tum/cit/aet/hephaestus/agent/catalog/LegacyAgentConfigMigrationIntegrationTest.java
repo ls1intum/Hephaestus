@@ -40,13 +40,21 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * so this is the only tier that can catch a regression here.
  *
  * <p>Tests are ordered because the last two mutate the database they inspect.
+ *
+ * <p>The database it inspects is this release and nothing past it, so what it asserts are the names and
+ * values <em>this</em> migration wrote — {@code PRACTICE_DETECTION}, not whatever a later release renames
+ * it to. A rename shipped after this release is that release's own migration to prove, and pulling it in
+ * here would leave a test of a past upgrade rewritten by every future one.
  */
 @Testcontainers
 @Tag("integration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LegacyAgentConfigMigrationIntegrationTest {
 
-    /** The consolidated changelog this release ships; everything before it is the "old" schema. */
+    /**
+     * The consolidated changelog this release ships; everything before it is the "old" schema, and
+     * everything after it belongs to a later release that this test neither applies nor rolls back.
+     */
     private static final String RELEASE_CHANGELOG = "1785015307013_changelog.xml";
 
     private static final String MASTER = "db/master.xml";
@@ -74,7 +82,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             liquibase.tag(PRE_RELEASE_TAG);
         }
         seedLegacyConfiguration();
-        runRemainingChangeSets();
+        runTheReleaseChangeSets();
     }
 
     @Test
@@ -94,7 +102,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .as("the mentor fell back to it and detection fanned out to it, so it keeps both purposes")
             .containsExactly(
                 new String[] { "MENTOR", "900", "5", "true" },
-                new String[] { "PRACTICE_REVIEW", "900", "5", "true" }
+                new String[] { "PRACTICE_DETECTION", "900", "5", "true" }
             );
     }
 
@@ -129,7 +137,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     void aConfigSharedByBothPurposesBecomesTwoBindingsOnOneModel() throws SQLException {
         assertThat(bindingsOf("legacy-bound")).containsExactly(
             new String[] { "MENTOR", "600", "3", "false" },
-            new String[] { "PRACTICE_REVIEW", "600", "3", "false" }
+            new String[] { "PRACTICE_DETECTION", "600", "3", "false" }
         );
         assertThat(
             scalar(
@@ -195,7 +203,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .as("the limits are what the binding exists to carry; skipping the model would have dropped them")
             .containsExactly(
                 new String[] { "MENTOR", "1200", "7", "true" },
-                new String[] { "PRACTICE_REVIEW", "1200", "7", "true" }
+                new String[] { "PRACTICE_DETECTION", "1200", "7", "true" }
             );
     }
 
@@ -229,7 +237,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     void aPointerAtADisabledConfigPausesDetectionButNotTheMentor() throws SQLException {
         assertThat(purposeToModelSlug("legacy-paused")).containsExactly(
             Map.entry("MENTOR", "legacy-9509"),
-            Map.entry("PRACTICE_REVIEW", "legacy-9508")
+            Map.entry("PRACTICE_DETECTION", "legacy-9508")
         );
     }
 
@@ -327,7 +335,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
         String ledgerBefore = scalar("SELECT count(*)::text FROM llm_usage_event");
 
         execute("DELETE FROM databasechangelog WHERE filename LIKE '%" + RELEASE_CHANGELOG + "'");
-        assertThatCode(LegacyAgentConfigMigrationIntegrationTest::runRemainingChangeSets)
+        assertThatCode(LegacyAgentConfigMigrationIntegrationTest::runTheReleaseChangeSets)
             .as("every changeSet must guard itself; a second pass over an upgraded database must not throw")
             .doesNotThrowAnyException();
 
@@ -357,13 +365,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
     /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
-            List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
-            List<Integer> releaseIndexes = new ArrayList<>();
-            for (int index = 0; index < pending.size(); index++) {
-                if (pending.get(index).getFilePath().endsWith(RELEASE_CHANGELOG)) {
-                    releaseIndexes.add(index);
-                }
-            }
+            List<Integer> releaseIndexes = pendingReleaseIndexes(liquibase);
             if (releaseIndexes.isEmpty()) {
                 return 0;
             }
@@ -372,10 +374,33 @@ class LegacyAgentConfigMigrationIntegrationTest {
         }
     }
 
-    private static void runRemainingChangeSets() throws Exception {
+    /**
+     * Applies what is pending through the last changeset the release contributes, and stops there.
+     *
+     * <p>Bounded rather than a plain {@code update()}, because rolling back to {@link #PRE_RELEASE_TAG}
+     * walks the databasechangelog in reverse <em>execution</em> order rather than changelog order, and
+     * {@link #reRunningTheReleaseChangelogChangesNothing} re-executes this release, which moves it behind
+     * every changelog appended after it. Applying those too would therefore roll this release back first
+     * and leave a later changelog rolling back against tables this one had already taken away.
+     */
+    private static void runTheReleaseChangeSets() throws Exception {
         try (Liquibase liquibase = liquibase()) {
-            liquibase.update(contexts(), new LabelExpression());
+            List<Integer> releaseIndexes = pendingReleaseIndexes(liquibase);
+            assertThat(releaseIndexes).as("the release changelog has nothing left to apply").isNotEmpty();
+            liquibase.update(releaseIndexes.getLast() + 1, contexts(), new LabelExpression());
         }
+    }
+
+    /** Where the release changelog's changesets sit among those still unrun, in changelog order. */
+    private static List<Integer> pendingReleaseIndexes(Liquibase liquibase) throws Exception {
+        List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
+        List<Integer> indexes = new ArrayList<>();
+        for (int index = 0; index < pending.size(); index++) {
+            if (pending.get(index).getFilePath().endsWith(RELEASE_CHANGELOG)) {
+                indexes.add(index);
+            }
+        }
+        return indexes;
     }
 
     /** Each caller gets its own connection: closing a {@link Liquibase} closes the one it was given. */
@@ -437,7 +462,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             INSERT INTO agent_job (id, workspace_id, config_id, job_type, status, config_snapshot, job_token,
                                    retry_count, created_at, completed_at, llm_model, llm_total_calls,
                                    llm_total_input_tokens, llm_total_output_tokens, llm_cost_usd)
-            VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_REVIEW', 'COMPLETED',
+            VALUES ('9a000000-0000-0000-0000-000000000001', 9401, 9501, 'PRACTICE_DETECTION', 'COMPLETED',
                     '{}'::jsonb, 'token', 0, now(), now(), 'gpt-4o', 3, 1000, 500, 0.25)
             """,
             """

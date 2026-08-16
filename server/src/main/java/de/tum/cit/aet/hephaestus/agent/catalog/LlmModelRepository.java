@@ -15,6 +15,14 @@ public interface LlmModelRepository extends JpaRepository<LlmModel, Long> {
 
     boolean existsByConnectionIdAndUpstreamModelId(Long connectionId, String upstreamModelId);
 
+    /**
+     * Every instance model exposing this upstream id. Deliberately a list: uniqueness is only enforced
+     * per connection, so two connections may serve the same upstream id at different prices, and the one
+     * caller that resolves a model from a stored name ({@code LlmUsageRepricer}) must be able to see that
+     * it is ambiguous rather than be handed an arbitrary winner.
+     */
+    List<LlmModel> findByUpstreamModelId(String upstreamModelId);
+
     boolean existsByConnectionId(Long connectionId);
 
     @Query("SELECT m FROM LlmModel m JOIN FETCH m.connection ORDER BY m.id")

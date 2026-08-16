@@ -129,7 +129,9 @@ public class ObservationController {
         @PathVariable UUID observationId
     ) {
         var observation = observationService.getObservation(workspaceContext.id(), observationId);
-        String deliveredGuidance = observationService.getDeliveredGuidance(observationId).orElse(null);
+        String deliveredGuidance = observationService
+            .getDeliveredGuidance(workspaceContext.id(), observationId)
+            .orElse(null);
         boolean includeEvidence = evidenceAuthorization.permits(
             workspaceContext.id(),
             observation,

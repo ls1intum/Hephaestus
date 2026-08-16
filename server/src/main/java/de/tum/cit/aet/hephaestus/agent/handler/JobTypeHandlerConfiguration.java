@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
@@ -107,6 +108,7 @@ public class JobTypeHandlerConfiguration {
     JobTypeHandler pullRequestReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
+        FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
@@ -119,6 +121,7 @@ public class JobTypeHandlerConfiguration {
             workspaceContextBuilder,
             taskEnvelopeWriter,
             resultParser,
+            compositionResultParser,
             deliveryService,
             feedbackService,
             secretDiffScanner,

@@ -24,6 +24,7 @@ import {
     validateInapplicabilityScope,
 } from "./pi-finding-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
+import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi-runner-usage.mjs";
 import {
     COMPOSITION_MIN_BUDGET_MS,
     compositionBudgetMs,
@@ -35,12 +36,22 @@ const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
-// The feedback-composition stage (see reflection-composer.md). Mirrors SandboxLayout:
-// FEEDBACK_COMPOSITION_PATH / REFLECTION_FEEDBACK_FILENAME / REFLECTION_COMPOSER_PROMPT_FILENAME.
+// The feedback-composition stage (see feedback-composer.md). Mirrors SandboxLayout:
+// FEEDBACK_COMPOSITION_PATH / FEEDBACK_FILENAME / FEEDBACK_COMPOSER_PROMPT_FILENAME.
 const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
-const REFLECTION_FEEDBACK_PATH = `${OUTPUT}/reflection-feedback.json`;
-const COMPOSER_PROMPT_PATH = `${CWD}/reflection-composer.md`;
+const FEEDBACK_PATH = `${OUTPUT}/feedback.json`;
+const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
 const OBSERVATION_HISTORY_PATH = `${CWD}/inputs/history/observations.json`;
+const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
+// This run's own measurements, projected for the composer. Under work/ because the composer must be
+// handed them rather than left to grep out/review-state.json for them, and because a projection of
+// rows that are already collected has no business being collected a second time.
+const COMPOSITION_WORK_DIR = `${CWD}/work/composition`;
+const COMPOSITION_OBSERVATIONS_PATH = `${COMPOSITION_WORK_DIR}/observations.json`;
+// The source kind a citation must carry for its location to exist inside this change's diff, and
+// therefore for an inline note to be placeable on it. Mirrors PullRequestReviewHandler.filterByDiffScope,
+// which asks the same question in Java and today answers it by DELETING the observation.
+const DIFF_SOURCE_KIND = "scm.pull-request.diff";
 const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
 if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
     throw new Error(`AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`);
@@ -329,6 +340,20 @@ function hasPersistedReviewState() {
     return reviewState.findings.length > 0;
 }
 
+/**
+ * Settle whether this attempt has a usable result.json, and say where it came from: "agent" when the
+ * agent wrote one that validates, "tool-state" when one had to be composed from the persisted
+ * report_finding calls, null when neither works and the retry is owed its turn.
+ *
+ * Both branches are the ones the exit path used to run inline; naming the outcome lets the answer be
+ * computed once and read by both the budget arithmetic and the exit.
+ */
+function resolveResultFile() {
+    if (checkResultFile()) return "agent";
+    if (maybeWriteResultFile() && checkResultFile()) return "tool-state";
+    return null;
+}
+
 
 function appendFindings(findings) {
     let inserted = 0;
@@ -400,24 +425,45 @@ const reportFindingTool = defineTool({
 
 // ── Feedback composition stage ────────────────────────────────────────────────
 //
-// A SECOND LLM turn, after the review's measurements are final, that turns what has been observed
-// about this developer ACROSS pieces of work into process-level messages for their reflection surface.
-// Observation and feedback are separate acts; this is where the separation lives in the runtime.
+// A SECOND LLM turn, after the review's measurements are final, that decides what — if anything — is
+// worth saying to this developer now, on which surface, and in what words. Measurement and intervention
+// are separate acts; this is where the separation lives in the runtime.
+//
+// One turn writes for every enabled lane, because the per-lane rules are only statable in contrast:
+// "the note on the work says this, so the private page must not say it again" cannot be expressed by a
+// stage that can see one lane at a time.
 //
 // Strictly additive. It runs in its OWN session, only once the review has durable state and only from
 // time the review did not need, and every failure inside it is swallowed: a review that measured
 // correctly is a successful review whether or not anything was composed from it. Nothing here can
 // touch reviewState or the exit code.
 
-const composedFeedback = { messages: [] };
+const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"];
+const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"];
+const WITHHOLD_REASONS = ["NO_MATERIAL_CHANGE", "ALREADY_SAID", "BELOW_BAR"];
+
+// What the stage produces, and everything Java needs to check it against. The observations and the
+// thread keys are echoed rather than re-derived server-side on purpose: they are the exact inputs the
+// composer was shown, so a unit that names one of them can be validated against what was actually on
+// the table rather than against a re-query that may have moved.
+const composedFeedback = { observations: [], preparedThreadKeys: [], units: [] };
 
 function loadCompositionRequest() {
     try {
         if (!existsSync(COMPOSITION_REQUEST_PATH)) return null;
         const request = JSON.parse(readFileSync(COMPOSITION_REQUEST_PATH, "utf8"));
         if (!request || request.enabled !== true) return null;
+        const channels = {};
+        for (const channel of CHANNELS) {
+            const bounds = request.channels?.[channel];
+            channels[channel] = {
+                enabled: bounds?.enabled === true,
+                maxUnits: Math.max(0, Math.min(Number(bounds?.maxUnits) || 0, 10)),
+            };
+        }
+        if (!CHANNELS.some((channel) => channels[channel].enabled && channels[channel].maxUnits > 0)) return null;
         return {
-            maxMessages: Math.max(1, Math.min(Number(request.maxMessages) || 2, 10)),
+            channels,
             minDistinctArtifacts: Math.max(2, Number(request.minDistinctArtifacts) || 2),
         };
     } catch (e) {
@@ -447,75 +493,235 @@ function composablePracticeSlugs() {
     return [...slugs].sort();
 }
 
+// The messages already written for this person and not yet read. A composer may replace one of these,
+// and only one of these: the key it names must be a key it was shown, or it is inventing a target.
+function stagedPreparedThreadKeys() {
+    try {
+        if (!existsSync(PREPARED_FEEDBACK_PATH)) return [];
+        const prepared = JSON.parse(readFileSync(PREPARED_FEEDBACK_PATH, "utf8"));
+        return [
+            ...new Set(
+                (prepared?.prepared ?? [])
+                    .map((entry) => entry?.threadKey)
+                    .filter((key) => typeof key === "string" && key.trim().length > 0),
+            ),
+        ];
+    } catch (e) {
+        console.error(`[pi-runner] prepared feedback unreadable for composition: ${e.message}`);
+        return [];
+    }
+}
+
+// A citation can carry an inline note only if it locates a line inside THIS change. Everything else is
+// a true observation about work that is not on the diff, which is a reason to route it elsewhere and
+// never a reason to drop it.
+function citationIsAnchorable(citation) {
+    return (
+        citation?.sourceKind === DIFF_SOURCE_KIND &&
+        typeof citation?.path === "string" &&
+        citation.path.trim().length > 0 &&
+        Number.isInteger(citation?.startLine)
+    );
+}
+
+// This run's measurements, as the composer sees them. Ids are positional and stable for the run: the
+// composer names one, and Java resolves it back through the same list, echoed alongside the units.
+function projectObservations() {
+    return reviewState.findings.map((finding, index) => {
+        const citations = (finding.evidence?.citations ?? []).map((citation, citationIndex) => ({
+            index: citationIndex,
+            sourceKind: citation.sourceKind,
+            path: citation.path,
+            side: citation.side ?? null,
+            startLine: citation.startLine ?? null,
+            endLine: citation.endLine ?? null,
+            quote: citation.quote,
+            anchorable: citationIsAnchorable(citation),
+        }));
+        return {
+            id: `obs-${index}`,
+            practiceSlug: finding.practiceSlug,
+            title: finding.title,
+            presence: finding.presence,
+            assessment: finding.assessment ?? null,
+            severity: finding.severity ?? null,
+            confidence: finding.confidence ?? null,
+            reasoning: finding.reasoning,
+            anchorable: citations.some((citation) => citation.anchorable),
+            citations,
+        };
+    });
+}
+
+// Java resolves the anchor from the citation, so it needs the locations and nothing else. The quote and
+// the reasoning stay out: they are already on the observation rows, and re-collecting them would put a
+// second copy of every measurement into the job's output column.
+function leanObservations(observations) {
+    return observations.map((observation) => ({
+        id: observation.id,
+        practiceSlug: observation.practiceSlug,
+        assessment: observation.assessment,
+        severity: observation.severity,
+        anchorable: observation.anchorable,
+        citations: observation.citations.map((citation) => ({
+            index: citation.index,
+            sourceKind: citation.sourceKind,
+            path: citation.path,
+            side: citation.side,
+            startLine: citation.startLine,
+            endLine: citation.endLine,
+            anchorable: citation.anchorable,
+        })),
+    }));
+}
+
 function persistComposedFeedback() {
-    writeFileSync(REFLECTION_FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
+    writeFileSync(FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
 }
 
 // Structurally distinct from report_finding, and that is the point: no presence, no assessment, no
-// severity, no confidence, no citations. An intervention that could carry a verdict would eventually
-// be read back as one.
-function buildProcessFeedbackTool(practiceSlugs, maxMessages) {
+// severity, no confidence, no citations the composer typed. An intervention that could carry a verdict
+// would eventually be read back as one, and an anchor the composer invented would put a note on a line
+// that does not exist — so it names an observation and a citation index, never a path and never a line.
+function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys) {
+    const observationsById = new Map(observations.map((observation) => [observation.id, observation]));
+    const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
+    const usedPerChannel = Object.fromEntries(CHANNELS.map((channel) => [channel, 0]));
+    const seen = new Set();
+    const refuse = (text) => ({ content: [{ type: "text", text }], details: { stored: 0 } });
+
     return defineTool({
-        name: "report_process_feedback",
-        label: "Report Process Feedback",
+        name: "report_feedback",
+        label: "Report Feedback",
         description:
-            "Persist exactly one process-level message for the developer's reflection surface. Call it as soon as one message is ready, one call per practice. This is an intervention, not a measurement: it takes no presence, assessment, severity or confidence.",
+            "Persist exactly one feedback unit for one channel. Call it as soon as one unit is ready, one call " +
+            "per unit. This is an intervention, not a measurement: it takes no presence, assessment, severity " +
+            "or confidence, and no citation you typed yourself.",
         parameters: {
             type: "object",
             additionalProperties: false,
-            required: ["message"],
+            required: ["unit"],
             properties: {
-                message: {
+                unit: {
                     type: "object",
                     additionalProperties: false,
-                    required: ["practiceSlug", "title", "body", "nextStep"],
+                    required: ["channel", "practiceSlug", "basedOn", "action"],
                     properties: {
+                        channel: {
+                            type: "string",
+                            enum: enabledChannels,
+                            description: "Which surface this unit is for. Each has its own level and its own rules.",
+                        },
                         practiceSlug: {
                             type: "string",
                             enum: practiceSlugs,
-                            description: "The practice whose recurring pattern this message is about.",
+                            description: "The practice this unit is about. One unit per practice per channel.",
                         },
+                        basedOn: {
+                            type: "array",
+                            minItems: 1,
+                            items: { type: "string", minLength: 1 },
+                            description:
+                                "What this rests on: ids from this run's observations, and/or 'prior:<practiceSlug>' " +
+                                "for a claim that rests on the staged record rather than on this run.",
+                        },
+                        action: {
+                            type: "string",
+                            enum: ACTIONS,
+                            description:
+                                "NEW to say something; SUPERSEDE to replace a message that is queued and unread; " +
+                                "WITHHOLD to record, with a reason, that you decided to stay quiet.",
+                        },
+                        supersedesThreadKey: {
+                            type: "string",
+                            maxLength: 64,
+                            description:
+                                "Required for SUPERSEDE: the threadKey of an entry in inputs/history/prepared.json. " +
+                                "You may not name a key that is not in that file.",
+                        },
+                        withholdReason: { type: "string", enum: WITHHOLD_REASONS },
                         title: {
                             type: "string",
                             maxLength: 255,
-                            description: "Names the pattern in a few words. Never names the person.",
+                            description: "Names the issue in a few words. Never names the person.",
                         },
                         body: {
                             type: "string",
                             maxLength: 8000,
                             description:
-                                "The message, as Markdown, addressed to the developer as 'you'. Read verbatim. Cites the pieces of work, never a line of code.",
+                                "IN_CONTEXT and IN_APP only. Markdown, read verbatim by the developer.",
                         },
                         nextStep: {
                             type: "string",
                             maxLength: 2000,
                             description:
-                                "One habit to try on the NEXT piece of work. If it can be done right now on one diff, it is the wrong level.",
+                                "IN_CONTEXT and IN_APP only. One edit before merging, or one habit for next time.",
+                        },
+                        conversation: {
+                            type: "object",
+                            additionalProperties: false,
+                            required: ["opener", "evidence", "target"],
+                            description:
+                                "IN_CHAT only. The move, not the script: the mentor still writes the words " +
+                                "of the turn with the live conversation in front of it.",
+                            properties: {
+                                opener: {
+                                    type: "string",
+                                    maxLength: 2000,
+                                    description:
+                                        "A question about how they work, asked before anything is told. Read verbatim " +
+                                        "when the mentor raises it.",
+                                },
+                                evidence: {
+                                    type: "string",
+                                    maxLength: 4000,
+                                    description:
+                                        "What you would show them once they have answered, and not before. The mentor " +
+                                        "decides when.",
+                                },
+                                target: {
+                                    type: "string",
+                                    maxLength: 2000,
+                                    description: "What this turn is trying to leave them able to do themselves.",
+                                },
+                            },
+                        },
+                        anchor: {
+                            type: "object",
+                            additionalProperties: false,
+                            required: ["observationId", "citationIndex"],
+                            description:
+                                "IN_CONTEXT only. Names an observation and one of ITS citations; the file, side and " +
+                                "line come from that citation, never from you.",
+                            properties: {
+                                observationId: { type: "string", minLength: 1 },
+                                citationIndex: { type: "integer", minimum: 0 },
+                            },
                         },
                     },
                 },
             },
         },
         execute: async (_toolCallId, params) => {
-            const message = params.message;
-            if (composedFeedback.messages.some((m) => m.practiceSlug === message.practiceSlug)) {
-                return {
-                    content: [{ type: "text", text: `Already have a message for ${message.practiceSlug}; skipped.` }],
-                    details: { stored: 0, total: composedFeedback.messages.length },
-                };
+            const unit = params.unit;
+            const bounds = request.channels[unit.channel];
+            if (!bounds?.enabled) {
+                return refuse(`${unit.channel} is not a lane this run may write for; skipped.`);
             }
-            if (composedFeedback.messages.length >= maxMessages) {
-                return {
-                    content: [{ type: "text", text: `Message cap of ${maxMessages} reached; skipped.` }],
-                    details: { stored: 0, total: composedFeedback.messages.length },
-                };
+            const key = `${unit.channel}:${unit.practiceSlug}`;
+            if (seen.has(key)) {
+                return refuse(`Already have a ${unit.channel} unit for ${unit.practiceSlug}; skipped.`);
             }
-            composedFeedback.messages.push({
-                practiceSlug: message.practiceSlug,
-                title: message.title,
-                body: message.body,
-                nextStep: message.nextStep,
-            });
+            if (usedPerChannel[unit.channel] >= bounds.maxUnits) {
+                return refuse(`${unit.channel} cap of ${bounds.maxUnits} reached; skipped.`);
+            }
+            const rejection = validateUnit(unit, observationsById, preparedThreadKeys);
+            if (rejection) {
+                return refuse(rejection);
+            }
+            seen.add(key);
+            usedPerChannel[unit.channel]++;
+            composedFeedback.units.push(unit);
             // Written on every call, like report_finding, so a stage killed by the watchdog still
             // leaves behind what it had already decided.
             persistComposedFeedback();
@@ -523,13 +729,54 @@ function buildProcessFeedbackTool(practiceSlugs, maxMessages) {
                 content: [
                     {
                         type: "text",
-                        text: `Stored a process-level message for ${message.practiceSlug}. ${composedFeedback.messages.length}/${maxMessages} used.`,
+                        text: `Stored a ${unit.channel} unit for ${unit.practiceSlug} (${unit.action}). ${usedPerChannel[unit.channel]}/${bounds.maxUnits} used on that lane.`,
                     },
                 ],
-                details: { stored: 1, total: composedFeedback.messages.length },
+                details: { stored: 1, channel: unit.channel, total: composedFeedback.units.length },
             };
         },
     });
+}
+
+// The rules JSON Schema cannot state: which fields each channel and each action require, and that an
+// anchor and a supersession target must both name something that was actually on the table. Java checks
+// every one of these again — this side exists so the model is told at once, while it can still fix it.
+function validateUnit(unit, observationsById, preparedThreadKeys) {
+    if (unit.action === "WITHHOLD") {
+        if (!unit.withholdReason) return "WITHHOLD needs a withholdReason; skipped.";
+        return null;
+    }
+    if (!unit.title?.trim()) return "A unit that is not a WITHHOLD needs a title; skipped.";
+    if (unit.action === "SUPERSEDE") {
+        if (!unit.supersedesThreadKey) return "SUPERSEDE needs a supersedesThreadKey; skipped.";
+        if (!preparedThreadKeys.includes(unit.supersedesThreadKey)) {
+            return `No queued message has threadKey '${unit.supersedesThreadKey}'; it must come from inputs/history/prepared.json. Skipped.`;
+        }
+    }
+    if (unit.channel === "IN_CHAT") {
+        if (unit.body || unit.nextStep) return "IN_CHAT takes conversation{opener,evidence,target}, not body/nextStep; skipped.";
+        if (!unit.conversation?.opener?.trim()) return "IN_CHAT needs conversation.opener; skipped.";
+        if (!unit.conversation?.evidence?.trim()) return "IN_CHAT needs conversation.evidence; skipped.";
+        if (!unit.conversation?.target?.trim()) return "IN_CHAT needs conversation.target; skipped.";
+        if (unit.anchor) return "Only IN_CONTEXT units may carry an anchor; skipped.";
+        return null;
+    }
+    if (unit.conversation) return "Only IN_CHAT units may carry a conversation block; skipped.";
+    if (!unit.body?.trim()) return `${unit.channel} needs a body; skipped.`;
+    if (!unit.nextStep?.trim()) return `${unit.channel} needs a nextStep; skipped.`;
+    if (unit.channel === "IN_APP") {
+        if (unit.anchor) return "Only IN_CONTEXT units may carry an anchor; skipped.";
+        return null;
+    }
+    if (!unit.anchor) return "An IN_CONTEXT unit is a note on a line, so it needs an anchor; skipped.";
+    const observation = observationsById.get(unit.anchor.observationId);
+    if (!observation) return `No observation '${unit.anchor.observationId}' in this run; skipped.`;
+    const citation = observation.citations[unit.anchor.citationIndex];
+    if (!citation) return `Observation '${observation.id}' has no citation ${unit.anchor.citationIndex}; skipped.`;
+    if (!citation.anchorable) {
+        return `Citation ${unit.anchor.citationIndex} of '${observation.id}' is not on this change's diff, so no note can be placed on it. Skipped.`;
+    }
+    return null;
 }
 
 async function runCompositionStage(sharedDeps, budgetMs) {
@@ -546,8 +793,15 @@ async function runCompositionStage(sharedDeps, budgetMs) {
     if (practiceSlugs.length === 0) {
         return null;
     }
+    const observations = projectObservations();
+    const preparedThreadKeys = stagedPreparedThreadKeys();
+    composedFeedback.observations = leanObservations(observations);
+    composedFeedback.preparedThreadKeys = preparedThreadKeys;
+    mkdirSync(COMPOSITION_WORK_DIR, { recursive: true });
+    writeFileSync(COMPOSITION_OBSERVATIONS_PATH, JSON.stringify({ observations }, null, 2));
+
     const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
-    const tool = buildProcessFeedbackTool(practiceSlugs, request.maxMessages);
+    const tool = buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys);
 
     // A SEPARATE session, not another turn on the review's. Two reasons, both structural: the review's
     // conversation is a record of taking measurements, and re-sending it would both cost its full
@@ -555,12 +809,22 @@ async function runCompositionStage(sharedDeps, budgetMs) {
     const { session } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
-        tools: ["read", "grep", "report_process_feedback"],
+        tools: ["read", "grep", "report_feedback"],
         customTools: [tool],
         sessionManager: SessionManager.inMemory(),
         settingsManager: sharedDeps.settingsManager,
         authStorage: sharedDeps.authStorage,
         modelRegistry: sharedDeps.modelRegistry,
+    });
+
+    // Subscribed for the same reason the review session is: this session is created with the same
+    // settings, so it compacts too, and a compacted call is one the proxy has already billed upstream
+    // while this stage reports nothing for it.
+    const streamUsage = newUsageLedger();
+    const unsubscribeUsage = session.subscribe((event) => {
+        if (event.type === "message_end") {
+            addAssistantUsage(streamUsage, event.message);
+        }
     });
 
     let aborted = false;
@@ -571,69 +835,41 @@ async function runCompositionStage(sharedDeps, budgetMs) {
     }, budgetMs);
     const startMs = Date.now();
     try {
-        await session.prompt(
-            `${instructions}\n\n## This turn\n` +
-                `Write at most ${request.maxMessages} message(s). A pattern needs at least ` +
-                `${request.minDistinctArtifacts} distinct pieces of work. Persist each with ` +
-                `report_process_feedback. If nothing clears the bar, write nothing and say so in one line.`,
-        );
+        await session.prompt(`${instructions}\n\n${buildCompositionTurn(request, observations)}`);
     } catch (err) {
         console.error(`[pi-runner] Composition stage prompt error: ${err.message}`);
     } finally {
         clearTimeout(timer);
+        unsubscribeUsage();
     }
     // Always written, even empty: an empty payload is the stage saying it looked and composed nothing,
     // which is a different fact from the stage never having run.
     persistComposedFeedback();
     console.error(
-        `[pi-runner] Composition stage: ${composedFeedback.messages.length} message(s) in ${((Date.now() - startMs) / 1000).toFixed(1)}s, aborted=${aborted}`,
+        `[pi-runner] Composition stage: ${composedFeedback.units.length} unit(s) in ${((Date.now() - startMs) / 1000).toFixed(1)}s, aborted=${aborted}`,
     );
-    return session;
+    return extractUsageFromSession(session.state, streamUsage);
 }
 
-function extractUsageFromSession(session) {
-    const messages = session.messages || [];
-    let model = null,
-        inputTokens = 0,
-        outputTokens = 0,
-        reasoningTokens = 0,
-        cacheReadTokens = 0,
-        cacheWriteTokens = 0,
-        costUsd = 0,
-        totalCalls = 0,
-        assistantMessages = 0;
-    const stopReasons = {};
-
-    for (const msg of messages) {
-        if (msg.role !== "assistant" || !msg.usage) continue;
-        assistantMessages++;
-        totalCalls++;
-        model = msg.model || model;
-        inputTokens += Number(msg.usage.input || 0);
-        outputTokens += Number(msg.usage.output || 0);
-        // Responses-path shape (output_tokens_details.reasoning_tokens) surfaced by the SDK as
-        // usage.reasoning when the upstream model reports it (e.g. o-series/gpt-5 reasoning models);
-        // absent for chat/completions-only models, so this stays 0 for those.
-        reasoningTokens += Number(msg.usage.reasoning || msg.usage.reasoningTokens || 0);
-        cacheReadTokens += Number(msg.usage.cacheRead || 0);
-        cacheWriteTokens += Number(msg.usage.cacheWrite || 0);
-        costUsd += Number(msg.usage.cost?.total || 0);
-        const sr = msg.stopReason || "unknown";
-        stopReasons[sr] = (stopReasons[sr] || 0) + 1;
-    }
-
-    return {
-        model,
-        inputTokens,
-        outputTokens,
-        reasoningTokens,
-        cacheReadTokens,
-        cacheWriteTokens,
-        costUsd,
-        totalCalls,
-        assistantMessages,
-        stopReasons,
-    };
+function buildCompositionTurn(request, observations) {
+    const lanes = CHANNELS.filter((channel) => request.channels[channel].enabled)
+        .map((channel) => `${channel} (at most ${request.channels[channel].maxUnits})`)
+        .join(", ");
+    const closed = CHANNELS.filter((channel) => !request.channels[channel].enabled);
+    const anchorable = observations.filter((observation) => observation.anchorable).length;
+    return (
+        `## This turn\n` +
+        `The review just finished. Its ${observations.length} measurement(s) are in ` +
+        `\`work/composition/observations.json\`; ${anchorable} of them cite a line inside this change and can ` +
+        `therefore carry a note on the work. Read that file first, then the history.\n\n` +
+        `Lanes open this turn: ${lanes}.` +
+        (closed.length > 0
+            ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.`
+            : "") +
+        `\nA pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.\n\n` +
+        `Persist each unit with report_feedback as soon as it is ready. Writing nothing on a lane is a ` +
+        `correct and common outcome; say in one line why, and stop.`
+    );
 }
 
 function accumulateUsage(prev, curr) {
@@ -917,11 +1153,15 @@ async function main() {
     }, INITIAL_TIMEOUT_MS);
 
     const events = [];
+    const streamUsage = newUsageLedger();
     const unsubscribe = session.subscribe((event) => {
         if (event.type === "tool_execution_start") {
             console.error(`[pi-runner] tool: ${event.toolName ?? "?"}`);
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
+            // Counted here, not from session.messages at the end: compaction deletes messages, and a
+            // deleted message took its tokens off the bill.
+            addAssistantUsage(streamUsage, event.message);
             const stopReason = event.message.stopReason;
             const types = (event.message.content || []).map((c) => c.type);
             const toolCalls = types.filter((t) => t === "tool_use" || t === "tool_call").length;
@@ -1014,7 +1254,7 @@ async function main() {
     }
 
     const initialDurationMs = Date.now() - startMs;
-    const initialUsage = extractUsageFromSession(session.state);
+    const initialUsage = extractUsageFromSession(session.state, streamUsage);
     accumulateUsage(null, initialUsage);
     prevUsage = initialUsage;
 
@@ -1035,14 +1275,27 @@ async function main() {
         `[pi-runner] Initial: ${(initialDurationMs / 1000).toFixed(1)}s, calls=${initialUsage.totalCalls}, softTimeout=${softTimeoutFired}, hardAbort=${hardAborted}, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
+    // ── Is the review already finished? ──────────────────────────────────────
+    //
+    // Asked BEFORE composition, not after, because the answer decides how much time composition may
+    // have. The retry below is the only claimant on RETRY_TIMEOUT_MS and it fires on exactly one
+    // condition: no usable result.json. Settle that condition first and a healthy review stops reserving
+    // an allowance nothing can spend.
+    //
+    // Safe to move ahead of the stage: the composer runs on its own session with its own tool set, which
+    // does not include report_finding, so nothing between here and the exit can change reviewState or
+    // the file.
+    const resultFileSource = resolveResultFile();
+
     // ── Feedback composition ─────────────────────────────────────────────────
     //
     // The second LLM step: observations were the measurement, this turns them into an intervention for
-    // the developer's reflection surface. Three conditions, and the last is the whole rule: durable review
+    // the developer's practice pages. Three conditions, and the last is the whole rule: durable review
     // state to compose from; no hard abort, because a review that lost its turn needs its retry allowance
-    // more than the reflection surface needs a message today; and, once that allowance is set aside, enough
-    // of the budget still unspent to finish a turn. Whether the soft nudge fired is not a condition — it is
-    // a steer that fires at 42.5% of the budget and says nothing about what is left.
+    // more than the practice pages need a message today; and enough of the budget still unspent to
+    // finish a turn — counting the retry allowance as spoken for only while the retry can still fire.
+    // Whether the soft nudge fired is not a condition — it is a steer that lands at 42.5% of the budget
+    // and says nothing about what is left.
     // Isolated: any failure is logged and this review's outcome is untouched.
     const reviewStatePersisted = hasPersistedReviewState();
     const leftoverForCompositionMs = compositionBudgetMs({
@@ -1050,21 +1303,23 @@ async function main() {
         elapsedMs: Date.now() - startMs,
         retryMs: RETRY_TIMEOUT_MS,
         compositionCeilingMs: COMPOSITION_TIMEOUT_MS,
+        resultFileValid: resultFileSource !== null,
     });
     if (
         shouldCompose({
             hasPersistedReviewState: reviewStatePersisted,
             hardAborted,
+            resultFileValid: resultFileSource !== null,
             budgetMs: leftoverForCompositionMs,
         })
     ) {
         try {
-            const composeSession = await runCompositionStage(
+            const composeUsage = await runCompositionStage(
                 { settingsManager, authStorage, modelRegistry },
                 leftoverForCompositionMs,
             );
-            if (composeSession) {
-                accumulateUsage(null, extractUsageFromSession(composeSession.state));
+            if (composeUsage) {
+                accumulateUsage(null, composeUsage);
                 persistUsage();
             }
         } catch (err) {
@@ -1073,18 +1328,17 @@ async function main() {
     } else {
         console.error(
             `[pi-runner] Composition stage skipped: reviewState=${reviewStatePersisted}, hardAbort=${hardAborted}, ` +
+                `resultFile=${resultFileSource ?? "none"}, ` +
                 `budget=${leftoverForCompositionMs}ms (floor ${COMPOSITION_MIN_BUDGET_MS}ms)`,
         );
     }
 
-    if (checkResultFile()) {
+    if (resultFileSource === "agent") {
         console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);
         unsubscribe();
         process.exit(0);
     }
-
-    maybeWriteResultFile();
-    if (checkResultFile()) {
+    if (resultFileSource === "tool-state") {
         console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after initial run`);
         unsubscribe();
         process.exit(0);
@@ -1165,7 +1419,7 @@ async function main() {
     }
 
     const retryDurationMs = Date.now() - retryStartMs;
-    const retryUsage = extractUsageFromSession(session.state);
+    const retryUsage = extractUsageFromSession(session.state, streamUsage);
     accumulateUsage(prevUsage, retryUsage);
     prevUsage = retryUsage;
 

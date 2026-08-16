@@ -98,6 +98,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             workspaceContextBuilder,
             taskEnvelopeWriter,
             resultParser,
+            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
             feedbackService,
             new SecretDiffScanner(),

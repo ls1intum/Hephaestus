@@ -22,7 +22,7 @@ Within **Practice setup** or **Practice catalog**, shorten **practice area** to 
 | **Practice feedback** | Guidance written from observations and addressed to a developer — both the whole and the countable unit | message, AI feedback, feedback item, ledger unit |
 | **Delivery**          | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced | placement, surface            |
 | **Channel**           | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting; the destinations are the `FeedbackChannel` constants | destination, surface, reach |
-| **My feedback**       | The developer's own page of practice feedback, prepared for them and readable by nobody else — the surface of the `REFLECTION` channel | private view, profile, reflection dashboard |
+| **Practice feedback about a habit** | Practice feedback prepared for one developer about what recurs across their work, readable by nobody else — the `IN_APP` channel | my feedback, private view, profile, reflection, reflection dashboard |
 | **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
 | **Developer**         | The person an observation is about                                              | learner                            |
 | **Contributor**       | A repository role relevant to review eligibility                                | user, when the role matters        |
@@ -71,20 +71,24 @@ and in the compound terms **Hephaestus default** and **No Hephaestus default** �
 contributor doc names when explaining what the system does. This rule is about the surfaces a developer or a
 workspace administrator reads.
 
-**The three channels are three levels of feedback, and each is named for how the developer engages with
-it.** `IN_CONTEXT` is the task level — what is wrong here, in this change. `CONVERSATION` is the
-self-regulation level — the same evidence turned into a question the developer answers about their own
-work. `REFLECTION` is the process level — the habit that recurs across several pieces of their work, and
-what to do differently next time. The names are the levels of Hattie & Timperley's model, not storage
-locations, which is why the third one is not called *profile*: **Profile** is the public page at
-`/user/{username}`, addressed by whose it is, and the reflection channel's surface has no such address.
+**All three channel names say where the feedback lands, and nothing else.** `IN_CONTEXT` lands on the work
+itself — a pull request summary or inline note, an issue comment. `IN_CHAT` lands in a turn of a
+conversation, wherever that conversation runs: the in-app mentor, or Slack. `IN_APP` lands on the
+developer's own practice pages, where nobody replies to it.
 
-`REFLECTION` is the code noun — the enum constant, the `chk_feedback_channel` value, the endpoint
-`GET /practices/feedback/reflection`, the `components/reflection/` directory. **My feedback** is what a
-developer reads: the sidebar entry, the page title, and the route `/w/{slug}/my-feedback`. Do not
-introduce a third name for the same thing; in particular *private view* is a description of a property,
-never a label, and *reflection dashboard* names a page rather than a lane. On an operator surface, where
-the question is where a piece of feedback landed, the place reads **On their feedback page**.
+The mentor also renders inside the app, so the line between the last two is *dialogic or not*: ask **is it
+a turn?** before **which screen?** A channel names a destination, never a cognitive level and never what
+the developer is supposed to do about it. The three do line up with the task, self-regulation and process
+levels of Hattie & Timperley's model (ADR 0029), but a level is a claim about content that a destination
+cannot enforce, so do not use the level as the name.
+
+`IN_APP` is the code noun — the enum constant, the `chk_feedback_channel` value, the endpoint
+`GET /practices/feedback/in-app`. It has been renamed three times (`REFLECTION_DASHBOARD`, `PROFILE`,
+`REFLECTION`) and this is the last one; ADR 0029 records why each earlier name failed. Do not reintroduce
+any of them: *profile* is the public page at `/user/{username}`, *private view* describes a property
+rather than naming one, and *reflection* names what the developer is supposed to do rather than where the
+feedback lands — an outcome nothing in the system can observe. On an operator surface, where the question
+is where a piece of feedback landed, the place reads **On their practice pages**.
 
 **Feedback waiting for a mentor conversation is *prepared*, never *queued*.** A queue implies somebody has
 to work it; nothing does — `FeedbackDeliveryState.PREPARED` auto-advances to `DELIVERED` on the next chat

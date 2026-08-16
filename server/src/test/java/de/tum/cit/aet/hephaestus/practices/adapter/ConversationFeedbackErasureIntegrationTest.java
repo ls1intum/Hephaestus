@@ -203,7 +203,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         UUID prObs = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.PULL_REQUEST, 8001L);
         UUID prFb = lastFeedbackId;
 
-        // Workspace B: a CONVERSATION unit — a different tenant, MUST survive.
+        // Workspace B: an IN_CHAT unit — a different tenant, MUST survive.
         UUID otherWsObs = seedBoundObservationAndFeedback(
             jobB,
             practiceB,
@@ -241,7 +241,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         "eraseConversationFeedbackAboutUser deletes only that subject's CONVERSATION rows; other user + PR/ISSUE + other tenant survive"
     )
     void eraseConversationFeedbackAboutUserScopedToSubject() {
-        // Workspace A, subject = recipientA: one CONVERSATION unit (target) + one PR unit + one ISSUE unit (survive).
+        // Workspace A, subject = recipientA: one IN_CHAT unit (target) + one PR unit + one ISSUE unit (survive).
         UUID convObsA = seedBoundObservationAndFeedback(
             jobA,
             practiceA,
@@ -255,7 +255,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         UUID issueObsA = seedBoundObservationAndFeedback(jobA, practiceA, recipientA, ArtifactKinds.ISSUE, 9002L);
         UUID issueFbA = lastFeedbackId;
 
-        // Workspace A, subject = recipientC: a CONVERSATION unit for a DIFFERENT person — MUST survive.
+        // Workspace A, subject = recipientC: an IN_CHAT unit for a DIFFERENT person — MUST survive.
         UUID convObsOther = seedBoundObservationAndFeedback(
             jobA,
             practiceA,
@@ -265,7 +265,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
         );
         UUID convFbOther = lastFeedbackId;
 
-        // Workspace B, subject = recipientA (same user id, different tenant): a CONVERSATION unit — MUST survive.
+        // Workspace B, subject = recipientA (same user id, different tenant): an IN_CHAT unit — MUST survive.
         UUID convObsWsB = seedBoundObservationAndFeedback(
             jobB,
             practiceB,
@@ -358,7 +358,7 @@ class ConversationFeedbackErasureIntegrationTest extends BaseIntegrationTest {
                 .artifactId(artifactId)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
-                .channel(FeedbackChannel.CONVERSATION)
+                .channel(FeedbackChannel.IN_CHAT)
                 .position(positionSeq.getAndIncrement())
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)

@@ -87,7 +87,7 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
         if (manifest.declaredCapabilities().contains(Capability.FEEDBACK_DELIVERY)) {
             assertThat(lanes)
                 .as("%s declares FEEDBACK_DELIVERY but names no artifact it would deliver to", manifest.kind())
-                .containsAnyOf(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.CONVERSATION);
+                .containsAnyOf(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CHAT);
         }
         if (manifest.declaredCapabilities().contains(Capability.INLINE_FINDINGS)) {
             assertThat(lanes)

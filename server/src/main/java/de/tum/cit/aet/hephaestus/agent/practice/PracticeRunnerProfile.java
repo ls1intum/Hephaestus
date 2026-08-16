@@ -18,6 +18,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     private static final List<String> SIDECARS = List.of(
         "pi-finding-normalize.mjs",
         "pi-runner-timings.mjs",
+        "pi-runner-usage.mjs",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 
@@ -27,7 +28,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
      * into every session implicitly, while composing feedback is a different job with a different voice
      * and must not inherit the vocabulary of the one that took the measurements.
      */
-    private static final List<String> PROMPTS = List.of(SandboxLayout.REFLECTION_COMPOSER_PROMPT_FILENAME);
+    private static final List<String> PROMPTS = List.of(SandboxLayout.FEEDBACK_COMPOSER_PROMPT_FILENAME);
 
     private static final List<String> FLAGS = List.of("--no-warnings");
 

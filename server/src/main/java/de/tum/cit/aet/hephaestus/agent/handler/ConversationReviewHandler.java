@@ -43,7 +43,7 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Delivery persists findings via {@link PracticeDetectionDeliveryService} (artifact kind chat.conversation_thread,
  * {@code aboutUserId} carried explicitly in metadata) and then publishes {@link PracticeDetectionDeliveredEvent}
- * to drive the conversational-delivery loop: OBSERVED problems become PREPARED CONVERSATION units for the
+ * to drive the conversational-delivery loop: OBSERVED problems become PREPARED IN_CHAT units for the
  * judged author and surface in their next mentor DM turn. Nothing is posted back to Slack from here.
  */
 public class ConversationReviewHandler implements JobTypeHandler {

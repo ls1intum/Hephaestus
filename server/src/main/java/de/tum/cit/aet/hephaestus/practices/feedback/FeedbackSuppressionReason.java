@@ -41,8 +41,8 @@ public enum FeedbackSuppressionReason {
      * Like {@link #PRACTICE_TIER_QUIET}, but for a backfill campaign: measured retrospectively, so it is
      * not said out loud where it would read as today's work.
      *
-     * <p>The reflection lane holds a backfill back too, under its own name
-     * ({@code ReflectionRoutingDecision.BACKFILL_HELD}) and for its own reason: a process-level message is
+     * <p>The in-app lane holds a backfill back too, under its own name
+     * ({@code InAppRoutingDecision.BACKFILL_HELD}) and for its own reason: a process-level message is
      * a trend claim, and {@link de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin} calls a
      * backfilled population "sound as a snapshot, unusable as a trend against LIVE rows".
      */

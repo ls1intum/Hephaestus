@@ -87,7 +87,7 @@ public class FeedbackLedgerRecorder {
      * {@link ConversationalFeedbackPreparer} derives its positions from the one shared constant rather than
      * a second literal.
      */
-    public static final int CONVERSATION_UNIT_ORDINAL_BASE = 3000;
+    public static final int IN_CHAT_UNIT_ORDINAL_BASE = 3000;
 
     /**
      * Undelivered (FAILED) units start here, one band clear of the one above. One row per job records the
@@ -107,12 +107,12 @@ public class FeedbackLedgerRecorder {
     public static final int TIER_WITHHELD_UNIT_ORDINAL_BASE = 6000;
 
     /**
-     * REFLECTION units start here, one band clear of the one above. They share the review job's
+     * IN_APP units start here, one band clear of the one above. They share the review job's
      * {@code agent_job_id} because the process-level message is composed inside that job's run, so they
      * need a band of their own exactly as the conversational units do. Public so
-     * {@code ReflectionFeedbackPreparer} derives its positions from the one shared constant.
+     * {@code InAppFeedbackPreparer} derives its positions from the one shared constant.
      */
-    public static final int REFLECTION_UNIT_ORDINAL_BASE = 7000;
+    public static final int IN_APP_UNIT_ORDINAL_BASE = 7000;
 
     private final ObservationRepository observationRepository;
     private final FeedbackRepository feedbackRepository;
@@ -181,8 +181,8 @@ public class FeedbackLedgerRecorder {
         boolean inlineDelivered,
         boolean conversationalDeliveryEligible
     ) {
-        if (conversationalDeliveryEligible && deliveryAllowed()) {
-            publishConversationDeliveryTrigger(job);
+        if (conversationalDeliveryEligible) {
+            publishFeedbackLaneTrigger(job);
         }
         if (delivery == null) {
             return;
@@ -350,15 +350,22 @@ public class FeedbackLedgerRecorder {
     }
 
     /**
-     * Fire {@link PracticeDetectionDeliveredEvent} so the conversational-delivery listener can route this cycle's
-     * observations and prepare CONVERSATION units. Best-effort - a publish failure must never poison the ledger
-     * write or the delivery already received.
+     * Fire {@link PracticeDetectionDeliveredEvent} so both longitudinal lanes can route this cycle's
+     * observations — IN_CHAT units for the mentor, IN_APP units for the developer's practice pages.
+     * Best-effort - a publish failure must never poison the ledger write or the delivery already received.
+     *
+     * <p><b>Never gated on silent mode.</b> Silence stops what leaves the instance; neither lane this wakes
+     * leaves it. An IN_APP unit is read on the developer's own pages and egresses nowhere, and IN_CHAT's
+     * egress is refused at the turn itself, by {@code ConversationalDeliveryReconciler}. Withholding the
+     * signal here silenced both of them as a side effect of silencing the merge-request note, and left the
+     * hourly {@code FeedbackLanePreparationSweeper} as the only path — which then logs "the listeners are
+     * dropping events" on every pass, because under silence they always were.
      */
-    private void publishConversationDeliveryTrigger(AgentJob job) {
+    private void publishFeedbackLaneTrigger(AgentJob job) {
         try {
             eventPublisher.publishEvent(new PracticeDetectionDeliveredEvent(job.getId(), job.getWorkspace().getId()));
         } catch (RuntimeException e) {
-            log.warn("Conversational-delivery trigger publish failed (delivery unaffected): jobId={}", job.getId(), e);
+            log.warn("Feedback-lane trigger publish failed (delivery unaffected): jobId={}", job.getId(), e);
         }
     }
 
@@ -611,7 +618,7 @@ public class FeedbackLedgerRecorder {
      * saw in-context. No-ops entirely when there is no body/workspace or a DELIVERED unit already exists (a prior
      * run landed); otherwise signals the conversation, then writes the FAILED row unless it already exists (a
      * retry re-signals harmlessly but never double-persists) or the job has no observations. REQUIRES_NEW,
-     * best-effort: callers wrap in try/catch. The FAILED row feeds only the reflection dashboard; the mentor
+     * best-effort: callers wrap in try/catch. The FAILED row feeds only the operator surfaces; the mentor
      * reads DELIVERED-only, so it never feeds coaching.
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -625,13 +632,13 @@ public class FeedbackLedgerRecorder {
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
             return; // a DELIVERED unit already exists (a prior run landed) — never contradict it or re-signal
         }
+        // Signalled before the silent-mode check, not after it: the lanes this wakes are internal, and
+        // silence is about what leaves the instance.
+        publishFeedbackLaneTrigger(job);
         if (!deliveryAllowed()) {
             recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             return;
         }
-        // Failed direct delivery → let the CONVERSATION channel cover the un-delivered loci. Idempotent listener,
-        // so a retry that re-signals is harmless.
-        publishConversationDeliveryTrigger(job);
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), UNDELIVERED_UNIT_ORDINAL)) {
             return; // already recorded (job retry)
         }

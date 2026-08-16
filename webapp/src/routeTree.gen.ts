@@ -36,7 +36,6 @@ import { Route as AuthenticatedWWorkspaceSlugIndexRouteImport } from './routes/_
 import { Route as AuthenticatedAdminCatalogIndexRouteImport } from './routes/_authenticated/admin.catalog.index'
 import { Route as AuthenticatedWorkspacesNewGitlabRouteImport } from './routes/_authenticated/workspaces/new/gitlab'
 import { Route as AuthenticatedWorkspacesNewGithubRouteImport } from './routes/_authenticated/workspaces/new/github'
-import { Route as AuthenticatedWWorkspaceSlugMyFeedbackRouteImport } from './routes/_authenticated/w/$workspaceSlug/my-feedback'
 import { Route as AuthenticatedWWorkspaceSlugMentorRouteImport } from './routes/_authenticated/w/$workspaceSlug/mentor'
 import { Route as AuthenticatedWWorkspaceSlugAchievementsRouteImport } from './routes/_authenticated/w/$workspaceSlug/achievements'
 import { Route as AuthenticatedWWorkspaceSlugAdminRouteRouteImport } from './routes/_authenticated/w/$workspaceSlug/admin/route'
@@ -230,12 +229,6 @@ const AuthenticatedWorkspacesNewGithubRoute =
   AuthenticatedWorkspacesNewGithubRouteImport.update({
     id: '/workspaces/new/github',
     path: '/workspaces/new/github',
-    getParentRoute: () => AuthenticatedRoute,
-  } as any)
-const AuthenticatedWWorkspaceSlugMyFeedbackRoute =
-  AuthenticatedWWorkspaceSlugMyFeedbackRouteImport.update({
-    id: '/w/$workspaceSlug/my-feedback',
-    path: '/w/$workspaceSlug/my-feedback',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
 const AuthenticatedWWorkspaceSlugMentorRoute =
@@ -582,7 +575,6 @@ export interface FileRoutesByFullPath {
   '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
-  '/w/$workspaceSlug/my-feedback': typeof AuthenticatedWWorkspaceSlugMyFeedbackRoute
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
   '/admin/catalog/': typeof AuthenticatedAdminCatalogIndexRoute
@@ -657,7 +649,6 @@ export interface FileRoutesByTo {
   '/admin': typeof AuthenticatedAdminIndexRoute
   '/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
   '/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
-  '/w/$workspaceSlug/my-feedback': typeof AuthenticatedWWorkspaceSlugMyFeedbackRoute
   '/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
   '/admin/catalog': typeof AuthenticatedAdminCatalogIndexRoute
@@ -731,7 +722,6 @@ export interface FileRoutesById {
   '/_authenticated/w/$workspaceSlug/admin': typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
   '/_authenticated/w/$workspaceSlug/achievements': typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   '/_authenticated/w/$workspaceSlug/mentor': typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
-  '/_authenticated/w/$workspaceSlug/my-feedback': typeof AuthenticatedWWorkspaceSlugMyFeedbackRoute
   '/_authenticated/workspaces/new/github': typeof AuthenticatedWorkspacesNewGithubRoute
   '/_authenticated/workspaces/new/gitlab': typeof AuthenticatedWorkspacesNewGitlabRoute
   '/_authenticated/admin/catalog/': typeof AuthenticatedAdminCatalogIndexRoute
@@ -811,7 +801,6 @@ export interface FileRouteTypes {
     | '/w/$workspaceSlug/admin'
     | '/w/$workspaceSlug/achievements'
     | '/w/$workspaceSlug/mentor'
-    | '/w/$workspaceSlug/my-feedback'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
     | '/admin/catalog/'
@@ -886,7 +875,6 @@ export interface FileRouteTypes {
     | '/admin'
     | '/w/$workspaceSlug/admin'
     | '/w/$workspaceSlug/achievements'
-    | '/w/$workspaceSlug/my-feedback'
     | '/workspaces/new/github'
     | '/workspaces/new/gitlab'
     | '/admin/catalog'
@@ -959,7 +947,6 @@ export interface FileRouteTypes {
     | '/_authenticated/w/$workspaceSlug/admin'
     | '/_authenticated/w/$workspaceSlug/achievements'
     | '/_authenticated/w/$workspaceSlug/mentor'
-    | '/_authenticated/w/$workspaceSlug/my-feedback'
     | '/_authenticated/workspaces/new/github'
     | '/_authenticated/workspaces/new/gitlab'
     | '/_authenticated/admin/catalog/'
@@ -1215,13 +1202,6 @@ declare module '@tanstack/react-router' {
       path: '/workspaces/new/github'
       fullPath: '/workspaces/new/github'
       preLoaderRoute: typeof AuthenticatedWorkspacesNewGithubRouteImport
-      parentRoute: typeof AuthenticatedRoute
-    }
-    '/_authenticated/w/$workspaceSlug/my-feedback': {
-      id: '/_authenticated/w/$workspaceSlug/my-feedback'
-      path: '/w/$workspaceSlug/my-feedback'
-      fullPath: '/w/$workspaceSlug/my-feedback'
-      preLoaderRoute: typeof AuthenticatedWWorkspaceSlugMyFeedbackRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/w/$workspaceSlug/mentor': {
@@ -1837,7 +1817,6 @@ interface AuthenticatedRouteChildren {
   AuthenticatedWWorkspaceSlugAdminRouteRoute: typeof AuthenticatedWWorkspaceSlugAdminRouteRouteWithChildren
   AuthenticatedWWorkspaceSlugAchievementsRoute: typeof AuthenticatedWWorkspaceSlugAchievementsRoute
   AuthenticatedWWorkspaceSlugMentorRoute: typeof AuthenticatedWWorkspaceSlugMentorRouteWithChildren
-  AuthenticatedWWorkspaceSlugMyFeedbackRoute: typeof AuthenticatedWWorkspaceSlugMyFeedbackRoute
   AuthenticatedWorkspacesNewGithubRoute: typeof AuthenticatedWorkspacesNewGithubRoute
   AuthenticatedWorkspacesNewGitlabRoute: typeof AuthenticatedWorkspacesNewGitlabRoute
   AuthenticatedWWorkspaceSlugIndexRoute: typeof AuthenticatedWWorkspaceSlugIndexRoute
@@ -1859,8 +1838,6 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
     AuthenticatedWWorkspaceSlugAchievementsRoute,
   AuthenticatedWWorkspaceSlugMentorRoute:
     AuthenticatedWWorkspaceSlugMentorRouteWithChildren,
-  AuthenticatedWWorkspaceSlugMyFeedbackRoute:
-    AuthenticatedWWorkspaceSlugMyFeedbackRoute,
   AuthenticatedWorkspacesNewGithubRoute: AuthenticatedWorkspacesNewGithubRoute,
   AuthenticatedWorkspacesNewGitlabRoute: AuthenticatedWorkspacesNewGitlabRoute,
   AuthenticatedWWorkspaceSlugIndexRoute: AuthenticatedWWorkspaceSlugIndexRoute,

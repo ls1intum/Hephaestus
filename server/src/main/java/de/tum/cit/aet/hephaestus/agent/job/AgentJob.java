@@ -190,6 +190,24 @@ public class AgentJob {
     private short deliveryAttempts = 0;
 
     /**
+     * When the conversational-feedback lane finished running for this job, whether or not it prepared
+     * anything.
+     *
+     * <p>The lane is driven by an {@code @Async @TransactionalEventListener}, and a submission to a
+     * saturated pool is rejected and gone: the event has no second chance and the work is lost with no
+     * trace. This column is that trace. It is the only durable difference between "the lane ran and
+     * decided nothing was worth preparing" and "the lane never ran", which are otherwise identical from
+     * the outside — both are simply an absence of {@code feedback} rows.
+     * {@code FeedbackLanePreparationSweeper} picks up whatever is still null.
+     */
+    @Column(name = "in_chat_prepared_at")
+    private Instant inChatPreparedAt;
+
+    /** The in-app lane's half of {@link #inChatPreparedAt}; the two lanes fail independently. */
+    @Column(name = "in_app_prepared_at")
+    private Instant inAppPreparedAt;
+
+    /**
      * Worker that owns this job while RUNNING. Soft reference to {@code worker_registry.worker_id} (no
      * FK: a finished job must survive its worker row being reaped). Fences terminal writes, so a
      * requeued job's original worker cannot clobber the new owner's.

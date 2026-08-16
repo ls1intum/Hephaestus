@@ -30,11 +30,11 @@ public enum ObservationOrigin {
      * second half of the delivery predicate; {@link PracticeReviewTier#delivers} is the first, and a unit
      * travels only where <em>both</em> admit it.
      *
-     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#REFLECTION} and nothing else: posting a
+     * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#IN_APP} and nothing else: posting a
      * backfilled finding in context would notify everyone subscribed to a merged pull request about work
      * nobody can act on.
      *
-     * <p>The REFLECTION entitlement is a ceiling, not an instruction. That lane now has a producer, and it
+     * <p>The IN_APP entitlement is a ceiling, not an instruction. That lane now has a producer, and it
      * refuses backfilled evidence on its own account — a process-level message is a claim about a trend,
      * and a backfilled population is explicitly not one (see the class note above). Keeping the
      * entitlement here rather than closing it keeps the two questions apart: this one asks what a
@@ -43,7 +43,7 @@ public enum ObservationOrigin {
     public boolean delivers(FeedbackChannel channel) {
         return switch (this) {
             case LIVE, MANUAL -> true;
-            case BACKFILL -> channel == FeedbackChannel.REFLECTION;
+            case BACKFILL -> channel == FeedbackChannel.IN_APP;
         };
     }
 }

@@ -10,6 +10,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageJobType;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder.LlmUsageSample;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -316,6 +317,7 @@ public class MentorTurnPersistence {
         UsageBreakdown usage = extractUsageFromState(state);
         int calls = state.observedCallCount();
         long reasoning = 0;
+        UsageProvenance provenance = UsageProvenance.RUNNER;
         if (isEmpty(usage)) {
             MentorTurnLlmUsage viaProxy = chatMessageRepository
                 .findLlmUsageById(assistant.getId())
@@ -335,6 +337,7 @@ public class MentorTurnPersistence {
                 );
                 calls = viaProxy.totalCalls();
                 reasoning = viaProxy.reasoningTokens();
+                provenance = UsageProvenance.PROXY;
             }
         }
         LlmUsageSample sample = new LlmUsageSample(
@@ -350,6 +353,9 @@ public class MentorTurnPersistence {
             reasoning,
             Math.max(1, calls),
             cookie.priceSnapshot(),
+            // Neither record had tokens, so the row names no source rather than crediting one that saw
+            // nothing — the same distinction the UNVERIFIABLE append below makes about the amount.
+            isEmpty(usage) ? UsageProvenance.NONE : provenance,
             Instant.now()
         );
         if (isEmpty(usage)) usageRecorder.recordUnverifiable(thread.getWorkspace().getId(), sample);

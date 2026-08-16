@@ -811,6 +811,33 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     )
     List<ObservationPracticeTier> practiceReviewTiersFor(@Param("observationIds") Collection<UUID> observationIds);
 
+    /**
+     * The practice each of {@code observationIds} measures, by slug.
+     *
+     * <p>Projected for the same reason as {@link #practiceReviewTiersFor}: the composition stage names a
+     * practice and nothing else about the evidence, so this join is the whole of the match between what the
+     * composer wrote and what was measured — and the producer that needs it is handed observations that may
+     * already be detached. A lazy {@code o.practice.slug} there would make a composed message reach the
+     * developer or not depending on whether the caller happened to hold a session.
+     */
+    @Query(
+        """
+        SELECT o.id AS observationId, p.slug AS practiceSlug
+        FROM Observation o
+        JOIN o.practice p
+        WHERE o.id IN :observationIds
+        """
+    )
+    List<ObservationPracticeSlug> practiceSlugsFor(@Param("observationIds") Collection<UUID> observationIds);
+
+    /** One observation's practice slug, without loading either entity. */
+    interface ObservationPracticeSlug {
+        UUID getObservationId();
+
+        @Nullable
+        String getPracticeSlug();
+    }
+
     /** One observation's practice tier and its area's, without loading any of the three entities. */
     interface ObservationPracticeTier {
         UUID getObservationId();

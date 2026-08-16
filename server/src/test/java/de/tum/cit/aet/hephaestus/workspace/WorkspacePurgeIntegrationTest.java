@@ -810,7 +810,7 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     .artifactId(threadId)
                     .recipientUserId(owner.getId())
                     .aboutUserId(owner.getId())
-                    .channel(FeedbackChannel.CONVERSATION)
+                    .channel(FeedbackChannel.IN_CHAT)
                     .position(0)
                     .deliveryState(FeedbackDeliveryState.PREPARED)
                     .source(FeedbackSource.AGENT)

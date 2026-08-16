@@ -38,8 +38,6 @@ tags:
   name: Slack channel activation
 - description: Per-workspace LLM spend rollup and budget status
   name: LLM Usage
-- description: The developer's own prepared practice feedback
-  name: Reflection Feedback
 - description: Manage practice areas
   name: Practice Areas
 - description: Workspace-scoped mentor chat threads
@@ -74,6 +72,8 @@ tags:
   name: Teams
 - description: The starting catalog copied into new workspaces
   name: Admin Practice Catalog
+- description: The developer's own prepared practice feedback
+  name: In-App Feedback
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
@@ -4517,7 +4517,7 @@ paths:
       summary: Get engagement statistics
       tags:
       - Feedback Reaction
-  /workspaces/{workspaceSlug}/practices/feedback/reflection:
+  /workspaces/{workspaceSlug}/practices/feedback/in-app:
     get:
       description: "Process-level messages prepared for the authenticated developer:\
         \ for each habit that recurs in their work, what the pattern is, the pieces\
@@ -4525,7 +4525,7 @@ paths:
         \ notes (which say what is wrong in one diff) and from the mentor conversation\
         \ (which asks rather than tells). Reading a message is what delivers it, so\
         \ this GET records the delivery."
-      operationId: getReflectionFeedback
+      operationId: getInAppFeedback
       parameters:
       - description: Workspace slug
         in: path
@@ -4541,12 +4541,12 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/ReflectionFeedback"
-          description: "Reflection messages returned, newest first"
+                  $ref: "#/components/schemas/InAppFeedback"
+          description: "In-app messages returned, newest first"
       security: []
-      summary: The current developer's reflection feedback
+      summary: The current developer's in-app feedback
       tags:
-      - Reflection Feedback
+      - In-App Feedback
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
     get:
       description: "Returns the current user's most recent reaction to the specified\
@@ -5147,8 +5147,8 @@ paths:
             type: string
             enum:
             - IN_CONTEXT
-            - CONVERSATION
-            - REFLECTION
+            - IN_CHAT
+            - IN_APP
       - in: query
         name: agentJobId
         required: false
@@ -9193,6 +9193,85 @@ components:
       required:
       - reason
       - targetAccountId
+    InAppEvidence:
+      type: object
+      description: One piece of work the pattern was observed on
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Identifier of the work within its kind
+        artifactKind:
+          type: string
+          description: "Kind of work, e.g. scm.pull_request"
+        observedAt:
+          type: string
+          format: date-time
+          description: When the measurement behind this occurrence was taken
+        title:
+          type: string
+          description: What the review recorded on this piece of work
+      required:
+      - artifactId
+      - artifactKind
+      - observedAt
+    InAppFeedback:
+      type: object
+      description: A process-level message on the developer's own practice pages
+      properties:
+        areaName:
+          type: string
+          description: Area display name; null when the practice has none
+        areaSlug:
+          type: string
+          description: Area the practice sits in; null when the practice has none
+        body:
+          type: string
+          description: "The message, as Markdown; ends with the habit to try next"
+        evidence:
+          type: array
+          description: "The pieces of work the habit was observed on, newest first"
+          items:
+            $ref: "#/components/schemas/InAppEvidence"
+        headline:
+          type: string
+          description: "Short headline naming the habit, never the person"
+        id:
+          type: string
+          format: uuid
+        occurrenceCount:
+          type: integer
+          format: int32
+          description: How many pieces of work carry it — the length of the evidence
+            list
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+          description: Practice this habit belongs to
+        preparedAt:
+          type: string
+          format: date-time
+          description: When the message was composed
+        readAt:
+          type: string
+          format: date-time
+          description: When this developer first opened it; null until they have
+        whatGoodLooksLike:
+          type: string
+          description: "What good looks like, in the learner's framing"
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in the learner's framing"
+      required:
+      - body
+      - evidence
+      - headline
+      - id
+      - occurrenceCount
+      - practiceName
+      - practiceSlug
+      - preparedAt
     InitiateConnectionRequest:
       type: object
       description: |-
@@ -11486,85 +11565,6 @@ components:
       - addressed
       - disputed
       - notApplicable
-    ReflectionEvidence:
-      type: object
-      description: One piece of work the pattern was observed on
-      properties:
-        artifactId:
-          type: integer
-          format: int64
-          description: Identifier of the work within its kind
-        artifactKind:
-          type: string
-          description: "Kind of work, e.g. scm.pull_request"
-        observedAt:
-          type: string
-          format: date-time
-          description: When the measurement behind this occurrence was taken
-        title:
-          type: string
-          description: What the review recorded on this piece of work
-      required:
-      - artifactId
-      - artifactKind
-      - observedAt
-    ReflectionFeedback:
-      type: object
-      description: A process-level message on the developer's own reflection surface
-      properties:
-        areaName:
-          type: string
-          description: Area display name; null when the practice has none
-        areaSlug:
-          type: string
-          description: Area the practice sits in; null when the practice has none
-        body:
-          type: string
-          description: "The message, as Markdown; ends with the habit to try next"
-        evidence:
-          type: array
-          description: "The pieces of work the habit was observed on, newest first"
-          items:
-            $ref: "#/components/schemas/ReflectionEvidence"
-        headline:
-          type: string
-          description: "Short headline naming the habit, never the person"
-        id:
-          type: string
-          format: uuid
-        occurrenceCount:
-          type: integer
-          format: int32
-          description: How many pieces of work carry it — the length of the evidence
-            list
-        practiceName:
-          type: string
-        practiceSlug:
-          type: string
-          description: Practice this habit belongs to
-        preparedAt:
-          type: string
-          format: date-time
-          description: When the message was composed
-        readAt:
-          type: string
-          format: date-time
-          description: When this developer first opened it; null until they have
-        whatGoodLooksLike:
-          type: string
-          description: "What good looks like, in the learner's framing"
-        whyItMatters:
-          type: string
-          description: "Why this practice matters, in the learner's framing"
-      required:
-      - body
-      - evidence
-      - headline
-      - id
-      - occurrenceCount
-      - practiceName
-      - practiceSlug
-      - preparedAt
     ReflectionItem:
       type: object
       description: A single piece of practice feedback to read and act on
@@ -11950,8 +11950,8 @@ components:
           type: string
           enum:
           - IN_CONTEXT
-          - CONVERSATION
-          - REFLECTION
+          - IN_CHAT
+          - IN_APP
         createdAt:
           type: string
           format: date-time
@@ -12095,8 +12095,8 @@ components:
           type: string
           enum:
           - IN_CONTEXT
-          - CONVERSATION
-          - REFLECTION
+          - IN_CHAT
+          - IN_APP
         createdAt:
           type: string
           format: date-time
@@ -12194,14 +12194,14 @@ components:
         body:
           type: string
           description: "Stored composed body; null when none was produced, and always\
-            \ null on the REFLECTION channel — the developer's reflection surface\
-            \ is not readable by an operator"
+            \ null on the IN_APP and IN_CHAT channels — neither the developer's practice\
+            \ pages nor the mentor's queued move is readable by an operator"
         channel:
           type: string
           enum:
           - IN_CONTEXT
-          - CONVERSATION
-          - REFLECTION
+          - IN_CHAT
+          - IN_APP
         createdAt:
           type: string
           format: date-time

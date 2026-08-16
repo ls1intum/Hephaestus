@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
 import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.handler.reflection.ReflectionCompositionInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
@@ -26,10 +26,12 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +47,23 @@ import tools.jackson.databind.node.ObjectNode;
 public class IssueReviewHandler implements JobTypeHandler {
 
     private static final Logger log = LoggerFactory.getLogger(IssueReviewHandler.class);
+
+    /**
+     * The lanes an issue review can actually reach: an event review's lanes, less the one that needs a diff.
+     *
+     * <p>An in-context unit is a note on a line, so the composer must anchor it to a citation that falls
+     * inside this change; an issue has no diff, so every such unit is refused the moment it is written.
+     * Offering the lane anyway would spend the composer's output on notes that cannot land and tell it, in
+     * the same breath, that a surface exists which does not. The set is therefore narrowed here, where the
+     * occasion is known, rather than by loosening what counts as anchorable — that would invent placements
+     * instead of removing them.
+     *
+     * <p>Written as a subtraction rather than as a list of the two survivors so that this class names no
+     * lane it cannot deliver on; which lanes those turn out to be is pinned by {@code IssueReviewHandlerTest}.
+     */
+    static final Set<FeedbackChannel> ISSUE_REVIEW_CHANNELS = Set.copyOf(
+        EnumSet.complementOf(EnumSet.of(FeedbackChannel.IN_CONTEXT))
+    );
 
     private final JsonMapper objectMapper;
     private final WorkspaceContextBuilder workspaceContextBuilder;
@@ -175,9 +194,13 @@ public class IssueReviewHandler implements JobTypeHandler {
         Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
         practiceCatalogInjector.inject(files, job, ArtifactKinds.ISSUE, practices);
-        // See PullRequestReviewHandler: a second, separate turn composes this developer's reflection surface
-        // after the measurements are final.
-        ReflectionCompositionInputs.stage(files, PracticeDetectionDeliveryService.originOf(metadata));
+        // See PullRequestReviewHandler: a second, separate turn composes this developer's feedback once
+        // the measurements are final — here for the two longitudinal lanes only, per ISSUE_REVIEW_CHANNELS.
+        FeedbackCompositionInputs.stage(
+            files,
+            PracticeDetectionDeliveryService.originOf(metadata),
+            ISSUE_REVIEW_CHANNELS
+        );
         log.info(
             "Issue context preparation complete: {} files, issueNumber={}, jobId={}",
             files.size(),

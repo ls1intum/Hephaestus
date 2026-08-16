@@ -51,6 +51,7 @@ public class LlmUsageRecorder {
         long reasoningTokens,
         int totalCalls,
         LlmPriceSnapshot price,
+        UsageProvenance provenance,
         Instant occurredAt
     ) {}
 
@@ -127,7 +128,8 @@ public class LlmUsageRecorder {
                 price.per1mInputUsd(),
                 price.per1mOutputUsd(),
                 price.per1mCacheReadUsd(),
-                price.per1mCacheWriteUsd()
+                price.per1mCacheWriteUsd(),
+                sample.provenance().name()
             )
         );
         if (inserted == 0) {
