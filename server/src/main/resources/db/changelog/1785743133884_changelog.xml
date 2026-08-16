@@ -565,7 +565,6 @@
 
 
 
-
     <changeSet author="hephaestus-evidence-contract" id="1785743133884-12">
         <preConditions onFail="MARK_RAN" onFailMessage="agent_job.review_readiness already present">
             <not><columnExists tableName="agent_job" columnName="review_readiness"/></not>
@@ -2849,49 +2848,5 @@
          measurement was taken under, and rewriting it would falsify that record. subject is not part of
          ReviewRuleFingerprint, so no existing observation becomes stale here and no reflective surface
          empties. -->
-    <changeSet author="hephaestus-terminology" id="1785743133884-53">
-        <preConditions onFail="MARK_RAN" onFailMessage="Reviewer-side curated practices already name their subject">
-            <not>
-                <sqlCheck expectedResult="0"><![CDATA[
-                    SELECT count(*) FROM practice p
-                    WHERE p.source_curated_slug IN (
-                            'leaves-useful-specific-review-comments',
-                            'reviews-respectfully-asks-rather-than-demands',
-                            'reviews-substantively-with-understanding')
-                      AND EXISTS (
-                          SELECT 1 FROM jsonb_array_elements(p.bindings) AS b
-                          WHERE b ->> 'subject' IS DISTINCT FROM 'REVIEWER')
-                ]]></sqlCheck>
-            </not>
-        </preConditions>
-        <comment>Re-sync subject=REVIEWER onto already-installed copies of the three reviewer-side practices.</comment>
-        <sql splitStatements="true" endDelimiter=";"><![CDATA[
-            UPDATE practice p
-            SET bindings = (
-                SELECT jsonb_agg(b || '{"subject": "REVIEWER"}'::jsonb ORDER BY ord)
-                FROM jsonb_array_elements(p.bindings) WITH ORDINALITY AS t(b, ord)
-            )
-            WHERE p.source_curated_slug IN (
-                    'leaves-useful-specific-review-comments',
-                    'reviews-respectfully-asks-rather-than-demands',
-                    'reviews-substantively-with-understanding')
-              AND jsonb_array_length(p.bindings) > 0
-              AND EXISTS (
-                  SELECT 1 FROM jsonb_array_elements(p.bindings) AS b
-                  WHERE b ->> 'subject' IS DISTINCT FROM 'REVIEWER');
-        ]]></sql>
-        <rollback><![CDATA[
-            UPDATE practice p
-            SET bindings = (
-                SELECT jsonb_agg(b - 'subject' ORDER BY ord)
-                FROM jsonb_array_elements(p.bindings) WITH ORDINALITY AS t(b, ord)
-            )
-            WHERE p.source_curated_slug IN (
-                    'leaves-useful-specific-review-comments',
-                    'reviews-respectfully-asks-rather-than-demands',
-                    'reviews-substantively-with-understanding')
-              AND jsonb_array_length(p.bindings) > 0;
-        ]]></rollback>
-    </changeSet>
 
 </databaseChangeLog>

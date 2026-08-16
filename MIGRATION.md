@@ -65,6 +65,21 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🟡 Reviewer-side practices keep the old wording until you update them
+
+**Affected**: workspaces created before this release that use the shipped practices
+*leaves useful, specific review comments*, *asks rather than demands*, and *reviews substantively*.
+
+Those three judge how somebody **reviews** a teammate's change. Until this release an occasion did not
+record whose conduct it judged, so their observations were filed against the author of the change
+rather than the reviewer who wrote the comments. An occasion now records it, and a review that cannot
+name the reviewer does not run.
+
+A workspace installs the shipped catalogue once, so an existing workspace still holds the old wording.
+Open **Practice catalogue** and apply the update to those three practices to pick it up. Until you do,
+they behave exactly as they did before — nothing new is recorded against the wrong person, because the
+new guard reads the occasion and the old wording still says *author*.
+
 #### 🔴 `GIT_STORAGE_PATH` is now `HEPHAESTUS_FABRIC_ROOT`
 
 **Affected**: deployments that set `GIT_STORAGE_PATH` to anything other than `/data/git-repos`. Check

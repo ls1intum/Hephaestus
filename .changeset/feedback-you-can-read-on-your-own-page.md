@@ -27,7 +27,9 @@ Reviews of documentation pages continue to record what they find without deliver
 that on is a separate, deliberate step.
 
 Practices that judge how somebody *reviews* a teammate's change — leaving specific comments, asking
-rather than demanding, reading before approving — are paused. They were being recorded against the
-author of the change rather than the reviewer who wrote the comments, so the wrong person would have
-been shown them. They resume once a review can name which reviewer each observation is about. Every
-other practice is unaffected.
+rather than demanding, reading before approving — now say so, and a review that cannot name the
+reviewer does not run rather than recording the observation against the author of the change, which
+is what happened before. **Operators:** an occasion records who it judges, and a workspace set up
+before this release still holds the old wording for those three practices until they are updated from
+the catalogue on the practice-catalogue screen; until then they keep behaving as they did. Every other
+practice is unaffected.
