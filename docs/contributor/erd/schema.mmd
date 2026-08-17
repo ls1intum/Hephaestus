@@ -94,6 +94,8 @@ erDiagram
         VARCHAR(32) hold_reason
         JSONB evidence_snapshot
         JSONB review_readiness
+        TIMESTAMPTZ in_chat_prepared_at
+        TIMESTAMPTZ in_app_prepared_at
     }
 
     ArtifactSignal {
@@ -652,6 +654,7 @@ erDiagram
         NUMERIC(18,8) applied_per_1m_cache_read_usd
         NUMERIC(18,8) applied_per_1m_cache_write_usd
         TIMESTAMPTZ occurred_at "NOT NULL"
+        VARCHAR(16) usage_provenance
     }
 
     LoginProvider {
