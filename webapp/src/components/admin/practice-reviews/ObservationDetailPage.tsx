@@ -32,7 +32,6 @@ import {
 import { ReviewPerson } from "./ReviewPerson";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
-import { confidenceLabel } from "./review-format";
 import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 
 export interface ObservationDetailPageProps {
@@ -162,7 +161,6 @@ export function ObservationDetailPage({
 						)}
 					</div>
 				</ReviewFact>
-				<ReviewFact label="Confidence">{confidenceLabel(observation.confidence)}</ReviewFact>
 			</ReviewFactGrid>
 
 			{observation.reasoning && (

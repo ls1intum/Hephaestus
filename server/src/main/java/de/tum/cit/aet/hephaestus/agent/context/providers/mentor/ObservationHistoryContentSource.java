@@ -158,7 +158,8 @@ public class ObservationHistoryContentSource implements ContentSource {
             node.put("assessment", assessment == null ? null : assessment.name());
             Severity severity = o.getSeverity();
             node.put("severity", severity == null ? null : severity.name());
-            node.put("confidence", o.getConfidence());
+            // No confidence. The detector no longer reports one, and while it did it never fell below 0.90
+            // across 580 observations — so handing it to the mentor was handing it a constant to weigh.
             node.put("observedAt", o.getObservedAt().toString());
             if (o.getArtifactKind() != null) {
                 node.put("artifactKind", o.getArtifactKind().value());

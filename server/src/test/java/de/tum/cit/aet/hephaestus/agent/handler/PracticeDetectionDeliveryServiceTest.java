@@ -27,9 +27,13 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -246,7 +250,6 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
             presence,
             assessment,
             Severity.INFO,
-            0.9f,
             evidence,
             null,
             null,
@@ -581,6 +584,95 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
+        @DisplayName("ABSENT + GOOD is refused for a practice that bounded no corpus, and points at INCONCLUSIVE")
+        void rejectsACleanStrengthFromAnUnboundedPractice() {
+            // The asymmetry the whole rule rests on. An ABSENT + BAD is anchored to the locus its citation
+            // points at, so it holds over that locus. An ABSENT + GOOD says the harmful behaviour is NOWHERE in
+            // the work — a universal over the whole corpus, which a practice that declared nothing EXHAUSTIVE
+            // has not closed and therefore cannot assert. The default bindings here are all REQUIRED.
+            ValidatedFinding finding = cleanStrength("pr-description-quality");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("declares no EXHAUSTIVE evidence source");
+            verifyNoInteractions(observationRepository);
+        }
+
+        @Test
+        @DisplayName("ABSENT + GOOD is delivered once the practice declares the corpus it searched exhaustive")
+        void acceptsACleanStrengthOverABoundedCorpus() {
+            // This is the verdict the eight defect detectors could not reach, and the reason they could not was
+            // never the practice — it was that nothing had bounded the corpus. Bound it and the negative is
+            // provable on exactly the evidence an ABSENT already owes.
+            exhaustiveOverTheDiff(testPractice);
+            ValidatedFinding finding = cleanStrength("pr-description-quality");
+
+            var result = service.deliver(testJob, List.of(finding));
+
+            assertThat(result.inserted()).isEqualTo(1);
+        }
+
+        @Test
+        @DisplayName("a bounded corpus still has to have been searched whole")
+        void stillRejectsAPartialSearchBehindACleanStrength() {
+            // Declaring the stance is what makes the claim admissible, not what makes it true: the search must
+            // still cover every source held exhaustive, or the strength is a universal over unread bytes.
+            exhaustiveOverTheDiff(testPractice);
+            ValidatedFinding finding = cleanStrength("pr-description-quality");
+            ((ObjectNode) finding.evidence().get("search")).putArray("consulted").add("scm.pull-request.core");
+
+            assertThatThrownBy(() -> service.deliver(testJob, List.of(finding)))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("did not search the sources its practice asserts absence over");
+            verifyNoInteractions(observationRepository);
+        }
+
+        /** An ABSENT + GOOD: the practice's defect was looked for over the diff and is not there. */
+        private ValidatedFinding cleanStrength(String slug) {
+            ValidatedFinding gap = validFinding(slug, Presence.ABSENT);
+            return new ValidatedFinding(
+                gap.practiceSlug(),
+                gap.title(),
+                Presence.ABSENT,
+                Assessment.GOOD,
+                null,
+                gap.evidence(),
+                gap.reasoning(),
+                gap.guidance(),
+                gap.suggestedDiffNotes()
+            );
+        }
+
+        /** Re-declare the practice's diff requirement as EXHAUSTIVE, leaving every other need alone. */
+        private void exhaustiveOverTheDiff(Practice practice) {
+            List<PracticeBinding> bindings = practice
+                .getBindings()
+                .stream()
+                .map(binding ->
+                    new PracticeBinding(
+                        binding.signals(),
+                        binding
+                            .needs()
+                            .stream()
+                            .map(need ->
+                                need.sourceKind().value().equals("scm.pull-request.diff")
+                                    ? new PracticeEvidenceRequirement(need.sourceKind(), EvidenceStance.EXHAUSTIVE)
+                                    : need
+                            )
+                            .toList(),
+                        binding.onDrafts(),
+                        binding.subject()
+                    )
+                )
+                .toList();
+            practice.setBindings(bindings);
+            // Re-stub the already-admitted revision rather than admitting the practice a second time: the
+            // stance is read off the revision's bindings, and a second admission is a duplicate slug.
+            PracticeRevision revision = practiceRevisionRepository.findById(11L).orElseThrow();
+            lenient().when(revision.getBindings()).thenReturn(bindings);
+        }
+
+        @Test
         @DisplayName("a NOT_APPLICABLE observation with no stated ground is refused")
         void rejectsAnUnjustifiedNotApplicable() {
             // The server repeats the sandbox's rule because the sandbox normalizer runs inside the thing it
@@ -743,7 +835,9 @@ class PracticeDetectionDeliveryServiceTest extends BaseUnitTest {
                 eq("PRESENT"), // presence (ADR 0022)
                 eq("GOOD"), // assessment (former-GOOD practice, PRESENT → a strength)
                 isNull(), // severity — coerced to null for a non-BAD finding (ADR 0022 invariant)
-                eq(0.9f),
+                // The detector no longer reports a confidence; the legacy column carries the same sentinel on
+                // every row now, so this position pins that nothing derived from the finding lands in it.
+                eq(Observation.UNMEASURED_CONFIDENCE),
                 anyString(),
                 isNull(),
                 fingerprintCaptor.capture(), // findingFingerprint == persisted recurrence_key

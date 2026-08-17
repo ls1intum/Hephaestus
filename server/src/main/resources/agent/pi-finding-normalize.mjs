@@ -31,8 +31,11 @@ export const PRESENCE_DESCRIPTIONS = {
     ABSENT:
         "The occasion for the behaviour arose in this work and the behaviour is not there. Pick this over " +
         "NOT_APPLICABLE when there WAS a place the behaviour belonged — NOT_APPLICABLE says no such place " +
-        "existed. A missing good behaviour is ABSENT (a gap), never PRESENT with a BAD assessment. Requires " +
-        "evidence.search: an absence is a claim about a corpus, and it holds only over the corpus you searched.",
+        "existed. A missing good behaviour is ABSENT (a gap), never PRESENT with a BAD assessment. It is " +
+        "equally the value for a harmful behaviour that could have appeared and did not, which is a strength " +
+        "(assessment=GOOD) and not a gap — but only where the practice bounds the corpus it searches, because " +
+        "a clean surface is provable only over a corpus you covered whole. Requires evidence.search: an " +
+        "absence is a claim about a corpus, and it holds only over the corpus you searched.",
     NOT_APPLICABLE:
         "This work has no subject for this practice: the occasion for the behaviour never arose, so there was " +
         "nothing here to judge. Pick this over INCONCLUSIVE only when you can name the fact about THIS work " +
@@ -44,8 +47,9 @@ export const PRESENCE_DESCRIPTIONS = {
         "There IS a subject here, you read the evidence this practice needs, and it does not settle the " +
         "question either way. Pick this over NOT_APPLICABLE whenever the practice's subject does occur in the " +
         "work but the evidence is not dispositive, and over a speculative ABSENT whenever you could not search " +
-        "far enough to say the behaviour is really missing. It needs no assessment and no extra evidence block: " +
-        "it is the correct, complete answer to uncertainty, and it costs no more to say than NOT_APPLICABLE.",
+        "far enough to say the behaviour is really missing. It carries no assessment. It does require " +
+        "evidence.undecidability — the question left open, and the evidence that would have settled it — " +
+        "because uncertainty is a measurement only when it says what it could not measure.",
 };
 
 /** Valence, and only valence: whether what presence recorded reflects well or badly on the work. */
@@ -266,10 +270,6 @@ export function normalizeFinding(finding) {
         : null;
     // severity is meaningful only for assessment=BAD; default INFO when absent (parser re-derives it).
     const severity = finding.severity == null ? "INFO" : String(finding.severity).trim().toUpperCase() || "INFO";
-    // Salvage percentage-style confidence (value in (1,100] -> /100), mirroring the Java consumer
-    // PracticeDetectionResultParser.parseConfidence; weak models commonly emit e.g. 85 for 0.85.
-    const rawConfidence = Number(finding.confidence);
-    const confidence = rawConfidence > 1 && rawConfidence <= 100 ? rawConfidence / 100 : rawConfidence;
     const reasoning = String(finding.reasoning ?? "").trim();
     // OPTIONAL, and deliberately so. Since composition authors the developer-facing text, guidance
     // survives only as the fallback body of an in-context note (DeliveryComposer.appendBody), which is
@@ -283,8 +283,6 @@ export function normalizeFinding(finding) {
     if (!PRESENCE_VALUES.includes(presence)) throw new Error(`invalid presence '${presence}'`);
     if (hasValence && !ASSESSMENT_VALUES.includes(assessment)) throw new Error(`invalid assessment '${assessment}'`);
     if (!SEVERITY_VALUES.includes(severity)) throw new Error(`invalid severity '${severity}'`);
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
-        throw new Error("confidence must be between 0 and 1");
     if (!reasoning) throw new Error("reasoning is required");
     const evidence = normalizeEvidence(finding.evidence, presence);
     const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
@@ -295,7 +293,6 @@ export function normalizeFinding(finding) {
         title,
         presence,
         severity,
-        confidence,
         evidence,
         reasoning,
         suggestedDiffNotes,
@@ -341,6 +338,15 @@ export function validateEvidenceSources(finding, availableSourceKinds, artifactS
  * domain: an ABSENT observation that did not consult one of them is asserting a universal over a
  * corpus it never opened, and the honest answer is INCONCLUSIVE instead.
  *
+ * <p>The two directions of an absence do not need the same proof, and the difference is what lets a
+ * clean surface be recorded as a strength at all. An ABSENT/BAD says a good behaviour is missing from
+ * the place the citation points at — the claim is anchored to that locus, so the search only has to
+ * reach as far as the locus does. An ABSENT/GOOD says a harmful behaviour is nowhere in the work, which
+ * ranges over the WHOLE corpus and is provable only if that corpus is closed and was covered whole.
+ * A practice that has not declared an exhaustive stance has not closed a corpus, so it cannot make that
+ * claim, and INCONCLUSIVE is the honest answer; one that has, can. This is what the eight defect
+ * detectors used to buy by refusing GOOD outright and paying for it in false NOT_APPLICABLEs.
+ *
  * <p>Consulting something this run never staged is the same error the citation check already rejects —
  * the bytes were not there, so they cannot have been searched.
  */
@@ -348,6 +354,13 @@ export function validateSearchScope(finding, exhaustiveSourceKinds, availableSou
     if (finding.presence !== "ABSENT") return;
     const search = finding.evidence.search;
     if (!search) throw new Error("an ABSENT observation must record its search");
+    if (finding.assessment === "GOOD" && exhaustiveSourceKinds.size === 0) {
+        throw new Error(
+            `cannot conclude ABSENT + GOOD for '${finding.practiceSlug}': it declares no source it searches ` +
+                `exhaustively, so "this is not anywhere in the work" ranges over a corpus it has not bounded — ` +
+                `say INCONCLUSIVE instead`,
+        );
+    }
     const consulted = new Set(search.consulted);
     for (const sourceKind of consulted) {
         if (!availableSourceKinds.has(sourceKind)) {

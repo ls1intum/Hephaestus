@@ -37,7 +37,6 @@ import tools.jackson.databind.json.JsonMapper;
  *       "presence": "PRESENT",
  *       "assessment": "GOOD",
  *       "severity": "INFO",
- *       "confidence": 0.95,
  *       "evidence": { ... },
  *       "reasoning": "...",
  *       "guidance": "...",
@@ -76,9 +75,9 @@ public class PracticeDetectionResultParser {
      * The practices whose {@code BAD} finding may present as a merge-blocker ({@code CRITICAL}/{@code MAJOR}) —
      * ones that can break correctness, security, or data integrity. Every other (craft/process/authoring)
      * practice is ADVISORY: {@link ValidatedFinding#coerceCoherence(boolean, boolean)} caps its band to
-     * {@code MINOR}. Confidence alone can't make this call — a craft critique and a real defect are emitted at
-     * the same high confidence — so this consequence-class list is the discriminator. Pinned by
-     * {@code PracticeDetectionResultParserTest}.
+     * {@code MINOR}. Nothing the detector reports about its own certainty could make this call — a craft
+     * critique and a real defect were emitted with identical certainty, which is why that field is gone —
+     * so this consequence-class list is the discriminator. Pinned by {@code PracticeDetectionResultParserTest}.
      */
     static final Set<String> BLOCKING_ELIGIBLE_PRACTICES = Set.of(
         "handles-errors-instead-of-swallowing-them",
@@ -295,8 +294,6 @@ public class PracticeDetectionResultParser {
         // See parseSeverityOrDefault: defaults to INFO rather than discarding the finding.
         Severity severity = parseSeverityOrDefault(entry);
 
-        float confidence = parseConfidence(entry);
-
         JsonNode evidence = null;
         JsonNode evidenceNode = entry.get("evidence");
         if (evidenceNode != null && !evidenceNode.isNull() && !evidenceNode.isMissingNode()) {
@@ -342,7 +339,6 @@ public class PracticeDetectionResultParser {
             presence,
             assessment,
             severity,
-            confidence,
             evidence,
             reasoning,
             guidance,
@@ -403,22 +399,6 @@ public class PracticeDetectionResultParser {
         } catch (IllegalArgumentException e) {
             throw new EntryValidationException("invalid " + field + " value: '" + node.asString() + "'");
         }
-    }
-
-    private static float parseConfidence(JsonNode entry) {
-        JsonNode node = entry.get("confidence");
-        if (node == null || node.isNull() || !node.isNumber()) {
-            throw new EntryValidationException("missing or non-numeric confidence");
-        }
-        float confidence = node.floatValue();
-        // Detect a percentage (e.g. 85 -> 0.85): the model sometimes emits confidence out of 100.
-        if (confidence > 1.0f && confidence <= 100.0f) {
-            confidence = confidence / 100.0f;
-        }
-        if (confidence < 0.0f || confidence > 1.0f) {
-            throw new EntryValidationException("confidence out of range [0.0, 1.0]: " + confidence);
-        }
-        return confidence;
     }
 
     /**
@@ -513,7 +493,6 @@ public class PracticeDetectionResultParser {
         Presence presence,
         @Nullable Assessment assessment,
         @Nullable Severity severity,
-        float confidence,
         JsonNode evidence,
         String reasoning,
         String guidance,
@@ -527,7 +506,6 @@ public class PracticeDetectionResultParser {
             Presence presence,
             @Nullable Assessment assessment,
             @Nullable Severity severity,
-            float confidence,
             JsonNode evidence,
             String reasoning,
             String guidance,
@@ -539,7 +517,6 @@ public class PracticeDetectionResultParser {
                 presence,
                 assessment,
                 severity,
-                confidence,
                 evidence,
                 reasoning,
                 guidance,
@@ -555,7 +532,6 @@ public class PracticeDetectionResultParser {
                 presence,
                 assessment,
                 severity,
-                confidence,
                 evidence,
                 reasoning,
                 guidance,
@@ -576,8 +552,15 @@ public class PracticeDetectionResultParser {
          * Coerces {@code (presence, assessment, severity)} to the system's coherence invariants, independent
          * of what the model emitted:
          * <ol>
-         *   <li>A defect-detector practice only ever flags a defect or abstains; a model-emitted
-         *       {@code PRESENT, GOOD} there is off-contract noise, coerced to {@code NOT_APPLICABLE}.</li>
+         *   <li>A defect-detector practice hunts one <em>undesirable</em> behaviour, so what would be
+         *       {@code PRESENT} for it is the defect. A model-emitted {@code PRESENT, GOOD} there endorses a
+         *       good act nobody observed, and is coerced to {@code NOT_APPLICABLE}. {@code ABSENT, GOOD} is a
+         *       different claim and survives: the harmful behaviour could have appeared in the corpus this
+         *       practice bounds and did not, which is a strength, and whether the corpus really was bounded
+         *       and covered is settled where the evidence is — {@code enforceRecordedSearch} in
+         *       {@link PracticeDetectionDeliveryService}, against the practice's own {@code EXHAUSTIVE}
+         *       stances. Collapsing it here is what used to tell a developer who wrote clean error handling
+         *       that their work had no subject for the practice.</li>
          *   <li>Severity is a coaching band only for a {@code BAD} finding (forced null otherwise), and a
          *       {@code BAD} arriving as {@code INFO} is raised to {@code MINOR}.</li>
          *   <li>When {@code advisoryOnly} (not in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a {@code BAD}
@@ -590,7 +573,7 @@ public class PracticeDetectionResultParser {
             Presence p = presence;
             Assessment a = assessment;
             String r = reasoning;
-            if (isDefectDetector && a == Assessment.GOOD) {
+            if (isDefectDetector && a == Assessment.GOOD && p == Presence.PRESENT) {
                 p = Presence.NOT_APPLICABLE;
                 a = null;
                 r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
@@ -612,19 +595,7 @@ public class PracticeDetectionResultParser {
             if (p == presence && a == assessment && s == severity) {
                 return this;
             }
-            return new ValidatedFinding(
-                practiceSlug,
-                title,
-                p,
-                a,
-                s,
-                confidence,
-                evidence,
-                r,
-                guidance,
-                suggestedDiffNotes,
-                keys
-            );
+            return new ValidatedFinding(practiceSlug, title, p, a, s, evidence, r, guidance, suggestedDiffNotes, keys);
         }
     }
 

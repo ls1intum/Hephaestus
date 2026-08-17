@@ -86,6 +86,43 @@ Both the in-sandbox normalizer and the delivery boundary enforce this. The dupli
 and matches the citation rules: a runner that crashed, ran an older image, or had its output rescued
 from raw text reaches delivery with nothing having validated the search.
 
+#### The two directions of an absence are not proved the same way
+
+`ABSENT` + `BAD` says a desired behaviour is missing **from the place the citation points at**. The claim is
+anchored to that locus, so the recorded search only has to reach as far as the locus does.
+
+`ABSENT` + `GOOD` says an undesirable behaviour is **nowhere in the work** — a universal over the whole
+corpus, admissible only where the corpus is closed and was covered whole. So it additionally requires the
+practice to declare at least one `EXHAUSTIVE` source: a practice that has bounded no corpus cannot make the
+claim, whatever it is about, and the honest answer for it is `INCONCLUSIVE`. Both the normalizer and delivery
+reject an unbounded `ABSENT` + `GOOD`.
+
+That distinction is what makes a clean result recordable at all. Eight practices in the bundled catalogue are
+defect detectors — their target signal is the undesirable behaviour — and they used to forbid `GOOD` outright,
+on the true premise that a clean bill of health cannot be proved from a fragment. The cost was that a
+developer who wrote sound error handling was told `NOT_APPLICABLE`: "this work had no subject for this
+practice", which is false, and which reads identically to "you touched nothing relevant". Those practices now
+hold `scm.pull-request.diff` `EXHAUSTIVE` — the corpus they were already scoped to, and one the capture
+contract can only ever report `COMPLETE` — so a covered pass over the added lines reports `ABSENT` + `GOOD`.
+What stays refused for them is `PRESENT` + `GOOD`: what would be present is the defect, so endorsing it would
+praise a good act nobody observed. `PracticeDetectionResultParser.coerceCoherence` coerces exactly that shape
+to `NOT_APPLICABLE`, and nothing else.
+
+#### There is no confidence field
+
+Observations used to carry a detector-reported `confidence` in `[0, 1]`. Measured over 580 live observations
+it never fell below 0.90 and was exactly 1.00 in 55% of them: the model cannot use the range, so every
+consumer that ranked or floored on it was ranking on noise. It is gone from the tool schema, the normalizer
+and `ValidatedFinding`.
+
+What ranks a finding now is `FindingOrder`: severity where it applies, then **evidence breadth** — the number
+of distinct loci the citations point at, the in-run form of recurrence — then a stable identity so the order
+is total and a re-run reproduces it. All three are properties the run can check rather than ones it reports.
+
+The `observation.confidence` column stays. It holds real history for the rows written before the change, and
+dropping a column is a destructive migration; rows written since carry
+`Observation.UNMEASURED_CONFIDENCE`.
+
 ### Recipient and subject remain distinct
 
 An observation's `aboutUserId` identifies the developer the evidence concerns. Feedback separately

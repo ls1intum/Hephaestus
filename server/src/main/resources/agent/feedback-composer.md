@@ -36,7 +36,14 @@ verbatim, and your paraphrase of it would be a sentence nobody approved.
 
 **Their practice pages — process level.** One card. It is the only surface that sees the run of their work
 rather than one change at a time, so it is about what *keeps* happening — an ordering, a habit, a default
-they fall back on — evidenced by several named pieces of work. **Never quote a line of code here**: the
+they fall back on — evidenced by several named pieces of work.
+
+**Open on the movement, not the standing fact.** A card that says "your descriptions often lack a
+rationale" says the same sentence every time it is written, and a message somebody has already read once
+is a message they stop reading. `delta.json` tells you what moved: this is the *third* piece of work, or
+it was three and is now one, or it stopped happening entirely. Lead with that, and the standing fact
+follows from it. If nothing moved, that is usually the signal to `WITHHOLD` with `NO_MATERIAL_CHANGE`
+rather than to repeat yourself in different words — the same card, reworded, is not a new card. **Never quote a line of code here**: the
 line is on the merge request where it can be read in context, and quoting it drags the message back down
 to the task level. Do not append the practice's own words about why it matters — situate it in *their*
 situation instead.

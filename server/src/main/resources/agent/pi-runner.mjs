@@ -297,20 +297,21 @@ const diffNoteSchema = {
 // only the fallback body of an in-context note. Requiring it on every finding made this step invent a
 // next step for a strength, for a practice with no subject here, and for a question it could not settle
 // — a standing pull toward "something is wrong" on the three answers that assert nothing is.
+//
+// There is no `confidence` field, and asking for one back would be asking for noise. Across 580 real
+// observations it never once fell below 0.90 and was exactly 1.00 in 55% of them: the model cannot use
+// the range, so every consumer that ranked on it was ranking on nothing. What a finding is worth is read
+// off things we can check — its severity, and how much of the corpus its citations actually span.
 const findingSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning"],
+    required: ["practiceSlug", "title", "presence", "evidence", "reasoning"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
         title: { type: "string", minLength: 1, maxLength: 120 },
         presence: presenceSchema,
         assessment: assessmentSchema,
         severity: severitySchema,
-        // Upper bound is 100, not 1, so a model emitting percentage-style confidence (e.g. 85)
-        // is not rejected at the SDK boundary; normalizeFinding rescales (1,100] -> /100 to
-        // mirror the Java consumer PracticeDetectionResultParser.parseConfidence.
-        confidence: { type: "number", minimum: 0, maximum: 100 },
         evidence: evidenceSchema,
         reasoning: {
             type: "string",
@@ -363,9 +364,6 @@ function isValidFinding(f) {
     // assessment is required only for a presence that carries valence; NOT_APPLICABLE and
     // INCONCLUSIVE are both silence and must NOT carry one (mirrors Presence.carriesValence()).
     if (carriesValence(f.presence) && typeof f.assessment !== "string") return false;
-    // Number(null) === 0 — reject nullish before isNaN check.
-    if (f.confidence == null || f.confidence === "") return false;
-    if (Number.isNaN(Number(f.confidence))) return false;
     return true;
 }
 
@@ -629,7 +627,6 @@ function projectObservations() {
             presence: finding.presence,
             assessment: finding.assessment ?? null,
             severity: finding.severity ?? null,
-            confidence: finding.confidence ?? null,
             reasoning: finding.reasoning,
             anchorable: citations.some((citation) => citation.anchorable),
             citations,

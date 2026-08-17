@@ -226,7 +226,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
             Presence.ABSENT,
             Assessment.BAD,
             Severity.MAJOR,
-            0.9f,
             null,
             "reasoning",
             "guidance",

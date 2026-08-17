@@ -31,7 +31,6 @@ import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -276,14 +275,11 @@ public class FeedbackLedgerRecorder {
             .filter(f -> f.getPresence().carriesValence())
             .filter(f -> !excludedIds.contains(f.getId()))
             .filter(f -> summaryDelivered || deliveredInlineKeys.contains(f.getRecurrenceKey()))
-            // Stable order matching the composer’s prioritisation: severity, then confidence DESC, then id — so the
-            // persisted PRIMARY ordinal of equal-severity problems is reproducible across re-runs rather
-            // than flapping with the repository's findByAgentJobId iteration order.
-            .sorted(
-                Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
-                    .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
-                    .thenComparing(f -> f.getId().toString())
-            )
+            // Stable order matching the composer's prioritisation, and the same FindingOrder it uses:
+            // severity, then how much of the work the finding's citations span, then id — so the persisted
+            // PRIMARY ordinal of equal-severity problems is reproducible across re-runs rather than flapping
+            // with the repository's findByAgentJobId iteration order.
+            .sorted(FindingOrder.worstFirst())
             .toList();
         int ordinal = 0;
         for (Observation f : assessed) {
@@ -502,11 +498,7 @@ public class FeedbackLedgerRecorder {
         List<Observation> assessed = evidence
             .stream()
             .filter(f -> f.getPresence().carriesValence())
-            .sorted(
-                Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
-                    .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
-                    .thenComparing(f -> f.getId().toString())
-            )
+            .sorted(FindingOrder.worstFirst())
             .toList();
         for (Observation f : assessed) {
             EvidenceRole role = f.getAssessment() == Assessment.BAD ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
@@ -673,11 +665,7 @@ public class FeedbackLedgerRecorder {
         List<Observation> assessed = findings
             .stream()
             .filter(f -> f.getPresence().carriesValence())
-            .sorted(
-                Comparator.comparingInt(FeedbackLedgerRecorder::severityOrdinal)
-                    .thenComparing(Comparator.comparing(FeedbackLedgerRecorder::confidenceOf).reversed())
-                    .thenComparing(f -> f.getId().toString())
-            )
+            .sorted(FindingOrder.worstFirst())
             .toList();
         for (Observation f : assessed) {
             EvidenceRole role = f.getAssessment() == Assessment.BAD ? EvidenceRole.PRIMARY : EvidenceRole.SUPPORTING;
@@ -740,18 +728,5 @@ public class FeedbackLedgerRecorder {
 
     private boolean deliveryAllowed() {
         return egressGuard.deliveryAllowed("prepare-conversational-feedback");
-    }
-
-    /**
-     * Severity ordinal for sorting, treating a null severity (a GOOD strength under ADR 0022) as the
-     * least severe so problems always sort ahead of strengths.
-     */
-    private static int severityOrdinal(Observation f) {
-        return f.getSeverity() == null ? Integer.MAX_VALUE : f.getSeverity().ordinal();
-    }
-
-    /** Confidence for the stable sort tiebreak, treating a null confidence as 0 (mirrors DeliveryComposer). */
-    private static float confidenceOf(Observation f) {
-        return f.getConfidence() == null ? 0f : f.getConfidence();
     }
 }

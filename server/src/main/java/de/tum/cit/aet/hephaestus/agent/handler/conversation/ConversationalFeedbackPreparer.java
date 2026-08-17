@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
+import de.tum.cit.aet.hephaestus.agent.handler.FindingOrder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
@@ -15,7 +16,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import java.time.Instant;
 import java.util.Comparator;
@@ -65,8 +65,8 @@ import org.springframework.transaction.annotation.Transactional;
  * composer is shown as a supersession target, so a unit written without one can never be replaced by anything.
  *
  * <p>Bounded (top-N=3 raised per recipient). Ordinals are derived from the admitted observations alone, in a
- * deterministic order (recipient, severity, confidence, id), so a re-run of the same job re-derives the same
- * {@code (agent_job_id, position)} grain whatever the composer said, and the {@code existsByAgentJobIdAndPosition}
+ * deterministic order (recipient, then {@link FindingOrder}: severity, evidence breadth, id), so a re-run of the
+ * same job re-derives the same {@code (agent_job_id, position)} grain whatever the composer said, and the {@code existsByAgentJobIdAndPosition}
  * guard makes preparation idempotent. Positions start at
  * {@link FeedbackLedgerRecorder#IN_CHAT_UNIT_ORDINAL_BASE} so they never collide with the IN_CONTEXT /
  * suppressed / policy-floor units of the same job.
@@ -125,12 +125,7 @@ public class ConversationalFeedbackPreparer {
         }
         List<Observation> ordered = admitted
             .stream()
-            .sorted(
-                Comparator.comparingLong(Observation::getAboutUserId)
-                    .thenComparingInt(ConversationalFeedbackPreparer::severityOrdinal)
-                    .thenComparing(Comparator.comparing(ConversationalFeedbackPreparer::confidenceOf).reversed())
-                    .thenComparing(o -> o.getId().toString())
-            )
+            .sorted(Comparator.comparingLong(Observation::getAboutUserId).thenComparing(FindingOrder.worstFirst()))
             .collect(Collectors.toList());
 
         // Every admitted observation consumes a slot, so the band is not bounded by the per-recipient cap.
@@ -381,14 +376,5 @@ public class ConversationalFeedbackPreparer {
 
     private static String normalizeSlug(String practiceSlug) {
         return practiceSlug.toLowerCase(Locale.ROOT).replace('_', '-');
-    }
-
-    private static int severityOrdinal(Observation observation) {
-        Severity severity = observation.getSeverity();
-        return severity == null ? Integer.MAX_VALUE : severity.ordinal();
-    }
-
-    private static float confidenceOf(Observation observation) {
-        return observation.getConfidence() == null ? 0f : observation.getConfidence();
     }
 }

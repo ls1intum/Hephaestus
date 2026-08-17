@@ -185,8 +185,15 @@ public class ObservationService {
         for (List<Observation> group : byPractice.values()) {
             Practice practice = group.get(0).getPractice();
 
-            // A defect-detector practice has no GOOD observation, so a persisted GOOD row predating the
-            // write-time coercion must not surface here as a false "strength" — read-time guard for the dashboard.
+            // A defect-detector practice hunts an undesirable behaviour, so it has no PRESENT, GOOD: what
+            // would be present is the defect. A persisted row of that shape predating the write-time coercion
+            // must not surface here as a false "strength" — read-time guard for the dashboard.
+            //
+            // Its ABSENT, GOOD rows are the opposite case and belong on the card. The harmful behaviour could
+            // have appeared in the corpus the practice bounds and did not, proven against the search the
+            // observation carries, and this surface is the whole reason that verdict was made reachable: a
+            // developer who writes clean error handling has to be able to read that they did, and used to be
+            // told instead that their work had no subject for the practice.
             boolean isDefectDetector = practice.isDefectDetector();
 
             // The "to work on" headline must be the highest-impact CORROBORATED item, not just the highest
@@ -221,17 +228,16 @@ public class ObservationService {
                 .limit(MAX_ITEMS_PER_PRACTICE)
                 .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
                 .toList();
-            List<ReflectionItemDTO> strengths = isDefectDetector
-                ? List.of()
-                : group
-                      .stream()
-                      .filter(f -> f.getAssessment() == Assessment.GOOD)
-                      .limit(MAX_STRENGTHS_PER_PRACTICE)
-                      .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
-                      .toList();
+            List<ReflectionItemDTO> strengths = group
+                .stream()
+                .filter(f -> f.getAssessment() == Assessment.GOOD)
+                .filter(f -> !isDefectDetector || f.getPresence() == Presence.ABSENT)
+                .limit(MAX_STRENGTHS_PER_PRACTICE)
+                .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
+                .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
-                // This fires for a defect-detector practice whose only rows are GOOD: strengths are suppressed
-                // for defect-detectors (no clean-bill-of-health) and there are no BAD rows, so the card is empty
+                // This fires for a defect-detector practice whose only rows are PRESENT, GOOD: those are
+                // suppressed above (no clean-bill-of-health) and there are no BAD rows, so the card is empty
                 // and contributes nothing to the dashboard. Skip it rather than emit a contentless card.
                 continue;
             }

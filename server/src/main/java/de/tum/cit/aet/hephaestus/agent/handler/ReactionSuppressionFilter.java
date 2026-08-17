@@ -169,7 +169,6 @@ class ReactionSuppressionFilter {
             vf.presence(),
             vf.assessment(),
             vf.severity(),
-            vf.confidence(),
             vf.evidence(),
             reasoning,
             vf.guidance(),

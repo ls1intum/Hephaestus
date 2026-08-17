@@ -48,7 +48,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         finding.put("presence", "PRESENT");
         finding.put("assessment", "GOOD");
         finding.put("severity", "INFO");
-        finding.put("confidence", 0.95);
         return finding;
     }
 
@@ -183,7 +182,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(f.title()).isEqualTo("Good PR description");
             assertThat(f.presence()).isEqualTo(Presence.PRESENT);
             assertThat(f.severity()).isEqualTo(Severity.INFO);
-            assertThat(f.confidence()).isEqualTo(0.95f);
         }
 
         @Test
@@ -409,39 +407,28 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(result.validFindings().get(0).severity()).isEqualTo(Severity.INFO);
         }
 
+        /**
+         * The parser used to police a {@code confidence} in {@code [0, 1]}, rescale a percentage-shaped one,
+         * and DISCARD the finding when neither worked. Measured over 580 live observations the field never
+         * fell below 0.90 and was exactly 1.00 in 55% of them, so it graded nothing and could only ever throw
+         * away real observations over a number nobody read. It is gone from the schema — and a model that
+         * still sends one is not punished for it, because the finding is sound without it.
+         */
         @Test
-        void confidenceBelowZero() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", -0.5);
+        void confidenceIsNeitherRequiredNorGroundsForDiscard() {
+            for (Object volunteered : new Object[] { -0.5, 85, 150, 0.0, 1.0 }) {
+                ObjectNode finding = validFindingNode();
+                finding.putPOJO("confidence", volunteered);
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+                ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
 
-            assertThat(result.validFindings()).isEmpty();
-            assertThat(result.discarded()).hasSize(1);
-            assertThat(result.discarded().get(0).reason()).contains("out of range");
-        }
+                assertThat(result.validFindings()).as("confidence=%s", volunteered).hasSize(1);
+                assertThat(result.discarded()).isEmpty();
+            }
 
-        @Test
-        void percentageConfidence() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 85);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).confidence()).isEqualTo(0.85f);
-        }
-
-        @Test
-        void confidenceAbove100() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 150);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).isEmpty();
-            assertThat(result.discarded()).hasSize(1);
-            assertThat(result.discarded().get(0).reason()).contains("out of range");
+            ParseResult withNone = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
+            assertThat(withNone.validFindings()).hasSize(1);
+            assertThat(withNone.discarded()).isEmpty();
         }
 
         @Test
@@ -495,28 +482,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             assertThat(f.reasoning()).isNull();
             assertThat(f.guidance()).isNull();
             assertThat(f.evidence()).isNull();
-        }
-
-        @Test
-        void confidenceExactlyZero() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 0.0);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).confidence()).isEqualTo(0.0f);
-        }
-
-        @Test
-        void confidenceExactlyOne() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 1.0);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).confidence()).isEqualTo(1.0f);
         }
 
         @Test
@@ -580,7 +545,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ObjectNode bad1 = validFindingNode();
             bad1.remove("practiceSlug");
             ObjectNode bad2 = validFindingNode();
-            bad2.put("confidence", -1);
+            bad2.remove("title");
 
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(bad1, bad2)));
 
@@ -605,7 +570,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // An ABSENT gap is a BAD assessment; any other presence here pairs with GOOD.
             finding.put("assessment", "ABSENT".equalsIgnoreCase(presence) ? "BAD" : "GOOD");
             finding.put("severity", severity);
-            finding.put("confidence", 0.90);
             ArrayNode arr = finding.putArray("suggestedDiffNotes");
             for (ObjectNode note : notes) {
                 arr.add(note);
@@ -657,7 +621,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             finding.put("presence", "ABSENT");
             finding.put("assessment", "BAD");
             finding.put("severity", "MAJOR");
-            finding.put("confidence", 0.90);
             ArrayNode arr = finding.putArray("suggestedDiffNotes");
             ObjectNode bad1 = objectMapper.createObjectNode();
             bad1.put("startLine", 1);
@@ -719,17 +682,14 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void keepsAllFindingsPerPractice() {
             ObjectNode f1 = validFindingNode();
             f1.put("practiceSlug", "error-handling");
-            f1.put("confidence", 0.85);
             f1.put("title", "First violation");
 
             ObjectNode f2 = validFindingNode();
             f2.put("practiceSlug", "error-handling");
-            f2.put("confidence", 0.95);
             f2.put("title", "Second violation");
 
             ObjectNode f3 = validFindingNode();
             f3.put("practiceSlug", "code-hygiene");
-            f3.put("confidence", 0.90);
 
             ParseResult result = parser.parse(wrapRawOutput(wrapFindings(f1, f2, f3)));
 
@@ -786,7 +746,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // Simulate agent output with Swift \(error) in code snippets
             // Jackson would fail on \( because it's not a valid JSON escape
             String rawWithSwiftEscapes = """
-                {"findings":[{"practiceSlug":"silent-failure","title":"Empty catch","presence":"ABSENT","assessment":"BAD","severity":"MAJOR","confidence":0.95,"guidance":"```swift\\nprint(\\"Error: \\(error)\\")\\n```"}]}
+                {"findings":[{"practiceSlug":"silent-failure","title":"Empty catch","presence":"ABSENT","assessment":"BAD","severity":"MAJOR","guidance":"```swift\\nprint(\\"Error: \\(error)\\")\\n```"}]}
                 """;
 
             ParseResult result = parser.parse(wrapRawOutput(rawWithSwiftEscapes));
@@ -865,7 +825,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 presence,
                 assessment,
                 severity,
-                0.9f,
                 null,
                 "reasoning",
                 "guidance",
@@ -935,7 +894,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 Presence.ABSENT,
                 Assessment.GOOD,
                 Severity.INFO,
-                0.9f,
                 null,
                 "reasoning",
                 "guidance",
@@ -948,18 +906,45 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("defect-detector (ABSENT, GOOD) is off-contract → coerced to NOT_APPLICABLE")
-        void defectDetectorAbsentGoodCoercedToNa() {
-            // A defect-detector only ever emits PRESENT/BAD or NOT_APPLICABLE; an ABSENT/GOOD it produces is
-            // off-contract model noise and must NOT ship as a false strength (it is a real strength only for a
-            // normal practice — see absentGoodIsPreservedAsStrength).
-            var offContract = new ValidatedFinding(
+        @DisplayName("defect-detector (ABSENT, GOOD) survives — it is the shape its strength has")
+        void defectDetectorAbsentGoodSurvives() {
+            // A defect-detector's target signal is the undesirable behaviour, so what would be PRESENT for it
+            // is the defect and a (PRESENT, GOOD) is off-contract. (ABSENT, GOOD) is the OTHER claim: the
+            // harmful behaviour could have appeared in the corpus the practice bounds and did not. Coercing it
+            // away is what used to tell a developer who wrote clean error handling that their work had no
+            // subject for the practice — a NOT_APPLICABLE that is simply false, and indistinguishable from
+            // "you touched nothing relevant". Whether the corpus really was bounded and covered is settled
+            // against the practice's EXHAUSTIVE stances in PracticeDetectionDeliveryService, not guessed here.
+            var strength = new ValidatedFinding(
                 "p",
                 "t",
                 Presence.ABSENT,
                 Assessment.GOOD,
                 Severity.INFO,
-                0.9f,
+                null,
+                "reasoning",
+                "guidance",
+                List.of()
+            );
+            var out = strength.coerceCoherence(true, false);
+            assertThat(out.presence()).isEqualTo(Presence.ABSENT);
+            assertThat(out.assessment()).isEqualTo(Assessment.GOOD);
+            // Severity is a coaching band for a problem only, so a strength carries none whatever was emitted.
+            assertThat(out.severity()).isNull();
+            assertThat(out.reasoning()).isEqualTo("reasoning");
+        }
+
+        @Test
+        @DisplayName("defect-detector (PRESENT, GOOD) is still off-contract → coerced to NOT_APPLICABLE")
+        void defectDetectorPresentGoodCoercedToNa() {
+            // The refusal that survives, and the one that was always the real one: a PRESENT here would be
+            // the defect, so endorsing it praises a good act nobody observed.
+            var offContract = new ValidatedFinding(
+                "p",
+                "t",
+                Presence.PRESENT,
+                Assessment.GOOD,
+                Severity.INFO,
                 null,
                 "reasoning",
                 "guidance",
@@ -980,7 +965,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 Presence.PRESENT,
                 Assessment.GOOD,
                 Severity.INFO,
-                0.9f,
                 null,
                 "r",
                 "g",
@@ -992,7 +976,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 Presence.PRESENT,
                 Assessment.GOOD,
                 Severity.MAJOR,
-                0.9f,
                 null,
                 "r",
                 "g",
@@ -1038,7 +1021,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MAJOR,
-                0.98f,
                 null,
                 "r",
                 "g",
@@ -1050,7 +1032,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MAJOR,
-                0.95f,
                 null,
                 "r",
                 "g",
@@ -1073,7 +1054,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MAJOR,
-                0.98f,
                 null,
                 "r",
                 "g",

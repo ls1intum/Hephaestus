@@ -86,6 +86,13 @@ there": every source the practice holds in `exhaustiveSources`. When it was not 
 it, or you cannot tell how much of it you saw — the answer is `INCONCLUSIVE`, never `NOT_APPLICABLE` and never
 a speculative `ABSENT`.
 
+The two directions of an absence are not proved the same way, and the difference decides whether a clean result
+can be a strength. An `ABSENT, BAD` says a good behaviour is missing *from the place you cited*, so the claim
+reaches only as far as that locus. An `ABSENT, GOOD` says a harmful behaviour is **nowhere in the work** — a
+claim over the whole corpus, admissible only for a practice with a non-empty `exhaustiveSources` and only when
+your `consulted` covers every one of them. Emit an `ABSENT, GOOD` with no `exhaustiveSources` behind it and the
+server rejects the finding; say `INCONCLUSIVE` instead.
+
 **COHERENCE RULE (non-negotiable — the most common mistake).** `assessment` is REQUIRED for `PRESENT` and
 `ABSENT`, and MUST be omitted for `NOT_APPLICABLE` and `INCONCLUSIVE`: the server drops any assessment attached
 to those two, so attaching one only loses your reasoning. An inapplicable practice is not a quiet strength and
@@ -126,11 +133,20 @@ off the practice's severity table — the server nulls it everywhere else. If yo
    practice on which you are also emitting a BAD. One `GOOD` per practice.
 
    **Defect-detector exception — this OVERRIDES the rule above.** Some practices declare in their OWN criteria
-   that they have no strength to report: they exist only to flag a defect or abstain, because their positive
-   ("no duplication anywhere", "every error handled", "every boundary validated") cannot be PROVEN from a diff.
-   When a practice's criteria open with "DEFECT-DETECTOR DISCIPLINE" or otherwise say "never a strength" / "no
-   GOOD finding", HONOUR it: never emit `assessment=GOOD` for that practice, and record a clean surface as its
-   criteria direct. The affirmation half applies only to practices whose criteria define a provable positive.
+   ("DEFECT-DETECTOR DISCIPLINE") that they hunt one specific defect. Their target signal is the *undesirable*
+   behaviour, so a `PRESENT, GOOD` is never available to them: what would be present is the defect, and
+   endorsing its absence as if you had seen a good act is a clean bill of health you did not earn.
+
+   Their strength has the other shape. When such a practice names a bounded corpus — it will say so, and its
+   `exhaustiveSources` in `inputs/practices/index.json` will be non-empty — and you covered that corpus WHOLE
+   and the defect is not in it, that is `ABSENT, GOOD`: the harmful behaviour could have appeared here and did
+   not. Record it with `evidence.search`, whose `boundary` states exactly what you did not cover, and cite the
+   surface you read. This is a real strength and you should emit it; a developer who wrote clean error handling
+   has done something, and `NOT_APPLICABLE` would tell them there was nothing here to see.
+
+   The refusal survives wherever the corpus is NOT bounded: if the practice lists no `exhaustiveSources`, "the
+   defect is nowhere" ranges past what you read, so the answer is `INCONCLUSIVE` (or `NOT_APPLICABLE` where its
+   criteria direct), never `ABSENT, GOOD`. The server rejects an unbounded `ABSENT, GOOD` outright.
 
    **Review-thread exception — the diff is NOT the surface.** Review-thread practices
    (`reviews-substantively-with-understanding`, `reviews-respectfully-asks-rather-than-demands`,
@@ -151,8 +167,10 @@ off the practice's severity table — the server nulls it everywhere else. If yo
 5. **Severity is fixed by the practice criteria, not your judgement.** For a BAD finding, apply the practice's severity table
    exactly, keyed off the countable fact you quoted (a line-count bucket, a present/absent token, a regex hit). Identical facts
    MUST yield identical severity every run. Never escalate on a feeling of "how bad" it is.
-6. **Confidence is a delivery gate, not a severity input.** Set confidence high ONLY when a precompute fact or a verbatim
-   quote backs the finding; lower it when the call is interpretive. Do not pad confidence. `confidence` is a float in [0.0, 1.0].
+6. **There is no confidence field, and how sure you feel is not part of the output.** A finding is either grounded in a
+   quotable fact — in which case report it — or it is not, in which case the answer is `INCONCLUSIVE` and you say in
+   `reasoning` what would have settled it. Do not hedge a shaky finding into the record; the two honest states are a
+   finding you can quote and a question you could not close.
 7. **Evidence locations reference the real artifact** (a file:line in the diff, or the issue/PR text) — never an internal
    `context/` file. A finding whose only location is a context file is out of scope; drop it.
 8. **Never fabricate context — confirm a file exists before you rely on it.** Before you base ANY finding on a context file
@@ -440,7 +458,6 @@ Use `report_finding` — it is the output contract in this runtime.
             "presence": "PRESENT | ABSENT | NOT_APPLICABLE | INCONCLUSIVE",
             "assessment": "GOOD | BAD",
             "severity": "CRITICAL | MAJOR | MINOR | INFO",
-            "confidence": 0.85,
             "evidence": {
                 "search": {
                     "consulted": ["scm.review-threads"],

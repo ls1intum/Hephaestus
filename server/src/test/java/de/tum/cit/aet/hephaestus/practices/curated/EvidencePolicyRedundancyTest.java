@@ -57,9 +57,25 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
 
     /**
      * Which shipped practices claim something is <em>absent</em>, recorded here because it is a reading of
-     * each practice's criteria rather than anything the code can derive. Deliberately short: a practice
-     * that instead points at a contradiction it can quote does not need the whole capture. Adding to this
-     * list is a decision about what a practice may assert, made here rather than noticed in a diff.
+     * each practice's criteria rather than anything the code can derive. Adding to this list is a decision
+     * about what a practice may assert, made here rather than noticed in a diff.
+     *
+     * <p>Two different claims land a practice on this list, and both are absences.
+     *
+     * <p>The first four assert a <em>gap</em> over a corpus that arrives in pages: "no reviewer raised this",
+     * "the issue closed with its outcome unmet". A partial capture of review threads is equally consistent
+     * with "nobody raised it" and "the raising was in the part we did not fetch", so the whole capture is
+     * what makes the gap assertable at all.
+     *
+     * <p>The eight defect detectors are here for the mirror-image reason: to assert a <em>clean</em> result.
+     * Their target signal is the undesirable behaviour, so their strength has the shape "the defect could have
+     * appeared in this change and did not" — a universal over the corpus, admissible only where the corpus is
+     * closed and was covered whole. Each was already scoped to the added and changed lines of the diff, and
+     * {@code scm.pull-request.diff} is a source the contract can only report {@code COMPLETE} (it does not
+     * support {@code PARTIAL}) and already demands {@code COMPLETE_AND_NON_EMPTY}, so holding it
+     * {@code EXHAUSTIVE} costs no readiness and buys the verdict. Without it these practices had to answer a
+     * clean surface with {@code NOT_APPLICABLE} — "this work had no subject for this practice" — which is
+     * false of a change they read, and which reads to a developer as "you touched nothing relevant".
      */
     @Test
     void onlyThePracticesThatAssertAnAbsenceDemandAWholeCapture() {
@@ -85,16 +101,34 @@ class EvidencePolicyRedundancyTest extends BaseUnitTest {
             );
 
         assertThat(exhaustive).containsOnlyKeys(
+            // Gap-shaped absences over a paginated corpus.
             "merged-past-unresolved-review-threads",
             "engaging-with-inline-review-comments",
             "issue-closed-with-unmet-outcome",
-            "ready-and-traceable-handoff"
+            "ready-and-traceable-handoff",
+            // Clean-shaped absences over the diff: the eight defect detectors.
+            "removes-duplication-instead-of-copy-pasting",
+            "keeps-functions-small-and-single-purpose",
+            "leaves-the-code-clean-with-intent-revealing-comments",
+            "handles-errors-instead-of-swallowing-them",
+            "validates-inputs-and-edge-cases-at-the-boundary",
+            "avoids-unsafe-panics-and-chosen-crashes",
+            "validates-and-escapes-untrusted-input",
+            "avoids-insecure-defaults-and-over-broad-permissions"
         );
         assertThat(exhaustive.get("merged-past-unresolved-review-threads")).containsExactly(
             new SourceKind("scm.review-threads")
         );
         assertThat(exhaustive.get("issue-closed-with-unmet-outcome")).containsExactly(
             new SourceKind("scm.issue.comments")
+        );
+        // A defect detector bounds the diff and nothing else: its clean verdict must not silently start
+        // ranging over the repository tree, which no capture can ever cover whole.
+        assertThat(exhaustive.get("handles-errors-instead-of-swallowing-them")).containsExactly(
+            new SourceKind("scm.pull-request.diff")
+        );
+        assertThat(exhaustive.get("validates-and-escapes-untrusted-input")).containsExactly(
+            new SourceKind("scm.pull-request.diff")
         );
     }
 }

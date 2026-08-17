@@ -23,6 +23,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -224,7 +225,9 @@ public class PracticeDetectionDeliveryService {
                 finding.presence().name(),
                 finding.assessment() == null ? null : finding.assessment().name(),
                 severityName,
-                finding.confidence(),
+                // The detector no longer reports a confidence, and the column it used to fill is kept only
+                // for the history already in it (Observation#UNMEASURED_CONFIDENCE).
+                Observation.UNMEASURED_CONFIDENCE,
                 evidenceJson,
                 finding.reasoning(),
                 recurrenceKey,
@@ -549,6 +552,20 @@ public class PracticeDetectionDeliveryService {
      * Holds an {@code ABSENT} observation to the search it recorded: a partial capture of the review threads
      * is equally consistent with "nobody raised it" and "the raising was in the part we did not fetch", so
      * {@link EvidenceStance#EXHAUSTIVE} sources are exactly what the search must have covered.
+     *
+     * <p><b>The two directions of an absence do not need the same proof.</b> An {@code ABSENT, BAD} says a good
+     * behaviour is missing from the place its citation points at; the claim is anchored to that locus, and the
+     * recorded search bounds it. An {@code ABSENT, GOOD} says a harmful behaviour is <em>nowhere in the
+     * work</em> — a universal over the whole corpus, provable only if the corpus is closed and was covered
+     * whole. So a practice that declares no {@code EXHAUSTIVE} stance has closed no corpus and may not make
+     * that claim, whatever it is about; one that has, may, on exactly the evidence it already owes.
+     *
+     * <p>This is the rule that lets a clean surface be recorded as a strength at all. Eight defect detectors
+     * used to forbid {@code GOOD} outright on the true premise that a clean bill of health cannot be proved
+     * from a fragment — and paid for it by telling a developer who wrote sound error handling that their work
+     * had no subject for the practice, which is false and which reads identically to "you touched nothing
+     * relevant". The premise only ever held for an unbounded corpus; this is where the boundary is checked
+     * instead of assumed.
      */
     private void enforceRecordedSearch(
         ValidatedFinding finding,
@@ -558,6 +575,15 @@ public class PracticeDetectionDeliveryService {
     ) {
         if (finding.presence() != Presence.ABSENT) {
             return;
+        }
+        if (finding.assessment() == Assessment.GOOD && exhaustive.isEmpty()) {
+            throw new JobDeliveryException(
+                "An ABSENT, GOOD observation needs a practice that bounds the corpus it searches, and this one " +
+                    "declares no EXHAUSTIVE evidence source: slug=" +
+                    finding.practiceSlug() +
+                    ", jobId=" +
+                    job.getId()
+            );
         }
         JsonNode search = finding.evidence() == null ? null : finding.evidence().get("search");
         JsonNode consulted = search == null ? null : search.get("consulted");

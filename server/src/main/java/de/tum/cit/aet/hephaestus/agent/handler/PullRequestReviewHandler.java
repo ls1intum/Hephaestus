@@ -575,7 +575,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             Presence.PRESENT,
             Assessment.BAD,
             severity,
-            1.0f,
             evidence,
             reasoning,
             guidance,

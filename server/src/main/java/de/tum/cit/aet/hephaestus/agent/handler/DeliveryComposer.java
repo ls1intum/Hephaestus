@@ -295,12 +295,13 @@ class DeliveryComposer {
         }
 
         if (negatives.isEmpty()) {
-            // Ranked most-certain first so the highest-confidence reinforcements survive the cap, and so a
-            // practice's single composed message is claimed by its strongest signal.
+            // Ranked best-attested first, so the strengths that survive the cap are the ones we saw in the
+            // most of the work, and so a practice's single composed message is claimed by its widest
+            // signal. Strengths carry no severity, so breadth is the only ranking dimension there is here.
             List<ValidatedFinding> observed = findings
                 .stream()
                 .filter(DeliveryComposer::isStrength)
-                .sorted(Comparator.comparingDouble((ValidatedFinding f) -> f.confidence()).reversed())
+                .sorted(FindingOrder.bestAttestedFirst())
                 .toList();
             if (observed.isEmpty()) {
                 // Every finding NOT_APPLICABLE or INCONCLUSIVE: nothing was actually assessed, so deliver
@@ -437,8 +438,13 @@ class DeliveryComposer {
 
     /**
      * Caps the non-blocking (MINOR/INFO) improvement tail to {@link #MAX_IMPROVEMENT_SUGGESTIONS}, keeping
-     * the highest-severity then highest-confidence ones; every blocking finding survives uncapped. Preserves
-     * incoming severity ordering.
+     * the highest-severity then widest-evidenced ones ({@link FindingOrder}); every blocking finding survives
+     * uncapped. Preserves incoming severity ordering.
+     *
+     * <p>What survives a cap is the one place ranking is not cosmetic — the findings below the line are not
+     * shown at all — so the key has to be something the run observed. A nudge quoted at four loci is a habit
+     * running through the change; one quoted at a single locus is a one-off, and it is the habit that is
+     * worth the slot.
      */
     private static List<ValidatedFinding> capImprovementTail(List<ValidatedFinding> negatives) {
         List<ValidatedFinding> blocking = new ArrayList<>();
@@ -454,11 +460,7 @@ class DeliveryComposer {
         // equal findings into one slot and the re-emit below would match both, overshooting the cap.
         Set<ValidatedFinding> keptImprovements = improvements
             .stream()
-            .sorted(
-                Comparator.comparingInt((ValidatedFinding f) -> f.severity().ordinal()).thenComparing(
-                    Comparator.comparingDouble(ValidatedFinding::confidence).reversed()
-                )
-            )
+            .sorted(FindingOrder.worstFirstUnstored())
             .limit(MAX_IMPROVEMENT_SUGGESTIONS)
             .collect(Collectors.toCollection(() -> Collections.newSetFromMap(new IdentityHashMap<>())));
 
@@ -632,19 +634,22 @@ class DeliveryComposer {
 
     /**
      * The single earned strength line allowed alongside blocking issues: one brief acknowledgement of the
-     * run's highest-confidence GOOD finding, rendered after the issue count — not a feedback sandwich that
+     * run's best-attested GOOD finding, rendered after the issue count — not a feedback sandwich that
      * buries the critique. A slug without a curated phrase falls back to a generic line rather than
      * dropping the acknowledgement or dumping a raw slug.
+     *
+     * <p>Ranked by the same comparator as the no-issues path, so the strength this line lands on is the one
+     * that would have led there — a run cannot praise one thing when it has problems and a different thing
+     * when it does not.
      */
     static String composeSubordinatePositive(List<ValidatedFinding> positives) {
         if (positives == null || positives.isEmpty()) {
             return "";
         }
-        // Most-certain GOOD finding first, so the single line we are allowed lands on the strongest signal.
         return positives
             .stream()
             .filter(DeliveryComposer::isStrength)
-            .max(Comparator.comparingDouble(ValidatedFinding::confidence))
+            .min(FindingOrder.bestAttestedFirst())
             .map(DeliveryComposer::subordinateStrengthLine)
             .orElse("");
     }

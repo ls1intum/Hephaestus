@@ -29,7 +29,6 @@ function baseFinding(overrides = {}) {
         presence: "present",
         assessment: "bad",
         severity: "major",
-        confidence: 0.8,
         reasoning: "The diff touches auth and billing in one PR.",
         guidance: "Split into two PRs.",
         evidence: {
@@ -68,6 +67,31 @@ test("mixed-case enums up-case", () => {
     assert.equal(out.presence, "PRESENT");
     assert.equal(out.assessment, "GOOD");
     assert.equal(out.severity, "MINOR");
+});
+
+// ── No confidence ────────────────────────────────────────────────────────────
+// Measured over 580 live observations, confidence never fell below 0.90 and was exactly 1.00 in 55% of
+// them. A field with no usable range is not a measurement, and every consumer that ranked on it was
+// ranking on noise. It is gone from the schema; a model that emits one anyway is not failed for it —
+// rejecting the finding would throw away a real observation over a field we no longer read — but the
+// number never reaches the record.
+
+test("a finding carries no confidence, and one offered is dropped rather than rejected", () => {
+    const out = normalizeFinding(baseFinding());
+    assert.equal("confidence" in out, false);
+
+    const volunteered = normalizeFinding(baseFinding({ confidence: 0.42 }));
+    assert.equal("confidence" in volunteered, false);
+    assert.equal(volunteered.presence, "PRESENT");
+
+    // Nothing about a finding is decided by it any more: the two differ in no other field.
+    assert.deepEqual(volunteered, out);
+});
+
+test("a nonsensical confidence can no longer fail an otherwise-sound finding", () => {
+    for (const confidence of [-1, 4200, "very", null]) {
+        assert.doesNotThrow(() => normalizeFinding(baseFinding({ confidence })));
+    }
 });
 
 test("NOT_APPLICABLE (lowercase) nulls assessment", () => {
@@ -250,6 +274,41 @@ test("ABSENT is refused unless the search covered every source the practice asse
     );
     // Claiming to have searched something this run never staged.
     assert.throws(() => validateSearchScope(finding, new Set(), new Set()), /was not available/);
+});
+
+// ── ABSENT + GOOD: a clean surface, over a corpus the practice bounded ───────
+//
+// The eight defect detectors used to forbid GOOD outright, on the true premise that "no duplication
+// anywhere" cannot be proved from a fragment. The cost was that a developer who wrote clean error
+// handling was told NOT_APPLICABLE — "this work had no subject for this practice" — which is false, and
+// which collapses "you touched nothing relevant" together with "you did this well".
+//
+// The premise only ever held for an UNBOUNDED corpus. Where the practice declares an exhaustive stance
+// and the search covered it whole, the negative is provable, and that is exactly the condition the
+// existing search-scope rule already measures. So the gate is not new machinery: an ABSENT+GOOD is
+// admitted on the same evidence an ABSENT+BAD is, plus the requirement that a corpus was declared at all.
+
+test("ABSENT + GOOD needs a practice that bounded its corpus; ABSENT + BAD does not", () => {
+    const strength = normalizeFinding(absentFinding(goodSearch, { assessment: "GOOD", severity: undefined }));
+    const gap = normalizeFinding(absentFinding(goodSearch));
+    const available = new Set(["scm.review-threads"]);
+
+    // Declared exhaustive over the corpus it searched → the clean result is assertable.
+    assert.doesNotThrow(() => validateSearchScope(strength, new Set(["scm.review-threads"]), available));
+    // Declared nothing exhaustive → "the harmful behaviour is nowhere" ranges past anything it read.
+    assert.throws(() => validateSearchScope(strength, new Set(), available), /ABSENT \+ GOOD/);
+    assert.throws(() => validateSearchScope(strength, new Set(), available), /INCONCLUSIVE/);
+    // A gap is anchored to the locus it cites, so it never needed a declared corpus and still does not.
+    assert.doesNotThrow(() => validateSearchScope(gap, new Set(), available));
+});
+
+test("a bounded corpus does not excuse a partial search, in either direction", () => {
+    const strength = normalizeFinding(absentFinding(goodSearch, { assessment: "GOOD", severity: undefined }));
+    const available = new Set(["scm.review-threads", "scm.linked-work-items"]);
+    assert.throws(
+        () => validateSearchScope(strength, new Set(["scm.review-threads", "scm.linked-work-items"]), available),
+        /without searching scm.linked-work-items/,
+    );
 });
 
 test("the search scope rule applies to ABSENT only", () => {
@@ -492,7 +551,6 @@ test("an INCONCLUSIVE observation must say what it could not settle", () => {
         practiceSlug: "describe-what-and-why",
         title: "Rationale lives somewhere this review cannot read",
         presence: "INCONCLUSIVE",
-        confidence: 0.9,
         reasoning: "The body points at an issue for the why, and that issue was not staged.",
         evidence: { citations: baseFinding().evidence.citations },
     };

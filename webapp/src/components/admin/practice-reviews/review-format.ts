@@ -5,11 +5,6 @@ import type { ReviewSubject } from "@/api/types.gen";
  * does not belong here: it goes in that enum's defs module under `@/components/practice-vocabulary`,
  * so the filter dropdown, the row badge and the detail header all read one entry.
  */
-export function confidenceLabel(confidence: number | undefined): string {
-	if (confidence == null) return "—";
-	return `${Math.round(confidence * 100)}%`;
-}
-
 export function subjectLabel(subject: ReviewSubject | undefined): string {
 	if (!subject) return "Unavailable developer";
 	return subject.name || subject.login || `#${subject.id}`;

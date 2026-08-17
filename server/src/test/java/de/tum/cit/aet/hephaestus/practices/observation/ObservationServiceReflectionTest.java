@@ -320,4 +320,82 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
         // Both share a locus seen on 2 targets → neither quarantined → both displayed.
         assertThat(cards.get(0).toWorkOn()).hasSize(2);
     }
+
+    // ── A defect detector's strength reaches the card ─────────────────────────
+    //
+    // The point of making (ABSENT, GOOD) reachable at all. Suppressing every GOOD row for a defect detector
+    // was the read-time half of a rule that turned "you wrote clean error handling" into "this work had no
+    // subject for this practice" — a claim that is false and that reads identically to "you touched nothing
+    // relevant". The refusal that survives is the one that was always the real one: a (PRESENT, GOOD) for a
+    // defect detector would praise a good act nobody observed, because what would be PRESENT is the defect.
+
+    private static Practice defectDetector(String slug) {
+        Practice practice = practice(slug);
+        practice.setCriteria("DEFECT-DETECTOR DISCIPLINE: this practice hunts one specific defect.");
+        return practice;
+    }
+
+    private Observation strength(Practice practice, Presence presence) {
+        return Observation.builder()
+            .id(UUID.randomUUID())
+            .practice(practice)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
+            .artifactId(42L)
+            .title("nothing swallowed on the paths you added")
+            .presence(presence)
+            .assessment(Assessment.GOOD)
+            .confidence(Observation.UNMEASURED_CONFIDENCE)
+            .build();
+    }
+
+    private void feeds(Observation... observations) {
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(List.of(observations));
+        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
+    }
+
+    @Test
+    @DisplayName("a defect detector's (ABSENT, GOOD) is shown as a strength — the clean result they earned")
+    void defectDetectorAbsentGoodIsShownAsAStrength() {
+        Practice practice = defectDetector("handles-errors-instead-of-swallowing-them");
+        feeds(strength(practice, Presence.ABSENT));
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).strengths()).hasSize(1);
+        assertThat(cards.get(0).toWorkOn()).isEmpty();
+    }
+
+    @Test
+    @DisplayName("a defect detector's (PRESENT, GOOD) is still withheld, and an empty card is not emitted")
+    void defectDetectorPresentGoodIsStillWithheld() {
+        Practice practice = defectDetector("handles-errors-instead-of-swallowing-them");
+        feeds(strength(practice, Presence.PRESENT));
+
+        // Nothing survives, so there is no card at all rather than a contentless one.
+        assertThat(observationService.getReflection(WORKSPACE_ID)).isEmpty();
+    }
+
+    @Test
+    @DisplayName("an ordinary practice keeps both shapes of strength")
+    void ordinaryPracticeKeepsBothShapesOfStrength() {
+        // The suppression is keyed to the defect-detector marker, not to presence in general: narrowing it
+        // must not have narrowed anything for the rest of the catalogue.
+        Practice practice = practice("robust-error-handling");
+        feeds(strength(practice, Presence.PRESENT), strength(practice, Presence.ABSENT));
+
+        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).strengths()).hasSize(2);
+    }
 }
