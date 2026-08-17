@@ -12,12 +12,16 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 import {
+    ASSESSMENT_DESCRIPTIONS,
     ASSESSMENT_VALUES,
+    PRESENCE_DESCRIPTIONS,
     PRESENCE_VALUES,
+    SEVERITY_DESCRIPTIONS,
     SEVERITY_VALUES,
     carriesValence,
     citationMatchesArtifact,
     dedupeKeyForFinding,
+    describeVocabulary,
     normalizeFinding,
     validateEvidenceSources,
     validateSearchScope,
@@ -125,9 +129,37 @@ const reviewState = {
 // The tool schema the model sees is generated from the SAME vocabulary the normalizer validates
 // against, so the SDK boundary can no longer accept a value the normalizer rejects (or, as happened
 // with INCONCLUSIVE, reject one the orchestrator instructs the model to emit).
-const presenceSchema = { type: "string", enum: PRESENCE_VALUES };
-const assessmentSchema = { type: "string", enum: ASSESSMENT_VALUES };
-const severitySchema = { type: "string", enum: SEVERITY_VALUES };
+//
+// Each enum carries the discriminator for every one of its values, because an enum of bare words is a
+// choice the model cannot make: if a person reading the schema could not say which of two values a case
+// belongs to, neither can it, and it will settle on whichever value reads as the safe default. That is
+// measurable — a live corpus produced NOT_APPLICABLE 61% of the time and INCONCLUSIVE not once. The
+// wording lives beside the vocabulary in pi-finding-normalize.mjs so a value can never be added without
+// one; here it is only rendered.
+const presenceSchema = {
+    type: "string",
+    enum: PRESENCE_VALUES,
+    description:
+        "Is the behaviour this practice names in the work? Every practice names one — read its criteria for " +
+        "what the behaviour is, then pick the value whose test you can actually pass.\n" +
+        describeVocabulary(PRESENCE_VALUES, PRESENCE_DESCRIPTIONS),
+};
+const assessmentSchema = {
+    type: "string",
+    enum: ASSESSMENT_VALUES,
+    description:
+        "Is what presence recorded good or bad FOR THE DEVELOPER? Required for PRESENT and ABSENT; omit it " +
+        "entirely for NOT_APPLICABLE and INCONCLUSIVE, which assert no direction and are not quiet verdicts.\n" +
+        describeVocabulary(ASSESSMENT_VALUES, ASSESSMENT_DESCRIPTIONS),
+};
+const severitySchema = {
+    type: "string",
+    enum: SEVERITY_VALUES,
+    description:
+        "How much the problem costs. Set it only when assessment is BAD, and read it off the practice's own " +
+        "severity table keyed to the fact you quoted — never from a feeling of how bad it is, so identical " +
+        "facts land in the same band every run.\n" + describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS),
+};
 // Where you looked, for what, and where the looking stopped. REQUIRED when presence=ABSENT: "I did
 // not find it" only means "it is not there" if the corpus searched was the one the claim ranges over,
 // and that is a fact only the searcher can report.
@@ -226,10 +258,15 @@ const diffNoteSchema = {
 // `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
 // conditional cleanly across all validators the SDK may use, so we keep it out of `required`
 // here and enforce the (presence, assessment) coupling in normalizeFinding().
+//
+// `guidance` is NOT required. The composition stage authors what the developer reads, so guidance is now
+// only the fallback body of an in-context note. Requiring it on every finding made this step invent a
+// next step for a strength, for a practice with no subject here, and for a question it could not settle
+// — a standing pull toward "something is wrong" on the three answers that assert nothing is.
 const findingSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning", "guidance"],
+    required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
         title: { type: "string", minLength: 1, maxLength: 120 },
@@ -241,8 +278,21 @@ const findingSchema = {
         // mirror the Java consumer PracticeDetectionResultParser.parseConfidence.
         confidence: { type: "number", minimum: 0, maximum: 100 },
         evidence: evidenceSchema,
-        reasoning: { type: "string", minLength: 1 },
-        guidance: { type: "string", minLength: 1 },
+        reasoning: {
+            type: "string",
+            minLength: 1,
+            description:
+                "What you observed, in plain prose a developer reads verbatim: the behaviour you looked for, " +
+                "where you looked, and what the evidence showed. For INCONCLUSIVE, say here what would have " +
+                "decided it.",
+        },
+        guidance: {
+            type: "string",
+            description:
+                "OPTIONAL — one concrete next step, and only where there is one to take: a BAD finding, or a " +
+                "strength worth pushing further. Omit it entirely for NOT_APPLICABLE and INCONCLUSIVE, and for " +
+                "any finding where the honest next step is none. Do not invent one to fill the field.",
+        },
         suggestedDiffNotes: { type: "array", items: diffNoteSchema },
     },
 };
@@ -1006,8 +1056,8 @@ function loadPracticeSlugs() {
 // cannot drift between the sites that emit it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
-    `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
-    `For an INCONCLUSIVE finding, guidance states in one sentence what would have decided it. ` +
+    `guidance is optional: write it only where there is a real next step — a BAD finding, or a strength worth ` +
+    `pushing further — and leave it off entirely for NOT_APPLICABLE and INCONCLUSIVE rather than inventing one. ` +
     `Only keep GOOD findings that add real review value. ` +
     `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
@@ -1231,8 +1281,11 @@ async function main() {
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
                     `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
                     `— set presence (${PRESENCE_VALUES.join("/")}) and, unless it is NOT_APPLICABLE or INCONCLUSIVE, ` +
-                    `assessment (GOOD/BAD). If you read the evidence and it does not settle the question, say ` +
-                    `INCONCLUSIVE — do NOT reach for NOT_APPLICABLE, which claims there was nothing here to see.`;
+                    `assessment (GOOD/BAD). Ask the one question presence answers: is the behaviour this practice names ` +
+                    `in the work? It is there = PRESENT; the occasion for it was here and it is not = ABSENT; the ` +
+                    `occasion never arose = NOT_APPLICABLE. If you read the evidence and it does not settle the ` +
+                    `question, say INCONCLUSIVE — do NOT reach for NOT_APPLICABLE, which claims there was nothing here ` +
+                    `to see.`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {

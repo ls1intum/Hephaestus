@@ -6,8 +6,15 @@ import path from "node:path";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MOD = path.resolve(__dirname, "../../../main/resources/agent/pi-finding-normalize.mjs");
 const {
+    ASSESSMENT_DESCRIPTIONS,
+    ASSESSMENT_VALUES,
+    PRESENCE_DESCRIPTIONS,
+    PRESENCE_VALUES,
+    SEVERITY_DESCRIPTIONS,
+    SEVERITY_VALUES,
     carriesValence,
     citationMatchesArtifact,
+    describeVocabulary,
     normalizeFinding,
     dedupeKeyForFinding,
     validateEvidenceSources,
@@ -361,4 +368,82 @@ test("a NOT_APPLICABLE claim may only rest on sources this run staged", () => {
     // Every other presence is none of this validator's business.
     const present = normalizeFinding(baseFinding());
     assert.doesNotThrow(() => validateInapplicabilityScope(present, new Set()));
+});
+
+// ── Optional guidance ────────────────────────────────────────────────────────
+// guidance was REQUIRED with minLength 1 while composition still authored nothing. Now that the
+// composition stage writes what the developer reads, guidance survives only as the fallback body of an
+// in-context note — and demanding one on every finding made the measurement step invent a next step for
+// a strength, for a practice with no subject here, and for a question it could not settle. Those are
+// exactly the three answers that assert nothing is wrong.
+
+test("a finding with no guidance is accepted, and the key is simply absent", () => {
+    const finding = baseFinding();
+    delete finding.guidance;
+    const out = normalizeFinding(finding);
+    assert.equal("guidance" in out, false);
+});
+
+test("blank guidance collapses to absent rather than to an empty string", () => {
+    // One shape reaches Java, not two: DeliveryComposer falls back on guidance being null, and a "" that
+    // survived would read as an authored-but-empty next step.
+    for (const blank of ["", "   ", "\n"]) {
+        const out = normalizeFinding(baseFinding({ guidance: blank }));
+        assert.equal("guidance" in out, false, `guidance ${JSON.stringify(blank)} must not survive`);
+    }
+});
+
+test("guidance is kept, trimmed, when there really is a next step", () => {
+    const out = normalizeFinding(baseFinding({ guidance: "  Split into two PRs.  " }));
+    assert.equal(out.guidance, "Split into two PRs.");
+});
+
+test("dropping guidance changes nothing else about the finding", () => {
+    const withGuidance = normalizeFinding(baseFinding());
+    const withoutGuidance = normalizeFinding(baseFinding({ guidance: undefined }));
+    assert.equal(dedupeKeyForFinding(withGuidance), dedupeKeyForFinding(withoutGuidance));
+    assert.deepEqual({ ...withGuidance, guidance: undefined }, { ...withoutGuidance, guidance: undefined });
+});
+
+// ── Vocabulary descriptions ──────────────────────────────────────────────────
+// The tool schema is generated from these, so a value with no description reaches the model as one of
+// four undifferentiated words — which is how a live corpus produced NOT_APPLICABLE 61% of the time and
+// INCONCLUSIVE not once. The parity test pins the vocabularies against Java; this pins the meanings
+// against the vocabularies.
+
+test("every vocabulary value carries a description", () => {
+    for (const [values, descriptions, label] of [
+        [PRESENCE_VALUES, PRESENCE_DESCRIPTIONS, "presence"],
+        [ASSESSMENT_VALUES, ASSESSMENT_DESCRIPTIONS, "assessment"],
+        [SEVERITY_VALUES, SEVERITY_DESCRIPTIONS, "severity"],
+    ]) {
+        assert.deepEqual(
+            Object.keys(descriptions).sort(),
+            [...values].sort(),
+            `${label} descriptions must cover exactly ${label} values`,
+        );
+    }
+});
+
+test("describeVocabulary refuses a value it cannot describe", () => {
+    // The guard that makes the coverage above structural: adding a presence without describing it fails
+    // when the schema is built, rather than shipping a word the model has no way to choose.
+    assert.throws(
+        () => describeVocabulary([...PRESENCE_VALUES, "UNDECIDED"], PRESENCE_DESCRIPTIONS),
+        /'UNDECIDED' has no description/,
+    );
+});
+
+test("each presence description discriminates it from its nearest neighbour", () => {
+    // Not prose-checking: the failure mode is a description that defines a value in isolation, which is
+    // no help at the only moment it is read — when two values both look defensible.
+    const rendered = describeVocabulary(PRESENCE_VALUES, PRESENCE_DESCRIPTIONS);
+    for (const value of PRESENCE_VALUES) {
+        assert.ok(rendered.includes(`${value} — `), `${value} is rendered on its own line`);
+        const others = PRESENCE_VALUES.filter((other) => other !== value);
+        assert.ok(
+            others.some((other) => PRESENCE_DESCRIPTIONS[value].includes(other)),
+            `${value} must say how it differs from another presence`,
+        );
+    }
 });

@@ -7,6 +7,92 @@ export const PRESENCE_VALUES = ["PRESENT", "ABSENT", "NOT_APPLICABLE", "INCONCLU
 export const ASSESSMENT_VALUES = ["GOOD", "BAD"];
 export const SEVERITY_VALUES = ["CRITICAL", "MAJOR", "MINOR", "INFO"];
 
+// ── What each value MEANS, at the moment of choosing between two of them ─────
+//
+// A bare enum hands the model four words and no way to tell them apart, and it will then reach for
+// whichever one reads as the safe default — which for a four-valued presence is always the one that
+// looks like N/A on a form. So each value is described by its DISCRIMINATOR against its nearest
+// neighbour rather than by a definition that stands alone: the choice is only ever made in a pair.
+//
+// These are the text the tool schema carries (pi-runner.mjs builds `description` from them), so they
+// are the last thing the model reads before it fills the field in.
+
+/**
+ * Presence answers ONE question for every practice in the catalogue: is the behaviour this practice
+ * names in the work? That framing is what makes the four values decidable without knowing which
+ * practice is being scored — a missing good behaviour is an ABSENT good behaviour, not a PRESENT bad
+ * one, whatever the practice happens to be about.
+ */
+export const PRESENCE_DESCRIPTIONS = {
+    PRESENT:
+        "The behaviour this practice names is in the work and you can point at it — your citation shows the " +
+        "thing itself. Pick this over ABSENT when the behaviour occurred, and over INCONCLUSIVE when the " +
+        "evidence settles the question.",
+    ABSENT:
+        "The occasion for the behaviour arose in this work and the behaviour is not there. Pick this over " +
+        "NOT_APPLICABLE when there WAS a place the behaviour belonged — NOT_APPLICABLE says no such place " +
+        "existed. A missing good behaviour is ABSENT (a gap), never PRESENT with a BAD assessment. Requires " +
+        "evidence.search: an absence is a claim about a corpus, and it holds only over the corpus you searched.",
+    NOT_APPLICABLE:
+        "This work has no subject for this practice: the occasion for the behaviour never arose, so there was " +
+        "nothing here to judge. Pick this over INCONCLUSIVE only when you can name the fact about THIS work " +
+        "that rules the subject out (evidence.inapplicability.ruledOutBy); if the honest answer to 'why does " +
+        "it not apply' is 'I could not tell', the presence is INCONCLUSIVE. This value enters the developer's " +
+        "long-running record as 'there was nothing to see here', so it is an assertion about their work and " +
+        "never a way to abstain.",
+    INCONCLUSIVE:
+        "There IS a subject here, you read the evidence this practice needs, and it does not settle the " +
+        "question either way. Pick this over NOT_APPLICABLE whenever the practice's subject does occur in the " +
+        "work but the evidence is not dispositive, and over a speculative ABSENT whenever you could not search " +
+        "far enough to say the behaviour is really missing. It needs no assessment and no extra evidence block: " +
+        "it is the correct, complete answer to uncertainty, and it costs no more to say than NOT_APPLICABLE.",
+};
+
+/** Valence, and only valence: whether what presence recorded reflects well or badly on the work. */
+export const ASSESSMENT_DESCRIPTIONS = {
+    GOOD:
+        "What you saw reflects well and is worth acknowledging. With PRESENT: the good behaviour the practice " +
+        "names is there. With ABSENT: a harmful behaviour that could have appeared did not.",
+    BAD:
+        "What you saw is a problem the developer should act on. With PRESENT: a harmful behaviour is in the " +
+        "work (commission). With ABSENT: a good behaviour that belonged here is missing (omission).",
+};
+
+/**
+ * Severity is read off the practice's own severity table, keyed to the fact that was quoted — these
+ * descriptions calibrate the bands so the same fact lands in the same band every run. They are not an
+ * invitation to grade by feel.
+ */
+export const SEVERITY_DESCRIPTIONS = {
+    CRITICAL:
+        "The consequence is expensive or impossible to undo once this merges — a leaked credential, data loss, " +
+        "a security hole. Differs from MAJOR by whether the damage can still be taken back.",
+    MAJOR:
+        "A real defect to fix before merging, whose consequence is contained and correctable. Differs from " +
+        "MINOR by whether a reader of this change would be wrong about how it behaves.",
+    MINOR:
+        "A craft-level improvement worth making that nobody would block a merge on. Differs from INFO by " +
+        "whether there is a specific edit to make.",
+    INFO: "An observation with no required edit. This is the band for anything that is not a defect.",
+};
+
+/**
+ * Renders a vocabulary as the `description` of its enum field, one line per value.
+ *
+ * <p>Throws on a value with no description, so a value added to the vocabulary without being described
+ * fails here rather than reaching the model as an undifferentiated word — the same structural guard, one
+ * level down, that AgentVocabularySyncTest applies across the language boundary.
+ */
+export function describeVocabulary(values, descriptions) {
+    return values
+        .map((value) => {
+            const description = descriptions[value];
+            if (!description) throw new Error(`vocabulary value '${value}' has no description`);
+            return `${value} — ${description}`;
+        })
+        .join("\n");
+}
+
 /**
  * Whether an observation with this presence carries a good/bad direction — the exact twin of
  * Presence.carriesValence() in Java and of the DB CHECK chk_observation_presence_assessment.
@@ -160,6 +246,12 @@ export function normalizeFinding(finding) {
     const rawConfidence = Number(finding.confidence);
     const confidence = rawConfidence > 1 && rawConfidence <= 100 ? rawConfidence / 100 : rawConfidence;
     const reasoning = String(finding.reasoning ?? "").trim();
+    // OPTIONAL, and deliberately so. Since composition authors the developer-facing text, guidance
+    // survives only as the fallback body of an in-context note (DeliveryComposer.appendBody), which is
+    // null-safe. Demanding one on every finding made the measurement step invent a next step for
+    // strengths, for NOT_APPLICABLE and for INCONCLUSIVE — a standing pull toward "something is wrong"
+    // on exactly the three answers that assert nothing is. Blank collapses to absent so the Java side
+    // sees one shape, not two.
     const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");
     if (!title) throw new Error("title is required");
@@ -169,7 +261,6 @@ export function normalizeFinding(finding) {
     if (!Number.isFinite(confidence) || confidence < 0 || confidence > 1)
         throw new Error("confidence must be between 0 and 1");
     if (!reasoning) throw new Error("reasoning is required");
-    if (!guidance) throw new Error("guidance is required");
     const evidence = normalizeEvidence(finding.evidence, presence);
     const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
         ? finding.suggestedDiffNotes.map(normalizeDiffNote)
@@ -182,9 +273,9 @@ export function normalizeFinding(finding) {
         confidence,
         evidence,
         reasoning,
-        guidance,
         suggestedDiffNotes,
     };
+    if (guidance) out.guidance = guidance;
     if (hasValence) out.assessment = assessment;
     return out;
 }
