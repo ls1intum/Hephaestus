@@ -473,7 +473,24 @@ class FeedbackLedgerRecorderTest extends BaseUnitTest {
         rec.recordUndelivered(job(), new DeliveryContent("body", List.of(), List.of()));
 
         verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
-        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(any());
+        // Typed, not any(): ApplicationEventPublisher.publishEvent is overloaded, and a bare any() binds to
+        // the ApplicationEvent overload this code never calls — which passes whatever the code does.
+        verify(eventPublisher, org.mockito.Mockito.never()).publishEvent(
+            any(de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent.class)
+        );
+    }
+
+    @Test
+    void recordUndelivered_wakesTheLongitudinalLanes_evenWithNothingToPostOnTheWork() {
+        // The composer can decline to say anything on the merge request and still have written a message
+        // about the habit behind it. Waking the private lanes used to be gated on there being a note, so
+        // those messages were composed and then dropped until the hourly sweeper found them.
+        recorder().recordUndelivered(job(), null);
+
+        verify(eventPublisher).publishEvent(
+            any(de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent.class)
+        );
+        verify(feedbackRepository, org.mockito.Mockito.never()).save(any());
     }
 
     @Test

@@ -623,18 +623,21 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordUndelivered(AgentJob job, DeliveryContent delivery) {
-        if (delivery == null || delivery.mrNote() == null) {
-            return;
-        }
         if (job.getWorkspace() == null) {
             return; // a no-workspace integrity failure has no recipient/artifact to bind
         }
         if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), IN_CONTEXT_UNIT_ORDINAL)) {
-            return; // a DELIVERED unit already exists (a prior run landed) — never contradict it or re-signal
+            return; // a DELIVERED unit already exists (a prior run landed) — record() signalled, do not re-signal
         }
-        // Signalled before the silent-mode check, not after it: the lanes this wakes are internal, and
-        // silence is about what leaves the instance.
+        // Signalled here, above the note check and above silent mode, because the lanes this wakes are
+        // internal and neither condition bears on them. A review that composed nothing to post on the work
+        // can still have composed a message about the habit behind it, so gating this on `mrNote` made the
+        // developer's private page a passenger of the public comment — the same mistake as gating it on
+        // silence, one level up. An in-context note is one lane's output, not a precondition for the others.
         publishFeedbackLaneTrigger(job);
+        if (delivery == null || delivery.mrNote() == null) {
+            return; // nothing to post on the work; the lanes above are already awake
+        }
         if (!deliveryAllowed()) {
             recordSuppressedUnit(job, delivery, FeedbackSuppressionReason.INSTANCE_SILENCED);
             return;
