@@ -447,3 +447,24 @@ test("each presence description discriminates it from its nearest neighbour", ()
         );
     }
 });
+
+// Measured against gpt-oss-120b: asked to quote the merge-request title
+// `Resolve "Connect data between screens"` verbatim, it returned curly quotes in 6 of 6 runs across
+// three tool-schema shapes. The transcription was faithful; only the glyphs moved. Before this fold
+// the citation failed `includes`, report_finding threw, and the observation was lost.
+test("a citation survives the typographic substitutions a model makes while transcribing", () => {
+    const content = 'Resolve "Connect data between screens" — see the plan';
+    const cite = (quote) => ({ sourceKind: "scm.pull-request.core", quote });
+
+    assert.equal(citationMatchesArtifact(cite('Resolve "Connect data between screens"'), content), true);
+    assert.equal(citationMatchesArtifact(cite('Resolve “Connect data between screens”'), content), true);
+    assert.equal(citationMatchesArtifact(cite("see the plan"), content), true);
+});
+
+test("folding glyphs never makes a quote the artifact does not contain match", () => {
+    const content = 'Resolve "Connect data between screens"';
+    const cite = (quote) => ({ sourceKind: "scm.pull-request.core", quote });
+
+    assert.equal(citationMatchesArtifact(cite('Resolve “Disconnect data between screens”'), content), false);
+    assert.equal(citationMatchesArtifact(cite("a rationale the author never wrote"), content), false);
+});

@@ -356,8 +356,38 @@ export function validateInapplicabilityScope(finding, availableSourceKinds) {
     }
 }
 
+/**
+ * Typographic substitutions a model makes while transcribing, folded before comparison.
+ *
+ * Measured, not guessed: asked to quote the title `Resolve "Connect data between screens"` verbatim,
+ * gpt-oss-120b returned it with curly quotes in 6 of 6 runs across three different tool schemas. The
+ * text was faithful; only the glyphs moved. Without this fold the citation fails `includes`, the
+ * finding throws, and a correct observation is lost — so the check was rejecting transcription rather
+ * than fabrication, which is the opposite of its job.
+ *
+ * Deliberately narrow. Only characters with an unambiguous ASCII original are folded, so a quote that
+ * says something the artifact does not still fails: this cannot turn a wrong quote into a right one.
+ */
+const CONFUSABLES = new Map(
+    Object.entries({
+        "‘": "'", "’": "'", "‚": "'", "‛": "'",
+        "“": '"', "”": '"', "„": '"', "‟": '"',
+        "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-",
+        " ": " ", " ": " ", " ": " ", " ": " ",
+    })
+);
+
+/** Fold the substitutions above; everything else is compared as written. */
+function foldConfusables(text) {
+    let out = "";
+    for (const ch of text) out += CONFUSABLES.get(ch) ?? ch;
+    return out;
+}
+
 export function citationMatchesArtifact(citation, content) {
-    if (citation.sourceKind !== "scm.pull-request.diff") return content.includes(citation.quote);
+    if (citation.sourceKind !== "scm.pull-request.diff") {
+        return content.includes(citation.quote) || foldConfusables(content).includes(foldConfusables(citation.quote));
+    }
     let oldPath = null;
     let newPath = null;
     const citedLines = new Map();
