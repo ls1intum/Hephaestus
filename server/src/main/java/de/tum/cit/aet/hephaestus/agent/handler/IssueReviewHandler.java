@@ -239,9 +239,7 @@ public class IssueReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
-        if (job.getMetadata().path(ObservationAdmissionService.DIGEST_METADATA_KEY).asString().isBlank()) {
-            throw new JobDeliveryException("Review finished without Java observation admission");
-        }
+        ObservationAdmissionService.requireMatchingCompositionDigest(job);
         List<PracticeDetectionResultParser.ValidatedObservation> observations = observationRepository
             .findByAgentJobId(job.getId())
             .stream()
@@ -305,7 +303,18 @@ public class IssueReviewHandler implements JobTypeHandler {
             return;
         }
         try {
-            String commentId = commentPoster.postIssueFormattedBody(job, commentFormatter.format(sanitized, job));
+            String formatted = commentFormatter.format(sanitized, job);
+            String prior = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
+            PullRequestCommentPoster.UpdateResult update =
+                prior == null ? null : commentPoster.updateFormattedBody(job, prior, formatted);
+            if (update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
+                job.setDeliveryCommentId(prior);
+                return;
+            }
+            String commentId =
+                update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED
+                    ? update.externalId()
+                    : commentPoster.postIssueFormattedBody(job, formatted);
             if (commentId == null) {
                 feedbackLedgerRecorder.recordUndelivered(job, delivery);
                 return;

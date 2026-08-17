@@ -1,4 +1,3 @@
-// Pi SDK runner — embedded in-process; persists observations via custom tools.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
@@ -52,7 +51,6 @@ const {
     compositionMs: COMPOSITION_TIMEOUT_MS,
 } = deriveTimeouts(AGENT_BUDGET_MS, existsSync(`${CWD}/inputs/feedback-composition.json`));
 
-// Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
     console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
     try {
@@ -81,10 +79,7 @@ const artifactSources = new Map(
 );
 const practiceIndex = JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8"));
 const admittedPractices = new Set(practiceIndex.map((practice) => practice.slug));
-// The sources this practice holds EXHAUSTIVE — the domain over which it is allowed to assert an
-// absence, and therefore the domain a search must cover before ABSENT is sound. The only per-practice
-// source list left: what may be CITED is what the manifest says this run staged, which is the same
-// answer for every practice.
+// ABSENT is sound only over sources the practice declares exhaustive.
 const practiceExhaustiveSources = new Map(
     practiceIndex.map((practice) => [practice.slug, new Set(practice.exhaustiveSources ?? [])]),
 );
@@ -104,16 +99,6 @@ const reviewState = {
     observations: [],
     observationKeys: [],
 };
-// The tool schema the model sees is generated from the SAME vocabulary the normalizer validates
-// against, so the SDK boundary can no longer accept a value the normalizer rejects (or, as happened
-// with INCONCLUSIVE, reject one the orchestrator instructs the model to emit).
-//
-// Each enum carries the discriminator for every one of its values, because an enum of bare words is a
-// choice the model cannot make: if a person reading the schema could not say which of two values a case
-// belongs to, neither can it, and it will settle on whichever value reads as the safe default. That is
-// measurable — a live corpus produced NOT_APPLICABLE 61% of the time and INCONCLUSIVE not once. The
-// wording lives beside the vocabulary in pi-observation-normalize.mjs so a value can never be added without
-// one; here it is only rendered.
 const presenceSchema = {
     type: "string",
     enum: PRESENCE_VALUES,
@@ -139,9 +124,6 @@ const severitySchema = {
         "facts land in the same band every run.\n" +
         describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS),
 };
-// Where you looked, for what, and where the looking stopped. REQUIRED when presence=ABSENT: "I did
-// not find it" only means "it is not there" if the corpus searched was the one the claim ranges over,
-// and that is a fact only the searcher can report.
 const searchSchema = {
     type: "object",
     additionalProperties: false,
@@ -165,10 +147,6 @@ const searchSchema = {
         },
     },
 };
-// What the practice looks for, and the fact about THIS work that rules it out. REQUIRED when
-// presence=NOT_APPLICABLE: that value is a claim about the developer's work — "there was nothing here to
-// see" — and it is the only presence with no proof attached, which is exactly why uncertainty drains into
-// it. Naming the ground is what separates it from an abstention. If you cannot name one, say INCONCLUSIVE.
 const inapplicabilitySchema = {
     type: "object",
     additionalProperties: false,
@@ -194,18 +172,6 @@ const inapplicabilitySchema = {
         },
     },
 };
-// The question the evidence left open, and what would have closed it. REQUIRED when
-// presence=INCONCLUSIVE, which until now was the one value that cost nothing to say and appeared in no
-// schema at all.
-//
-// Measured, not assumed. On a bench of 12 real merge requests plus two constructed undecidable ones,
-// moving evidence ahead of the verdict dropped INCONCLUSIVE from 6/6 of the undecidable cases to 1/6 —
-// once the model had quoted body text it read the body as settling the question. Adding this block put it
-// back to 6/6 with no loss of agreement elsewhere. A required sub-schema turns out to be a signpost as
-// much as a toll: it is how the model finds a value it otherwise walks past.
-//
-// It also makes the answer useful. "I could not tell" is a dead end; "I could not tell, and here is what
-// would have decided it" is a statement about missing evidence that a practice author can act on.
 const undecidabilitySchema = {
     type: "object",
     additionalProperties: false,
@@ -255,21 +221,6 @@ const evidenceSchema = {
         },
     },
 };
-// `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
-// conditional cleanly across all validators the SDK may use, so we keep it out of `required`
-// here and enforce the (presence, assessment) coupling in normalizeObservation().
-//
-// There is no `guidance` field. `additionalProperties: false` means the model cannot add one back, and
-// the normalizer drops it if the SDK ever lets one through. The composition stage is the only author of
-// what a developer reads; asking THIS step for a next step as well made it invent one for a strength, for
-// a practice with no subject here, and for a question it could not settle — a standing pull toward
-// "something is wrong" on exactly the three answers that assert nothing is. `reasoning` is what a
-// measurement has to say, and it is already read verbatim.
-//
-// There is no `confidence` field, and asking for one back would be asking for noise. Across 580 real
-// observations it never once fell below 0.90 and was exactly 1.00 in 55% of them: the model cannot use
-// the range, so every consumer that ranked on it was ranking on nothing. What an observation is worth is read
-// off things we can check — its severity, and how much of the corpus its citations actually span.
 const observationSchema = {
     type: "object",
     additionalProperties: false,
@@ -338,8 +289,6 @@ function isValidObservation(f) {
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
     if (typeof f.summary !== "string" || !f.summary.trim()) return false;
     if (typeof f.presence !== "string") return false;
-    // assessment is required only for a presence that carries valence; NOT_APPLICABLE and
-    // INCONCLUSIVE are both silence and must NOT carry one (mirrors Presence.carriesValence()).
     if (carriesValence(f.presence) && typeof f.assessment !== "string") return false;
     return true;
 }
@@ -355,7 +304,6 @@ function isValidObservationsPayload(p) {
 }
 
 function lenientJsonParse(text) {
-    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNESCAPED_CONTROL_CHARS).
     try {
         return JSON.parse(text);
     } catch {}
@@ -399,14 +347,6 @@ function hasPersistedReviewState() {
     return reviewState.observations.length > 0;
 }
 
-/**
- * Settle whether this attempt has a usable result.json, and say where it came from: "agent" when the
- * agent wrote one that validates, "tool-state" when one had to be composed from the persisted
- * report_observation calls, null when neither works and the retry is owed its turn.
- *
- * Both branches are the ones the exit path used to run inline; naming the outcome lets the answer be
- * computed once and read by both the budget arithmetic and the exit.
- */
 function resolveResultFile() {
     if (checkResultFile()) return "agent";
     if (maybeWriteResultFile() && checkResultFile()) return "tool-state";
@@ -506,22 +446,18 @@ function extractLastAssistantText(sessionState) {
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg.role !== "assistant") continue;
-        // Pi SDK uses "text" and "thinking" content types — check both
         const textBlocks = (msg.content || []).filter((c) => c.type === "text" || c.type === "thinking");
         const text = textBlocks
             .map((c) => c.text || c.thinking || "")
             .join("")
             .trim();
         if (!text || text.length < 20) continue;
-        // Only return text that looks like it might contain JSON (has braces)
         if (text.includes("{") && text.includes("}")) return text;
     }
     return null;
 }
 
-// Mirror PracticeDetectionResultParser.MAX_RAW_OUTPUT_LENGTH on the Java side: a well-formed agent
-// rawOutput never approaches this, so a larger blob is junk and the brace-scan below would burn the
-// remaining grace window parsing growing slices for nothing.
+// Keep the recovery scan bounded consistently with PracticeDetectionResultParser.
 const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
 
 function tryParseJsonFromText(text) {
@@ -540,13 +476,10 @@ function tryParseJsonFromText(text) {
         } catch {}
         match = jsonBlockPattern.exec(text);
     }
-    // Find {"observations": ... } object (tolerates whitespace).
     const observationsMatch = text.match(/\{\s*"observations"/);
     if (!observationsMatch || observationsMatch.index === undefined) return null;
     const braceStart = observationsMatch.index;
-    // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
-    // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
-    // extractJsonFromText, which caps at a small fixed number of attempts).
+    // Bound brace-heavy recovery input consistently with the Java parser.
     let attempts = 0;
     for (let end = text.indexOf("}", braceStart); end >= 0 && attempts < 256; end = text.indexOf("}", end + 1)) {
         attempts++;
@@ -585,8 +518,6 @@ function chunkArray(arr, size) {
     return out;
 }
 
-// Group practice slugs by their area (from index.json), preserving order. A area forms one coherent,
-// focused evaluation; ungrouped practices fall back to their own one-practice group.
 function loadPracticeGroups() {
     try {
         const indexPath = `${CWD}/inputs/practices/index.json`;
@@ -618,8 +549,6 @@ function loadPracticeSlugs() {
     }
 }
 
-// Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
-// cannot drift between the sites that emit it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
     `Record what you saw; you are not asked for a next step, so do not write one. ` +
@@ -638,9 +567,6 @@ function buildRetryScaffold(slugs) {
     );
 }
 
-// Task envelope: /workspace/task.json (TaskEnvelope<PracticeReviewTask>).
-// Exit 42 on schema-version mismatch or unknown kind so the executor can log
-// envelope/image drift distinctly from agent failures.
 const ENVELOPE_MISMATCH_EXIT = 42;
 const SUPPORTED_SCHEMA_VERSION = 1;
 const SUPPORTED_KIND = "practice_review";
@@ -703,10 +629,7 @@ const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"];
 const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"];
 const WITHHOLD_REASONS = ["NO_MATERIAL_CHANGE", "ALREADY_SAID", "BELOW_BAR"];
 
-// What the stage produces, and everything Java needs to check it against. The observations and the
-// thread keys are echoed rather than re-derived server-side on purpose: they are the exact inputs the
-// composer was shown, so a unit that names one of them can be validated against what was actually on
-// the table rather than against a re-query that may have moved.
+// Echo the exact composition inputs so Java validates references against the same snapshot.
 const composedFeedback = { admissionDigest: null, observations: [], preparedThreadKeys: [], units: [] };
 
 function loadCompositionRequest() {
@@ -738,10 +661,7 @@ function loadCompositionRequest() {
     }
 }
 
-// The practices a message may be about: what this run evaluated, plus what this developer's recorded
-// history mentions. A pattern routinely predates the current run, so restricting to the run's own
-// practice set would make the commonest true pattern unsayable. The server resolves the slug to this
-// person's own measurements regardless, so an unknown one simply finds no evidence.
+// Longitudinal feedback may reference practices found only in this developer's history.
 function composablePracticeSlugs() {
     const slugs = new Set(admittedPractices);
     try {
@@ -759,8 +679,7 @@ function composablePracticeSlugs() {
     return [...slugs].sort();
 }
 
-// The messages already written for this person and not yet read. A composer may replace one of these,
-// and only one of these: the key it names must be a key it was shown, or it is inventing a target.
+// Supersession is limited to unread thread keys present in this snapshot.
 function stagedPreparedThreadKeys() {
     try {
         if (!existsSync(PREPARED_FEEDBACK_PATH)) return [];
@@ -778,9 +697,7 @@ function stagedPreparedThreadKeys() {
     }
 }
 
-// A citation can carry an inline note only if it locates a line inside THIS change. Everything else is
-// a true observation about work that is not on the diff, which is a reason to route it elsewhere and
-// never a reason to drop it.
+// Inline placement requires a citation inside the current diff.
 function leanObservations(observations) {
     return observations.map((observation) => ({
         id: observation.id,
@@ -804,10 +721,7 @@ function persistComposedFeedback() {
     writeFileSync(FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
 }
 
-// Structurally distinct from report_observation, and that is the point: no presence, no assessment, no
-// severity, no confidence, no citations the composer typed. An intervention that could carry a verdict
-// would eventually be read back as one, and an anchor the composer invented would put a note on a line
-// that does not exist — so it names an observation and a citation index, never a path and never a line.
+// The composer references admitted observations; it cannot author verdicts, citations, or locations.
 function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys) {
     const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
     const placementKinds = request.inContextPlacementKinds || [];
@@ -951,6 +865,9 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
             },
         },
         execute: async (_toolCallId, params) => {
+            if (!compositionAdmitted) {
+                return refuse("Feedback composition opens only after Java admits the completed observations.");
+            }
             const unit = params.unit;
             const observationsById = new Map(observations.map((observation) => [observation.id, observation]));
             const bounds = request.channels[unit.channel];
@@ -971,8 +888,6 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
             seen.add(key);
             usedPerChannel[unit.channel]++;
             composedFeedback.units.push(unit);
-            // Written on every call, like report_observation, so a stage killed by the watchdog still
-            // leaves behind what it had already decided.
             persistComposedFeedback();
             return {
                 content: [
@@ -987,10 +902,15 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
     });
 }
 
-// The rules JSON Schema cannot state: which fields each channel and each action require, and that an
-// anchor and a supersession target must both name something that was actually on the table. Java checks
-// every one of these again — this side exists so the model is told at once, while it can still fix it.
+// Enforce snapshot-dependent constraints here for fast model correction; Java rechecks them.
 function validateUnit(unit, observationsById, preparedThreadKeys, placementKinds) {
+    const invalidEvidence = unit.basedOn.find((reference) => {
+        if (reference === `prior:${unit.practiceSlug}`) return false;
+        return observationsById.get(reference)?.practiceSlug !== unit.practiceSlug;
+    });
+    if (invalidEvidence) {
+        return `Evidence '${invalidEvidence}' does not name an admitted observation for ${unit.practiceSlug}; skipped.`;
+    }
     if (unit.action === "WITHHOLD") {
         if (!unit.withholdReason) return "WITHHOLD needs a withholdReason; skipped.";
         return null;
@@ -1121,9 +1041,7 @@ async function main() {
         `[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry=${RETRY_TIMEOUT_MS}ms`,
     );
 
-    // `tools` is an allowlist of tool *names* (Pi 0.74+ filters customTools through the same
-    // allowlist), so both built-in and custom tool names must appear here. Edit/write are omitted
-    // — observations are persisted only via report_observation.
+    // Pi filters custom tools through this allowlist; omit filesystem mutation tools.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
     const authStorage = AuthStorage.create();
@@ -1159,8 +1077,7 @@ async function main() {
         authStorage,
         modelRegistry,
     });
-    // Extension load failures are silent in Pi — surface them so the agent doesn't fall through
-    // to a built-in provider's default endpoint (e.g. api.openai.com).
+    // Fail closed: Pi otherwise silently falls back to a built-in provider.
     if (extensionsResult?.extensions?.length) {
         for (const ext of extensionsResult.extensions) {
             console.error(`[pi-runner] extension loaded: ${ext.path}`);
@@ -1194,13 +1111,11 @@ async function main() {
         persistComposedFeedback();
     }
 
-    // ── Attempt 1: Initial analysis ──────────────────────────────
 
     let softTimeoutFired = false;
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft nudge: steer the agent to persist observations before the hard timeout aborts.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
@@ -1224,8 +1139,7 @@ async function main() {
             console.error(`[pi-runner] tool: ${event.toolName ?? "?"}`);
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
-            // Counted here, not from session.messages at the end: compaction deletes messages, and a
-            // deleted message took its tokens off the bill.
+            // Compaction removes messages but does not undo their token usage.
             addAssistantUsage(streamUsage, event.message);
             const stopReason = event.message.stopReason;
             const types = (event.message.content || []).map((c) => c.type);
@@ -1242,18 +1156,11 @@ async function main() {
     console.error(`[pi-runner] Starting initial analysis`);
     const startMs = Date.now();
 
-    // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
-    // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
-    // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
-    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_observation
-    // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
-    // practice gets an observation. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
     const groups = loadPracticeGroups();
     const batches = [];
     if (groups.length > 0) {
-        // One batch per area; sub-chunk a area that exceeds batchSize so context stays bounded.
         for (const g of groups) {
             for (const chunk of chunkArray(g.slugs, batchSize)) batches.push(chunk);
         }
@@ -1285,7 +1192,6 @@ async function main() {
             console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
 
-        // Coverage gate: every active practice must get an observation. Re-prompt the ones no turn reported.
         if (!hardAborted && allSlugs.length > 0) {
             const covered = new Set(reviewState.observations.map((f) => f.practiceSlug).filter(Boolean));
             const missing = allSlugs.filter((s) => !covered.has(s));
@@ -1353,9 +1259,7 @@ async function main() {
         process.exit(0);
     }
 
-    // ── Validate & retry: if durable state is incomplete, re-prompt the agent ──
 
-    // Extract what the agent actually said — log message structure for diagnostics
     const lastMsgs = (session.state.messages || []).filter((m) => m.role === "assistant").slice(-2);
     for (const m of lastMsgs) {
         const types = (m.content || []).map((c) => c.type);
@@ -1395,7 +1299,6 @@ async function main() {
 
     const retryStartMs = Date.now();
 
-    // Recovery strategy varies by failure mode (timeout vs no-persist vs nothing-said).
     let retryPrompt;
     if (softTimeoutFired || hardAborted) {
         retryPrompt =
@@ -1467,7 +1370,6 @@ async function main() {
         process.exit(0);
     }
 
-    // Last attempt: try to rescue from text
     if (tryRescueFromTextResponse(session.state)) {
         console.error(`[pi-runner] SUCCESS: rescued valid JSON from text`);
         await completeWithAdmittedComposition();

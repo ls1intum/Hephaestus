@@ -54,30 +54,16 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * The workspace-context source: what earlier reviews recorded, and what was already said.
- *
- * <p>The two guarantees under test are the ones the rest of the design leans on. A review must always
- * receive the history, so that a sequence of single-event reviews can add up to more than a sequence.
- * And a person's first-ever review must receive it <em>present and empty</em>, because "the record was
- * read and held nothing" is a fact a review may reason from while "the record was never staged" is not.
- */
 @Tag("unit")
 class ReviewHistoryContentSourceTest {
 
     private static final long WORKSPACE_ID = 7L;
     private static final long PR_ID = 42L;
     private static final long AUTHOR_ID = 99L;
-
-    /** The row id of the merge request an entry was filed against — what a person never sees. */
     private static final long OBSERVED_ARTIFACT_ROW_ID = 306L;
     private static final long DELIVERED_ARTIFACT_ROW_ID = 307L;
-
-    /** What the same merge request is called where the developer works. */
     private static final int OBSERVED_ARTIFACT_NUMBER = 22;
     private static final int DELIVERED_ARTIFACT_NUMBER = 23;
-
-    /** Filed against a kind no resolver names, so the row id is all a leaking payload could offer. */
     private static final long UNNAMEABLE_ARTIFACT_ROW_ID = 909L;
 
     private static final Set<Long> ROW_IDS = Set.of(
@@ -122,10 +108,6 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
-    /**
-     * Staged by every review, independent of any practice declaring it: a review's record of the person
-     * must not depend on a practice author remembering to ask for it.
-     */
     @Test
     void answersForBothHistoryKindsWithoutAnyPracticeDeclaringThem() {
         assertThat(provider.sourceKinds()).containsExactlyInAnyOrder(
@@ -134,22 +116,12 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
-    /**
-     * The shape production asks for. {@code WorkspaceContextBuilder} captures each source kind on its
-     * own — one {@code capture} call per kind, so that one failing collector costs only its own source —
-     * and then rejects a contribution that reports anything about a kind it did not ask about. A
-     * collector that answers for both halves whichever half was requested therefore fails every review,
-     * not just the half it overreached on.
-     */
     @Nested
     class WhenOnlyOneHalfIsAskedFor {
 
         @Test
         void observationHistoryAloneAnswersForObservationHistoryOnly() {
             var captured = provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
-
-            // The delta is arithmetic over the observations and carries no other reading, so it rides on
-            // the kind it is derived from rather than asking an operator to authorize it separately.
             assertThat(captured.files()).containsOnlyKeys(
                 "inputs/history/observations.json",
                 "inputs/history/delta.json"
@@ -170,7 +142,6 @@ class ReviewHistoryContentSourceTest {
             assertThat(captured.contentStates()).containsOnlyKeys(ReviewHistoryContentSource.FEEDBACK_HISTORY);
         }
 
-        /** An unasked-for half must not cost the read that answers it. */
         @Test
         void theUnaskedHalfIsNotQueried() {
             provider.capture(prRequest(), Set.of(ReviewHistoryContentSource.OBSERVATION_HISTORY));
@@ -180,13 +151,6 @@ class ReviewHistoryContentSourceTest {
         }
     }
 
-    /**
-     * A person with no record still gets the files.
-     *
-     * <p>The content state must still read EMPTY. Deriving it from the staged file list — which is what
-     * the manifest does by default — would answer NON_EMPTY here and tell the review that a first-time
-     * contributor has a history.
-     */
     @Test
     void aFirstEverReviewGetsAPresentAndEmptyHistory() {
         var observationsCapture = captureObservationHistory();
@@ -217,7 +181,7 @@ class ReviewHistoryContentSourceTest {
         JsonNode entry = read(captured.files().get("inputs/history/observations.json")).get("observations").get(0);
         assertThat(entry.get("practiceSlug").asString()).isEqualTo("swallows-errors");
         assertThat(entry.get("recurrenceKey").asString()).isEqualTo("rec-1");
-        assertThat(entry.get("title").asString()).isEqualTo("Caught and ignored");
+        assertThat(entry.get("summary").asString()).isEqualTo("Caught and ignored");
         assertThat(captured.contentStates()).containsEntry(
             ReviewHistoryContentSource.OBSERVATION_HISTORY,
             SourceContentState.NON_EMPTY
@@ -247,10 +211,6 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
-    /**
-     * Without this file a composer deciding to replace a queued message is guessing at what it is
-     * replacing, so the key it must name is staged rather than left to be inferred.
-     */
     @Test
     void stagesWhatIsQueuedAndUnreadWithTheKeyThatIdentifiesIt() {
         when(feedbackRepository.findPreparedForRecipient(any(), any(), any())).thenReturn(
@@ -273,11 +233,6 @@ class ReviewHistoryContentSourceTest {
         assertThat(entry.get("body").asString()).contains("nobody has read yet");
     }
 
-    /**
-     * The delta names practices and statuses. The recurrence key itself must not cross: it is a hash of
-     * the subject and the artifact's row id, so it is meaningless to a reader and is the one field here a
-     * model could quote back at somebody as if it named their work.
-     */
     @Test
     void stagesHowEachLocusMovedWithoutStagingTheKeyItMovedAt() {
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
@@ -293,7 +248,6 @@ class ReviewHistoryContentSourceTest {
         assertThat(locus.has("recurrenceKey")).isFalse();
     }
 
-    /** The delta is computed from what was staged, so a withheld observation cannot reappear inside it. */
     @Test
     void theDeltaHoldsNothingTheVisibilityPolicyRefused() {
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
@@ -304,24 +258,17 @@ class ReviewHistoryContentSourceTest {
         assertThat(read(captureObservationHistory().files().get("inputs/history/delta.json")).get("loci")).isEmpty();
     }
 
-    /**
-     * A window over a growing record can show that something recurred and can never show that something
-     * never happened, so COMPLETE is not a state this source is allowed to report.
-     */
     @Test
     void neverReportsCompleteBecauseTheWindowIsBounded() {
         assertThat(captureObservationHistory().completeness().values()).containsOnly(SourceCompleteness.PARTIAL);
         assertThat(captureFeedbackHistory().completeness().values()).containsOnly(SourceCompleteness.PARTIAL);
     }
 
-    /** An observation the visibility policy refuses is not staged, exactly as on every other read of it. */
     @Test
     void withholdsAnObservationTheVisibilityPolicyRefuses() {
         when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
             List.of(observation("swallows-errors", "rec-1", "Caught and ignored"))
         );
-        // doReturn, not when(...): re-stubbing through when() would call the mock, running the
-        // setUp answer against the matchers' null placeholders.
         doReturn(Set.of()).when(visibilityPolicy).permitsAll(anyLong(), any(), any());
 
         var captured = captureObservationHistory();
@@ -333,12 +280,6 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
-    /**
-     * An unresolvable subject is not an empty history.
-     *
-     * <p>Reporting EMPTY here would let a review conclude "this has never come up before" from a lookup
-     * that never ran — the one way this source could manufacture the absence it exists to make checkable.
-     */
     @Test
     void reportsUnavailableRatherThanEmptyWhenTheSubjectCannotBeResolved() {
         when(pullRequestRepository.findByIdWithAuthorAndRepository(eq(PR_ID))).thenReturn(Optional.empty());
@@ -358,13 +299,6 @@ class ReviewHistoryContentSourceTest {
         );
     }
 
-    /**
-     * The number the developer can type, never the row it is stored in.
-     *
-     * <p>A composed in-app message quotes this file back to the person it is about. Handed 306 — the
-     * primary key behind merge request !22 — a model writes "in PR #306", and the developer follows the
-     * reference to unrelated work or to nothing at all.
-     */
     @Nested
     class NamingTheWorkAnEntryIsAbout {
 
@@ -401,10 +335,6 @@ class ReviewHistoryContentSourceTest {
             assertThat(artifact.get("container").asString()).isEqualTo("acme/web");
         }
 
-        /**
-         * Work nobody can name is named by its kind. "A conversation thread" is true of it; its row id is
-         * not something anyone could look up, so offering the id would only invite a fabricated citation.
-         */
         @Test
         void workNoResolverCanNameIsStagedAsItsKindWithoutANumber() {
             when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
@@ -422,10 +352,6 @@ class ReviewHistoryContentSourceTest {
             assertThat(artifact.has("url")).isFalse();
         }
 
-        /**
-         * The invariant, checked over the whole document rather than over the one field that leaked: a
-         * staged history holds no number the developer could not have typed themselves.
-         */
         @Test
         void noHistoryFileCarriesARowIdAnywhere() {
             when(observationRepository.findRecentByDeveloperAndWorkspace(any(), any(), any(), any())).thenReturn(
@@ -453,7 +379,6 @@ class ReviewHistoryContentSourceTest {
         }
     }
 
-    /** History is about the person; the mentor chat has its own context sources and its own consent gate. */
     @Test
     void doesNotSupportTheMentorChat() {
         assertThat(
@@ -493,10 +418,6 @@ class ReviewHistoryContentSourceTest {
         return pullRequest;
     }
 
-    /**
-     * Stands in for the registered resolvers: names the merge requests, and answers for a kind nobody
-     * resolves exactly as {@code RegisteredArtifactIdentities} does — by its kind, with no number.
-     */
     private static Map<Long, ArtifactIdentity> identitiesOf(long workspaceId, ArtifactKind kind, Collection<Long> ids) {
         Map<Long, ArtifactIdentity> named = new LinkedHashMap<>();
         for (Long id : ids) {

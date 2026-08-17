@@ -33,17 +33,11 @@ import { type FeedbackSearch, reviewScopeSearch } from "./review-search";
 
 export interface FeedbackDetailPageProps {
 	workspaceSlug: string;
-	/** What the reader was filtering on the Delivery list, carried into the links back out of here. */
 	search: FeedbackSearch;
-	/** The record this page is about, or `undefined` while it is unknown. */
 	feedback: GetPracticeReviewFeedbackResponse | undefined;
 	isLoading: boolean;
 	error: unknown;
 	onRetry?: () => void;
-	/**
-	 * The workspace's practices, which the source observations' practice links show as a hover card.
-	 * Optional in effect: a page without it still links, it just cannot show the prose.
-	 */
 	practices: Practice[] | undefined;
 }
 
@@ -89,9 +83,6 @@ export function FeedbackDetailPage({
 			</article>
 		);
 	}
-	// No record and no error is still nothing to draw, but it is not a failure either: it is a query
-	// that never came back. Routing it through the alert made it `error={undefined}`, which the alert
-	// classifies as a lost connection — a cause it has no evidence for.
 	if (!feedback) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
@@ -101,7 +92,6 @@ export function FeedbackDetailPage({
 		);
 	}
 	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
-	// No slug means a kind this build has no route for; the artifact still renders, unlinked.
 	const artifactSlug = feedback.artifact
 		? reviewArtifactTypeSlug(feedback.artifact.type)
 		: undefined;
@@ -265,12 +255,6 @@ export function FeedbackDetailPage({
 	);
 }
 
-/**
- * The file and lines an inline note is anchored to; only inline placements have one.
- *
- * A `FILE` anchor carries a path and no line, so it stays a bare path rather than picking up a
- * coordinate it does not have.
- */
 function anchorLabel(placement: ReviewPlacement): string {
 	const { anchorPath, anchorStartLine, anchorEndLine } = placement;
 	if (!anchorPath || !anchorStartLine) return anchorPath ?? "";

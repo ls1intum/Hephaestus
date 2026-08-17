@@ -15,10 +15,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
-/**
- * Validates composition output at the server trust boundary. Malformed composition is ignored without
- * invalidating observations already persisted by the measurement stage.
- */
 @Component
 public class FeedbackCompositionResultParser {
 
@@ -34,7 +30,6 @@ public class FeedbackCompositionResultParser {
 
     private static final int MAX_PRACTICE_SLUG_LENGTH = 128;
 
-    /** Composed units in model-reported order. */
     public List<ComposedFeedbackUnit> parse(@Nullable JsonNode jobOutput) {
         if (jobOutput == null || !jobOutput.isObject()) {
             return List.of();
@@ -51,8 +46,6 @@ public class FeedbackCompositionResultParser {
         Set<String> preparedThreadKeys = readThreadKeys(payload.get("preparedThreadKeys"));
 
         List<ComposedFeedbackUnit> parsed = new ArrayList<>();
-        // One unit per practice per channel: two messages about the same habit on the same surface are
-        // the same message twice, and the recipient would read the second as a separate problem.
         Set<String> seen = new LinkedHashSet<>();
         for (JsonNode unit : units) {
             if (parsed.size() >= MAX_UNITS) {
@@ -71,7 +64,6 @@ public class FeedbackCompositionResultParser {
         return List.copyOf(parsed);
     }
 
-    /** The units for one lane, in the order the stage reported them. */
     public List<ComposedFeedbackUnit> parse(@Nullable JsonNode jobOutput, FeedbackChannel channel) {
         return parse(jobOutput)
             .stream()
@@ -95,8 +87,22 @@ public class FeedbackCompositionResultParser {
         }
         List<String> basedOn = strings(unit.get("basedOn"));
         if (basedOn.isEmpty()) {
-            // A unit that names nothing it rests on cannot be bound to any evidence, and an unbound
-            // message is an assertion the ledger could never justify afterwards.
+            return null;
+        }
+        String normalizedPracticeSlug = normalizeSlug(practiceSlug);
+        boolean grounded = basedOn
+            .stream()
+            .allMatch(reference -> {
+                if (("prior:" + normalizedPracticeSlug).equals(reference)) return true;
+                StagedObservation observation = observations.get(reference);
+                return observation != null && normalizedPracticeSlug.equals(observation.practiceSlug());
+            });
+        if (!grounded) {
+            log.warn(
+                "Composed unit names evidence outside its practice: channel={}, practice={}",
+                channel,
+                practiceSlug
+            );
             return null;
         }
 
@@ -106,7 +112,7 @@ public class FeedbackCompositionResultParser {
                 ? null
                 : new ComposedFeedbackUnit(
                       channel,
-                      normalizeSlug(practiceSlug),
+                      normalizedPracticeSlug,
                       basedOn,
                       action,
                       null,
@@ -122,8 +128,6 @@ public class FeedbackCompositionResultParser {
         String supersedesThreadKey = null;
         if (action == ComposedFeedbackUnit.Action.SUPERSEDE) {
             supersedesThreadKey = text(unit, "supersedesThreadKey", ComposedFeedbackUnit.MAX_THREAD_KEY_LENGTH);
-            // A supersession target the composer was never shown is a target it invented, and acting on
-            // it would let a model retire a message it cannot have read.
             if (supersedesThreadKey == null || !preparedThreadKeys.contains(supersedesThreadKey)) {
                 log.warn(
                     "Composed unit names a supersession target that was not staged: channel={}, practice={}",
@@ -145,7 +149,7 @@ public class FeedbackCompositionResultParser {
                 ? null
                 : new ComposedFeedbackUnit(
                       channel,
-                      normalizeSlug(practiceSlug),
+                      normalizedPracticeSlug,
                       basedOn,
                       action,
                       supersedesThreadKey,
@@ -167,14 +171,12 @@ public class FeedbackCompositionResultParser {
         ComposedFeedbackUnit.InContextPlacement placement = null;
         if (channel == FeedbackChannel.IN_CONTEXT) {
             if (unit.hasNonNull("body")) return null;
-            placement = resolvePlacement(unit.get("placement"), observations, basedOn, normalizeSlug(practiceSlug));
+            placement = resolvePlacement(unit.get("placement"), observations, basedOn, normalizedPracticeSlug);
             if (placement == null) {
                 log.warn("Composed IN_CONTEXT unit has no valid placement: practice={}", practiceSlug);
                 return null;
             }
         } else if (unit.get("placement") != null && !unit.get("placement").isNull()) {
-            // An anchor on a longitudinal lane is a category error: those surfaces are not on the diff,
-            // and a unit that thinks it is anchored was written at the wrong level.
             log.warn("Composed {} unit carries an anchor, which only IN_CONTEXT may have", channel);
             return null;
         }
@@ -185,7 +187,7 @@ public class FeedbackCompositionResultParser {
 
         ComposedFeedbackUnit composed = new ComposedFeedbackUnit(
             channel,
-            normalizeSlug(practiceSlug),
+            normalizedPracticeSlug,
             basedOn,
             action,
             supersedesThreadKey,
@@ -229,10 +231,6 @@ public class FeedbackCompositionResultParser {
               );
     }
 
-    /**
-     * The file, side and line an in-context note goes on — read off the observation's own citation, never
-     * off anything the composer typed.
-     */
     private static ComposedFeedbackUnit.@Nullable ResolvedAnchor resolveAnchor(
         @Nullable JsonNode anchor,
         Map<String, StagedObservation> observations
@@ -254,8 +252,6 @@ public class FeedbackCompositionResultParser {
             return null;
         }
         StagedCitation citation = observation.citations().get(index);
-        // Both gates, because they refuse different mistakes: an observation nothing in this change can
-        // carry a note for, and a citation of one that happens to point outside the diff.
         if (
             !observation.anchorable() ||
             !citation.anchorable() ||
@@ -328,7 +324,6 @@ public class FeedbackCompositionResultParser {
         return List.copyOf(values);
     }
 
-    /** Reads a complete four-part mentor brief. */
     private static ComposedFeedbackUnit.@Nullable ConversationBrief notesOf(JsonNode unit) {
         JsonNode notes = unit.get("notes");
         if (notes == null || !notes.isObject()) {
@@ -344,7 +339,6 @@ public class FeedbackCompositionResultParser {
         return new ComposedFeedbackUnit.ConversationBrief(situation, capability, evidenceSummary, inConversationSignal);
     }
 
-    /** One sanitised note, or {@code null} when it was absent or sanitised away to nothing. */
     private static @Nullable String note(JsonNode notes, String field, int maxLength) {
         String sanitized = StudentTextSanitizer.sanitize(text(notes, field, maxLength));
         return sanitized.isBlank() ? null : sanitized;
@@ -411,11 +405,9 @@ public class FeedbackCompositionResultParser {
         if (text.isEmpty()) {
             return null;
         }
-        // Never truncate composed prose: partial Markdown or notes can change its meaning.
         return text.length() <= maxLength ? text : null;
     }
 
-    /** One observation as the composer was shown it — only what deciding an anchor needs. */
     private record StagedObservation(
         @Nullable String practiceSlug,
         boolean anchorable,

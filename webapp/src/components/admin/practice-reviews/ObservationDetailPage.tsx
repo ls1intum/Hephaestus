@@ -36,17 +36,11 @@ import { type ObservationsSearch, reviewScopeSearch } from "./review-search";
 
 export interface ObservationDetailPageProps {
 	workspaceSlug: string;
-	/** What the reader was filtering on the Observations list, carried into the links out of here. */
 	search: ObservationsSearch;
-	/** The record this page is about, or `undefined` while it is unknown. */
 	observation: GetPracticeReviewObservationResponse | undefined;
 	isLoading: boolean;
 	error: unknown;
 	onRetry?: () => void;
-	/**
-	 * The workspace's practices, which the practice this was judged against shows as a hover card.
-	 * Optional in effect: a page without it still links, it just cannot show the prose.
-	 */
 	practices: Practice[] | undefined;
 }
 
@@ -92,8 +86,6 @@ export function ObservationDetailPage({
 			</article>
 		);
 	}
-	// Not the alert: no record and no error is a query that never came back, and the alert would read
-	// the absent status as a lost connection. See `MissingRecordEmpty`.
 	if (!observation) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
@@ -102,7 +94,6 @@ export function ObservationDetailPage({
 			</article>
 		);
 	}
-	// No slug means a kind this build has no route for; the artifact still renders, unlinked.
 	const artifactSlug = observation.artifact
 		? reviewArtifactTypeSlug(observation.artifact.type)
 		: undefined;
@@ -220,13 +211,6 @@ export function ObservationDetailPage({
 											: "Feedback this observation supports"}
 									</Link>
 								}
-								// The place is plain text in the meta line, exactly where `FeedbackRow` puts it,
-								// and only the outcome is a chip. Side by side the two collided: on the
-								// conversation lane a delivered unit drew `BotMessageSquareIcon` twice, under
-								// "In conversation" and "Delivered in conversation" — and the second is word for
-								// word a refinement of the first, because every lane-specific outcome label must
-								// begin with the state it refines. Two rows built from one record should not have
-								// two layouts either.
 								meta={
 									<>
 										<ReviewRowMeta items={[DELIVERY_PLACE_DEFS[feedback.channel].label]} />

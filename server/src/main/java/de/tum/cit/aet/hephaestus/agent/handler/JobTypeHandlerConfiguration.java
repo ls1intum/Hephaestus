@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
@@ -114,7 +115,7 @@ public class JobTypeHandlerConfiguration {
         SecretDiffScanner secretDiffScanner,
         InContextDeliveryGate inContextDeliveryGate,
         ApplicationEventPublisher eventPublisher,
-        de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository
+        ObservationRepository observationRepository
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
@@ -145,7 +146,7 @@ public class JobTypeHandlerConfiguration {
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         PracticeFeedbackCommentFormatter commentFormatter,
-        de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository
+        ObservationRepository observationRepository
     ) {
         return new IssueReviewHandler(
             objectMapper,

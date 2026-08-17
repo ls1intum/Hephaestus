@@ -27,9 +27,9 @@ records the outcome, the evidence that supports it, and an evidence rationale. I
 **Feedback** is a durable intervention composed from one or more observations for one delivery channel.
 It may be delivered, withheld, or superseded. We deliver feedback, never raw observations.
 
-Measurement and composition run as separate agent sessions with separate tools:
+Measurement and composition run as separate turns in one agent session, with a hard capability seam:
 
-- `report_observation` records measurements. The session cannot read reactions or prior feedback.
+- `report_observation` records measurements and is closed after Java admits them.
 - `report_feedback` proposes feedback only after admitted observations, history, and deltas are staged.
   It cannot create observation evidence or override an observation outcome.
 

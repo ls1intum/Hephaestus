@@ -42,8 +42,6 @@ function ObservationsListRoute() {
 	const observationsQueryResult = useQuery({
 		...listPracticeReviewObservationsOptions({
 			path: { workspaceSlug },
-			// `observationsQuery` renames the URL's `order` to the `sort` the endpoint takes; the route
-			// test pins that, because the two words are one typo apart and the list looks fine either way.
 			query: observationsQuery(search, REVIEW_PAGE_SIZE),
 		}),
 	});
@@ -51,8 +49,6 @@ function ObservationsListRoute() {
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 	const people = useReviewPeople(workspaceSlug);
 
-	// Reconciles the page in the URL with the page the server actually has, so it belongs beside the
-	// query rather than on the screen that only draws what it is handed.
 	useClampedPage(search.page, observationsQueryResult.data?.page?.totalPages, (page) =>
 		updateSearch({ page }),
 	);
@@ -76,8 +72,6 @@ function ObservationsListRoute() {
 				isLoading: practicesQuery.isLoading,
 				isError: practicesQuery.isError,
 			}}
-			// The same list a second time, unreduced: the facet needs a label per slug, while the hover
-			// card on a row's practice name needs the record's prose.
 			practiceRecords={practicesQuery.data}
 			people={people}
 		/>

@@ -21,9 +21,6 @@ function FeedbackDetailRoute() {
 	const feedbackQueryResult = useQuery({
 		...getPracticeReviewFeedbackOptions({ path: { workspaceSlug, feedbackId } }),
 	});
-	// The feedback record names each source observation's practice by slug, and the hover card on that
-	// name needs the practice itself. One list for the page, shared by query key with every other
-	// screen that asks for it.
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 
 	return (

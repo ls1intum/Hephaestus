@@ -5273,7 +5273,7 @@ export type BackfillSummary = {
  * response build time so adding/removing a capability needs no DB migration.
  */
 export type ConnectionSummary = {
-    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FEEDBACK' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     createdAt?: Date;
     displayName?: string;
     family?: 'SCM' | 'MESSAGING' | 'DOCUMENTATION';
@@ -5305,7 +5305,7 @@ export type ConnectionSummary = {
  * object.
  */
 export type ConnectionDetail = {
-    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FEEDBACK' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     config?: {
         [key: string]: unknown;
     };

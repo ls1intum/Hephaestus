@@ -317,9 +317,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
-        if (job.getMetadata().path(ObservationAdmissionService.DIGEST_METADATA_KEY).asString().isBlank()) {
-            throw new JobDeliveryException("Review finished without Java observation admission");
-        }
+        ObservationAdmissionService.requireMatchingCompositionDigest(job);
         deliverAdmitted(job);
     }
 

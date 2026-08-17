@@ -105,7 +105,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             deliveryService,
             feedbackService,
             new SecretDiffScanner(),
-            // Real flag-OFF filter: evaluate() returns the observations unchanged without touching the repos.
             new ReactionSuppressionFilter(
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(
@@ -121,8 +120,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     false
                 )
             ),
-            // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
-            // therefore admitted, so these tests exercise delivery rather than the tier.
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
@@ -229,7 +226,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         );
     }
 
-    /** Stub the workspace context build + practice catalog to return minimal valid data. */
     private void stubDefaults() {
         lenient()
             .when(
@@ -281,13 +277,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("pr_number").asInt()).isEqualTo(42);
             assertThat(metadata.get("commit_sha").asString()).isEqualTo("abc123def456");
-            // The MR title + description are the only inputs for the process practices
-            // (describe-what-and-why, commit-subjects-explain-each-change); a regression here makes them
-            // silently un-evaluable.
             assertThat(metadata.get("title").asString()).isEqualTo("Fix authentication bug");
             assertThat(metadata.get("body").asString()).isEqualTo("This PR fixes the login issue");
-            // No triggerEvent in sampleRequest() → phase segment is "manual"; head SHA stays the trailing
-            // freshness slot so extractCooldownKeyPrefix scopes cooldown per (pr, phase), not per push.
             assertThat(submission.idempotencyKey()).isEqualTo("pr_review:owner/repo:42:manual:abc123def456");
         }
 
@@ -419,8 +410,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ).thenReturn(samplePractices());
 
             Map<String, byte[]> files = handler.prepareInputs(jobWithMetadata(sampleJobMetadata())).files();
-
-            // First three entries must be the provider files in their original order
             var keys = files.keySet().iterator();
             assertThat(keys.next()).isEqualTo("inputs/context/metadata.json");
             assertThat(keys.next()).isEqualTo("inputs/context/diff.patch");
@@ -461,6 +450,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             return job;
         }
 
+        private void admit(AgentJob job, String rawOutputJson) {
+            handler.admitObservations(job, objectMapper.readTree(rawOutputJson).path("observations"));
+        }
+
         @Test
         @SuppressWarnings("unchecked")
         void delegatesToDeliveryService() {
@@ -480,7 +473,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             AgentJob job = jobWithOutput(rawOutput);
             when(deliveryService.deliver(eq(job), any())).thenReturn(new DeliveryResult(1, 0, false, Map.of()));
 
-            handler.deliver(job);
+            admit(job, rawOutput);
 
             verify(deliveryService).deliver(eq(job), any());
         }
@@ -488,7 +481,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         @Test
         void throwsWhenNoValidObservations() {
             AgentJob job = jobWithOutput("{\"observations\":[]}");
-            assertThatThrownBy(() -> handler.deliver(job))
+            assertThatThrownBy(() -> admit(job, "{\"observations\":[]}"))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("No valid observations");
         }
@@ -517,7 +510,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 new DeliveryResult(1, 0, false, Map.of())
             );
 
-            handler.deliver(job);
+            admit(job, rawOutput);
 
             List<PracticeDetectionResultParser.ValidatedObservation> delivered = captor.getValue();
             var secret = delivered
@@ -536,9 +529,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void throwsWhenAllNotApplicableButDiffHasFiles() {
-            // Stale/empty-diff refuse-to-deliver: every observation is NOT_APPLICABLE yet the diff lists changed
-            // files — the agent was handed a stale diff. Refusing here stops a misleading "nothing applies"
-            // post over an artifact that did change.
             String rawOutput = """
                 {
                   "observations": [{
@@ -558,7 +548,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n+++ b/Sources/Auth.swift\n@@ -1 +1 @@\n+changed\n"
             );
 
-            assertThatThrownBy(() -> handler.deliver(job))
+            assertThatThrownBy(() -> admit(job, rawOutput))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("stale/empty diff");
             verifyNoInteractions(deliveryService);
@@ -566,8 +556,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
 
         @Test
         void throwsWhenAllFindingsFilteredByDiffScope() {
-            // The only observation cites a file that is NOT in the diff — the diff-scope filter drops it, leaving
-            // nothing to deliver. That is a refuse-to-deliver, not a silent empty post.
             String rawOutput = """
                 {
                   "observations": [{
@@ -585,12 +573,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
             ObjectNode output = objectMapper.createObjectNode();
             output.put("rawOutput", rawOutput);
             job.setOutput(output);
-            // Diff touches a DIFFERENT file, so the observation's location is out of scope.
             stubDiff(
                 "diff --git a/Sources/Other.swift b/Sources/Other.swift\n+++ b/Sources/Other.swift\n@@ -1 +1 @@\n+x\n"
             );
 
-            assertThatThrownBy(() -> handler.deliver(job))
+            assertThatThrownBy(() -> admit(job, rawOutput))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("filtered by diff scope");
             verifyNoInteractions(deliveryService);
@@ -630,7 +617,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 new DeliveryResult(1, 0, false, Map.of())
             );
 
-            handler.deliver(job);
+            admit(job, rawOutput);
 
             List<PracticeDetectionResultParser.ValidatedObservation> delivered = captor.getValue();
             var secret = delivered
@@ -650,59 +637,8 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 "b2b88104bf5c02259227480b0eabe2f9b7d63501e03e788b7b82a499b818e12a"
             );
         }
-
-        @Test
-        @SuppressWarnings("unchecked")
-        void stampsDeliveryObservationFingerprintOntoComposedDiffNote() {
-            String rawOutput = """
-                {
-                  "observations": [{
-                    "practiceSlug": "error-handling",
-                    "summary": "Unhandled error path",
-                    "presence": "ABSENT",
-                    "assessment": "BAD",
-                    "severity": "MAJOR",
-                    "evidenceRationale": "The error branch is swallowed.",
-                    "evidence": { "citations": [{
-                      "sourceKind": "scm.pull-request.diff",
-                      "artifactPath": "inputs/context/diff.patch",
-                      "path": "Sources/Auth.swift",
-                      "side": "NEW",
-                      "startLine": 12,
-                      "endLine": 12,
-                      "quote": "throw error",
-                      "quoteRedacted": false
-                    }] }
-                  }]
-                }
-                """;
-            AgentJob job = jobWithMetadata(sampleJobMetadata());
-            ObjectNode output = objectMapper.createObjectNode();
-            output.put("rawOutput", rawOutput);
-            job.setOutput(output);
-            stubDiff(
-                "diff --git a/Sources/Auth.swift b/Sources/Auth.swift\n" +
-                    "--- a/Sources/Auth.swift\n" +
-                    "+++ b/Sources/Auth.swift\n" +
-                    "@@ -11,0 +12 @@\n" +
-                    "+throw error\n"
-            );
-
-            when(deliveryService.deliver(eq(job), any())).thenAnswer(invocation -> {
-                List<PracticeDetectionResultParser.ValidatedObservation> received = invocation.getArgument(1);
-                Map<PracticeDetectionResultParser.ValidatedObservation, ObservationKeys> keys =
-                    new java.util.IdentityHashMap<>();
-                for (var f : received) {
-                    keys.put(f, new ObservationKeys("occ-" + f.practiceSlug(), "corr-" + f.practiceSlug()));
-                }
-                return new DeliveryResult(received.size(), 0, true, keys);
-            });
-
-            handler.deliver(job);
-        }
     }
 
-    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

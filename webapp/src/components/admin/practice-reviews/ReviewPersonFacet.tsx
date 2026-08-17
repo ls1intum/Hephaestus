@@ -18,15 +18,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { getInitials } from "@/lib/avatar";
 
-/**
- * The members endpoint takes `page` and `size` and nothing else — no query, no name filter — so the
- * search box here filters what has already arrived and cannot reach anyone past this page. A larger
- * workspace has people who are unselectable *and* whom the search answers "No matches" for, which
- * reads as "that person does not exist here", so the popover states the limit rather than hiding it.
- *
- * <p>Exported because `useReviewPeople`, which does the fetching, has to ask for exactly the page
- * this sentence promises.
- */
 export const MEMBER_PAGE_SIZE = 100;
 
 export interface PersonOption {
@@ -35,42 +26,18 @@ export interface PersonOption {
 	secondary?: string;
 }
 
-/**
- * The member list this facet offers, already reduced to what it draws. Whoever fetches it —
- * `useReviewPeople` in the app, a fixture in a story — owes the same four fields, so the facet never
- * learns where its people came from.
- *
- * A `FacetSource` and one field more, by extension rather than by resemblance: the two used to be
- * declared separately with a comment claiming they were the same shape, and they were not — the
- * flags were optional on one and required on the other.
- */
 export interface ReviewPeople extends FacetSource<PersonOption> {
-	/**
-	 * The list is one page long and that page came back full, so there are probably people missing.
-	 * The endpoint returns a bare array with no total, so a full page is the only signal there is.
-	 */
 	capped: boolean;
 }
 
 export interface ReviewPersonFacetProps {
-	/** "Developer" on Observations, "Recipient" on Delivery — the two are not always the same person. */
 	title: string;
 	people: ReviewPeople;
 	selected: number | undefined;
 	onChange: (userId: number | undefined) => void;
-	/**
-	 * The name of the person `selected` identifies, shown before the member list loads and for a
-	 * person who has since left the workspace. It must name *that* person: a caller reading it off the
-	 * first row of the list it filters is right only while the filter is on, and otherwise labels one
-	 * person's id with another's name.
-	 */
 	fallbackName?: string;
 }
 
-/**
- * Single-select rather than multi, because the search schema carries one id and the API takes one: a
- * multi-select trigger that silently kept only the last choice would lie about what it did.
- */
 export function ReviewPersonFacet({
 	title,
 	people,
@@ -128,8 +95,6 @@ export function ReviewPersonFacet({
 							? "No people in this workspace"
 							: "No matches"}
 				</ComboboxEmpty>
-				{/* The list carries the name, not just the popup: in single-select mode Base UI puts
-				    `role="listbox"` on this element, and an unnamed listbox fails axe. */}
 				<ComboboxList aria-label={`${title} options`}>
 					{(option: PersonOption) => (
 						<ComboboxItem key={option.userId} value={option}>

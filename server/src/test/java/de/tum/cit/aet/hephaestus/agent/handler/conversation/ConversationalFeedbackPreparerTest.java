@@ -38,17 +38,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationEventPublisher;
 
-/**
- * What a prepared conversational unit carries, and who decided it should exist.
- *
- * <p>The composition stage alone decides what is raised. Measurements ground its move, but a ranking of
- * measurements is not a coaching brief and must never create a body-less mentor queue entry.
- */
 class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
     private static final long WS = 1L;
@@ -80,19 +73,11 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         eventPublisher,
         egressGuard
     );
-
-    /**
-     * The practice behind each locus, as the preparer actually gets it. Projected in production rather than
-     * walked off the entity, because the observations reach the preparer from whichever caller routed them
-     * and may be detached — so the stub answers from the ids it is asked about rather than with a fixed row,
-     * and a mis-keyed lookup cannot pass as a working one.
-     */
     private final Map<UUID, String> practiceSlugByObservation = new HashMap<>();
 
     @BeforeEach
     void deliveryIsAllowedAndNothingIsPreparedYet() {
         lenient().when(egressGuard.deliveryAllowed(any())).thenReturn(true);
-        // Nothing queued on any thread unless a case says so, which is what a first run about a habit sees.
         lenient()
             .when(supersession.supersede(anyLong(), anyLong(), any(), any()))
             .thenReturn(FeedbackSupersession.Outcome.standalone());
@@ -131,7 +116,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the composer's notes reach the row in all four parts, and none of them is a script")
     void carriesTheMove() {
         Observation observation = problem(ALICE, TESTS, Severity.MAJOR);
 
@@ -150,15 +134,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         assertThat(brief.inConversationSignal()).isEqualTo(SELF_CHECK);
     }
 
-    /**
-     * The whole point of the second phase: what is raised is the composer's judgement, not a re-ranking of
-     * the measurements underneath it. A locus it read and wrote nothing about is not raised, and owes no row
-     * — the reason belongs to the evidence rather than to any gate of ours.
-     */
     @Test
-    @DisplayName("composed moves select, and outrank the severity order")
     void composedMovesDriveSelection() {
-        // The ranking would put the CRITICAL locus first; the composer wrote about the other one.
         Observation loud = problem(ALICE, SIZE, Severity.CRITICAL);
         Observation quiet = problem(ALICE, TESTS, Severity.MINOR);
 
@@ -173,12 +150,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             });
     }
 
-    /**
-     * Several loci of one practice are one thing to raise, and the composer already named the others inside
-     * the move it wrote. The extras take no row and, deliberately, no slot of the per-recipient cap.
-     */
     @Test
-    @DisplayName("one move per practice per recipient, however many loci it has")
     void collapsesLociOfOnePractice() {
         List<Observation> admitted = List.of(
             problem(ALICE, TESTS, Severity.MAJOR),
@@ -192,13 +164,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         assertThat(saved()).extracting(Feedback::getRecipientUserId).containsExactlyInAnyOrder(ALICE, BOB);
     }
 
-    /**
-     * A move about a practice this run measured nothing admissible for cannot be prepared: the mentor's queue
-     * is read through the observations bound to a unit, so an evidence-free unit would be invisible there and
-     * unexplainable afterwards.
-     */
     @Test
-    @DisplayName("a move with no admitted locus behind it prepares nothing")
     void dropsAMoveWithNoEvidence() {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
@@ -211,9 +177,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         verify(feedbackRepository, never()).save(any());
     }
 
-    /** Our cap, not the evidence's — so the locus still gets a row, and never a move it can never raise. */
     @Test
-    @DisplayName("past the per-recipient cap the locus is withheld with a row and no move")
     void capsAtThreePerRecipient() {
         List<Observation> admitted = List.of(
             problem(ALICE, "p-one", Severity.CRITICAL),
@@ -235,14 +199,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             });
     }
 
-    /**
-     * The key is what makes this lane supersedable at all: it is staged to the composer as the handle for
-     * "replace this", and the staging drops any row whose key is blank. A raised row therefore always
-     * carries one, and a capped row never does — it was not raised, so it is not on the thread, and putting
-     * it at the head would leave the queued move behind it unreplaceable.
-     */
     @Test
-    @DisplayName("every raised row carries its habit's thread key, and a capped row carries none")
     void raisedRowsCarryTheHabitThread() {
         List<Observation> admitted = List.of(
             problem(ALICE, "p-one", Severity.CRITICAL),
@@ -271,7 +228,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a missing composition stage creates no mentor work")
     void missingCompositionCreatesNoQueueEntry() {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
@@ -285,7 +241,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a SUPERSEDE that wins the claim retires the queued move and points back at it")
     void supersedeRetiresTheQueuedMove() {
         UUID retired = UUID.randomUUID();
         String threadKey = threadKeyFor(TESTS, ALICE);
@@ -310,13 +265,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             });
     }
 
-    /**
-     * Nothing that has been received may be un-said: the mentor already raised the queued move, so it keeps
-     * its state and the new move is written beside it. Losing the claim is not a reason to stay silent about
-     * something that was measured — the thread continues instead.
-     */
     @Test
-    @DisplayName("a SUPERSEDE that loses to a raised move is still written, following it")
     void supersedeLosingToADeliveredMoveStillWrites() {
         UUID alreadyRaised = UUID.randomUUID();
         String threadKey = threadKeyFor(TESTS, ALICE);
@@ -340,13 +289,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             });
     }
 
-    /**
-     * The runner refuses a key that was never staged, so the composer cannot invent one — but it can name a
-     * real key belonging to another of this person's habits. Acting on that would retire a move about
-     * something else and leave it unsaid forever, so the move is written as a new one instead.
-     */
     @Test
-    @DisplayName("a key belonging to another habit claims nothing and is written as new")
     void refusesACrossHabitSupersession() {
         String someoneElsesHabit = threadKeyFor(SIZE, ALICE);
 
@@ -367,9 +310,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             });
     }
 
-    /** Without a composed brief there is no habit to claim, even when the observation is otherwise valid. */
     @Test
-    @DisplayName("an unresolved practice claims nothing")
     void anUnresolvedPracticeClaimsNothing() {
         preparer.prepare(UUID.randomUUID(), WS, List.of(problem(ALICE, null, Severity.MAJOR)), List.of());
 
@@ -377,12 +318,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         verify(feedbackRepository, never()).save(any());
     }
 
-    /**
-     * A re-run reaching a unit it already wrote must not claim a second time: the move it would retire is
-     * the one this very unit replaced on the first pass.
-     */
     @Test
-    @DisplayName("a re-run does not claim the thread again")
     void reRunDoesNotSupersedeTwice() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
 
@@ -397,7 +333,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a re-run writes nothing and publishes nothing")
     void reRunIsIdempotent() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
         List<Observation> admitted = List.of(
@@ -409,18 +344,10 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
         assertThat(prepared).isZero();
         verify(feedbackRepository, never()).save(any());
-        // any(Object.class), not any(): binds the publishEvent(Object) overload the record dispatches to.
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
-    /**
-     * Ordinals come from the measurements alone, never from what the composer said about them, so the
-     * {@code (agent_job_id, position)} grain a re-run recognises does not move when composition does. Here
-     * the top-ranked locus is composed for by nobody: it still consumes its position, and the raised unit
-     * still lands on the position its own rank gives it.
-     */
     @Test
-    @DisplayName("positions are derived from the admitted loci, not from what was composed")
     void ordinalsIgnoreComposition() {
         List<Observation> admitted = List.of(
             problem(ALICE, SIZE, Severity.CRITICAL),
@@ -435,15 +362,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             .isEqualTo(FeedbackLedgerRecorder.IN_CHAT_UNIT_ORDINAL_BASE + 1);
     }
 
-    /**
-     * "Say nothing" is a decision, and it is the composer's, so nothing is raised for that practice. No
-     * SUPPRESSED row is written either: every {@code WithholdReason} is a property of the evidence or of what
-     * the person has already been told, and none of them is a reason this server held something back. Mapping
-     * one onto {@code FeedbackSuppressionReason} would mean widening a database CHECK constraint to record a
-     * refusal its own vocabulary does not describe.
-     */
     @Test
-    @DisplayName("a withheld practice is not raised and writes no row")
     void withholdWritesNothing() {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
@@ -457,12 +376,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
-    /**
-     * A turn that only withheld still spoke. Falling back to the severity ranking here would overrule the
-     * composer with exactly the mechanism the second phase exists to replace.
-     */
     @Test
-    @DisplayName("a withhold-only turn does not fall back to the severity ranking")
     void withholdIsNotSilence() {
         List<Observation> admitted = List.of(
             problem(ALICE, TESTS, Severity.MAJOR),
@@ -476,7 +390,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("with nothing composed, severity never creates body-less feedback")
     void doesNotFallBackToTheRanking() {
         List<Observation> admitted = List.of(
             problem(ALICE, TESTS, Severity.MINOR),
@@ -491,7 +404,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("an unresolved practice cannot create feedback without a composed brief")
     void unresolvedPracticeWithoutCompositionCreatesNothing() {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
@@ -505,7 +417,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("silent mode still creates no future work, composed or not")
     void silentModePreparesNothing() {
         when(egressGuard.deliveryAllowed(any())).thenReturn(false);
 
@@ -534,7 +445,6 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         return move(practiceSlug, ComposedFeedbackUnit.Action.NEW, null);
     }
 
-    /** A move the composer wrote to replace the one queued on {@code supersedesThreadKey}. */
     private static ComposedFeedbackUnit supersede(String practiceSlug, String supersedesThreadKey) {
         return move(practiceSlug, ComposedFeedbackUnit.Action.SUPERSEDE, supersedesThreadKey);
     }

@@ -192,8 +192,9 @@ section.
 ## Measurement and intervention
 
 Everything above this line is the system taking a reading. Everything below it is the system deciding
-to say something to a person. Those are two different acts, they run as two separate model turns
-inside one agent job, and keeping them apart is the reason one fact can read three different ways.
+to say something to a person. Those are separate turns in one agent session. An authenticated server callback admits the observations
+between them, so composition retains context but can use only the persisted projection. Keeping that boundary
+is why one fact can read three different ways.
 
 **A measurement is falsifiable.** _"This change adds a tax-exempt branch, and nothing in the change
 tests it"_ is either true or false, and you check it by opening the file. It says nothing about what
@@ -252,11 +253,11 @@ to refuse.
 
 ### Phase 2, concretely
 
-`runCompositionStage` in `pi-runner.mjs` opens a **separate in-memory session** with exactly three
-tools — `read`, `grep` and `report_feedback`. No `bash`, and no `report_observation`, so the stage cannot
-touch the review's own result file. It is a separate session rather than another turn on the review's
-for two reasons worth keeping: re-using the review's session would re-bill the whole conversation, and
-it would invite the composer to treat its own reasoning as evidence.
+After Java admits the observations, `pi-runner.mjs` resumes the same in-memory session with
+`agent/feedback-composer.md`. Reusing the session avoids making the agent reconstruct the artifact context. The provider still receives the prior conversation on the resumed turn; prompt caching may reduce, but does not erase, that input cost.
+The runner closes the measurement phase before that turn: `report_observation` refuses every later call,
+and `report_feedback` can only bind to the admitted observations returned by Java. Composition has a
+reserved timeout, so detection cannot consume its entire container budget.
 
 It is prompted with `agent/feedback-composer.md` and reads:
 
@@ -270,7 +271,8 @@ It is prompted with `agent/feedback-composer.md` and reads:
 | The practices, by slug                                     | `inputs/practices/index.json`, `inputs/practices/<slug>.md` | `PracticeCatalogInjector`                          |
 | Which lanes are open, and how many messages each may carry | `inputs/feedback-composition.json`                          | `FeedbackCompositionInputs`                        |
 
-Output is `out/feedback.json`, parsed by `FeedbackCompositionResultParser` into `ComposedFeedbackUnit`s.
+Output is `out/feedback.json`, collected into the job output and parsed by
+`FeedbackCompositionResultParser` into `ComposedFeedbackUnit`s.
 
 Three properties of that list matter more than the paths:
 
@@ -541,7 +543,8 @@ The durable boundaries, which the implementation may reschedule freely behind:
 - **Observations** — the agent reports through `report_observation`;
   `PracticeDetectionResultParser` validates and never throws, and persistence assigns occurrence and
   recurrence identity.
-- **Feedback** — the agent reports through `report_feedback` in a second session;
+- **Feedback** — after admission, the same agent session reports through `report_feedback` in a closed
+  intervention phase;
   `FeedbackCompositionResultParser` validates and never throws, and every attempt, withholding,
   replacement and placement is recorded in the ledger. The seam itself is
   [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md).

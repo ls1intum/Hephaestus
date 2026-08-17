@@ -53,23 +53,10 @@ import {
 	reviewableByHephaestus,
 } from "./review-autonomy-model";
 
-/**
- * The width of the decision column, shared by an area's ladder and its practices'.
- *
- * An area's ladder and its practices' are the same control at two levels of one chain, so they have
- * to share a left edge. A stated width is what puts them there; laid out after a content-width
- * accordion header instead, an area's ladder starts at a different x under every area name.
- * `DecisionsShareOneColumn` in the stories is the assertion.
- */
 const DECISION_COLUMN = "sm:w-80";
 
 const AREA_GRID = "sm:grid-cols-[minmax(0,1fr)_20rem]";
 
-/**
- * The decision track is a fixed 20rem at the end of this grid and of {@link AREA_GRID}, and both are
- * laid out across the same width, so the row's extra leading track for the checkbox moves where the
- * practice *name* starts and not where the ladder does.
- */
 const ROW_GRID = "grid-cols-[auto_minmax(0,1fr)] sm:grid-cols-[auto_minmax(0,1fr)_20rem]";
 
 export interface ReviewAutonomyPendingState {
@@ -82,7 +69,6 @@ export interface ReviewAutonomyPendingState {
 export interface ReviewAutonomyPageProps {
 	workspaceSlug: string;
 	settings: PracticeReviewSettings;
-	/** Server-resolved counts for the whole workspace and every area, in catalogue order. */
 	rollup: ReviewTierRollup;
 	practices: Practice[];
 	pending: ReviewAutonomyPendingState;
@@ -94,7 +80,6 @@ export interface ReviewAutonomyPageProps {
 	onClearAreaTier: (areaSlug: string) => void;
 	onSetPracticeTier: (practiceSlug: string, tier: ReviewTier) => void;
 	onClearPracticeTier: (practiceSlug: string) => void;
-	/** A null tier clears every named practice back to inheriting. */
 	onBulkSetTier: (practiceSlugs: string[], tier: ReviewTier | null) => void;
 }
 
@@ -119,8 +104,6 @@ export function ReviewAutonomyPage({
 
 	const groups = groupPracticesByArea(rollup, practices, { overridesOnly });
 	const overrides = countOverrides(rollup);
-	// Filtering is a reading mode, not a navigation one: a narrowed list whose groups are all shut
-	// hides the very rows it was opened to show.
 	const openValue = overridesOnly ? groups.map((group) => group.key) : openAreas;
 
 	const selectableSlugs = new Set(
@@ -130,7 +113,6 @@ export function ReviewAutonomyPage({
 				.map((practice) => practice.slug),
 		),
 	);
-	// A selection survives the filter being switched on, so it can name rows that are now hidden.
 	const actionable = [...selected].filter((slug) => selectableSlugs.has(slug));
 
 	const toggle = (slug: string, checked: boolean) => {
@@ -150,9 +132,6 @@ export function ReviewAutonomyPage({
 				onSetWorkspaceDefault={onSetWorkspaceDefault}
 				onClearWorkspaceDefault={onClearWorkspaceDefault}
 			/>
-
-			{/* No horizontal padding: at the narrowest viewport a strip wider than its parent drags the
-			    whole page sideways, which `expectNoPageOverflow` in the stories is what catches. */}
 			<div className="sticky top-0 z-20 space-y-3 border-b bg-background/95 py-3 backdrop-blur supports-backdrop-filter:bg-background/80">
 				<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 					<TierSummary counts={rollup.counts} overrides={overrides} />
@@ -242,8 +221,6 @@ function WorkspaceDecisionCard({
 			<CardContent>
 				<Field>
 					<FieldTitle>How far reviews go without you</FieldTitle>
-					{/* Not "everything to its left": below `sm` the ladder stacks, so the rung before this one
-					    is above it and no direction names both layouts. */}
 					<FieldDescription>
 						Each step keeps everything the step before it does and adds one thing. Turning this down
 						leaves the reviews running — it only changes what happens next.
@@ -271,11 +248,6 @@ function WorkspaceDecisionCard({
 	);
 }
 
-/**
- * Read straight off the server's rollup. Counting the rendered rows instead would put a second
- * implementation of the inheritance chain here, and would answer for the rows that happen to be
- * loaded rather than for the workspace.
- */
 function TierSummary({
 	counts,
 	overrides,
@@ -301,15 +273,8 @@ function byHandSentence(overrides: { practices: number; areas: number }): string
 	return parts.length === 0 ? "" : `${parts.join(" and ")} set by hand.`;
 }
 
-/**
- * A toggle group rather than a switch, because this control only narrows the list while every other
- * control on the screen writes a setting — and because both states are then named on screen, rather
- * than one being the unlabelled absence of the other.
- */
 function ScopeFilter({ value, onChange }: { value: boolean; onChange: (next: boolean) => void }) {
 	return (
-		// `role="toolbar"`: `ToggleGroup` emits `aria-orientation`, which ARIA allows on toolbar but not
-		// on group, and the items are `aria-pressed` buttons rather than radios.
 		<ToggleGroup
 			role="toolbar"
 			variant="outline"
@@ -324,10 +289,6 @@ function ScopeFilter({ value, onChange }: { value: boolean; onChange: (next: boo
 	);
 }
 
-/**
- * A menu rather than the ladder the rows use: a selection can hold practices at different tiers, so
- * there is no current value for a segmented control to show without misreporting most of them.
- */
 function BulkActionBar({
 	count,
 	bulk,
@@ -361,8 +322,6 @@ function BulkActionBar({
 							}
 						/>
 						<DropdownMenuContent align="end">
-							{/* The label has to live inside a group: it renders Base UI's `Menu.GroupLabel`,
-							    which throws without a `Menu.Group` ancestor and takes the whole popup down. */}
 							<DropdownMenuGroup>
 								<DropdownMenuLabel>Set every selected practice to</DropdownMenuLabel>
 								{REVIEW_TIER_ORDER.map((tier) => (
@@ -418,14 +377,9 @@ function AreaGroup({
 		selectableSlugs.length > 0 && selectableSlugs.every((slug) => selected.has(slug));
 
 	return (
-		// `scroll-mt-24` clears the sticky strip above: tabbing to an area's trigger scrolls it into view,
-		// and `scroll-margin` is what that scroll respects — without it the heading a keyboard user just
-		// moved to lands underneath the strip.
 		<AccordionItem value={group.key} className="scroll-mt-24 rounded-lg border bg-card px-3">
 			<div className={cn("grid gap-2 py-1 sm:items-center sm:gap-4", AREA_GRID)}>
 				<AccordionTrigger>
-					{/* Spans, not `ItemTitle`/`ItemDescription`: this is inside a `<button>`, which may only
-					    contain phrasing content, and those primitives render `<div>`s. */}
 					<span className="flex min-w-0 flex-col gap-1">
 						<span className="flex flex-wrap items-center gap-2">
 							<span className="break-words">{group.name}</span>
@@ -439,8 +393,6 @@ function AreaGroup({
 					</span>
 				</AccordionTrigger>
 				{areaSlug === null ? (
-					// The no-area bucket is not an area, so there is nothing for a tier to be stored against;
-					// its practices inherit the workspace default directly.
 					<span className={cn("min-w-0 text-muted-foreground text-xs", DECISION_COLUMN)}>
 						Follows the workspace default
 					</span>
@@ -482,8 +434,6 @@ function AreaGroup({
 								{allSelected ? "Deselect" : "Select"} all {selectableSlugs.length}
 							</Button>
 						)}
-						{/* Ruled, not boxed: a bordered card here would inset the practice ladders from the
-						    area ladder above them, breaking the shared decision column. */}
 						<ul className="mt-2 divide-y border-t">
 							{group.practices.map((practice) => (
 								<PracticeAutonomyRow
@@ -532,8 +482,6 @@ function PracticeAutonomyRow({
 		<Item
 			render={<li />}
 			variant="default"
-			// `px-0`: the row's grid tracks have to end where the area header's tracks end, or the two
-			// ladders do not share a column.
 			className={cn("grid items-start gap-2 rounded-none px-0 py-3 sm:gap-4", ROW_GRID)}
 		>
 			<ItemMedia>
@@ -556,8 +504,6 @@ function PracticeAutonomyRow({
 						</Link>
 					</PracticeDetailHoverCard>
 				</ItemTitle>
-				{/* The kind of work is what changes the cost of this decision: Deliver on a pull-request
-				    practice writes on every PR the team opens, on a document practice it may never fire. */}
 				<ItemDescription className="flex flex-wrap items-center gap-1.5">
 					<span>{artifactKindLabel(practice.artifactKind)}</span>
 					{limitation && <Badge variant="warning">{limitation}</Badge>}
@@ -597,25 +543,12 @@ function PracticeAutonomyRow({
 }
 
 export interface DecisionNoteProps {
-	/**
-	 * What this level follows when nobody set it here, ready to print — or null when it was set here,
-	 * which is the only case that offers a way back.
-	 */
 	follows: string | null;
-	/**
-	 * The reset's accessible name. It has to open with the visible words (WCAG 2.2 SC 2.5.3) and name
-	 * what it resets: the screen renders one of these per area and one per practice, so "Use the
-	 * default" alone identifies none of them.
-	 */
 	resetLabel: string;
 	disabled: boolean;
 	onClear: () => void;
 }
 
-/**
- * One paragraph rather than a flex row holding a span and a button: `Field` stretches every child to
- * its full width, so a link-styled button laid out beside the sentence spans the whole card.
- */
 function DecisionNote({ follows, resetLabel, disabled, onClear }: DecisionNoteProps) {
 	return (
 		<p className="text-muted-foreground text-xs">

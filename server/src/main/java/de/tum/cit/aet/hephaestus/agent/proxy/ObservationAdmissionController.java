@@ -1,8 +1,12 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
+import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import io.swagger.v3.oas.annotations.Hidden;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -12,9 +16,10 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Authenticated mid-run trust-boundary callback used by the practice runner. */
 @RestController
 @RequestMapping("/internal/llm")
+@Hidden
+@PreAuthorize("isAuthenticated()")
 public class ObservationAdmissionController {
 
     private final ObservationAdmissionService admission;
@@ -24,6 +29,7 @@ public class ObservationAdmissionController {
     }
 
     @PostMapping("/admit-observations")
+    @WorkspaceAgnostic("Authenticated sandbox token carries and constrains workspace route")
     public ObjectNode admit(@RequestBody JsonNode request, Authentication authentication) {
         if (request.path("schemaVersion").asInt(-1) != 1 || !request.path("observations").isArray()) {
             throw new ResponseStatusException(
@@ -31,12 +37,12 @@ public class ObservationAdmissionController {
                 "Expected schemaVersion 1 and observations array"
             );
         }
-        ProxyRouting routing = (ProxyRouting) authentication.getPrincipal();
+        if (!(authentication.getPrincipal() instanceof ProxyRouting routing)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agent-job credential required");
+        }
         UUID jobId = routing.sourceId();
         if (
-            jobId == null ||
-            routing.attempt() == null ||
-            routing.attempt().sourceType() != de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType.AGENT_JOB
+            jobId == null || routing.attempt() == null || routing.attempt().sourceType() != LlmUsageSourceType.AGENT_JOB
         ) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Agent-job credential required");
         }

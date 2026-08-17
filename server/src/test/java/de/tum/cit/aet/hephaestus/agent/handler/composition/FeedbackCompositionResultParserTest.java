@@ -11,15 +11,6 @@ import org.junit.jupiter.params.provider.ValueSource;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * The boundary a composed payload has to cross before anybody reads it.
- *
- * <p>The composition stage is additive, so the parser's first contract is "never throw". Its second is
- * the one that matters here: the payload arrives from inside the sandbox, next to the model, so nothing
- * in it is trusted. A unit that names a supersession target nobody staged, or an anchor pointing at a
- * citation that does not exist, or a line that is not in this change, is a unit that would put words on
- * a surface they do not belong on — each is refused, and each refusal is a case below.
- */
 class FeedbackCompositionResultParserTest extends BaseUnitTest {
 
     private final JsonMapper objectMapper = JsonMapper.builder().build();
@@ -144,15 +135,6 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             });
     }
 
-    /**
-     * Each note refuses a different degradation of the turn, so three of four is not a smaller note - it is a
-     * turn missing the part that makes it coaching. The one dropped here is the coaching goal, without which
-     * the mentor cannot tell what useful movement the conversation is meant to support.
-     *
-     * <p>The absent case and the blank case are both here because they are not the same code path: the
-     * sanitiser answers {@code ""} for a field that was never present, so a missing note arrives looking
-     * exactly like an empty one, and a check for null alone lets both through.
-     */
     @ParameterizedTest
     @ValueSource(
         strings = {
@@ -208,10 +190,6 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         ).isEmpty();
     }
 
-    /**
-     * A supersession target the composer was never shown is one it invented, and acting on it would let a
-     * model retire a message it cannot have read.
-     */
     @Test
     void refusesAUnitNamingAThreadKeyThatWasNeverStaged() {
         String unit = """
@@ -242,10 +220,6 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         ).isEmpty();
     }
 
-    /**
-     * The observation is true; it is simply not on this change. That routes it to another surface, and it
-     * must never put a note on a line the diff does not contain.
-     */
     @Test
     void refusesAnInContextUnitAnchoredToAnObservationThatIsNotOnTheDiff() {
         assertThat(
@@ -279,7 +253,6 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         ).isEmpty();
     }
 
-    /** The longitudinal surfaces are not on the diff, so a unit that thinks it is anchored is misaddressed. */
     @Test
     void refusesAnAnchorOnALongitudinalLane() {
         assertThat(
@@ -329,10 +302,26 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         ).isEmpty();
     }
 
-    /**
-     * Without a body there is nothing to read, and without a next step it is a verdict rather than
-     * feedback. A unit missing either is dropped rather than delivered half.
-     */
+    @Test
+    void rejectsEvidenceFromAnotherPracticeOrAnUnknownObservation() {
+        for (String reference : List.of("obs-1", "obs-missing", "prior:keeps-the-thread-moving")) {
+            assertThat(
+                parser.parse(
+                    output(
+                        """
+                        { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
+                          "basedOn": ["%s"], "action": "NEW",
+                          "title": "t", "body": "b", "nextStep": "n" }
+                        """.formatted(reference),
+                        "[]"
+                    )
+                )
+            )
+                .as("evidence reference %s", reference)
+                .isEmpty();
+        }
+    }
+
     @ParameterizedTest
     @ValueSource(strings = { "channel", "practiceSlug", "basedOn", "action", "title", "body", "nextStep" })
     void dropsAnInAppUnitMissingAnyLoadBearingPart(String omitted) {
@@ -349,7 +338,6 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(parser.parse(outputOf(objectMapper.createArrayNode().add(unit), "[]"))).isEmpty();
     }
 
-    /** Two units about one habit on one surface read as two problems, so the second is dropped. */
     @Test
     void keepsOnlyTheFirstUnitForAPracticeOnOneChannel() {
         List<ComposedFeedbackUnit> units = parser.parse(
@@ -357,9 +345,9 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 objectMapper.readTree(
                     """
                     [
-                      { "channel": "IN_APP", "practiceSlug": "p", "basedOn": ["obs-0"], "action": "NEW",
+                      { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": ["obs-0"], "action": "NEW",
                         "title": "First", "body": "b", "nextStep": "n" },
-                      { "channel": "IN_APP", "practiceSlug": "p", "basedOn": ["obs-0"], "action": "NEW",
+                      { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change", "basedOn": ["obs-0"], "action": "NEW",
                         "title": "Second", "body": "b", "nextStep": "n" }
                     ]
                     """
@@ -371,9 +359,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         assertThat(units).singleElement().extracting(ComposedFeedbackUnit::title).isEqualTo("First");
     }
 
-    /** One practice may earn one message on each surface — that is the point of composing all three at once. */
     @Test
-    void keepsOnePracticeOnTwoDifferentChannelsAndHandsEachLaneItsOwn() {
+    void filtersByChannelWithoutCollapsingOtherChannels() {
         JsonNode jobOutput = outputOf(
             objectMapper.readTree(
                 """
@@ -399,12 +386,12 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
     }
 
     @Test
-    void normalisesTheSlugTheSameWayTheFindingParserDoes() {
+    void normalisesPracticeSlug() {
         assertThat(
             parser.parse(
                 output(
                     """
-                    { "channel": "IN_APP", "practiceSlug": "Ships_Tests", "basedOn": ["obs-0"],
+                    { "channel": "IN_APP", "practiceSlug": "Ships_Tests_With_The_Change", "basedOn": ["obs-0"],
                       "action": "NEW", "title": "t", "body": "b", "nextStep": "n" }
                     """,
                     "[]"
@@ -413,13 +400,9 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
         )
             .singleElement()
             .extracting(ComposedFeedbackUnit::practiceSlug)
-            .isEqualTo("ships-tests");
+            .isEqualTo("ships-tests-with-the-change");
     }
 
-    /**
-     * A review that measured correctly is a successful review whether or not anything was composed from
-     * it, so every shape below is an empty list rather than a failure.
-     */
     @Test
     void treatsAnyMalformedOrAbsentPayloadAsNothingComposed() {
         assertThat(parser.parse(null)).isEmpty();

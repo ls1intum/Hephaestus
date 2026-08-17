@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -15,11 +17,19 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/** Java trust boundary between measurement and same-session feedback composition. */
 @Service
 public class ObservationAdmissionService {
 
     public static final String DIGEST_METADATA_KEY = "observation_admission_digest";
+
+    static void requireMatchingCompositionDigest(AgentJob job) {
+        String admitted = job.getMetadata() == null ? "" : job.getMetadata().path(DIGEST_METADATA_KEY).asString();
+        String composed =
+            job.getOutput() == null ? "" : job.getOutput().path("feedback").path("admissionDigest").asString();
+        if (admitted.isBlank() || !admitted.equals(composed)) {
+            throw new JobDeliveryException("Feedback was not composed from this job's admitted observations");
+        }
+    }
 
     private final AgentJobRepository jobs;
     private final ObservationRepository observations;
@@ -44,10 +54,10 @@ public class ObservationAdmissionService {
     @Transactional
     public ObjectNode admit(UUID jobId, JsonNode submitted) {
         AgentJob job = jobs.findByIdWithWorkspaceForUpdate(jobId).orElseThrow();
-        if (job.getStatus() != de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.RUNNING) {
+        if (job.getStatus() != AgentJobStatus.RUNNING) {
             throw new IllegalStateException("Observation admission requires a RUNNING job");
         }
-        String digest = ProvenanceDigest.sha256Hex(canonical(submitted));
+        String digest = ProvenanceDigest.sha256Hex(serializedPayload(submitted));
         String existing = job.getMetadata().path(DIGEST_METADATA_KEY).asString();
         if (!existing.isBlank()) {
             if (!existing.equals(digest)) throw new AdmissionConflictException();
@@ -58,12 +68,15 @@ public class ObservationAdmissionService {
             case ISSUE_REVIEW -> issues.admitObservations(job, submitted);
             default -> throw new IllegalArgumentException("Job type does not admit review observations");
         }
-        ((ObjectNode) job.getMetadata()).put(DIGEST_METADATA_KEY, digest);
+        ObjectNode metadata =
+            job.getMetadata() instanceof ObjectNode object ? (ObjectNode) object.deepCopy() : mapper.createObjectNode();
+        metadata.put(DIGEST_METADATA_KEY, digest);
+        job.setMetadata(metadata);
         jobs.save(job);
         return response(job, digest, observations.findByAgentJobId(jobId));
     }
 
-    private byte[] canonical(JsonNode submitted) {
+    private byte[] serializedPayload(JsonNode submitted) {
         try {
             return mapper.writeValueAsBytes(submitted);
         } catch (Exception e) {

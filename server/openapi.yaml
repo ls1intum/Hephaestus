@@ -7910,7 +7910,7 @@ components:
             - WEBHOOK_INGEST
             - TOKEN_REFRESH
             - FEEDBACK_DELIVERY
-            - INLINE_FINDINGS
+            - INLINE_FEEDBACK
             - APPROVAL_WORKFLOW
             - SCOPE_CHANGES
           uniqueItems: true
@@ -7968,7 +7968,7 @@ components:
             - WEBHOOK_INGEST
             - TOKEN_REFRESH
             - FEEDBACK_DELIVERY
-            - INLINE_FINDINGS
+            - INLINE_FEEDBACK
             - APPROVAL_WORKFLOW
             - SCOPE_CHANGES
           uniqueItems: true

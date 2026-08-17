@@ -18,19 +18,8 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
-import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/**
- * Cross-language vocabulary sync. Every enum that crosses the sandbox boundary is written twice — once
- * as a Java enum the server persists, once as a JavaScript literal the in-sandbox runner validates
- * against — and nothing but this test holds the two spellings together.
- *
- * <p>A value the server accepts but the runner rejects gets refiled by the model under whatever value the
- * runner does accept — silently turning one presence into another in a permanent record of how a person
- * works. That failure mode is silent by construction, so the guard has to be structural: a value added on
- * one side and not the other fails here, in the same change.
- */
 class AgentVocabularySyncTest extends BaseUnitTest {
 
     private static final Path NORMALIZER = resolveResource("agent/pi-observation-normalize.mjs");
@@ -38,7 +27,6 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     private static final Path ORCHESTRATOR = resolveResource("agent/pi-orchestrator.md");
 
     @Test
-    @DisplayName("the runner's presence vocabulary is exactly Presence.values()")
     void presenceVocabularyMatches() throws IOException {
         assertThat(jsArray("PRESENCE_VALUES"))
             .as("PRESENCE_VALUES in pi-observation-normalize.mjs vs Presence.values()")
@@ -46,7 +34,6 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the runner's assessment vocabulary is exactly Assessment.values()")
     void assessmentVocabularyMatches() throws IOException {
         assertThat(jsArray("ASSESSMENT_VALUES"))
             .as("ASSESSMENT_VALUES in pi-observation-normalize.mjs vs Assessment.values()")
@@ -54,7 +41,6 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the runner's severity vocabulary is exactly Severity.values()")
     void severityVocabularyMatches() throws IOException {
         assertThat(jsArray("SEVERITY_VALUES"))
             .as("SEVERITY_VALUES in pi-observation-normalize.mjs vs Severity.values()")
@@ -62,12 +48,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the runner's carriesValence() decides the same presences as Presence.carriesValence()")
     void carriesValenceAgrees() throws IOException {
-        // Not merely which values exist, but which of them demand an assessment. Disagreement here is
-        // the same class of bug one level down: the runner would reject a valence-free presence for
-        // lacking an assessment the server would have nulled anyway, and the model would refile it as
-        // whatever the runner does accept.
         String body = Files.readString(NORMALIZER, StandardCharsets.UTF_8);
         Matcher fn = Pattern.compile(
             "export function carriesValence\\(presence\\) \\{(.*?)\\n\\}",
@@ -87,10 +68,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the runner single-sources its vocabularies instead of re-declaring them")
     void runnerImportsTheVocabulary() throws IOException {
-        // The tool schema the model sees and the normalizer that validates the result must be generated
-        // from ONE list, or a value rejected by one and not the other is invisible from either file alone.
         String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(body)
@@ -100,13 +78,13 @@ class AgentVocabularySyncTest extends BaseUnitTest {
             .contains("SEVERITY_VALUES");
 
         assertThat(body)
-            .as("the final tool exposes only the assessed occurrence subset, not persisted refusal values")
-            .contains("occurrence: { type: \"string\", enum: [\"PRESENT\", \"ABSENT\"] }")
-            .doesNotContain("occurrence: { type: \"string\", enum: PRESENCE_VALUES }");
+            .contains("\"BEHAVIOR_PRESENT_GOOD\"")
+            .contains("\"BEHAVIOR_ABSENT_BAD_MAJOR\"")
+            .contains("\"NO_REVIEW_OCCASION\"")
+            .contains("\"INSUFFICIENT_EVIDENCE\"");
     }
 
     @Test
-    @DisplayName("the runner and composer prompt use exactly the server's conversation-note fields")
     void conversationNoteShapeMatches() throws IOException {
         List<String> javaFields = Arrays.stream(ComposedFeedbackUnit.ConversationBrief.class.getRecordComponents())
             .map(component -> component.getName())
@@ -128,12 +106,22 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the orchestrator teaches the final outcome union rather than persisted refusal names")
+    void toolPhasesAreGated() throws IOException {
+        String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
+
+        assertThat(body)
+            .contains("if (measurementClosed)")
+            .contains("measurementClosed = true")
+            .contains("if (!compositionAdmitted)")
+            .contains("compositionAdmitted = true");
+    }
+
+    @Test
     void orchestratorPromptCoversEveryOutcome() throws IOException {
         String body = Files.readString(ORCHESTRATOR, StandardCharsets.UTF_8);
         assertThat(body)
-            .contains("ASSESSED")
-            .contains("DECLINED")
+            .contains("BEHAVIOR_PRESENT_")
+            .contains("BEHAVIOR_ABSENT_")
             .contains("NO_REVIEW_OCCASION")
             .contains("INSUFFICIENT_EVIDENCE")
             .doesNotContain("NOT_APPLICABLE")
@@ -144,7 +132,6 @@ class AgentVocabularySyncTest extends BaseUnitTest {
         return Stream.of(values).map(Enum::name).toList();
     }
 
-    /** Extracts the quoted members of {@code export const <name> = [...]} from the normalizer module. */
     private static Set<String> jsArray(String constantName) throws IOException {
         String body = Files.readString(NORMALIZER, StandardCharsets.UTF_8);
         Matcher matcher = Pattern.compile(
