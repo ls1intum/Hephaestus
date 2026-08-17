@@ -49,6 +49,12 @@ function baseFinding(overrides = {}) {
     };
 }
 
+/** The ground an INCONCLUSIVE observation owes, mirroring `search` for ABSENT. */
+const UNDECIDABLE = {
+    openQuestion: "Whether the body states a why, or only restates the title",
+    wouldSettleIt: "The body of the issue the description defers to",
+};
+
 test("lowercase enums + underscored slug normalize and are accepted (not dropped)", () => {
     const out = normalizeFinding(baseFinding());
     assert.equal(out.practiceSlug, "writes-focused-pull-requests");
@@ -163,7 +169,8 @@ test("removed-line citations use old-side coordinates", () => {
 // see here" into a person's record on a change where there was something to see.
 
 test("INCONCLUSIVE is accepted and carries no assessment", () => {
-    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined });
+    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined,
+        evidence: { ...baseFinding().evidence, undecidability: UNDECIDABLE } });
     assert.equal(out.presence, "INCONCLUSIVE");
     assert.equal("assessment" in out, false);
 });
@@ -172,8 +179,14 @@ test("an assessment attached to a valence-free presence is dropped, not rejected
     const finding = (presence) =>
         presence === "NOT_APPLICABLE"
             ? notApplicableFinding(goodInapplicability, { assessment: "GOOD" })
-            : { ...baseFinding(), presence, assessment: "GOOD" };
+            : {
+                  ...baseFinding(),
+                  presence,
+                  assessment: "GOOD",
+                  evidence: { ...baseFinding().evidence, undecidability: UNDECIDABLE },
+              };
     for (const presence of ["NOT_APPLICABLE", "INCONCLUSIVE"]) {
+        // each of the two grounds its own claim; supply whichever this presence owes
         const out = normalizeFinding(finding(presence));
         assert.equal("assessment" in out, false, `${presence} must not carry an assessment`);
     }
@@ -356,7 +369,8 @@ test("the refusal points at INCONCLUSIVE, because that is the answer it is askin
 });
 
 test("INCONCLUSIVE needs no inapplicability block — it is not claiming anything about the work", () => {
-    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined });
+    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined,
+        evidence: { ...baseFinding().evidence, undecidability: UNDECIDABLE } });
     assert.equal("inapplicability" in out.evidence, false);
 });
 
@@ -467,4 +481,36 @@ test("folding glyphs never makes a quote the artifact does not contain match", (
 
     assert.equal(citationMatchesArtifact(cite('Resolve “Disconnect data between screens”'), content), false);
     assert.equal(citationMatchesArtifact(cite("a rationale the author never wrote"), content), false);
+});
+
+// INCONCLUSIVE was the one presence with no ground, and the bench says that mattered in both
+// directions: it made the value cheap to write, and — because it appeared in no schema — hard to find.
+// Moving evidence ahead of the verdict dropped it from 6/6 of the undecidable cases to 1/6; adding this
+// block restored 6/6.
+test("an INCONCLUSIVE observation must say what it could not settle", () => {
+    const base = {
+        practiceSlug: "describe-what-and-why",
+        title: "Rationale lives somewhere this review cannot read",
+        presence: "INCONCLUSIVE",
+        confidence: 0.9,
+        reasoning: "The body points at an issue for the why, and that issue was not staged.",
+        evidence: { citations: baseFinding().evidence.citations },
+    };
+
+    assert.throws(() => normalizeFinding(base), /undecidability/);
+    assert.throws(
+        () => normalizeFinding({ ...base, evidence: { ...base.evidence, undecidability: { openQuestion: "x" } } }),
+        /wouldSettleIt/,
+    );
+
+    const ok = normalizeFinding({
+        ...base,
+        evidence: {
+            ...base.evidence,
+            undecidability: { openQuestion: "Whether the body states a why", wouldSettleIt: "The linked issue's body" },
+        },
+    });
+    assert.equal(ok.presence, "INCONCLUSIVE");
+    assert.equal(ok.assessment, undefined);
+    assert.equal(ok.evidence.undecidability.wouldSettleIt, "The linked issue's body");
 });

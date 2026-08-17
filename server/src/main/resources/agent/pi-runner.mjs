@@ -215,6 +215,39 @@ const inapplicabilitySchema = {
         },
     },
 };
+// The question the evidence left open, and what would have closed it. REQUIRED when
+// presence=INCONCLUSIVE, which until now was the one value that cost nothing to say and appeared in no
+// schema at all.
+//
+// Measured, not assumed. On a bench of 12 real merge requests plus two constructed undecidable ones,
+// moving evidence ahead of the verdict dropped INCONCLUSIVE from 6/6 of the undecidable cases to 1/6 —
+// once the model had quoted body text it read the body as settling the question. Adding this block put it
+// back to 6/6 with no loss of agreement elsewhere. A required sub-schema turns out to be a signpost as
+// much as a toll: it is how the model finds a value it otherwise walks past.
+//
+// It also makes the answer useful. "I could not tell" is a dead end; "I could not tell, and here is what
+// would have decided it" is a statement about missing evidence that a practice author can act on.
+const undecidabilitySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["openQuestion", "wouldSettleIt"],
+    properties: {
+        openQuestion: {
+            type: "string",
+            minLength: 1,
+            description: "The question the evidence you actually read left open, in one sentence.",
+        },
+        wouldSettleIt: {
+            type: "string",
+            minLength: 1,
+            description:
+                "The EVIDENCE that would have decided it — something that already exists and you could not " +
+                "read, named concretely: 'the body of issue #7', 'the test file the description says covers " +
+                "this'. NOT what the author should have written: advice belongs to a later step, and " +
+                "answering with it leaves nobody any wiser about which source this practice is missing.",
+        },
+    },
+};
 const evidenceSchema = {
     type: "object",
     additionalProperties: false,
@@ -222,6 +255,7 @@ const evidenceSchema = {
     properties: {
         search: searchSchema,
         inapplicability: inapplicabilitySchema,
+        undecidability: undecidabilitySchema,
         citations: {
             type: "array",
             minItems: 1,

@@ -491,6 +491,13 @@ Use `report_finding` — it is the output contract in this runtime.
   not "not relevant". A delivery with an unjustified `NOT_APPLICABLE` is rejected, exactly as an ABSENT with no
   recorded search is. If the honest `ruledOutBy` would be "I could not tell", then the presence is
   `INCONCLUSIVE` and this block does not apply.
+- `evidence.undecidability` is REQUIRED when `presence` is `INCONCLUSIVE`, and ignored otherwise. `openQuestion`
+  states, in one sentence, what the evidence you read left open; `wouldSettleIt` names concretely what would have
+  decided it — "the body of the issue the description defers to", "the test file the description says covers
+  this" — never "more context". Saying you could not tell is a measurement only if it says what it could not
+  tell; without that it is the cheapest sentence in the vocabulary, and uncertainty drains into it the way it
+  used to drain into `NOT_APPLICABLE`. `wouldSettleIt` is also the most useful thing you can leave behind: it is
+  what tells a practice author which evidence their practice is missing.
 - Every evidence citation must name a source `inputs/manifest.json` lists as `AVAILABLE`, an `artifactPath`
   listed under **that** source there, and an exact non-empty quote from that artifact. `path` is the
   developer-facing file or object location. The runtime verifies source ownership and quote content and rejects

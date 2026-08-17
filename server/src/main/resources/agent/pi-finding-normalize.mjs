@@ -218,7 +218,32 @@ export function normalizeEvidence(evidence, presence) {
         }
         return { citations, inapplicability: normalizeInapplicability(evidence.inapplicability) };
     }
+    // And the same shape once more, for the last presence that had no ground at all. "I could not tell" is
+    // only a measurement if it says what it could not tell and what would have told it; otherwise it is the
+    // cheapest thing to write, which is how it becomes the next place uncertainty drains to.
+    if (presence === "INCONCLUSIVE") {
+        if (evidence.undecidability == null) {
+            throw new Error(
+                "an INCONCLUSIVE observation must say what it could not settle: evidence.undecidability with " +
+                    "openQuestion and wouldSettleIt",
+            );
+        }
+        return { citations, undecidability: normalizeUndecidability(evidence.undecidability) };
+    }
     return evidence.search == null ? { citations } : { citations, search: normalizeSearch(evidence.search) };
+}
+
+/**
+ * The recorded shape of a question the evidence left open. Sibling of {@link normalizeSearch} and
+ * {@link normalizeInapplicability}: each presence that makes a claim beyond its citations has to ground it.
+ */
+export function normalizeUndecidability(undecidability) {
+    if (!undecidability || typeof undecidability !== "object") throw new Error("undecidability is required");
+    const openQuestion = String(undecidability.openQuestion ?? "").trim();
+    const wouldSettleIt = String(undecidability.wouldSettleIt ?? "").trim();
+    if (!openQuestion) throw new Error("undecidability.openQuestion is required");
+    if (!wouldSettleIt) throw new Error("undecidability.wouldSettleIt is required");
+    return { openQuestion, wouldSettleIt };
 }
 
 export function normalizeFinding(finding) {
