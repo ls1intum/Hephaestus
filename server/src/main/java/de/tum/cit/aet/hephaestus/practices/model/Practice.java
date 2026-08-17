@@ -29,12 +29,28 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 import org.hibernate.annotations.ColumnDefault;
+import org.hibernate.annotations.DynamicUpdate;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
+/**
+ * Updated column-by-column rather than whole-row, because a database trigger keys off which columns an
+ * UPDATE names.
+ *
+ * <p>{@code practice_requires_current_revision_projection} is declared {@code AFTER UPDATE OF slug, name,
+ * applies_to, bindings, criteria, …} — and Postgres fires an {@code UPDATE OF} trigger when a column
+ * appears in the SET list, whether or not its value changed. Hibernate's default whole-row update names
+ * every column on every save, so changing something as unrelated as {@code review_tier} re-asserted the
+ * whole projection and had the deferred trigger re-check it at commit. Setting a practice's review tier
+ * through the API therefore failed with a 409 while the identical write in SQL succeeded.
+ *
+ * <p>With this, an update names only what actually changed, so the trigger fires when the projection is
+ * genuinely touched and stays silent otherwise — which is what it was written to mean.
+ */
+@DynamicUpdate
 @Entity
 @Table(
     name = "practice",
