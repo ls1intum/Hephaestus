@@ -371,14 +371,14 @@ public class MentorTurnPersistence {
         );
     }
 
-    /** Reconcile linked findings in the same transaction as the completed assistant message. */
+    /** Reconcile linked observations in the same transaction as the completed assistant message. */
     private void reconcileConversationalDelivery(
         ChatMessage assistant,
         TranslatorState state,
         MentorChannel.DeliveryOutcome deliveryOutcome
     ) {
-        List<UUID> linkedFindingIds = state.linkedFindingIds();
-        if (linkedFindingIds.isEmpty()) {
+        List<UUID> linkedObservationIds = state.linkedObservationIds();
+        if (linkedObservationIds.isEmpty()) {
             return;
         }
         ChatThread thread = assistant.getThread();
@@ -389,13 +389,13 @@ public class MentorTurnPersistence {
             case INSTANCE_SILENCED -> conversationalDeliveryReconciler.suppressForSilentMode(
                 thread.getWorkspace().getId(),
                 thread.getUser().getId(),
-                linkedFindingIds
+                linkedObservationIds
             );
             case DELIVERED -> conversationalDeliveryReconciler.reconcile(
                 thread.getWorkspace().getId(),
                 thread.getUser().getId(),
                 assistant.getId(),
-                linkedFindingIds
+                linkedObservationIds
             );
             case NOT_DELIVERED -> {
             }

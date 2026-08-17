@@ -23,7 +23,7 @@ final class ContextMapWriter {
     /** Enough neighbours to orient in a directory; past this the listing stops being a pointer. */
     private static final int MAX_NEIGHBOURS = 12;
 
-    /** Referencing files worth naming per changed file. Beyond a few, "widely used" is the finding. */
+    /** Referencing files worth naming per changed file. Beyond a few, "widely used" is the observation. */
     private static final int MAX_REFERENCES = 5;
 
     private static final Pattern DIFF_HEADER = Pattern.compile("^diff --git a/.* b/(.+)$", Pattern.MULTILINE);
@@ -40,7 +40,9 @@ final class ContextMapWriter {
         StringBuilder map = new StringBuilder("# Context map\n\n");
         map
             .append("Where to look for the code the change depends on. Paths are workspace-relative.\n")
-            .append("Findings still quote `inputs/context/diff.patch`; this is for judging what you read there.\n\n")
+            .append(
+                "Observations still quote `inputs/context/diff.patch`; this is for judging what you read there.\n\n"
+            )
             .append("## The change\n\n- `")
             .append(SandboxLayout.CONTEXT_PREFIX)
             .append("diff.patch` — ")

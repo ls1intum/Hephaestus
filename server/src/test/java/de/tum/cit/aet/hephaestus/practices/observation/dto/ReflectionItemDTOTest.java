@@ -22,7 +22,7 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     private static Observation finding(String evidenceJson) {
         return Observation.builder()
             .id(UUID.randomUUID())
-            .title("Distance-warning logic ships with no test")
+            .summary("Distance-warning logic ships with no test")
             .severity(Severity.MAJOR)
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
@@ -97,11 +97,11 @@ class ReflectionItemDTOTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("guidance is the delivered feedback body passed in — null when nothing was delivered")
-    void guidanceComesFromDeliveredBody() {
-        assertThat(ReflectionItemDTO.from(finding(null), "Add a unit test for evaluateDistance.").guidance()).isEqualTo(
-            "Add a unit test for evaluateDistance."
-        );
-        assertThat(ReflectionItemDTO.from(finding(null), null).guidance()).isNull();
+    @DisplayName("deliveredFeedback is the delivered feedback body passed in — null when nothing was delivered")
+    void deliveredFeedbackComesFromDeliveredBody() {
+        assertThat(
+            ReflectionItemDTO.from(finding(null), "Add a unit test for evaluateDistance.").deliveredFeedback()
+        ).isEqualTo("Add a unit test for evaluateDistance.");
+        assertThat(ReflectionItemDTO.from(finding(null), null).deliveredFeedback()).isNull();
     }
 }

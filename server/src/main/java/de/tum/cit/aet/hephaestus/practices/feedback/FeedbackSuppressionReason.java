@@ -8,7 +8,7 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 public enum FeedbackSuppressionReason {
     /** Dropped by the per-run volume cap on the non-blocking improvement tail ({@code DeliveryComposer}). */
     VOLUME_CAPPED,
-    /** Collapsed as a near-duplicate of another finding delivered in the same run ({@code DeliveryComposer}). */
+    /** Collapsed as a near-duplicate of another observation delivered in the same run ({@code DeliveryComposer}). */
     COMPOSER_DEDUPED,
     /** The subject explicitly DISPUTED this locus on an earlier run; not re-surfaced unless the evidence changes. */
     REACTED_DISPUTED,

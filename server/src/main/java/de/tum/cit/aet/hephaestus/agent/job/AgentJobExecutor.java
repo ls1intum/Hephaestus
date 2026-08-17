@@ -148,6 +148,7 @@ public class AgentJobExecutor {
     private final WorkspaceAgentBindingRepository bindingRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final PracticePiAdapter practiceAgent;
+
     private final SandboxManager sandboxManager;
     private final AsyncTaskExecutor sandboxExecutor;
     private final TransactionTemplate transactionTemplate;
@@ -610,7 +611,7 @@ public class AgentJobExecutor {
             metricOutcome = AgentJobStatus.CANCELLED.name();
         } catch (InsufficientEvidenceException e) {
             try {
-                persistRefusedEvidence(jobId, job.getRetryCount(), e.preparedInputs());
+                persistRefusedEvidence(jobId, job.getJobType(), job.getRetryCount(), e.preparedInputs());
                 ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
                 Integer updated = transactionTemplate.execute(status ->
                     jobRepository.transitionToEvidenceRefused(
@@ -713,6 +714,7 @@ public class AgentJobExecutor {
         );
         persistProvenanceDigests(
             jobId,
+            job.getJobType(),
             agentSpec.promptDigest(),
             sandboxSpec.inputFiles(),
             job.getRetryCount(),
@@ -721,9 +723,15 @@ public class AgentJobExecutor {
         return new PreparedSandbox(sandboxSpec, preparedInputs);
     }
 
-    private void persistRefusedEvidence(UUID jobId, int retryCount, PreparedJobInputs preparedInputs) {
+    private void persistRefusedEvidence(
+        UUID jobId,
+        AgentJobType jobType,
+        int retryCount,
+        PreparedJobInputs preparedInputs
+    ) {
         persistProvenanceDigests(
             jobId,
+            jobType,
             null,
             preparedInputs.files(),
             retryCount,
@@ -737,6 +745,7 @@ public class AgentJobExecutor {
      */
     private void persistProvenanceDigests(
         UUID jobId,
+        AgentJobType jobType,
         @Nullable String promptDigest,
         Map<String, byte[]> inputFiles,
         int retryCount,
@@ -778,7 +787,7 @@ public class AgentJobExecutor {
             throw new IllegalStateException("Practice review inputs have an incomplete evidence snapshot");
         }
         ObjectNode snapshot = objectMapper.createObjectNode();
-        snapshot.set("manifest", objectMapper.readTree(manifest));
+        if (manifest != null) snapshot.set("manifest", objectMapper.readTree(manifest));
         if (practices != null) {
             snapshot.set("practices", objectMapper.readTree(practices));
         }

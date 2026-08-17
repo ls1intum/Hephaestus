@@ -34,12 +34,12 @@ name for one of them — an act number, a phase letter, a sprint label — is un
 **Each stage owns exactly one refusal vocabulary, and they are not interchangeable.** Answering a question
 from one stage in another stage's words is the failure this table exists to prevent.
 
-| Stage | Refusal vocabulary | Lands in | Means |
-| --- | --- | --- | --- |
-| Occasion | `SignalStateReason` | `artifact_signal.state_reason` | We chose not to look, or not yet |
-| Capture | `SourceAbsenceReason` per source, `SourceReadinessReason` per practice check | `agent_job.evidence_snapshot` (the manifest), `agent_job.review_readiness` | We could not look |
-| Observation | `Presence.INCONCLUSIVE` | `observation.presence` | We looked and could not tell |
-| Delivery | `FeedbackSuppressionReason` | `feedback.suppression_reason` | We know, and chose to stay quiet |
+| Stage       | Refusal vocabulary                                                           | Lands in                                                                   | Means                            |
+| ----------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------- |
+| Occasion    | `SignalStateReason`                                                          | `artifact_signal.state_reason`                                             | We chose not to look, or not yet |
+| Capture     | `SourceAbsenceReason` per source, `SourceReadinessReason` per practice check | `agent_job.evidence_snapshot` (the manifest), `agent_job.review_readiness` | We could not look                |
+| Observation | `Presence.INCONCLUSIVE`                                                      | `observation.presence`                                                     | We looked and could not tell     |
+| Delivery    | `FeedbackSuppressionReason`                                                  | `feedback.suppression_reason`                                              | We know, and chose to stay quiet |
 
 The four are not ranked and do not substitute for one another. "We could not look" is deliberately not
 representable as a `Presence` value, because a `Presence` is a claim about the developer's work and a
@@ -51,7 +51,7 @@ answer is "two of them", the reason is really two reasons.
 
 ## Occasion
 
-An occasion is an *occurrence* — one named signal on one revision of one artifact — recorded in
+An occasion is an _occurrence_ — one named signal on one revision of one artifact — recorded in
 `artifact_signal` before any decision is taken about it. Recording first is what makes silence auditable:
 every review that did not happen has a row saying so.
 
@@ -81,14 +81,14 @@ policy applied on top of it.
 **Terminal — refused, never re-offered.** The fact that caused the refusal cannot change for this
 occurrence.
 
-| Reason | Why it can never come out differently |
-| --- | --- |
-| `GATE_SKIPPED` | A workspace review gate turned it away |
-| `COOLDOWN_ACTIVE` | This work was reviewed too recently; a later occurrence gets its own row |
-| `REQUEST_COOLDOWN_ACTIVE` | A review of this was asked for moments ago |
-| `REQUESTER_QUOTA_EXHAUSTED` | The asker's hourly allowance is spent; asking again is a new occurrence |
-| `CONCURRENT_DUPLICATE` | The same review was already running |
-| `OUT_OF_REVIEW_SCOPE` | The branch a merge request targeted will not change |
+| Reason                      | Why it can never come out differently                                    |
+| --------------------------- | ------------------------------------------------------------------------ |
+| `GATE_SKIPPED`              | A workspace review gate turned it away                                   |
+| `COOLDOWN_ACTIVE`           | This work was reviewed too recently; a later occurrence gets its own row |
+| `REQUEST_COOLDOWN_ACTIVE`   | A review of this was asked for moments ago                               |
+| `REQUESTER_QUOTA_EXHAUSTED` | The asker's hourly allowance is spent; asking again is a new occurrence  |
+| `CONCURRENT_DUPLICATE`      | The same review was already running                                      |
+| `OUT_OF_REVIEW_SCOPE`       | The branch a merge request targeted will not change                      |
 
 **Retryable — parked as `PENDING`, re-offered until it lapses.** Somebody can lift these without the
 artifact changing.
@@ -100,23 +100,23 @@ in that map renders as a sentence and nothing more, which is the correct answer 
 terminal ones below: sending somebody to a settings page that cannot affect what they just read is how a
 limit gets widened to fix a non-fault.
 
-| Reason | What lifts it | Where the trace links |
-| --- | --- | --- |
-| `WORKSPACE_INACTIVE` | The workspace becomes active again | — no screen reactivates a workspace; the status endpoint has no UI |
-| `PRACTICES_DISABLED` | An admin starts practice reviews | Practices → Review → *When and where* |
-| `NO_ACTIVE_PRACTICE` | A practice covering this kind of work is installed | Practices → Practice setup |
-| `REVIEW_MODEL_UNBOUND` | An admin binds a model for practice review | Administration → AI models |
-| `PRACTICE_TIER_OFF` | An admin raises a watching practice above `OFF` — at the practice, its area, or the workspace default | Practices → Review → *How much* |
-| `BUDGET_EXHAUSTED` | The cap is raised, or the month rolls over | Administration → AI usage |
-| `SUBJECT_UNLINKED` | The author links a Hephaestus account | — the author's own account page, which an admin cannot open for them |
-| `MODEL_UNAVAILABLE` | The bound model or its connection becomes usable | Administration → AI models |
+| Reason                 | What lifts it                                                                                         | Where the trace links                                                |
+| ---------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `WORKSPACE_INACTIVE`   | The workspace becomes active again                                                                    | — no screen reactivates a workspace; the status endpoint has no UI   |
+| `PRACTICES_DISABLED`   | An admin starts practice reviews                                                                      | Practices → Review → _When and where_                                |
+| `NO_ACTIVE_PRACTICE`   | A practice covering this kind of work is installed                                                    | Practices → Practice setup                                           |
+| `REVIEW_MODEL_UNBOUND` | An admin binds a model for practice review                                                            | Administration → AI models                                           |
+| `PRACTICE_TIER_OFF`    | An admin raises a watching practice above `OFF` — at the practice, its area, or the workspace default | Practices → Review → _How much_                                      |
+| `BUDGET_EXHAUSTED`     | The cap is raised, or the month rolls over                                                            | Administration → AI usage                                            |
+| `SUBJECT_UNLINKED`     | The author links a Hephaestus account                                                                 | — the author's own account page, which an admin cannot open for them |
+| `MODEL_UNAVAILABLE`    | The bound model or its connection becomes usable                                                      | Administration → AI models                                           |
 
 **Retired — terminal, but not a decision.** These close a row nobody will come back to.
 
-| Reason | Meaning |
-| --- | --- |
+| Reason                      | Meaning                                      |
+| --------------------------- | -------------------------------------------- |
 | `PENDING_DEADLINE_EXCEEDED` | Re-offered for seven days and never admitted |
-| `ARTIFACT_GONE` | The work no longer exists |
+| `ARTIFACT_GONE`             | The work no longer exists                    |
 
 Two properties of this ledger you have to know before you reason about volume. A `PENDING` row is retried
 on a cadence (`hephaestus.signal-ledger.pending-retry-after`, default one hour) until
@@ -140,7 +140,7 @@ Two things about it are facts about the code rather than about the vocabulary, s
 is visible from the enum, and assuming otherwise is a mistake the enum will not stop you making:
 
 - **Three doors collapse into `MANUAL`.** `ManualReviewRequests` is the single recording site for both the
-  `/hephaestus review` comment command (via `BotCommandProcessor`) and the *Review this now* button (via
+  `/hephaestus review` comment command (via `BotCommandProcessor`) and the _Review this now_ button (via
   `PracticeReviewRequestController`); `DevTriggerController` is a third, gated on
   `hephaestus.dev.trigger-enabled`. Provenance cannot tell you which one was used.
 - **`SYNC` is a dead end for connected project work.** `AgentJobEventListener` and
@@ -182,12 +182,12 @@ Identity is assigned at persistence, not by the detector: an occurrence key dedu
 (`insertIfAbsent`, `ON CONFLICT DO NOTHING`), and a recurrence key hashes the locus so the same observation
 is recognisable across runs.
 
-**An observation carries `reasoning` and no advice.** `reasoning` is the measurement's own
-justification — *"the change adds a tax-exempt branch, and no test file in this diff calls `total`"* —
-and it is the only prose the observation persists. The detector also emits a `guidance` string, but
-that string is not a column and never becomes one: advice is a property of a *delivery*, so it lives on
-the feedback ledger instead (ADR 0021, ADR 0022). What `guidance` is still for is the subject of the
-next section.
+**An observation carries `evidenceRationale` and no advice.** `evidenceRationale` is the measurement's own
+justification — _"the change adds a tax-exempt branch, and no test file in this diff calls `total`"_ —
+and it is the only prose the observation carries anywhere. The detector emits no next step: there is no
+`guidance` field on the tool, on the parsed observation, or on the ledger. Advice is a property of a
+_delivery_ (ADR 0021, ADR 0022), and the stage that decides deliveries is the subject of the next
+section.
 
 ## Measurement and intervention
 
@@ -195,13 +195,13 @@ Everything above this line is the system taking a reading. Everything below it i
 to say something to a person. Those are two different acts, they run as two separate model turns
 inside one agent job, and keeping them apart is the reason one fact can read three different ways.
 
-**A measurement is falsifiable.** *"This change adds a tax-exempt branch, and nothing in the change
-tests it"* is either true or false, and you check it by opening the file. It says nothing about what
+**A measurement is falsifiable.** _"This change adds a tax-exempt branch, and nothing in the change
+tests it"_ is either true or false, and you check it by opening the file. It says nothing about what
 anybody should do, and like any instrument reading it is kept forever, unedited, so later readings can
 be compared with it.
 
-**An intervention cannot be true or false.** *"Write the assertion that distinguishes the new branch
-before you write the branch"* is only useful or useless, and whether it is useful depends entirely on
+**An intervention cannot be true or false.** _"Write the assertion that distinguishes the new branch
+before you write the branch"_ is only useful or useless, and whether it is useful depends entirely on
 who is reading it, where they are reading it, what they were told last week, and whether anybody has
 said it to them already.
 
@@ -210,8 +210,10 @@ artifact, it is measurement; if you can only check it by watching what the perso
 intervention.**
 
 They are separated because the good version of each ruins the other. A measurement authored as advice
-starts bending toward whatever makes good advice — the finding you can write a nice tip about gets
-reported, the one you cannot gets quietly dropped. And advice written at the moment of measurement can
+starts bending toward whatever makes good advice — the observation you can write a nice tip about gets
+reported, the one you cannot gets quietly dropped. It also bends toward _fault_, because a next step
+presupposes something to step away from: the three answers that assert nothing is wrong (a strength, a
+practice with no subject here, a question the evidence left open) are the ones that suffer for it. And advice written at the moment of measurement can
 only ever be about the one thing just measured: it cannot know that this is the third time, it cannot
 know the developer was already told, and it cannot decide to stay quiet.
 
@@ -251,22 +253,22 @@ to refuse.
 ### Phase 2, concretely
 
 `runCompositionStage` in `pi-runner.mjs` opens a **separate in-memory session** with exactly three
-tools — `read`, `grep` and `report_feedback`. No `bash`, and no `report_finding`, so the stage cannot
+tools — `read`, `grep` and `report_feedback`. No `bash`, and no `report_observation`, so the stage cannot
 touch the review's own result file. It is a separate session rather than another turn on the review's
 for two reasons worth keeping: re-using the review's session would re-bill the whole conversation, and
 it would invite the composer to treat its own reasoning as evidence.
 
 It is prompted with `agent/feedback-composer.md` and reads:
 
-| Input | Where | Staged by |
-| --- | --- | --- |
-| This run's observations, projected | `work/composition/observations.json` | the runner itself, from the review's result file |
-| Prior observations about this person | `inputs/history/observations.json` | `ReviewHistoryContentSource` — 90 days, at most 50 |
-| Feedback already delivered | `inputs/history/feedback.json` | the same, at most 30 |
-| Feedback prepared but not yet read | `inputs/history/prepared.json` | the same, at most 20 |
-| How each measured locus moved | `inputs/history/delta.json` | the same, computed by `ObservationDelta` |
-| The practices, by slug | `inputs/practices/index.json`, `inputs/practices/<slug>.md` | `PracticeCatalogInjector` |
-| Which lanes are open, and how many messages each may carry | `inputs/feedback-composition.json` | `FeedbackCompositionInputs` |
+| Input                                                      | Where                                                       | Staged by                                          |
+| ---------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
+| This run's observations, projected                         | `work/composition/observations.json`                        | the runner itself, from the review's result file   |
+| Prior observations about this person                       | `inputs/history/observations.json`                          | `ReviewHistoryContentSource` — 90 days, at most 50 |
+| Feedback already delivered                                 | `inputs/history/feedback.json`                              | the same, at most 30                               |
+| Feedback prepared but not yet read                         | `inputs/history/prepared.json`                              | the same, at most 20                               |
+| How each measured locus moved                              | `inputs/history/delta.json`                                 | the same, computed by `ObservationDelta`           |
+| The practices, by slug                                     | `inputs/practices/index.json`, `inputs/practices/<slug>.md` | `PracticeCatalogInjector`                          |
+| Which lanes are open, and how many messages each may carry | `inputs/feedback-composition.json`                          | `FeedbackCompositionInputs`                        |
 
 Output is `out/feedback.json`, parsed by `FeedbackCompositionResultParser` into `ComposedFeedbackUnit`s.
 
@@ -283,9 +285,9 @@ Three properties of that list matter more than the paths:
 - **The delta is arithmetic, not judgement.** `ObservationDelta.classify` groups a person's window by
   artifact, treats the newest run of each artifact as "now", and returns `NEW`, `RECURRING` (still
   there and the assessment or severity moved), `UNCHANGED` (still there, nothing moved) or `RESOLVED`.
-  `RESOLVED` is the whole reason it exists: *"the gap from last week is closed"* originates from a locus
+  `RESOLVED` is the whole reason it exists: _"the gap from last week is closed"_ originates from a locus
   that is in the prior set and absent from the newest run, so no mapping that walks this run's
-  observations can ever reach it. A vanished *strength* is deliberately not `RESOLVED` — that would
+  observations can ever reach it. A vanished _strength_ is deliberately not `RESOLVED` — that would
   credit somebody with fixing what was already right. And because the recurrence key folds the artifact
   id, the delta can never say "this keeps happening across your work"; that claim comes from the staged
   observation history, and the composer has to clear a distinct-artifact floor to make it.
@@ -294,29 +296,29 @@ Three properties of that list matter more than the paths:
 
 `FeedbackChannel` is not three renderers of one message. Each value is a different level of Hattie &
 Timperley's model, which is why the mapping from observations to feedback is not 1:1 in either
-direction. All three names answer one question — *where does this land?* — and
+direction. All three names answer one question — _where does this land?_ — and
 [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)
 records why the lane once called `REFLECTION` is not named for what the developer is meant to do with it.
 
-| | `IN_CONTEXT` | `IN_APP` | `IN_CHAT` |
-| --- | --- | --- | --- |
-| Lands | on the work artifact — pull request summary or inline note, issue comment | on the developer's own practice pages | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
-| Level | task | process | self-regulation |
-| Answers | "what is wrong here?" | "what keeps happening in how I work?" | "how would I have caught this myself?" |
-| Audience | public — the team reads it | private, to the developer alone | private, in a live mentor turn |
-| Evidence is | a quoted line, spliced by the server from the citation | several pieces of work, named | the same, held back until they answer |
-| Next step is | one edit, in this change | a habit, for next time | a self-check they commit to |
-| `whyItMatters` | appended verbatim by the server | situated by the composer, never appended | not used |
-| Anchor | required, and only onto this change's diff | forbidden | forbidden |
-| Messages per run | at most 3 | at most 2 | at most 3 |
+|                  | `IN_CONTEXT`                                                              | `IN_APP`                                 | `IN_CHAT`                                                                                        |
+| ---------------- | ------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Lands            | on the work artifact — pull request summary or inline note, issue comment | on the developer's own practice pages    | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
+| Level            | task                                                                      | process                                  | self-regulation                                                                                  |
+| Answers          | "what is wrong here?"                                                     | "what keeps happening in how I work?"    | "how would I have caught this myself?"                                                           |
+| Audience         | public — the team reads it                                                | private, to the developer alone          | private, in a live mentor turn                                                                   |
+| Evidence is      | a quoted line, spliced by the server from the citation                    | several pieces of work, named            | the same, held back until they answer                                                            |
+| Next step is     | one edit, in this change                                                  | a habit, for next time                   | a self-check they commit to                                                                      |
+| `whyItMatters`   | appended verbatim by the server                                           | situated by the composer, never appended | not used                                                                                         |
+| Anchor           | required, and only onto this change's diff                                | forbidden                                | forbidden                                                                                        |
+| Messages per run | at most 3                                                                 | at most 2                                | at most 3                                                                                        |
 
-**The mentor renders in the app too, and that does not make it `IN_APP`.** `IN_CHAT` is the *dialogic*
+**The mentor renders in the app too, and that does not make it `IN_APP`.** `IN_CHAT` is the _dialogic_
 channel — the unit becomes a turn the developer can answer — wherever the conversation runs. `IN_APP` is
-the *non-dialogic* practice surface — the unit is written down, and reading it is the whole interaction.
-Ask *is it a turn?* before asking *which screen?*: a new written surface inside Hephaestus is `IN_APP`,
+the _non-dialogic_ practice surface — the unit is written down, and reading it is the whole interaction.
+Ask _is it a turn?_ before asking _which screen?_: a new written surface inside Hephaestus is `IN_APP`,
 and a mentor that moves to another chat product is still `IN_CHAT`.
 
-Two of the rows are the load-bearing ones. The public lane never says *"you keep doing this"* — that
+Two of the rows are the load-bearing ones. The public lane never says _"you keep doing this"_ — that
 is a performance review in front of the team — even though the composer knows it. The private lanes
 never re-quote a line of code, because the line is already on the merge request where it can be read
 in context. Neither rule is achievable by templating one advice string over three surfaces, which is
@@ -327,13 +329,24 @@ the complement of `IN_CONTEXT` rather than as a list — a fourth channel would 
 is the safe direction. The per-lane message caps above restate caps the lanes themselves own;
 `FeedbackCompositionCapsTest` is what stops the two copies drifting.
 
-`IN_CHAT` is composed as a **move**, not a script: an `opener` (a question asked before anything
-is told), the `evidence` (shown only once they answer), and the `target` (what the turn should leave
-them able to do). It is stored as JSON on `feedback.body` via `ConversationBriefBody` and handed to the
-mentor under a `move` key by `PreparedConversationFeedbackContentSource` — deliberately never under
-`body` or `message`, because it is not text to speak. The mentor still writes the words of the turn, so
-nothing goes stale waiting to be raised. A unit with no composed move has that key **missing**, not
-empty, so "the composer said nothing here" cannot read as "the composer had nothing to say".
+`IN_CHAT` is composed as **notes to the mentor**, not as a turn: the `situation` (factual, artifacts
+named, never addressed to the developer as "you"), the `capability` (the useful understanding or
+behaviour the conversation should support), the `evidenceSummary` (checked against the separately staged
+observation evidence), and the `inConversationSignal` (an observable sign that the conversation helped). The rule the field names
+enforce is that you write what the mentor needs to know, never a sentence for it to say — anything phrased
+as a line of dialogue gets spoken and sounds like a script.
+
+The notes are stored as JSON on `feedback.body` via `ConversationBriefBody` and handed to the mentor under
+a `notes` key by `PreparedConversationFeedbackContentSource`; the composed title is staged separately as
+`topic`. Neither is placed under `body` or
+`message`, because none of it is text to speak. The mentor re-composes the whole turn against the live
+conversation, so nothing goes stale waiting to be raised. A unit with no composed notes has that key
+**missing**, not empty, so "the composer said nothing here" cannot read as "the composer had nothing to
+say".
+
+`ConversationBriefBody` accepts exactly this shape. There are no field aliases, version readers, or fallback
+conversation schemas: producer, parser, persistence and mentor context share the same four names, and a
+structural test fails when the Java record, runner schema and composer prompt drift.
 
 ### What the composer is not allowed to do
 
@@ -345,19 +358,19 @@ is dropped and logged.
 - **No verdict fields.** `report_feedback` takes no presence, assessment, severity or confidence. An
   intervention that could carry a verdict would eventually be read back as one.
 - **No typed citation, path or line number.** An `IN_CONTEXT` unit names `{ observationId,
-  citationIndex }` and the server resolves the file, side and line from that observation's own
+citationIndex }` and the server resolves the file, side and line from that observation's own
   citation — and refuses a citation whose `anchorable` flag is false, meaning it does not fall inside
-  this change's diff. The composer therefore *cannot* invent an anchor, which retires the class of
+  this change's diff. The composer therefore _cannot_ invent an anchor, which retires the class of
   failure that grounding checks previously had to catch after the fact.
 - **No invented supersession target.** `action: "SUPERSEDE"` must name a `threadKey` that was staged in
   `prepared.json`.
 - **No second message on the same lane about the same practice.** One unit per `(channel,
-  practiceSlug)`; the rest are dropped.
+practiceSlug)`; the rest are dropped.
 
 Staying quiet is the fourth action, not a gap: `action: "WITHHOLD"` with `NO_MATERIAL_CHANGE`,
 `ALREADY_SAID` or `BELOW_BAR`. That enum is deliberately **not** `FeedbackSuppressionReason` — a
 withhold reason is the composer's own judgement, and `FeedbackSuppressionReason` is a database check
-constraint listing reasons the *server* refused. Merging them would make "we had nothing worth saying"
+constraint listing reasons the _server_ refused. Merging them would make "we had nothing worth saying"
 indistinguishable from "the tier held it back".
 
 ### Supersession — nothing received may be un-said
@@ -372,13 +385,13 @@ runs `UPDATE feedback SET delivery_state='SUPERSEDED' WHERE id = ? AND delivery_
 retrying a bounded number of times while the head of the thread keeps moving. There are three outcomes
 and **the new unit is written in all three**:
 
-| Outcome | What happened | `replaces_id` |
-| --- | --- | --- |
-| `SUPERSEDED` | A queued message was claimed and retired | the retired row |
-| `CONTINUED` | The recipient read it first; it keeps `DELIVERED` | the row that was read |
-| `NEW` | Nothing live on the thread | not set |
+| Outcome      | What happened                                     | `replaces_id`         |
+| ------------ | ------------------------------------------------- | --------------------- |
+| `SUPERSEDED` | A queued message was claimed and retired          | the retired row       |
+| `CONTINUED`  | The recipient read it first; it keeps `DELIVERED` | the row that was read |
+| `NEW`        | Nothing live on the thread                        | not set               |
 
-`DELIVERED` is never retired on the longitudinal lanes, because on those lanes delivered means *read*.
+`DELIVERED` is never retired on the longitudinal lanes, because on those lanes delivered means _read_.
 The in-context lane still retires a `DELIVERED` summary, and that is not an exception to the rule: the
 provider comment is **edited in place**, so the old text stops being visible and the ledger has to say
 so.
@@ -401,10 +414,12 @@ mid-flight still leaves behind what it had already decided — and it is written
 Each lane absorbs that differently, and the difference is the design:
 
 - **In context has a fallback, so it needs no durability.** `DeliveryComposer` prefers the composed
-  unit for a practice and otherwise renders the finding's own `reasoning` and `guidance`. That fallback
-  is not a degraded stub — it is exactly the comment that shipped before composition existed. **This is
-  why `report_finding` still requires `guidance` even though `guidance` is still not a column:** it is
-  the floor under a stage that is permitted to fail.
+  unit for a practice and otherwise renders the observation's own `evidenceRationale`, with the catalogue's
+  "why this matters" under it. **The fallback carries no next step, because no measurement writes one.**
+  An uncomposed practice tells the developer what was seen at that locus and stops — that is the honest
+  output of a stage that was not asked what to do, and it is the price of not biasing the measurement.
+  What the composer will never post is the shell of a note: an observation whose `evidenceRationale` scrubs away
+  to nothing places no inline comment at all, and lands in full in the summary instead.
 - **The longitudinal lanes have no fallback, so they are made durable instead.** `agent_job` carries a
   per-lane preparation mark recording that a lane ran at all, and
   `FeedbackLanePreparationSweeper` re-runs any lane whose async listener did not. It selects on the
@@ -442,7 +457,7 @@ flowchart LR
   observations are dropped before a body is composed, so nothing is sent and nothing is stored to send later.
   The tier is the **effective** one, resolved practice → area → workspace, because either of the first two
   levels may hold no opinion. Withheld here means `PRACTICE_TIER_QUIET`. There is no second, unordered
-  axis narrowing *where* a delivering practice may speak: `DELIVER` delivers wherever the reviewed work
+  axis narrowing _where_ a delivering practice may speak: `DELIVER` delivers wherever the reviewed work
   allows, and that is the whole decision.
 - **`ObservationOrigin`** — `LIVE` and `MANUAL` deliver everywhere; `BACKFILL` is entitled only to
   `IN_APP`. Withheld here means `BACKFILL_QUIET`.
@@ -452,7 +467,7 @@ a habit that recurs across several pieces of their work is named along with what
 time. It is composed, admitted and stored per developer and served to that developer alone from
 `GET /practices/feedback/in-app`; the developer's practice pages are where it will surface. Its body is
 the only text the system composes that is read verbatim by a named person who is its sole audience —
-`IN_CONTEXT` bodies are already public on the work, and an `IN_CHAT` body holds a *move* for the mentor
+`IN_CONTEXT` feedback is already public on the work, and `IN_CHAT` stores structured notes for the mentor
 rather than words for the developer (and is NULL when nothing was composed for the lane) — so an
 ArchUnit rule (`InAppChannelProducerArchTest`) keeps the set of classes that may write one or read one
 back small and named, and `ReviewFeedbackQueryService` withholds the body from every operator surface. The `BACKFILL` entitlement is a ceiling, not an instruction: a
@@ -466,7 +481,7 @@ constant (`ARTIFACT_DRAFT`) kept only so old rows still read back.
 
 ## Who does what, and where
 
-The most counter-intuitive facts about this system are all about *where* code runs, and none of them are
+The most counter-intuitive facts about this system are all about _where_ code runs, and none of them are
 visible from the class names.
 
 ```mermaid
@@ -497,7 +512,7 @@ sequenceDiagram
   review path.
 - **Evidence capture runs on the claiming worker, not on the server.** `handler.prepareInputs` — and
   therefore `WorkspaceContextBuilder` and `ContextManifestBuilder` — is called from `AgentJobExecutor`
-  after the claim. The beans themselves carry no runtime-role condition; it is the *call chain* that is
+  after the claim. The beans themselves carry no runtime-role condition; it is the _call chain_ that is
   worker-exclusive. The operational consequence is easy to miss: **the worker reads the repository clone
   from its own disk**, so a worker without checkout enabled and without the fabric volume captures a
   degraded tree and says so in the manifest.
@@ -523,7 +538,7 @@ The durable boundaries, which the implementation may reschedule freely behind:
   [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
 - **Workspace ABI** — the sandbox receives read-only `inputs/`, disposable `work/`, and returns only
   `out/`. [Agent workspace ABI](agent/workspace-abi.mdx) is the source of truth for paths and exit codes.
-- **Observations** — the agent reports through `report_finding` (the sandbox contract keeps the older word);
+- **Observations** — the agent reports through `report_observation`;
   `PracticeDetectionResultParser` validates and never throws, and persistence assigns occurrence and
   recurrence identity.
 - **Feedback** — the agent reports through `report_feedback` in a second session;
@@ -555,7 +570,7 @@ workspace:
 So a practice at `PROPOSE` is `REVIEWED` with `observationCount > 0`, `deliveredCount = 0` and
 `PRACTICE_TIER_QUIET` in `withheldReasons` — measured, and deliberately quiet. That trio is how a held
 observation reaches a reader at all; the `SUPPRESSED` ledger row behind it is storage, not a screen.
-`TURNED_OFF` is the workspace's own choice and is checked *before* any mechanical
+`TURNED_OFF` is the workspace's own choice and is checked _before_ any mechanical
 reason, so it never masks one. It is not called `SILENCED`: silence is what `PROPOSE` does, and
 `PRACTICE_TIER_QUIET` already covers it.
 

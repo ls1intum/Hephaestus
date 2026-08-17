@@ -49,9 +49,9 @@ public class ConversationalDeliveryReconciler {
         this.visibilityPolicy = visibilityPolicy;
     }
 
-    public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedFindingIds) {
+    public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedObservationIds) {
         Instant now = Instant.now();
-        for (Observation observation : admitted(workspaceId, linkedFindingIds).values()) {
+        for (Observation observation : admitted(workspaceId, linkedObservationIds).values()) {
             UUID observationId = observation.getId();
             List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
                 workspaceId,
@@ -96,12 +96,12 @@ public class ConversationalDeliveryReconciler {
     }
 
     /**
-     * The linked findings this turn may act on: the observations this workspace can read whose claim and
+     * The linked observations this turn may act on: the observations this workspace can read whose claim and
      * evidence the visibility policy still permits for mentoring, keyed by id, in the mentor's emission
      * order.
      *
-     * <p>{@code linkedFindingIds} is the mentor's raw tool output — {@code link_finding} carries whatever
-     * UUID the model emitted, and nothing between the tool call and here checks it against the findings the
+     * <p>{@code linkedObservationIds} is the mentor's raw tool output — {@code link_observation} carries whatever
+     * UUID the model emitted, and nothing between the tool call and here checks it against the observations the
      * turn's context was actually served ({@code PiEventToUiChunkTranslator} only parses it as a UUID). This
      * gate is therefore the only thing standing between a model-chosen id and a write to the feedback
      * ledger, and <em>both</em> endings of a turn are ledger writes — one flips a unit to DELIVERED, the
@@ -113,16 +113,16 @@ public class ConversationalDeliveryReconciler {
      * spend the developer's coaching on a condition that may lift tomorrow. The unit behind a refused id is
      * still settled, by {@link ConversationFeedbackTtlSweeper} at the end of its window.
      *
-     * <p>Two queries for the whole turn, not one per linked id — nothing caps how many findings a mentor
-     * turn links (TranslatorState appends a row per {@code link_finding} tool call).
+     * <p>Two queries for the whole turn, not one per linked id — nothing caps how many observations a mentor
+     * turn links (TranslatorState appends a row per {@code link_observation} tool call).
      */
-    private Map<UUID, Observation> admitted(long workspaceId, List<UUID> linkedFindingIds) {
-        if (linkedFindingIds == null || linkedFindingIds.isEmpty()) {
+    private Map<UUID, Observation> admitted(long workspaceId, List<UUID> linkedObservationIds) {
+        if (linkedObservationIds == null || linkedObservationIds.isEmpty()) {
             return Map.of();
         }
-        // Emission order, deduplicated: the first linked finding that survives every gate wins the turn, so
+        // Emission order, deduplicated: the first linked observation that survives every gate wins the turn, so
         // the order the mentor linked them in is part of the answer and must survive the batching below.
-        Set<UUID> observationIds = new LinkedHashSet<>(linkedFindingIds);
+        Set<UUID> observationIds = new LinkedHashSet<>(linkedObservationIds);
         List<Observation> rows = observationRepository.findAllByIdInAndWorkspaceId(observationIds, workspaceId);
         Map<UUID, Observation> byId = new HashMap<>(rows.size());
         for (Observation observation : rows) {
@@ -147,13 +147,13 @@ public class ConversationalDeliveryReconciler {
     /**
      * Silent Mode permanently suppresses the unit instead of postponing it: the mentor had this to say and
      * the instance stopped it, which is a different answer to "why was nothing said" than "it is still
-     * queued". Walks the same {@link #admitted} findings {@link #reconcile} may act on: a linked id that
+     * queued". Walks the same {@link #admitted} observations {@link #reconcile} may act on: a linked id that
      * subsystem is not allowed to raise is not one Silent Mode gets to claim it stopped. It does not repeat
      * that method's recurrence-key rule — "already said inline" is about what to say next, and nothing is
      * being said.
      */
-    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedFindingIds) {
-        for (UUID observationId : admitted(workspaceId, linkedFindingIds).keySet()) {
+    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedObservationIds) {
+        for (UUID observationId : admitted(workspaceId, linkedObservationIds).keySet()) {
             List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
                 workspaceId,
                 recipientUserId,

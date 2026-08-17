@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 /**
  * The two persisted identities of one {@link de.tum.cit.aet.hephaestus.practices.model.Observation}, stamped
- * onto a finding by the handler so downstream stages address the stored row without recomputing either key.
+ * onto an observation by the handler so downstream stages address the stored row without recomputing either key.
  *
  * @param occurrenceKey this observation alone ({@code observation.occurrence_key}, uniquely constrained) —
  *     the key to use whenever a single observation must be addressed

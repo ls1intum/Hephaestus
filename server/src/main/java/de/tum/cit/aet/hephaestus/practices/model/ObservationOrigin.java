@@ -31,7 +31,7 @@ public enum ObservationOrigin {
      * travels only where <em>both</em> admit it.
      *
      * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#IN_APP} and nothing else: posting a
-     * backfilled finding in context would notify everyone subscribed to a merged pull request about work
+     * backfilled observation in context would notify everyone subscribed to a merged pull request about work
      * nobody can act on.
      *
      * <p>The IN_APP entitlement is a ceiling, not an instruction. That lane now has a producer, and it

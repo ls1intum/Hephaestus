@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -143,7 +143,7 @@ class FeedbackDeliveryService {
             }
             return;
         }
-        List<InlineFindingChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
+        List<InlineFeedbackChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
 
         if (summaryOutcome == SummaryOutcome.DELIVERED && !inlineResult.suppressed()) {
             reEditSummaryWithSignals(job, summaryComposer, inlineSignals, trend);
@@ -288,7 +288,7 @@ class FeedbackDeliveryService {
     private void reEditSummaryWithSignals(
         AgentJob job,
         @Nullable InlineAwareSummaryComposer summaryComposer,
-        List<InlineFindingChannel.DeliveredSignal> inlineSignals,
+        List<InlineFeedbackChannel.DeliveredSignal> inlineSignals,
         @Nullable TrendDelta trend
     ) {
         String summaryRef = job.getDeliveryCommentId();
@@ -297,8 +297,8 @@ class FeedbackDeliveryService {
         }
         Set<String> deliveredKeys = inlineSignals
             .stream()
-            .filter(signal -> signal.disposition() != InlineFindingChannel.Disposition.FAILED)
-            .map(InlineFindingChannel.DeliveredSignal::recurrenceKey)
+            .filter(signal -> signal.disposition() != InlineFeedbackChannel.Disposition.FAILED)
+            .map(InlineFeedbackChannel.DeliveredSignal::recurrenceKey)
             .filter(key -> key != null && !key.isBlank())
             .collect(Collectors.toSet());
         if (deliveredKeys.isEmpty()) {

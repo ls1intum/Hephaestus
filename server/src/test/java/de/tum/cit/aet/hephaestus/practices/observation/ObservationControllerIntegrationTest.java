@@ -132,7 +132,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             presence,
             assessmentFor(presence),
             severity,
-            confidence,
             DIFF_EVIDENCE_JSON,
             "Test reasoning for " + title,
             null,
@@ -210,7 +209,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("My finding")
                 .jsonPath("$.totalElements")
                 .isEqualTo(1);
@@ -233,7 +232,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Practice A")
                 .jsonPath("$.content[0].practiceSlug")
                 .isEqualTo("pr-description-quality");
@@ -256,7 +255,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Bad");
         }
 
@@ -282,7 +281,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("A neg")
                 .jsonPath("$.content[0].practiceSlug")
                 .isEqualTo("pr-description-quality")
@@ -411,14 +410,12 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo("scm.pull_request")
                 .jsonPath("$.content[0].artifactId")
                 .isEqualTo(42)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Shape check")
                 .jsonPath("$.content[0].presence")
                 .isEqualTo("ABSENT")
                 .jsonPath("$.content[0].severity")
                 .isEqualTo("MAJOR")
-                .jsonPath("$.content[0].confidence")
-                .isEqualTo(0.85)
                 .jsonPath("$.content[0].observedAt")
                 .isNotEmpty()
                 // Internal fields must not leak
@@ -428,9 +425,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .doesNotExist()
                 .jsonPath("$.content[0].evidence")
                 .doesNotExist()
-                .jsonPath("$.content[0].reasoning")
+                .jsonPath("$.content[0].evidenceRationale")
                 .doesNotExist()
-                .jsonPath("$.content[0].guidance")
+                .jsonPath("$.content[0].deliveredFeedback")
                 .doesNotExist();
         }
 
@@ -476,11 +473,11 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Newest")
-                .jsonPath("$.content[1].title")
+                .jsonPath("$.content[1].summary")
                 .isEqualTo("Middle")
-                .jsonPath("$.content[2].title")
+                .jsonPath("$.content[2].summary")
                 .isEqualTo("Oldest");
         }
 
@@ -531,7 +528,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.8f,
                 null,
                 "reasoning",
                 null,
@@ -550,7 +546,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("My WS finding")
                 .jsonPath("$.totalElements")
                 .isEqualTo(1);
@@ -714,14 +710,12 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.id")
                 .isEqualTo(findingId.toString())
-                .jsonPath("$.title")
+                .jsonPath("$.summary")
                 .isEqualTo("Detailed finding")
                 .jsonPath("$.presence")
                 .isEqualTo("ABSENT")
                 .jsonPath("$.severity")
                 .isEqualTo("MAJOR")
-                .jsonPath("$.confidence")
-                .isEqualTo(0.85)
                 .jsonPath("$.practiceSlug")
                 .isEqualTo("pr-description-quality")
                 .jsonPath("$.practiceName")
@@ -730,9 +724,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo("scm.pull_request")
                 .jsonPath("$.artifactId")
                 .isEqualTo(42)
-                .jsonPath("$.reasoning")
+                .jsonPath("$.evidenceRationale")
                 .isEqualTo("Test reasoning for Detailed finding")
-                .jsonPath("$.guidance")
+                .jsonPath("$.deliveredFeedback")
                 .isEqualTo("Split this PR so each change reviews on its own.")
                 .jsonPath("$.observedAt")
                 .isNotEmpty()
@@ -809,7 +803,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.9f,
                 evidenceJson,
                 "reasoning",
                 null,
@@ -855,7 +848,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.9f,
                 arrayEvidenceJson,
                 "reasoning",
                 null,
@@ -871,7 +863,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.title")
+                .jsonPath("$.summary")
                 .isEqualTo("Array evidence finding")
                 .jsonPath("$.evidence")
                 .doesNotExist();
@@ -951,9 +943,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.length()")
                 .isEqualTo(2)
-                .jsonPath("$[0].title")
+                .jsonPath("$[0].summary")
                 .isEqualTo("PR finding 1")
-                .jsonPath("$[1].title")
+                .jsonPath("$[1].summary")
                 .isEqualTo("PR finding 2");
         }
 
@@ -996,11 +988,11 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.length()")
                 .isEqualTo(2)
-                .jsonPath("$[0].title")
+                .jsonPath("$[0].summary")
                 .isEqualTo("My PR finding")
                 .jsonPath("$[0].presence")
                 .isEqualTo("PRESENT")
-                .jsonPath("$[1].title")
+                .jsonPath("$[1].summary")
                 .isEqualTo("Their PR finding")
                 .jsonPath("$[1].presence")
                 .isEqualTo("ABSENT");
@@ -1057,9 +1049,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$[0].title")
+                .jsonPath("$[0].summary")
                 .isEqualTo("New")
-                .jsonPath("$[1].title")
+                .jsonPath("$[1].summary")
                 .isEqualTo("Old");
         }
 
@@ -1114,7 +1106,6 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.8f,
                 null,
                 "reasoning",
                 null,
@@ -1133,7 +1124,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.length()")
                 .isEqualTo(1)
-                .jsonPath("$[0].title")
+                .jsonPath("$[0].summary")
                 .isEqualTo("WS1 PR finding");
         }
     }
@@ -1185,7 +1176,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo(practiceA.getSlug())
                 .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].toWorkOn[0].title")
+                .jsonPath("$[0].toWorkOn[0].summary")
                 .isEqualTo("Thin PR description")
                 .jsonPath("$[0].toWorkOn[0].severity")
                 .isEqualTo("MAJOR")
@@ -1195,7 +1186,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo(practiceB.getSlug())
                 .jsonPath("$[1].standing")
                 .isEqualTo("STRENGTH")
-                .jsonPath("$[1].strengths[0].title")
+                .jsonPath("$[1].strengths[0].summary")
                 .isEqualTo("Thorough review")
                 .jsonPath("$[1].toWorkOn.length()")
                 .isEqualTo(0);

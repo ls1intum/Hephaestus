@@ -66,7 +66,7 @@ final class ProgressFooterRenderer {
     }
 
     private static String titleOf(LocusTransition t) {
-        String title = t.title();
+        String title = t.summary();
         if (title == null || title.isBlank()) {
             return t.practiceSlug();
         }

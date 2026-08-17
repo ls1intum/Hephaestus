@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.annotation.JsonSubTypes;
 import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.annotation.JsonValue;
+import java.util.Objects;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;
 import tools.jackson.databind.JsonNode;
@@ -34,7 +35,7 @@ import tools.jackson.databind.JsonNode;
         @JsonSubTypes.Type(value = UIMessageChunk.ToolOutputError.class, name = "tool-output-error"),
         @JsonSubTypes.Type(value = UIMessageChunk.Error.class, name = "error"),
         @JsonSubTypes.Type(value = UIMessageChunk.DataMentorStatus.class, name = "data-mentor-status"),
-        @JsonSubTypes.Type(value = UIMessageChunk.DataFinding.class, name = "data-finding"),
+        @JsonSubTypes.Type(value = UIMessageChunk.DataObservation.class, name = "data-observation"),
     }
 )
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -208,19 +209,24 @@ public sealed interface UIMessageChunk {
     }
 
     /**
-     * Hephaestus-specific data part emitted when Pi calls the {@code link_finding} custom tool.
-     * Permanent (NOT transient) — the linked-finding chip is part of the message history.
-     * Carries the finding id both at the top-level {@code id} (for AI SDK deduplication) and
+     * Hephaestus-specific data part emitted when Pi calls the {@code link_observation} custom tool.
+     * Permanent (NOT transient) — the linked-observation chip is part of the message history.
+     * Carries the observation id both at the top-level {@code id} (for AI SDK deduplication) and
      * inside the {@code data} envelope.
      */
-    record DataFinding(
-        @Nullable @JsonProperty("id") UUID id,
-        @JsonProperty("data") DataFindingPayload data
+    record DataObservation(
+        @JsonProperty("id") UUID id,
+        @JsonProperty("data") DataObservationPayload data
     ) implements UIMessageChunk {
-        public record DataFindingPayload(UUID findingId) {}
+        public DataObservation {
+            Objects.requireNonNull(id, "id");
+            Objects.requireNonNull(data, "data");
+        }
 
-        public static DataFinding of(UUID findingId) {
-            return new DataFinding(findingId, new DataFindingPayload(findingId));
+        public record DataObservationPayload(UUID observationId) {}
+
+        public static DataObservation of(UUID observationId) {
+            return new DataObservation(observationId, new DataObservationPayload(observationId));
         }
     }
 }

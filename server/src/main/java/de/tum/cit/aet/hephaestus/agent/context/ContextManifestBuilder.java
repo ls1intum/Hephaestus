@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReason;
 import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.PracticeSubjectCheck;
 import de.tum.cit.aet.hephaestus.evidence.RequiredCaptureQuality;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
 import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceState;
@@ -120,6 +121,7 @@ public class ContextManifestBuilder {
     private final FabricLayout layout;
     private final JsonMapper objectMapper;
     private final ArtifactSourceCatalogRegistry catalogs;
+    private final PracticeSubjectEvaluator subjectEvaluator;
     private final Clock clock;
 
     public ContextManifestBuilder(
@@ -127,12 +129,14 @@ public class ContextManifestBuilder {
         FabricLayout layout,
         JsonMapper objectMapper,
         ArtifactSourceCatalogRegistry catalogs,
+        PracticeSubjectEvaluator subjectEvaluator,
         Clock clock
     ) {
         this.cas = cas;
         this.layout = layout;
         this.objectMapper = objectMapper;
         this.catalogs = catalogs;
+        this.subjectEvaluator = subjectEvaluator;
         this.clock = clock;
     }
 
@@ -247,13 +251,15 @@ public class ContextManifestBuilder {
         List<Practice> practices,
         String jobId,
         Instant temporalAnchor,
-        @Nullable SignalName signal
+        @Nullable SignalName signal,
+        Map<String, byte[]> staged
     ) {
         AutomatedReviewReadinessResult result = checkAutomatedReviewReadiness(
             manifest,
             practices,
             temporalAnchor,
-            signal
+            signal,
+            staged
         );
         if (result.decisions().isEmpty()) {
             throw new IllegalArgumentException("Cannot persist an empty automated-review readiness report");
@@ -280,12 +286,13 @@ public class ContextManifestBuilder {
         ArtifactSourceManifest manifest,
         List<Practice> practices
     ) {
-        return checkAutomatedReviewReadiness(manifest, practices, clock.instant(), null);
+        return checkAutomatedReviewReadiness(manifest, practices, clock.instant(), null, Map.of());
     }
 
     /**
-     * @param signal what occasioned the review, which decides which of each practice's bindings speaks
-     *               for it; {@code null} means nobody named an occasion and every binding does
+     * Readiness judged without the staged bytes, which makes every subject declaration undecidable and
+     * therefore asks every practice whose evidence is readable. The safe reading for a caller — a
+     * replay, a test — that holds a manifest but not the capture it describes.
      */
     public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
         ArtifactSourceManifest manifest,
@@ -293,7 +300,24 @@ public class ContextManifestBuilder {
         Instant temporalAnchor,
         @Nullable SignalName signal
     ) {
+        return checkAutomatedReviewReadiness(manifest, practices, temporalAnchor, signal, Map.of());
+    }
+
+    /**
+     * @param signal what occasioned the review, which decides which of each practice's bindings speaks
+     *               for it; {@code null} means nobody named an occasion and every binding does
+     * @param staged the capture's own bytes, from which a practice's declared subject is decided. Empty
+     *               means "not supplied", which leaves every subject undecided and every practice asked
+     */
+    public AutomatedReviewReadinessResult checkAutomatedReviewReadiness(
+        ArtifactSourceManifest manifest,
+        List<Practice> practices,
+        Instant temporalAnchor,
+        @Nullable SignalName signal,
+        Map<String, byte[]> staged
+    ) {
         Objects.requireNonNull(temporalAnchor, "temporalAnchor");
+        Objects.requireNonNull(staged, "staged");
         // A manifest recorded under a source contract this runtime no longer ships is unreplayable
         // rather than invalid: the recorded decision remains correct for the evidence it was made on.
         // Declining to re-derive a readiness result is correct; failing as though the evidence were
@@ -401,12 +425,29 @@ public class ContextManifestBuilder {
                     )
                 );
             }
+            // The subject is asked about last, and only of a practice that would otherwise be asked.
+            // "We could not read what this needs" outranks "there was nothing of this kind here",
+            // because a capture we could not read cannot establish the second: judging the subject over
+            // it would dress an instrument failure up as a fact about somebody's work.
+            boolean readableAndDeclared =
+                decisionReasons.isEmpty() && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements);
+            PracticeSubjectCheck subjectCheck = readableAndDeclared
+                ? subjectEvaluator.evaluate(
+                      PracticeBinding.subjectFor(practice.getBindings(), signal),
+                      manifest,
+                      staged
+                  )
+                : null;
+            if (subjectCheck != null && subjectCheck.absent()) {
+                decisionReasons.add(AutomatedReviewReadinessReason.SUBJECT_NOT_IN_THE_WORK);
+            }
             AutomatedReviewReadinessDecision decision = new AutomatedReviewReadinessDecision(
                 practice.getSlug(),
                 checkedAt,
                 decisionReasons.isEmpty() && sourceChecks.stream().allMatch(SourceReadinessCheck::meetsRequirements),
                 decisionReasons,
-                sourceChecks
+                sourceChecks,
+                subjectCheck
             );
             decisions.add(decision);
             if (decision.ready()) ready.add(practice);

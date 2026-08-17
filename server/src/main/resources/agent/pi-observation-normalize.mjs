@@ -107,20 +107,6 @@ export function carriesValence(presence) {
     return presence === "PRESENT" || presence === "ABSENT";
 }
 
-export function normalizeDiffNote(note) {
-    if (!note || typeof note !== "object") throw new Error("diff note must be an object");
-    const filePath = String(note.filePath ?? "").trim();
-    const startLine = Number(note.startLine);
-    const endLine = note.endLine == null ? startLine : Number(note.endLine);
-    const body = String(note.body ?? "").trim();
-    if (!filePath) throw new Error("diff note filePath is required");
-    if (!Number.isInteger(startLine) || startLine <= 0)
-        throw new Error("diff note startLine must be a positive integer");
-    if (!Number.isInteger(endLine) || endLine < startLine) throw new Error("diff note endLine must be >= startLine");
-    if (!body) throw new Error("diff note body is required");
-    return { filePath, startLine, endLine, body };
-}
-
 /**
  * The recorded scope of a search that came up empty. An ABSENT observation is a universal claim —
  * "it is not there" — and the one thing a fragment of a corpus can never support. Narrating the
@@ -156,8 +142,7 @@ export function normalizeSearch(search) {
  * choosing, which is the only moment the choice can be made well.
  */
 export function normalizeInapplicability(inapplicability) {
-    if (!inapplicability || typeof inapplicability !== "object")
-        throw new Error("inapplicability is required");
+    if (!inapplicability || typeof inapplicability !== "object") throw new Error("inapplicability is required");
     const consulted = Array.isArray(inapplicability.consulted)
         ? inapplicability.consulted.map((kind) => String(kind ?? "").trim()).filter(Boolean)
         : [];
@@ -250,63 +235,86 @@ export function normalizeUndecidability(undecidability) {
     return { openQuestion, wouldSettleIt };
 }
 
-export function normalizeFinding(finding) {
-    if (!finding || typeof finding !== "object") throw new Error("finding must be an object");
-    const practiceSlug = String(finding.practiceSlug ?? "")
+export function normalizeObservation(observation) {
+    if (!observation || typeof observation !== "object") throw new Error("observation must be an object");
+    const allowed = new Set(["practiceSlug", "summary", "outcome", "evidence", "evidenceRationale"]);
+    const unknown = Object.keys(observation).filter((key) => !allowed.has(key));
+    if (unknown.length) throw new Error(`unknown observation field(s): ${unknown.join(", ")}`);
+    const practiceSlug = String(observation.practiceSlug ?? "")
         .trim()
         .toLowerCase()
         .replace(/_/g, "-");
-    const title = String(finding.title ?? "").trim();
-    const presence = String(finding.presence ?? "")
+    const title = String(observation.summary ?? "").trim();
+    const reasoning = String(observation.evidenceRationale ?? "").trim();
+    const outcome = String(observation.outcome ?? "")
         .trim()
         .toUpperCase();
-    // NOT_APPLICABLE and INCONCLUSIVE are both silence and carry no direction; the Java parser
-    // nulls any assessment attached to either, so drop it here rather than demanding one.
+    let presence;
+    let assessment = null;
+    let severity = "INFO";
+    if (outcome === "NO_REVIEW_OCCASION") presence = "NOT_APPLICABLE";
+    else if (outcome === "INSUFFICIENT_EVIDENCE") presence = "INCONCLUSIVE";
+    else {
+        const match = /^BEHAVIOR_(PRESENT|ABSENT)_(GOOD|BAD)(?:_(MINOR|MAJOR|CRITICAL))?$/.exec(outcome);
+        if (!match) throw new Error(`invalid outcome '${outcome}'`);
+        presence = match[1];
+        assessment = match[2];
+        if (assessment === "BAD") {
+            if (!match[3]) throw new Error("BAD outcome requires a severity suffix");
+            severity = match[3];
+        } else if (match[3]) {
+            throw new Error("GOOD outcome must not carry severity");
+        }
+    }
     const hasValence = carriesValence(presence);
-    const assessment = hasValence
-        ? String(finding.assessment ?? "")
-              .trim()
-              .toUpperCase()
-        : null;
-    // severity is meaningful only for assessment=BAD; default INFO when absent (parser re-derives it).
-    const severity = finding.severity == null ? "INFO" : String(finding.severity).trim().toUpperCase() || "INFO";
-    const reasoning = String(finding.reasoning ?? "").trim();
-    // OPTIONAL, and deliberately so. Since composition authors the developer-facing text, guidance
-    // survives only as the fallback body of an in-context note (DeliveryComposer.appendBody), which is
-    // null-safe. Demanding one on every finding made the measurement step invent a next step for
-    // strengths, for NOT_APPLICABLE and for INCONCLUSIVE — a standing pull toward "something is wrong"
-    // on exactly the three answers that assert nothing is. Blank collapses to absent so the Java side
-    // sees one shape, not two.
-    const guidance = String(finding.guidance ?? "").trim();
     if (!practiceSlug) throw new Error("practiceSlug is required");
-    if (!title) throw new Error("title is required");
-    if (!PRESENCE_VALUES.includes(presence)) throw new Error(`invalid presence '${presence}'`);
-    if (hasValence && !ASSESSMENT_VALUES.includes(assessment)) throw new Error(`invalid assessment '${assessment}'`);
-    if (!SEVERITY_VALUES.includes(severity)) throw new Error(`invalid severity '${severity}'`);
-    if (!reasoning) throw new Error("reasoning is required");
-    const evidence = normalizeEvidence(finding.evidence, presence);
-    const suggestedDiffNotes = Array.isArray(finding.suggestedDiffNotes)
-        ? finding.suggestedDiffNotes.map(normalizeDiffNote)
-        : [];
+    if (!title) throw new Error("summary is required");
+    if (!reasoning) throw new Error("evidenceRationale is required");
+    const externalEvidence = observation.evidence ?? {};
+    const evidenceFields = new Set(["citations", "exhaustiveSearch", "exclusion", "missingEvidence"]);
+    const unknownEvidence = Object.keys(externalEvidence).filter((key) => !evidenceFields.has(key));
+    if (unknownEvidence.length) throw new Error(`unknown evidence field(s): ${unknownEvidence.join(", ")}`);
+    const branchCount = ["exhaustiveSearch", "exclusion", "missingEvidence"].filter(
+        (key) => externalEvidence[key] != null,
+    ).length;
+    const expectedBranch =
+        presence === "ABSENT"
+            ? "exhaustiveSearch"
+            : presence === "NOT_APPLICABLE"
+              ? "exclusion"
+              : presence === "INCONCLUSIVE"
+                ? "missingEvidence"
+                : null;
+    if (
+        (expectedBranch == null && branchCount !== 0) ||
+        (expectedBranch != null && (branchCount !== 1 || externalEvidence[expectedBranch] == null))
+    ) {
+        throw new Error(`evidence must carry exactly ${expectedBranch ?? "citations"} for this outcome`);
+    }
+    const internalEvidence = {
+        citations: externalEvidence.citations,
+        ...(externalEvidence.exhaustiveSearch == null ? {} : { search: externalEvidence.exhaustiveSearch }),
+        ...(externalEvidence.exclusion == null ? {} : { inapplicability: externalEvidence.exclusion }),
+        ...(externalEvidence.missingEvidence == null ? {} : { undecidability: externalEvidence.missingEvidence }),
+    };
+    const evidence = normalizeEvidence(internalEvidence, presence);
     const out = {
         practiceSlug,
-        title,
+        summary: title,
         presence,
         severity,
         evidence,
-        reasoning,
-        suggestedDiffNotes,
+        evidenceRationale: reasoning,
     };
-    if (guidance) out.guidance = guidance;
     if (hasValence) out.assessment = assessment;
     return out;
 }
 
-export function dedupeKeyForFinding(finding) {
-    const citations = finding.evidence.citations
+export function dedupeKeyForObservation(observation) {
+    const citations = observation.evidence.citations
         .map((citation) => `${citation.path}:${citation.startLine}-${citation.endLine}`)
         .join(",");
-    return `${finding.practiceSlug}|${finding.title}|${citations}`;
+    return `${observation.practiceSlug}|${observation.summary}|${citations}`;
 }
 
 /**
@@ -316,10 +324,10 @@ export function dedupeKeyForFinding(finding) {
  * the practice predicted it would read this one — it is whether the source was there and the quote
  * really came out of it. A practice whose subject turns out to live in a source its author did not
  * name is exactly the case full context exists to catch, and rejecting its citation would have thrown
- * away the finding for being observant.
+ * away the observation for being observant.
  */
-export function validateEvidenceSources(finding, availableSourceKinds, artifactSources = new Map()) {
-    for (const citation of finding.evidence.citations) {
+export function validateEvidenceSources(observation, availableSourceKinds, artifactSources = new Map()) {
+    for (const citation of observation.evidence.citations) {
         const sourceKind = citation.sourceKind;
         if (!availableSourceKinds.has(sourceKind)) {
             throw new Error(`evidence source '${sourceKind}' was not available to this invocation`);
@@ -350,13 +358,13 @@ export function validateEvidenceSources(finding, availableSourceKinds, artifactS
  * <p>Consulting something this run never staged is the same error the citation check already rejects —
  * the bytes were not there, so they cannot have been searched.
  */
-export function validateSearchScope(finding, exhaustiveSourceKinds, availableSourceKinds) {
-    if (finding.presence !== "ABSENT") return;
-    const search = finding.evidence.search;
+export function validateSearchScope(observation, exhaustiveSourceKinds, availableSourceKinds) {
+    if (observation.presence !== "ABSENT") return;
+    const search = observation.evidence.search;
     if (!search) throw new Error("an ABSENT observation must record its search");
-    if (finding.assessment === "GOOD" && exhaustiveSourceKinds.size === 0) {
+    if (observation.assessment === "GOOD" && exhaustiveSourceKinds.size === 0) {
         throw new Error(
-            `cannot conclude ABSENT + GOOD for '${finding.practiceSlug}': it declares no source it searches ` +
+            `cannot conclude ABSENT + GOOD for '${observation.practiceSlug}': it declares no source it searches ` +
                 `exhaustively, so "this is not anywhere in the work" ranges over a corpus it has not bounded — ` +
                 `say INCONCLUSIVE instead`,
         );
@@ -370,7 +378,7 @@ export function validateSearchScope(finding, exhaustiveSourceKinds, availableSou
     const unsearched = [...exhaustiveSourceKinds].filter((sourceKind) => !consulted.has(sourceKind)).sort();
     if (unsearched.length > 0) {
         throw new Error(
-            `cannot conclude ABSENT for '${finding.practiceSlug}' without searching ${unsearched.join(", ")} — ` +
+            `cannot conclude ABSENT for '${observation.practiceSlug}' without searching ${unsearched.join(", ")} — ` +
                 `say INCONCLUSIVE instead, or record the search`,
         );
     }
@@ -383,9 +391,9 @@ export function validateSearchScope(finding, exhaustiveSourceKinds, availableSou
  * have been read, so claiming to have read them is the inapplicability-shaped version of citing evidence
  * we never had.
  */
-export function validateInapplicabilityScope(finding, availableSourceKinds) {
-    if (finding.presence !== "NOT_APPLICABLE") return;
-    const inapplicability = finding.evidence.inapplicability;
+export function validateInapplicabilityScope(observation, availableSourceKinds) {
+    if (observation.presence !== "NOT_APPLICABLE") return;
+    const inapplicability = observation.evidence.inapplicability;
     if (!inapplicability) throw new Error("a NOT_APPLICABLE observation must say why the practice does not apply");
     for (const sourceKind of inapplicability.consulted) {
         if (!availableSourceKinds.has(sourceKind)) {
@@ -400,7 +408,7 @@ export function validateInapplicabilityScope(finding, availableSourceKinds) {
  * Measured, not guessed: asked to quote the title `Resolve "Connect data between screens"` verbatim,
  * gpt-oss-120b returned it with curly quotes in 6 of 6 runs across three different tool schemas. The
  * text was faithful; only the glyphs moved. Without this fold the citation fails `includes`, the
- * finding throws, and a correct observation is lost — so the check was rejecting transcription rather
+ * observation throws, and a correct measurement is lost — so the check was rejecting transcription rather
  * than fabrication, which is the opposite of its job.
  *
  * Deliberately narrow. Only characters with an unambiguous ASCII original are folded, so a quote that
@@ -408,11 +416,25 @@ export function validateInapplicabilityScope(finding, availableSourceKinds) {
  */
 const CONFUSABLES = new Map(
     Object.entries({
-        "‘": "'", "’": "'", "‚": "'", "‛": "'",
-        "“": '"', "”": '"', "„": '"', "‟": '"',
-        "‐": "-", "‑": "-", "‒": "-", "–": "-", "—": "-", "―": "-",
-        " ": " ", " ": " ", " ": " ", " ": " ",
-    })
+        "‘": "'",
+        "’": "'",
+        "‚": "'",
+        "‛": "'",
+        "“": '"',
+        "”": '"',
+        "„": '"',
+        "‟": '"',
+        "‐": "-",
+        "‑": "-",
+        "‒": "-",
+        "–": "-",
+        "—": "-",
+        "―": "-",
+        " ": " ",
+        " ": " ",
+        " ": " ",
+        " ": " ",
+    }),
 );
 
 /** Fold the substitutions above; everything else is compared as written. */

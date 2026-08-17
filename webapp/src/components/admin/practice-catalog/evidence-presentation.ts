@@ -161,4 +161,5 @@ const READINESS_REASON_LABELS: Record<PracticeEvidenceReason, string> = {
 	SOURCE_EMPTY: "was empty",
 	NO_AUTOMATED_REVIEW: "this practice is not set up for automated review",
 	DECLARED_EVIDENCE_INSUFFICIENT: "this practice declares its evidence insufficient",
+	SUBJECT_NOT_IN_THE_WORK: "the work did not contain this practice's subject",
 };

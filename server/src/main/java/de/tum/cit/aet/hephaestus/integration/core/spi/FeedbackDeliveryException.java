@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
 /**
- * Thrown by {@link SummaryChannel}, {@link InlineFindingChannel}, and
+ * Thrown by {@link SummaryChannel}, {@link InlineFeedbackChannel}, and
  * {@link ApprovalChannel} implementations when posting fails irrecoverably.
  *
  * <p>Vendor adapters never need to know about the agent-side

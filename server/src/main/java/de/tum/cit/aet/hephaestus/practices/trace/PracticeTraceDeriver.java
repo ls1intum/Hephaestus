@@ -140,6 +140,21 @@ final class PracticeTraceDeriver {
                     output
                 );
             }
+            // SKIPPED, not NOT_ASSESSABLE. The run read the evidence and the thing this practice judges
+            // was not in the work — "we chose not to ask", for a reason that will not change for this
+            // artifact, which is exactly what SKIPPED means here. Calling it NOT_ASSESSABLE would report
+            // an instrument failure that did not happen and invite somebody to go fixing our capture.
+            if (readiness.notApplicable() != null) {
+                return entry(
+                    practice,
+                    PracticeTraceOutcome.SKIPPED,
+                    "This practice does not apply here: " + readiness.notApplicable() + ".",
+                    occurrence,
+                    review.decidedAt(),
+                    occurrence.reviewId(),
+                    output
+                );
+            }
             return entry(
                 practice,
                 PracticeTraceOutcome.NOT_ASSESSABLE,

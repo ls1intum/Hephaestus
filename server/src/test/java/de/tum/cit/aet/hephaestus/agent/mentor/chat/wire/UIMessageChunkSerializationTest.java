@@ -37,7 +37,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
      */
     static List<Object[]> chunkFixtures() {
         UUID messageId = UUID.fromString("11111111-2222-3333-4444-555555555555");
-        UUID findingId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
+        UUID observationId = UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee");
         UIMessageChunk.MessageMetadata finishMeta = new UIMessageChunk.MessageMetadata(
             "openai/gpt-oss-120b",
             new UIMessageChunk.MessageMetadata.Usage(655, 65, null, null, 720),
@@ -110,26 +110,21 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
                 "{\"type\":\"tool-output-error\",\"toolCallId\":\"call-1\"," +
                 "\"errorText\":\"fetch_context: path not allowed\"}",
             },
-            // data-finding without id (legacy "anonymous link") still serialises with optional id null-omitted.
-            new Object[] {
-                new UIMessageChunk.DataFinding(null, new UIMessageChunk.DataFinding.DataFindingPayload(findingId)),
-                "{\"type\":\"data-finding\",\"data\":{\"findingId\":\"" + findingId + "\"}}",
-            },
             // NON_NULL: finishReason omitted, but messageMetadata kept.
             // data-* envelope shape per AI SDK strict-object schema:
             // {type, id?, data: unknown, transient?: boolean}. status is transient (banner only);
-            // finding is permanent (linked chip in message history).
+            // observation is permanent (linked chip in message history).
             new Object[] {
                 UIMessageChunk.DataMentorStatus.of("warming-up", "container-cold"),
                 "{\"type\":\"data-mentor-status\",\"id\":\"mentor-status\"," +
                 "\"data\":{\"state\":\"warming-up\",\"reason\":\"container-cold\"},\"transient\":true}",
             },
             new Object[] {
-                UIMessageChunk.DataFinding.of(findingId),
-                "{\"type\":\"data-finding\",\"id\":\"" +
-                findingId +
-                "\",\"data\":{\"findingId\":\"" +
-                findingId +
+                UIMessageChunk.DataObservation.of(observationId),
+                "{\"type\":\"data-observation\",\"id\":\"" +
+                observationId +
+                "\",\"data\":{\"observationId\":\"" +
+                observationId +
                 "\"}}",
             },
             new Object[] {
@@ -150,7 +145,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
 
     // A `dataChunkDiscriminatorSpelling` test would be pure duplication: the parameterised
     // chunkFixtures test above already pins the exact JSON for `data-mentor-status` and
-    // `data-finding` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
+    // `data-observation` chunks, and a Jackson SNAKE_CASE override would fail those fixture tests
     // BEFORE reaching the spelling assertion.
 
     @Test
@@ -167,7 +162,7 @@ class UIMessageChunkSerializationTest extends BaseUnitTest {
             registered.add(t.value());
         }
         // Sealed interface auto-permits its directly-nested record subtypes plus DataMentorStatus /
-        // DataFinding which are top-level nested records. Reflectively enumerate permits via the
+        // DataObservation which are top-level nested records. Reflectively enumerate permits via the
         // class-level `getPermittedSubclasses()` (Java 17+).
         Class<?>[] permitted = UIMessageChunk.class.getPermittedSubclasses();
         assertThat(permitted).as("sealed permits resolves").isNotEmpty();

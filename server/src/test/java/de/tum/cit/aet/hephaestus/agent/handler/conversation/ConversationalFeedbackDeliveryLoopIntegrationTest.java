@@ -169,7 +169,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
     }
 
     @Test
-    void threeLinkFindingsFlipExactlyOne_reRunNoOp_thenSweepExpiresRemainder() {
+    void threeLinkObservationsFlipExactlyOne_reRunNoOp_thenSweepExpiresRemainder() {
         AgentJob job = newJob();
         Observation a = saveObservation(job, "occ-a");
         Observation b = saveObservation(job, "occ-b");
@@ -192,7 +192,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         assertThat(placements.get(0).getPlacementType()).isEqualTo(PlacementType.CONVERSATION_TURN);
         assertThat(placements.get(0).getChatMessageId()).isEqualTo(chatMessageId);
 
-        // A re-run linking the already-delivered finding is a no-op (guarded CAS returns 0).
+        // A re-run linking the already-delivered observation is a no-op (guarded CAS returns 0).
         int reflips = reconciler.reconcile(workspace.getId(), recipient.getId(), chatMessageId, List.of(a.getId()));
         assertThat(reflips).isZero();
         assertThat(deliveredCount()).isEqualTo(1);
@@ -221,7 +221,7 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
         prepareFor(job);
         ChatMessage assistant = persistAssistantMessage(ChatMessage.Status.in_flight);
         TranslatorState state = new TranslatorState(assistant.getId());
-        state.recordDataFinding(observation.getId());
+        state.recordDataObservation(observation.getId());
         MentorTurnPersistence.TurnPersistenceCookie cookie = new MentorTurnPersistence.TurnPersistenceCookie(
             assistant.getThread().getId(),
             UUID.randomUUID(),
@@ -306,7 +306,6 @@ class ConversationalFeedbackDeliveryLoopIntegrationTest extends BaseIntegrationT
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/metadata.json\",\"path\":\"metadata.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             null,
             null,

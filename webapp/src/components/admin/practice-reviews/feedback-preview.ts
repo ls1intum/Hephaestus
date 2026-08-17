@@ -57,7 +57,7 @@ function flattenMarkdown(source: string): Flattened {
 		if (insideFence) continue;
 		const trimmed = line.trim();
 		if (!trimmed) continue;
-		// A horizontal rule separates two findings; in one line of prose it is a false sentence break.
+		// A horizontal rule separates two observations; in one line of prose it is a false sentence break.
 		if (/^([-*_])\1{2,}$/.test(trimmed.replace(/\s/g, ""))) {
 			dropped = true;
 			continue;

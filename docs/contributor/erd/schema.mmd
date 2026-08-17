@@ -719,12 +719,11 @@ erDiagram
         VARCHAR(64) artifact_kind "NOT NULL"
         BIGINT artifact_id "NOT NULL"
         BIGINT about_user_id FK "NOT NULL"
-        VARCHAR(255) title "NOT NULL"
+        VARCHAR(255) summary "NOT NULL"
         VARCHAR(16) presence "NOT NULL"
         VARCHAR(16) severity
-        REAL confidence "NOT NULL"
         JSONB evidence
-        TEXT reasoning
+        TEXT evidence_rationale
         TIMESTAMPTZ observed_at "NOT NULL"
         VARCHAR(64) recurrence_key
         BIGINT practice_revision_id FK

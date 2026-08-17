@@ -5,11 +5,11 @@ import static de.tum.cit.aet.hephaestus.integration.scm.github.feedback.GithubPr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
@@ -32,7 +32,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitHub adapter for {@link InlineFindingChannel}. Posts all inline findings as a
+ * GitHub adapter for {@link InlineFeedbackChannel}. Posts all inline feedbackItems as a
  * single atomic {@code addPullRequestReview} mutation with embedded threads — one
  * notification per review, all-or-nothing semantics for the batch.
  *
@@ -43,15 +43,15 @@ import org.springframework.stereotype.Component;
  * ({@code GetPullRequestReviewThreads}) and index this reviewer's own prior threads by that key. A finding
  * whose key already has a live (non-outdated) bot thread is PRESERVED rather than re-posted, so a stable
  * finding does not accrue a duplicate thread on every re-run. After posting, the created comment node ids are
- * read back from the mutation payload and matched to findings by {@code path:line} so each
+ * read back from the mutation payload and matched to feedbackItems by {@code path:line} so each
  * {@link DeliveredSignal} carries the durable comment + review handles.
  *
- * <p>Both the post path and the {@link #clearStaleFindings} override retire (minimize as {@code OUTDATED}) the
+ * <p>Both the post path and the {@link #clearStaleFeedback} override retire (minimize as {@code OUTDATED}) the
  * prior bot threads whose finding the current run no longer emits — the GitHub analogue of GitLab's
- * delete-stale-notes path. {@code clearStaleFindings} covers the zero-note re-run; {@code postInlineFindings}
- * covers the partial-vanish case (some findings still hold, others went away).
+ * delete-stale-notes path. {@code clearStaleFeedback} covers the zero-note re-run; {@code postInlineFeedback}
+ * covers the partial-vanish case (some feedbackItems still hold, others went away).
  *
- * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed, logged, and emitted as a
+ * <p>Non-{@link FeedbackAnchor.DiffAnchor} anchors are counted as failed, logged, and emitted as a
  * {@code FAILED} {@link DeliveredSignal} (GitHub has no analogue for document/channel/issue anchors on a PR
  * review) so the SPI invariant {@code posted + failed == signals.size()} holds, matching GitLab.
  *
@@ -61,9 +61,9 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @OutboundEgressGateway
-public class GithubInlineFindingChannel implements InlineFindingChannel {
+public class GithubInlineFeedbackChannel implements InlineFeedbackChannel {
 
-    private static final Logger log = LoggerFactory.getLogger(GithubInlineFindingChannel.class);
+    private static final Logger log = LoggerFactory.getLogger(GithubInlineFeedbackChannel.class);
 
     /** GitHub caps {@code reviewThreads(first:)} at 100; we page through with the connection cursor. */
     private static final int THREADS_PAGE_SIZE = 100;
@@ -86,7 +86,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     private final GithubPrNodeIdResolver prNodeIdResolver;
     private final OutboundEgressGuard egressGuard;
 
-    public GithubInlineFindingChannel(
+    public GithubInlineFeedbackChannel(
         GitHubGraphQlClientProvider gitHubProvider,
         GithubPrNodeIdResolver prNodeIdResolver,
         OutboundEgressGuard egressGuard
@@ -102,18 +102,18 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Override
-    public InlineResult postInlineFindings(SummaryChannel.FeedbackTarget target, List<InlineFinding> findings) {
-        if (findings == null || findings.isEmpty()) {
+    public InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        if (feedbackItems == null || feedbackItems.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             log.warn(
-                "GitHub rate limit critical — skipping {} inline findings: workspaceId={}",
-                findings.size(),
+                "GitHub rate limit critical — skipping {} inline feedbackItems: workspaceId={}",
+                feedbackItems.size(),
                 scopeId
             );
-            return InlineResult.counts(0, findings.size());
+            return InlineResult.counts(0, feedbackItems.size());
         }
 
         PrCoordinates pr = GithubSummaryChannel.parseSubjectExternalId(target.subjectExternalId());
@@ -123,18 +123,18 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         // a failed read yields an empty index, degrading to a fresh post (still keyed) rather than blocking.
         Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, pr);
 
-        // Partition findings: those whose key already has a live prior thread are preserved; the rest are posted.
-        List<InlineFinding> toPost = new ArrayList<>(findings.size());
+        // Partition feedbackItems: those whose key already has a live prior thread are preserved; the rest are posted.
+        List<InlineFeedback> toPost = new ArrayList<>(feedbackItems.size());
         List<DeliveredSignal> preservedSignals = new ArrayList<>();
         // Per-finding FAILED signals for anchors GitHub cannot place (non-diff). Counted in `failed` AND carried
         // in `signals` so the SPI invariant posted + failed == signals.size() holds (GitLab parity).
         List<DeliveredSignal> unsupportedSignals = new ArrayList<>();
         // Keys still backed by a finding this run (preserved now, posted below). Prior threads outside this set
-        // belong to findings that vanished and must be retired.
+        // belong to feedbackItems that vanished and must be retired.
         Set<String> seenKeys = new HashSet<>();
-        for (InlineFinding finding : findings) {
-            if (!(finding.anchor() instanceof FindingAnchor.DiffAnchor diff)) {
-                log.warn("Skipping non-diff anchor on GitHub inline finding: anchor={}", finding.anchor());
+        for (InlineFeedback finding : feedbackItems) {
+            if (!(finding.anchor() instanceof FeedbackAnchor.DiffAnchor diff)) {
+                log.warn("Skipping non-diff anchor on GitHub inline feedback: anchor={}", finding.anchor());
                 unsupportedSignals.add(
                     new DeliveredSignal(finding.recurrenceKey(), finding.anchor(), Disposition.FAILED, null, null)
                 );
@@ -163,11 +163,11 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         int unsupportedAnchorCount = unsupportedSignals.size();
 
         if (toPost.isEmpty()) {
-            // Nothing new to post, but findings that vanished since the last run still have live bot threads —
+            // Nothing new to post, but feedbackItems that vanished since the last run still have live bot threads —
             // retire them here too (this is the most common partial re-review: all survivors are preserved).
             int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
             log.debug(
-                "All GitHub inline findings preserved or skipped (none to post): workspaceId={}, preserved={}, minimized={}",
+                "All GitHub inline feedbackItems preserved or skipped (none to post): workspaceId={}, preserved={}, minimized={}",
                 scopeId,
                 preservedSignals.size(),
                 minimized
@@ -186,10 +186,10 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
 
         // Build the thread payloads, embedding each finding's correlation tag so the next run can index it back.
         List<Map<String, Object>> threads = new ArrayList<>(toPost.size());
-        List<FindingAnchor.DiffAnchor> postedAnchors = new ArrayList<>(toPost.size());
+        List<FeedbackAnchor.DiffAnchor> postedAnchors = new ArrayList<>(toPost.size());
         List<String> postedKeys = new ArrayList<>(toPost.size());
-        for (InlineFinding finding : toPost) {
-            FindingAnchor.DiffAnchor diff = (FindingAnchor.DiffAnchor) finding.anchor();
+        for (InlineFeedback finding : toPost) {
+            FeedbackAnchor.DiffAnchor diff = (FeedbackAnchor.DiffAnchor) finding.anchor();
             threads.add(buildThread(diff, appendCorrelationTag(finding.body(), finding.recurrenceKey())));
             postedAnchors.add(diff);
             postedKeys.add(finding.recurrenceKey());
@@ -200,7 +200,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         signalsBeforeSuppression.addAll(unsupportedSignals);
 
         try {
-            egressGuard.requireDeliveryAllowed("github.post-inline-findings");
+            egressGuard.requireDeliveryAllowed("github.post-inline-feedbackItems");
             ClientGraphQlResponse response = gitHubProvider
                 .forScope(scopeId)
                 .documentName("AddPullRequestReviewWithThreads")
@@ -238,7 +238,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
             int minimized = minimizeVanishedThreads(scopeId, priorByKey.values(), seenKeys);
 
             log.info(
-                "Posted {} GitHub inline findings as single review: workspaceId={}, prNodeId={}, preserved={}, minimized={}",
+                "Posted {} GitHub inline feedbackItems as single review: workspaceId={}, prNodeId={}, preserved={}, minimized={}",
                 threads.size(),
                 scopeId,
                 prNodeId,
@@ -257,7 +257,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
                 .collect(Collectors.toSet());
             List<String> suppressedKeys = toPost
                 .stream()
-                .map(InlineFinding::recurrenceKey)
+                .map(InlineFeedback::recurrenceKey)
                 .filter(Objects::nonNull)
                 .filter(key -> !completedKeys.contains(key))
                 .toList();
@@ -270,7 +270,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         } catch (FeedbackDeliveryException e) {
             throw e;
         } catch (Exception e) {
-            log.warn("GitHub inline finding batch failed: workspaceId={}, threadCount={}", scopeId, threads.size(), e);
+            log.warn("GitHub inline feedback batch failed: workspaceId={}, threadCount={}", scopeId, threads.size(), e);
             List<DeliveredSignal> failed = failedSignals(postedAnchors, postedKeys);
             failed.addAll(preservedSignals);
             failed.addAll(unsupportedSignals);
@@ -281,11 +281,11 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     /**
      * Minimizes (hides as {@code OUTDATED}) every prior bot thread on the PR — the GitHub analogue of GitLab's
      * stale-note delete. Called on a zero-note re-run so a PR re-reviewed into nothing-inline doesn't keep
-     * findings on code no longer in the diff. GitHub reviews are append-only, so minimize is the only
+     * feedbackItems on code no longer in the diff. GitHub reviews are append-only, so minimize is the only
      * non-destructive way to retire a thread.
      */
     @Override
-    public void clearStaleFindings(SummaryChannel.FeedbackTarget target, String marker) {
+    public void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker) {
         long scopeId = target.ref().workspaceId();
         if (gitHubProvider.isRateLimitCritical(scopeId)) {
             log.warn("GitHub rate limit critical — skipping stale inline-thread minimize: workspaceId={}", scopeId);
@@ -300,17 +300,17 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     }
 
     /**
-     * Builds {@link DeliveredSignal}s for the posted threads, matching comment node ids back to findings.
+     * Builds {@link DeliveredSignal}s for the posted threads, matching comment node ids back to feedbackItems.
      *
      * <p>Primary match is the per-finding correlation tag (ck-fingerprint) embedded in each posted comment body:
-     * {@code path:line} is NOT unique — two findings can anchor to the same line — so a positional or path:line
+     * {@code path:line} is NOT unique — two feedbackItems can anchor to the same line — so a positional or path:line
      * index would hand the second finding the first's comment id (or none), corrupting its ledger external_ref.
-     * Falls back to path:line only for a comment whose body carries no parseable tag (pre-correlation findings).
+     * Falls back to path:line only for a comment whose body carries no parseable tag (pre-correlation feedbackItems).
      */
     private static List<DeliveredSignal> buildPostedSignals(
         ClientGraphQlResponse response,
         @Nullable String reviewId,
-        List<FindingAnchor.DiffAnchor> anchors,
+        List<FeedbackAnchor.DiffAnchor> anchors,
         List<String> keys
     ) {
         Map<String, String> commentIdByCk = new HashMap<>();
@@ -339,7 +339,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
 
         List<DeliveredSignal> signals = new ArrayList<>(anchors.size());
         for (int i = 0; i < anchors.size(); i++) {
-            FindingAnchor.DiffAnchor diff = anchors.get(i);
+            FeedbackAnchor.DiffAnchor diff = anchors.get(i);
             String key = keys.get(i);
             String commentId = key == null ? null : commentIdByCk.get(key);
             if (commentId == null) {
@@ -350,7 +350,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
         return signals;
     }
 
-    private static List<DeliveredSignal> failedSignals(List<FindingAnchor.DiffAnchor> anchors, List<String> keys) {
+    private static List<DeliveredSignal> failedSignals(List<FeedbackAnchor.DiffAnchor> anchors, List<String> keys) {
         List<DeliveredSignal> signals = new ArrayList<>(anchors.size());
         for (int i = 0; i < anchors.size(); i++) {
             signals.add(new DeliveredSignal(keys.get(i), anchors.get(i), Disposition.FAILED, null, null));
@@ -442,7 +442,7 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
 
     /**
      * Minimizes the prior bot threads whose key is absent from {@code seenKeys} and that are not already
-     * outdated/resolved — the findings that genuinely went away. Returns the number minimized. Best-effort.
+     * outdated/resolved — the feedbackItems that genuinely went away. Returns the number minimized. Best-effort.
      */
     private int minimizeVanishedThreads(long scopeId, Iterable<PriorThread> priorThreads, Set<String> seenKeys) {
         int minimized = 0;
@@ -505,8 +505,8 @@ public class GithubInlineFindingChannel implements InlineFindingChannel {
     /** A prior review thread we posted, matched by the correlation key in its first comment. */
     private record PriorThread(String key, String threadId, String commentId, boolean outdated) {}
 
-    /** Builds a GitHub review-thread payload from a {@link FindingAnchor.DiffAnchor}. */
-    private static Map<String, Object> buildThread(FindingAnchor.DiffAnchor diff, String body) {
+    /** Builds a GitHub review-thread payload from a {@link FeedbackAnchor.DiffAnchor}. */
+    private static Map<String, Object> buildThread(FeedbackAnchor.DiffAnchor diff, String body) {
         Map<String, Object> thread = new HashMap<>();
         thread.put("path", diff.filePath());
         thread.put("body", body);

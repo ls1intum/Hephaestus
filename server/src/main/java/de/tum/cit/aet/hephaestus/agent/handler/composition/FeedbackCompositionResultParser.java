@@ -16,40 +16,14 @@ import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 
 /**
- * Reads the composition stage's output off a finished job.
- *
- * <p>Never throws. The composition stage is additive: a review whose measurements landed is a successful
- * review whether or not anything was composed from them, so a malformed or absent payload yields an empty
- * list and the surfaces simply gain nothing this cycle.
- *
- * <p><b>Everything the runner checked is checked again here, and that is not belt-and-braces.</b> The
- * runner executes inside the sandbox alongside the model; its validation exists so the model is corrected
- * while it can still fix the unit. This class is the boundary a payload has to cross to become something
- * a person reads, and it trusts nothing it did not verify.
- *
- * <p>The payload the runner writes to {@code out/feedback.json} is surfaced by {@code PiResultParser}
- * under {@code output.feedback}. It is self-describing on purpose — it carries the observations the
- * composer was shown and the thread keys it was offered, so a unit can be checked against what was
- * actually on the table rather than against a re-query that may have moved since:
- *
- * <pre>{@code
- * {
- *   "observations": [ { "id": "obs-0", "practiceSlug": "...", "anchorable": true,
- *                       "citations": [ { "index": 0, "path": "...", "side": "NEW",
- *                                        "startLine": 47, "anchorable": true } ] } ],
- *   "preparedThreadKeys": [ "..." ],
- *   "units": [ { "channel": "IN_CONTEXT", "practiceSlug": "...", "basedOn": [ "obs-0" ],
- *                "action": "NEW", "title": "...", "body": "...", "nextStep": "...",
- *                "anchor": { "observationId": "obs-0", "citationIndex": 0 } } ]
- * }
- * }</pre>
+ * Validates composition output at the server trust boundary. Malformed composition is ignored without
+ * invalidating observations already persisted by the measurement stage.
  */
 @Component
 public class FeedbackCompositionResultParser {
 
     private static final Logger log = LoggerFactory.getLogger(FeedbackCompositionResultParser.class);
 
-    /** The key {@code PiResultParser} files the composition payload under on the job's output. */
     public static final String OUTPUT_KEY = "feedback";
 
     /**
@@ -60,11 +34,7 @@ public class FeedbackCompositionResultParser {
 
     private static final int MAX_PRACTICE_SLUG_LENGTH = 128;
 
-    /**
-     * The composed units on this job's output, in the order the stage reported them.
-     *
-     * @param jobOutput the job's {@code output} column, or {@code null} for a job that produced none
-     */
+    /** Composed units in model-reported order. */
     public List<ComposedFeedbackUnit> parse(@Nullable JsonNode jobOutput) {
         if (jobOutput == null || !jobOutput.isObject()) {
             return List.of();
@@ -170,7 +140,7 @@ public class FeedbackCompositionResultParser {
         }
 
         if (channel == FeedbackChannel.IN_CHAT) {
-            ComposedFeedbackUnit.ConversationBrief brief = conversationOf(unit);
+            ComposedFeedbackUnit.ConversationBrief brief = notesOf(unit);
             return brief == null
                 ? null
                 : new ComposedFeedbackUnit(
@@ -188,28 +158,29 @@ public class FeedbackCompositionResultParser {
                   );
         }
 
-        // Sanitised on the way in, not on the way out: this text is stored and then read verbatim by a
-        // developer, and the same sanitiser already guards every other student-facing body.
-        String body = StudentTextSanitizer.sanitize(text(unit, "body", ComposedFeedbackUnit.MAX_BODY_LENGTH));
         String nextStep = StudentTextSanitizer.sanitize(
             text(unit, "nextStep", ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH)
         );
-        if (body == null || nextStep == null) {
-            return null;
-        }
+        if (nextStep == null) return null;
 
-        ComposedFeedbackUnit.ResolvedAnchor anchor = null;
+        String body = null;
+        ComposedFeedbackUnit.InContextPlacement placement = null;
         if (channel == FeedbackChannel.IN_CONTEXT) {
-            anchor = resolveAnchor(unit.get("anchor"), observations);
-            if (anchor == null) {
-                log.warn("Composed IN_CONTEXT unit has no placeable anchor: practice={}", practiceSlug);
+            if (unit.hasNonNull("body")) return null;
+            placement = resolvePlacement(unit.get("placement"), observations, basedOn, normalizeSlug(practiceSlug));
+            if (placement == null) {
+                log.warn("Composed IN_CONTEXT unit has no valid placement: practice={}", practiceSlug);
                 return null;
             }
-        } else if (unit.get("anchor") != null && !unit.get("anchor").isNull()) {
+        } else if (unit.get("placement") != null && !unit.get("placement").isNull()) {
             // An anchor on a longitudinal lane is a category error: those surfaces are not on the diff,
             // and a unit that thinks it is anchored was written at the wrong level.
             log.warn("Composed {} unit carries an anchor, which only IN_CONTEXT may have", channel);
             return null;
+        }
+        if (channel == FeedbackChannel.IN_APP) {
+            body = StudentTextSanitizer.sanitize(text(unit, "body", ComposedFeedbackUnit.MAX_BODY_LENGTH));
+            if (body == null) return null;
         }
 
         ComposedFeedbackUnit composed = new ComposedFeedbackUnit(
@@ -223,9 +194,39 @@ public class FeedbackCompositionResultParser {
             body,
             nextStep,
             null,
-            anchor
+            placement
         );
         return composed.isComplete() ? composed : null;
+    }
+
+    private static ComposedFeedbackUnit.@Nullable InContextPlacement resolvePlacement(
+        @Nullable JsonNode placement,
+        Map<String, StagedObservation> observations,
+        List<String> basedOn,
+        String practiceSlug
+    ) {
+        if (placement == null || !placement.isObject()) return null;
+        String kind = text(placement, "kind", 16);
+        if ("ARTIFACT".equals(kind)) {
+            if (placement.hasNonNull("observationId") || placement.hasNonNull("citationIndex")) return null;
+            boolean grounded = basedOn
+                .stream()
+                .map(observations::get)
+                .anyMatch(observation -> observation != null && practiceSlug.equals(observation.practiceSlug()));
+            if (!grounded) return null;
+            return new ComposedFeedbackUnit.InContextPlacement(
+                ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT,
+                null
+            );
+        }
+        if (!"DIFF".equals(kind)) return null;
+        ComposedFeedbackUnit.ResolvedAnchor anchor = resolveAnchor(placement, observations);
+        return anchor == null
+            ? null
+            : new ComposedFeedbackUnit.InContextPlacement(
+                  ComposedFeedbackUnit.InContextPlacement.PlacementKind.DIFF,
+                  anchor
+              );
     }
 
     /**
@@ -298,7 +299,14 @@ public class FeedbackCompositionResultParser {
                     );
                 }
             }
-            observations.put(id, new StagedObservation(entry.path("anchorable").asBoolean(false), citations));
+            observations.put(
+                id,
+                new StagedObservation(
+                    normalizedSlug(text(entry, "practiceSlug", MAX_PRACTICE_SLUG_LENGTH)),
+                    entry.path("anchorable").asBoolean(false),
+                    citations
+                )
+            );
         }
         return observations;
     }
@@ -320,24 +328,26 @@ public class FeedbackCompositionResultParser {
         return List.copyOf(values);
     }
 
-    private static ComposedFeedbackUnit.@Nullable ConversationBrief conversationOf(JsonNode unit) {
-        JsonNode conversation = unit.get("conversation");
-        if (conversation == null || !conversation.isObject()) {
+    /** Reads a complete four-part mentor brief. */
+    private static ComposedFeedbackUnit.@Nullable ConversationBrief notesOf(JsonNode unit) {
+        JsonNode notes = unit.get("notes");
+        if (notes == null || !notes.isObject()) {
             return null;
         }
-        String opener = StudentTextSanitizer.sanitize(
-            text(conversation, "opener", ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH)
-        );
-        String evidence = StudentTextSanitizer.sanitize(
-            text(conversation, "evidence", ComposedFeedbackUnit.MAX_EVIDENCE_LENGTH)
-        );
-        String target = StudentTextSanitizer.sanitize(
-            text(conversation, "target", ComposedFeedbackUnit.MAX_NEXT_STEP_LENGTH)
-        );
-        if (opener == null || evidence == null || target == null) {
+        String situation = note(notes, "situation", ComposedFeedbackUnit.MAX_SITUATION_LENGTH);
+        String capability = note(notes, "capability", ComposedFeedbackUnit.MAX_AIM_LENGTH);
+        String evidenceSummary = note(notes, "evidenceSummary", ComposedFeedbackUnit.MAX_EVIDENCE_LENGTH);
+        String inConversationSignal = note(notes, "inConversationSignal", ComposedFeedbackUnit.MAX_AIM_LENGTH);
+        if (situation == null || capability == null || evidenceSummary == null || inConversationSignal == null) {
             return null;
         }
-        return new ComposedFeedbackUnit.ConversationBrief(opener, evidence, target);
+        return new ComposedFeedbackUnit.ConversationBrief(situation, capability, evidenceSummary, inConversationSignal);
+    }
+
+    /** One sanitised note, or {@code null} when it was absent or sanitised away to nothing. */
+    private static @Nullable String note(JsonNode notes, String field, int maxLength) {
+        String sanitized = StudentTextSanitizer.sanitize(text(notes, field, maxLength));
+        return sanitized.isBlank() ? null : sanitized;
     }
 
     private static @Nullable FeedbackChannel channelOf(JsonNode unit) {
@@ -383,6 +393,10 @@ public class FeedbackCompositionResultParser {
         return practiceSlug.toLowerCase(Locale.ROOT).replace('_', '-');
     }
 
+    private static @Nullable String normalizedSlug(@Nullable String practiceSlug) {
+        return practiceSlug == null ? null : normalizeSlug(practiceSlug);
+    }
+
     private static @Nullable Integer integer(JsonNode node, String field) {
         JsonNode value = node.get(field);
         return value == null || !value.isIntegralNumber() ? null : value.asInt();
@@ -397,11 +411,16 @@ public class FeedbackCompositionResultParser {
         if (text.isEmpty()) {
             return null;
         }
-        return text.length() <= maxLength ? text : text.substring(0, maxLength);
+        // Never truncate composed prose: partial Markdown or notes can change its meaning.
+        return text.length() <= maxLength ? text : null;
     }
 
     /** One observation as the composer was shown it — only what deciding an anchor needs. */
-    private record StagedObservation(boolean anchorable, List<StagedCitation> citations) {}
+    private record StagedObservation(
+        @Nullable String practiceSlug,
+        boolean anchorable,
+        List<StagedCitation> citations
+    ) {}
 
     private record StagedCitation(
         @Nullable String path,

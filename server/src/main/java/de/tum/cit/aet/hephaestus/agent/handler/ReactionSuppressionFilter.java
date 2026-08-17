@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
@@ -22,15 +22,15 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Reaction-aware re-nag suppression (ADR 0021). Runs AFTER the findings are persisted (so each carries
+ * Reaction-aware re-nag suppression (ADR 0021). Runs AFTER the observations are persisted (so each carries
  * its stable {@code recurrence_key}) and BEFORE the summary/inline notes are composed: a locus the student
  * already DISPUTED / marked NOT_APPLICABLE on an EARLIER run is dropped from this run's delivery (and a
  * SUPPRESSED ledger row is written so an eval sees it was deliberately withheld, not missed). A locus the
  * student marked ADDRESSED ("I fixed it") but that is STILL assessed BAD this run is kept, with stiffer wording.
  *
- * <p>The reaction is captured against the EPHEMERAL per-run finding id, which differs every run; matching is
+ * <p>The reaction is captured against the EPHEMERAL per-run observation id, which differs every run; matching is
  * therefore by {@code recurrence_key} (A2 denormalized it onto the reaction). Flag-gated
- * ({@code hephaestus.practice-review.reaction-suppression}); a no-op when off, when no findings were persisted,
+ * ({@code hephaestus.practice-review.reaction-suppression}); a no-op when off, when no observations were persisted,
  * or when no reaction matches.
  */
 @Component
@@ -62,19 +62,19 @@ class ReactionSuppressionFilter {
         this.reviewProperties = reviewProperties;
     }
 
-    /** Which findings to still deliver (escalated ones already rewritten) and how many were suppressed. */
-    record ReactionDecision(List<ValidatedFinding> deliverable, int suppressedCount) {}
+    /** Which observations to still deliver (escalated ones already rewritten) and how many were suppressed. */
+    record ReactionDecision(List<ValidatedObservation> deliverable, int suppressedCount) {}
 
     // Read-only tx: we run outside the handler's transaction and read scalar identity columns off the
     // persisted observations. recordSuppressed writes in its own REQUIRES_NEW tx, so readOnly does not bind it.
     @Transactional(readOnly = true)
-    public ReactionDecision evaluate(AgentJob job, List<ValidatedFinding> scopedFindings) {
+    public ReactionDecision evaluate(AgentJob job, List<ValidatedObservation> scopedObservations) {
         if (!reviewProperties.reactionSuppression()) {
-            return new ReactionDecision(scopedFindings, 0);
+            return new ReactionDecision(scopedObservations, 0);
         }
         List<Observation> persisted = observationRepository.findByAgentJobId(job.getId());
         if (persisted.isEmpty()) {
-            return new ReactionDecision(scopedFindings, 0);
+            return new ReactionDecision(scopedObservations, 0);
         }
 
         // All observations of one job share the recipient + target. The reacting party is the subject
@@ -96,27 +96,27 @@ class ReactionSuppressionFilter {
             }
         }
         // Every persisted observation may carry a null recurrence_key (a detector that emitted
-        // no locatable findings). The reaction lookup is a native query whose `IN (:recurrenceKeys)` would
+        // no locatable observations). The reaction lookup is a native query whose `IN (:recurrenceKeys)` would
         // render as `IN ()` and crash on Postgres — short-circuit with no suppression when there are no keys.
         if (recurrenceKeys.isEmpty()) {
-            return new ReactionDecision(scopedFindings, 0);
+            return new ReactionDecision(scopedObservations, 0);
         }
         Map<String, ReactionAction> actionByKey = new HashMap<>();
         for (Reaction r : reactionRepository.findLatestByRecurrenceKeysAndReactor(recurrenceKeys, aboutUserId)) {
             actionByKey.put(r.getRecurrenceKey(), r.getAction());
         }
         if (actionByKey.isEmpty()) {
-            return new ReactionDecision(scopedFindings, 0);
+            return new ReactionDecision(scopedObservations, 0);
         }
 
-        List<ValidatedFinding> deliverable = new ArrayList<>(scopedFindings.size());
+        List<ValidatedObservation> deliverable = new ArrayList<>(scopedObservations.size());
         int suppressed = 0;
         int suppressedIndex = 0;
-        for (ValidatedFinding vf : scopedFindings) {
+        for (ValidatedObservation vf : scopedObservations) {
             // Use the recurrence_key the handler already stamped from the value deliver() persisted (it runs
             // strictly after that stamp loop), so the match is provably identical to the persisted row a
-            // reaction is keyed to — not a parallel recompute that could drift. A finding with no stamped key
-            // was never persisted (unknown slug / no locatable findings), so no reaction can target it.
+            // reaction is keyed to — not a parallel recompute that could drift. An observation with no stamped key
+            // was never persisted (unknown slug / no locatable observations), so no reaction can target it.
             String key = vf.recurrenceKey();
             if (key == null) {
                 deliverable.add(vf);
@@ -151,29 +151,29 @@ class ReactionSuppressionFilter {
                 job.getId(),
                 suppressed,
                 deliverable.size(),
-                scopedFindings.size()
+                scopedObservations.size()
             );
         }
         return new ReactionDecision(deliverable, suppressed);
     }
 
-    /** A copy of the finding with a stiffer opener, for a locus the student said was fixed but that recurs. */
-    private static ValidatedFinding withEscalatedReasoning(ValidatedFinding vf) {
+    /** A copy of the observation with a stiffer opener, for a locus the student said was fixed but that recurs. */
+    private static ValidatedObservation withEscalatedReasoning(ValidatedObservation vf) {
         String prefix = "You previously marked this as fixed, but it is still present. ";
-        String reasoning = vf.reasoning() == null || vf.reasoning().isBlank() ? prefix.trim() : prefix + vf.reasoning();
+        String reasoning =
+            vf.evidenceRationale() == null || vf.evidenceRationale().isBlank()
+                ? prefix.trim()
+                : prefix + vf.evidenceRationale();
         // Preserve the correlation key the handler stamped on the input so the escalated copy keeps the same
         // cross-run identity as the locus it re-nags.
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             vf.practiceSlug(),
-            vf.title(),
+            vf.summary(),
             vf.presence(),
             vf.assessment(),
             vf.severity(),
             vf.evidence(),
-            reasoning,
-            vf.guidance(),
-            vf.suggestedDiffNotes(),
-            vf.keys()
+            reasoning
         );
     }
 

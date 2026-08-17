@@ -197,7 +197,7 @@ class DocumentReviewHandlerTest extends BaseUnitTest {
                 )
             );
             when(
-                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any())
+                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any(), any())
             ).thenReturn(
                 new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
                     List.of(practice),

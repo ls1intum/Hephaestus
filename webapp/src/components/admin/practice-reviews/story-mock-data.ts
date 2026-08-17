@@ -291,14 +291,13 @@ interface FeedbackSpec {
 
 interface ObservationSpec {
 	id: string;
-	title: string;
-	reasoning: string;
+	summary: string;
+	evidenceRationale: string;
 	practiceSlug: string;
 	area: AreaSlug;
 	presence: ReviewObservation["presence"];
 	assessment?: ReviewObservation["assessment"];
 	severity?: ReviewObservation["severity"];
-	confidence: number;
 	claimCurrentness?: ReviewObservation["claimCurrentness"];
 	observedAt: string;
 	evidence?: EvidenceCitation[];
@@ -343,9 +342,9 @@ const cited = (sourceKind: string, path: string, quote: string, line = 1): Evide
 });
 
 /**
- * Shaped the way `DeliveryComposer` shapes a real note: a lead line, bold finding headings with an
+ * Shaped the way `DeliveryComposer` shapes a real note: a lead line, bold observation headings with an
  * inline-code locator, a fenced quote of the code, an italic why-this-matters, and a rule between
- * findings. Long enough that the server's preview cut lands inside the first fence, which is the
+ * observations. Long enough that the server's preview cut lands inside the first fence, which is the
  * case a fixture of one-sentence previews never reaches.
  */
 const LONG_BODY = [
@@ -403,14 +402,13 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		observations: [
 			{
 				id: "55555555-5555-5555-5555-555555555555",
-				title: "The controller delegates before it does anything else",
-				reasoning:
+				summary: "The controller delegates before it does anything else",
+				evidenceRationale:
 					"The handler is three statements long: it binds the request, calls ReviewQueryService and maps the result. The caching decision that arrived with this change sits entirely inside the service, so it can be exercised without standing up HTTP.",
 				practiceSlug: "thin-controllers",
 				area: "code-quality",
 				presence: "PRESENT",
 				assessment: "GOOD",
-				confidence: 0.94,
 				observedAt: "2026-07-28T13:40:00Z",
 				evidence: [
 					diff(
@@ -423,15 +421,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "66666666-6666-6666-6666-666666666666",
-				title: "A cache miss and a permission failure come back as the same 404",
-				reasoning:
+				summary: "A cache miss and a permission failure come back as the same 404",
+				evidenceRationale:
 					"findVisible returns an empty Optional both when the row does not exist and when the caller has no grant on the workspace, and the only caller turns either into a NotFoundException. Two situations that need different answers — retry the link, or ask for access — arrive as one.",
 				practiceSlug: "errors-carry-context",
 				area: "code-quality",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MAJOR",
-				confidence: 0.81,
 				observedAt: "2026-07-28T13:39:00Z",
 				evidence: [
 					diff(
@@ -455,15 +452,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "77777777-7777-7777-7777-777777777777",
-				title: "Three of the new tests are named after the method they call",
-				reasoning:
+				summary: "Three of the new tests are named after the method they call",
+				evidenceRationale:
 					"testCache1, testCache2 and testCache3 pin down a cold read, a warm read and an eviction after a membership change. The names carry none of that, so a red build names a file and a number rather than the behaviour that broke.",
 				practiceSlug: "tests-name-the-behaviour",
 				area: "testing",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MINOR",
-				confidence: 0.76,
 				observedAt: "2026-07-28T13:38:00Z",
 				evidence: [
 					diff(
@@ -476,15 +472,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "88888888-8888-8888-8888-888888888888",
-				title: "The description lists the files touched and stops there",
-				reasoning:
+				summary: "The description lists the files touched and stops there",
+				evidenceRationale:
 					"The body of the pull request is a bullet per changed file. Nothing in it says what was slow, how slow, or why a cache was the answer rather than a narrower query — the questions a reviewer who was not in that conversation has to ask before they can agree.",
 				practiceSlug: "the-change-explains-itself",
 				area: "documentation",
 				presence: "ABSENT",
 				assessment: "BAD",
 				severity: "INFO",
-				confidence: 0.68,
 				observedAt: "2026-07-28T13:37:00Z",
 				evidence: [
 					cited(
@@ -550,15 +545,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		observations: [
 			{
 				id: "bbbbbbbb-2222-2222-2222-222222222222",
-				title: "Invoice numbering leaks the ledger's table name into the public API",
-				reasoning:
+				summary: "Invoice numbering leaks the ledger's table name into the public API",
+				evidenceRationale:
 					"The response field is called ledgerSeqNo, which is the column the number is stored in. Callers outside billing have to learn the storage layout to read an invoice, and the day the ledger is replaced the field is either wrong or frozen.",
 				practiceSlug: "product-language",
 				area: "architecture",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "CRITICAL",
-				confidence: 0.71,
 				claimCurrentness: "STALE",
 				observedAt: "2026-07-27T09:15:00Z",
 				evidence: [
@@ -578,13 +572,12 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "cccccccc-2222-2222-2222-222222222222",
-				title: "The change touches no controller",
-				reasoning:
+				summary: "The change touches no controller",
+				evidenceRationale:
 					"Everything in the merge request sits under the billing domain package. There is no request handler in the diff, so this practice has nothing to look at here.",
 				practiceSlug: "thin-controllers",
 				area: "code-quality",
 				presence: "NOT_APPLICABLE",
-				confidence: 0.62,
 				observedAt: "2026-07-27T09:14:00Z",
 				evidence: [
 					cited(
@@ -619,13 +612,12 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		observations: [
 			{
 				id: "eeeeeeee-3333-3333-3333-333333333333",
-				title: "The thread ends without naming what was chosen",
-				reasoning:
+				summary: "The thread ends without naming what was chosen",
+				evidenceRationale:
 					"Four people weighed two rollback strategies over eleven messages and the last one is a thumbs-up. Nothing in the thread states which strategy won, so a reader arriving tomorrow cannot tell agreement from the end of the working day.",
 				practiceSlug: "decisions-are-written-down",
 				area: "collaboration",
 				presence: "INCONCLUSIVE",
-				confidence: 0.4,
 				claimCurrentness: "UNVERIFIABLE",
 				observedAt: "2026-07-26T16:02:00Z",
 				evidence: [
@@ -644,14 +636,13 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "ffffffff-3333-3333-3333-333333333333",
-				title: "The rollback is described in the words the on-call would use",
-				reasoning:
+				summary: "The rollback is described in the words the on-call would use",
+				evidenceRationale:
 					"Every message names the customer-visible effect — prices reverting, invoices reissuing — rather than the tables involved. Somebody paged at two in the morning could act on this thread without opening the schema.",
 				practiceSlug: "product-language",
 				area: "architecture",
 				presence: "PRESENT",
 				assessment: "GOOD",
-				confidence: 0.83,
 				observedAt: "2026-07-26T16:01:00Z",
 				evidence: [
 					cited(
@@ -694,14 +685,13 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		observations: [
 			{
 				id: "11111111-5555-5555-5555-555555555555",
-				title: "The runbook opens with the one step that cannot be undone",
-				reasoning:
+				summary: "The runbook opens with the one step that cannot be undone",
+				evidenceRationale:
 					"Step one puts the workspace into maintenance before anything is restored, and the page says so in the first line rather than in a note at the bottom. A reader following the page top to bottom does the irreversible thing at the point where it is still safe.",
 				practiceSlug: "the-change-explains-itself",
 				area: "documentation",
 				presence: "PRESENT",
 				assessment: "GOOD",
-				confidence: 0.91,
 				observedAt: "2026-07-25T11:30:00Z",
 				evidence: [
 					cited(
@@ -734,15 +724,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 		observations: [
 			{
 				id: "44444444-6666-6666-6666-666666666666",
-				title: "A dropped delivery is logged at debug and never counted",
-				reasoning:
+				summary: "A dropped delivery is logged at debug and never counted",
+				evidenceRationale:
 					"When the backoff gives up, the handler writes a debug line and returns. Nothing increments a counter and nothing reaches the dead-letter subject, so a provider outage looks identical to a quiet afternoon on every dashboard the team has.",
 				practiceSlug: "errors-carry-context",
 				area: "code-quality",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MAJOR",
-				confidence: 0.88,
 				observedAt: "2026-07-29T08:12:00Z",
 				evidence: [
 					diff(
@@ -760,14 +749,13 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "55555555-7777-7777-7777-777777777777",
-				title: "The retry tests read as sentences about the backoff",
-				reasoning:
+				summary: "The retry tests read as sentences about the backoff",
+				evidenceRationale:
 					"Each of the four new tests is named for the behaviour it fixes in place — that the delay doubles, that it stops at the ceiling, that a success resets it, that a 4xx is not retried. A red build points straight at which of the four rules broke.",
 				practiceSlug: "tests-name-the-behaviour",
 				area: "testing",
 				presence: "PRESENT",
 				assessment: "GOOD",
-				confidence: 0.92,
 				observedAt: "2026-07-29T08:11:00Z",
 				evidence: [
 					diff(
@@ -780,15 +768,14 @@ export const REVIEW_FIXTURE: RunSpec[] = [
 			},
 			{
 				id: "66666666-7777-7777-7777-777777777777",
-				title: "The queue is called the outbox everywhere except in the config",
-				reasoning:
+				summary: "The queue is called the outbox everywhere except in the config",
+				evidenceRationale:
 					"The class, the metric and the log lines all say outbox. The property is hephaestus.webhook.retry-buffer.*, so an operator reading a dashboard and an operator editing configuration are looking for two different words for one thing.",
 				practiceSlug: "product-language",
 				area: "architecture",
 				presence: "PRESENT",
 				assessment: "BAD",
 				severity: "MINOR",
-				confidence: 0.79,
 				observedAt: "2026-07-29T08:10:00Z",
 				evidence: [
 					diff(
@@ -911,7 +898,6 @@ function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
 		area: area(spec.area),
 		assessment: spec.assessment,
 		claimCurrentness: spec.claimCurrentness ?? "CURRENT",
-		confidence: spec.confidence,
 		feedbackDisposition: disposition(spec.id),
 		observedAt: new Date(spec.observedAt),
 		origin: run.origin ?? "LIVE",
@@ -920,7 +906,7 @@ function toObservation(run: RunSpec, spec: ObservationSpec): ReviewObservation {
 		presence: spec.presence,
 		severity: spec.severity,
 		subject: run.developer,
-		title: spec.title,
+		summary: spec.summary,
 	};
 }
 
@@ -1042,7 +1028,7 @@ export function observationDetail(observationId: string): ReviewObservationDetai
 			role: item.from[0] === observationId ? "PRIMARY" : "SUPPORTING",
 			suppressionReason: item.withheldFor,
 		})),
-		reasoning: observation.reasoning,
+		evidenceRationale: observation.evidenceRationale,
 	};
 }
 
@@ -1066,7 +1052,6 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 				area: source.area,
 				assessment: source.assessment,
 				claimCurrentness: source.claimCurrentness,
-				confidence: source.confidence,
 				observedAt: source.observedAt,
 				ordinal,
 				practiceName: source.practiceName,
@@ -1074,7 +1059,7 @@ export function feedbackDetail(feedbackId: string): ReviewFeedbackDetail {
 				presence: source.presence,
 				role: ordinal === 0 ? "PRIMARY" : "SUPPORTING",
 				severity: source.severity,
-				title: source.title,
+				summary: source.summary,
 			};
 		}),
 		// Only feedback that reached the work has a placement. Deriving it from the outcome keeps a

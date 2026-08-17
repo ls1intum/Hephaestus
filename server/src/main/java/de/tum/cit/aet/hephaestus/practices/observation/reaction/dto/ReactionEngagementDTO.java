@@ -4,12 +4,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 /**
  * Reaction engagement for the current developer in a workspace, reported along two orthogonal axes: a
- * RESPONSE axis (what the developer did with the feedback) and a VALIDITY axis (whether the finding applied
+ * RESPONSE axis (what the developer did with the feedback) and a VALIDITY axis (whether the observation applied
  * at all).
  *
  * <p><b>{@code notApplicable} is a VALIDITY/scope signal, not an uptake count</b> — it MUST NOT be folded
  * into a response/uptake ratio with {@code addressed}/{@code disputed}. The uptake denominator is
- * {@code addressed + disputed} (the findings the developer engaged with as feedback); a high
+ * {@code addressed + disputed} (the observations the developer engaged with as feedback); a high
  * {@code notApplicable} means the detector is mis-scoped, which is a separate signal.
  *
  * <p>Zero counts are returned as 0, not omitted.

@@ -7699,7 +7699,7 @@ components:
         parts:
           type: array
           items:
-            description: AI SDK UIMessage part (text / data-finding).
+            description: AI SDK UIMessage part (text / data-observation).
         role:
           type: string
     ChatMessageVote:
@@ -9208,7 +9208,7 @@ components:
           type: string
           format: date-time
           description: When the measurement behind this occurrence was taken
-        title:
+        summary:
           type: string
           description: What the review recorded on this piece of work
       required:
@@ -9904,7 +9904,8 @@ components:
       - updatedAt
     ObservationDetail:
       type: object
-      description: Full practice observation detail including guidance and evidence
+      description: Full practice observation detail including delivered feedback and
+        evidence
       properties:
         artifactId:
           type: integer
@@ -9928,16 +9929,15 @@ components:
           - CURRENT
           - STALE
           - UNVERIFIABLE
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
-        evidence:
-          $ref: "#/components/schemas/ObservationEvidence"
-        guidance:
+        deliveredFeedback:
           type: string
           description: What to do — the delivered feedback for this observation (null
             if nothing was delivered)
+        evidence:
+          $ref: "#/components/schemas/ObservationEvidence"
+        evidenceRationale:
+          type: string
+          description: Evidence-based rationale for the observation
         id:
           type: string
           format: uuid
@@ -9968,9 +9968,6 @@ components:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
-        reasoning:
-          type: string
-          description: AI reasoning behind the observation
         severity:
           type: string
           description: Severity level (null unless assessment is BAD)
@@ -9979,21 +9976,20 @@ components:
           - MAJOR
           - MINOR
           - INFO
-        title:
+        summary:
           type: string
-          description: Observation title
+          description: Observation summary
       required:
       - artifactId
       - artifactKind
       - claimCurrentness
-      - confidence
       - id
       - observedAt
       - origin
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
     ObservationEvidence:
       type: object
       description: "Verified, source-bound evidence for an observation"
@@ -10032,10 +10028,6 @@ components:
           - CURRENT
           - STALE
           - UNVERIFIABLE
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
         id:
           type: string
           format: uuid
@@ -10074,21 +10066,20 @@ components:
           - MAJOR
           - MINOR
           - INFO
-        title:
+        summary:
           type: string
-          description: Observation title
+          description: Observation summary
       required:
       - artifactId
       - artifactKind
       - claimCurrentness
-      - confidence
       - id
       - observedAt
       - origin
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
     OutlineCollection:
       type: object
       description: A mirrored Outline collection with its sync state and live document
@@ -10677,6 +10668,10 @@ components:
       description: "An occasion that starts a review, and the evidence that review\
         \ reads"
       properties:
+        appliesWhen:
+          $ref: "#/components/schemas/PracticeSubject"
+          description: What must be in the work for this practice to apply; omit to
+            always apply
         needs:
           type: array
           description: "Sources a review occasioned this way reads, each with the\
@@ -10732,6 +10727,7 @@ components:
           - SOURCE_EMPTY
           - NO_AUTOMATED_REVIEW
           - DECLARED_EVIDENCE_INSUFFICIENT
+          - SUBJECT_NOT_IN_THE_WORK
         reviewsAffected:
           type: integer
           format: int32
@@ -10926,6 +10922,49 @@ components:
       - displayName
       - recommended
       - signal
+    PracticeSubject:
+      type: object
+      description: What must be in a piece of work for this practice to have anything
+        to judge
+      properties:
+        absentSays:
+          type: string
+          description: "Sentence shown when the subject was proven absent, in the\
+            \ author's voice"
+          maxLength: 300
+          minLength: 0
+        anyOf:
+          type: array
+          description: Shapes the subject may take; the subject is present when any
+            one is found
+          items:
+            $ref: "#/components/schemas/PracticeSubjectClause"
+          maxItems: 10
+          minItems: 1
+      required:
+      - absentSays
+    PracticeSubjectClause:
+      type: object
+      description: One shape the subject a practice judges can take in a piece of
+        work
+      properties:
+        changedPathMatches:
+          type: array
+          description: Globs; holds when the change touches a matching path
+          items:
+            type: string
+        diffContains:
+          type: array
+          description: Literal strings; holds when the diff contains one of them
+          items:
+            type: string
+        evidenceHasItems:
+          type: string
+          description: Named evidence collection; holds when it has at least one entry
+          enum:
+          - scm.review-threads
+          - scm.inline-review-comments
+          - scm.general-review-comments
     PracticeTraceEntry:
       type: object
       description: "What became of one practice on this artifact, and whether anyone\
@@ -11576,7 +11615,7 @@ components:
         artifactKind:
           type: string
           description: The kind of work this is about (PR / issue)
-        guidance:
+        deliveredFeedback:
           type: string
           description: What to do — the delivered feedback for this observation (null
             if nothing was delivered)
@@ -12022,12 +12061,6 @@ components:
           - CURRENT
           - STALE
           - UNVERIFIABLE
-        confidence:
-          type: number
-          format: float
-          description: Observation confidence
-          maximum: 1
-          minimum: 0
         observationId:
           type: string
           format: uuid
@@ -12063,11 +12096,10 @@ components:
           - MAJOR
           - MINOR
           - INFO
-        title:
+        summary:
           type: string
       required:
       - claimCurrentness
-      - confidence
       - observationId
       - observedAt
       - ordinal
@@ -12075,7 +12107,7 @@ components:
       - practiceSlug
       - presence
       - role
-      - title
+      - summary
     ReviewFeedback:
       type: object
       properties:
@@ -12326,12 +12358,6 @@ components:
           - CURRENT
           - STALE
           - UNVERIFIABLE
-        confidence:
-          type: number
-          format: float
-          description: Observation confidence
-          maximum: 1
-          minimum: 0
         feedbackDisposition:
           $ref: "#/components/schemas/ReviewFeedbackDisposition"
           description: Counts of linked feedback by delivery state
@@ -12376,13 +12402,12 @@ components:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the observation is about; null when the identity
             is no longer resolvable
-        title:
+        summary:
           type: string
       required:
       - agentJobId
       - artifact
       - claimCurrentness
-      - confidence
       - feedbackDisposition
       - id
       - observedAt
@@ -12390,7 +12415,7 @@ components:
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
     ReviewObservationCounts:
       type: object
       description: Counts of observations by assessment
@@ -12442,14 +12467,10 @@ components:
           - CURRENT
           - STALE
           - UNVERIFIABLE
-        confidence:
-          type: number
-          format: float
-          description: Observation confidence
-          maximum: 1
-          minimum: 0
         evidence:
           $ref: "#/components/schemas/ObservationEvidence"
+        evidenceRationale:
+          type: string
         feedback:
           type: array
           description: "Linked feedback, newest first"
@@ -12476,8 +12497,6 @@ components:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
-        reasoning:
-          type: string
         recurrenceKey:
           type: string
           description: Cross-run locus key; null when continuity is unavailable
@@ -12493,20 +12512,19 @@ components:
           $ref: "#/components/schemas/ReviewSubject"
           description: Whose work the observation is about; null when the identity
             is no longer resolvable
-        title:
+        summary:
           type: string
       required:
       - agentJobId
       - artifact
       - claimCurrentness
-      - confidence
       - feedback
       - id
       - observedAt
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
     ReviewPlacement:
       type: object
       description: A recorded message placement

@@ -26,7 +26,7 @@ public final class FeedbackAdmission {
      *
      * @param tier the practice's <em>effective</em> tier, or {@code null} when the caller resolved none.
      *     That is always a lookup miss and never an unknown practice: both review handlers run
-     *     {@code PracticeDetectionDeliveryService#deliver}, which refuses any finding whose slug is not
+     *     {@code PracticeDetectionDeliveryService#deliver}, which refuses any observation whose slug is not
      *     among the job's admitted revisions, before anything reaches this gate. A miss is admitted on this
      *     axis, because withholding feedback a developer was owed on the strength of it is the worse
      *     failure; the provenance axis is unaffected and still applies.

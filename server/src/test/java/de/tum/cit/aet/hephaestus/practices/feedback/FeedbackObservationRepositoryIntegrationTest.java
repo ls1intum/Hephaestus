@@ -14,7 +14,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationFeedbackBody;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -127,7 +127,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "findLatestAdviceBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, " +
+        "findLatestFeedbackBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, " +
             "SUPPRESSED, and null-body units"
     )
     void findAdviceBodiesIncludesFailedExcludesPreparedSuppressed() {
@@ -143,7 +143,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(2, FeedbackDeliveryState.SUPPRESSED, "Withheld"), suppressed);
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
-        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+        List<ObservationFeedbackBody> bodies = feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
             workspace.getId(),
             List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId()),
             IN_CONTEXT_ONLY
@@ -152,7 +152,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         assertThat(bodies).hasSize(2);
         Map<UUID, String> byObservation = bodies
             .stream()
-            .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
+            .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
         assertThat(byObservation)
             .containsEntry(delivered.getId(), "The advice the student saw")
             .containsEntry(failed.getId(), "The advice the direct post could not place")
@@ -160,7 +160,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void findLatestAdviceBodiesUsesIdAsDeterministicTieBreak() {
+    void findLatestFeedbackBodiesUsesIdAsDeterministicTieBreak() {
         Observation observation = saveObservation("obs-repeated");
         Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
         UUID lowerId = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -168,13 +168,13 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(lowerId, 10, FeedbackDeliveryState.DELIVERED, "Earlier identity", createdAt), observation);
         bind(saveFeedback(higherId, 11, FeedbackDeliveryState.DELIVERED, "Latest identity", createdAt), observation);
 
-        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+        List<ObservationFeedbackBody> bodies = feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
             workspace.getId(),
             List.of(observation.getId()),
             IN_CONTEXT_ONLY
         );
 
-        assertThat(bodies).singleElement().extracting(ObservationAdviceBody::getBody).isEqualTo("Latest identity");
+        assertThat(bodies).singleElement().extracting(ObservationFeedbackBody::getBody).isEqualTo("Latest identity");
     }
 
     @Test
@@ -182,7 +182,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         "a newer IN_APP unit bound to the same observation does not become its advice: the per-finding " +
             "surfaces keep showing what was said about that finding"
     )
-    void findLatestAdviceBodiesAnswersOnlyForTheChannelsTheCallerNames() {
+    void findLatestFeedbackBodiesAnswersOnlyForTheChannelsTheCallerNames() {
         Observation observation = saveObservation("obs-both-lanes");
         bind(
             saveFeedback(
@@ -209,25 +209,25 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         );
 
         assertThat(
-            feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+            feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
                 workspace.getId(),
                 List.of(observation.getId()),
                 IN_CONTEXT_ONLY
             )
         )
             .singleElement()
-            .extracting(ObservationAdviceBody::getBody)
+            .extracting(ObservationFeedbackBody::getBody)
             .isEqualTo("The note posted on the pull request");
 
         assertThat(
-            feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
+            feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
                 workspace.getId(),
                 List.of(observation.getId()),
                 List.of(FeedbackChannel.IN_APP.name())
             )
         )
             .singleElement()
-            .extracting(ObservationAdviceBody::getBody)
+            .extracting(ObservationFeedbackBody::getBody)
             .asString()
             .startsWith("### You keep shipping untested changes");
     }
@@ -303,7 +303,6 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             null,
             null,
             null,

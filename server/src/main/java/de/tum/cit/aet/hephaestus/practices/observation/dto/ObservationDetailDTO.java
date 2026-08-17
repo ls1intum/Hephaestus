@@ -14,20 +14,20 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Detail-view DTO for a single practice observation. Includes guidance, reasoning,
+ * Detail-view DTO for a single practice observation. Includes delivered feedback, evidence rationale,
  * and structured evidence that are omitted from the list view.
  *
  * <p>Intentionally omits internal fields: {@code agentJobId}, {@code occurrenceKey},
  * and raw {@code aboutUserId}.
  */
-@Schema(description = "Full practice observation detail including guidance and evidence")
+@Schema(description = "Full practice observation detail including delivered feedback and evidence")
 public record ObservationDetailDTO(
     @NonNull @Schema(description = "Observation ID") UUID id,
     @NonNull @Schema(description = "Practice slug") String practiceSlug,
     @NonNull @Schema(description = "Practice name") String practiceName,
     @NonNull @Schema(description = "Artifact type (e.g. PULL_REQUEST)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Artifact entity ID") Long artifactId,
-    @NonNull @Schema(description = "Observation title") String title,
+    @NonNull @Schema(description = "Observation summary") String summary,
     @NonNull @Schema(description = "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE") Presence presence,
     @Nullable
     @Schema(
@@ -35,12 +35,11 @@ public record ObservationDetailDTO(
     )
     Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @Nullable ObservationEvidenceDTO evidence,
-    @Nullable @Schema(description = "AI reasoning behind the observation") String reasoning,
+    @Nullable @Schema(description = "Evidence-based rationale for the observation") String evidenceRationale,
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
-    String guidance,
+    String deliveredFeedback,
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull
     @Schema(description = "What occasioned the measurement; never mix origins in one trend line")
@@ -49,7 +48,7 @@ public record ObservationDetailDTO(
 ) {
     public static ObservationDetailDTO from(
         Observation observation,
-        @Nullable String deliveredGuidance,
+        @Nullable String deliveredFeedback,
         boolean includeEvidence
     ) {
         var practice = observation.getPractice();
@@ -59,14 +58,13 @@ public record ObservationDetailDTO(
             practice.getName(),
             observation.getArtifactKind(),
             observation.getArtifactId(),
-            observation.getTitle(),
+            observation.getSummary(),
             observation.getPresence(),
             observation.getAssessment(),
             observation.getSeverity(),
-            observation.getConfidence(),
             includeEvidence ? ObservationEvidenceDTO.from(observation.getEvidence()) : null,
-            observation.getReasoning(),
-            deliveredGuidance,
+            observation.getEvidenceRationale(),
+            deliveredFeedback,
             ReviewClaimCurrentness.of(observation.getPracticeRevision(), practice),
             observation.getOrigin(),
             observation.getObservedAt()

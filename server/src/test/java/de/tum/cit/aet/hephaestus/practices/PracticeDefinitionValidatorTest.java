@@ -1,10 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
 import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SubjectEvidenceCollection;
 import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
@@ -224,6 +226,98 @@ class PracticeDefinitionValidatorTest extends BaseUnitTest {
         assertThatThrownBy(() -> validator.validate(definition))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("must not use detector result labels");
+    }
+
+    /**
+     * The invariant that keeps the validator's "can never be captured completely" rule from ever needing
+     * to fire, asserted over the whole vocabulary rather than over one declaration.
+     *
+     * <p>A collection whose source can only ever be PARTIAL — retrieval that cannot establish it found
+     * everything, such as referenced wiki documents or resolved work-item links — would be undecidable at
+     * review time and therefore fall through to running the practice, safely and for ever. That is not a
+     * bug, it is the guard rail; but a clause that can never fire reads in the catalogue as though it
+     * narrowed something, so the vocabulary must not offer one.
+     */
+    @Test
+    void everyNamedCollectionCanBeCapturedWholeAndSoCanActuallyDecideAClause() {
+        var catalogs = new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC());
+
+        for (SubjectEvidenceCollection collection : SubjectEvidenceCollection.values()) {
+            assertThat(catalogs.requireSource(VERSION, collection.sourceKind()).completenessPolicy().supportsComplete())
+                .as(
+                    "%s is read from %s, which can never report a complete capture",
+                    collection,
+                    collection.sourceKind()
+                )
+                .isTrue();
+        }
+    }
+
+    @Test
+    void rejectsASubjectReadFromASourceThisWorkTypeDoesNotHave() {
+        assertThatThrownBy(() ->
+            validator.validate(
+                new PracticeDefinition(
+                    "Focused review",
+                    List.of(
+                        new PracticeBinding(
+                            List.of(ScmSignals.ISSUE_OPENED),
+                            List.of(need(new SourceKind("scm.issue.core"))),
+                            false,
+                            de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole.AUTHOR,
+                            new PracticeSubject(
+                                "the change touches no dependency manifest",
+                                List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml")))
+                            )
+                        )
+                    ),
+                    "Assess the review",
+                    null,
+                    languageModel(),
+                    null,
+                    null,
+                    null
+                )
+            )
+        )
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessageContaining("could never be decided about it");
+    }
+
+    @Test
+    void acceptsASubjectDecidableFromASourceTheWorkTypeCapturesWhole() {
+        assertThatCode(() ->
+            validator.validate(
+                withSubject(
+                    new PracticeSubject(
+                        "the change touches no dependency manifest or lockfile",
+                        List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml", "**/package.json")))
+                    ),
+                    DIFF
+                )
+            )
+        ).doesNotThrowAnyException();
+    }
+
+    private static PracticeDefinition withSubject(PracticeSubject subject, SourceKind reads) {
+        return new PracticeDefinition(
+            "Focused review",
+            List.of(
+                new PracticeBinding(
+                    List.of(ScmSignals.PULL_REQUEST_OPENED),
+                    List.of(need(reads)),
+                    false,
+                    de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole.AUTHOR,
+                    subject
+                )
+            ),
+            "Assess the review",
+            null,
+            languageModel(),
+            null,
+            null,
+            null
+        );
     }
 
     private static PracticeDefinition definition(

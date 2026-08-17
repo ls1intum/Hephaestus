@@ -27,16 +27,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
  * named for it: a channel is a destination, and a level is a claim about content that the destination
  * does not enforce.
  *
- * <p><b>{@code IN_APP} has been renamed three times; this is the last one.</b> It was
- * {@code REFLECTION_DASHBOARD} (dropped for naming a page), then {@code PROFILE} (dropped for colliding
- * with the public user profile), then {@code REFLECTION} — dropped because it named what the developer is
- * supposed to <em>do</em> rather than where the feedback lands, because it asserted an outcome the system
- * cannot observe (nothing here can tell whether anyone reflected), and because two Java packages named
- * {@code reflection} collide with {@code java.lang.reflect} in every reader's head. A future value goes on
- * this same axis or not at all.
- *
  * <p>This is the destination a delivery is recorded against, not the thing that does the delivering:
- * the vendor pipes are {@code integration.core.spi.SummaryChannel}, {@code InlineFindingChannel} and
+ * the vendor pipes are {@code integration.core.spi.SummaryChannel}, {@code InlineFeedbackChannel} and
  * {@code ApprovalChannel}, each named for what it posts. Both in-context lanes collapse to
  * {@link #IN_CONTEXT} here, because the ledger records that the developer was told in place while the
  * delivery path still has to know which bean to call.

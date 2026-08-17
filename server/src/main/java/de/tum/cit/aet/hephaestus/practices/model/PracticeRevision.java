@@ -32,8 +32,8 @@ import org.hibernate.type.SqlTypes;
 
 /**
  * An immutable, append-only snapshot of a {@link Practice}: SCD-2 over the whole definition, not only
- * over {@code criteria}. {@code Observation.practiceRevision} pins each finding to the revision the
- * detector saw, and a finding written before versioning pins {@code null}.
+ * over {@code criteria}. {@code Observation.practiceRevision} pins each observation to the revision the
+ * detector saw, and a observation written before versioning pins {@code null}.
  *
  * <p><strong>The snapshot must stay complete.</strong> Every field a review reads off a practice is
  * copied here by the constructor; a field added to {@link Practice} and not added here reproduces a

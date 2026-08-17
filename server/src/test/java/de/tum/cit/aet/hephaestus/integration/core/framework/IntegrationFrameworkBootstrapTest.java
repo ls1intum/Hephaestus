@@ -156,7 +156,7 @@ class IntegrationFrameworkBootstrapTest extends BaseUnitTest {
             credentialProviders,
             List.of(), // tokenRefreshers
             List.of(), // feedbackChannels
-            List.of(), // inlineFindingChannels
+            List.of(), // inlineFeedbackChannels
             List.of(), // approvalChannels
             lifecycleListeners,
             // A validator over an empty world: these tests are about capability wiring, and every manifest

@@ -32,7 +32,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  *
  * <p>Open to any workspace <em>member</em>, not just an admin: the question is a developer's before it
  * is an operator's. Membership is the bar {@code ObservationController} already sets for reading every
- * developer's findings on a pull request, and this surface carries counts rather than content.
+ * developer's observations on a pull request, and this surface carries counts rather than content.
  *
  * <p>A GET under {@code /workspaces/**} is {@code permitAll} at the filter chain and a public-read
  * workspace admits anonymous callers, so the membership check has to be made here or it is not made.

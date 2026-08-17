@@ -22,7 +22,7 @@ public enum PracticeReviewTier {
     OFF,
 
     /**
-     * Nothing measured here is lost: every finding is persisted as an observation and gets a
+     * Nothing measured here is lost: every observation is persisted as an observation and gets a
      * {@code SUPPRESSED} feedback row stamped
      * {@link de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason#PRACTICE_TIER_QUIET}, so
      * the behaviour series stays unbroken where dropping the practice from reviews would put a hole in it.

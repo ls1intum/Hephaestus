@@ -14,7 +14,7 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * List-view DTO for practice observations. Omits large text fields (guidance, reasoning)
+ * List-view DTO for practice observations. Omits large text fields (delivered feedback, evidence rationale)
  * and internal fields (agentJobId, occurrenceKey, evidence) to keep payloads small.
  */
 @Schema(description = "Practice observation summary for list views")
@@ -24,7 +24,7 @@ public record ObservationListDTO(
     @NonNull @Schema(description = "Practice name") String practiceName,
     @NonNull @Schema(description = "Artifact type (e.g. PULL_REQUEST)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Artifact entity ID") Long artifactId,
-    @NonNull @Schema(description = "Observation title") String title,
+    @NonNull @Schema(description = "Observation summary") String summary,
     @NonNull @Schema(description = "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE") Presence presence,
     @Nullable
     @Schema(
@@ -32,7 +32,6 @@ public record ObservationListDTO(
     )
     Assessment assessment,
     @Nullable @Schema(description = "Severity level (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "AI confidence score (0.0–1.0)") Float confidence,
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull
     @Schema(description = "What occasioned the measurement; never mix origins in one trend line")
@@ -50,11 +49,10 @@ public record ObservationListDTO(
             practice.getName(),
             observation.getArtifactKind(),
             observation.getArtifactId(),
-            observation.getTitle(),
+            observation.getSummary(),
             observation.getPresence(),
             observation.getAssessment(),
             observation.getSeverity(),
-            observation.getConfidence(),
             ReviewClaimCurrentness.of(observation.getPracticeRevision(), practice),
             observation.getOrigin(),
             observation.getObservedAt()

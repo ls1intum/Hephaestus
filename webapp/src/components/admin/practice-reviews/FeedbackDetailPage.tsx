@@ -222,7 +222,7 @@ export function FeedbackDetailPage({
 										params={{ workspaceSlug, observationId: observation.observationId }}
 										search={reviewScopeSearch(search)}
 									>
-										{observation.title}
+										{observation.summary}
 									</Link>
 								}
 								meta={

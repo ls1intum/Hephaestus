@@ -335,7 +335,7 @@ class ReviewContractViolationTest extends BaseUnitTest {
         void deliveringALaneTheArtifactDoesNotHaveIsRefused() {
             List<String> violations = validate(
                 contribution(Set.of(WIDGET), Map.of(), Map.of(WIDGET, Set.of(FeedbackLane.IN_CONTEXT_INLINE))),
-                Set.of(Capability.INLINE_FINDINGS)
+                Set.of(Capability.INLINE_FEEDBACK)
             );
 
             assertThat(violations).singleElement().asString().contains("a lane that artifact does not have");

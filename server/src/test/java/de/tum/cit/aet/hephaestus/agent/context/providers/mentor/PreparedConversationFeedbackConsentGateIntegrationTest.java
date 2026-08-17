@@ -119,7 +119,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
-        assertThat(arr.get(0).get("findingId").asString()).isEqualTo(activeObs.getId().toString());
+        assertThat(arr.get(0).get("observationId").asString()).isEqualTo(activeObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("chat.conversation_thread");
         assertThat(arr.get(0).get("artifactId").asLong()).isEqualTo(activeThreadId);
         assertThat(root.get("totalPrepared").asInt()).isEqualTo(1);
@@ -141,18 +141,19 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         JsonNode root = contribute();
         JsonNode arr = root.get("preparedConversationFeedback");
         assertThat(arr).hasSize(1);
-        assertThat(arr.get(0).get("findingId").asString()).isEqualTo(prObs.getId().toString());
+        assertThat(arr.get(0).get("observationId").asString()).isEqualTo(prObs.getId().toString());
         assertThat(arr.get(0).get("artifactKind").asString()).isEqualTo("scm.pull_request");
     }
 
     /**
-     * The composer's move has to reach the mentor's sandbox in its three parts, and it has to arrive as
-     * {@code move} rather than as anything a prompt could read as text to paste. The fallback is a missing
-     * key, not an empty object, so "nothing was composed" cannot read as "the composer had nothing to say".
+     * The composer's notes have to reach the mentor's sandbox in all four parts, and they have to arrive as
+     * {@code notes} rather than as anything a prompt could read as text to paste - the mentor reads the key
+     * before it reads the values. The fallback is a missing key, not an empty object, so "nothing was
+     * composed" cannot read as "the composer had nothing to say".
      */
     @Test
-    @DisplayName("a composed move reaches the mentor as a move, and an uncomposed unit carries none")
-    void stagesTheComposedMove() {
+    @DisplayName("composed notes reach the mentor as notes, and an uncomposed unit carries none")
+    void stagesTheComposedNotes() {
         practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 2));
@@ -182,7 +183,8 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                     null,
                     null,
                     new ComposedFeedbackUnit.ConversationBrief(
-                        "At what point do you decide the test is done?",
+                        "On !18, !20 and !22 the test landed a push after the review comment.",
+                        "Writing the test last is what leaves the review to find the gap.",
                         "On !18, !20 and !22 the test arrived a push later.",
                         "They name a check they could run before pushing."
                     ),
@@ -193,12 +195,23 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
 
         JsonNode item = contribute().get("preparedConversationFeedback").get(0);
         assertThat(item.has("body")).isFalse();
-        JsonNode move = item.get("move");
-        assertThat(move.get("opener").asString()).isEqualTo("At what point do you decide the test is done?");
-        assertThat(move.get("evidence").asString()).isEqualTo("On !18, !20 and !22 the test arrived a push later.");
-        assertThat(move.get("target").asString()).isEqualTo("They name a check they could run before pushing.");
+        assertThat(item.get("topic").asString()).isEqualTo("The test arrives after the review");
+        assertThat(item.get("evidence").get("citations").get(0).get("quote").asString()).isEqualTo("example");
+        JsonNode notes = item.get("notes");
+        assertThat(notes.get("situation").asString()).isEqualTo(
+            "On !18, !20 and !22 the test landed a push after the review comment."
+        );
+        assertThat(notes.get("capability").asString()).isEqualTo(
+            "Writing the test last is what leaves the review to find the gap."
+        );
+        assertThat(notes.get("evidenceSummary").asString()).isEqualTo(
+            "On !18, !20 and !22 the test arrived a push later."
+        );
+        assertThat(notes.get("inConversationSignal").asString()).isEqualTo(
+            "They name a check they could run before pushing."
+        );
 
-        // The same surface, prepared with nothing composed: no move key at all, on that item alone.
+        // The same surface, prepared with nothing composed: no notes key at all, on that item alone.
         AgentJob uncomposed = newJob();
         savePullRequestObservation(uncomposed, "occ-uncomposed", 4343L);
         prepareFor(uncomposed);
@@ -206,7 +219,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         JsonNode both = contribute().get("preparedConversationFeedback");
         assertThat(both).hasSize(2);
         assertThat(both)
-            .filteredOn(node -> node.has("move"))
+            .filteredOn(node -> node.has("notes"))
             .hasSize(1);
     }
 
@@ -248,7 +261,6 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             artifactKind.equals("chat.conversation_thread")
                 ? "{\"citations\":[{\"sourceKind\":\"slack.conversation.thread\",\"artifactPath\":\"inputs/context/thread.json\",\"path\":\"Slack thread\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}"
                 : "{\"citations\":[{\"sourceKind\":\"scm.pull-request.core\",\"artifactPath\":\"inputs/context/pull-request.json\",\"path\":\"pull-request.json\",\"startLine\":1,\"endLine\":1,\"quote\":\"example\",\"quoteRedacted\":false}]}",

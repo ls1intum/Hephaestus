@@ -253,6 +253,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 layout,
                 mapper,
                 new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+                new PracticeSubjectEvaluator(mapper),
                 Clock.systemUTC()
             );
             var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
@@ -317,6 +318,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 layout,
                 mapper,
                 new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+                new PracticeSubjectEvaluator(mapper),
                 Clock.systemUTC()
             );
             var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);

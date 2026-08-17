@@ -71,7 +71,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         assertThat(status(d, "keyZ")).isEqualTo(TransitionStatus.NEW);
         // a RESOLVED locus carries the PRIOR run's prose (it is absent now; that is what the student last saw)
         LocusTransition resolved = transition(d, "keyY");
-        assertThat(resolved.title()).isEqualTo("Y title");
+        assertThat(resolved.summary()).isEqualTo("Y title");
         assertThat(resolved.priorAssessment()).isEqualTo(Assessment.BAD);
         assertThat(resolved.currentAssessment()).isNull();
     }
@@ -365,17 +365,12 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public Float getConfidence() {
-                return conf;
-            }
-
-            @Override
             public String getPracticeSlug() {
                 return slug;
             }
 
             @Override
-            public String getTitle() {
+            public String getSummary() {
                 return title;
             }
 

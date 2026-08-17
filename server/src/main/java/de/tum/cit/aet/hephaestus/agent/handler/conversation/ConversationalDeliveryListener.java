@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -90,12 +91,21 @@ public class ConversationalDeliveryListener {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int prepare(UUID agentJobId, Long workspaceId) {
-        int prepared = route(agentJobId, workspaceId);
-        agentJobRepository.markInChatPrepared(agentJobId, Instant.now());
+        return prepare(agentJobId, agentJobId, workspaceId);
+    }
+
+    /** Prepare source observations using a separate composition job's output. */
+    public int prepare(UUID sourceJobId, UUID compositionJobId, Long workspaceId) {
+        int prepared = route(sourceJobId, compositionJobId, workspaceId);
+        agentJobRepository.markInChatPrepared(compositionJobId, Instant.now());
         return prepared;
     }
 
     private int route(UUID agentJobId, Long workspaceId) {
+        return route(agentJobId, agentJobId, workspaceId);
+    }
+
+    private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {
         if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
             log.debug("Conversational preparation suppressed: jobId={}", agentJobId);
             return 0;
@@ -105,7 +115,7 @@ public class ConversationalDeliveryListener {
             return 0;
         }
         List<Observation> admitted = router.admit(observations, workspaceId, RoutingContext.author());
-        return preparer.prepare(agentJobId, workspaceId, admitted, composedMoves(agentJobId));
+        return preparer.prepare(outputJobId, workspaceId, admitted, composedMoves(outputJobId));
     }
 
     /**
@@ -113,9 +123,9 @@ public class ConversationalDeliveryListener {
      * single turn, so the units arrive together and each lane takes its own: a unit addressed to the merge
      * request or to the developer's page is not this producer's to route.
      *
-     * <p>Empty is a normal answer, not a failure. Composition is a stage a review may skip, and the
-     * preparer's severity-ranked selection is exactly the fallback for that case — so a missing, malformed
-     * or conversation-silent payload costs the mentor its brief and nothing else.
+     * <p>Empty means there is no mentor-ready brief to queue. It covers both an intentionally quiet turn and
+     * a composition stage that was skipped, failed, or malformed; neither is permission to turn a severity
+     * ranking into feedback. A later review may compose a complete brief for the same habit.
      */
     private List<ComposedFeedbackUnit> composedMoves(UUID agentJobId) {
         AgentJob job = agentJobRepository.findById(agentJobId).orElse(null);

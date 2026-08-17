@@ -13,7 +13,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
@@ -36,7 +36,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
 /**
- * The in-context delivery predicate: which findings are allowed to land on the artifact, and what is
+ * The in-context delivery predicate: which observations are allowed to land on the artifact, and what is
  * written down about the ones that are not. Two rules apply — the practice's loudness tier and the run's
  * provenance — and this holds both to their reasons.
  */
@@ -69,9 +69,9 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practice("loud", PracticeReviewTier.DELIVER))
         );
-        ValidatedFinding finding = finding("loud", "occ-1");
+        ValidatedObservation observation = observation("loud", "occ-1");
 
-        assertThat(gate().admitInContext(job(), List.of(finding))).containsExactly(finding);
+        assertThat(gate().admitInContext(job(), List.of(observation))).containsExactly(observation);
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
@@ -85,15 +85,15 @@ class InContextDeliveryGateTest extends BaseUnitTest {
                 practice("loud", PracticeReviewTier.DELIVER)
             )
         );
-        ValidatedFinding measured = finding("measured", "occ-1");
-        ValidatedFinding proposed = finding("proposed", "occ-2");
-        ValidatedFinding loud = finding("loud", "occ-3");
+        ValidatedObservation measured = observation("measured", "occ-1");
+        ValidatedObservation proposed = observation("proposed", "occ-2");
+        ValidatedObservation loud = observation("loud", "occ-3");
         // Built BEFORE the stubbing call: mocking inside a when(...) argument leaves Mockito's stubbing
         // half-finished and fails the next interaction instead of this line.
         List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"), observation("occ-3"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
 
-        List<ValidatedFinding> admitted = gate().admitInContext(job(), List.of(measured, proposed, loud));
+        List<ValidatedObservation> admitted = gate().admitInContext(job(), List.of(measured, proposed, loud));
 
         assertThat(admitted).containsExactly(loud);
         // Written down, not dropped: a later evaluation must be able to tell a deliberate quiet from a miss.
@@ -109,24 +109,24 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practice("known", PracticeReviewTier.PROPOSE))
         );
-        ValidatedFinding stranger = finding("not-in-the-catalogue", "occ-9");
+        ValidatedObservation stranger = observation("not-in-the-catalogue", "occ-9");
 
         assertThat(gate().admitInContext(job(), List.of(stranger))).containsExactly(stranger);
         verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
     @Test
-    void aWithheldFindingThatWasNeverPersistedGetsNoLedgerRow() {
+    void aWithheldObservationThatWasNeverPersistedGetsNoLedgerRow() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practice("measured", PracticeReviewTier.PROPOSE))
         );
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(List.of());
 
-        assertThat(gate().admitInContext(job(), List.of(finding("measured", null)))).isEmpty();
+        assertThat(gate().admitInContext(job(), List.of(observation("measured", null)))).isEmpty();
         verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
-    /** A ledger failure is telemetry loss, never delivery loss: the surviving findings still go out. */
+    /** A ledger failure is telemetry loss, never delivery loss: the surviving observations still go out. */
     @Test
     void aLedgerFailureDoesNotStopTheFindingsThatSurvived() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
@@ -137,24 +137,24 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         doThrow(new IllegalStateException("ledger down"))
             .when(feedbackLedgerRecorder)
             .recordWithheld(any(), any(), any(), eq(0));
-        ValidatedFinding loud = finding("loud", "occ-2");
+        ValidatedObservation loud = observation("loud", "occ-2");
 
-        assertThat(gate().admitInContext(job(), List.of(finding("measured", "occ-1"), loud))).containsExactly(loud);
+        assertThat(gate().admitInContext(job(), List.of(observation("measured", "occ-1"), loud))).containsExactly(loud);
     }
 
     /**
-     * A campaign's findings never reach the artifact. Posting one would comment on a pull request merged
+     * A campaign's observations never reach the artifact. Posting one would comment on a pull request merged
      * months ago and notify everyone still subscribed to it about work nobody can act on.
      */
     @Test
     void aBackfilledRunSaysNothingOnTheArtifactWhateverTheTierIs() {
         List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
-        ValidatedFinding loud = finding("loud", "occ-1");
-        ValidatedFinding alsoLoud = finding("also-loud", "occ-2");
+        ValidatedObservation loud = observation("loud", "occ-1");
+        ValidatedObservation alsoLoud = observation("also-loud", "occ-2");
 
         assertThat(gate().admitInContext(backfillJob(), List.of(loud, alsoLoud))).isEmpty();
-        // Never even asks for the tiers: no dial can make a retrospective finding actionable in place.
+        // Never even asks for the tiers: no dial can make a retrospective observation actionable in place.
         verifyNoInteractions(practiceRepository);
         verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordWithheld(
             any(),
@@ -166,14 +166,14 @@ class InContextDeliveryGateTest extends BaseUnitTest {
 
     /** The two withholding rules are separately answerable, which is why they are separately recorded. */
     @Test
-    void aTierWithheldFindingIsRecordedUnderTheTierNotTheProvenance() {
+    void aTierWithheldObservationIsRecordedUnderTheTierNotTheProvenance() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(practice("measured", PracticeReviewTier.PROPOSE))
         );
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
 
-        assertThat(gate().admitInContext(job(), List.of(finding("measured", "occ-1")))).isEmpty();
+        assertThat(gate().admitInContext(job(), List.of(observation("measured", "occ-1")))).isEmpty();
         verify(feedbackLedgerRecorder).recordWithheld(
             any(),
             any(),
@@ -186,9 +186,9 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     void aJobWithoutAWorkspaceIsLeftAlone() {
         AgentJob job = new AgentJob();
         job.setId(JOB_ID);
-        ValidatedFinding finding = finding("anything", "occ-1");
+        ValidatedObservation observation = observation("anything", "occ-1");
 
-        assertThat(gate().admitInContext(job, List.of(finding))).containsExactly(finding);
+        assertThat(gate().admitInContext(job, List.of(observation))).containsExactly(observation);
         verifyNoInteractions(practiceRepository);
     }
 
@@ -219,8 +219,8 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         return practice;
     }
 
-    private ValidatedFinding finding(String slug, String occurrenceKey) {
-        return new ValidatedFinding(
+    private ValidatedObservation observation(String slug, String occurrenceKey) {
+        return new ValidatedObservation(
             slug,
             "title",
             Presence.ABSENT,
@@ -228,8 +228,6 @@ class InContextDeliveryGateTest extends BaseUnitTest {
             Severity.MAJOR,
             null,
             "reasoning",
-            "guidance",
-            List.of(),
             occurrenceKey == null ? null : new ObservationKeys(occurrenceKey, "rk-" + occurrenceKey)
         );
     }

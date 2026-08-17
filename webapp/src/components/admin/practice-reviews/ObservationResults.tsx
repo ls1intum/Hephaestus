@@ -126,7 +126,7 @@ export function ObservationRow({
 					params={{ workspaceSlug, observationId: observation.id }}
 					search={scope ?? ((previous) => previous)}
 				>
-					{observation.title}
+					{observation.summary}
 				</Link>
 			}
 			meta={

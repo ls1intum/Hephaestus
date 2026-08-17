@@ -90,10 +90,10 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
      *
      * <p><b>{@code channels} is required, and deliberately has no default.</b> A {@link Feedback} body is
      * "what we told them", but three lanes can tell them something and they are not interchangeable: an
-     * IN_CONTEXT note and a mentor turn are about the one finding they are bound to, while an IN_APP
+     * IN_CONTEXT note and a mentor turn are about the one observation they are bound to, while an IN_APP
      * unit is a cross-artifact message that binds every problem behind it as PRIMARY evidence and is
      * about none of them individually. With no channel predicate this query's newest-first tie-break
-     * hands a per-finding surface the process message instead — so the lane a caller means is a fact only
+     * hands a per-observation surface the process message instead — so the lane a caller means is a fact only
      * the caller holds, and it has to state it.
      *
      * <p>Bound as names rather than as {@link FeedbackChannel} values because this is a native query, where
@@ -120,13 +120,13 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         """,
         nativeQuery = true
     )
-    List<ObservationAdviceBody> findLatestAdviceBodiesByObservationIds(
+    List<ObservationFeedbackBody> findLatestFeedbackBodiesByObservationIds(
         @Param("workspaceId") Long workspaceId,
         @Param("observationIds") Collection<UUID> observationIds,
         @Param("channels") Collection<String> channels
     );
 
-    interface ObservationAdviceBody {
+    interface ObservationFeedbackBody {
         UUID getObservationId();
         String getBody();
     }
@@ -135,7 +135,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
 
     /**
      * The id(s) of the PREPARED IN_CHAT feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
-     * given observation. Maps a mentor {@code link_finding} observation id back to the unit to flip to DELIVERED.
+     * given observation. Maps a mentor {@code link_observation} id back to the unit to flip to DELIVERED.
      * Ordered newest-first so a caller can take the first; the reconciler's CAS makes any duplicate flip a no-op.
      */
     @Query(
@@ -157,24 +157,15 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         @Param("observationId") UUID observationId
     );
 
-    /**
-     * Facts + practice + the composer's move for the newest PREPARED IN_CHAT units of a recipient - the payload
-     * the {@code PreparedConversationFeedbackContentSource} ships to the mentor. Ordered newest-first, bounded by the
-     * caller's {@code Pageable}.
-     *
-     * <p>{@code body} is never the mentor's script. It is either NULL - the fallback selection, where the mentor
-     * composes everything at delivery as it always has - or a {@link ConversationBriefBody} brief: the question to
-     * open with, the evidence to hold back, and the target. Read it through that class, which answers null for
-     * anything it did not write, rather than as text to speak.
-     */
+    /** Newest prepared conversation facts and optional {@link ConversationBriefBody} bodies for a recipient. */
     @Query(
         """
         SELECT fo.feedback.id AS feedbackId,
                o.id AS observationId,
                p.slug AS practiceSlug,
                p.name AS practiceName,
-               o.title AS title,
-               o.reasoning AS reasoning,
+               o.summary AS summary,
+               o.evidenceRationale AS evidenceRationale,
                o.severity AS severity,
                fo.feedback.body AS body,
                fo.feedback.artifactKind AS artifactKind,
@@ -200,10 +191,10 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     @Query(
         """
         SELECT fo.observation.id AS observationId, fo.role AS role, fo.ordinal AS ordinal,
-               p.slug AS practiceSlug, p.name AS practiceName, o.title AS title,
+               p.slug AS practiceSlug, p.name AS practiceName, o.summary AS summary,
                pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
                o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
-               o.confidence AS confidence, evaluatedRevision.id AS practiceRevisionId,
+               evaluatedRevision.id AS practiceRevisionId,
                evaluatedRevision.reviewRuleFingerprint AS practiceRevisionFingerprint,
                currentRevision.reviewRuleFingerprint AS currentPracticeRevisionFingerprint,
                o.observedAt AS observedAt
@@ -250,11 +241,10 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getAreaName();
         String getAreaIcon();
         String getAreaColor();
-        String getTitle();
+        String getSummary();
         Presence getPresence();
         Assessment getAssessment();
         Severity getSeverity();
-        Float getConfidence();
         Long getPracticeRevisionId();
         String getPracticeRevisionFingerprint();
         String getCurrentPracticeRevisionFingerprint();
@@ -278,9 +268,12 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         UUID getObservationId();
         String getPracticeSlug();
         String getPracticeName();
-        String getTitle();
-        String getReasoning();
-        /** The composer's move, or null when nothing was composed for this unit. See {@link ConversationBriefBody}. */
+        String getSummary();
+        String getEvidenceRationale();
+        /**
+         * The composer's notes to the mentor, or null when nothing was composed for this unit. See
+         * {@link ConversationBriefBody}.
+         */
         String getBody();
         Severity getSeverity();
         ArtifactKind getArtifactKind();

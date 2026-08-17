@@ -234,7 +234,7 @@ public class AgentJobService {
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        return submitForBinding(workspace, jobType, submission, signalKey);
+        return submitForBinding(workspace, jobType, artifactKindFor(jobType, request), submission, signalKey);
     }
 
     /**
@@ -256,6 +256,7 @@ public class AgentJobService {
     private SubmissionOutcome submitForBinding(
         Workspace workspace,
         AgentJobType jobType,
+        ArtifactKind artifactKind,
         JobSubmission submission,
         @Nullable SignalKey signalKey
     ) {
@@ -283,7 +284,7 @@ public class AgentJobService {
             // Resolved, not filtered in SQL: a practice that inherits its tier stores NULL, and
             // `review_tier <> 'OFF'` answers UNKNOWN for it, which would refuse review for every
             // workspace that left a practice to inherit.
-            if (!hasReviewablePractice(currentWorkspace, artifactKindFor(jobType))) {
+            if (!hasReviewablePractice(currentWorkspace, artifactKind)) {
                 log.debug(
                     "Skipping practice review with no active practice for its work type: workspaceId={}, jobType={}",
                     workspace.getId(),
@@ -349,7 +350,7 @@ public class AgentJobService {
             job.setWorkspace(currentWorkspace);
             job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             job.setJobType(jobType);
-            job.setArtifactKind(artifactKindFor(jobType));
+            job.setArtifactKind(artifactKind);
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
             try {
@@ -439,6 +440,10 @@ public class AgentJobService {
             case CONVERSATION_REVIEW -> ArtifactKinds.CONVERSATION_THREAD;
             case DOCUMENT_REVIEW -> ArtifactKinds.DOCUMENT;
         };
+    }
+
+    private static ArtifactKind artifactKindFor(AgentJobType jobType, JobSubmissionRequest request) {
+        return artifactKindFor(jobType);
     }
 
     /**

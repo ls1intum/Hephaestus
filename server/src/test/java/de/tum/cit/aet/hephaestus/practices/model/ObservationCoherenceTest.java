@@ -26,10 +26,9 @@ class ObservationCoherenceTest extends BaseUnitTest {
             .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(1L)
             .aboutUserId(2L)
-            .title("title")
+            .summary("title")
             .presence(presence)
-            .assessment(assessment)
-            .confidence(0.9f);
+            .assessment(assessment);
     }
 
     private static void persist(Observation observation) {

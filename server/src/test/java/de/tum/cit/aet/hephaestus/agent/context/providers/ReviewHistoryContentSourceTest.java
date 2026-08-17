@@ -578,13 +578,13 @@ class ReviewHistoryContentSourceTest {
             .id(UUID.randomUUID())
             .practice(practice)
             .recurrenceKey(recurrenceKey)
-            .title(title)
+            .summary(title)
             .presence(Presence.PRESENT)
             .assessment(Assessment.BAD)
             .artifactKind(artifactKind)
             .artifactId(artifactId)
             .observedAt(Instant.parse("2026-07-01T09:00:00Z"))
-            .reasoning("The catch block logs and continues.")
+            .evidenceRationale("The catch block logs and continues.")
             .build();
     }
 }

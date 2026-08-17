@@ -5,7 +5,7 @@ import java.util.Objects;
 /**
  * The vendor pipe that posts a review's summary — every integration declaring
  * {@link Capability#FEEDBACK_DELIVERY} implements it, alongside the capability-gated
- * {@link InlineFindingChannel} and {@link ApprovalChannel}.
+ * {@link InlineFeedbackChannel} and {@link ApprovalChannel}.
  *
  * <p>Distinct from {@code practices.feedback.FeedbackChannel}, which names where feedback landed; this
  * one does the landing.

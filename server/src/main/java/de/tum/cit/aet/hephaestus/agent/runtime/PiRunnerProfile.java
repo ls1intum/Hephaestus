@@ -13,7 +13,7 @@ public interface PiRunnerProfile {
     String runnerScript();
 
     /**
-     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-finding-normalize.mjs}).
+     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-observation-normalize.mjs}).
      * Each is staged at the workspace root next to the runner so the import resolves. Empty by default.
      */
     default List<String> sidecarScripts() {

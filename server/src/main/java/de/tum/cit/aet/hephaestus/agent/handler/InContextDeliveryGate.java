@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -24,11 +24,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Decides which findings reach the artifact itself, by applying {@link FeedbackAdmission} to the
- * {@link FeedbackChannel#IN_CONTEXT} channel: a finding is posted only if its practice's autonomy tier
+ * Decides which observations reach the artifact itself, by applying {@link FeedbackAdmission} to the
+ * {@link FeedbackChannel#IN_CONTEXT} channel: an observation is posted only if its practice's autonomy tier
  * admits the channel <em>and</em> the run's provenance does.
  *
- * <p>Runs strictly after the findings are persisted and stamped with their observation keys — a
+ * <p>Runs strictly after the observations are persisted and stamped with their observation keys — a
  * {@code PROPOSE} practice and a backfill are measured and recorded exactly like an engaged live run, and
  * differ only in how far the result travels. Nothing here touches the behaviour time series.
  *
@@ -36,9 +36,9 @@ import org.springframework.transaction.annotation.Transactional;
  * subscriber would be notified about work nobody can act on; it's checked once per job since a job has
  * exactly one origin.
  *
- * <p>Each withheld finding gets a SUPPRESSED ledger row rather than being dropped in silence, so a later
+ * <p>Each withheld observation gets a SUPPRESSED ledger row rather than being dropped in silence, so a later
  * evaluation can tell a deliberate quiet from a detection miss. Writing the row is best-effort: a ledger
- * failure never blocks the delivery of the findings that survived.
+ * failure never blocks the delivery of the observations that survived.
  *
  * <p>A slug the catalogue read does not resolve is kept when only the tier would have withheld it — it is
  * never an unknown practice ({@code PracticeDetectionDeliveryService.deliver} refuses those first), only a
@@ -67,21 +67,21 @@ class InContextDeliveryGate {
         this.workspaceDefaults = workspaceDefaults;
     }
 
-    /** The subset of {@code findings} that may be placed on the artifact, in the order given. */
+    /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
     @Transactional(readOnly = true)
-    List<ValidatedFinding> admitInContext(AgentJob job, List<ValidatedFinding> findings) {
-        if (findings.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
-            return findings;
+    List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
+        if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
+            return observations;
         }
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
             log.info(
-                "Provenance withheld all {} finding(s) from the artifact: origin={}, jobId={}",
-                findings.size(),
+                "Provenance withheld all {} observation(s) from the artifact: origin={}, jobId={}",
+                observations.size(),
                 origin,
                 job.getId()
             );
-            recordWithheld(job, findings, FeedbackSuppressionReason.BACKFILL_QUIET);
+            recordWithheld(job, observations, FeedbackSuppressionReason.BACKFILL_QUIET);
             return List.of();
         }
 
@@ -95,55 +95,55 @@ class InContextDeliveryGate {
             tierBySlug.put(practice.getSlug(), ReviewTierResolver.effectiveTierOf(practice, defaults.defaultTier()));
         }
 
-        List<ValidatedFinding> admitted = new ArrayList<>(findings.size());
-        List<ValidatedFinding> withheld = new ArrayList<>();
-        for (ValidatedFinding finding : findings) {
-            PracticeReviewTier tier = tierBySlug.get(finding.practiceSlug());
+        List<ValidatedObservation> admitted = new ArrayList<>(observations.size());
+        List<ValidatedObservation> withheld = new ArrayList<>();
+        for (ValidatedObservation observation : observations) {
+            PracticeReviewTier tier = tierBySlug.get(observation.practiceSlug());
             if (tier == null) {
                 log.warn(
-                    "No tier resolved for a delivered finding's practice, so the tier axis cannot " +
+                    "No tier resolved for a delivered observation's practice, so the tier axis cannot " +
                         "withhold it: slug={}, jobId={}",
-                    finding.practiceSlug(),
+                    observation.practiceSlug(),
                     job.getId()
                 );
             }
             if (FeedbackAdmission.delivers(origin, tier, FeedbackChannel.IN_CONTEXT)) {
-                admitted.add(finding);
+                admitted.add(observation);
             } else {
-                withheld.add(finding);
+                withheld.add(observation);
             }
         }
         if (withheld.isEmpty()) {
-            return findings;
+            return observations;
         }
         log.info(
-            "Autonomy tier withheld {} of {} finding(s) from the artifact: jobId={}",
+            "Autonomy tier withheld {} of {} observation(s) from the artifact: jobId={}",
             withheld.size(),
-            findings.size(),
+            observations.size(),
             job.getId()
         );
         recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_TIER_QUIET);
         return admitted;
     }
 
-    private void recordWithheld(AgentJob job, List<ValidatedFinding> withheld, FeedbackSuppressionReason reason) {
+    private void recordWithheld(AgentJob job, List<ValidatedObservation> withheld, FeedbackSuppressionReason reason) {
         Map<String, Observation> byOccurrence = new HashMap<>();
         for (Observation observation : observationRepository.findByAgentJobId(job.getId())) {
             byOccurrence.put(observation.getOccurrenceKey(), observation);
         }
         int index = 0;
-        for (ValidatedFinding finding : withheld) {
+        for (ValidatedObservation measured : withheld) {
             // Overflowing the band would address the NEXT band's unit, which the (agent_job_id, position)
             // guard would then read as "already recorded" and drop.
             if (index >= FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH) {
                 log.warn(
-                    "Withheld-feedback ledger band full at {} rows; remaining withheld findings are unrecorded: jobId={}",
+                    "Withheld-feedback ledger band full at {} rows; remaining withheld observations are unrecorded: jobId={}",
                     index,
                     job.getId()
                 );
                 return;
             }
-            String occurrenceKey = finding.occurrenceKey();
+            String occurrenceKey = measured.occurrenceKey();
             if (occurrenceKey == null) {
                 continue; // never persisted, so there is no observation for a ledger row to bind
             }

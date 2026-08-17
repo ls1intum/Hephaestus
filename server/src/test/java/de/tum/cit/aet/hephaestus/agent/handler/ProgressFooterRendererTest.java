@@ -62,8 +62,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
             "New dead branch",
             null,
             Assessment.BAD,
-            Severity.MAJOR,
-            0.8f
+            Severity.MAJOR
         );
         LocusTransition nowSatisfied = new LocusTransition(
             "k-fixed",
@@ -72,8 +71,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
             "Name now clear",
             Assessment.BAD,
             Assessment.GOOD,
-            Severity.MINOR,
-            0.8f
+            Severity.MINOR
         );
         TrendDelta d = delta(List.of(newProblem, nowSatisfied));
 
@@ -131,6 +129,6 @@ class ProgressFooterRendererTest extends BaseUnitTest {
         // locus is a gap → Assessment.BAD. NEW has no prior; RESOLVED has no current.
         Assessment prior = status == TransitionStatus.NEW ? null : Assessment.BAD;
         Assessment curr = status == TransitionStatus.RESOLVED ? null : Assessment.BAD;
-        return new LocusTransition(key, status, slug, title, prior, curr, Severity.MAJOR, 0.8f);
+        return new LocusTransition(key, status, slug, title, prior, curr, Severity.MAJOR);
     }
 }

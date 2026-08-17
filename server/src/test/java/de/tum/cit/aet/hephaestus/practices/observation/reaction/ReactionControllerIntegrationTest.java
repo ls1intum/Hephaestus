@@ -111,11 +111,10 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(42L)
             .aboutUserId(adminUser.getId())
-            .title("Missing error handling")
+            .summary("Missing error handling")
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
-            .confidence(0.85f)
             .recurrenceKey(HEADLINE_RECURRENCE_KEY)
             .observedAt(Instant.now())
             .build();

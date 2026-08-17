@@ -144,7 +144,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.95f,
                 null,
                 "Good quality",
                 null,
@@ -156,12 +155,11 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             Observation found = observationRepository.findById(id).orElseThrow();
             assertThat(found.getOccurrenceKey()).isEqualTo("key-1");
-            assertThat(found.getTitle()).isEqualTo("Good PR description");
+            assertThat(found.getSummary()).isEqualTo("Good PR description");
             assertThat(found.getPresence().name()).isEqualTo("PRESENT");
             assertThat(found.getAssessment()).isEqualTo(Assessment.GOOD);
             assertThat(found.getSeverity().name()).isEqualTo("INFO");
-            assertThat(found.getConfidence()).isEqualTo(0.95f);
-            assertThat(found.getReasoning()).isEqualTo("Good quality");
+            assertThat(found.getEvidenceRationale()).isEqualTo("Good quality");
         }
 
         @Test
@@ -184,7 +182,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.8f,
                 null,
                 null,
                 null,
@@ -205,7 +202,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.5f,
                 null,
                 null,
                 null,
@@ -236,7 +232,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.7f,
                 evidence,
                 "Missing error handling",
                 null,
@@ -274,7 +269,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
@@ -325,7 +319,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
@@ -346,7 +339,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MINOR",
-                0.5f,
                 null,
                 null,
                 null,
@@ -401,7 +393,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.6f,
                 null,
                 null,
                 null,
@@ -422,7 +413,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
@@ -473,7 +463,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 presence,
                 assessment,
                 severity,
-                0.9f,
                 null,
                 null,
                 null,
@@ -582,7 +571,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
@@ -631,7 +619,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 presence,
                 "PRESENT".equals(presence) ? "GOOD" : "BAD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
@@ -804,7 +791,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.9f,
                 null,
                 null,
                 null,
@@ -886,7 +872,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.9f,
                 null,
                 null,
                 null,

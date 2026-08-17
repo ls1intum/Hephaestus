@@ -5,7 +5,7 @@
  *   <li><b>Job-type dispatch</b> ({@code handler.spi}: {@code JobTypeHandler}, {@code JobSubmission}) plus the
  *       {@code *ReviewHandler}s and {@code JobTypeHandlerRegistry}/{@code JobTypeHandlerConfiguration} that wire
  *       a job type to the code that runs it.</li>
- *   <li><b>The delivery layer</b> — renders immutable findings into SCM feedback and posts it:
+ *   <li><b>The delivery layer</b> — renders immutable observations into SCM feedback and posts it:
  *       {@code DeliveryComposer}, {@code FeedbackDeliveryService}, {@code PracticeDetectionDeliveryService},
  *       {@code DiffNotePoster}, {@code PullRequestCommentPoster}, {@code ProgressFooterRenderer}, plus the
  *       {@code FeedbackLedgerRecorder} (the sole write-orchestrator of the {@code practices.feedback} ledger —

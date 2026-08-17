@@ -50,7 +50,7 @@ describe("feedbackPreviewText", () => {
 		);
 	});
 
-	it("drops the rule between two findings", () => {
+	it("drops the rule between two observations", () => {
 		expect(preview("First point.\n\n---\n\nSecond point.")).toBe("First point. Second point…");
 	});
 

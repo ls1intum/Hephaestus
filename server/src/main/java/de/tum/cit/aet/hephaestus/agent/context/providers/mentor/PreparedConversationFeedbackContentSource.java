@@ -77,10 +77,7 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             );
 
         Set<Long> activeThreadIds = consentGate.activeThreadIds(workspaceId, conversationThreadIds(prepared));
-        // The facts carry no evidence, so each one has to be read back and authorized before it may be
-        // quoted at the mentor. Both reads are batched: the per-fact form spent a fetch plus an
-        // authorization round trip on every row, and the fetch was itself lazy about the practice revision
-        // the currentness test compares.
+        // Load and authorize the bound observations before exposing their evidence to the mentor.
         Map<UUID, Observation> observations = observationsById(workspaceId, prepared);
         Set<UUID> visible = visibilityPolicy.permitsAll(
             workspaceId,
@@ -94,9 +91,6 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
 
         ArrayNode arr = root.putArray("preparedConversationFeedback");
         for (PreparedConversationFact fact : prepared) {
-            // Membership is the whole answer, and it covers both refusals the per-fact form made: an
-            // observation this workspace could not read never entered the batch, so it can never be in the
-            // permitted set either.
             if (!visible.contains(fact.getObservationId())) {
                 continue;
             }
@@ -107,15 +101,15 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
                 continue;
             }
             ObjectNode node = arr.addObject();
-            node.put("findingId", fact.getObservationId().toString());
+            node.put("observationId", fact.getObservationId().toString());
             node.put("practiceSlug", fact.getPracticeSlug());
             node.put("practiceName", fact.getPracticeName());
-            node.put("title", fact.getTitle());
+            node.put("summary", fact.getSummary());
             if (fact.getSeverity() != null) {
                 node.put("severity", fact.getSeverity().name());
             }
-            if (fact.getReasoning() != null) {
-                node.put("reasoning", fact.getReasoning());
+            if (fact.getEvidenceRationale() != null) {
+                node.put("evidenceRationale", fact.getEvidenceRationale());
             }
             if (fact.getArtifactKind() != null) {
                 node.put("artifactKind", fact.getArtifactKind().value());
@@ -126,7 +120,12 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
             if (fact.getPreparedAt() != null) {
                 node.put("preparedAt", fact.getPreparedAt().toString());
             }
-            writeMove(node, fact.getBody());
+            Observation observation = observations.get(fact.getObservationId());
+            if (observation != null && observation.getEvidence() != null) {
+                // The mentor grounds its own wording in the authorized measurement, not only the brief.
+                node.set("evidence", observation.getEvidence());
+            }
+            writeNotes(node, fact.getBody());
         }
         root.put("totalPrepared", arr.size());
         try {
@@ -136,27 +135,18 @@ public class PreparedConversationFeedbackContentSource implements ContentSource 
         }
     }
 
-    /**
-     * The composer's move for one prepared unit, when there is one.
-     *
-     * <p>Written under {@code move}, and never under {@code body} or {@code message}, because it is not text
-     * to speak: {@code opener} is the question to ask before anything is told, {@code evidence} is what to
-     * show only once the developer has answered, and {@code target} is what the turn is trying to leave them
-     * able to do for themselves. The mentor still writes the words of the turn.
-     *
-     * <p>A unit prepared without a move simply has none, and the mentor composes from the fact as it always
-     * has - the fallback is a missing key, not an empty object, so "nothing was composed" cannot read as "the
-     * composer had nothing to say".
-     */
-    private static void writeMove(ObjectNode node, String body) {
+    /** Adds structured internal notes when the prepared body contains a complete brief. */
+    private static void writeNotes(ObjectNode node, String body) {
         ConversationBriefBody.Brief brief = ConversationBriefBody.parse(body);
         if (brief == null) {
             return;
         }
-        ObjectNode move = node.putObject("move");
-        move.put("opener", brief.opener());
-        move.put("evidence", brief.evidence());
-        move.put("target", brief.target());
+        node.put("topic", brief.title());
+        ObjectNode notes = node.putObject("notes");
+        notes.put("situation", brief.situation());
+        notes.put("capability", brief.capability());
+        notes.put("evidenceSummary", brief.evidenceSummary());
+        notes.put("inConversationSignal", brief.inConversationSignal());
     }
 
     /**

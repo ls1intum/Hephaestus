@@ -31,7 +31,7 @@ public record ChatMessageDTO(
     UUID id,
     @Nullable UUID parentMessageId,
     String role,
-    @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-finding).")) List<Object> parts,
+    @ArraySchema(schema = @Schema(description = "AI SDK UIMessage part (text / data-observation).")) List<Object> parts,
     @Nullable @Schema(description = "Per-turn metadata: status, model, costUsd, usage, …") Map<String, Object> metadata,
     Instant createdAt
 ) {

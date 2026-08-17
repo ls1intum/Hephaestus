@@ -13,4 +13,5 @@ public enum PracticeEvidenceSkipReason {
     SOURCE_EMPTY,
     NO_AUTOMATED_REVIEW,
     DECLARED_EVIDENCE_INSUFFICIENT,
+    SUBJECT_NOT_IN_THE_WORK,
 }

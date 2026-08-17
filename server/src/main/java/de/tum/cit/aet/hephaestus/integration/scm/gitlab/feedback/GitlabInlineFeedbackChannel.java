@@ -6,10 +6,10 @@ import static de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMr
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
@@ -34,7 +34,7 @@ import org.springframework.graphql.client.ClientGraphQlResponse;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab adapter for {@link InlineFindingChannel}. Posts inline diff notes one at a
+ * GitLab adapter for {@link InlineFeedbackChannel}. Posts inline diff notes one at a
  * time via {@code CreateDiffNote} (GitLab has no batch API). For positions outside the
  * diff hunk, falls back to a regular MR comment with {@code file:line} prefix.
  *
@@ -48,10 +48,10 @@ import org.springframework.stereotype.Component;
  * only those, are {@code DestroyNote}d. Reconciliation reads are best-effort; a failed read degrades to
  * fresh posts (still keyed) rather than blocking delivery.
  *
- * <p>The {@link #clearStaleFindings} path remains for the zero-note re-run (the empty-diff pathology) where
- * there are no findings to reconcile against and every prior note is therefore stale.
+ * <p>The {@link #clearStaleFeedback} path remains for the zero-note re-run (the empty-diff pathology) where
+ * there are no feedbackItems to reconcile against and every prior note is therefore stale.
  *
- * <p>Non-{@link FindingAnchor.DiffAnchor} anchors are counted as failed.
+ * <p>Non-{@link FeedbackAnchor.DiffAnchor} anchors are counted as failed.
  *
  * <p>Gated on {@code hephaestus.integration.gitlab.enabled=true} to track
  * {@link GitLabGraphQlClientProvider}.
@@ -59,9 +59,9 @@ import org.springframework.stereotype.Component;
 @Component
 @OutboundEgressGateway
 @ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
-public class GitlabInlineFindingChannel implements InlineFindingChannel {
+public class GitlabInlineFeedbackChannel implements InlineFeedbackChannel {
 
-    private static final Logger log = LoggerFactory.getLogger(GitlabInlineFindingChannel.class);
+    private static final Logger log = LoggerFactory.getLogger(GitlabInlineFeedbackChannel.class);
 
     /**
      * GitLab's max page size for the {@code discussions} connection (the GraphQL {@code first} cap is 100).
@@ -85,7 +85,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     private final GitlabMrResolver mrResolver;
     private final OutboundEgressGuard egressGuard;
 
-    public GitlabInlineFindingChannel(
+    public GitlabInlineFeedbackChannel(
         GitLabGraphQlClientProvider gitLabProvider,
         GitlabMrResolver mrResolver,
         OutboundEgressGuard egressGuard
@@ -102,11 +102,11 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
     /**
      * Deletes every marker-bearing inline note on the MR without posting new ones — the clear half of
-     * clear-then-post (SPI {@link InlineFindingChannel#clearStaleFindings}). Called on a zero-note re-run so
+     * clear-then-post (SPI {@link InlineFeedbackChannel#clearStaleFeedback}). Called on a zero-note re-run so
      * a PR re-reviewed into nothing-inline doesn't keep line-numbered notes on code no longer in the diff.
      */
     @Override
-    public void clearStaleFindings(SummaryChannel.FeedbackTarget target, String marker) {
+    public void clearStaleFeedback(SummaryChannel.FeedbackTarget target, String marker) {
         if (marker == null || marker.isBlank()) {
             return;
         }
@@ -120,18 +120,18 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     }
 
     @Override
-    public InlineResult postInlineFindings(SummaryChannel.FeedbackTarget target, List<InlineFinding> findings) {
-        if (findings == null || findings.isEmpty()) {
+    public InlineResult postInlineFeedback(SummaryChannel.FeedbackTarget target, List<InlineFeedback> feedbackItems) {
+        if (feedbackItems == null || feedbackItems.isEmpty()) {
             return InlineResult.counts(0, 0);
         }
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             log.warn(
-                "GitLab rate limit critical — skipping {} inline findings: workspaceId={}",
-                findings.size(),
+                "GitLab rate limit critical — skipping {} inline feedbackItems: workspaceId={}",
+                feedbackItems.size(),
                 scopeId
             );
-            return InlineResult.counts(0, findings.size());
+            return InlineResult.counts(0, feedbackItems.size());
         }
 
         MrCoordinates mr = GitlabMrResolver.parseSubjectExternalId(target.subjectExternalId());
@@ -142,31 +142,31 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                 scopeId,
                 mrInfo.globalId()
             );
-            return InlineResult.counts(0, findings.size());
+            return InlineResult.counts(0, feedbackItems.size());
         }
 
         // Index this reviewer's prior threads by correlation key so a stable finding edits its existing thread
         // instead of being cleared-then-reposted. Best-effort: a failed read yields an empty index, degrading to
         // fresh keyed posts (no edit, no delete) rather than blocking delivery.
-        String marker = findings.get(0).marker();
+        String marker = feedbackItems.get(0).marker();
         Map<String, PriorThread> priorByKey = indexPriorThreads(scopeId, mr.projectPath(), mr.iid(), marker);
 
         int posted = 0;
         int failed = 0;
         boolean rateLimited = false;
         Set<String> seenKeys = new HashSet<>();
-        // Keys we've already posted/edited a thread for THIS run. Guards the case where two findings in one
+        // Keys we've already posted/edited a thread for THIS run. Guards the case where two feedbackItems in one
         // batch carry the same non-null recurrenceKey (a fingerprint that escaped upstream dedup): without
         // this, both would createThread a fresh duplicate, and the next run's last-wins index would orphan one
         // permanently (its key stays in seenKeys, so it is never reaped). First wins; the twin is skipped.
         Set<String> processedKeys = new HashSet<>();
-        List<DeliveredSignal> signals = new ArrayList<>(findings.size());
+        List<DeliveredSignal> signals = new ArrayList<>(feedbackItems.size());
 
-        for (int index = 0; index < findings.size(); index++) {
-            InlineFinding finding = findings.get(index);
-            int remaining = findings.size() - index - 1;
-            if (!(finding.anchor() instanceof FindingAnchor.DiffAnchor diff)) {
-                log.warn("Skipping non-diff anchor on GitLab inline finding: anchor={}", finding.anchor());
+        for (int index = 0; index < feedbackItems.size(); index++) {
+            InlineFeedback finding = feedbackItems.get(index);
+            int remaining = feedbackItems.size() - index - 1;
+            if (!(finding.anchor() instanceof FeedbackAnchor.DiffAnchor diff)) {
+                log.warn("Skipping non-diff anchor on GitLab inline feedback: anchor={}", finding.anchor());
                 failed++;
                 signals.add(failedSignal(finding));
                 continue;
@@ -184,7 +184,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
             // Within-batch duplicate fingerprint: this key already produced a thread this run. Skip the twin
             // rather than create a second thread that no future run could reconcile. (Null keys are
-            // pre-correlation findings and are never collapsed.)
+            // pre-correlation feedbackItems and are never collapsed.)
             if (key != null && !processedKeys.add(key)) {
                 log.warn("Skipping duplicate recurrenceKey within batch: workspaceId={}, key={}", scopeId, key);
                 continue;
@@ -222,7 +222,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
                     posted,
                     failed,
                     signals,
-                    recurrenceKeys(findings.subList(index, findings.size()))
+                    recurrenceKeys(feedbackItems.subList(index, feedbackItems.size()))
                 );
             } catch (RateLimitHit e) {
                 log.warn("GitLab rate limit hit during diff note posting — stopping: workspaceId={}", scopeId);
@@ -241,7 +241,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         }
 
         log.info(
-            "Reconciled GitLab inline findings: posted/edited={}, failed={}, deleted-gone={}, workspaceId={}",
+            "Reconciled GitLab inline feedbackItems: posted/edited={}, failed={}, deleted-gone={}, workspaceId={}",
             posted,
             failed,
             deletedGone,
@@ -250,12 +250,12 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         return new InlineResult(posted, failed, List.copyOf(signals));
     }
 
-    private static List<String> recurrenceKeys(List<InlineFinding> findings) {
-        return findings.stream().map(InlineFinding::recurrenceKey).filter(Objects::nonNull).toList();
+    private static List<String> recurrenceKeys(List<InlineFeedback> feedbackItems) {
+        return feedbackItems.stream().map(InlineFeedback::recurrenceKey).filter(Objects::nonNull).toList();
     }
 
     /** Posts a brand-new diff-note thread; falls back to an MR comment when the line is outside the diff hunk. */
-    private Outcome createThread(long scopeId, MrInfo mrInfo, FindingAnchor.DiffAnchor diff, String body) {
+    private Outcome createThread(long scopeId, MrInfo mrInfo, FeedbackAnchor.DiffAnchor diff, String body) {
         try {
             Map<String, Object> position = buildPosition(diff, mrInfo);
             egressGuard.requireDeliveryAllowed("gitlab.post-inline-finding");
@@ -313,7 +313,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         }
     }
 
-    private Outcome editInPlace(long scopeId, PriorThread prior, String body, FindingAnchor.DiffAnchor diff) {
+    private Outcome editInPlace(long scopeId, PriorThread prior, String body, FeedbackAnchor.DiffAnchor diff) {
         try {
             egressGuard.requireDeliveryAllowed("gitlab.update-inline-finding");
             ClientGraphQlResponse response = gitLabProvider
@@ -454,7 +454,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
 
     /**
      * Destroys prior bot threads whose key is absent from the current run and that no developer engaged with —
-     * the findings that genuinely went away. Returns the number deleted. Best-effort per note.
+     * the feedbackItems that genuinely went away. Returns the number deleted. Best-effort per note.
      */
     private int destroyVanishedThreads(long scopeId, Map<String, PriorThread> priorByKey, Set<String> seenKeys) {
         int deleted = 0;
@@ -469,7 +469,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
         return deleted;
     }
 
-    private static DeliveredSignal failedSignal(InlineFinding finding) {
+    private static DeliveredSignal failedSignal(InlineFeedback finding) {
         return new DeliveredSignal(finding.recurrenceKey(), finding.anchor(), Disposition.FAILED, null, null);
     }
 
@@ -510,7 +510,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     /** Signals the per-finding loop to stop and fail the rest of the batch on a rate-limit hit. */
     private static final class RateLimitHit extends RuntimeException {}
 
-    private static Map<String, Object> buildPosition(FindingAnchor.DiffAnchor diff, MrInfo mrInfo) {
+    private static Map<String, Object> buildPosition(FeedbackAnchor.DiffAnchor diff, MrInfo mrInfo) {
         Map<String, Object> position = new HashMap<>();
         position.put("headSha", mrInfo.headSha());
         position.put("startSha", mrInfo.startSha());
@@ -648,7 +648,7 @@ public class GitlabInlineFindingChannel implements InlineFindingChannel {
     private String postFallbackComment(
         long scopeId,
         String mrGlobalId,
-        FindingAnchor.DiffAnchor diff,
+        FeedbackAnchor.DiffAnchor diff,
         String markedBody
     ) {
         try {

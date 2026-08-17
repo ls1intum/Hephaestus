@@ -7,7 +7,7 @@ import java.util.UUID;
  * Published after practice observations are persisted for a completed agent job.
  *
  * @param developerId the user the observations are about (ADR-0022 {@code aboutUserId})
- * @param findingsDiscarded number of observations discarded (unknown slug, over cap, duplicate)
+ * @param observationsDiscarded number of observations discarded (unknown slug, over cap, duplicate)
  */
 public record PracticeDetectionCompletedEvent(
     UUID agentJobId,
@@ -15,7 +15,7 @@ public record PracticeDetectionCompletedEvent(
     ArtifactKind artifactKind,
     Long artifactId,
     Long developerId,
-    int findingsInserted,
-    int findingsDiscarded,
+    int observationsInserted,
+    int observationsDiscarded,
     boolean hasNegative
 ) {}

@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession;
-import de.tum.cit.aet.hephaestus.agent.handler.FindingOrder;
+import de.tum.cit.aet.hephaestus.agent.handler.ObservationOrder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.practices.feedback.ConversationBriefBody;
@@ -38,38 +38,11 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Writes the PREPARED IN_CHAT feedback units for a cycle's admitted observations. A prepared unit is a
- * standing "raise this next" marker: {@code channel=IN_CHAT}, {@code deliveryState=PREPARED}, and a body that
- * is either the composer's <em>move</em> or nothing at all. Each unit's recipient is its own observation's
- * {@code about_user_id} (per-observation).
+ * Prepares bounded {@code IN_CHAT} units for each observation subject. Only complete composed briefs are
+ * queued: observations are evidence for a mentor move, not a substitute for one.
  *
- * <p><b>Two selections, and which one runs is the composer's to decide.</b> When the composition stage wrote
- * anything for this lane, its units <em>are</em> the decision about what is worth raising: each one names a
- * practice, the server resolves that practice's admitted loci itself, and the best-ranked locus per recipient
- * carries the unit. A locus the composer wrote nothing about is not raised — the stage read it and chose not to
- * speak, which is a property of the evidence and not a withholding this server owes anybody a row for. When the
- * stage produced nothing for this lane (it is a stage a review may skip, and it may fail), selection falls back to
- * the severity ranking below, and the body stays NULL exactly as before, so that the mentor composes at delivery
- * as it always has.
- *
- * <p><b>What is frozen, and what is not.</b> The stored brief is the opener, the evidence to hold back, and the
- * target - never the mentor's script. That is a real narrowing of the old NULL-body rule, taken deliberately: the
- * mentor still writes every word of the turn with the live conversation in front of it, and the 14-day TTL sweep
- * still expires a move that was never raised. See {@link ConversationBriefBody}.
- *
- * <p><b>One live move per habit.</b> Every raised unit carries a {@code threadKey} scoped to its practice, so a
- * later move about the same habit replaces the one still queued rather than stacking beside it. A move the mentor
- * has already raised is DELIVERED and is never rewritten; the replacement is written beside it and points back at
- * it instead. That swap is {@link de.tum.cit.aet.hephaestus.agent.handler.FeedbackSupersession}, and it happens
- * inside this method's transaction so a retirement can never outlive its replacement. The key is also what the
- * composer is shown as a supersession target, so a unit written without one can never be replaced by anything.
- *
- * <p>Bounded (top-N=3 raised per recipient). Ordinals are derived from the admitted observations alone, in a
- * deterministic order (recipient, then {@link FindingOrder}: severity, evidence breadth, id), so a re-run of the
- * same job re-derives the same {@code (agent_job_id, position)} grain whatever the composer said, and the {@code existsByAgentJobIdAndPosition}
- * guard makes preparation idempotent. Positions start at
- * {@link FeedbackLedgerRecorder#IN_CHAT_UNIT_ORDINAL_BASE} so they never collide with the IN_CONTEXT /
- * suppressed / policy-floor units of the same job.
+ * <p>A practice-scoped thread key keeps one unread unit per habit. Supersession and replacement run in the
+ * same transaction, while deterministic job positions make retries idempotent.
  */
 @Component
 public class ConversationalFeedbackPreparer {
@@ -123,9 +96,16 @@ public class ConversationalFeedbackPreparer {
         if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
             return 0;
         }
+        Composition composition = Composition.of(composed);
+        if (!composition.spoke()) {
+            // A missing/failed composition stage is not permission to manufacture a queue from severity.
+            // The mentor needs a prepared coaching brief, and a null body cannot distinguish deliberate
+            // silence from infrastructure failure. The lane recovery marker is still written by the caller.
+            return 0;
+        }
         List<Observation> ordered = admitted
             .stream()
-            .sorted(Comparator.comparingLong(Observation::getAboutUserId).thenComparing(FindingOrder.worstFirst()))
+            .sorted(Comparator.comparingLong(Observation::getAboutUserId).thenComparing(ObservationOrder.worstFirst()))
             .collect(Collectors.toList());
 
         // Every admitted observation consumes a slot, so the band is not bounded by the per-recipient cap.
@@ -142,7 +122,6 @@ public class ConversationalFeedbackPreparer {
             );
         }
 
-        Composition composition = Composition.of(composed);
         // Read once, from a projection, and needed on every path: the practice is both the join between what
         // the composer wrote and what was measured, and the scope of the row's continuity key. The
         // observations arrive from whichever caller routed them and may be detached, so walking
@@ -187,12 +166,13 @@ public class ConversationalFeedbackPreparer {
                 }
                 matchedUnits.add(practiceSlug);
                 move = unit;
-                ComposedFeedbackUnit.ConversationBrief brief = Objects.requireNonNull(unit.conversation());
+                ComposedFeedbackUnit.ConversationBrief brief = Objects.requireNonNull(unit.notes());
                 body = ConversationBriefBody.render(
                     Objects.requireNonNull(unit.title()),
-                    brief.opener(),
-                    brief.evidence(),
-                    brief.target()
+                    brief.situation(),
+                    brief.capability(),
+                    brief.evidenceSummary(),
+                    brief.inConversationSignal()
                 );
             }
 
@@ -310,7 +290,7 @@ public class ConversationalFeedbackPreparer {
                     unit.channel() == FeedbackChannel.IN_CHAT &&
                     unit.action() != ComposedFeedbackUnit.Action.WITHHOLD &&
                     unit.isComplete() &&
-                    unit.conversation() != null &&
+                    unit.notes() != null &&
                     unit.title() != null
                 ) {
                     // The parser already admits one unit per practice per channel; first wins either way.

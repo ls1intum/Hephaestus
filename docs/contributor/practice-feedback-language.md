@@ -96,21 +96,16 @@ turn that links the feedback. The label is **Prepared for conversation**. *Prepa
 for a suppressed observation: at the **Propose** tier no feedback is composed at all, so nothing is prepared
 there either.
 
-**Observation, not finding**, for the measurement — in copy, in URLs, in API schema and field names, and in
-new Java. *Finding* names the right thing in exactly two places, and both mean a note pinned to a position
-in a diff rather than a measurement:
-
-- the delivery-side anchor and channel types — `FindingAnchor`, `InlineFindingChannel`, and the provider
-  implementations behind them;
-- the `findings` array in the sandbox contract the reviewing model returns, which
-  `PracticeDetectionResultParser` reads. That is a prompt-and-parser contract with a model, not a name
-  a reader ever sees.
+**Observation, not finding**, for the measurement — in copy, URLs, API schema, field names, and Java.
+Delivery uses `FeedbackAnchor` and `InlineFeedbackChannel`; the mentor uses `link_observation` and
+`data-observation`. The schema and wire protocol have no aliases for the retired vocabulary. The only
+compatibility surface is an HTTP redirect from the former reviews URL so existing bookmarks do not break;
+it carries no data contract and new links never use it.
 
 Everything else is an observation, including the read APIs and the reviews UI — the surfaces an operator
 actually reads are exactly where the banned word does the most damage. Those names are
 `ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`, `observationId`, and
-`/practices/reviews/observations`. Nothing is grandfathered: a *finding* outside the two bullets above is
-a bug.
+`/practices/reviews/observations`. Apart from that redirect, a *finding* in this subsystem is a bug.
 
 For how much a workspace lets the system do on its own about a practice — including whether it is
 reviewed at all — use **autonomy tier** and its three values **Off**, **Propose**, **Deliver**, as

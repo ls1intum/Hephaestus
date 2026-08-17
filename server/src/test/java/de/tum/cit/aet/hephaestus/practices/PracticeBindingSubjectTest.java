@@ -142,4 +142,35 @@ class PracticeBindingSubjectTest extends BaseUnitTest {
             ActorRole.AUTHOR
         );
     }
+
+    @Test
+    void doesNotSkipAReviewWhenApplicableBindingsDisagreeAboutItsSubjectPredicate() {
+        PracticeSubject manifests = new PracticeSubject(
+            "the change touches no dependency manifest",
+            List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml")))
+        );
+        PracticeSubject tests = new PracticeSubject(
+            "the change touches no tests",
+            List.of(PracticeSubjectClause.changedPathMatches(List.of("**/*Test.java")))
+        );
+        PracticeBinding onOpen = new PracticeBinding(
+            List.of(ScmSignals.PULL_REQUEST_OPENED),
+            List.of(),
+            false,
+            ActorRole.AUTHOR,
+            manifests
+        );
+        PracticeBinding onMerged = new PracticeBinding(
+            List.of(ScmSignals.PULL_REQUEST_MERGED),
+            List.of(),
+            false,
+            ActorRole.AUTHOR,
+            tests
+        );
+
+        assertThat(PracticeBinding.subjectFor(List.of(onOpen, onMerged), null)).isNull();
+        assertThat(PracticeBinding.subjectFor(List.of(onOpen, onMerged), ScmSignals.PULL_REQUEST_OPENED)).isEqualTo(
+            manifests
+        );
+    }
 }

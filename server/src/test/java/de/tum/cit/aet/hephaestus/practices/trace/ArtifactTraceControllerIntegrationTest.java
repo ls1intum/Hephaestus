@@ -330,7 +330,6 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
             "PRESENT",
             "GOOD",
             "INFO",
-            0.9f,
             "{\"citations\":[]}",
             "Because the diff says so",
             "recurrence-1",

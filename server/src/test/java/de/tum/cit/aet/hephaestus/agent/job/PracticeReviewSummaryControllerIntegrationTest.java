@@ -382,7 +382,6 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
             presence,
             assessment,
             severity,
-            0.8f,
             "{}",
             "Reasoning",
             "summary-" + title,

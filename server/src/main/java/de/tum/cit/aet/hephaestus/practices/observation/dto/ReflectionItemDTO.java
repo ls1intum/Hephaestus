@@ -16,7 +16,7 @@ public record ReflectionItemDTO(
     @NonNull @Schema(description = "The headline of the feedback") String title,
     @Nullable
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
-    String guidance,
+    String deliveredFeedback,
     @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
     @NonNull @Schema(description = "The kind of work this is about (PR / issue)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
@@ -28,11 +28,11 @@ public record ReflectionItemDTO(
     )
     ObservationOrigin origin
 ) {
-    public static ReflectionItemDTO from(Observation observation, @Nullable String deliveredGuidance) {
+    public static ReflectionItemDTO from(Observation observation, @Nullable String deliveredFeedback) {
         return new ReflectionItemDTO(
             observation.getId(),
-            observation.getTitle(),
-            deliveredGuidance,
+            observation.getSummary(),
+            deliveredFeedback,
             observation.getSeverity(),
             observation.getArtifactKind(),
             observation.getArtifactId(),

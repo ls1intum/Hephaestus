@@ -66,7 +66,9 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 workspaceDefaults()
-            )
+            ),
+            org.mockito.Mockito.mock(ApplicationEventPublisher.class),
+            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
     }
 
@@ -79,19 +81,19 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             envelopeWriter,
             new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             parser,
+            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
-            commentPoster,
-            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-            org.mockito.Mockito.mock(PracticeFeedbackDeliveryPolicy.class),
-            new PracticeFeedbackCommentFormatter(
-                new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
-            ),
             new InContextDeliveryGate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 workspaceDefaults()
-            )
+            ),
+            org.mockito.Mockito.mock(PullRequestCommentPoster.class),
+            org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+            org.mockito.Mockito.mock(PracticeFeedbackDeliveryPolicy.class),
+            org.mockito.Mockito.mock(PracticeFeedbackCommentFormatter.class),
+            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
     }
 

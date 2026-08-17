@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -19,78 +18,38 @@ import tools.jackson.core.json.JsonReadFeature;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
-/**
- * Parses structured agent output into validated practice findings. The MR summary is composed
- * server-side by {@link DeliveryComposer}; the agent only supplies findings and per-finding
- * inline diff suggestions.
- *
- * <p>This is a pure function with no Spring dependencies. It never throws — all
- * parse failures are captured in {@link ParseResult#discarded()}.
- *
- * <p>Expected input shape (stored as escaped JSON string at {@code jobOutput.rawOutput}):
- * <pre>{@code
- * {
- *   "findings": [
- *     {
- *       "practiceSlug": "pr-description-quality",
- *       "title": "Good PR description",
- *       "presence": "PRESENT",
- *       "assessment": "GOOD",
- *       "severity": "INFO",
- *       "evidence": { ... },
- *       "reasoning": "...",
- *       "guidance": "...",
- *       "suggestedDiffNotes": [
- *         { "filePath": "src/Foo.swift", "startLine": 10, "body": "Suggestion..." }
- *       ]
- *     }
- *   ]
- * }
- * }</pre>
- */
+/** Parses normalized agent output into validated observations without throwing on malformed entries. */
 public class PracticeDetectionResultParser {
 
     private static final Logger log = LoggerFactory.getLogger(PracticeDetectionResultParser.class);
 
-    private static final int MAX_TITLE_LENGTH = 255;
-    private static final int MAX_REASONING_LENGTH = 10_000;
-    private static final int MAX_GUIDANCE_LENGTH = 5_000;
+    private static final int MAX_SUMMARY_LENGTH = 255;
+    private static final int MAX_EVIDENCE_RATIONALE_LENGTH = 10_000;
     private static final int MAX_EVIDENCE_BYTES = 64 * 1024;
 
     private static final int MAX_RAW_OUTPUT_LENGTH = 1_000_000;
 
-    /**
-     * Workspace-relative prefix of the collected-output dir, derived from the ABI's absolute {@code OUTPUT_PATH}
-     * so the firewall below tracks a rename of the output dir instead of hardcoding {@code "out/"}.
-     */
-    private static final String OUTPUT_RELATIVE_PREFIX =
-        SandboxLayout.OUTPUT_PATH.substring(SandboxLayout.WORKSPACE_ROOT.length() + 1) + "/";
-
-    /** Matches {@code PullRequestCommentPoster.MAX_BODY_LENGTH}. */
     static final int MAX_MR_NOTE_LENGTH = 60_000;
 
-    static final int MAX_DIFF_NOTE_BODY_LENGTH = 2_000;
-
-    /**
-     * The practices whose {@code BAD} finding may present as a merge-blocker ({@code CRITICAL}/{@code MAJOR}) —
-     * ones that can break correctness, security, or data integrity. Every other (craft/process/authoring)
-     * practice is ADVISORY: {@link ValidatedFinding#coerceCoherence(boolean, boolean)} caps its band to
-     * {@code MINOR}. Nothing the detector reports about its own certainty could make this call — a craft
-     * critique and a real defect were emitted with identical certainty, which is why that field is gone —
-     * so this consequence-class list is the discriminator. Pinned by {@code PracticeDetectionResultParserTest}.
-     */
+    /** Only practices with correctness, security, or integrity consequences may block a merge. */
     static final Set<String> BLOCKING_ELIGIBLE_PRACTICES = Set.of(
         "handles-errors-instead-of-swallowing-them",
         "validates-inputs-and-edge-cases-at-the-boundary",
         "avoids-unsafe-panics-and-chosen-crashes",
         "validates-and-escapes-untrusted-input",
         "avoids-insecure-defaults-and-over-broad-permissions",
-        // A dishonest test (always-green, asserting nothing, disabled) HIDES defects rather than merely
-        // missing them, so it keeps blocking weight despite being a "process" practice.
         "keeps-the-test-suite-honest"
     );
+    private static final Set<String> OBSERVATION_FIELDS = Set.of(
+        "practiceSlug",
+        "summary",
+        "presence",
+        "assessment",
+        "severity",
+        "evidence",
+        "evidenceRationale"
+    );
 
-    /** Bounds comment API fan-out, not finding detection. */
     static final int MAX_DELIVERY_DIFF_NOTES = 30;
 
     private final JsonMapper objectMapper;
@@ -114,15 +73,12 @@ public class PracticeDetectionResultParser {
         if (rawOutputText.isBlank()) {
             return ParseResult.empty("rawOutput is blank");
         }
-        // Bound the whole pipeline (readTree AND sanitizeJsonEscapes both walk the full string), not just the
-        // fallback extractor — a runaway/oversized sandbox output must not be fully materialized in memory.
+        // Reject before parsing to bound memory use on untrusted model output.
         if (rawOutputText.length() > MAX_RAW_OUTPUT_LENGTH) {
             log.warn("parse: rawOutput too large ({} chars), skipping", rawOutputText.length());
             return ParseResult.empty("rawOutput too large");
         }
 
-        // rawOutput is JSON but LLMs sometimes emit Swift-style \(var) interpolation that strict
-        // JSON rejects; sanitize then fall back to extracting JSON from mixed-text output.
         String sanitizedText = sanitizeJsonEscapes(rawOutputText);
         JsonNode root;
         try {
@@ -136,18 +92,18 @@ public class PracticeDetectionResultParser {
         if (root == null || root.isNull()) {
             return ParseResult.empty("rawOutput parsed to null");
         }
-        JsonNode findingsNode = extractFindingsNode(root);
-        if (findingsNode == null || !findingsNode.isArray()) {
-            return ParseResult.empty("missing or non-array 'findings' field");
+        JsonNode observationsNode = extractObservationsNode(root);
+        if (observationsNode == null || !observationsNode.isArray()) {
+            return ParseResult.empty("missing or non-array 'observations' field");
         }
-        if (findingsNode.isEmpty()) {
-            return ParseResult.empty("findings array is empty");
+        if (observationsNode.isEmpty()) {
+            return ParseResult.empty("observations array is empty");
         }
 
-        List<ValidatedFinding> valid = new ArrayList<>();
+        List<ValidatedObservation> valid = new ArrayList<>();
         List<DiscardedEntry> discarded = new ArrayList<>();
-        for (int i = 0; i < findingsNode.size(); i++) {
-            JsonNode entry = findingsNode.get(i);
+        for (int i = 0; i < observationsNode.size(); i++) {
+            JsonNode entry = observationsNode.get(i);
             if (!entry.isObject()) {
                 discarded.add(new DiscardedEntry(i, "entry is not a JSON object"));
                 continue;
@@ -162,196 +118,73 @@ public class PracticeDetectionResultParser {
         return new ParseResult(Collections.unmodifiableList(valid), Collections.unmodifiableList(discarded));
     }
 
-    private JsonNode extractFindingsNode(JsonNode root) {
-        return root.get("findings");
+    private JsonNode extractObservationsNode(JsonNode root) {
+        return root.get("observations");
     }
 
-    private List<DiffNote> parseSuggestedDiffNotes(JsonNode entry, int findingIndex) {
-        JsonNode suggestedNode = entry.get("suggestedDiffNotes");
-        if (suggestedNode == null || suggestedNode.isNull() || !suggestedNode.isArray()) {
-            return List.of();
+    private ValidatedObservation validateEntry(JsonNode entry, int index) {
+        List<String> unknownFields = entry
+            .properties()
+            .stream()
+            .map(java.util.Map.Entry::getKey)
+            .filter(field -> !OBSERVATION_FIELDS.contains(field))
+            .toList();
+        if (!unknownFields.isEmpty()) {
+            throw new EntryValidationException("unknown observation fields: " + unknownFields);
         }
-        List<DiffNote> notes = new ArrayList<>();
-        for (int j = 0; j < suggestedNode.size(); j++) {
-            DiffNote note = parseSingleDiffNote(suggestedNode.get(j), findingIndex, j);
-            if (note != null) {
-                notes.add(note);
-            }
-        }
-        return Collections.unmodifiableList(notes);
-    }
-
-    @Nullable
-    private DiffNote parseSingleDiffNote(JsonNode entry, int findingIndex, int noteIndex) {
-        if (!entry.isObject()) {
-            log.debug("Skipping non-object suggestedDiffNote at finding {}, index {}", findingIndex, noteIndex);
-            return null;
-        }
-
-        JsonNode filePathNode = entry.get("filePath");
-        if (
-            filePathNode == null ||
-            filePathNode.isNull() ||
-            !filePathNode.isString() ||
-            filePathNode.asString().isBlank()
-        ) {
-            log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing filePath", findingIndex, noteIndex);
-            return null;
-        }
-        String filePath = filePathNode.asString();
-
-        // Reject internal workspace paths: the agent sometimes hallucinates inputs/context/ or work/analysis/ paths.
-        if (
-            filePath.startsWith(SandboxLayout.CONTEXT_PREFIX) ||
-            filePath.startsWith(SandboxLayout.HISTORY_PREFIX) ||
-            filePath.startsWith(SandboxLayout.PRACTICES_PREFIX) ||
-            filePath.startsWith(SandboxLayout.ANALYSIS_PREFIX) ||
-            filePath.startsWith(OUTPUT_RELATIVE_PREFIX) ||
-            filePath.startsWith(SandboxLayout.PRECOMPUTE_PREFIX) ||
-            filePath.startsWith(SandboxLayout.PRECOMPUTE_OUT_PREFIX)
-        ) {
-            log.debug(
-                "Skipping suggestedDiffNote with internal path at finding {}, index {}: {}",
-                findingIndex,
-                noteIndex,
-                filePath
-            );
-            return null;
-        }
-
-        JsonNode startLineNode = entry.get("startLine");
-        if (startLineNode == null || startLineNode.isNull() || !startLineNode.isNumber()) {
-            log.debug(
-                "Skipping suggestedDiffNote at finding {}, index {}: missing or non-numeric startLine",
-                findingIndex,
-                noteIndex
-            );
-            return null;
-        }
-        int startLine = startLineNode.asInt();
-        if (startLine <= 0) {
-            log.debug(
-                "Skipping suggestedDiffNote at finding {}, index {}: startLine must be positive, got {}",
-                findingIndex,
-                noteIndex,
-                startLine
-            );
-            return null;
-        }
-
-        Integer endLine = null;
-        JsonNode endLineNode = entry.get("endLine");
-        if (endLineNode != null && !endLineNode.isNull() && endLineNode.isNumber()) {
-            int endLineValue = endLineNode.asInt();
-            if (endLineValue >= startLine) {
-                endLine = endLineValue;
-            }
-        }
-
-        JsonNode bodyNode = entry.get("body");
-        if (bodyNode == null || bodyNode.isNull() || !bodyNode.isString() || bodyNode.asString().isBlank()) {
-            log.debug("Skipping suggestedDiffNote at finding {}, index {}: missing body", findingIndex, noteIndex);
-            return null;
-        }
-        String body = bodyNode.asString();
-        if (body.length() > MAX_DIFF_NOTE_BODY_LENGTH) {
-            log.debug(
-                "Truncating suggestedDiffNote body from {} to {} chars at finding {}, index {}",
-                body.length(),
-                MAX_DIFF_NOTE_BODY_LENGTH,
-                findingIndex,
-                noteIndex
-            );
-            body = body.substring(0, MAX_DIFF_NOTE_BODY_LENGTH);
-        }
-
-        return new DiffNote(filePath, startLine, endLine, body);
-    }
-
-    // Finding entry validation
-
-    private ValidatedFinding validateEntry(JsonNode entry, int index) {
-        // Required: practiceSlug
         String practiceSlug = textField(entry, "practiceSlug");
         if (practiceSlug.isBlank()) {
             throw new EntryValidationException("practiceSlug is blank");
         }
         practiceSlug = practiceSlug.toLowerCase(Locale.ROOT).replace('_', '-');
 
-        String title = textField(entry, "title");
-        if (title.isBlank()) {
-            throw new EntryValidationException("title is blank");
+        String summary = textField(entry, "summary");
+        if (summary.isBlank()) {
+            throw new EntryValidationException("summary is blank");
         }
-        if (title.length() > MAX_TITLE_LENGTH) {
-            title = title.substring(0, MAX_TITLE_LENGTH - 3) + "...";
+        if (summary.length() > MAX_SUMMARY_LENGTH) {
+            throw new EntryValidationException("summary exceeds " + MAX_SUMMARY_LENGTH + " characters");
         }
 
         Presence presence = parseEnum(entry, "presence", Presence.class);
 
-        // See parseAssessment: required only when presence carries valence.
         Assessment assessment = parseAssessment(entry, presence);
-
-        // See parseSeverityOrDefault: defaults to INFO rather than discarding the finding.
         Severity severity = parseSeverityOrDefault(entry);
 
-        JsonNode evidence = null;
-        JsonNode evidenceNode = entry.get("evidence");
-        if (evidenceNode != null && !evidenceNode.isNull() && !evidenceNode.isMissingNode()) {
-            try {
-                String serialized = objectMapper.writeValueAsString(evidenceNode);
-                if (serialized.getBytes(StandardCharsets.UTF_8).length <= MAX_EVIDENCE_BYTES) {
-                    evidence = evidenceNode;
-                } else {
-                    log.debug("Evidence exceeds {} bytes, dropping: slug={}", MAX_EVIDENCE_BYTES, practiceSlug);
-                }
-            } catch (JacksonException e) {
-                log.debug("Failed to parse evidence JSON, dropping: slug={}, error={}", practiceSlug, e.getMessage());
+        JsonNode evidence = entry.get("evidence");
+        if (evidence == null || !evidence.isObject()) {
+            throw new EntryValidationException("missing or non-object field: evidence");
+        }
+        try {
+            if (objectMapper.writeValueAsBytes(evidence).length > MAX_EVIDENCE_BYTES) {
+                throw new EntryValidationException("evidence exceeds " + MAX_EVIDENCE_BYTES + " bytes");
             }
+        } catch (JacksonException e) {
+            throw new EntryValidationException("invalid evidence JSON");
         }
 
-        String reasoning = optionalTextField(entry, "reasoning");
-        if (reasoning != null && reasoning.length() > MAX_REASONING_LENGTH) {
-            log.debug(
-                "Truncating reasoning from {} to {} chars: slug={}",
-                reasoning.length(),
-                MAX_REASONING_LENGTH,
-                practiceSlug
+        String evidenceRationale = textField(entry, "evidenceRationale");
+        if (evidenceRationale.isBlank()) {
+            throw new EntryValidationException("evidenceRationale is blank");
+        }
+        if (evidenceRationale.length() > MAX_EVIDENCE_RATIONALE_LENGTH) {
+            throw new EntryValidationException(
+                "evidenceRationale exceeds " + MAX_EVIDENCE_RATIONALE_LENGTH + " characters"
             );
-            reasoning = reasoning.substring(0, MAX_REASONING_LENGTH);
         }
 
-        String guidance = optionalTextField(entry, "guidance");
-        if (guidance != null && guidance.length() > MAX_GUIDANCE_LENGTH) {
-            log.debug(
-                "Truncating guidance from {} to {} chars: slug={}",
-                guidance.length(),
-                MAX_GUIDANCE_LENGTH,
-                practiceSlug
-            );
-            guidance = guidance.substring(0, MAX_GUIDANCE_LENGTH);
-        }
-
-        List<DiffNote> suggestedDiffNotes = parseSuggestedDiffNotes(entry, index);
-
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             practiceSlug,
-            title,
+            summary,
             presence,
             assessment,
             severity,
             evidence,
-            reasoning,
-            guidance,
-            suggestedDiffNotes
+            evidenceRationale
         );
     }
 
-    /**
-     * Null exactly when {@code presence} does not {@link Presence#carriesValence() carry valence} — an
-     * assessment supplied there is dropped rather than honoured, so a model that couldn't settle an
-     * INCONCLUSIVE finding can't smuggle an unearned GOOD into the series. Otherwise required; a missing or
-     * unrecognised value discards the entry.
-     */
+    /** Assessment exists only for outcomes that carry valence. */
     private static Assessment parseAssessment(JsonNode entry, Presence presence) {
         if (!presence.carriesValence()) {
             return null;
@@ -378,7 +211,7 @@ public class PracticeDetectionResultParser {
 
     /**
      * A missing, null, or non-text value defaults to {@link Severity#INFO} rather than discarding the
-     * finding: {@link ValidatedFinding#coerceCoherence(boolean, boolean)} re-derives the real band anyway. A
+     * observation: {@link ValidatedObservation#coerceCoherence(boolean, boolean)} re-derives the real band anyway. A
      * present but unrecognised value still fails the entry.
      */
     private static Severity parseSeverityOrDefault(JsonNode entry) {
@@ -439,7 +272,7 @@ public class PracticeDetectionResultParser {
 
     /**
      * The orchestrator protocol emits phase markers (e.g. {@code [PHASE0]...}) before its JSON object; this
-     * finds the first {@code '{'} that starts a valid object containing a "findings" array.
+     * finds the first {@code '{'} that starts a valid object containing an "observations" array.
      */
     @Nullable
     private JsonNode extractJsonFromText(String text) {
@@ -453,7 +286,7 @@ public class PracticeDetectionResultParser {
             if (braceIdx < 0) break;
             try {
                 JsonNode node = lenientMapper.readTree(text.substring(braceIdx));
-                if (node != null && node.isObject() && node.has("findings")) {
+                if (node != null && node.isObject() && node.has("observations")) {
                     return node;
                 }
             } catch (JacksonException ignored) {
@@ -476,66 +309,49 @@ public class PracticeDetectionResultParser {
         }
     }
 
-    public record ParseResult(List<ValidatedFinding> validFindings, List<DiscardedEntry> discarded) {
+    public record ParseResult(List<ValidatedObservation> validObservations, List<DiscardedEntry> discarded) {
         static ParseResult empty(String reason) {
             return new ParseResult(List.of(), List.of(new DiscardedEntry(-1, reason)));
         }
     }
 
     /**
-     * @param keys the identities {@code PracticeDetectionDeliveryService.deliver} persisted for this finding,
+     * @param keys the identities {@code PracticeDetectionDeliveryService.deliver} persisted for this observation,
      *     stamped by the handler rather than recomputed downstream so they cannot drift from the stored
      *     observation. {@code null} until stamped — the parser leaves it unset.
      */
-    public record ValidatedFinding(
+    public record ValidatedObservation(
         String practiceSlug,
-        String title,
+        String summary,
         Presence presence,
         @Nullable Assessment assessment,
         @Nullable Severity severity,
         JsonNode evidence,
-        String reasoning,
-        String guidance,
-        List<DiffNote> suggestedDiffNotes,
+        String evidenceRationale,
         @Nullable ObservationKeys keys
     ) {
-        /** The parser's output shape: a finding not yet stamped with its persisted identities. */
-        public ValidatedFinding(
+        /** The parser's output shape: an observation not yet stamped with its persisted identities. */
+        public ValidatedObservation(
             String practiceSlug,
-            String title,
+            String summary,
             Presence presence,
             @Nullable Assessment assessment,
             @Nullable Severity severity,
             JsonNode evidence,
-            String reasoning,
-            String guidance,
-            List<DiffNote> suggestedDiffNotes
+            String evidenceRationale
         ) {
-            this(
-                practiceSlug,
-                title,
-                presence,
-                assessment,
-                severity,
-                evidence,
-                reasoning,
-                guidance,
-                suggestedDiffNotes,
-                null
-            );
+            this(practiceSlug, summary, presence, assessment, severity, evidence, evidenceRationale, null);
         }
 
-        public ValidatedFinding withKeys(@Nullable ObservationKeys keys) {
-            return new ValidatedFinding(
+        public ValidatedObservation withKeys(@Nullable ObservationKeys keys) {
+            return new ValidatedObservation(
                 practiceSlug,
-                title,
+                summary,
                 presence,
                 assessment,
                 severity,
                 evidence,
-                reasoning,
-                guidance,
-                suggestedDiffNotes,
+                evidenceRationale,
                 keys
             );
         }
@@ -548,37 +364,18 @@ public class PracticeDetectionResultParser {
             return keys == null ? null : keys.occurrenceKey();
         }
 
-        /**
-         * Coerces {@code (presence, assessment, severity)} to the system's coherence invariants, independent
-         * of what the model emitted:
-         * <ol>
-         *   <li>A defect-detector practice hunts one <em>undesirable</em> behaviour, so what would be
-         *       {@code PRESENT} for it is the defect. A model-emitted {@code PRESENT, GOOD} there endorses a
-         *       good act nobody observed, and is coerced to {@code NOT_APPLICABLE}. {@code ABSENT, GOOD} is a
-         *       different claim and survives: the harmful behaviour could have appeared in the corpus this
-         *       practice bounds and did not, which is a strength, and whether the corpus really was bounded
-         *       and covered is settled where the evidence is — {@code enforceRecordedSearch} in
-         *       {@link PracticeDetectionDeliveryService}, against the practice's own {@code EXHAUSTIVE}
-         *       stances. Collapsing it here is what used to tell a developer who wrote clean error handling
-         *       that their work had no subject for the practice.</li>
-         *   <li>Severity is a coaching band only for a {@code BAD} finding (forced null otherwise), and a
-         *       {@code BAD} arriving as {@code INFO} is raised to {@code MINOR}.</li>
-         *   <li>When {@code advisoryOnly} (not in {@link #BLOCKING_ELIGIBLE_PRACTICES}), a {@code BAD}
-         *       finding's {@code CRITICAL}/{@code MAJOR} band is capped to {@code MINOR} so it lands as a
-         *       suggestion rather than a merge-blocker.</li>
-         * </ol>
-         * Idempotent: a no-op coercion returns {@code this}.
-         */
-        public ValidatedFinding coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
+        /** Enforces valence and severity invariants independently of model output. */
+        public ValidatedObservation coerceCoherence(boolean isDefectDetector, boolean advisoryOnly) {
             Presence p = presence;
             Assessment a = assessment;
-            String r = reasoning;
+            String r = evidenceRationale;
             if (isDefectDetector && a == Assessment.GOOD && p == Presence.PRESENT) {
                 p = Presence.NOT_APPLICABLE;
                 a = null;
-                r = "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " + reasoning;
+                r =
+                    "[auto-downgraded: defect-detector practice has no clean-bill-of-health observation] " +
+                    evidenceRationale;
             }
-            // (ABSENT, GOOD) is a legitimate strength per ADR 0022 §1 and is preserved, not collapsed here.
             if (!p.carriesValence()) {
                 a = null;
             }
@@ -595,21 +392,17 @@ public class PracticeDetectionResultParser {
             if (p == presence && a == assessment && s == severity) {
                 return this;
             }
-            return new ValidatedFinding(practiceSlug, title, p, a, s, evidence, r, guidance, suggestedDiffNotes, keys);
+            return new ValidatedObservation(practiceSlug, summary, p, a, s, evidence, r);
         }
     }
 
-    /**
-     * Applies {@link ValidatedFinding#coerceCoherence(boolean, boolean)} to every finding. Returns a fresh
-     * mutable list (call sites mutate it downstream for fingerprint stamping). Shared by the PR and Issue
-     * handlers so the rule cannot drift between them.
-     */
-    public static List<ValidatedFinding> coerceCoherence(
-        List<ValidatedFinding> findings,
+    /** Applies coherence rules to all observations and returns a mutable result. */
+    public static List<ValidatedObservation> coerceCoherence(
+        List<ValidatedObservation> observations,
         Set<String> defectDetectorSlugs
     ) {
-        List<ValidatedFinding> out = new ArrayList<>(findings.size());
-        for (ValidatedFinding f : findings) {
+        List<ValidatedObservation> out = new ArrayList<>(observations.size());
+        for (ValidatedObservation f : observations) {
             boolean advisoryOnly = !BLOCKING_ELIGIBLE_PRACTICES.contains(f.practiceSlug());
             out.add(f.coerceCoherence(defectDetectorSlugs.contains(f.practiceSlug()), advisoryOnly));
         }
@@ -619,32 +412,36 @@ public class PracticeDetectionResultParser {
     public record DiscardedEntry(int index, String reason) {}
 
     /**
-     * Pre-rendered delivery content from the agent, alongside the structured findings — the server sanitizes
+     * Pre-rendered delivery content from the agent, alongside the structured observations — the server sanitizes
      * and posts it without further rendering.
      *
-     * @param withheld the findings the composer chose not to render, for the ledger to record as SUPPRESSED
+     * @param withheld the observations the composer chose not to render, for the ledger to record as SUPPRESSED
      */
-    public record DeliveryContent(@Nullable String mrNote, List<DiffNote> diffNotes, List<WithheldFinding> withheld) {
+    public record DeliveryContent(
+        @Nullable String mrNote,
+        List<DiffNote> diffNotes,
+        List<WithheldObservation> withheld
+    ) {
         public DeliveryContent withDiffNotes(List<DiffNote> notes) {
             return new DeliveryContent(mrNote, notes, withheld);
         }
     }
 
     /**
-     * A finding the {@link DeliveryComposer} withheld from the rendered delivery, identified by the
+     * An observation the {@link DeliveryComposer} withheld from the rendered delivery, identified by the
      * {@code occurrenceKey} of the observation it was persisted as — a per-observation identity, so a
-     * withheld finding is never confused with another at the same locus.
+     * withheld observation is never confused with another at the same locus.
      */
-    public record WithheldFinding(String occurrenceKey, FeedbackSuppressionReason reason) {}
+    public record WithheldObservation(String occurrenceKey, FeedbackSuppressionReason reason) {}
 
     /**
      * An inline diff note targeting a specific file and line range.
      *
      * @param filePath path relative to repo root (new path, not old)
      * @param endLine  optional last line number for multi-line (GitHub only; GitLab ignores)
-     * @param recurrenceKey the stable cross-run identity inherited from the finding this note belongs to, so a
+     * @param recurrenceKey the stable cross-run identity inherited from the observation this note belongs to, so a
      *     posted placement can be matched back across re-runs; {@code null} until {@link DeliveryComposer}
-     *     carries it over from the stamped finding.
+     *     carries it over from the stamped observation.
      */
     public record DiffNote(
         String filePath,

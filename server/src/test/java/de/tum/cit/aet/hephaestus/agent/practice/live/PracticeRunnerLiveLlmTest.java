@@ -41,7 +41,7 @@ import tools.jackson.databind.node.ObjectNode;
  * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
  *
  * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
- * {@code report_finding} tool, and the result schema the runner emits — all without Docker.
+ * {@code report_observation} tool, and the result schema the runner emits — all without Docker.
  * The {@code DockerSandboxLiveTest} covers the sandbox SPI separately.
  *
  * <p>Mirrors {@code MentorLiveLlmTest} for the Pi SDK install and the custom provider
@@ -153,6 +153,13 @@ class PracticeRunnerLiveLlmTest {
         LiveLlmCredentials creds = LiveLlmCredentials.fromEnv();
 
         stageWorkspace(creds);
+        // This is a measurement harness, not a delivery test. Keeping the composition request absent
+        // means the runner cannot even prepare feedback, and spawnRunner strips every ambient credential
+        // before the agent process starts. In particular, a developer's GH_TOKEN/GITHUB_TOKEN is never
+        // exposed to the model's bash tool.
+        assertThat(Files.exists(WORKSPACE.resolve(SandboxLayout.FEEDBACK_COMPOSITION_PATH)))
+            .as("live harness does not request feedback composition")
+            .isFalse();
         Process runner = spawnRunner(creds);
 
         // Drain stdout/stderr into the JVM console with a tag so failures show what the agent said.
@@ -193,7 +200,7 @@ class PracticeRunnerLiveLlmTest {
 
         // Strict assertion 1: the parser must classify the run as successful when exit code is 0.
         // If exit code is 1 (retry-exhausted) we don't enforce success() — but we still demand
-        // findings below, which is the real product invariant.
+        // observations below, which is the real product invariant.
         if (exitCode == 0) {
             assertThat(result.success()).as("PiResultParser.success() reflects exit code 0").isTrue();
         }
@@ -202,31 +209,33 @@ class PracticeRunnerLiveLlmTest {
         assertThat(rawOutput).as("result.json (or review-state.json fallback) yielded a parsed payload").isNotNull();
 
         JsonNode parsed = MAPPER.readTree(rawOutput);
-        JsonNode findings = parsed.path("findings");
-        assertThat(findings.isArray()).as("findings must be a JSON array").isTrue();
-        assertThat(findings.size()).as("at least one finding emitted").isGreaterThanOrEqualTo(1);
+        JsonNode observations = parsed.path("observations");
+        assertThat(observations.isArray()).as("observations must be a JSON array").isTrue();
+        assertThat(observations.size()).as("at least one observation emitted").isGreaterThanOrEqualTo(1);
 
-        // Strict shape: every finding must match the wire schema PiResultParser exposes to downstream
+        // Strict shape: every observation must match the wire schema PiResultParser exposes to downstream
         // delivery code. Catches drift between runner output and parser tolerance.
-        for (int i = 0; i < findings.size(); i++) {
-            JsonNode finding = findings.get(i);
-            String tag = "finding[" + i + "]";
-            assertThat(finding.path("practiceSlug").asString())
+        for (int i = 0; i < observations.size(); i++) {
+            JsonNode observation = observations.get(i);
+            String tag = "observation[" + i + "]";
+            assertThat(observation.path("practiceSlug").asString())
                 .as(tag + ".practiceSlug")
                 .isEqualTo("avoids-insecure-defaults-and-over-broad-permissions");
-            assertThat(finding.path("presence").asString())
+            assertThat(observation.path("presence").asString())
                 .as(tag + ".presence")
-                .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE");
-            // assessment is null/absent only when presence is NOT_APPLICABLE
-            if (!"NOT_APPLICABLE".equals(finding.path("presence").asString())) {
-                assertThat(finding.path("assessment").asString()).as(tag + ".assessment").isIn("GOOD", "BAD");
+                .isIn("PRESENT", "ABSENT", "NOT_APPLICABLE", "INCONCLUSIVE");
+            // The two valence-free presences carry no assessment.
+            if (
+                !"NOT_APPLICABLE".equals(observation.path("presence").asString()) &&
+                !"INCONCLUSIVE".equals(observation.path("presence").asString())
+            ) {
+                assertThat(observation.path("assessment").asString()).as(tag + ".assessment").isIn("GOOD", "BAD");
             }
-            assertThat(finding.path("severity").asString())
+            assertThat(observation.path("severity").asString())
                 .as(tag + ".severity")
                 .isIn("CRITICAL", "MAJOR", "MINOR", "INFO");
-            double confidence = finding.path("confidence").asDouble(-1.0);
-            assertThat(confidence).as(tag + ".confidence in [0,1]").isBetween(0.0, 1.0);
-            assertThat(finding.path("evidence").path("citations").isArray())
+            assertThat(observation.has("confidence")).as(tag + " has no confidence field").isFalse();
+            assertThat(observation.path("evidence").path("citations").isArray())
                 .as(tag + ".evidence.citations is an array")
                 .isTrue();
         }
@@ -235,11 +244,13 @@ class PracticeRunnerLiveLlmTest {
         // if it misses, the prompt or fixture is broken — not the LLM. A planted secret is a (PRESENT, BAD)
         // observation: the bad signal IS present and that is a violation.
         boolean foundViolation = false;
-        for (JsonNode finding : findings) {
+        for (JsonNode observation : observations) {
             if (
-                "avoids-insecure-defaults-and-over-broad-permissions".equals(finding.path("practiceSlug").asString()) &&
-                "PRESENT".equals(finding.path("presence").asString()) &&
-                "BAD".equals(finding.path("assessment").asString())
+                "avoids-insecure-defaults-and-over-broad-permissions".equals(
+                    observation.path("practiceSlug").asString()
+                ) &&
+                "PRESENT".equals(observation.path("presence").asString()) &&
+                "BAD".equals(observation.path("assessment").asString())
             ) {
                 foundViolation = true;
                 break;
@@ -247,8 +258,8 @@ class PracticeRunnerLiveLlmTest {
         }
         assertThat(foundViolation)
             .as(
-                "at least one (PRESENT, BAD) avoids-insecure-defaults-and-over-broad-permissions finding for the planted apiKey/dbPassword. " +
-                    "Findings payload: " +
+                "at least one (PRESENT, BAD) avoids-insecure-defaults-and-over-broad-permissions observation for the planted apiKey/dbPassword. " +
+                    "Observations payload: " +
                     rawOutput
             )
             .isTrue();
@@ -266,7 +277,7 @@ class PracticeRunnerLiveLlmTest {
                 usage.costUsd()
             );
         }
-        System.out.printf("[practice-live] %d finding(s); violation=%s%n", findings.size(), foundViolation);
+        System.out.printf("[practice-live] %d observation(s); violation=%s%n", observations.size(), foundViolation);
     }
 
     // Workspace staging
@@ -303,6 +314,7 @@ class PracticeRunnerLiveLlmTest {
         // The same pi-provider.json contract production uses, not a parallel models.json that could drift.
         Path piHome = WORKSPACE.resolve(".pi-home");
         Files.createDirectories(piHome);
+        Files.createDirectories(WORKSPACE.resolve(".home"));
         Files.write(piHome.resolve("settings.json"), buildSettingsJson(creds.model()));
         Files.write(WORKSPACE.resolve("pi-provider.json"), buildProviderConfigJson(creds));
 
@@ -344,7 +356,7 @@ class PracticeRunnerLiveLlmTest {
                 "Review merge request #1 in test/fixture. Read inputs/context/diff_summary.md, " +
                     "inputs/practices/all-criteria.md, inputs/practices/index.json, and inputs/context/metadata.json. " +
                     "Apply the avoids-insecure-defaults-and-over-broad-permissions practice to inputs/context/diff.patch. Persist each " +
-                    "justified finding via report_finding (one tool call per finding). Follow " +
+                    "justified observation via report_observation (one tool call per observation). Follow " +
                     SandboxLayout.ORCHESTRATOR_PATH +
                     " for the schema and review rules.",
                 1,
@@ -390,6 +402,15 @@ class PracticeRunnerLiveLlmTest {
         ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.mjs");
         pb.directory(WORKSPACE.toFile());
         Map<String, String> env = pb.environment();
+        // Fail closed: the agent has a bash tool, so inheriting the developer's shell environment would
+        // also inherit SCM, cloud, database, and deployment credentials. The live test needs only the
+        // model proxy plus basic process environment. This makes an accidental GitHub write impossible
+        // even when the invoking shell is authenticated.
+        String path = env.getOrDefault("PATH", "/usr/local/bin:/usr/bin:/bin");
+        env.clear();
+        env.put("PATH", path);
+        env.put("HOME", WORKSPACE.resolve(".home").toString());
+        env.put("LANG", "C.UTF-8");
         env.put("LLM_PROXY_URL", creds.baseUrl());
         env.put("LLM_PROXY_TOKEN", creds.apiKey());
         // PI_CODING_AGENT_DIR points Pi at our staged extension + settings, away from ~/.pi.

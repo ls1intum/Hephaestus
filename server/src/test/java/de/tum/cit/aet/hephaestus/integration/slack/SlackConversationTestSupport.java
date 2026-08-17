@@ -177,7 +177,6 @@ public final class SlackConversationTestSupport {
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             null,
             null,
             null,

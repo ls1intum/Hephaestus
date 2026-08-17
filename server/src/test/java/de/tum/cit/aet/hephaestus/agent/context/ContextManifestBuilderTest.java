@@ -34,6 +34,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceRequirement;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceSufficiency;
 import de.tum.cit.aet.hephaestus.practices.PracticeInsufficientEvidenceAction;
+import de.tum.cit.aet.hephaestus.practices.PracticeSubject;
+import de.tum.cit.aet.hephaestus.practices.PracticeSubjectClause;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -48,6 +50,7 @@ import java.util.Map;
 import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.JsonNode;
@@ -141,7 +144,14 @@ class ContextManifestBuilderTest extends BaseUnitTest {
     @Test
     void shouldAuthorizeCaptureForTheDetectionAudience() {
         ArtifactSourceCatalogRegistry catalogs = mock(ArtifactSourceCatalogRegistry.class);
-        ContextManifestBuilder target = new ContextManifestBuilder(cas, layout, mapper, catalogs, Clock.systemUTC());
+        ContextManifestBuilder target = new ContextManifestBuilder(
+            cas,
+            layout,
+            mapper,
+            catalogs,
+            new PracticeSubjectEvaluator(mapper),
+            Clock.systemUTC()
+        );
         SourceContractVersion version = new SourceContractVersion("1.0.0");
 
         target.isSourceUsePermitted(version, DIFF);
@@ -558,7 +568,8 @@ class ContextManifestBuilderTest extends BaseUnitTest {
                     List.of(practiceRequiringComments()),
                     "job-refused",
                     NOW,
-                    null
+                    null,
+                    Map.of()
                 )
                 .readyPractices()
         ).isEmpty();
@@ -650,7 +661,14 @@ class ContextManifestBuilderTest extends BaseUnitTest {
         Practice practice = practiceRequiring(CORE, "pr-core");
         assertThat(
             laterBuilder
-                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-future-watermark", NOW, null)
+                .prepareAutomatedReviewReadiness(
+                    manifest,
+                    List.of(practice),
+                    "job-future-watermark",
+                    NOW,
+                    null,
+                    Map.of()
+                )
                 .readyPractices()
         ).containsExactly(practice);
     }
@@ -684,7 +702,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
 
         assertThat(
             delayedBuilder
-                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-delayed", NOW, null)
+                .prepareAutomatedReviewReadiness(manifest, List.of(practice), "job-delayed", NOW, null, Map.of())
                 .readyPractices()
         ).containsExactly(practice);
         JsonNode sourceCheck = mapper
@@ -763,6 +781,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             layout,
             mapper,
             catalogs,
+            new PracticeSubjectEvaluator(mapper),
             Clock.systemUTC()
         );
 
@@ -917,6 +936,7 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             layout,
             mapper,
             new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+            new PracticeSubjectEvaluator(mapper),
             Clock.fixed(instant, java.time.ZoneOffset.UTC)
         );
     }
@@ -941,6 +961,143 @@ class ContextManifestBuilderTest extends BaseUnitTest {
             Map.of(),
             Set.of(kind)
         );
+    }
+
+    @Nested
+    @DisplayName("A practice whose subject is not in the work is not asked")
+    class SubjectDeclarations {
+
+        @Test
+        void shouldWithholdThePracticeAndRecordThePredicateThatRuledItOut() {
+            var prepared = diffCapture(
+                "job-subject-absent",
+                "diff --git a/src/App.java b/src/App.java\n@@ -1 +1 @@\n+x\n"
+            );
+
+            AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadiness(
+                prepared.manifest(),
+                List.of(withSubject(practiceRequiring(DIFF, "dependencies"), dependencySubject())),
+                NOW,
+                null,
+                prepared.files()
+            );
+
+            assertThat(result.readyPractices()).isEmpty();
+            var decision = result.decisions().getFirst();
+            assertThat(decision.reasonCodes()).containsExactly(AutomatedReviewReadinessReason.SUBJECT_NOT_IN_THE_WORK);
+            // The sentence a reader is shown, carried on the decision rather than re-derived downstream.
+            assertThat(decision.subjectCheck()).isNotNull();
+            assertThat(decision.subjectCheck().describedAs()).isEqualTo(
+                "the change touches no dependency manifest or lockfile"
+            );
+            // Nothing about the evidence was wrong, so nothing may say it was.
+            assertThat(decision.sourceChecks()).allMatch(SourceReadinessCheck::meetsRequirements);
+        }
+
+        @Test
+        void shouldAskThePracticeWhenTheSubjectIsInTheWork() {
+            var prepared = diffCapture("job-subject-present", "diff --git a/pom.xml b/pom.xml\n@@ -1 +1 @@\n+<dep/>\n");
+
+            AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadiness(
+                prepared.manifest(),
+                List.of(withSubject(practiceRequiring(DIFF, "dependencies"), dependencySubject())),
+                NOW,
+                null,
+                prepared.files()
+            );
+
+            assertThat(result.readyPractices()).hasSize(1);
+            assertThat(result.decisions().getFirst().reasonCodes()).isEmpty();
+        }
+
+        /**
+         * A caller holding the manifest but not the capture it describes — a replay, or any code path
+         * that has not been taught to pass the bytes. It must ask the practice, never skip it.
+         */
+        @Test
+        void shouldAskThePracticeWhenNobodySuppliedTheStagedBytes() {
+            var prepared = diffCapture("job-no-bytes", "diff --git a/src/App.java b/src/App.java\n@@ -1 +1 @@\n+x\n");
+
+            AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadinessAsOfNow(
+                prepared.manifest(),
+                List.of(withSubject(practiceRequiring(DIFF, "dependencies"), dependencySubject()))
+            );
+
+            assertThat(result.readyPractices()).hasSize(1);
+        }
+
+        /**
+         * "We could not look" outranks "there was nothing of this kind here". Judging a subject over a
+         * capture we could not read would dress an instrument failure up as a fact about somebody's work,
+         * so the subject is not even asked and no subject check is recorded.
+         */
+        @Test
+        void shouldNotJudgeTheSubjectOfAPracticeWhoseEvidenceCouldNotBeRead() {
+            ArtifactSourceManifest manifest = builder.augment(
+                new LinkedHashMap<>(),
+                Map.of(),
+                "job-unreadable",
+                plan(),
+                new ContextManifestBuilder.CaptureMetadata(Map.of(), Map.of(), Map.of(), Map.of(), Map.of(), Set.of())
+            );
+
+            AutomatedReviewReadinessResult result = builder.checkAutomatedReviewReadiness(
+                manifest,
+                List.of(withSubject(practiceRequiring(DIFF, "dependencies"), dependencySubject())),
+                NOW,
+                null,
+                Map.of()
+            );
+
+            assertThat(result.readyPractices()).isEmpty();
+            var decision = result.decisions().getFirst();
+            assertThat(decision.subjectCheck()).isNull();
+            assertThat(decision.reasonCodes()).doesNotContain(AutomatedReviewReadinessReason.SUBJECT_NOT_IN_THE_WORK);
+            assertThat(decision.sourceChecks().getFirst().reasonCodes()).containsExactly(
+                SourceReadinessReason.SOURCE_NOT_AVAILABLE
+            );
+        }
+
+        private PreparedDiff diffCapture(String jobId, String diff) {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            files.put("inputs/context/diff.patch", diff.getBytes(StandardCharsets.UTF_8));
+            ArtifactSourceManifest manifest = builder.augment(
+                files,
+                Map.of("inputs/context/diff.patch", DIFF),
+                jobId,
+                plan(),
+                new ContextManifestBuilder.CaptureMetadata(
+                    Map.of(DIFF, SourceCompleteness.COMPLETE),
+                    Map.of(DIFF, SourceContentState.NON_EMPTY),
+                    Map.of(DIFF, "abc123"),
+                    Map.of(),
+                    Map.of(),
+                    Map.of(),
+                    Set.of(DIFF)
+                )
+            );
+            return new PreparedDiff(manifest, files);
+        }
+
+        private record PreparedDiff(ArtifactSourceManifest manifest, Map<String, byte[]> files) {}
+    }
+
+    private static PracticeSubject dependencySubject() {
+        return new PracticeSubject(
+            "the change touches no dependency manifest or lockfile",
+            List.of(PracticeSubjectClause.changedPathMatches(List.of("**/pom.xml", "**/package.json")))
+        );
+    }
+
+    /** Re-declares the practice's single binding with a subject, leaving its evidence untouched. */
+    private static Practice withSubject(Practice practice, PracticeSubject subject) {
+        PracticeBinding binding = practice.getBindings().getFirst();
+        practice.setBindings(
+            List.of(
+                new PracticeBinding(binding.signals(), binding.needs(), binding.onDrafts(), binding.subject(), subject)
+            )
+        );
+        return practice;
     }
 
     private static Practice practiceRequiringComments() {

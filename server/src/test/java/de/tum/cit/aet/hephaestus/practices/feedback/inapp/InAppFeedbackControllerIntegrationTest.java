@@ -260,7 +260,6 @@ class InAppFeedbackControllerIntegrationTest extends AbstractWorkspaceIntegratio
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.9f,
             DIFF_EVIDENCE_JSON,
             "Reasoning for " + title,
             null,

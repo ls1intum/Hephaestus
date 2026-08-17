@@ -277,7 +277,6 @@ class SlackRetentionErasureIntegrationTest extends BaseIntegrationTest {
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             null,
             null,
             null,

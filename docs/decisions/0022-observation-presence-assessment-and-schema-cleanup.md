@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-06-24
 **Authors:** Felix T.J. Dietrich
-**Supersedes (in part):** [ADR 0021](0021-findings-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
+**Supersedes (in part):** [ADR 0021](0021-observations-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
 
 ## Context
 

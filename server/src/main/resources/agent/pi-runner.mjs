@@ -1,4 +1,4 @@
-// Pi SDK runner — embedded in-process; persists findings via custom tools.
+// Pi SDK runner — embedded in-process; persists observations via custom tools.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
@@ -20,45 +20,26 @@ import {
     SEVERITY_VALUES,
     carriesValence,
     citationMatchesArtifact,
-    dedupeKeyForFinding,
+    dedupeKeyForObservation,
     describeVocabulary,
-    normalizeFinding,
+    normalizeObservation,
     validateEvidenceSources,
     validateSearchScope,
     validateInapplicabilityScope,
-} from "./pi-finding-normalize.mjs";
+} from "./pi-observation-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi-runner-usage.mjs";
-import {
-    COMPOSITION_MIN_BUDGET_MS,
-    compositionBudgetMs,
-    deriveTimeouts,
-    shouldCompose,
-} from "./pi-runner-timings.mjs";
+import { deriveTimeouts } from "./pi-runner-timings.mjs";
 
 const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
 const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
-// The feedback-composition stage (see feedback-composer.md). Mirrors SandboxLayout:
-// FEEDBACK_COMPOSITION_PATH / FEEDBACK_FILENAME / FEEDBACK_COMPOSER_PROMPT_FILENAME.
-const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
-const FEEDBACK_PATH = `${OUTPUT}/feedback.json`;
-const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
-const OBSERVATION_HISTORY_PATH = `${CWD}/inputs/history/observations.json`;
-const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
-// This run's own measurements, projected for the composer. Under work/ because the composer must be
-// handed them rather than left to grep out/review-state.json for them, and because a projection of
-// rows that are already collected has no business being collected a second time.
-const COMPOSITION_WORK_DIR = `${CWD}/work/composition`;
-const COMPOSITION_OBSERVATIONS_PATH = `${COMPOSITION_WORK_DIR}/observations.json`;
-// The source kind a citation must carry for its location to exist inside this change's diff, and
-// therefore for an inline note to be placeable on it. Mirrors PullRequestReviewHandler.filterByDiffScope,
-// which asks the same question in Java and today answers it by DELETING the observation.
-const DIFF_SOURCE_KIND = "scm.pull-request.diff";
 const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
 if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
-    throw new Error(`AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`);
+    throw new Error(
+        `AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`,
+    );
 }
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR;
 if (!AGENT_DIR) {
@@ -68,20 +49,21 @@ const {
     initialMs: INITIAL_TIMEOUT_MS,
     retryMs: RETRY_TIMEOUT_MS,
     softNudgeMs: SOFT_TIMEOUT_MS,
-    // Ceiling for the feedback-composition stage. Never additive to the review's own allowance: the
-    // stage runs only from what the review left unspent, and only when that clears the floor (see main()).
-    compositionCeilingMs: COMPOSITION_TIMEOUT_MS,
-} = deriveTimeouts(AGENT_BUDGET_MS);
+    compositionMs: COMPOSITION_TIMEOUT_MS,
+} = deriveTimeouts(AGENT_BUDGET_MS, existsSync(`${CWD}/inputs/feedback-composition.json`));
 
 // Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
     console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
     try {
-        writeFileSync(`${OUTPUT}/watchdog-killed.json`, JSON.stringify({
-            budgetMs: AGENT_BUDGET_MS,
-            elapsedMs: AGENT_BUDGET_MS + 30_000,
-            reason: "runtime exceeded budget + 30s grace, hard-killed by watchdog",
-        }));
+        writeFileSync(
+            `${OUTPUT}/watchdog-killed.json`,
+            JSON.stringify({
+                budgetMs: AGENT_BUDGET_MS,
+                elapsedMs: AGENT_BUDGET_MS + 30_000,
+                reason: "runtime exceeded budget + 30s grace, hard-killed by watchdog",
+            }),
+        );
     } catch {
         /* best-effort — already exiting */
     }
@@ -92,14 +74,10 @@ mkdirSync(OUTPUT, { recursive: true });
 
 const manifest = JSON.parse(readFileSync(`${CWD}/inputs/manifest.json`, "utf8"));
 const availableSourceKinds = new Set(
-    manifest.sources
-        .filter((source) => source.state.availability === "AVAILABLE")
-        .map((source) => source.kind),
+    manifest.sources.filter((source) => source.state.availability === "AVAILABLE").map((source) => source.kind),
 );
 const artifactSources = new Map(
-    manifest.sources.flatMap((source) =>
-        (source.artifacts ?? []).map((artifact) => [artifact.path, source.kind]),
-    ),
+    manifest.sources.flatMap((source) => (source.artifacts ?? []).map((artifact) => [artifact.path, source.kind])),
 );
 const practiceIndex = JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8"));
 const admittedPractices = new Set(practiceIndex.map((practice) => practice.slug));
@@ -123,8 +101,8 @@ const usageTotals = {
 };
 const runnerDebug = { attempts: [], usageTotals };
 const reviewState = {
-    findings: [],
-    findingKeys: [],
+    observations: [],
+    observationKeys: [],
 };
 // The tool schema the model sees is generated from the SAME vocabulary the normalizer validates
 // against, so the SDK boundary can no longer accept a value the normalizer rejects (or, as happened
@@ -134,7 +112,7 @@ const reviewState = {
 // choice the model cannot make: if a person reading the schema could not say which of two values a case
 // belongs to, neither can it, and it will settle on whichever value reads as the safe default. That is
 // measurable — a live corpus produced NOT_APPLICABLE 61% of the time and INCONCLUSIVE not once. The
-// wording lives beside the vocabulary in pi-finding-normalize.mjs so a value can never be added without
+// wording lives beside the vocabulary in pi-observation-normalize.mjs so a value can never be added without
 // one; here it is only rendered.
 const presenceSchema = {
     type: "string",
@@ -158,7 +136,8 @@ const severitySchema = {
     description:
         "How much the problem costs. Set it only when assessment is BAD, and read it off the practice's own " +
         "severity table keyed to the fact you quoted — never from a feeling of how bad it is, so identical " +
-        "facts land in the same band every run.\n" + describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS),
+        "facts land in the same band every run.\n" +
+        describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS),
 };
 // Where you looked, for what, and where the looking stopped. REQUIRED when presence=ABSENT: "I did
 // not find it" only means "it is not there" if the corpus searched was the one the claim ranges over,
@@ -276,59 +255,61 @@ const evidenceSchema = {
         },
     },
 };
-const diffNoteSchema = {
-    type: "object",
-    additionalProperties: false,
-    // endLine is optional (single-line suggestion); normalizers + the Java parser treat it as optional, so
-    // keeping it REQUIRED would reject an otherwise-valid single-line note at the SDK boundary.
-    required: ["filePath", "startLine", "body"],
-    properties: {
-        filePath: { type: "string", minLength: 1 },
-        startLine: { type: "integer", minimum: 1 },
-        endLine: { type: "integer", minimum: 1 },
-        body: { type: "string", minLength: 1 },
-    },
-};
 // `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
 // conditional cleanly across all validators the SDK may use, so we keep it out of `required`
-// here and enforce the (presence, assessment) coupling in normalizeFinding().
+// here and enforce the (presence, assessment) coupling in normalizeObservation().
 //
-// `guidance` is NOT required. The composition stage authors what the developer reads, so guidance is now
-// only the fallback body of an in-context note. Requiring it on every finding made this step invent a
-// next step for a strength, for a practice with no subject here, and for a question it could not settle
-// — a standing pull toward "something is wrong" on the three answers that assert nothing is.
+// There is no `guidance` field. `additionalProperties: false` means the model cannot add one back, and
+// the normalizer drops it if the SDK ever lets one through. The composition stage is the only author of
+// what a developer reads; asking THIS step for a next step as well made it invent one for a strength, for
+// a practice with no subject here, and for a question it could not settle — a standing pull toward
+// "something is wrong" on exactly the three answers that assert nothing is. `reasoning` is what a
+// measurement has to say, and it is already read verbatim.
 //
 // There is no `confidence` field, and asking for one back would be asking for noise. Across 580 real
 // observations it never once fell below 0.90 and was exactly 1.00 in 55% of them: the model cannot use
-// the range, so every consumer that ranked on it was ranking on nothing. What a finding is worth is read
+// the range, so every consumer that ranked on it was ranking on nothing. What an observation is worth is read
 // off things we can check — its severity, and how much of the corpus its citations actually span.
-const findingSchema = {
+const observationSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["practiceSlug", "title", "presence", "evidence", "reasoning"],
+    required: ["practiceSlug", "summary", "outcome", "evidence", "evidenceRationale"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
-        title: { type: "string", minLength: 1, maxLength: 120 },
-        presence: presenceSchema,
-        assessment: assessmentSchema,
-        severity: severitySchema,
-        evidence: evidenceSchema,
-        reasoning: {
+        summary: { type: "string", minLength: 1, maxLength: 120 },
+        outcome: {
+            type: "string",
+            enum: [
+                "BEHAVIOR_PRESENT_GOOD",
+                "BEHAVIOR_PRESENT_BAD_MINOR",
+                "BEHAVIOR_PRESENT_BAD_MAJOR",
+                "BEHAVIOR_PRESENT_BAD_CRITICAL",
+                "BEHAVIOR_ABSENT_GOOD",
+                "BEHAVIOR_ABSENT_BAD_MINOR",
+                "BEHAVIOR_ABSENT_BAD_MAJOR",
+                "BEHAVIOR_ABSENT_BAD_CRITICAL",
+                "NO_REVIEW_OCCASION",
+                "INSUFFICIENT_EVIDENCE",
+            ],
+            description:
+                "Choose a BEHAVIOR result whenever the practice has something to judge. An absent target behaviour is BEHAVIOR_ABSENT, never NO_REVIEW_OCCASION. NO_REVIEW_OCCASION means a prerequisite situation explicitly named by the practice did not occur.",
+        },
+        evidence: {
+            ...evidenceSchema,
+            properties: {
+                citations: evidenceSchema.properties.citations,
+                exhaustiveSearch: searchSchema,
+                exclusion: inapplicabilitySchema,
+                missingEvidence: undecidabilitySchema,
+            },
+        },
+        evidenceRationale: {
             type: "string",
             minLength: 1,
             description:
-                "What you observed, in plain prose a developer reads verbatim: the behaviour you looked for, " +
-                "where you looked, and what the evidence showed. For INCONCLUSIVE, say here what would have " +
-                "decided it.",
+                "A concise explanation of how the cited evidence warrants this outcome. Describe evidence, " +
+                "not advice, intent, confidence, or hidden chain-of-thought.",
         },
-        guidance: {
-            type: "string",
-            description:
-                "OPTIONAL — one concrete next step, and only where there is one to take: a BAD finding, or a " +
-                "strength worth pushing further. Omit it entirely for NOT_APPLICABLE and INCONCLUSIVE, and for " +
-                "any finding where the honest next step is none. Do not invent one to fill the field.",
-        },
-        suggestedDiffNotes: { type: "array", items: diffNoteSchema },
     },
 };
 
@@ -339,10 +320,7 @@ function persistRunnerDebug() {
     writeFileSync(`${OUTPUT}/runner-debug.json`, JSON.stringify(runnerDebug, null, 2));
 }
 function persistReviewState() {
-    writeFileSync(
-        REVIEW_STATE_PATH,
-        JSON.stringify({ findings: reviewState.findings }, null, 2),
-    );
+    writeFileSync(REVIEW_STATE_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
 }
 
 const SECRET_PATTERN =
@@ -355,11 +333,10 @@ function redact(text) {
     });
 }
 
-
-function isValidFinding(f) {
+function isValidObservation(f) {
     if (!f || typeof f !== "object") return false;
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
-    if (typeof f.title !== "string" || !f.title.trim()) return false;
+    if (typeof f.summary !== "string" || !f.summary.trim()) return false;
     if (typeof f.presence !== "string") return false;
     // assessment is required only for a presence that carries valence; NOT_APPLICABLE and
     // INCONCLUSIVE are both silence and must NOT carry one (mirrors Presence.carriesValence()).
@@ -367,13 +344,13 @@ function isValidFinding(f) {
     return true;
 }
 
-function isValidFindingsPayload(p) {
+function isValidObservationsPayload(p) {
     return (
         p &&
         typeof p === "object" &&
-        Array.isArray(p.findings) &&
-        p.findings.length > 0 &&
-        p.findings.every(isValidFinding)
+        Array.isArray(p.observations) &&
+        p.observations.length > 0 &&
+        p.observations.every(isValidObservation)
     );
 }
 
@@ -395,16 +372,16 @@ function checkResultFile() {
     if (!existsSync(RESULT_PATH)) return false;
     try {
         const data = lenientJsonParse(readFileSync(RESULT_PATH, "utf-8"));
-        const valid = isValidFindingsPayload(data);
+        const valid = isValidObservationsPayload(data);
         if (!valid) {
-            const hasFindings = Array.isArray(data?.findings);
-            const count = hasFindings ? data.findings.length : 0;
-            const validCount = hasFindings ? data.findings.filter(isValidFinding).length : 0;
-            console.error(`[pi-runner] result.json validation failed: findings=${count}, valid=${validCount}`);
+            const hasObservations = Array.isArray(data?.observations);
+            const count = hasObservations ? data.observations.length : 0;
+            const validCount = hasObservations ? data.observations.filter(isValidObservation).length : 0;
+            console.error(`[pi-runner] result.json validation failed: observations=${count}, valid=${validCount}`);
         }
         if (!valid) return false;
-        const normalized = data.findings.map(normalizeAndValidateFinding);
-        writeFileSync(RESULT_PATH, JSON.stringify({ findings: normalized }, null, 2));
+        const normalized = data.observations.map(normalizeAndValidateObservation);
+        writeFileSync(RESULT_PATH, JSON.stringify({ observations: normalized }, null, 2));
         return true;
     } catch (e) {
         console.error(`[pi-runner] result.json parse error: ${e.message}`);
@@ -413,19 +390,19 @@ function checkResultFile() {
 }
 
 function maybeWriteResultFile() {
-    if (reviewState.findings.length === 0) return false;
-    writeFileSync(RESULT_PATH, JSON.stringify({ findings: reviewState.findings }, null, 2));
+    if (reviewState.observations.length === 0) return false;
+    writeFileSync(RESULT_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
     return true;
 }
 
 function hasPersistedReviewState() {
-    return reviewState.findings.length > 0;
+    return reviewState.observations.length > 0;
 }
 
 /**
  * Settle whether this attempt has a usable result.json, and say where it came from: "agent" when the
  * agent wrote one that validates, "tool-state" when one had to be composed from the persisted
- * report_finding calls, null when neither works and the retry is owed its turn.
+ * report_observation calls, null when neither works and the retry is owed its turn.
  *
  * Both branches are the ones the exit path used to run inline; naming the outcome lets the answer be
  * computed once and read by both the budget arithmetic and the exit.
@@ -436,21 +413,20 @@ function resolveResultFile() {
     return null;
 }
 
-
-function appendFindings(findings) {
+function appendObservations(observations) {
     let inserted = 0;
     let duplicates = 0;
-    const seen = new Set(reviewState.findingKeys);
-    for (const rawFinding of findings) {
-        const finding = normalizeAndValidateFinding(rawFinding);
-        const key = dedupeKeyForFinding(finding);
+    const seen = new Set(reviewState.observationKeys);
+    for (const rawObservation of observations) {
+        const observation = normalizeAndValidateObservation(rawObservation);
+        const key = dedupeKeyForObservation(observation);
         if (seen.has(key)) {
             duplicates++;
             continue;
         }
         seen.add(key);
-        reviewState.findingKeys.push(key);
-        reviewState.findings.push(finding);
+        reviewState.observationKeys.push(key);
+        reviewState.observations.push(observation);
         inserted++;
     }
     persistReviewState();
@@ -458,68 +434,271 @@ function appendFindings(findings) {
     return { inserted, duplicates };
 }
 
-function normalizeAndValidateFinding(rawFinding) {
-    const finding = normalizeFinding(rawFinding);
-    if (!admittedPractices.has(finding.practiceSlug)) throw new Error(`unknown practice '${finding.practiceSlug}'`);
-    validateEvidenceSources(finding, availableSourceKinds, artifactSources);
+function normalizeAndValidateObservation(rawObservation) {
+    const observation = normalizeObservation(rawObservation);
+    if (!admittedPractices.has(observation.practiceSlug))
+        throw new Error(`unknown practice '${observation.practiceSlug}'`);
+    validateEvidenceSources(observation, availableSourceKinds, artifactSources);
     validateSearchScope(
-        finding,
-        practiceExhaustiveSources.get(finding.practiceSlug) ?? new Set(),
+        observation,
+        practiceExhaustiveSources.get(observation.practiceSlug) ?? new Set(),
         availableSourceKinds,
     );
-    validateInapplicabilityScope(finding, availableSourceKinds);
-    for (const citation of finding.evidence.citations) {
+    validateInapplicabilityScope(observation, availableSourceKinds);
+    for (const citation of observation.evidence.citations) {
         const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
         if (!citationMatchesArtifact(citation, content)) {
             throw new Error(`citation does not match artifact location '${citation.artifactPath}'`);
         }
     }
-    return finding;
+    return observation;
 }
 
-const reportFindingTool = defineTool({
-    name: "report_finding",
-    label: "Report Finding",
+let measurementClosed = false;
+
+const reportObservationTool = defineTool({
+    name: "report_observation",
+    label: "Report Observation",
     description:
-        "Persist exactly one structured finding immediately so it survives retries and timeouts. Call this as soon as one finding is ready. Do not wait to batch findings.",
+        "Persist exactly one structured observation immediately so it survives retries and timeouts. Call this as soon as one observation is ready. Do not wait to batch observations.",
     parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["finding"],
+        required: ["observation"],
         properties: {
-            finding: findingSchema,
+            observation: observationSchema,
         },
     },
     execute: async (_toolCallId, params) => {
-        const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.assessment === "BAD" ? 1 : 0;
+        if (measurementClosed) {
+            return {
+                content: [{ type: "text", text: "Measurement is closed; this turn may only compose feedback." }],
+                details: { inserted: 0, measurementClosed: true },
+            };
+        }
+        const { inserted, duplicates } = appendObservations([params.observation]);
+        const negativeCount = params.observation.assessment === "BAD" ? 1 : 0;
         return {
             content: [
                 {
                     type: "text",
-                    text: `Stored ${inserted} finding${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative findings in this call: ${negativeCount}.`,
+                    text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negativeCount}.`,
                 },
             ],
-            details: { inserted, duplicates, totalFindings: reviewState.findings.length },
+            details: { inserted, duplicates, totalObservations: reviewState.observations.length },
         };
     },
 });
 
-// ── Feedback composition stage ────────────────────────────────────────────────
-//
-// A SECOND LLM turn, after the review's measurements are final, that decides what — if anything — is
-// worth saying to this developer now, on which surface, and in what words. Measurement and intervention
-// are separate acts; this is where the separation lives in the runtime.
-//
-// One turn writes for every enabled lane, because the per-lane rules are only statable in contrast:
-// "the note on the work says this, so the private page must not say it again" cannot be expressed by a
-// stage that can see one lane at a time.
-//
-// Strictly additive. It runs in its OWN session, only once the review has durable state and only from
-// time the review did not need, and every failure inside it is swallowed: a review that measured
-// correctly is a successful review whether or not anything was composed from it. Nothing here can
-// touch reviewState or the exit code.
+function accumulateUsage(prev, curr) {
+    usageTotals.model = curr.model || usageTotals.model;
+    usageTotals.inputTokens += Math.max(0, curr.inputTokens - (prev?.inputTokens || 0));
+    usageTotals.outputTokens += Math.max(0, curr.outputTokens - (prev?.outputTokens || 0));
+    usageTotals.reasoningTokens += Math.max(0, curr.reasoningTokens - (prev?.reasoningTokens || 0));
+    usageTotals.cacheReadTokens += Math.max(0, curr.cacheReadTokens - (prev?.cacheReadTokens || 0));
+    usageTotals.cacheWriteTokens += Math.max(0, curr.cacheWriteTokens - (prev?.cacheWriteTokens || 0));
+    usageTotals.costUsd += Math.max(0, curr.costUsd - (prev?.costUsd || 0));
+    usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls || 0));
+}
 
+function extractLastAssistantText(sessionState) {
+    const messages = sessionState.messages || [];
+    for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        if (msg.role !== "assistant") continue;
+        // Pi SDK uses "text" and "thinking" content types — check both
+        const textBlocks = (msg.content || []).filter((c) => c.type === "text" || c.type === "thinking");
+        const text = textBlocks
+            .map((c) => c.text || c.thinking || "")
+            .join("")
+            .trim();
+        if (!text || text.length < 20) continue;
+        // Only return text that looks like it might contain JSON (has braces)
+        if (text.includes("{") && text.includes("}")) return text;
+    }
+    return null;
+}
+
+// Mirror PracticeDetectionResultParser.MAX_RAW_OUTPUT_LENGTH on the Java side: a well-formed agent
+// rawOutput never approaches this, so a larger blob is junk and the brace-scan below would burn the
+// remaining grace window parsing growing slices for nothing.
+const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
+
+function tryParseJsonFromText(text) {
+    if (!text) return null;
+    if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
+    try {
+        const parsed = JSON.parse(text);
+        if (isValidObservationsPayload(parsed)) return parsed;
+    } catch {}
+    const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g;
+    let match = jsonBlockPattern.exec(text);
+    while (match !== null) {
+        try {
+            const parsed = JSON.parse(match[1].trim());
+            if (isValidObservationsPayload(parsed)) return parsed;
+        } catch {}
+        match = jsonBlockPattern.exec(text);
+    }
+    // Find {"observations": ... } object (tolerates whitespace).
+    const observationsMatch = text.match(/\{\s*"observations"/);
+    if (!observationsMatch || observationsMatch.index === undefined) return null;
+    const braceStart = observationsMatch.index;
+    // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
+    // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
+    // extractJsonFromText, which caps at a small fixed number of attempts).
+    let attempts = 0;
+    for (let end = text.indexOf("}", braceStart); end >= 0 && attempts < 256; end = text.indexOf("}", end + 1)) {
+        attempts++;
+        try {
+            const candidate = text.slice(braceStart, end + 1);
+            const parsed = JSON.parse(candidate);
+            if (isValidObservationsPayload(parsed)) return parsed;
+        } catch {}
+    }
+    return null;
+}
+
+function tryRescueFromTextResponse(sessionState) {
+    const text = extractLastAssistantText(sessionState);
+    if (!text) return false;
+    try {
+        writeFileSync(`${OUTPUT}/last-assistant-text.txt`, text);
+    } catch {}
+    const payload = tryParseJsonFromText(text);
+    if (!payload) {
+        console.error(
+            `[pi-runner] Text rescue: found text (${text.length} chars) but no valid JSON. First 200: ${text.slice(0, 200)}`,
+        );
+        return false;
+    }
+    console.error(`[pi-runner] Text rescue: extracted ${payload.observations.length} observations`);
+    writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
+    return checkResultFile();
+}
+
+function chunkArray(arr, size) {
+    const out = [];
+    for (let i = 0; i < arr.length; i += size) {
+        out.push(arr.slice(i, i + size));
+    }
+    return out;
+}
+
+// Group practice slugs by their area (from index.json), preserving order. A area forms one coherent,
+// focused evaluation; ungrouped practices fall back to their own one-practice group.
+function loadPracticeGroups() {
+    try {
+        const indexPath = `${CWD}/inputs/practices/index.json`;
+        if (!existsSync(indexPath)) return [];
+        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+        if (!Array.isArray(index)) return [];
+        const byArea = new Map();
+        for (const p of index) {
+            if (!p.slug) continue;
+            const area = p.area || p.slug;
+            if (!byArea.has(area)) byArea.set(area, []);
+            byArea.get(area).push(p.slug);
+        }
+        return [...byArea.entries()].map(([area, slugs]) => ({ area, slugs }));
+    } catch {
+        return [];
+    }
+}
+
+function loadPracticeSlugs() {
+    try {
+        const indexPath = `${CWD}/inputs/practices/index.json`;
+        if (!existsSync(indexPath)) return [];
+        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
+        if (!Array.isArray(index)) return [];
+        return index.map((p) => p.slug).filter(Boolean);
+    } catch {
+        return [];
+    }
+}
+
+// Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
+// cannot drift between the sites that emit it.
+const PERSIST_DISCIPLINE =
+    `There is no target count and no quota. ` +
+    `Record what you saw; you are not asked for a next step, so do not write one. ` +
+    `Only keep GOOD observations that add real review value. ` +
+    `Do not add derivative low-signal observations when a stronger observation already covers the problem. ` +
+    `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
+
+function buildRetryScaffold(slugs) {
+    if (!slugs.length) return "";
+    return (
+        `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
+        `Persist every justified observation with report_observation, one observation per call. ` +
+        `There is no target count and no quota. ` +
+        `Only report GOOD observations that add real review value. ` +
+        `Do not emit derivative low-signal observations when a stronger root-cause observation already covers the problem.`
+    );
+}
+
+// Task envelope: /workspace/task.json (TaskEnvelope<PracticeReviewTask>).
+// Exit 42 on schema-version mismatch or unknown kind so the executor can log
+// envelope/image drift distinctly from agent failures.
+const ENVELOPE_MISMATCH_EXIT = 42;
+const SUPPORTED_SCHEMA_VERSION = 1;
+const SUPPORTED_KIND = "practice_review";
+const TASK_PATH = "/workspace/task.json";
+
+function readTaskEnvelope() {
+    let raw;
+    try {
+        raw = readFileSync(TASK_PATH, "utf-8");
+    } catch (err) {
+        console.error(`[pi-runner] Failed to read ${TASK_PATH}: ${err.message}`);
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    let envelope;
+    try {
+        envelope = JSON.parse(raw);
+    } catch (err) {
+        console.error(`[pi-runner] Failed to parse ${TASK_PATH}: ${err.message}`);
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    if (envelope?.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
+        console.error(
+            `[pi-runner] Unsupported schemaVersion: got ${envelope?.schemaVersion}, expected ${SUPPORTED_SCHEMA_VERSION}. ` +
+                `Server/image version drift — rebuild the agent-pi image or roll back the server.`,
+        );
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    if (envelope?.task?.kind !== SUPPORTED_KIND) {
+        console.error(
+            `[pi-runner] Unknown task kind: got "${envelope?.task?.kind}", expected "${SUPPORTED_KIND}". ` +
+                `This runner only handles practice_review tasks.`,
+        );
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    if (typeof envelope.task.prompt !== "string" || envelope.task.prompt.trim() === "") {
+        console.error(`[pi-runner] task.prompt is missing or blank in ${TASK_PATH}`);
+        process.exit(ENVELOPE_MISMATCH_EXIT);
+    }
+    return envelope;
+}
+
+const taskEnvelope = readTaskEnvelope();
+const prompt = taskEnvelope.task.prompt.trim();
+console.error(
+    `[pi-runner] Task envelope loaded: kind=${taskEnvelope.task.kind}, ` +
+        `jobId=${taskEnvelope.jobId}, workspaceId=${taskEnvelope.workspaceId}, ` +
+        `repository=${taskEnvelope.task.repositoryFullName ?? "?"}, ` +
+        `prNumber=${taskEnvelope.task.pullRequestNumber ?? "?"}`,
+);
+
+const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
+const FEEDBACK_PATH = `${OUTPUT}/feedback.json`;
+const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
+const OBSERVATION_HISTORY_PATH = `${CWD}/inputs/history/observations.json`;
+const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
+const COMPOSITION_OBSERVATIONS_PATH = `${CWD}/work/composition/observations.json`;
+let compositionAdmitted = false;
+let admissionDigest = null;
 const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"];
 const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"];
 const WITHHOLD_REASONS = ["NO_MATERIAL_CHANGE", "ALREADY_SAID", "BELOW_BAR"];
@@ -528,7 +707,7 @@ const WITHHOLD_REASONS = ["NO_MATERIAL_CHANGE", "ALREADY_SAID", "BELOW_BAR"];
 // thread keys are echoed rather than re-derived server-side on purpose: they are the exact inputs the
 // composer was shown, so a unit that names one of them can be validated against what was actually on
 // the table rather than against a re-query that may have moved.
-const composedFeedback = { observations: [], preparedThreadKeys: [], units: [] };
+const composedFeedback = { admissionDigest: null, observations: [], preparedThreadKeys: [], units: [] };
 
 function loadCompositionRequest() {
     try {
@@ -544,8 +723,13 @@ function loadCompositionRequest() {
             };
         }
         if (!CHANNELS.some((channel) => channels[channel].enabled && channels[channel].maxUnits > 0)) return null;
+        const inContextPlacementKinds = (request.inContextPlacementKinds ?? []).filter((kind) =>
+            ["DIFF", "ARTIFACT"].includes(kind),
+        );
+        if (channels.IN_CONTEXT.enabled && inContextPlacementKinds.length === 0) return null;
         return {
             channels,
+            inContextPlacementKinds,
             minDistinctArtifacts: Math.max(2, Number(request.minDistinctArtifacts) || 2),
         };
     } catch (e) {
@@ -597,46 +781,6 @@ function stagedPreparedThreadKeys() {
 // A citation can carry an inline note only if it locates a line inside THIS change. Everything else is
 // a true observation about work that is not on the diff, which is a reason to route it elsewhere and
 // never a reason to drop it.
-function citationIsAnchorable(citation) {
-    return (
-        citation?.sourceKind === DIFF_SOURCE_KIND &&
-        typeof citation?.path === "string" &&
-        citation.path.trim().length > 0 &&
-        Number.isInteger(citation?.startLine)
-    );
-}
-
-// This run's measurements, as the composer sees them. Ids are positional and stable for the run: the
-// composer names one, and Java resolves it back through the same list, echoed alongside the units.
-function projectObservations() {
-    return reviewState.findings.map((finding, index) => {
-        const citations = (finding.evidence?.citations ?? []).map((citation, citationIndex) => ({
-            index: citationIndex,
-            sourceKind: citation.sourceKind,
-            path: citation.path,
-            side: citation.side ?? null,
-            startLine: citation.startLine ?? null,
-            endLine: citation.endLine ?? null,
-            quote: citation.quote,
-            anchorable: citationIsAnchorable(citation),
-        }));
-        return {
-            id: `obs-${index}`,
-            practiceSlug: finding.practiceSlug,
-            title: finding.title,
-            presence: finding.presence,
-            assessment: finding.assessment ?? null,
-            severity: finding.severity ?? null,
-            reasoning: finding.reasoning,
-            anchorable: citations.some((citation) => citation.anchorable),
-            citations,
-        };
-    });
-}
-
-// Java resolves the anchor from the citation, so it needs the locations and nothing else. The quote and
-// the reasoning stay out: they are already on the observation rows, and re-collecting them would put a
-// second copy of every measurement into the job's output column.
 function leanObservations(observations) {
     return observations.map((observation) => ({
         id: observation.id,
@@ -660,13 +804,13 @@ function persistComposedFeedback() {
     writeFileSync(FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
 }
 
-// Structurally distinct from report_finding, and that is the point: no presence, no assessment, no
+// Structurally distinct from report_observation, and that is the point: no presence, no assessment, no
 // severity, no confidence, no citations the composer typed. An intervention that could carry a verdict
 // would eventually be read back as one, and an anchor the composer invented would put a note on a line
 // that does not exist — so it names an observation and a citation index, never a path and never a line.
 function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys) {
-    const observationsById = new Map(observations.map((observation) => [observation.id, observation]));
     const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
+    const placementKinds = request.inContextPlacementKinds || [];
     const usedPerChannel = Object.fromEntries(CHANNELS.map((channel) => [channel, 0]));
     const seen = new Set();
     const refuse = (text) => ({ content: [{ type: "text", text }], details: { stored: 0 } });
@@ -730,54 +874,77 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
                             type: "string",
                             maxLength: 8000,
                             description:
-                                "IN_CONTEXT and IN_APP only. Markdown, read verbatim by the developer.",
+                                "IN_APP only: begin with what delta.json says changed, then name the cross-artifact work pattern; never quote a line. Markdown, read verbatim.",
                         },
                         nextStep: {
                             type: "string",
                             maxLength: 2000,
                             description:
-                                "IN_CONTEXT and IN_APP only. One edit before merging, or one habit for next time.",
+                                "IN_CONTEXT: one edit before merging. IN_APP: one repeatable habit for the next piece of work. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
                         },
-                        conversation: {
+                        notes: {
                             type: "object",
                             additionalProperties: false,
-                            required: ["opener", "evidence", "target"],
+                            required: ["situation", "capability", "evidenceSummary", "inConversationSignal"],
                             description:
-                                "IN_CHAT only. The move, not the script: the mentor still writes the words " +
-                                "of the turn with the live conversation in front of it.",
+                                "IN_CHAT only. Notes TO the mentor, which composes the whole turn itself, later, " +
+                                "with the live conversation in front of it. Write what it needs to know, never a " +
+                                "sentence for it to say: anything phrased as a line of dialogue will be spoken, and " +
+                                "will sound like a script.",
                             properties: {
-                                opener: {
-                                    type: "string",
-                                    maxLength: 2000,
-                                    description:
-                                        "A question about how they work, asked before anything is told. Read verbatim " +
-                                        "when the mentor raises it.",
-                                },
-                                evidence: {
+                                situation: {
                                     type: "string",
                                     maxLength: 4000,
                                     description:
-                                        "What you would show them once they have answered, and not before. The mentor " +
-                                        "decides when.",
+                                        "What you saw: factual, specific, the artifacts named. Your words about them, " +
+                                        "not words for them - third person, never addressed to the developer as 'you', " +
+                                        "and never a judgement of the person.",
                                 },
-                                target: {
+                                capability: {
                                     type: "string",
                                     maxLength: 2000,
-                                    description: "What this turn is trying to leave them able to do themselves.",
+                                    description:
+                                        "The understanding or self-check this conversation should support. State the capability, not a solution such as a required heading/template, and not a question, script, diagnosis, or fixed tactic.",
+                                },
+                                evidenceSummary: {
+                                    type: "string",
+                                    maxLength: 4000,
+                                    description:
+                                        "A concise account of the artifacts and observations that ground this note. " +
+                                        "Summarise rather than inventing a quote; the original observation evidence is " +
+                                        "staged separately for the mentor to inspect.",
+                                },
+                                inConversationSignal: {
+                                    type: "string",
+                                    maxLength: 2000,
+                                    description:
+                                        "A sign detectable before the conversation ends: a distinction, decision, question, or self-check the developer can articulate. Not a promise, future artifact, message text, or compliance target.",
                                 },
                             },
                         },
-                        anchor: {
-                            type: "object",
-                            additionalProperties: false,
-                            required: ["observationId", "citationIndex"],
+                        placement: {
                             description:
-                                "IN_CONTEXT only. Names an observation and one of ITS citations; the file, side and " +
-                                "line come from that citation, never from you.",
-                            properties: {
-                                observationId: { type: "string", minLength: 1 },
-                                citationIndex: { type: "integer", minimum: 0 },
-                            },
+                                "IN_CONTEXT only. DIFF places a note at one verified observation citation. " +
+                                "ARTIFACT places it in the issue or change summary without inventing a line.",
+                            oneOf: placementKinds.map((kind) =>
+                                kind === "DIFF"
+                                    ? {
+                                          type: "object",
+                                          additionalProperties: false,
+                                          required: ["kind", "observationId", "citationIndex"],
+                                          properties: {
+                                              kind: { type: "string", enum: ["DIFF"] },
+                                              observationId: { type: "string", minLength: 1 },
+                                              citationIndex: { type: "integer", minimum: 0 },
+                                          },
+                                      }
+                                    : {
+                                          type: "object",
+                                          additionalProperties: false,
+                                          required: ["kind"],
+                                          properties: { kind: { type: "string", enum: ["ARTIFACT"] } },
+                                      },
+                            ),
                         },
                     },
                 },
@@ -785,6 +952,7 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
         },
         execute: async (_toolCallId, params) => {
             const unit = params.unit;
+            const observationsById = new Map(observations.map((observation) => [observation.id, observation]));
             const bounds = request.channels[unit.channel];
             if (!bounds?.enabled) {
                 return refuse(`${unit.channel} is not a lane this run may write for; skipped.`);
@@ -796,14 +964,14 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
             if (usedPerChannel[unit.channel] >= bounds.maxUnits) {
                 return refuse(`${unit.channel} cap of ${bounds.maxUnits} reached; skipped.`);
             }
-            const rejection = validateUnit(unit, observationsById, preparedThreadKeys);
+            const rejection = validateUnit(unit, observationsById, preparedThreadKeys, placementKinds);
             if (rejection) {
                 return refuse(rejection);
             }
             seen.add(key);
             usedPerChannel[unit.channel]++;
             composedFeedback.units.push(unit);
-            // Written on every call, like report_finding, so a stage killed by the watchdog still
+            // Written on every call, like report_observation, so a stage killed by the watchdog still
             // leaves behind what it had already decided.
             persistComposedFeedback();
             return {
@@ -822,7 +990,7 @@ function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadK
 // The rules JSON Schema cannot state: which fields each channel and each action require, and that an
 // anchor and a supersession target must both name something that was actually on the table. Java checks
 // every one of these again — this side exists so the model is told at once, while it can still fix it.
-function validateUnit(unit, observationsById, preparedThreadKeys) {
+function validateUnit(unit, observationsById, preparedThreadKeys, placementKinds) {
     if (unit.action === "WITHHOLD") {
         if (!unit.withholdReason) return "WITHHOLD needs a withholdReason; skipped.";
         return null;
@@ -835,101 +1003,70 @@ function validateUnit(unit, observationsById, preparedThreadKeys) {
         }
     }
     if (unit.channel === "IN_CHAT") {
-        if (unit.body || unit.nextStep) return "IN_CHAT takes conversation{opener,evidence,target}, not body/nextStep; skipped.";
-        if (!unit.conversation?.opener?.trim()) return "IN_CHAT needs conversation.opener; skipped.";
-        if (!unit.conversation?.evidence?.trim()) return "IN_CHAT needs conversation.evidence; skipped.";
-        if (!unit.conversation?.target?.trim()) return "IN_CHAT needs conversation.target; skipped.";
-        if (unit.anchor) return "Only IN_CONTEXT units may carry an anchor; skipped.";
+        if (unit.body || unit.nextStep) {
+            return "IN_CHAT takes notes{situation,capability,evidenceSummary,inConversationSignal}, not body/nextStep - nothing on this lane is read out; skipped.";
+        }
+        if (!unit.notes?.situation?.trim()) return "IN_CHAT needs notes.situation; skipped.";
+        if (!unit.notes?.capability?.trim()) return "IN_CHAT needs notes.capability; skipped.";
+        if (!unit.notes?.evidenceSummary?.trim()) return "IN_CHAT needs notes.evidenceSummary; skipped.";
+        if (!unit.notes?.inConversationSignal?.trim()) return "IN_CHAT needs notes.inConversationSignal; skipped.";
+        if (unit.placement) return "Only IN_CONTEXT units may carry a placement; skipped.";
         return null;
     }
-    if (unit.conversation) return "Only IN_CHAT units may carry a conversation block; skipped.";
-    if (!unit.body?.trim()) return `${unit.channel} needs a body; skipped.`;
+    if (unit.notes) return "Only IN_CHAT units may carry a notes block; skipped.";
     if (!unit.nextStep?.trim()) return `${unit.channel} needs a nextStep; skipped.`;
     if (unit.channel === "IN_APP") {
-        if (unit.anchor) return "Only IN_CONTEXT units may carry an anchor; skipped.";
+        if (!unit.body?.trim()) return "IN_APP needs a body; skipped.";
+        if (unit.placement) return "Only IN_CONTEXT units may carry a placement; skipped.";
+        const normalizedBody = normalizeQuotedText(unit.body);
+        const repeatsCurrentEvidence = unit.basedOn.some((id) =>
+            (observationsById.get(id)?.citations ?? []).some((citation) => {
+                const quote = normalizeQuotedText(citation.quote ?? "");
+                return quote.length >= 12 && normalizedBody.includes(quote);
+            }),
+        );
+        if (repeatsCurrentEvidence) {
+            return "IN_APP describes a cross-artifact pattern; do not copy a current artifact quote into it. Skipped.";
+        }
         return null;
     }
-    if (!unit.anchor) return "An IN_CONTEXT unit is a note on a line, so it needs an anchor; skipped.";
-    const observation = observationsById.get(unit.anchor.observationId);
-    if (!observation) return `No observation '${unit.anchor.observationId}' in this run; skipped.`;
-    const citation = observation.citations[unit.anchor.citationIndex];
-    if (!citation) return `Observation '${observation.id}' has no citation ${unit.anchor.citationIndex}; skipped.`;
+    if (unit.body) return "IN_CONTEXT takes title, placement, and nextStep only; skipped.";
+    if (!unit.placement) return "IN_CONTEXT needs a DIFF or ARTIFACT placement; skipped.";
+    if (!placementKinds.includes(unit.placement.kind)) {
+        return `${unit.placement.kind} placement is unavailable on this artifact; skipped.`;
+    }
+    if (unit.placement.kind === "ARTIFACT") {
+        if (unit.placement.observationId != null || unit.placement.citationIndex != null) {
+            return "ARTIFACT placement takes no observationId or citationIndex; skipped.";
+        }
+        const grounded = unit.basedOn.some((id) => observationsById.get(id)?.practiceSlug === unit.practiceSlug);
+        if (!grounded) {
+            return "ARTIFACT placement must be based on a current observation for this practice; skipped.";
+        }
+        return null;
+    }
+    if (unit.placement.kind !== "DIFF") return "Unknown IN_CONTEXT placement kind; skipped.";
+    if (!unit.placement.observationId || !Number.isInteger(unit.placement.citationIndex)) {
+        return "DIFF placement needs observationId and citationIndex; skipped.";
+    }
+    const observation = observationsById.get(unit.placement.observationId);
+    if (!observation) return `No observation '${unit.placement.observationId}' in this run; skipped.`;
+    const citation = observation.citations[unit.placement.citationIndex];
+    if (!citation) return `Observation '${observation.id}' has no citation ${unit.placement.citationIndex}; skipped.`;
     if (!citation.anchorable) {
-        return `Citation ${unit.anchor.citationIndex} of '${observation.id}' is not on this change's diff, so no note can be placed on it. Skipped.`;
+        return `Citation ${unit.placement.citationIndex} of '${observation.id}' is not on this change's diff, so no note can be placed on it. Skipped.`;
     }
     return null;
 }
 
-async function runCompositionStage(sharedDeps, budgetMs) {
-    const request = loadCompositionRequest();
-    if (!request) {
-        console.error(`[pi-runner] Composition stage: not requested for this run`);
-        return null;
-    }
-    if (!existsSync(COMPOSER_PROMPT_PATH)) {
-        console.error(`[pi-runner] Composition stage: ${COMPOSER_PROMPT_PATH} missing, skipping`);
-        return null;
-    }
-    const practiceSlugs = composablePracticeSlugs();
-    if (practiceSlugs.length === 0) {
-        return null;
-    }
-    const observations = projectObservations();
-    const preparedThreadKeys = stagedPreparedThreadKeys();
-    composedFeedback.observations = leanObservations(observations);
-    composedFeedback.preparedThreadKeys = preparedThreadKeys;
-    mkdirSync(COMPOSITION_WORK_DIR, { recursive: true });
-    writeFileSync(COMPOSITION_OBSERVATIONS_PATH, JSON.stringify({ observations }, null, 2));
-
-    const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
-    const tool = buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys);
-
-    // A SEPARATE session, not another turn on the review's. Two reasons, both structural: the review's
-    // conversation is a record of taking measurements, and re-sending it would both cost its full
-    // token weight again and invite the composer to treat its own reasoning as evidence.
-    const { session } = await createAgentSession({
-        cwd: CWD,
-        agentDir: AGENT_DIR,
-        tools: ["read", "grep", "report_feedback"],
-        customTools: [tool],
-        sessionManager: SessionManager.inMemory(),
-        settingsManager: sharedDeps.settingsManager,
-        authStorage: sharedDeps.authStorage,
-        modelRegistry: sharedDeps.modelRegistry,
-    });
-
-    // Subscribed for the same reason the review session is: this session is created with the same
-    // settings, so it compacts too, and a compacted call is one the proxy has already billed upstream
-    // while this stage reports nothing for it.
-    const streamUsage = newUsageLedger();
-    const unsubscribeUsage = session.subscribe((event) => {
-        if (event.type === "message_end") {
-            addAssistantUsage(streamUsage, event.message);
-        }
-    });
-
-    let aborted = false;
-    const timer = setTimeout(() => {
-        aborted = true;
-        console.error(`[pi-runner] Composition stage hard timeout — aborting`);
-        session.abort().catch((err) => console.error(`[pi-runner] composition abort failed: ${err.message}`));
-    }, budgetMs);
-    const startMs = Date.now();
-    try {
-        await session.prompt(`${instructions}\n\n${buildCompositionTurn(request, observations)}`);
-    } catch (err) {
-        console.error(`[pi-runner] Composition stage prompt error: ${err.message}`);
-    } finally {
-        clearTimeout(timer);
-        unsubscribeUsage();
-    }
-    // Always written, even empty: an empty payload is the stage saying it looked and composed nothing,
-    // which is a different fact from the stage never having run.
-    persistComposedFeedback();
-    console.error(
-        `[pi-runner] Composition stage: ${composedFeedback.units.length} unit(s) in ${((Date.now() - startMs) / 1000).toFixed(1)}s, aborted=${aborted}`,
-    );
-    return extractUsageFromSession(session.state, streamUsage);
+function normalizeQuotedText(value) {
+    return value
+        .normalize("NFKC")
+        .replace(/[“”„‟]/g, '"')
+        .replace(/[‘’‚‛]/g, "'")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
 }
 
 function buildCompositionTurn(request, observations) {
@@ -944,8 +1081,9 @@ function buildCompositionTurn(request, observations) {
         `\`work/composition/observations.json\`; ${anchorable} of them cite a line inside this change and can ` +
         `therefore carry a note on the work. Read that file first, then the history.\n\n` +
         `Lanes open this turn: ${lanes}.` +
-        (closed.length > 0
-            ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.`
+        (closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "") +
+        (request.channels.IN_CONTEXT.enabled
+            ? ` IN_CONTEXT placements available here: ${request.inContextPlacementKinds.join(", ")}.`
             : "") +
         `\nA pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.\n\n` +
         `Persist each unit with report_feedback as soon as it is ready. Writing nothing on a lane is a ` +
@@ -953,210 +1091,29 @@ function buildCompositionTurn(request, observations) {
     );
 }
 
-function accumulateUsage(prev, curr) {
-    usageTotals.model = curr.model || usageTotals.model;
-    usageTotals.inputTokens += Math.max(0, curr.inputTokens - (prev?.inputTokens || 0));
-    usageTotals.outputTokens += Math.max(0, curr.outputTokens - (prev?.outputTokens || 0));
-    usageTotals.reasoningTokens += Math.max(0, curr.reasoningTokens - (prev?.reasoningTokens || 0));
-    usageTotals.cacheReadTokens += Math.max(0, curr.cacheReadTokens - (prev?.cacheReadTokens || 0));
-    usageTotals.cacheWriteTokens += Math.max(0, curr.cacheWriteTokens - (prev?.cacheWriteTokens || 0));
-    usageTotals.costUsd += Math.max(0, curr.costUsd - (prev?.costUsd || 0));
-    usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls || 0));
+async function admitObservations() {
+    const response = await fetch(`${process.env.LLM_PROXY_URL}/admit-observations`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${process.env.LLM_PROXY_TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify({ schemaVersion: 1, observations: reviewState.observations }),
+    });
+    if (!response.ok) throw new Error(`observation admission failed: HTTP ${response.status}`);
+    const admitted = await response.json();
+    if (
+        admitted?.schemaVersion !== 1 ||
+        typeof admitted?.admissionDigest !== "string" ||
+        !Array.isArray(admitted?.observations)
+    ) {
+        throw new Error("observation admission returned an invalid contract");
+    }
+    reviewState.observations.splice(0, reviewState.observations.length, ...admitted.observations);
+    admissionDigest = admitted.admissionDigest;
+    compositionAdmitted = true;
+    composedFeedback.admissionDigest = admissionDigest;
+    composedFeedback.observations = leanObservations(reviewState.observations);
+    mkdirSync(`${CWD}/work/composition`, { recursive: true });
+    writeFileSync(COMPOSITION_OBSERVATIONS_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
 }
-
-
-function extractLastAssistantText(sessionState) {
-    const messages = sessionState.messages || [];
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i];
-        if (msg.role !== "assistant") continue;
-        // Pi SDK uses "text" and "thinking" content types — check both
-        const textBlocks = (msg.content || []).filter((c) => c.type === "text" || c.type === "thinking");
-        const text = textBlocks
-            .map((c) => c.text || c.thinking || "")
-            .join("")
-            .trim();
-        if (!text || text.length < 20) continue;
-        // Only return text that looks like it might contain JSON (has braces)
-        if (text.includes("{") && text.includes("}")) return text;
-    }
-    return null;
-}
-
-// Mirror PracticeDetectionResultParser.MAX_RAW_OUTPUT_LENGTH on the Java side: a well-formed agent
-// rawOutput never approaches this, so a larger blob is junk and the brace-scan below would burn the
-// remaining grace window parsing growing slices for nothing.
-const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
-
-function tryParseJsonFromText(text) {
-    if (!text) return null;
-    if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
-    try {
-        const parsed = JSON.parse(text);
-        if (isValidFindingsPayload(parsed)) return parsed;
-    } catch {}
-    const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g;
-    let match = jsonBlockPattern.exec(text);
-    while (match !== null) {
-        try {
-            const parsed = JSON.parse(match[1].trim());
-            if (isValidFindingsPayload(parsed)) return parsed;
-        } catch {}
-        match = jsonBlockPattern.exec(text);
-    }
-    // Find {"findings": ... } object (tolerates whitespace).
-    const findingsMatch = text.match(/\{\s*"findings"/);
-    if (!findingsMatch || findingsMatch.index === undefined) return null;
-    const braceStart = findingsMatch.index;
-    // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
-    // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
-    // extractJsonFromText, which caps at a small fixed number of attempts).
-    let attempts = 0;
-    for (let end = text.indexOf("}", braceStart); end >= 0 && attempts < 256; end = text.indexOf("}", end + 1)) {
-        attempts++;
-        try {
-            const candidate = text.slice(braceStart, end + 1);
-            const parsed = JSON.parse(candidate);
-            if (isValidFindingsPayload(parsed)) return parsed;
-        } catch {}
-    }
-    return null;
-}
-
-function tryRescueFromTextResponse(sessionState) {
-    const text = extractLastAssistantText(sessionState);
-    if (!text) return false;
-    try {
-        writeFileSync(`${OUTPUT}/last-assistant-text.txt`, text);
-    } catch {}
-    const payload = tryParseJsonFromText(text);
-    if (!payload) {
-        console.error(
-            `[pi-runner] Text rescue: found text (${text.length} chars) but no valid JSON. First 200: ${text.slice(0, 200)}`,
-        );
-        return false;
-    }
-    console.error(`[pi-runner] Text rescue: extracted ${payload.findings.length} findings`);
-    writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
-    return checkResultFile();
-}
-
-
-function chunkArray(arr, size) {
-    const out = [];
-    for (let i = 0; i < arr.length; i += size) {
-        out.push(arr.slice(i, i + size));
-    }
-    return out;
-}
-
-// Group practice slugs by their area (from index.json), preserving order. A area forms one coherent,
-// focused evaluation; ungrouped practices fall back to their own one-practice group.
-function loadPracticeGroups() {
-    try {
-        const indexPath = `${CWD}/inputs/practices/index.json`;
-        if (!existsSync(indexPath)) return [];
-        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
-        if (!Array.isArray(index)) return [];
-        const byArea = new Map();
-        for (const p of index) {
-            if (!p.slug) continue;
-            const area = p.area || p.slug;
-            if (!byArea.has(area)) byArea.set(area, []);
-            byArea.get(area).push(p.slug);
-        }
-        return [...byArea.entries()].map(([area, slugs]) => ({ area, slugs }));
-    } catch {
-        return [];
-    }
-}
-
-function loadPracticeSlugs() {
-    try {
-        const indexPath = `${CWD}/inputs/practices/index.json`;
-        if (!existsSync(indexPath)) return [];
-        const index = JSON.parse(readFileSync(indexPath, "utf-8"));
-        if (!Array.isArray(index)) return [];
-        return index.map((p) => p.slug).filter(Boolean);
-    } catch {
-        return [];
-    }
-}
-
-// Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
-// cannot drift between the sites that emit it.
-const PERSIST_DISCIPLINE =
-    `There is no target count and no quota. ` +
-    `guidance is optional: write it only where there is a real next step — a BAD finding, or a strength worth ` +
-    `pushing further — and leave it off entirely for NOT_APPLICABLE and INCONCLUSIVE rather than inventing one. ` +
-    `Only keep GOOD findings that add real review value. ` +
-    `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
-    `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
-
-function buildRetryScaffold(slugs) {
-    if (!slugs.length) return "";
-    return (
-        `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
-        `Persist every justified finding with report_finding, one finding per call. ` +
-        `There is no target count and no quota. ` +
-        `Only report GOOD findings that add real review value. ` +
-        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
-    );
-}
-
-
-// Task envelope: /workspace/task.json (TaskEnvelope<PracticeReviewTask>).
-// Exit 42 on schema-version mismatch or unknown kind so the executor can log
-// envelope/image drift distinctly from agent failures.
-const ENVELOPE_MISMATCH_EXIT = 42;
-const SUPPORTED_SCHEMA_VERSION = 1;
-const SUPPORTED_KIND = "practice_review";
-const TASK_PATH = "/workspace/task.json";
-
-function readTaskEnvelope() {
-    let raw;
-    try {
-        raw = readFileSync(TASK_PATH, "utf-8");
-    } catch (err) {
-        console.error(`[pi-runner] Failed to read ${TASK_PATH}: ${err.message}`);
-        process.exit(ENVELOPE_MISMATCH_EXIT);
-    }
-    let envelope;
-    try {
-        envelope = JSON.parse(raw);
-    } catch (err) {
-        console.error(`[pi-runner] Failed to parse ${TASK_PATH}: ${err.message}`);
-        process.exit(ENVELOPE_MISMATCH_EXIT);
-    }
-    if (envelope?.schemaVersion !== SUPPORTED_SCHEMA_VERSION) {
-        console.error(
-            `[pi-runner] Unsupported schemaVersion: got ${envelope?.schemaVersion}, expected ${SUPPORTED_SCHEMA_VERSION}. ` +
-                `Server/image version drift — rebuild the agent-pi image or roll back the server.`,
-        );
-        process.exit(ENVELOPE_MISMATCH_EXIT);
-    }
-    if (envelope?.task?.kind !== SUPPORTED_KIND) {
-        console.error(
-            `[pi-runner] Unknown task kind: got "${envelope?.task?.kind}", expected "${SUPPORTED_KIND}". ` +
-                `This runner only handles practice_review tasks.`,
-        );
-        process.exit(ENVELOPE_MISMATCH_EXIT);
-    }
-    if (typeof envelope.task.prompt !== "string" || envelope.task.prompt.trim() === "") {
-        console.error(`[pi-runner] task.prompt is missing or blank in ${TASK_PATH}`);
-        process.exit(ENVELOPE_MISMATCH_EXIT);
-    }
-    return envelope;
-}
-
-const taskEnvelope = readTaskEnvelope();
-const prompt = taskEnvelope.task.prompt.trim();
-console.error(
-    `[pi-runner] Task envelope loaded: kind=${taskEnvelope.task.kind}, ` +
-        `jobId=${taskEnvelope.jobId}, workspaceId=${taskEnvelope.workspaceId}, ` +
-        `repository=${taskEnvelope.task.repositoryFullName ?? "?"}, ` +
-        `prNumber=${taskEnvelope.task.pullRequestNumber ?? "?"}`,
-);
 
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);
@@ -1166,7 +1123,7 @@ async function main() {
 
     // `tools` is an allowlist of tool *names* (Pi 0.74+ filters customTools through the same
     // allowlist), so both built-in and custom tool names must appear here. Edit/write are omitted
-    // — findings are persisted only via report_finding.
+    // — observations are persisted only via report_observation.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
     const authStorage = AuthStorage.create();
@@ -1187,11 +1144,16 @@ async function main() {
         console.error(`[pi-runner] hephaestus provider NOT registered — missing pi-provider.json or proxy env vars`);
     }
 
+    const compositionRequest = loadCompositionRequest();
+    const preparedThreadKeys = stagedPreparedThreadKeys();
+    const feedbackTool = compositionRequest
+        ? buildFeedbackTool(composablePracticeSlugs(), compositionRequest, reviewState.observations, preparedThreadKeys)
+        : null;
     const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
-        tools: ["read", "bash", "grep", "report_finding"],
-        customTools: [reportFindingTool],
+        tools: ["read", "bash", "grep", "report_observation", ...(feedbackTool ? ["report_feedback"] : [])],
+        customTools: [reportObservationTool, ...(feedbackTool ? [feedbackTool] : [])],
         sessionManager,
         settingsManager,
         authStorage,
@@ -1210,19 +1172,41 @@ async function main() {
         }
     }
 
+    async function completeWithAdmittedComposition() {
+        measurementClosed = true;
+        await admitObservations();
+        const result = JSON.parse(readFileSync(RESULT_PATH, "utf8"));
+        result.admissionDigest = admissionDigest;
+        writeFileSync(RESULT_PATH, JSON.stringify(result));
+        if (!compositionRequest || reviewState.observations.length === 0) return;
+        const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
+        const compositionTimer = setTimeout(() => {
+            console.error(`[pi-runner] Composition timeout — preserving observations and composed units so far`);
+            session.abort().catch((error) => console.error(`[pi-runner] composition abort failed: ${error.message}`));
+        }, COMPOSITION_TIMEOUT_MS);
+        try {
+            await session.prompt(
+                `${instructions}\n\n${buildCompositionTurn(compositionRequest, reviewState.observations)}`,
+            );
+        } finally {
+            clearTimeout(compositionTimer);
+        }
+        persistComposedFeedback();
+    }
+
     // ── Attempt 1: Initial analysis ──────────────────────────────
 
     let softTimeoutFired = false;
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft nudge: steer the agent to persist findings before the hard timeout aborts.
+    // Soft nudge: steer the agent to persist observations before the hard timeout aborts.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
         const steerMessage =
             `Stop analyzing and persist output now. ` +
-            `Use report_finding immediately for any finding you already have, one finding per call. ` +
+            `Use report_observation immediately for any observation you already have, one observation per call. ` +
             PERSIST_DISCIPLINE;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
@@ -1261,9 +1245,9 @@ async function main() {
     // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
     // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
     // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
-    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
+    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_observation
     // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
-    // practice gets a finding. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
+    // practice gets an observation. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
     const groups = loadPracticeGroups();
@@ -1290,8 +1274,8 @@ async function main() {
             const readHint = `Read inputs/practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
             const batchPrompt =
                 bi === 0
-                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`
-                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`;
+                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`
+                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`;
             try {
                 await session.prompt(batchPrompt);
             } catch (err) {
@@ -1301,29 +1285,24 @@ async function main() {
             console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
 
-        // Coverage gate: every active practice must get a finding. Re-prompt the ones no turn reported.
+        // Coverage gate: every active practice must get an observation. Re-prompt the ones no turn reported.
         if (!hardAborted && allSlugs.length > 0) {
-            const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
+            const covered = new Set(reviewState.observations.map((f) => f.practiceSlug).filter(Boolean));
             const missing = allSlugs.filter((s) => !covered.has(s));
             if (missing.length > 0) {
                 console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
                 const gatePrompt =
-                    `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
+                    `Coverage check. You have NOT yet reported an observation for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
-                    `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
-                    `— set presence (${PRESENCE_VALUES.join("/")}) and, unless it is NOT_APPLICABLE or INCONCLUSIVE, ` +
-                    `assessment (GOOD/BAD). Ask the one question presence answers: is the behaviour this practice names ` +
-                    `in the work? It is there = PRESENT; the occasion for it was here and it is not = ABSENT; the ` +
-                    `occasion never arose = NOT_APPLICABLE. If you read the evidence and it does not settle the ` +
-                    `question, say INCONCLUSIVE — do NOT reach for NOT_APPLICABLE, which claims there was nothing here ` +
-                    `to see.`;
+                    `(do NOT re-read the diff). Persist an observation for EVERY one with report_observation, one call per observation ` +
+                    `— choose a BEHAVIOR_* outcome when evidence settles the claim. Use NO_REVIEW_OCCASION only when a prerequisite situation explicitly named by the practice did not occur; target-behaviour absence is BEHAVIOR_ABSENT_*, never a decline. Use INSUFFICIENT_EVIDENCE when required evidence is unavailable. Fill exactly the evidence branch the tool schema requires.`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {
                     console.error(`[pi-runner] coverage-gate prompt error: ${err.message}`);
                 }
                 const stillMissing = allSlugs.filter(
-                    (s) => !new Set(reviewState.findings.map((f) => f.practiceSlug)).has(s),
+                    (s) => !new Set(reviewState.observations.map((f) => f.practiceSlug)).has(s),
                 );
                 console.error(
                     `[pi-runner] Coverage gate done: ${allSlugs.length - stillMissing.length}/${allSlugs.length} practices covered`,
@@ -1359,71 +1338,17 @@ async function main() {
         `[pi-runner] Initial: ${(initialDurationMs / 1000).toFixed(1)}s, calls=${initialUsage.totalCalls}, softTimeout=${softTimeoutFired}, hardAbort=${hardAborted}, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
-    // ── Is the review already finished? ──────────────────────────────────────
-    //
-    // Asked BEFORE composition, not after, because the answer decides how much time composition may
-    // have. The retry below is the only claimant on RETRY_TIMEOUT_MS and it fires on exactly one
-    // condition: no usable result.json. Settle that condition first and a healthy review stops reserving
-    // an allowance nothing can spend.
-    //
-    // Safe to move ahead of the stage: the composer runs on its own session with its own tool set, which
-    // does not include report_finding, so nothing between here and the exit can change reviewState or
-    // the file.
     const resultFileSource = resolveResultFile();
-
-    // ── Feedback composition ─────────────────────────────────────────────────
-    //
-    // The second LLM step: observations were the measurement, this turns them into an intervention for
-    // the developer's practice pages. Three conditions, and the last is the whole rule: durable review
-    // state to compose from; no hard abort, because a review that lost its turn needs its retry allowance
-    // more than the practice pages need a message today; and enough of the budget still unspent to
-    // finish a turn — counting the retry allowance as spoken for only while the retry can still fire.
-    // Whether the soft nudge fired is not a condition — it is a steer that lands at 42.5% of the budget
-    // and says nothing about what is left.
-    // Isolated: any failure is logged and this review's outcome is untouched.
-    const reviewStatePersisted = hasPersistedReviewState();
-    const leftoverForCompositionMs = compositionBudgetMs({
-        agentBudgetMs: AGENT_BUDGET_MS,
-        elapsedMs: Date.now() - startMs,
-        retryMs: RETRY_TIMEOUT_MS,
-        compositionCeilingMs: COMPOSITION_TIMEOUT_MS,
-        resultFileValid: resultFileSource !== null,
-    });
-    if (
-        shouldCompose({
-            hasPersistedReviewState: reviewStatePersisted,
-            hardAborted,
-            resultFileValid: resultFileSource !== null,
-            budgetMs: leftoverForCompositionMs,
-        })
-    ) {
-        try {
-            const composeUsage = await runCompositionStage(
-                { settingsManager, authStorage, modelRegistry },
-                leftoverForCompositionMs,
-            );
-            if (composeUsage) {
-                accumulateUsage(null, composeUsage);
-                persistUsage();
-            }
-        } catch (err) {
-            console.error(`[pi-runner] Composition stage failed (review unaffected): ${err.message}`);
-        }
-    } else {
-        console.error(
-            `[pi-runner] Composition stage skipped: reviewState=${reviewStatePersisted}, hardAbort=${hardAborted}, ` +
-                `resultFile=${resultFileSource ?? "none"}, ` +
-                `budget=${leftoverForCompositionMs}ms (floor ${COMPOSITION_MIN_BUDGET_MS}ms)`,
-        );
-    }
 
     if (resultFileSource === "agent") {
         console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);
+        await completeWithAdmittedComposition();
         unsubscribe();
         process.exit(0);
     }
     if (resultFileSource === "tool-state") {
         console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after initial run`);
+        await completeWithAdmittedComposition();
         unsubscribe();
         process.exit(0);
     }
@@ -1449,6 +1374,7 @@ async function main() {
         );
         if (tryRescueFromTextResponse(session.state)) {
             console.error(`[pi-runner] SUCCESS: rescued valid JSON from agent text`);
+            await completeWithAdmittedComposition();
             unsubscribe();
             process.exit(0);
         }
@@ -1475,20 +1401,23 @@ async function main() {
         retryPrompt =
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Do NOT read more files. ` +
-            `Persist every remaining justified finding with report_finding immediately, one finding per call. ` +
-            PERSIST_DISCIPLINE + ` ` +
+            `Persist every remaining justified observation with report_observation immediately, one observation per call. ` +
+            PERSIST_DISCIPLINE +
+            ` ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
-            `Do NOT read any more files. Persist the remaining findings with report_finding NOW, one finding per call. ` +
-            PERSIST_DISCIPLINE + ` ` +
+            `Do NOT read any more files. Persist the remaining observations with report_observation NOW, one observation per call. ` +
+            PERSIST_DISCIPLINE +
+            ` ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
-            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call. ` +
-            PERSIST_DISCIPLINE + ` ` +
+            `Use your analysis from above. Do NOT read more files. Persist observations with report_observation immediately, one observation per call. ` +
+            PERSIST_DISCIPLINE +
+            ` ` +
             scaffold;
     }
 
@@ -1523,22 +1452,26 @@ async function main() {
         `[pi-runner] Retry: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
-    unsubscribe();
-
     if (checkResultFile()) {
         console.error(`[pi-runner] SUCCESS: result.json valid after retry`);
+        await completeWithAdmittedComposition();
+        unsubscribe();
         process.exit(0);
     }
 
     maybeWriteResultFile();
     if (checkResultFile()) {
         console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after retry`);
+        await completeWithAdmittedComposition();
+        unsubscribe();
         process.exit(0);
     }
 
     // Last attempt: try to rescue from text
     if (tryRescueFromTextResponse(session.state)) {
         console.error(`[pi-runner] SUCCESS: rescued valid JSON from text`);
+        await completeWithAdmittedComposition();
+        unsubscribe();
         process.exit(0);
     }
 

@@ -11,7 +11,7 @@ Use the executable sources for exact details:
 - [Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/resources/db/changelog)
   for persisted constraints and indexes;
 - [`openapi.yaml`](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml) for HTTP projections;
-- [ADR 0021](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0021-findings-feedback-synthesis-seam.md)
+- [ADR 0021](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0021-observations-feedback-synthesis-seam.md)
   and
   [ADR 0022](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md)
   for design history;
@@ -113,15 +113,15 @@ to `NOT_APPLICABLE`, and nothing else.
 Observations used to carry a detector-reported `confidence` in `[0, 1]`. Measured over 580 live observations
 it never fell below 0.90 and was exactly 1.00 in 55% of them: the model cannot use the range, so every
 consumer that ranked or floored on it was ranking on noise. It is gone from the tool schema, the normalizer
-and `ValidatedFinding`.
+and `ValidatedObservation`.
 
-What ranks a finding now is `FindingOrder`: severity where it applies, then **evidence breadth** — the number
+What ranks an observation now is `ObservationOrder`: severity where it applies, then **evidence breadth** — the number
 of distinct loci the citations point at, the in-run form of recurrence — then a stable identity so the order
 is total and a re-run reproduces it. All three are properties the run can check rather than ones it reports.
 
-The `observation.confidence` column stays. It holds real history for the rows written before the change, and
-dropping a column is a destructive migration; rows written since carry
-`Observation.UNMEASURED_CONFIDENCE`.
+The field is also absent from persistence and every read API. Historical values were model-generated noise,
+not evidence worth preserving as a product contract; keeping them would leave consumers free to quietly rank
+on them again.
 
 ### Recipient and subject remain distinct
 

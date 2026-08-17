@@ -23,11 +23,10 @@ public record ReviewObservationDTO(
     @NonNull ReviewArtifactDTO artifact,
     @Schema(description = "Whose work the observation is about; null when the identity is no longer resolvable")
     ReviewSubjectDTO subject,
-    @NonNull String title,
+    @NonNull String summary,
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Observation confidence", minimum = "0", maximum = "1") Float confidence,
     @Schema(description = "Cross-run locus key; null when continuity is unavailable") String recurrenceKey,
     @NonNull
     @Schema(
@@ -55,11 +54,10 @@ public record ReviewObservationDTO(
             ReviewPracticeAreaDTO.from(row.getAreaSlug(), row.getAreaName(), row.getAreaIcon(), row.getAreaColor()),
             artifact,
             subjects.get(row.getAboutUserId()),
-            row.getTitle(),
+            row.getSummary(),
             row.getPresence(),
             row.getAssessment(),
             row.getSeverity(),
-            row.getConfidence(),
             row.getRecurrenceKey(),
             row.getOrigin(),
             ReviewClaimCurrentness.of(

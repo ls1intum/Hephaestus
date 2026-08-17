@@ -3061,4 +3061,38 @@
         </rollback>
     </changeSet>
 
+    <changeSet author="hephaestus-observations" id="1785743133884-59">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation.confidence already removed">
+            <columnExists tableName="observation" columnName="confidence"/>
+        </preConditions>
+        <comment>Remove model-reported confidence after validation showed that it carried no discriminating information.</comment>
+        <dropColumn tableName="observation" columnName="confidence"/>
+        <rollback>
+            <!-- Dropping the column is intentionally destructive: its historical values were not measurements.
+                 The default only restores the old application's NOT NULL shape; it does not recreate those values. -->
+            <addColumn tableName="observation">
+                <column name="confidence" type="REAL" defaultValueNumeric="1.0">
+                    <constraints nullable="false"/>
+                </column>
+            </addColumn>
+            <sql>ALTER TABLE observation ADD CONSTRAINT chk_observation_confidence CHECK (confidence &gt;= 0 AND confidence &lt;= 1)</sql>
+        </rollback>
+    </changeSet>
+
+    <changeSet author="hephaestus-observations" id="1785743133884-60">
+        <preConditions onFail="MARK_RAN" onFailMessage="observation text columns already use final names">
+            <and>
+                <columnExists tableName="observation" columnName="title"/>
+                <columnExists tableName="observation" columnName="reasoning"/>
+            </and>
+        </preConditions>
+        <comment>Use neutral measurement names for the observation summary and its evidence rationale.</comment>
+        <renameColumn tableName="observation" oldColumnName="title" newColumnName="summary" columnDataType="VARCHAR(255)"/>
+        <renameColumn tableName="observation" oldColumnName="reasoning" newColumnName="evidence_rationale" columnDataType="TEXT"/>
+        <rollback>
+            <renameColumn tableName="observation" oldColumnName="summary" newColumnName="title" columnDataType="VARCHAR(255)"/>
+            <renameColumn tableName="observation" oldColumnName="evidence_rationale" newColumnName="reasoning" columnDataType="TEXT"/>
+        </rollback>
+    </changeSet>
+
 </databaseChangeLog>

@@ -130,8 +130,8 @@ public class Observation {
     private String recurrenceKey;
 
     @NotNull
-    @Column(name = "title", nullable = false, length = 255)
-    private String title;
+    @Column(name = "summary", nullable = false, length = 255)
+    private String summary;
 
     /**
      * Whether the practice's target signal was seen, expected-but-absent, inapplicable, or undecidable
@@ -173,35 +173,12 @@ public class Observation {
     @Column(name = "severity", length = 16)
     private Severity severity;
 
-    /**
-     * <b>Legacy column, no longer measured.</b> The detector used to report a confidence in {@code [0, 1]} on
-     * every finding, and 580 live observations showed it could not be one: the value never fell below 0.90 and
-     * was exactly 1.00 in 55% of them, so anything ranking on it was ranking on float noise. The field is gone
-     * from the generation schema, and every row written from now on carries {@link #UNMEASURED_CONFIDENCE}.
-     *
-     * <p>The column stays because those 580 rows are real history and dropping a column is destructive; it is
-     * kept, not read as a quality signal. Still {@code NOT NULL} and DB-enforced by CHECK
-     * {@code chk_observation_confidence} ({@code confidence >= 0 AND confidence <= 1}) — the bounded range is
-     * not implied by the {@code Float} type.
-     */
-    @NotNull
-    @Column(name = "confidence", nullable = false)
-    private Float confidence;
-
-    /**
-     * What the {@link #confidence} column carries for every observation written since the field left the
-     * generation schema: "not measured". 1.0 rather than 0.0 so the historical readers that still rank or
-     * floor on the column treat a new row as no worse than the most confident row ever recorded, which is the
-     * only reading that does not silently demote every new observation below all 580 old ones.
-     */
-    public static final float UNMEASURED_CONFIDENCE = 1.0f;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "evidence", columnDefinition = "jsonb")
     private JsonNode evidence;
 
-    @Column(name = "reasoning", columnDefinition = "TEXT")
-    private String reasoning;
+    @Column(name = "evidence_rationale", columnDefinition = "TEXT")
+    private String evidenceRationale;
 
     @NotNull
     @Column(name = "observed_at", nullable = false)

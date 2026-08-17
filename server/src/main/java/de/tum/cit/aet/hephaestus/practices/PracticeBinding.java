@@ -56,27 +56,27 @@ public record PracticeBinding(
     List<PracticeEvidenceRequirement> needs,
     @Schema(description = "Whether an artifact still marked draft occasions this review; omit for false")
     boolean onDrafts,
-    // Bare, like onDrafts above it: the field is additive, and every binding written before roles
-    // existed omits it. Requiring it on the wire would refuse those payloads outright.
-    @Schema(description = "Whose conduct this review judges; omit for AUTHOR") ActorRole subject
+    @Schema(description = "Whose conduct this review judges; omit for AUTHOR") ActorRole subject,
+    @Valid
+    @Schema(description = "What must be in the work for this practice to apply; omit to always apply")
+    @Nullable
+    PracticeSubject appliesWhen
 ) {
-    /**
-     * Reads a binding that omits {@code onDrafts} or {@code subject}: Jackson will not default a
-     * primitive from an absent key, and an absent {@code subject} must read as AUTHOR so every binding
-     * written before roles existed keeps its meaning.
-     */
+    /** Applies contract defaults for optional binding fields. */
     @JsonCreator
     static PracticeBinding fromJson(
         @JsonProperty("signals") List<SignalName> signals,
         @JsonProperty("needs") List<PracticeEvidenceRequirement> needs,
         @JsonProperty("onDrafts") @Nullable Boolean onDrafts,
-        @JsonProperty("subject") @Nullable ActorRole subject
+        @JsonProperty("subject") @Nullable ActorRole subject,
+        @JsonProperty("appliesWhen") @Nullable PracticeSubject appliesWhen
     ) {
         return new PracticeBinding(
             signals,
             needs,
             Boolean.TRUE.equals(onDrafts),
-            subject == null ? ActorRole.AUTHOR : subject
+            subject == null ? ActorRole.AUTHOR : subject,
+            appliesWhen
         );
     }
 
@@ -115,14 +115,40 @@ public record PracticeBinding(
         }
     }
 
-    /** A binding whose review judges the artifact's author — what almost every practice is about. */
     public PracticeBinding(List<SignalName> signals, List<PracticeEvidenceRequirement> needs, boolean onDrafts) {
-        this(signals, needs, onDrafts, ActorRole.AUTHOR);
+        this(signals, needs, onDrafts, ActorRole.AUTHOR, null);
+    }
+
+    public PracticeBinding(
+        List<SignalName> signals,
+        List<PracticeEvidenceRequirement> needs,
+        boolean onDrafts,
+        ActorRole subject
+    ) {
+        this(signals, needs, onDrafts, subject, null);
     }
 
     /** A binding on one signal that reads the evidence the artifact kind's default names. */
     public static PracticeBinding on(SignalName signal, List<PracticeEvidenceRequirement> needs) {
-        return new PracticeBinding(List.of(signal), needs, false, ActorRole.AUTHOR);
+        return new PracticeBinding(List.of(signal), needs, false, ActorRole.AUTHOR, null);
+    }
+
+    /** Returns the common applicability predicate, or null when bindings are unconditional or disagree. */
+    public static @Nullable PracticeSubject subjectFor(List<PracticeBinding> bindings, @Nullable SignalName signal) {
+        PracticeSubject found = null;
+        for (PracticeBinding binding : bindings) {
+            if (signal != null && !binding.matches(signal)) {
+                continue;
+            }
+            if (binding.appliesWhen() == null) {
+                return null;
+            }
+            if (found != null && !found.equals(binding.appliesWhen())) {
+                return null;
+            }
+            found = binding.appliesWhen();
+        }
+        return found;
     }
 
     /**

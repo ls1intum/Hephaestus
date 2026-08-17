@@ -147,7 +147,6 @@ class InAppCooldownQueryIntegrationTest extends BaseIntegrationTest {
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             null,
             "reasoning",
             null,

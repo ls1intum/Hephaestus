@@ -15,11 +15,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineFinding;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor.DiffAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineFeedback;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
@@ -40,7 +40,7 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-class GitlabInlineFindingChannelTest extends BaseUnitTest {
+class GitlabInlineFeedbackChannelTest extends BaseUnitTest {
 
     private static final String MARKER = "<!-- hephaestus-diff-note -->";
 
@@ -65,26 +65,26 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
     @Mock
     private OutboundEgressGuard egressGuard;
 
-    private GitlabInlineFindingChannel channel;
+    private GitlabInlineFeedbackChannel channel;
     private HttpGraphQlClient client;
 
     @BeforeEach
     void setUp() {
-        channel = new GitlabInlineFindingChannel(gitLabProvider, mrResolver, egressGuard);
+        channel = new GitlabInlineFeedbackChannel(gitLabProvider, mrResolver, egressGuard);
         client = mock(HttpGraphQlClient.class);
     }
 
     @Test
     void emptyFindings() {
-        assertThat(channel.postInlineFindings(gitlabTarget(), List.of())).isEqualTo(InlineResult.counts(0, 0));
+        assertThat(channel.postInlineFeedback(gitlabTarget(), List.of())).isEqualTo(InlineResult.counts(0, 0));
     }
 
     @Test
     void rateLimitCriticalShortCircuits() {
         when(gitLabProvider.isRateLimitCritical(1L)).thenReturn(true);
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
         );
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
@@ -97,9 +97,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
             new MrInfo("gid://gitlab/MR/42", null, null, null)
         );
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
         );
         assertThat(result.posted()).isZero();
         assertThat(result.failed()).isEqualTo(1);
@@ -112,9 +112,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         stubDiscussionsReturning(List.of()); // no prior notes at all
         ArgumentCaptor<String> bodyCaptor = stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-this", MARKER, "ck-new"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-this", MARKER, "ck-new"))
         );
 
         assertThat(result.posted()).isEqualTo(1);
@@ -141,11 +141,11 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
             .when(egressGuard)
             .requireDeliveryAllowed("gitlab.post-inline-finding");
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
             List.of(
-                new InlineFinding(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-1"),
-                new InlineFinding(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-2")
+                new InlineFeedback(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-1"),
+                new InlineFeedback(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-2")
             )
         );
 
@@ -170,11 +170,11 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
             .when(egressGuard)
             .requireDeliveryAllowed("gitlab.post-inline-finding");
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
             List.of(
-                new InlineFinding(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-failed"),
-                new InlineFinding(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-suppressed")
+                new InlineFeedback(new DiffAnchor("src/One.java", 10, null), "first", MARKER, "ck-failed"),
+                new InlineFeedback(new DiffAnchor("src/Two.java", 20, null), "second", MARKER, "ck-suppressed")
             )
         );
 
@@ -195,9 +195,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
             .when(egressGuard)
             .requireDeliveryAllowed("gitlab.post-inline-finding");
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", MARKER, "ck-1"))
         );
 
         assertThat(result.suppressed()).isTrue();
@@ -224,9 +224,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         ClientGraphQlResponse updateResponse = emptyErrors("updateNote.errors");
         when(updateSpec.execute()).thenReturn(Mono.just(updateResponse));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fresh text", MARKER, "ck-stable"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fresh text", MARKER, "ck-stable"))
         );
 
         verify(updateSpec).variable("id", "gid://Note/OLD");
@@ -257,9 +257,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         HttpGraphQlClient.RequestSpec destroySpec = mock(HttpGraphQlClient.RequestSpec.class);
         lenient().when(client.documentName("DestroyNote")).thenReturn(destroySpec);
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "re-detected", MARKER, "ck-human"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "re-detected", MARKER, "ck-human"))
         );
 
         verify(updateSpec, never()).execute();
@@ -294,9 +294,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
         HttpGraphQlClient.RequestSpec destroySpec = stubDestroy();
 
-        channel.postInlineFindings(
+        channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "current", MARKER, "ck-current"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "current", MARKER, "ck-current"))
         );
 
         verify(destroySpec).variable("noteId", "gid://Note/A");
@@ -325,9 +325,9 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         stubField(noteResponse, "createNote.note.id", "gid://Note/FALLBACK");
         when(noteSpec.execute()).thenReturn(Mono.just(noteResponse));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 999, null), "fix", MARKER, "ck-fb"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 999, null), "fix", MARKER, "ck-fb"))
         );
 
         assertThat(result.posted()).isEqualTo(1);
@@ -352,11 +352,11 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         when(diffSpec.variable(any(), any())).thenReturn(diffSpec);
         when(diffSpec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-a", MARKER, "ck-a"),
-                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix-b", MARKER, "ck-b")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", MARKER, "ck-a"),
+                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix-b", MARKER, "ck-b")
             )
         );
 
@@ -389,11 +389,11 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         when(diffSpec.variable(any(), any())).thenReturn(diffSpec);
         when(diffSpec.execute()).thenReturn(Mono.error(new RuntimeException("429 Too Many Requests")));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
             List.of(
-                new InlineFinding(new DiffAnchor("src/A.java", 10, null), "fix-a", MARKER, "ck-a"),
-                new InlineFinding(new DiffAnchor("src/Keep.java", 20, null), "fix-keep", MARKER, "ck-keep")
+                new InlineFeedback(new DiffAnchor("src/A.java", 10, null), "fix-a", MARKER, "ck-a"),
+                new InlineFeedback(new DiffAnchor("src/Keep.java", 20, null), "fix-keep", MARKER, "ck-keep")
             )
         );
 
@@ -416,7 +416,7 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         stubDiscussionsReturning(List.of(discA, discB));
         HttpGraphQlClient.RequestSpec destroySpec = stubDestroy();
 
-        channel.clearStaleFindings(gitlabTarget(), "MARKER");
+        channel.clearStaleFeedback(gitlabTarget(), "MARKER");
 
         verify(destroySpec).variable("noteId", "gid://Note/A");
         verify(destroySpec, never()).variable("noteId", "gid://Note/B");
@@ -432,11 +432,11 @@ class GitlabInlineFindingChannelTest extends BaseUnitTest {
         stubDiscussionsReturning(List.of()); // no prior threads
         stubCreateDiffNoteSuccess("gid://Note/NEW", "gid://Disc/NEW");
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             gitlabTarget(),
             List.of(
-                new InlineFinding(new DiffAnchor("src/A.java", 10, null), "first", MARKER, "ck-dup"),
-                new InlineFinding(new DiffAnchor("src/B.java", 20, null), "twin", MARKER, "ck-dup")
+                new InlineFeedback(new DiffAnchor("src/A.java", 10, null), "first", MARKER, "ck-dup"),
+                new InlineFeedback(new DiffAnchor("src/B.java", 20, null), "twin", MARKER, "ck-dup")
             )
         );
 

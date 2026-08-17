@@ -11,14 +11,17 @@ import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -75,12 +78,63 @@ class PracticeCatalogInjector {
             .collect(Collectors.toMap(Practice::getSlug, Practice::getWhyItMatters, (a, b) -> a));
     }
 
+    /** Stage exactly the immutable revisions which produced a composition job's observations. */
+    Map<String, String> injectComposition(Map<String, byte[]> files, List<Observation> observations) {
+        Map<String, PracticeRevision> revisions = new LinkedHashMap<>();
+        for (Observation observation : observations) {
+            PracticeRevision revision = observation.getPracticeRevision();
+            if (revision == null || revision.getId() == null) {
+                throw new JobPreparationException(
+                    "Observation has no reproducible practice revision: " + observation.getId()
+                );
+            }
+            PracticeRevision prior = revisions.putIfAbsent(revision.getSlug(), revision);
+            if (prior != null && !prior.getId().equals(revision.getId())) {
+                throw new JobPreparationException(
+                    "One composition contains multiple revisions of " + revision.getSlug()
+                );
+            }
+        }
+        ArrayNode index = objectMapper.createArrayNode();
+        StringBuilder bundle = new StringBuilder();
+        Map<String, String> why = new LinkedHashMap<>();
+        revisions
+            .values()
+            .stream()
+            .sorted(Comparator.comparing(PracticeRevision::getSlug))
+            .forEach(revision -> {
+                ObjectNode entry = index.addObject();
+                entry.put("slug", revision.getSlug());
+                entry.put("name", revision.getName());
+                entry.put("revisionId", revision.getId());
+                String criteria = revision.getCriteria();
+                files.put(
+                    SandboxLayout.PRACTICES_PREFIX + revision.getSlug() + ".md",
+                    criteria.getBytes(StandardCharsets.UTF_8)
+                );
+                bundle.append("# ").append(revision.getSlug()).append("\n\n").append(criteria).append("\n\n---\n\n");
+                if (revision.getWhyItMatters() != null && !revision.getWhyItMatters().isBlank()) {
+                    why.put(revision.getSlug(), revision.getWhyItMatters());
+                }
+            });
+        try {
+            files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
+        } catch (JacksonException e) {
+            throw new JobPreparationException("Failed to serialize composition practice index: " + e.getMessage());
+        }
+        files.put(
+            SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
+            bundle.toString().getBytes(StandardCharsets.UTF_8)
+        );
+        return Map.copyOf(why);
+    }
+
     /**
      * The slugs of {@code focus}-scoped active practices that declare {@code DEFECT-DETECTOR DISCIPLINE} in
      * their criteria — i.e. practices with no legal {@code (PRESENT, GOOD)} clean-bill-of-health observation
      * (a clean surface is {@code NOT_APPLICABLE}, never a good reading). The delivery layer uses this to coerce
      * a model-emitted {@code (PRESENT, GOOD)} to {@code NOT_APPLICABLE} before it ships to the student as a
-     * false strength (see {@code ValidatedFinding#coerceCoherence}).
+     * false strength (see {@code ValidatedObservation#coerceCoherence}).
      */
     Set<String> defectDetectorSlugs(AgentJob job) {
         Set<String> slugs = new HashSet<>();

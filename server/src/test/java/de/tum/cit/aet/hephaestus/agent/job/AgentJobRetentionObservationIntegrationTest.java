@@ -77,7 +77,6 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             "{}",
             "Reasoning",
             "retention-locus",

@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionRe
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
@@ -66,9 +66,9 @@ public class JobTypeHandlerConfiguration {
     DiffNotePoster diffNotePoster(
         PullRequestCommentPoster commentPoster,
         PracticeFeedbackCommentFormatter commentFormatter,
-        List<InlineFindingChannel> inlineFindingChannels
+        List<InlineFeedbackChannel> inlineFeedbackChannels
     ) {
-        return new DiffNotePoster(commentPoster, commentFormatter, inlineFindingChannels);
+        return new DiffNotePoster(commentPoster, commentFormatter, inlineFeedbackChannels);
     }
 
     @Bean
@@ -105,14 +105,16 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    JobTypeHandler pullRequestReviewHandler(
+    PullRequestReviewHandler pullRequestReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
         FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
-        InContextDeliveryGate inContextDeliveryGate
+        InContextDeliveryGate inContextDeliveryGate,
+        ApplicationEventPublisher eventPublisher,
+        de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
@@ -126,20 +128,24 @@ public class JobTypeHandlerConfiguration {
             feedbackService,
             secretDiffScanner,
             reactionSuppressionFilter,
-            inContextDeliveryGate
+            inContextDeliveryGate,
+            eventPublisher,
+            observationRepository
         );
     }
 
     @Bean
-    JobTypeHandler issueReviewHandler(
+    IssueReviewHandler issueReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
+        FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
+        InContextDeliveryGate inContextDeliveryGate,
         PullRequestCommentPoster commentPoster,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         PracticeFeedbackCommentFormatter commentFormatter,
-        InContextDeliveryGate inContextDeliveryGate
+        de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository observationRepository
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -147,12 +153,14 @@ public class JobTypeHandlerConfiguration {
             taskEnvelopeWriter,
             practiceCatalogInjector,
             resultParser,
+            compositionResultParser,
             deliveryService,
+            inContextDeliveryGate,
             commentPoster,
             feedbackLedgerRecorder,
             deliveryPolicy,
             commentFormatter,
-            inContextDeliveryGate
+            observationRepository
         );
     }
 

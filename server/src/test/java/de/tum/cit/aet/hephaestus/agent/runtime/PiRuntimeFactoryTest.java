@@ -85,7 +85,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             var inputs = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false)).inputFiles();
             assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotNull();
             assertThat(new String(inputs.get(SandboxLayout.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
-                "findings"
+                "observations"
             );
             assertThat(inputs.get(SandboxLayout.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
         }
@@ -100,7 +100,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
                 assertThat(inputs.get(sidecar)).isNotEmpty();
             }
             assertThat(PRACTICE.sidecarScripts()).contains(
-                "pi-finding-normalize.mjs",
+                "pi-observation-normalize.mjs",
                 "pi-runner-timings.mjs",
                 "pi-runner-usage.mjs",
                 "pi-provider.mjs"

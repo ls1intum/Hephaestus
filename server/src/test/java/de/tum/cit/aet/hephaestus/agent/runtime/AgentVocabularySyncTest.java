@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.runtime;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -32,7 +33,7 @@ import org.junit.jupiter.api.Test;
  */
 class AgentVocabularySyncTest extends BaseUnitTest {
 
-    private static final Path NORMALIZER = resolveResource("agent/pi-finding-normalize.mjs");
+    private static final Path NORMALIZER = resolveResource("agent/pi-observation-normalize.mjs");
     private static final Path RUNNER = resolveResource("agent/pi-runner.mjs");
     private static final Path ORCHESTRATOR = resolveResource("agent/pi-orchestrator.md");
 
@@ -40,7 +41,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     @DisplayName("the runner's presence vocabulary is exactly Presence.values()")
     void presenceVocabularyMatches() throws IOException {
         assertThat(jsArray("PRESENCE_VALUES"))
-            .as("PRESENCE_VALUES in pi-finding-normalize.mjs vs Presence.values()")
+            .as("PRESENCE_VALUES in pi-observation-normalize.mjs vs Presence.values()")
             .containsExactlyInAnyOrderElementsOf(names(Presence.values()));
     }
 
@@ -48,7 +49,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     @DisplayName("the runner's assessment vocabulary is exactly Assessment.values()")
     void assessmentVocabularyMatches() throws IOException {
         assertThat(jsArray("ASSESSMENT_VALUES"))
-            .as("ASSESSMENT_VALUES in pi-finding-normalize.mjs vs Assessment.values()")
+            .as("ASSESSMENT_VALUES in pi-observation-normalize.mjs vs Assessment.values()")
             .containsExactlyInAnyOrderElementsOf(names(Assessment.values()));
     }
 
@@ -56,7 +57,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     @DisplayName("the runner's severity vocabulary is exactly Severity.values()")
     void severityVocabularyMatches() throws IOException {
         assertThat(jsArray("SEVERITY_VALUES"))
-            .as("SEVERITY_VALUES in pi-finding-normalize.mjs vs Severity.values()")
+            .as("SEVERITY_VALUES in pi-observation-normalize.mjs vs Severity.values()")
             .containsExactlyInAnyOrderElementsOf(names(Severity.values()));
     }
 
@@ -72,7 +73,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
             "export function carriesValence\\(presence\\) \\{(.*?)\\n\\}",
             Pattern.DOTALL
         ).matcher(body);
-        assertThat(fn.find()).as("carriesValence() is declared in pi-finding-normalize.mjs").isTrue();
+        assertThat(fn.find()).as("carriesValence() is declared in pi-observation-normalize.mjs").isTrue();
 
         Set<String> jsValenced = quotedStrings(fn.group(1));
         Set<String> javaValenced = Arrays.stream(Presence.values())
@@ -93,28 +94,50 @@ class AgentVocabularySyncTest extends BaseUnitTest {
         String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("pi-runner.mjs imports the shared vocabularies from pi-finding-normalize.mjs")
+            .as("pi-runner.mjs imports the shared vocabularies from pi-observation-normalize.mjs")
             .contains("PRESENCE_VALUES")
             .contains("ASSESSMENT_VALUES")
             .contains("SEVERITY_VALUES");
 
         assertThat(body)
-            .as("pi-runner.mjs must not re-declare a presence enum array — build the schema from PRESENCE_VALUES")
-            .doesNotContain("enum: [\"PRESENT\"");
+            .as("the final tool exposes only the assessed occurrence subset, not persisted refusal values")
+            .contains("occurrence: { type: \"string\", enum: [\"PRESENT\", \"ABSENT\"] }")
+            .doesNotContain("occurrence: { type: \"string\", enum: PRESENCE_VALUES }");
     }
 
     @Test
-    @DisplayName("the orchestrator prompt teaches every presence the schema accepts")
-    void orchestratorPromptCoversEveryPresence() throws IOException {
-        // The third hand-maintained copy. A presence the schema accepts but the prompt never names is a
-        // value the model will never emit; one the prompt teaches but the schema rejects is the bug this
-        // class was written for. Both directions are drift, and both are silent in production.
+    @DisplayName("the runner and composer prompt use exactly the server's conversation-note fields")
+    void conversationNoteShapeMatches() throws IOException {
+        List<String> javaFields = Arrays.stream(ComposedFeedbackUnit.ConversationBrief.class.getRecordComponents())
+            .map(component -> component.getName())
+            .toList();
+        String required =
+            "required: [" +
+            javaFields
+                .stream()
+                .map(field -> "\"" + field + "\"")
+                .collect(java.util.stream.Collectors.joining(", ")) +
+            "]";
+
+        assertThat(Files.readString(RUNNER, StandardCharsets.UTF_8))
+            .as("pi-runner.mjs conversation-note schema vs ConversationBrief")
+            .contains(required);
+        assertThat(Files.readString(resolveResource("agent/feedback-composer.md"), StandardCharsets.UTF_8))
+            .as("feedback-composer.md conversation-note shape vs ConversationBrief")
+            .contains("notes: { " + String.join(", ", javaFields) + " }");
+    }
+
+    @Test
+    @DisplayName("the orchestrator teaches the final outcome union rather than persisted refusal names")
+    void orchestratorPromptCoversEveryOutcome() throws IOException {
         String body = Files.readString(ORCHESTRATOR, StandardCharsets.UTF_8);
-        for (Presence presence : Presence.values()) {
-            assertThat(body)
-                .as("pi-orchestrator.md instructs the model when to emit %s", presence)
-                .contains(presence.name());
-        }
+        assertThat(body)
+            .contains("ASSESSED")
+            .contains("DECLINED")
+            .contains("NO_REVIEW_OCCASION")
+            .contains("INSUFFICIENT_EVIDENCE")
+            .doesNotContain("NOT_APPLICABLE")
+            .doesNotContain("INCONCLUSIVE");
     }
 
     private static List<String> names(Enum<?>[] values) {
@@ -128,7 +151,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
             "export const " + Pattern.quote(constantName) + "\\s*=\\s*\\[(.*?)]",
             Pattern.DOTALL
         ).matcher(body);
-        assertThat(matcher.find()).as("%s is declared in pi-finding-normalize.mjs", constantName).isTrue();
+        assertThat(matcher.find()).as("%s is declared in pi-observation-normalize.mjs", constantName).isTrue();
         Set<String> values = quotedStrings(matcher.group(1));
         assertThat(values).as("%s is not empty", constantName).isNotEmpty();
         return values;

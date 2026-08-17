@@ -133,10 +133,10 @@ public class DeliveredFeedbackContentSource implements ContentSource {
             if (body == null || body.isBlank()) {
                 continue;
             }
-            // A conversational unit's body is the composer's move, never the words the mentor spoke — those
-            // live in the chat transcript. Staging one here would show the mentor its own unspoken plan as
-            // something the developer has already been told, and the evidence it was told to hold back is
-            // exactly the part it would then believe it had already shown.
+            // A conversational unit's body is the composer's notes to the mentor, never the words the mentor
+            // spoke — those live in the chat transcript. Staging one here would show the mentor its own
+            // unspoken plan as something the developer has already been told. The current brief is an
+            // internal handoff, not a delivered message.
             if (ConversationBriefBody.isBrief(body)) {
                 continue;
             }

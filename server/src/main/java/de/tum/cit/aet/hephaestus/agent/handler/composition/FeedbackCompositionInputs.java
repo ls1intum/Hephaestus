@@ -36,6 +36,11 @@ import java.util.stream.Collectors;
  */
 public final class FeedbackCompositionInputs {
 
+    public enum InContextPlacementKind {
+        DIFF,
+        ARTIFACT,
+    }
+
     /**
      * Messages one run may compose per lane, before each lane's own per-recipient cap. Told to the stage
      * as well as enforced downstream, so it is not asked to write text that would be capped away the
@@ -74,7 +79,7 @@ public final class FeedbackCompositionInputs {
      * @param origin which population this run's measurements belong to
      */
     public static void stage(Map<String, byte[]> files, ObservationOrigin origin) {
-        stage(files, origin, EVENT_REVIEW_CHANNELS);
+        stage(files, origin, EVENT_REVIEW_CHANNELS, EnumSet.allOf(InContextPlacementKind.class));
     }
 
     /**
@@ -83,18 +88,38 @@ public final class FeedbackCompositionInputs {
      * @param channels the lanes this occasion may write for; an empty set is the same as not composing
      */
     public static void stage(Map<String, byte[]> files, ObservationOrigin origin, Set<FeedbackChannel> channels) {
+        stage(files, origin, channels, EnumSet.allOf(InContextPlacementKind.class));
+    }
+
+    public static void stage(
+        Map<String, byte[]> files,
+        ObservationOrigin origin,
+        Set<FeedbackChannel> channels,
+        Set<InContextPlacementKind> inContextPlacements
+    ) {
         if (origin == ObservationOrigin.BACKFILL || channels.isEmpty()) {
             return;
+        }
+        if (channels.contains(FeedbackChannel.IN_CONTEXT) && inContextPlacements.isEmpty()) {
+            throw new IllegalArgumentException("IN_CONTEXT requires at least one placement kind");
         }
         String request = """
             {
               "enabled": true,
               "minDistinctArtifacts": %d,
+              "inContextPlacementKinds": [%s],
               "channels": {
             %s
               }
             }
-            """.formatted(MIN_DISTINCT_ARTIFACTS, channelBounds(channels));
+            """.formatted(
+                MIN_DISTINCT_ARTIFACTS,
+                inContextPlacements
+                    .stream()
+                    .map(kind -> '"' + kind.name() + '"')
+                    .collect(Collectors.joining(", ")),
+                channelBounds(channels)
+            );
         files.put(SandboxLayout.FEEDBACK_COMPOSITION_PATH, request.getBytes(StandardCharsets.UTF_8));
     }
 

@@ -79,36 +79,15 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
     }
 
     private Observation bad(Practice practice, @org.jspecify.annotations.Nullable Severity severity) {
-        return bad(practice, severity, 0.9f, 42L);
-    }
-
-    private Observation bad(
-        Practice practice,
-        @org.jspecify.annotations.Nullable Severity severity,
-        float confidence,
-        long artifactId
-    ) {
-        return bad(practice, severity, confidence, artifactId, null);
-    }
-
-    private Observation bad(
-        Practice practice,
-        @org.jspecify.annotations.Nullable Severity severity,
-        float confidence,
-        long artifactId,
-        @org.jspecify.annotations.Nullable String recurrenceKey
-    ) {
         return Observation.builder()
             .id(UUID.randomUUID())
             .practice(practice)
             .artifactKind(ArtifactKinds.PULL_REQUEST)
-            .artifactId(artifactId)
-            .title("a problem")
+            .artifactId(42L)
+            .summary("a problem")
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(severity)
-            .confidence(confidence)
-            .recurrenceKey(recurrenceKey)
             .build();
     }
 
@@ -156,7 +135,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
             List.of()
         );
 
@@ -171,154 +150,6 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
             .toList();
         // CRITICAL leads; the null-severity item sorts last (treated as least-severe).
         assertThat(order).containsExactly(Severity.CRITICAL, null);
-    }
-
-    @Test
-    @DisplayName("gap #1c: a single low-confidence BAD is FILTERED OUT of the card, not merely sorted last (P4)")
-    void lowConfidenceSingleTargetGapIsNotDisplayed() {
-        Practice practice = practice("robust-error-handling");
-
-        // CRITICAL but coin-flip confidence on a single target (quarantined) vs MINOR but confident.
-        Observation lowConfCritical = bad(practice, Severity.CRITICAL, 0.3f, 42L);
-        Observation confidentMinor = bad(practice, Severity.MINOR, 0.95f, 42L);
-
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(lowConfCritical, confidentMinor));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
-
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
-
-        assertThat(cards).hasSize(1);
-        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
-        // Only the confident MINOR is shown; the quarantined low-confidence CRITICAL is withheld from the
-        // learner's dashboard entirely (the read-model firewall, not just a sort).
-        assertThat(items).hasSize(1);
-        assertThat(items.get(0).observationId()).isEqualTo(confidentMinor.getId());
-        assertThat(items.stream().map(ReflectionItemDTO::observationId)).doesNotContain(lowConfCritical.getId());
-    }
-
-    @Test
-    @DisplayName("gap #1c: an all-quarantined practice contributes no toWorkOn items (sub-floor BAD never shown)")
-    void allQuarantinedGapsAreFullyWithheld() {
-        Practice practice = practice("robust-error-handling");
-        // Two coin-flip BADs on the SAME single target → both quarantined → nothing to display.
-        Observation q1 = bad(practice, Severity.MAJOR, 0.2f, 42L);
-        Observation q2 = bad(practice, Severity.MINOR, 0.1f, 42L);
-
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(q1, q2));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
-
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
-
-        // No toWorkOn items and no strengths → the card is empty and contributes nothing to the dashboard.
-        assertThat(cards).isEmpty();
-    }
-
-    @Test
-    @DisplayName("a low-confidence BAD corroborated across >=2 targets is NOT quarantined and leads on severity")
-    void corroboratedLowConfidenceGapStillHeadlines() {
-        Practice practice = practice("robust-error-handling");
-
-        // Same low confidence but seen on TWO distinct targets → corroborated, so severity rules again.
-        Observation criticalTargetA = bad(practice, Severity.CRITICAL, 0.4f, 42L);
-        Observation minorTargetB = bad(practice, Severity.MINOR, 0.4f, 43L);
-
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(minorTargetB, criticalTargetA));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
-
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
-
-        assertThat(cards).hasSize(1);
-        // Neither is quarantined (2 distinct targets) → the CRITICAL leads on severity-weight.
-        assertThat(cards.get(0).toWorkOn().get(0).observationId()).isEqualTo(criticalTargetA.getId());
-    }
-
-    @Test
-    @DisplayName("corroboration is per recurrence LOCUS: an unrelated BAD on another target does not rescue a gap")
-    void corroborationIsPerRecurrenceLocusNotPerPractice() {
-        Practice practice = practice("robust-error-handling");
-
-        // A coin-flip gap at locus-A on a SINGLE target, plus an UNRELATED confident BAD at locus-B on a second
-        // target. With per-practice corroboration the two distinct targets would (wrongly) un-quarantine the
-        // locus-A gap; with per-LOCUS corroboration locus-A is still single-target → stays quarantined.
-        Observation lowConfLocusA = bad(practice, Severity.CRITICAL, 0.3f, 42L, "locus-A");
-        Observation confidentLocusB = bad(practice, Severity.MINOR, 0.95f, 43L, "locus-B");
-
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
-
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
-
-        assertThat(cards).hasSize(1);
-        List<ReflectionItemDTO> items = cards.get(0).toWorkOn();
-        // Only locus-B (confident) survives; the single-target coin-flip at locus-A is withheld even though an
-        // unrelated BAD exists on a second target for the same practice.
-        assertThat(items).hasSize(1);
-        assertThat(items.get(0).observationId()).isEqualTo(confidentLocusB.getId());
-        assertThat(items.stream().map(ReflectionItemDTO::observationId)).doesNotContain(lowConfLocusA.getId());
-    }
-
-    @Test
-    @DisplayName("a low-confidence gap corroborated across >=2 targets within the SAME locus is not quarantined")
-    void sameLocusAcrossTwoTargetsIsCorroborated() {
-        Practice practice = practice("robust-error-handling");
-
-        // The same recurrence locus seen on TWO distinct targets → corroborated within the locus → displayed.
-        Observation locusOnA = bad(practice, Severity.MAJOR, 0.3f, 42L, "same-locus");
-        Observation locusOnB = bad(practice, Severity.MAJOR, 0.3f, 43L, "same-locus");
-
-        when(
-            observationRepository.findRecentByDeveloperAndWorkspace(
-                eq(USER_ID),
-                eq(WORKSPACE_ID),
-                any(Instant.class),
-                any(Pageable.class)
-            )
-        ).thenReturn(List.of(locusOnA, locusOnB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
-            List.of()
-        );
-
-        List<ReflectionPracticeDTO> cards = observationService.getReflection(WORKSPACE_ID);
-
-        assertThat(cards).hasSize(1);
-        // Both share a locus seen on 2 targets → neither quarantined → both displayed.
-        assertThat(cards.get(0).toWorkOn()).hasSize(2);
     }
 
     // ── A defect detector's strength reaches the card ─────────────────────────
@@ -341,10 +172,9 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
             .practice(practice)
             .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(42L)
-            .title("nothing swallowed on the paths you added")
+            .summary("nothing swallowed on the paths you added")
             .presence(presence)
             .assessment(Assessment.GOOD)
-            .confidence(Observation.UNMEASURED_CONFIDENCE)
             .build();
     }
 
@@ -357,7 +187,7 @@ class ObservationServiceReflectionTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(observations));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any(), any(), any())).thenReturn(
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
             List.of()
         );
     }

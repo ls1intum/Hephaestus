@@ -101,6 +101,42 @@ public final class PracticeDefinitionValidator {
         }
     }
 
+    /** Applicability predicates must use evidence capable of settling the predicate. */
+    private void validateSubject(PracticeDefinition definition, Set<SourceKind> applicable) {
+        var version = definition.automatedReviewPolicy().sourceContractVersion();
+        for (PracticeBinding binding : definition.bindings()) {
+            PracticeSubject subject = binding.appliesWhen();
+            if (subject == null) {
+                continue;
+            }
+            if (!definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
+                throw new IllegalArgumentException(
+                    "A practice Hephaestus does not review cannot declare what it applies to; nothing would read it"
+                );
+            }
+            for (PracticeSubjectClause clause : subject.anyOf()) {
+                SourceKind readFrom = clause.readsFrom();
+                if (!applicable.contains(readFrom)) {
+                    throw new IllegalArgumentException(
+                        "This work type has no " +
+                            readFrom +
+                            ", so \"" +
+                            clause.describe() +
+                            "\" could never be decided about it"
+                    );
+                }
+                if (!sourceCatalogs.requireSource(version, readFrom).completenessPolicy().supportsComplete()) {
+                    throw new IllegalArgumentException(
+                        "Evidence source " +
+                            readFrom +
+                            " can never be captured completely, so its silence can never establish that " +
+                            "this practice does not apply"
+                    );
+                }
+            }
+        }
+    }
+
     /**
      * A practice may only read evidence that could exist for the kind of thing it reviews. What each
      * source demands of its capture is the source contract's business, not checked here.
@@ -108,6 +144,7 @@ public final class PracticeDefinitionValidator {
     private void validateEvidence(ArtifactKind artifactKind, PracticeDefinition definition) {
         var version = definition.automatedReviewPolicy().sourceContractVersion();
         Set<SourceKind> applicable = sourceCatalogs.requireSourcesFor(version, artifactKind.value());
+        validateSubject(definition, applicable);
         for (PracticeBinding binding : definition.bindings()) {
             for (PracticeEvidenceRequirement need : binding.needs()) {
                 var contract = sourceCatalogs.requireSource(version, need.sourceKind());

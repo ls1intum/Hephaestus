@@ -4,7 +4,7 @@ package de.tum.cit.aet.hephaestus.integration.core.spi;
  * Where a piece of feedback about an artifact can be put.
  *
  * <p>Delivery genuinely branches on this: a summary goes through {@link SummaryChannel}, a diff-anchored
- * note through {@link InlineFindingChannel} — separate SPIs with separate failure modes. That is why this
+ * note through {@link InlineFeedbackChannel} — separate SPIs with separate failure modes. That is why this
  * is finer-grained than the persisted {@code practices.feedback.FeedbackChannel}, where both in-context
  * lanes collapse to one value: the ledger only records that the developer was told in place, while the
  * delivery path has to know which bean to call.

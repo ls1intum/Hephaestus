@@ -33,10 +33,15 @@ public interface ReviewOutcomeLookup {
     ) {}
 
     /**
-     * @param blockers already-rendered phrases naming what could not be read, so no consumer has to
-     *                 learn the evidence vocabulary to explain a refusal
+     * @param blockers      already-rendered phrases naming what could not be read, so no consumer has to
+     *                      learn the evidence vocabulary to explain a refusal
+     * @param notApplicable set when the run read the evidence and the thing this practice judges was not
+     *                      in the work — the practice author's own sentence for it. Distinct from a
+     *                      blocker, and never both: a blocker is a fact about our instrument, this is a
+     *                      fact about the work, and telling somebody "we could not look" when we looked
+     *                      and there was nothing of this kind to see sends them to the wrong fix
      */
-    record PracticeReadinessOutcome(boolean ready, @NonNull List<String> blockers) {}
+    record PracticeReadinessOutcome(boolean ready, @NonNull List<String> blockers, @Nullable String notApplicable) {}
 
     /**
      * Deliberately coarser than the orchestrator's job status: a trace has nothing different to say

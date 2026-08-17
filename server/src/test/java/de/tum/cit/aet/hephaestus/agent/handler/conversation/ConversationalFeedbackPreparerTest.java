@@ -46,10 +46,8 @@ import org.springframework.context.ApplicationEventPublisher;
 /**
  * What a prepared conversational unit carries, and who decided it should exist.
  *
- * <p>Two selections meet here. When the composition stage wrote for this lane, its moves decide what is
- * raised and the unit carries the move. When it did not, the severity ranking that shipped before decides
- * and the body stays NULL — which is the documented path rather than a degraded one, since composition is a
- * stage a review may skip and one that may fail.
+ * <p>The composition stage alone decides what is raised. Measurements ground its move, but a ranking of
+ * measurements is not a coaching brief and must never create a body-less mentor queue entry.
  */
 class ConversationalFeedbackPreparerTest extends BaseUnitTest {
 
@@ -59,9 +57,10 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     private static final String TESTS = "ships-tests-with-the-change";
     private static final String SIZE = "keeps-the-change-reviewable";
 
-    private static final String OPENER = "At what point do you decide the test for a new branch is done?";
+    private static final String OBSERVED = "On !18, !20 and !22 the test landed a push after the review comment.";
+    private static final String REALISATION = "Writing the test last is what leaves the review to find the gap.";
     private static final String EVIDENCE = "On !18, !20 and !22 the test arrived a push later.";
-    private static final String TARGET = "They name a check they could run before pushing.";
+    private static final String SELF_CHECK = "They name a check they could run before pushing.";
 
     private final FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
     private final FeedbackObservationRepository feedbackObservationRepository = mock(
@@ -132,9 +131,9 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the composer's move reaches the row in its three parts, and none of them is a script")
+    @DisplayName("the composer's notes reach the row in all four parts, and none of them is a script")
     void carriesTheMove() {
-        Observation observation = problem(ALICE, TESTS, Severity.MAJOR, 0.9f);
+        Observation observation = problem(ALICE, TESTS, Severity.MAJOR);
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(observation), List.of(move(TESTS)));
 
@@ -145,9 +144,10 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         assertThat(unit.getSuppressionReason()).isNull();
         ConversationBriefBody.Brief brief = ConversationBriefBody.parse(unit.getBody());
         assertThat(brief).isNotNull();
-        assertThat(brief.opener()).isEqualTo(OPENER);
-        assertThat(brief.evidence()).isEqualTo(EVIDENCE);
-        assertThat(brief.target()).isEqualTo(TARGET);
+        assertThat(brief.situation()).isEqualTo(OBSERVED);
+        assertThat(brief.capability()).isEqualTo(REALISATION);
+        assertThat(brief.evidenceSummary()).isEqualTo(EVIDENCE);
+        assertThat(brief.inConversationSignal()).isEqualTo(SELF_CHECK);
     }
 
     /**
@@ -159,8 +159,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @DisplayName("composed moves select, and outrank the severity order")
     void composedMovesDriveSelection() {
         // The ranking would put the CRITICAL locus first; the composer wrote about the other one.
-        Observation loud = problem(ALICE, SIZE, Severity.CRITICAL, 0.99f);
-        Observation quiet = problem(ALICE, TESTS, Severity.MINOR, 0.4f);
+        Observation loud = problem(ALICE, SIZE, Severity.CRITICAL);
+        Observation quiet = problem(ALICE, TESTS, Severity.MINOR);
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(loud, quiet), List.of(move(TESTS)));
 
@@ -181,9 +181,9 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @DisplayName("one move per practice per recipient, however many loci it has")
     void collapsesLociOfOnePractice() {
         List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MAJOR, 0.9f),
-            problem(ALICE, TESTS, Severity.MAJOR, 0.8f),
-            problem(BOB, TESTS, Severity.MAJOR, 0.7f)
+            problem(ALICE, TESTS, Severity.MAJOR),
+            problem(ALICE, TESTS, Severity.MAJOR),
+            problem(BOB, TESTS, Severity.MAJOR)
         );
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS)));
@@ -203,7 +203,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, SIZE, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, SIZE, Severity.MAJOR)),
             List.of(move(TESTS))
         );
 
@@ -216,10 +216,10 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @DisplayName("past the per-recipient cap the locus is withheld with a row and no move")
     void capsAtThreePerRecipient() {
         List<Observation> admitted = List.of(
-            problem(ALICE, "p-one", Severity.CRITICAL, 0.9f),
-            problem(ALICE, "p-two", Severity.MAJOR, 0.9f),
-            problem(ALICE, "p-three", Severity.MAJOR, 0.8f),
-            problem(ALICE, "p-four", Severity.MINOR, 0.7f)
+            problem(ALICE, "p-one", Severity.CRITICAL),
+            problem(ALICE, "p-two", Severity.MAJOR),
+            problem(ALICE, "p-three", Severity.MAJOR),
+            problem(ALICE, "p-four", Severity.MINOR)
         );
         List<ComposedFeedbackUnit> composed = List.of(move("p-one"), move("p-two"), move("p-three"), move("p-four"));
 
@@ -245,10 +245,10 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @DisplayName("every raised row carries its habit's thread key, and a capped row carries none")
     void raisedRowsCarryTheHabitThread() {
         List<Observation> admitted = List.of(
-            problem(ALICE, "p-one", Severity.CRITICAL, 0.9f),
-            problem(ALICE, "p-two", Severity.MAJOR, 0.9f),
-            problem(ALICE, "p-three", Severity.MAJOR, 0.8f),
-            problem(ALICE, "p-four", Severity.MINOR, 0.7f)
+            problem(ALICE, "p-one", Severity.CRITICAL),
+            problem(ALICE, "p-two", Severity.MAJOR),
+            problem(ALICE, "p-three", Severity.MAJOR),
+            problem(ALICE, "p-four", Severity.MINOR)
         );
         List<ComposedFeedbackUnit> composed = List.of(move("p-one"), move("p-two"), move("p-three"), move("p-four"));
 
@@ -270,19 +270,18 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             .isNull();
     }
 
-    /** The fallback ranking writes no body, but it still writes a thread a later move can replace. */
     @Test
-    @DisplayName("the fallback ranking's rows are supersedable too")
-    void fallbackRowsCarryTheHabitThread() {
+    @DisplayName("a missing composition stage creates no mentor work")
+    void missingCompositionCreatesNoQueueEntry() {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of()
         );
 
-        assertThat(prepared).isEqualTo(1);
-        assertThat(saved()).singleElement().extracting(Feedback::getThreadKey).isEqualTo(threadKeyFor(TESTS, ALICE));
+        assertThat(prepared).isZero();
+        verify(feedbackRepository, never()).save(any());
     }
 
     @Test
@@ -297,7 +296,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of(supersede(TESTS, threadKey))
         );
 
@@ -328,7 +327,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of(supersede(TESTS, threadKey))
         );
 
@@ -354,7 +353,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of(supersede(TESTS, someoneElsesHabit))
         );
 
@@ -368,14 +367,14 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             });
     }
 
-    /** A locus whose practice cannot be read has no habit to key on, so nothing can be claimed for it. */
+    /** Without a composed brief there is no habit to claim, even when the observation is otherwise valid. */
     @Test
     @DisplayName("an unresolved practice claims nothing")
     void anUnresolvedPracticeClaimsNothing() {
-        preparer.prepare(UUID.randomUUID(), WS, List.of(problem(ALICE, null, Severity.MAJOR, 0.9f)), List.of());
+        preparer.prepare(UUID.randomUUID(), WS, List.of(problem(ALICE, null, Severity.MAJOR)), List.of());
 
         verify(supersession, never()).supersede(anyLong(), anyLong(), any(), any());
-        assertThat(saved()).singleElement().extracting(Feedback::getThreadKey).isNull();
+        verify(feedbackRepository, never()).save(any());
     }
 
     /**
@@ -390,7 +389,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of(supersede(TESTS, threadKeyFor(TESTS, ALICE)))
         );
 
@@ -402,8 +401,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     void reRunIsIdempotent() {
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
         List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MAJOR, 0.9f),
-            problem(ALICE, SIZE, Severity.MINOR, 0.5f)
+            problem(ALICE, TESTS, Severity.MAJOR),
+            problem(ALICE, SIZE, Severity.MINOR)
         );
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS), move(SIZE)));
@@ -424,8 +423,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @DisplayName("positions are derived from the admitted loci, not from what was composed")
     void ordinalsIgnoreComposition() {
         List<Observation> admitted = List.of(
-            problem(ALICE, SIZE, Severity.CRITICAL, 0.9f),
-            problem(ALICE, TESTS, Severity.MINOR, 0.5f)
+            problem(ALICE, SIZE, Severity.CRITICAL),
+            problem(ALICE, TESTS, Severity.MINOR)
         );
 
         preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(move(TESTS)));
@@ -449,7 +448,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of(withhold(TESTS))
         );
 
@@ -466,8 +465,8 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     @DisplayName("a withhold-only turn does not fall back to the severity ranking")
     void withholdIsNotSilence() {
         List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MAJOR, 0.9f),
-            problem(ALICE, SIZE, Severity.CRITICAL, 0.95f)
+            problem(ALICE, TESTS, Severity.MAJOR),
+            problem(ALICE, SIZE, Severity.CRITICAL)
         );
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of(withhold(TESTS)));
@@ -477,38 +476,32 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("with nothing composed, the severity ranking selects and the body stays NULL")
-    void fallsBackToTheRanking() {
+    @DisplayName("with nothing composed, severity never creates body-less feedback")
+    void doesNotFallBackToTheRanking() {
         List<Observation> admitted = List.of(
-            problem(ALICE, TESTS, Severity.MINOR, 0.4f),
-            problem(ALICE, SIZE, Severity.CRITICAL, 0.99f)
+            problem(ALICE, TESTS, Severity.MINOR),
+            problem(ALICE, SIZE, Severity.CRITICAL)
         );
 
         int prepared = preparer.prepare(UUID.randomUUID(), WS, admitted, List.of());
 
-        assertThat(prepared).isEqualTo(2);
-        assertThat(saved()).allSatisfy(unit -> assertThat(unit.getBody()).isNull());
-        assertThat(saved())
-            .extracting(Feedback::getPosition)
-            .containsExactly(
-                FeedbackLedgerRecorder.IN_CHAT_UNIT_ORDINAL_BASE,
-                FeedbackLedgerRecorder.IN_CHAT_UNIT_ORDINAL_BASE + 1
-            );
+        assertThat(prepared).isZero();
+        verify(feedbackRepository, never()).save(any());
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
-    /** A locus with no readable practice cannot be joined to any move; the ranking still handles it. */
     @Test
-    @DisplayName("the fallback does not need a practice slug")
-    void fallbackToleratesAnUnresolvedPractice() {
+    @DisplayName("an unresolved practice cannot create feedback without a composed brief")
+    void unresolvedPracticeWithoutCompositionCreatesNothing() {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, null, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, null, Severity.MAJOR)),
             List.of()
         );
 
-        assertThat(prepared).isEqualTo(1);
-        assertThat(saved()).singleElement().extracting(Feedback::getBody).isNull();
+        assertThat(prepared).isZero();
+        verify(feedbackRepository, never()).save(any());
     }
 
     @Test
@@ -519,7 +512,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         int prepared = preparer.prepare(
             UUID.randomUUID(),
             WS,
-            List.of(problem(ALICE, TESTS, Severity.MAJOR, 0.9f)),
+            List.of(problem(ALICE, TESTS, Severity.MAJOR)),
             List.of(move(TESTS))
         );
 
@@ -561,7 +554,7 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
             "The test arrives after the review, not with the change",
             null,
             null,
-            new ComposedFeedbackUnit.ConversationBrief(OPENER, EVIDENCE, TARGET),
+            new ComposedFeedbackUnit.ConversationBrief(OBSERVED, REALISATION, EVIDENCE, SELF_CHECK),
             null
         );
     }
@@ -582,14 +575,13 @@ class ConversationalFeedbackPreparerTest extends BaseUnitTest {
         );
     }
 
-    private Observation problem(long about, String practiceSlug, Severity severity, float confidence) {
+    private Observation problem(long about, String practiceSlug, Severity severity) {
         Observation observation = mock(Observation.class);
         UUID id = UUID.randomUUID();
         lenient().when(observation.getId()).thenReturn(id);
         lenient().when(observation.getPresence()).thenReturn(Presence.ABSENT);
         lenient().when(observation.getAssessment()).thenReturn(Assessment.BAD);
         lenient().when(observation.getSeverity()).thenReturn(severity);
-        lenient().when(observation.getConfidence()).thenReturn(confidence);
         lenient().when(observation.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         lenient().when(observation.getArtifactId()).thenReturn(100L);
         lenient().when(observation.getAboutUserId()).thenReturn(about);

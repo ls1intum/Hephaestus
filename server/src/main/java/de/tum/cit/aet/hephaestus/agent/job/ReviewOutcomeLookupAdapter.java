@@ -76,9 +76,33 @@ class ReviewOutcomeLookupAdapter implements ReviewOutcomeLookup {
             if (slug == null || slug.isBlank()) {
                 continue;
             }
-            bySlug.put(slug, new PracticeReadinessOutcome(decision.path("ready").asBoolean(false), blockers(decision)));
+            bySlug.put(
+                slug,
+                new PracticeReadinessOutcome(
+                    decision.path("ready").asBoolean(false),
+                    blockers(decision),
+                    notApplicable(decision)
+                )
+            );
         }
         return Map.copyOf(bySlug);
+    }
+
+    /**
+     * The practice author's own sentence for "the thing this judges was not in this work", or null.
+     *
+     * <p>Read from the subject check rather than reconstructed from the clause findings: the sentence is
+     * the record, and a surface that paraphrased it would drift from the catalogue the moment somebody
+     * edited the declaration. Guarded on {@code absent} because a check is also recorded when the
+     * subject was found, and that decision is a ready one with nothing to explain.
+     */
+    private static @Nullable String notApplicable(JsonNode decision) {
+        JsonNode check = decision.path("subjectCheck");
+        if (!check.path("absent").asBoolean(false)) {
+            return null;
+        }
+        String sentence = check.path("describedAs").asString(null);
+        return sentence == null || sentence.isBlank() ? null : sentence;
     }
 
     /** What could not be read, in words, so no consumer has to learn the evidence vocabulary. */

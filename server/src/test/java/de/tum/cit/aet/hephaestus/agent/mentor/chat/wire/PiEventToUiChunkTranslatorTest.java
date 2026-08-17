@@ -357,24 +357,24 @@ class PiEventToUiChunkTranslatorTest extends BaseUnitTest {
             .containsExactly("TextEnd");
     }
 
-    // link_finding (runner-emitted, camelCase canonical)
+    // link_observation (runner-emitted, camelCase canonical)
 
     @Test
-    void linkFinding_camelCase_emitsDataFinding() throws Exception {
-        JsonNode event = fixture("runner_link_finding.json");
+    void linkObservation_camelCase_emitsDataObservation() throws Exception {
+        JsonNode event = fixture("runner_link_observation.json");
 
         List<UIMessageChunk> out = translator.translate(event, state);
 
         assertThat(out).hasSize(1);
-        UIMessageChunk.DataFinding df = (UIMessageChunk.DataFinding) out.get(0);
-        assertThat(df.data().findingId()).isEqualTo(UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
-        assertThat(df.id()).isEqualTo(df.data().findingId());
+        UIMessageChunk.DataObservation df = (UIMessageChunk.DataObservation) out.get(0);
+        assertThat(df.data().observationId()).isEqualTo(UUID.fromString("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"));
+        assertThat(df.id()).isEqualTo(df.data().observationId());
     }
 
     @Test
     void linkFinding_invalidUuid_dropped() throws Exception {
         assertThat(
-            translator.translate(mapper.readTree("{\"type\":\"link_finding\",\"findingId\":\"nope\"}"), state)
+            translator.translate(mapper.readTree("{\"type\":\"link_observation\",\"observationId\":\"nope\"}"), state)
         ).isEmpty();
     }
 

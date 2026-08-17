@@ -80,7 +80,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             var entry = only(
                 practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
-                Map.of(RUN, completed(Map.of("slug", new PracticeReadinessOutcome(true, List.of())))),
+                Map.of(RUN, completed(Map.of("slug", new PracticeReadinessOutcome(true, List.of(), null)))),
                 Map.of()
             );
 
@@ -121,7 +121,8 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
                             "slug",
                             new PracticeReadinessOutcome(
                                 false,
-                                List.of("scm.pull-request.diff was captured only in part")
+                                List.of("scm.pull-request.diff was captured only in part"),
+                                null
                             )
                         )
                     )
@@ -131,6 +132,39 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
 
             assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.NOT_ASSESSABLE);
             assertThat(entry.explanation()).contains("scm.pull-request.diff was captured only in part");
+        }
+
+        /**
+         * The split this outcome exists for, asserted from the other side. The run read the evidence and
+         * the thing the practice judges was not in the work: that is a fact about the work, so the reader
+         * must not be told our instrument failed and sent off to go fixing a capture that was fine.
+         */
+        @Test
+        void rendersAnAbsentSubjectAsSkippedInThePracticeAuthorsOwnWords() {
+            var entry = only(
+                practice(PracticeReviewTier.DELIVER, READY),
+                List.of(triggered(READY, RUN)),
+                Map.of(
+                    RUN,
+                    completed(
+                        Map.of(
+                            "slug",
+                            new PracticeReadinessOutcome(
+                                false,
+                                List.of(),
+                                "the change touches no dependency manifest or lockfile"
+                            )
+                        )
+                    )
+                ),
+                Map.of()
+            );
+
+            assertThat(entry.outcome()).isEqualTo(PracticeTraceOutcome.SKIPPED);
+            assertThat(entry.explanation()).isEqualTo(
+                "This practice does not apply here: the change touches no dependency manifest or lockfile."
+            );
+            assertThat(entry.reviewId()).isEqualTo(RUN);
         }
 
         @Test
@@ -155,7 +189,7 @@ class PracticeTraceDeriverTest extends BaseUnitTest {
             var entry = only(
                 practice(PracticeReviewTier.DELIVER, READY),
                 List.of(triggered(READY, RUN)),
-                Map.of(RUN, completed(Map.of("other", new PracticeReadinessOutcome(true, List.of())))),
+                Map.of(RUN, completed(Map.of("other", new PracticeReadinessOutcome(true, List.of(), null)))),
                 Map.of()
             );
 

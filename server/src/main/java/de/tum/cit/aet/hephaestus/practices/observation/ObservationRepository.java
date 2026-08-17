@@ -27,9 +27,9 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Repository for immutable practice findings with idempotent insertion.
+ * Repository for immutable practice observations with idempotent insertion.
  *
- * <p>Workspace-agnostic: findings are scoped through {@code Practice.workspace}
+ * <p>Workspace-agnostic: observations are scoped through {@code Practice.workspace}
  * relationship, not via a direct workspace_id column.
  */
 @Repository
@@ -59,7 +59,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * All findings a given agent job produced — the source set the feedback ledger recorder binds to.
+     * All observations a given agent job produced — the source set the feedback ledger recorder binds to.
      * Ordered by id so {@code get(0)} is deterministic across retries: the recorder derives the recipient,
      * artifact, and thread key from the first row, and an unordered read could re-source them differently on
      * a re-run of a multi-subject / multi-artifact job.
@@ -101,7 +101,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     }
 
     /**
-     * Atomically inserts a practice finding if absent (race-condition safe).
+     * Atomically inserts a practice observation if absent (race-condition safe).
      *
      * <p>Uses PostgreSQL's ON CONFLICT DO NOTHING to handle concurrent inserts.
      * This avoids the race condition where exists() check passes but save() fails
@@ -116,15 +116,15 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         INSERT INTO observation (
             id, occurrence_key, agent_job_id, practice_id, practice_revision_id,
             artifact_kind, artifact_id, about_user_id,
-            title, presence, assessment, severity, confidence,
-            evidence, reasoning,
+            summary, presence, assessment, severity,
+            evidence, evidence_rationale,
             recurrence_key, observed_at, origin
         )
         VALUES (
             :id, :idempotencyKey, :agentJobId, :practiceId, :practiceRevisionId,
             :artifactKind, :artifactId, :aboutUserId,
-            :title, :presence, :assessment, :severity, :confidence,
-            CAST(:evidence AS jsonb), :reasoning,
+            :summary, :presence, :assessment, :severity,
+            CAST(:evidence AS jsonb), :evidenceRationale,
             :recurrenceKey, :observedAt, :origin
         )
         ON CONFLICT (occurrence_key) DO NOTHING
@@ -140,13 +140,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("artifactKind") String artifactKind,
         @Param("artifactId") Long artifactId,
         @Param("aboutUserId") Long aboutUserId,
-        @Param("title") String title,
+        @Param("summary") String summary,
         @Param("presence") String presence,
         @Param("assessment") String assessment,
         @Param("severity") String severity,
-        @Param("confidence") Float confidence,
         @Param("evidence") String evidence,
-        @Param("reasoning") String reasoning,
+        @Param("evidenceRationale") String evidenceRationale,
         @Param("recurrenceKey") String recurrenceKey,
         @Param("observedAt") Instant observedAt,
         @Param("origin") String origin
@@ -278,10 +277,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     // Read queries for the developer dashboard.
 
     /**
-     * Paginated findings for an about-user within a workspace, with optional filters.
+     * Paginated observations for an about-user within a workspace, with optional filters.
      *
      * <p>Workspace scoping is done via the {@code Practice.workspace} join. The about-user is the
-     * {@code about_user_id} subject the finding is filed against (ADR 0022).
+     * {@code about_user_id} subject the observation is filed against (ADR 0022).
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
      */
@@ -313,7 +312,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Per-practice aggregation for the developer dashboard: present/good and bad counts, and last finding date.
+     * Per-practice aggregation for the developer dashboard: present/good and bad counts, and last observation date.
      *
      * <p>Aggregates represent each target's current state: within the workspace, only the run with the newest
      * {@code (observed_at, agent_job_id)} tuple contributes.
@@ -371,7 +370,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Single finding by ID within a workspace, restricted to a specific about-user.
+     * Single observation by ID within a workspace, restricted to a specific about-user.
      *
      * <p>Ownership is enforced in the query (not in Java) to avoid lazy-load
      * fragility and to keep the auth check atomic with the fetch.
@@ -410,12 +409,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Recent findings the mentor can refer to by title in conversation.
+     * Recent observations the mentor can refer to by summary in conversation.
      *
      * <p>Re-review deduped (same grain as {@link #findSummaryByDeveloperAndWorkspace}): keeps only each
-     * target's LATEST detection run, so a re-pushed PR's findings don't repeat across the list and the
-     * mentor doesn't re-litigate the same finding on every re-push. Native because the latest-run selection
-     * needs {@code ORDER BY ... LIMIT 1} in a correlated subquery; the practice is loaded lazily per finding
+     * target's LATEST detection run, so a re-pushed PR's observations don't repeat across the list and the
+     * mentor doesn't re-litigate the same observation on every re-push. Native because the latest-run selection
+     * needs {@code ORDER BY ... LIMIT 1} in a correlated subquery; the practice is loaded lazily per observation
      * rather than JOIN-fetched.
      *
      * <p>Only a presence that {@link Presence#carriesValence() carries valence} is listed: {@code NOT_APPLICABLE}
@@ -425,7 +424,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * re-ordered by severity, to preserve its "what happened lately" purpose.
      *
      * <p><strong>Backfilled observations are included, partitioned by origin class</strong> — a campaign's
-     * {@code BAD} finding on a developer's own work is exactly what "what should I work on" is asking for,
+     * {@code BAD} observation on a developer's own work is exactly what "what should I work on" is asking for,
      * and excluding it made a campaign produce nothing any developer could see. The latest-run correlation is
      * evaluated <em>within</em> each origin class ({@code (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')})
      * rather than over the union: origin-blind, a campaign's job could become "the latest run" and erase
@@ -474,12 +473,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Severity histogram for a developer's findings within a workspace.
+     * Severity histogram for a developer's observations within a workspace.
      * Returns {@code [severityName, count]} rows — caller maps to a name→count map.
      *
      * <p>Re-review deduped to each target's latest run (see {@link #findRecentByDeveloperAndWorkspace}) so
      * the mentor's "how am I doing" histogram reflects current state, not the re-push multiplier. Only
-     * {@code BAD} findings carry a non-null severity, so the histogram is over problems.
+     * {@code BAD} observations carry a non-null severity, so the histogram is over problems.
      */
     @Query(
         value = """
@@ -520,7 +519,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     );
 
     /**
-     * Presence histogram for a developer's findings within a workspace.
+     * Presence histogram for a developer's observations within a workspace.
      *
      * <p>Aggregate policy matches {@link #findSummaryByDeveloperAndWorkspace}.
      */
@@ -564,7 +563,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     // Cross-run trend read path (ADR 0021) — the measurement substrate ObservationTrendService classifies.
 
     /**
-     * The runs (agent jobs) that produced ≥1 correlation-keyed finding for a target, newest first by the
+     * The runs (agent jobs) that produced ≥1 correlation-keyed observation for a target, newest first by the
      * run's latest detection. Pass {@code PageRequest.of(0, 2)} to get the two most-recent runs to diff.
      * Workspace-scoped via {@code Practice.workspace}.
      *
@@ -590,12 +589,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Pageable pageable
     );
 
-    /** All correlation-keyed findings for the given (already-resolved) run job-ids, with the trend fields. */
+    /** All correlation-keyed observations for the given (already-resolved) run job-ids, with the trend fields. */
     @Query(
         """
         SELECT f.agentJobId AS agentJobId, f.recurrenceKey AS recurrenceKey, f.presence AS presence,
-               f.assessment AS assessment, f.severity AS severity, f.confidence AS confidence, p.slug AS practiceSlug,
-               f.title AS title, f.observedAt AS observedAt
+               f.assessment AS assessment, f.severity AS severity, p.slug AS practiceSlug,
+               f.summary AS summary, f.observedAt AS observedAt
         FROM Observation f JOIN f.practice p
         WHERE f.agentJobId IN :agentJobIds AND p.workspace.id = :workspaceId AND f.recurrenceKey IS NOT NULL
           AND f.presence IN (de.tum.cit.aet.hephaestus.practices.model.Presence.PRESENT,
@@ -629,9 +628,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /** Projection: a correlation-keyed observation reduced to the fields the trend classifier needs. */
     interface LocusObservation extends LocusKey {
         Severity getSeverity();
-        Float getConfidence();
         String getPracticeSlug();
-        String getTitle();
+        String getSummary();
         Instant getObservedAt();
     }
 
@@ -675,11 +673,10 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
                    o.artifact_kind AS "artifactKind",
                    o.artifact_id AS "artifactId",
                    o.about_user_id AS "aboutUserId",
-                   o.title AS "title",
+                   o.summary AS "summary",
                    o.presence AS "presence",
                    o.assessment AS "assessment",
                    o.severity AS "severity",
-                   o.confidence AS "confidence",
                    o.recurrence_key AS "recurrenceKey",
                    o.origin AS "origin",
                    o.practice_revision_id AS "practiceRevisionId",
@@ -741,14 +738,13 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         String getArtifactKind();
         Long getArtifactId();
         Long getAboutUserId();
-        String getTitle();
+        String getSummary();
         Presence getPresence();
         Assessment getAssessment();
         Severity getSeverity();
-        Float getConfidence();
         String getRecurrenceKey();
         /**
-         * What occasioned the measurement. Without it the operator surface cannot tell a campaign's findings
+         * What occasioned the measurement. Without it the operator surface cannot tell a campaign's observations
          * from live ones, which is a population-mixing hazard in exactly the surface used to judge whether a
          * campaign was worth its cost.
          */

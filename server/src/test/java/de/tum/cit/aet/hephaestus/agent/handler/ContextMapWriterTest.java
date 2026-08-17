@@ -33,7 +33,7 @@ class ContextMapWriterTest {
     }
 
     @Test
-    @DisplayName("says so when nothing is named like a test, because that absence is itself the finding")
+    @DisplayName("says so when nothing is named like a test, because that absence is itself the observation")
     void namesTheAbsenceOfATestCounterpart() {
         Map<String, byte[]> files = staged("src/app/Depth.java", "src/app/Encoder.java");
 

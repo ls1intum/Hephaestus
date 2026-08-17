@@ -38,17 +38,7 @@ public final class ReviewRuleFingerprint {
         );
     }
 
-    /**
-     * The artifact kind is not digested separately: every signal name carries it, so digesting it too
-     * would only give a rename two places to be recorded.
-     *
-     * <p>{@code subject} is deliberately NOT digested either, and the omission is the same kind as
-     * why-it-matters above: this fingerprint answers "were these claims measured under the rules the
-     * practice holds now", and whose conduct the result is <em>about</em> changes neither the evidence a
-     * review reads nor the standard it applies. Digesting it would also demand a {@code SCHEME} bump,
-     * which would mark every observation in every workspace as measured under superseded rules and empty
-     * every reflective surface at once — a far larger claim than "we now know who this was about".
-     */
+    /** Actor attribution is excluded because it does not change evidence or evaluation rules. */
     static void addBindings(CanonicalDigest digest, List<PracticeBinding> bindings) {
         digest.addInt(bindings.size());
         for (PracticeBinding binding : bindings) {
@@ -57,6 +47,17 @@ public final class ReviewRuleFingerprint {
             digest.add(String.valueOf(binding.onDrafts()));
             digest.addInt(binding.needs().size());
             binding.needs().forEach(need -> digest.add(need.sourceKind().value()).add(need.stance().name()));
+            addAppliesWhen(digest, binding.appliesWhen());
+        }
+    }
+
+    private static void addAppliesWhen(CanonicalDigest digest, @Nullable PracticeSubject subject) {
+        if (subject == null) {
+            return;
+        }
+        digest.add("appliesWhen").add(subject.absentSays()).addInt(subject.anyOf().size());
+        for (PracticeSubjectClause clause : subject.anyOf()) {
+            digest.add(clause.aspect().name()).add(clause.describe());
         }
     }
 }

@@ -1073,9 +1073,45 @@ export type PracticeEvidenceRequirement = {
 };
 
 /**
+ * One shape the subject a practice judges can take in a piece of work
+ */
+export type PracticeSubjectClause = {
+    /**
+     * Globs; holds when the change touches a matching path
+     */
+    changedPathMatches?: Array<string>;
+    /**
+     * Literal strings; holds when the diff contains one of them
+     */
+    diffContains?: Array<string>;
+    /**
+     * Named evidence collection; holds when it has at least one entry
+     */
+    evidenceHasItems?: 'scm.review-threads' | 'scm.inline-review-comments' | 'scm.general-review-comments';
+};
+
+/**
+ * What must be in a piece of work for this practice to have anything to judge
+ */
+export type PracticeSubject = {
+    /**
+     * Sentence shown when the subject was proven absent, in the author's voice
+     */
+    absentSays: string;
+    /**
+     * Shapes the subject may take; the subject is present when any one is found
+     */
+    anyOf?: Array<PracticeSubjectClause>;
+};
+
+/**
  * An occasion that starts a review, and the evidence that review reads
  */
 export type PracticeBinding = {
+    /**
+     * What must be in the work for this practice to apply; omit to always apply
+     */
+    appliesWhen?: PracticeSubject;
     /**
      * Sources a review occasioned this way reads, each with the stance it takes
      */
@@ -2118,11 +2154,8 @@ export type ReviewObservationDetail = {
      * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * Observation confidence
-     */
-    confidence: number;
     evidence?: ObservationEvidence;
+    evidenceRationale?: string;
     /**
      * Linked feedback, newest first
      */
@@ -2136,7 +2169,6 @@ export type ReviewObservationDetail = {
     practiceRevisionId?: number;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
-    reasoning?: string;
     /**
      * Cross-run locus key; null when continuity is unavailable
      */
@@ -2149,7 +2181,7 @@ export type ReviewObservationDetail = {
      * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    title: string;
+    summary: string;
 };
 
 /**
@@ -2245,10 +2277,6 @@ export type ReviewObservation = {
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Observation confidence
-     */
-    confidence: number;
-    /**
      * Counts of linked feedback by delivery state
      */
     feedbackDisposition: ReviewFeedbackDisposition;
@@ -2273,7 +2301,7 @@ export type ReviewObservation = {
      * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    title: string;
+    summary: string;
 };
 
 /**
@@ -2369,10 +2397,6 @@ export type ReviewBoundObservation = {
      * Whether an observation was produced using the current review rules
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
-    /**
-     * Observation confidence
-     */
-    confidence: number;
     observationId: string;
     observedAt: Date;
     /**
@@ -2390,7 +2414,7 @@ export type ReviewBoundObservation = {
      * Severity band (null unless assessment is BAD)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    title: string;
+    summary: string;
 };
 
 export type ReviewFeedback = {
@@ -2621,7 +2645,7 @@ export type ReflectionItem = {
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
-    guidance?: string;
+    deliveredFeedback?: string;
     /**
      * Where in the work, e.g. "FrameRecorder.swift:212", when known
      */
@@ -3218,7 +3242,7 @@ export type PracticeEvidenceBlocker = {
     /**
      * Readiness reason recorded for that source or practice
      */
-    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT';
+    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'SUBJECT_NOT_IN_THE_WORK';
     /**
      * Reviews this blocker affected
      */
@@ -3492,10 +3516,6 @@ export type ObservationList = {
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    /**
      * Observation ID
      */
     id: string;
@@ -3524,9 +3544,9 @@ export type ObservationList = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Observation title
+     * Observation summary
      */
-    title: string;
+    summary: string;
 };
 
 export type PageConfigAuditEntryView = {
@@ -3886,7 +3906,7 @@ export type OutlineCollection = {
 };
 
 /**
- * Full practice observation detail including guidance and evidence
+ * Full practice observation detail including delivered feedback and evidence
  */
 export type ObservationDetail = {
     /**
@@ -3906,14 +3926,14 @@ export type ObservationDetail = {
      */
     claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * AI confidence score (0.0–1.0)
-     */
-    confidence: number;
-    evidence?: ObservationEvidence;
-    /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
-    guidance?: string;
+    deliveredFeedback?: string;
+    evidence?: ObservationEvidence;
+    /**
+     * Evidence-based rationale for the observation
+     */
+    evidenceRationale?: string;
     /**
      * Observation ID
      */
@@ -3939,17 +3959,13 @@ export type ObservationDetail = {
      */
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
-     * AI reasoning behind the observation
-     */
-    reasoning?: string;
-    /**
      * Severity level (null unless assessment is BAD)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Observation title
+     * Observation summary
      */
-    title: string;
+    summary: string;
 };
 
 /**
@@ -4442,7 +4458,7 @@ export type InAppEvidence = {
     /**
      * What the review recorded on this piece of work
      */
-    title?: string;
+    summary?: string;
 };
 
 export type ImpersonateRequest = {

@@ -52,7 +52,7 @@ public class GitLabManifest implements IntegrationManifest {
         EnumSet<Capability> capabilities = EnumSet.of(Capability.WEBHOOK_INGEST);
         if (gitlabStackEnabled) {
             capabilities.add(Capability.FEEDBACK_DELIVERY);
-            capabilities.add(Capability.INLINE_FINDINGS);
+            capabilities.add(Capability.INLINE_FEEDBACK);
             capabilities.add(Capability.APPROVAL_WORKFLOW);
         }
         return Set.copyOf(capabilities);

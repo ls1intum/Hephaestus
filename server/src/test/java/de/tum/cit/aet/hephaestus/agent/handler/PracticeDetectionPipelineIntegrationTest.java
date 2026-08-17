@@ -320,9 +320,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private String withEvidence(String rawOutput) {
         try {
             var root = OBJECT_MAPPER.readTree(rawOutput);
-            for (var finding : root.path("findings")) {
-                if (!finding.has("evidence")) {
-                    var citation = ((ObjectNode) finding).putObject("evidence").putArray("citations").addObject();
+            for (var observation : root.path("observations")) {
+                if (!observation.has("evidence")) {
+                    var citation = ((ObjectNode) observation).putObject("evidence").putArray("citations").addObject();
                     citation.put("sourceKind", "scm.pull-request.core");
                     citation.put("artifactPath", "inputs/context/metadata.json");
                     citation.put("path", "body");
@@ -332,8 +332,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 }
                 // An ABSENT observation asserts a universal, so delivery requires it to record the
                 // search that came up empty.
-                if ("ABSENT".equals(finding.path("presence").asString(null))) {
-                    var search = ((ObjectNode) finding.path("evidence")).putObject("search");
+                if ("ABSENT".equals(observation.path("presence").asString(null))) {
+                    var search = ((ObjectNode) observation.path("evidence")).putObject("search");
                     search.putArray("consulted").add("scm.pull-request.core");
                     search.put("lookedFor", "a null check on the changed method");
                     search.put("boundary", "the pull request metadata only");
@@ -346,16 +346,16 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     private String validAgentOutput() {
-        String findings = """
+        String observations = """
             {
-              "findings": [
+              "observations": [
                 {
                   "practiceSlug": "pr-description-quality",
                   "title": "Good PR description",
                   "presence": "PRESENT",
                   "assessment": "GOOD",
                   "severity": "INFO",
-                  "confidence": 0.95
+                  "reasoning": "The description names what changed."
                 },
                 {
                   "practiceSlug": "error-handling",
@@ -363,16 +363,10 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                   "presence": "ABSENT",
                   "assessment": "BAD",
                   "severity": "MAJOR",
-                  "confidence": 0.85,
-                  "reasoning": "The method does not check for null input.",
-                  "guidance": "Add a null check at the top of the method.",
-                  "suggestedDiffNotes": [
-                    { "filePath": "src/Main.java", "startLine": 10, "endLine": 15,
-                      "body": "Consider adding a null check here." }
-                  ]
+                  "reasoning": "The method does not check for null input."
                 }
               ]""";
-        return findings + "\n}";
+        return observations + "\n}";
     }
 
     @Nested
@@ -420,9 +414,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            List<Observation> findings = observationRepository.findAll();
-            assertThat(findings).hasSize(2);
-            assertThat(findings)
+            List<Observation> observations = observationRepository.findAll();
+            assertThat(observations).hasSize(2);
+            assertThat(observations)
                 .extracting(Observation::getPresence)
                 .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
 
@@ -430,7 +424,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
             assertThat(events).hasSize(1);
-            assertThat(events.get(0).findingsInserted()).isEqualTo(2);
+            assertThat(events.get(0).observationsInserted()).isEqualTo(2);
             assertThat(events.get(0).hasNegative()).isTrue();
 
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
@@ -445,14 +439,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void allPositiveFindingsPostsApproval() {
             String output = """
                 {
-                  "findings": [
+                  "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
@@ -460,7 +453,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
                     }
                   ]
                 }""";
@@ -471,7 +463,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // A findings summary reaches this same call, so only the body text tells an approval apart.
+            // A observations summary reaches this same call, so only the body text tells an approval apart.
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
             assertThat(body.getValue()).contains("nothing to change here");
@@ -489,7 +481,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThatThrownBy(() -> handler.deliver(agentJob))
                 .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No valid findings");
+                .hasMessageContaining("No valid observations");
 
             assertThat(observationRepository.findAll()).isEmpty();
             verify(commentPoster, never()).postFormattedBody(any(), any());
@@ -499,14 +491,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void unknownSlugRejectsDeliveryAtomically() {
             String output = """
                 {
-                  "findings": [
+                  "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
                       "title": "Good description",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
@@ -514,7 +505,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
                     },
                     {
                       "practiceSlug": "error-handling",
@@ -522,7 +512,6 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                       "presence": "ABSENT",
                       "assessment": "BAD",
                       "severity": "MINOR",
-                      "confidence": 0.8
                     }
                   ]
                 }""";
@@ -580,7 +569,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            // Findings are still persisted: deliver() persists first, then posts.
+            // Observations are still persisted: deliver() persists first, then posts.
             assertThat(observationRepository.findAll()).hasSize(2);
 
             verify(commentPoster, never()).postFormattedBody(any(), any());
@@ -595,7 +584,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     class FindingIdempotency {
 
         @Test
-        @DisplayName("re-delivering same job creates no duplicate findings")
+        @DisplayName("re-delivering same job creates no duplicate observations")
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
@@ -613,9 +602,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
             assertThat(events).hasSize(2);
-            assertThat(events.get(0).findingsInserted()).isEqualTo(2);
-            assertThat(events.get(1).findingsInserted()).isZero();
-            assertThat(events.get(1).findingsDiscarded()).isEqualTo(2);
+            assertThat(events.get(0).observationsInserted()).isEqualTo(2);
+            assertThat(events.get(1).observationsInserted()).isZero();
+            assertThat(events.get(1).observationsDiscarded()).isEqualTo(2);
         }
     }
 }

@@ -37,7 +37,7 @@ import tools.jackson.databind.node.ObjectNode;
 @RequiredArgsConstructor
 public class ObservationHistoryContentSource implements ContentSource {
 
-    public static final String OUTPUT_KEY = OUTPUT_PREFIX + "findings_history.json";
+    public static final String OUTPUT_KEY = OUTPUT_PREFIX + "observations_history.json";
 
     private static final int LOOKBACK_DAYS = 90;
     private static final int MAX_RECENT_OBSERVATIONS = 50;
@@ -151,15 +151,13 @@ public class ObservationHistoryContentSource implements ContentSource {
         for (Observation o : visible) {
             ObjectNode node = observationsArr.addObject();
             node.put("id", o.getId().toString());
-            node.put("title", o.getTitle());
+            node.put("summary", o.getSummary());
             node.put("practiceSlug", o.getPractice().getSlug());
             node.put("presence", o.getPresence().name());
             Assessment assessment = o.getAssessment();
             node.put("assessment", assessment == null ? null : assessment.name());
             Severity severity = o.getSeverity();
             node.put("severity", severity == null ? null : severity.name());
-            // No confidence. The detector no longer reports one, and while it did it never fell below 0.90
-            // across 580 observations — so handing it to the mentor was handing it a constant to weigh.
             node.put("observedAt", o.getObservedAt().toString());
             if (o.getArtifactKind() != null) {
                 node.put("artifactKind", o.getArtifactKind().value());
@@ -170,7 +168,7 @@ public class ObservationHistoryContentSource implements ContentSource {
             if (o.getEvidence() != null && !o.getEvidence().isNull()) {
                 node.set("evidence", o.getEvidence());
             }
-            node.put("reasoning", StudentTextSanitizer.sanitize(o.getReasoning()));
+            node.put("evidenceRationale", StudentTextSanitizer.sanitize(o.getEvidenceRationale()));
         }
 
         ArrayNode reviewsArr = root.putArray("reviewsReceived");

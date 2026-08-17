@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.util.Locale;
 import java.util.regex.Pattern;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.json.JsonMapper;
@@ -43,6 +44,48 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
      * {@code on} entry would fail the boot rather than reach a workspace. Asserted on the composed
      * definitions as well, because a bare-string entry expands into a binding without looking like one.
      */
+    /**
+     * The declarations that stop us spending a model call on a question the staged evidence already
+     * answers. Pinned by slug because the value of each is measured — on the corpus these were written
+     * against, they account for the great majority of every {@code NOT_APPLICABLE} ever recorded — and a
+     * declaration dropped in an edit would restore that cost in silence.
+     */
+    @Test
+    void shouldShipTheSubjectDeclarationsThatKeepPracticesFromBeingAskedForNothing() {
+        BundledPracticeCatalog catalog = loader.catalog();
+
+        assertThat(
+            catalog
+                .practices()
+                .stream()
+                .filter(practice -> practice.definition().bindings().getFirst().appliesWhen() != null)
+                .map(practice -> practice.slug())
+        ).containsExactlyInAnyOrder(
+            "changes-dependencies-deliberately",
+            "keeps-the-test-suite-honest",
+            "engaging-with-inline-review-comments"
+        );
+    }
+
+    /**
+     * Every declaration says, in the author's voice, what its absence means. A skip with no sentence is
+     * the silence this whole mechanism exists to stop producing.
+     */
+    @Test
+    void shouldGiveEverySubjectDeclarationASentenceForTheReader() {
+        assertThat(loader.catalog().practices()).allSatisfy(practice -> {
+            var subject = practice.definition().bindings().getFirst().appliesWhen();
+            if (subject == null) {
+                return;
+            }
+            assertThat(subject.absentSays())
+                .as("%s must explain its own silence", practice.slug())
+                .isNotBlank()
+                .doesNotContain("NOT_APPLICABLE");
+            assertThat(subject.anyOf()).isNotEmpty();
+        });
+    }
+
     @Test
     void shouldShipOneOccasionPerPractice() {
         assertThat(loader.catalog().practices()).allSatisfy(practice ->
@@ -70,6 +113,15 @@ class BundledPracticeCatalogLoaderTest extends BaseUnitTest {
     void shouldUseRealNewlinesInCriteria() {
         assertThat(loader.catalog().practices()).allSatisfy(practice ->
             assertThat(practice.definition().criteria()).as("criteria for '%s'", practice.slug()).doesNotContain("\\n")
+        );
+    }
+
+    @Test
+    void shouldKeepFeedbackInstructionsOutOfMeasurementCriteria() {
+        assertThat(loader.catalog().practices()).allSatisfy(practice ->
+            assertThat(practice.definition().criteria().toLowerCase(Locale.ROOT))
+                .as("measurement criteria for '%s'", practice.slug())
+                .doesNotContain("guidance")
         );
     }
 }

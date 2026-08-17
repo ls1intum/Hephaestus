@@ -15,22 +15,25 @@ import org.junit.jupiter.params.provider.ValueSource;
 class ConversationBriefBodyTest extends BaseUnitTest {
 
     private static final String TITLE = "The test arrives after the review";
-    private static final String OPENER = "At what point do you decide the test is done?";
-    private static final String EVIDENCE = "On !18, !20 and !22 the test arrived a push later.\n\nNo test was wrong.";
-    private static final String TARGET = "They name a check they could run before pushing.";
+    private static final String SITUATION = "On !18, !20 and !22 the test landed a push after the review comment.";
+    private static final String COACHING_GOAL = "Writing the test last is what makes the review find the gap.";
+    private static final String EVIDENCE_SUMMARY =
+        "On !18, !20 and !22 the test arrived a push later.\n\nNo test was wrong.";
+    private static final String SUCCESS_SIGNAL = "They name a check they could run before pushing.";
 
     @Test
-    @DisplayName("every part survives the round trip, newlines and all")
+    @DisplayName("every note survives the round trip, newlines and all")
     void roundTrips() {
         ConversationBriefBody.Brief brief = ConversationBriefBody.parse(
-            ConversationBriefBody.render(TITLE, OPENER, EVIDENCE, TARGET)
+            ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL)
         );
 
         assertThat(brief).isNotNull();
         assertThat(brief.title()).isEqualTo(TITLE);
-        assertThat(brief.opener()).isEqualTo(OPENER);
-        assertThat(brief.evidence()).isEqualTo(EVIDENCE);
-        assertThat(brief.target()).isEqualTo(TARGET);
+        assertThat(brief.situation()).isEqualTo(SITUATION);
+        assertThat(brief.capability()).isEqualTo(COACHING_GOAL);
+        assertThat(brief.evidenceSummary()).isEqualTo(EVIDENCE_SUMMARY);
+        assertThat(brief.inConversationSignal()).isEqualTo(SUCCESS_SIGNAL);
     }
 
     /**
@@ -43,16 +46,38 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @ValueSource(
         strings = {
             "### You keep shipping untested changes\n\nthe process-level message",
-            "plain prose that happens to mention opener and evidence and target",
+            "plain prose that happens to mention situation and evidenceSummary and inConversationSignal",
             "{",
-            "{\"kind\":\"conversation-brief\",\"version\":1,\"title\":\"t\",\"opener\":\"o\"}",
-            "{\"kind\":\"in-app\",\"version\":1,\"title\":\"t\",\"opener\":\"o\",\"evidence\":\"e\",\"target\":\"g\"}",
-            "{\"kind\":\"conversation-brief\",\"version\":2,\"title\":\"t\",\"opener\":\"o\",\"evidence\":\"e\",\"target\":\"g\"}",
+            "{\"kind\":\"conversation-brief\",\"title\":\"t\",\"situation\":\"s\"}",
+            "{\"kind\":\"in-app\",\"title\":\"t\",\"situation\":\"s\",\"capability\":\"g\"," +
+                "\"evidenceSummary\":\"e\",\"inConversationSignal\":\"x\"}",
+            "{\"kind\":\"conversation-brief\",\"title\":\"t\",\"situation\":\"s\"," +
+                "\"capability\":\"g\",\"evidenceSummary\":\"e\"}",
             "  ",
         }
     )
     void refusesAnythingElse(String body) {
         assertThat(ConversationBriefBody.parse(body)).isNull();
+    }
+
+    /**
+     * The narrower question {@code isBrief} answers - "is this a plan for the mentor rather than words a
+     * person read?" - must still say no to every body this class did not write. Both recognition and
+     * parsing require the same complete final shape.
+     */
+    @ParameterizedTest
+    @DisplayName("nothing another producer wrote is recognised as a brief")
+    @ValueSource(
+        strings = {
+            "### You keep shipping untested changes\n\nthe process-level message",
+            "plain prose that happens to mention situation and evidenceSummary and inConversationSignal",
+            "{",
+            "{\"kind\":\"in-app\",\"title\":\"t\",\"situation\":\"s\",\"capability\":\"g\"," +
+                "\"evidenceSummary\":\"e\",\"inConversationSignal\":\"x\"}",
+            "  ",
+        }
+    )
+    void recognisesNoOtherProducersBody(String body) {
         assertThat(ConversationBriefBody.isBrief(body)).isFalse();
     }
 
@@ -67,7 +92,7 @@ class ConversationBriefBodyTest extends BaseUnitTest {
     @Test
     @DisplayName("a brief carries no in-app headline")
     void isNotAnInAppBody() {
-        String body = ConversationBriefBody.render(TITLE, OPENER, EVIDENCE, TARGET);
+        String body = ConversationBriefBody.render(TITLE, SITUATION, COACHING_GOAL, EVIDENCE_SUMMARY, SUCCESS_SIGNAL);
 
         assertThat(InAppFeedbackBody.headlineOf(body)).isNull();
         assertThat(ConversationBriefBody.isBrief(body)).isTrue();

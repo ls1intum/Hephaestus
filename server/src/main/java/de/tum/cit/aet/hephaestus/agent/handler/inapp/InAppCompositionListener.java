@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 
+import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
@@ -119,13 +120,22 @@ public class InAppCompositionListener {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public int prepare(UUID agentJobId, Long workspaceId) {
-        int prepared = route(agentJobId, workspaceId);
-        agentJobRepository.markInAppPrepared(agentJobId, Instant.now());
+        return prepare(agentJobId, agentJobId, workspaceId);
+    }
+
+    /** Prepare source observations using a separate composition job's output. */
+    public int prepare(UUID sourceJobId, UUID compositionJobId, Long workspaceId) {
+        int prepared = route(sourceJobId, compositionJobId, workspaceId);
+        agentJobRepository.markInAppPrepared(compositionJobId, Instant.now());
         return prepared;
     }
 
     private int route(UUID agentJobId, Long workspaceId) {
-        AgentJob job = agentJobRepository.findById(agentJobId).orElse(null);
+        return route(agentJobId, agentJobId, workspaceId);
+    }
+
+    private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {
+        AgentJob job = agentJobRepository.findById(outputJobId).orElse(null);
         if (job == null) {
             return 0;
         }
@@ -146,7 +156,7 @@ public class InAppCompositionListener {
             if (recipient == null) {
                 continue;
             }
-            prepared += prepareFor(agentJobId, workspaceId, recipient, messages, positionBase);
+            prepared += prepareFor(outputJobId, workspaceId, recipient, messages, positionBase);
             positionBase += messages.size();
         }
         return prepared;

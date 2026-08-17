@@ -135,7 +135,7 @@ public class FeedbackLanePreparationSweeper {
                 failed++;
             }
         }
-        // Always logged when the pass found anything: a run of this sweeper finding work at all means the
+        // Always logged when the pass found anything: a run of this sweeper observation work at all means the
         // listeners are dropping events, which is a fact about the async pool worth seeing in the log even
         // on the passes where every recovery succeeded.
         log.info(

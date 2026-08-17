@@ -16,8 +16,8 @@ public enum Capability {
 
     /** Implements {@code SummaryChannel.postSummary}. */
     FEEDBACK_DELIVERY,
-    /** Implements {@code InlineFindingChannel.postInlineFindings}. */
-    INLINE_FINDINGS,
+    /** Implements {@code InlineFeedbackChannel.postInlineFeedback}. */
+    INLINE_FEEDBACK,
     /** Implements {@code ApprovalChannel.approve}. */
     APPROVAL_WORKFLOW,
     /** Listener emits {@code onScopeChanged} (channel join/leave, repo add/remove). */

@@ -202,7 +202,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     }
 
                     // Sub-SPI interfaces (e.g. family-typed extensions like ScmFeedbackChannel,
-                    // sealed permits like FindingAnchor.DocumentAnchor) are contracts, not adapters.
+                    // sealed permits like FeedbackAnchor.DocumentAnchor) are contracts, not adapters.
                     if (javaClass.isInterface()) {
                         return;
                     }

@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.observation.reaction;
 
 /**
- * A developer's reaction to an AI-generated practice finding. Captured as signal, not workflow.
+ * A developer's reaction to an AI-generated practice observation. Captured as signal, not workflow.
  *
  * <p>The value set partitions into two orthogonal axes: a RESPONSE axis — what the developer DID with the
- * feedback — and a VALIDITY axis — whether the finding applied at all. Conflating them contaminates any
+ * feedback — and a VALIDITY axis — whether the observation applied at all. Conflating them contaminates any
  * uptake metric, so readers MUST keep {@link #NOT_APPLICABLE} out of response/uptake ratios (enforced in
  * {@code ReactionEngagementDTO}).
  *
@@ -13,9 +13,9 @@ package de.tum.cit.aet.hephaestus.practices.observation.reaction;
  *       Named for the recipience ACT, not its outcome: a later run may still find the locus ABSENT,
  *       which the suppression filter ESCALATES rather than treating as done — so a value named "applied"
  *       (=outcome) would contradict that behaviour.</li>
- *   <li>RESPONSE · {@link #DISPUTED} — a REASONED rejection of the finding; the required explanation IS the
+ *   <li>RESPONSE · {@link #DISPUTED} — a REASONED rejection of the observation; the required explanation IS the
  *       evaluative judgement, not mere disagreement.</li>
- *   <li>VALIDITY · {@link #NOT_APPLICABLE} — the finding is sound but out of scope for this context; a
+ *   <li>VALIDITY · {@link #NOT_APPLICABLE} — the observation is sound but out of scope for this context; a
  *       relevance/scope signal, NOT an uptake outcome.</li>
  * </ul>
  *
@@ -26,8 +26,8 @@ package de.tum.cit.aet.hephaestus.practices.observation.reaction;
 public enum ReactionAction {
     /** RESPONSE: the developer acted on the guidance. The act, not the outcome — a recurrence is escalated. */
     ADDRESSED,
-    /** RESPONSE: a reasoned rejection of the finding. Requires an explanation (the evaluative judgement). */
+    /** RESPONSE: a reasoned rejection of the observation. Requires an explanation (the evaluative judgement). */
     DISPUTED,
-    /** VALIDITY: the finding is sound but out of scope here. A relevance signal — never an uptake count. */
+    /** VALIDITY: the observation is sound but out of scope here. A relevance signal — never an uptake count. */
     NOT_APPLICABLE,
 }

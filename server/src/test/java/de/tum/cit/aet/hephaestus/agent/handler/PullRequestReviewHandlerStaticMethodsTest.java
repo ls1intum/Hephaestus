@@ -22,11 +22,14 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
     @Nested
     class FilterByDiffScope {
 
-        private PracticeDetectionResultParser.ValidatedFinding makeFinding(String slug, List<String> filePaths) {
-            return makeFinding(slug, "scm.pull-request.diff", filePaths);
+        private PracticeDetectionResultParser.ValidatedObservation makeObservation(
+            String slug,
+            List<String> filePaths
+        ) {
+            return makeObservation(slug, "scm.pull-request.diff", filePaths);
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding makeFinding(
+        private PracticeDetectionResultParser.ValidatedObservation makeObservation(
             String slug,
             String sourceKind,
             List<String> filePaths
@@ -52,68 +55,64 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
                 citations.add(citation);
             }
             evidence.set("citations", citations);
-            return new PracticeDetectionResultParser.ValidatedFinding(
+            return new PracticeDetectionResultParser.ValidatedObservation(
                 slug,
                 "Test Title",
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MINOR,
                 evidence,
-                "reasoning",
-                "guidance",
-                List.of()
+                "reasoning"
             );
         }
 
-        private PracticeDetectionResultParser.ValidatedFinding makeFindingNoEvidence(String slug) {
-            return new PracticeDetectionResultParser.ValidatedFinding(
+        private PracticeDetectionResultParser.ValidatedObservation makeFindingNoEvidence(String slug) {
+            return new PracticeDetectionResultParser.ValidatedObservation(
                 slug,
                 "Test Title",
                 Presence.PRESENT,
                 Assessment.GOOD,
                 Severity.INFO,
                 null,
-                "reasoning",
-                "guidance",
-                List.of()
+                "reasoning"
             );
         }
 
         @Test
         void emptyDiffFilesReturnsAll() {
-            var finding = makeFinding("test", List.of("some/file.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of());
+            var observation = makeObservation("test", List.of("some/file.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of());
             assertThat(result).hasSize(1);
         }
 
         @Test
-        void keepsMatchingFindings() {
-            var finding = makeFinding("test", List.of("src/Main.swift"));
+        void keepsMatchingObservations() {
+            var observation = makeObservation("test", List.of("src/Main.swift"));
             var result = PullRequestReviewHandler.filterByDiffScope(
-                List.of(finding),
+                List.of(observation),
                 Set.of("src/Main.swift", "src/Helper.swift")
             );
             assertThat(result).hasSize(1);
         }
 
         @Test
-        void removesNonMatchingFindings() {
-            var finding = makeFinding("test", List.of("src/Other.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+        void removesNonMatchingObservations() {
+            var observation = makeObservation("test", List.of("src/Other.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of("src/Main.swift"));
             assertThat(result).isEmpty();
         }
 
         @Test
-        void keepsNoEvidenceFindings() {
-            var finding = makeFindingNoEvidence("mr-description");
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+        void keepsNoEvidenceObservations() {
+            var observation = makeFindingNoEvidence("mr-description");
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
 
         @Test
         void keepsIfAnyLocationInScope() {
-            var finding = makeFinding("test", List.of("out-of-scope.swift", "src/Main.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            var observation = makeObservation("test", List.of("out-of-scope.swift", "src/Main.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
 
@@ -121,31 +120,34 @@ class PullRequestReviewHandlerStaticMethodsTest extends BaseUnitTest {
         void keepsCodeFindingWhenLocationCarriesTheRepoMountPrefix() {
             // The agent cites files it read under the repo mount as "inputs/sources/scm/repo/<path>" (ADR
             // 0020); diff paths are repo-relative. The mount prefix must be normalised or a valid code
-            // finding on a changed file is dropped.
-            var finding = makeFinding("ships-tests-with-the-change", List.of("inputs/sources/scm/repo/src/Main.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            // observation on a changed file is dropped.
+            var observation = makeObservation(
+                "ships-tests-with-the-change",
+                List.of("inputs/sources/scm/repo/src/Main.swift")
+            );
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
 
         /**
-         * A citation that names no source cannot be placed in or out of the diff, and the finding has no
+         * A citation that names no source cannot be placed in or out of the diff, and the observation has no
          * other citation vouching for it — so it is dropped rather than posted on a file it may not touch.
          */
         @Test
         void dropsFindingWhoseOnlyCitationNamesNoSource() {
-            var finding = makeFinding("test", "", List.of("src/Main.swift"));
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            var observation = makeObservation("test", "", List.of("src/Main.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of("src/Main.swift"));
             assertThat(result).isEmpty();
         }
 
         @Test
         void keepsMetadataLevelPracticeEvenWithOutOfDiffLocation() {
-            var finding = makeFinding(
+            var observation = makeObservation(
                 "commit-subjects-explain-each-change",
                 "scm.pull-request.core",
                 List.of("some-commit-ref")
             );
-            var result = PullRequestReviewHandler.filterByDiffScope(List.of(finding), Set.of("src/Main.swift"));
+            var result = PullRequestReviewHandler.filterByDiffScope(List.of(observation), Set.of("src/Main.swift"));
             assertThat(result).hasSize(1);
         }
     }

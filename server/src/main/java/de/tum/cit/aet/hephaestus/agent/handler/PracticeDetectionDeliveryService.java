@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import de.tum.cit.aet.hephaestus.agent.context.providers.DocumentContentSource;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationSourceLiveness;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
@@ -118,7 +118,7 @@ public class PracticeDetectionDeliveryService {
     }
 
     @Transactional
-    public DeliveryResult deliver(AgentJob job, List<ValidatedFinding> validFindings) {
+    public DeliveryResult deliver(AgentJob job, List<ValidatedObservation> validObservations) {
         Long workspaceId = job.getWorkspace().getId();
         JsonNode metadata = job.getMetadata();
         if (metadata == null) {
@@ -144,22 +144,22 @@ public class PracticeDetectionDeliveryService {
         }
         Target target = resolveTarget(job, metadata);
         Map<String, PracticeRevision> revisionsBySlug = admittedRevisions(job, workspaceId);
-        for (ValidatedFinding finding : validFindings) {
-            PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
+        for (ValidatedObservation observation : validObservations) {
+            PracticeRevision revision = revisionsBySlug.get(observation.practiceSlug());
             if (revision == null) {
                 throw new JobDeliveryException(
-                    "Finding references a practice not admitted to the job: slug=" +
-                        finding.practiceSlug() +
+                    "Observation references a practice not admitted to the job: slug=" +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
             }
-            enforceAttribution(finding, revision, job);
-            enforceEvidenceBoundary(finding, revision, evidenceBoundary, job);
+            enforceAttribution(observation, revision, job);
+            enforceEvidenceBoundary(observation, revision, evidenceBoundary, job);
         }
 
         ObservationOrigin origin = originOf(metadata);
-        // The one person this job resolved. Sound for every finding only because the catalogue injector
+        // The one person this job resolved. Sound for every observation only because the catalogue injector
         // withheld every practice whose occasion is about somebody else, and enforceAttribution above
         // refuses one that reached here anyway.
         Long aboutUserId = target.aboutUserId();
@@ -171,46 +171,56 @@ public class PracticeDetectionDeliveryService {
         boolean hasNegative = false;
         Instant observedAt = Instant.now();
 
-        // Keyed by finding identity because equal findings still represent distinct occurrences.
-        Map<ValidatedFinding, ObservationKeys> observationKeys = new IdentityHashMap<>();
+        // Keyed by observation identity because equal observations still represent distinct occurrences.
+        Map<ValidatedObservation, ObservationKeys> observationKeys = new IdentityHashMap<>();
 
-        for (int i = 0; i < validFindings.size(); i++) {
-            ValidatedFinding finding = validFindings.get(i);
+        for (int i = 0; i < validObservations.size(); i++) {
+            ValidatedObservation observation = validObservations.get(i);
 
-            PracticeRevision revision = revisionsBySlug.get(finding.practiceSlug());
+            PracticeRevision revision = revisionsBySlug.get(observation.practiceSlug());
             Practice practice = revision.getPractice();
 
-            // Includes the index so distinct findings for the same practice on one artifact don't collide.
+            // Includes the index so distinct observations for the same practice on one artifact don't collide.
             String occurrenceKey =
-                finding.practiceSlug() + ":" + i + ":" + artifactKind.value() + ":" + artifactId + ":" + job.getId();
+                observation.practiceSlug() +
+                ":" +
+                i +
+                ":" +
+                artifactKind.value() +
+                ":" +
+                artifactId +
+                ":" +
+                job.getId();
 
             String evidenceJson = null;
-            if (finding.evidence() != null) {
+            if (observation.evidence() != null) {
                 try {
-                    evidenceJson = objectMapper.writeValueAsString(evidenceForPersistence(finding.evidence()));
+                    evidenceJson = objectMapper.writeValueAsString(evidenceForPersistence(observation.evidence()));
                 } catch (JacksonException e) {
                     throw new JobDeliveryException("Could not serialize validated evidence: jobId=" + job.getId(), e);
                 }
             }
 
             // Cross-run identity (ADR 0021): a content-derived key STABLE across re-detections, so a later
-            // Feedback can supersede instead of re-post. Derived from what the finding is ABOUT, never from
+            // Feedback can supersede instead of re-post. Derived from what the observation is ABOUT, never from
             // the job or a line number.
             String recurrenceKey = ObservationFingerprint.compute(
-                finding.practiceSlug(),
+                observation.practiceSlug(),
                 artifactKind.value(),
                 artifactId,
                 aboutUserId,
-                firstLocationPath(finding.evidence())
+                firstLocationPath(observation.evidence())
             );
-            observationKeys.put(finding, new ObservationKeys(occurrenceKey, recurrenceKey));
+            observationKeys.put(observation, new ObservationKeys(occurrenceKey, recurrenceKey));
 
             Long practiceRevisionId = revision.getId();
 
             // Enforced here because the native insertIfAbsent path bypasses Observation's @PrePersist
             // (ADR-0022): severity is an impact band for a BAD observation only.
             String severityName =
-                finding.assessment() == Assessment.BAD && finding.severity() != null ? finding.severity().name() : null;
+                observation.assessment() == Assessment.BAD && observation.severity() != null
+                    ? observation.severity().name()
+                    : null;
 
             int rows = observationRepository.insertIfAbsent(
                 UUID.randomUUID(),
@@ -221,15 +231,12 @@ public class PracticeDetectionDeliveryService {
                 artifactKind.value(),
                 artifactId,
                 aboutUserId,
-                finding.title(),
-                finding.presence().name(),
-                finding.assessment() == null ? null : finding.assessment().name(),
+                observation.summary(),
+                observation.presence().name(),
+                observation.assessment() == null ? null : observation.assessment().name(),
                 severityName,
-                // The detector no longer reports a confidence, and the column it used to fill is kept only
-                // for the history already in it (Observation#UNMEASURED_CONFIDENCE).
-                Observation.UNMEASURED_CONFIDENCE,
                 evidenceJson,
-                finding.reasoning(),
+                observation.evidenceRationale(),
                 recurrenceKey,
                 observedAt,
                 origin.name()
@@ -241,8 +248,8 @@ public class PracticeDetectionDeliveryService {
                 discardedDuplicate++;
             }
             // Gate on the assessment, not the insert result: a retry's insertIfAbsent returns 0 for an
-            // already-persisted finding, yet hasNegative must still reflect it for the delivery gate.
-            if (finding.assessment() == Assessment.BAD) {
+            // already-persisted observation, yet hasNegative must still reflect it for the delivery gate.
+            if (observation.assessment() == Assessment.BAD) {
                 hasNegative = true;
             }
         }
@@ -271,7 +278,7 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * Refuses a finding whose practice is about somebody this job cannot name.
+     * Refuses an observation whose practice is about somebody this job cannot name.
      *
      * <p>{@link #resolveTarget} resolves exactly one person, and it is the artifact's author (or the
      * subject a repo-less job carries). A practice whose occasion declares a non-AUTHOR
@@ -282,19 +289,19 @@ public class PracticeDetectionDeliveryService {
      *
      * <p>{@code PracticeCatalogInjector} already withholds these practices at preparation, so this
      * refuses only a job prepared before that filter existed. Loud rather than silent: the alternative is
-     * dropping a finding a review was paid for with nothing saying so.
+     * dropping an observation a review was paid for with nothing saying so.
      */
-    private void enforceAttribution(ValidatedFinding finding, PracticeRevision revision, AgentJob job) {
+    private void enforceAttribution(ValidatedObservation observation, PracticeRevision revision, AgentJob job) {
         ActorRole subject = PracticeBinding.subjectRoleOf(
             revision.getBindings(),
             PracticeCatalogInjector.signalOf(job)
         );
         if (subject != ActorRole.AUTHOR) {
             throw new JobDeliveryException(
-                "Finding is about a " +
+                "Observation is about a " +
                     subject +
                     " this review cannot name, so it has nobody to be filed against: slug=" +
-                    finding.practiceSlug() +
+                    observation.practiceSlug() +
                     ", jobId=" +
                     job.getId()
             );
@@ -302,22 +309,22 @@ public class PracticeDetectionDeliveryService {
     }
 
     private void enforceEvidenceBoundary(
-        ValidatedFinding finding,
+        ValidatedObservation observation,
         PracticeRevision revision,
         EvidenceBoundary boundary,
         AgentJob job
     ) {
         if (revision.getAutomatedReviewPolicy() == null || revision.getBindings() == null) {
             throw new JobDeliveryException(
-                "Practice has no evidence requirements: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
+                "Practice has no evidence requirements: slug=" + observation.practiceSlug() + ", jobId=" + job.getId()
             );
         }
-        JsonNode evidence = finding.evidence();
+        JsonNode evidence = observation.evidence();
         JsonNode citations = evidence == null ? null : evidence.get("citations");
         if (citations == null || !citations.isArray() || citations.isEmpty()) {
             throw new JobDeliveryException(
-                "Finding has no source-bound evidence citation: slug=" +
-                    finding.practiceSlug() +
+                "Observation has no source-bound evidence citation: slug=" +
+                    observation.practiceSlug() +
                     ", jobId=" +
                     job.getId()
             );
@@ -332,8 +339,8 @@ public class PracticeDetectionDeliveryService {
                 exhaustive.add(need.sourceKind());
             }
         });
-        enforceRecordedSearch(finding, exhaustive, boundary, job);
-        enforceStatedInapplicability(finding, boundary, job);
+        enforceRecordedSearch(observation, exhaustive, boundary, job);
+        enforceStatedInapplicability(observation, boundary, job);
         for (JsonNode citation : citations) {
             JsonNode sourceKind = citation.path("sourceKind");
             JsonNode artifactPath = citation.path("artifactPath");
@@ -362,8 +369,8 @@ public class PracticeDetectionDeliveryService {
                 (!quote.isTextual() && !redactedSecretCitation)
             ) {
                 throw new JobDeliveryException(
-                    "Finding has an invalid evidence citation: slug=" +
-                        finding.practiceSlug() +
+                    "Observation has an invalid evidence citation: slug=" +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
@@ -373,8 +380,8 @@ public class PracticeDetectionDeliveryService {
                 kind = new SourceKind(sourceKind.asText());
             } catch (IllegalArgumentException e) {
                 throw new JobDeliveryException(
-                    "Finding has invalid evidence-source attribution: slug=" +
-                        finding.practiceSlug() +
+                    "Observation has invalid evidence-source attribution: slug=" +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId(),
                     e
@@ -383,10 +390,10 @@ public class PracticeDetectionDeliveryService {
             SourceArtifactRef artifact = boundary.artifacts().get(artifactPath.asText());
             if (!boundary.allowedSources().contains(kind) || artifact == null || !artifact.kind().equals(kind)) {
                 throw new JobDeliveryException(
-                    "Finding cited unavailable or misattributed evidence source " +
+                    "Observation cited unavailable or misattributed evidence source " +
                         kind +
                         ": slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
@@ -394,7 +401,10 @@ public class PracticeDetectionDeliveryService {
             String exactQuote = quote.asText("");
             if (!redactedSecretCitation && exactQuote.isBlank()) {
                 throw new JobDeliveryException(
-                    "Finding has an empty evidence quote: slug=" + finding.practiceSlug() + ", jobId=" + job.getId()
+                    "Observation has an empty evidence quote: slug=" +
+                        observation.practiceSlug() +
+                        ", jobId=" +
+                        job.getId()
                 );
             }
             byte[] content = cas
@@ -490,11 +500,16 @@ public class PracticeDetectionDeliveryService {
      * <p>Enforced here as well as in the sandbox: a guard the constrained party can skip is advice, not a
      * boundary.
      */
-    private void enforceStatedInapplicability(ValidatedFinding finding, EvidenceBoundary boundary, AgentJob job) {
-        if (finding.presence() != Presence.NOT_APPLICABLE) {
+    private void enforceStatedInapplicability(
+        ValidatedObservation observation,
+        EvidenceBoundary boundary,
+        AgentJob job
+    ) {
+        if (observation.presence() != Presence.NOT_APPLICABLE) {
             return;
         }
-        JsonNode inapplicability = finding.evidence() == null ? null : finding.evidence().get("inapplicability");
+        JsonNode inapplicability =
+            observation.evidence() == null ? null : observation.evidence().get("inapplicability");
         JsonNode consulted = inapplicability == null ? null : inapplicability.get("consulted");
         if (
             inapplicability == null ||
@@ -509,7 +524,7 @@ public class PracticeDetectionDeliveryService {
             throw new JobDeliveryException(
                 "A NOT_APPLICABLE observation must name what the practice looks for and what rules it out " +
                     "here; if it could not be told either way the answer is INCONCLUSIVE: slug=" +
-                    finding.practiceSlug() +
+                    observation.practiceSlug() +
                     ", jobId=" +
                     job.getId()
             );
@@ -518,7 +533,7 @@ public class PracticeDetectionDeliveryService {
             if (!kind.isTextual()) {
                 throw new JobDeliveryException(
                     "Stated inapplicability names a non-textual source: slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
@@ -529,7 +544,7 @@ public class PracticeDetectionDeliveryService {
             } catch (IllegalArgumentException e) {
                 throw new JobDeliveryException(
                     "Stated inapplicability names an invalid source: slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId(),
                     e
@@ -540,7 +555,7 @@ public class PracticeDetectionDeliveryService {
                     "Stated inapplicability claims a source this run did not stage " +
                         sourceKind +
                         ": slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
@@ -568,24 +583,24 @@ public class PracticeDetectionDeliveryService {
      * instead of assumed.
      */
     private void enforceRecordedSearch(
-        ValidatedFinding finding,
+        ValidatedObservation observation,
         Set<SourceKind> exhaustive,
         EvidenceBoundary boundary,
         AgentJob job
     ) {
-        if (finding.presence() != Presence.ABSENT) {
+        if (observation.presence() != Presence.ABSENT) {
             return;
         }
-        if (finding.assessment() == Assessment.GOOD && exhaustive.isEmpty()) {
+        if (observation.assessment() == Assessment.GOOD && exhaustive.isEmpty()) {
             throw new JobDeliveryException(
                 "An ABSENT, GOOD observation needs a practice that bounds the corpus it searches, and this one " +
                     "declares no EXHAUSTIVE evidence source: slug=" +
-                    finding.practiceSlug() +
+                    observation.practiceSlug() +
                     ", jobId=" +
                     job.getId()
             );
         }
-        JsonNode search = finding.evidence() == null ? null : finding.evidence().get("search");
+        JsonNode search = observation.evidence() == null ? null : observation.evidence().get("search");
         JsonNode consulted = search == null ? null : search.get("consulted");
         if (
             search == null ||
@@ -599,7 +614,7 @@ public class PracticeDetectionDeliveryService {
         ) {
             throw new JobDeliveryException(
                 "An ABSENT observation must record where it searched: slug=" +
-                    finding.practiceSlug() +
+                    observation.practiceSlug() +
                     ", jobId=" +
                     job.getId()
             );
@@ -609,7 +624,7 @@ public class PracticeDetectionDeliveryService {
             if (!kind.isTextual()) {
                 throw new JobDeliveryException(
                     "Recorded search names a non-textual source: slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
@@ -620,7 +635,7 @@ public class PracticeDetectionDeliveryService {
             } catch (IllegalArgumentException e) {
                 throw new JobDeliveryException(
                     "Recorded search names an invalid source: slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId(),
                     e
@@ -633,7 +648,7 @@ public class PracticeDetectionDeliveryService {
                     "Recorded search claims a source this run did not stage " +
                         sourceKind +
                         ": slug=" +
-                        finding.practiceSlug() +
+                        observation.practiceSlug() +
                         ", jobId=" +
                         job.getId()
                 );
@@ -647,7 +662,7 @@ public class PracticeDetectionDeliveryService {
                 "An ABSENT observation did not search the sources its practice asserts absence over " +
                     unsearched +
                     ": slug=" +
-                    finding.practiceSlug() +
+                    observation.practiceSlug() +
                     ", jobId=" +
                     job.getId()
             );
@@ -982,13 +997,13 @@ public class PracticeDetectionDeliveryService {
     }
 
     /**
-     * @param observationKeys the keys persisted for each finding, by identity, so the caller stamps the same
-     *     keys onto its deliverable findings instead of recomputing them
+     * @param observationKeys the keys persisted for each observation, by identity, so the caller stamps the same
+     *     keys onto its deliverable observations instead of recomputing them
      */
     public record DeliveryResult(
         int inserted,
         int discardedDuplicate,
         boolean hasNegative,
-        Map<ValidatedFinding, ObservationKeys> observationKeys
+        Map<ValidatedObservation, ObservationKeys> observationKeys
     ) {}
 }

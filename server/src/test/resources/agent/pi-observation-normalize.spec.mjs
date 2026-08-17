@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const MOD = path.resolve(__dirname, "../../../main/resources/agent/pi-finding-normalize.mjs");
+const MOD = path.resolve(__dirname, "../../../main/resources/agent/pi-observation-normalize.mjs");
 const {
     ASSESSMENT_DESCRIPTIONS,
     ASSESSMENT_VALUES,
@@ -15,37 +15,94 @@ const {
     carriesValence,
     citationMatchesArtifact,
     describeVocabulary,
-    normalizeFinding,
-    dedupeKeyForFinding,
+    normalizeObservation: normalizeFinalObservation,
+    dedupeKeyForObservation,
     validateEvidenceSources,
     validateSearchScope,
     validateInapplicabilityScope,
 } = await import(MOD);
 
-function baseFinding(overrides = {}) {
-    return {
-        practiceSlug: "writes_focused_pull_requests",
-        title: "PR mixes unrelated changes",
-        presence: "present",
-        assessment: "bad",
-        severity: "major",
-        reasoning: "The diff touches auth and billing in one PR.",
-        guidance: "Split into two PRs.",
-        evidence: {
-            citations: [
-                {
-                    sourceKind: "scm.pull-request.diff",
-                    artifactPath: "inputs/context/diff.patch",
-                    path: "src/Auth.java",
-                    side: "NEW",
-                    startLine: 10,
-                    endLine: 10,
-                    quote: "+ insecure();",
-                },
-            ],
-        },
-        ...overrides,
+function baseObservation(overrides = {}) {
+    const presence = String(overrides.presence ?? "PRESENT").toUpperCase();
+    const assessment = String(overrides.assessment ?? "BAD").toUpperCase();
+    const severity = String(overrides.severity ?? "MAJOR").toUpperCase();
+    const rawEvidence = overrides.evidence ?? {};
+    const evidence = {
+        citations: rawEvidence.citations ?? [
+            {
+                sourceKind: "scm.pull-request.diff",
+                artifactPath: "inputs/context/diff.patch",
+                path: "src/Auth.java",
+                side: "NEW",
+                startLine: 10,
+                endLine: 10,
+                quote: "+ insecure();",
+            },
+        ],
+        ...((rawEvidence.search ?? rawEvidence.exhaustiveSearch) == null
+            ? {}
+            : { exhaustiveSearch: rawEvidence.search ?? rawEvidence.exhaustiveSearch }),
+        ...((rawEvidence.inapplicability ?? rawEvidence.exclusion) == null
+            ? {}
+            : { exclusion: rawEvidence.inapplicability ?? rawEvidence.exclusion }),
+        ...((rawEvidence.undecidability ?? rawEvidence.missingEvidence) == null
+            ? {}
+            : { missingEvidence: rawEvidence.undecidability ?? rawEvidence.missingEvidence }),
     };
+    const outcome = ["PRESENT", "ABSENT"].includes(presence)
+        ? `BEHAVIOR_${presence}_${assessment}${assessment === "BAD" ? `_${severity}` : ""}`
+        : presence === "NOT_APPLICABLE"
+          ? "NO_REVIEW_OCCASION"
+          : "INSUFFICIENT_EVIDENCE";
+    const translated = {
+        practiceSlug: overrides.practiceSlug ?? "writes_focused_pull_requests",
+        summary: overrides.title ?? "PR mixes unrelated changes",
+        outcome,
+        evidence,
+        evidenceRationale: overrides.reasoning ?? "The diff touches auth and billing in one PR.",
+    };
+    for (const [key, value] of Object.entries(overrides)) {
+        if (
+            ![
+                "title",
+                "presence",
+                "assessment",
+                "severity",
+                "reasoning",
+                "evidence",
+                "summary",
+                "outcome",
+                "evidenceRationale",
+            ].includes(key)
+        )
+            translated[key] = value;
+    }
+    return translated;
+}
+
+function normalizeObservation(input) {
+    if (
+        input &&
+        ("presence" in input ||
+            "assessment" in input ||
+            "severity" in input ||
+            "title" in input ||
+            "reasoning" in input)
+    ) {
+        return normalizeFinalObservation(baseObservation(input));
+    }
+    if (input?.evidence && (input.evidence.search || input.evidence.inapplicability || input.evidence.undecidability)) {
+        return normalizeFinalObservation({
+            ...input,
+            evidence: {
+                citations: input.evidence.citations,
+                ...(input.evidence.search == null ? {} : { exhaustiveSearch: input.evidence.search }),
+                ...(input.evidence.inapplicability == null ? {} : { exclusion: input.evidence.inapplicability }),
+                ...(input.evidence.undecidability == null ? {} : { missingEvidence: input.evidence.undecidability }),
+            },
+        });
+    }
+    return normalizeFinalObservation(input);
 }
 
 /** The ground an INCONCLUSIVE observation owes, mirroring `search` for ABSENT. */
@@ -55,7 +112,7 @@ const UNDECIDABLE = {
 };
 
 test("lowercase enums + underscored slug normalize and are accepted (not dropped)", () => {
-    const out = normalizeFinding(baseFinding());
+    const out = normalizeObservation(baseObservation());
     assert.equal(out.practiceSlug, "writes-focused-pull-requests");
     assert.equal(out.presence, "PRESENT");
     assert.equal(out.assessment, "BAD");
@@ -63,82 +120,85 @@ test("lowercase enums + underscored slug normalize and are accepted (not dropped
 });
 
 test("mixed-case enums up-case", () => {
-    const out = normalizeFinding(baseFinding({ presence: "Present", assessment: "Good", severity: "Minor" }));
+    const out = normalizeObservation(baseObservation({ presence: "Present", assessment: "Good", severity: "Minor" }));
     assert.equal(out.presence, "PRESENT");
     assert.equal(out.assessment, "GOOD");
-    assert.equal(out.severity, "MINOR");
+    assert.equal(out.severity, "INFO");
 });
 
 // ── No confidence ────────────────────────────────────────────────────────────
 // Measured over 580 live observations, confidence never fell below 0.90 and was exactly 1.00 in 55% of
 // them. A field with no usable range is not a measurement, and every consumer that ranked on it was
-// ranking on noise. It is gone from the schema; a model that emits one anyway is not failed for it —
-// rejecting the finding would throw away a real observation over a field we no longer read — but the
-// number never reaches the record.
+// ranking on noise. It is gone from the final schema, so emitting it is a contract error rather than a
+// silently accepted alternate payload.
 
-test("a finding carries no confidence, and one offered is dropped rather than rejected", () => {
-    const out = normalizeFinding(baseFinding());
+test("an observation carries no confidence, and one offered is rejected", () => {
+    const out = normalizeObservation(baseObservation());
     assert.equal("confidence" in out, false);
-
-    const volunteered = normalizeFinding(baseFinding({ confidence: 0.42 }));
-    assert.equal("confidence" in volunteered, false);
-    assert.equal(volunteered.presence, "PRESENT");
-
-    // Nothing about a finding is decided by it any more: the two differ in no other field.
-    assert.deepEqual(volunteered, out);
-});
-
-test("a nonsensical confidence can no longer fail an otherwise-sound finding", () => {
     for (const confidence of [-1, 4200, "very", null]) {
-        assert.doesNotThrow(() => normalizeFinding(baseFinding({ confidence })));
+        assert.throws(
+            () => normalizeObservation(baseObservation({ confidence })),
+            /unknown observation field.*confidence/,
+        );
     }
 });
 
 test("NOT_APPLICABLE (lowercase) nulls assessment", () => {
-    const out = normalizeFinding(notApplicableFinding(goodInapplicability, { presence: "not_applicable", assessment: "bad" }));
+    const out = normalizeObservation(
+        notApplicableObservation(goodInapplicability, { presence: "not_applicable", assessment: "bad" }),
+    );
     assert.equal(out.presence, "NOT_APPLICABLE");
     assert.equal(out.assessment, undefined);
 });
 
 test("dedupe key uses the normalized hyphenated slug", () => {
-    const a = dedupeKeyForFinding(normalizeFinding(baseFinding({ practiceSlug: "writes_focused_pull_requests" })));
-    const b = dedupeKeyForFinding(normalizeFinding(baseFinding({ practiceSlug: "WRITES-FOCUSED-PULL-REQUESTS" })));
+    const a = dedupeKeyForObservation(
+        normalizeObservation(baseObservation({ practiceSlug: "writes_focused_pull_requests" })),
+    );
+    const b = dedupeKeyForObservation(
+        normalizeObservation(baseObservation({ practiceSlug: "WRITES-FOCUSED-PULL-REQUESTS" })),
+    );
     assert.equal(a, b, "underscored and upper-hyphenated slugs must dedupe to the same key");
 });
 
 test("genuinely invalid enum still rejected after normalization", () => {
-    assert.throws(() => normalizeFinding(baseFinding({ presence: "maybe" })), /invalid presence/);
+    const invalid = baseObservation();
+    invalid.outcome = "MAYBE";
+    assert.throws(() => normalizeObservation(invalid), /invalid outcome/);
 });
 
 test("missing evidence-source attribution is rejected", () => {
-    assert.throws(() => normalizeFinding(baseFinding({ evidence: { citations: [] } })), /citations are required/);
+    assert.throws(
+        () => normalizeObservation(baseObservation({ evidence: { citations: [] } })),
+        /citations are required/,
+    );
 });
 
 test("citation requires an exact artifact path and quote", () => {
-    const missingPath = baseFinding();
+    const missingPath = baseObservation();
     delete missingPath.evidence.citations[0].artifactPath;
-    assert.throws(() => normalizeFinding(missingPath), /artifactPath is required/);
+    assert.throws(() => normalizeObservation(missingPath), /artifactPath is required/);
 
-    const missingQuote = baseFinding();
+    const missingQuote = baseObservation();
     delete missingQuote.evidence.citations[0].quote;
-    assert.throws(() => normalizeFinding(missingQuote), /quote is required/);
+    assert.throws(() => normalizeObservation(missingQuote), /quote is required/);
 });
 
 test("citation side is present exactly for pull-request diffs", () => {
-    const missingDiffSide = baseFinding();
+    const missingDiffSide = baseObservation();
     delete missingDiffSide.evidence.citations[0].side;
-    assert.throws(() => normalizeFinding(missingDiffSide), /side must be OLD or NEW/);
+    assert.throws(() => normalizeObservation(missingDiffSide), /side must be OLD or NEW/);
 
-    const nonDiffSide = baseFinding();
+    const nonDiffSide = baseObservation();
     nonDiffSide.evidence.citations[0].sourceKind = "scm.pull-request.core";
-    assert.throws(() => normalizeFinding(nonDiffSide), /must not specify side/);
+    assert.throws(() => normalizeObservation(nonDiffSide), /must not specify side/);
 });
 
 test("a citation must name a source this run staged, and the artifact that source produced", () => {
-    const finding = normalizeFinding(baseFinding());
+    const observation = normalizeObservation(baseObservation());
     assert.doesNotThrow(() =>
         validateEvidenceSources(
-            finding,
+            observation,
             new Set(["scm.pull-request.diff"]),
             new Map([["inputs/context/diff.patch", "scm.pull-request.diff"]]),
         ),
@@ -147,16 +207,16 @@ test("a citation must name a source this run staged, and the artifact that sourc
     // staged, so a quote from one the practice did not name is still a quote from bytes that were there.
     assert.doesNotThrow(() =>
         validateEvidenceSources(
-            finding,
+            observation,
             new Set(["scm.pull-request.diff", "workspace.project-inventory"]),
             new Map([["inputs/context/diff.patch", "scm.pull-request.diff"]]),
         ),
     );
-    assert.throws(() => validateEvidenceSources(finding, new Set(), new Map()), /was not available/);
+    assert.throws(() => validateEvidenceSources(observation, new Set(), new Map()), /was not available/);
     assert.throws(
         () =>
             validateEvidenceSources(
-                finding,
+                observation,
                 new Set(["scm.pull-request.diff"]),
                 new Map([["inputs/context/diff.patch", "scm.pull-request.core"]]),
             ),
@@ -165,7 +225,7 @@ test("a citation must name a source this run staged, and the artifact that sourc
 });
 
 test("diff citations bind the quote to the claimed file and line", () => {
-    const citation = normalizeFinding(baseFinding()).evidence.citations[0];
+    const citation = normalizeObservation(baseObservation()).evidence.citations[0];
     const diff =
         "diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
     assert.equal(citationMatchesArtifact(citation, diff), true);
@@ -176,7 +236,7 @@ test("diff citations bind the quote to the claimed file and line", () => {
 
 test("removed-line citations use old-side coordinates", () => {
     const citation = {
-        ...normalizeFinding(baseFinding()).evidence.citations[0],
+        ...normalizeObservation(baseObservation()).evidence.citations[0],
         side: "OLD",
         startLine: 8,
         endLine: 8,
@@ -193,25 +253,29 @@ test("removed-line citations use old-side coordinates", () => {
 // see here" into a person's record on a change where there was something to see.
 
 test("INCONCLUSIVE is accepted and carries no assessment", () => {
-    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined,
-        evidence: { ...baseFinding().evidence, undecidability: UNDECIDABLE } });
+    const out = normalizeObservation({
+        ...baseObservation(),
+        presence: "INCONCLUSIVE",
+        assessment: undefined,
+        evidence: { ...baseObservation().evidence, undecidability: UNDECIDABLE },
+    });
     assert.equal(out.presence, "INCONCLUSIVE");
     assert.equal("assessment" in out, false);
 });
 
 test("an assessment attached to a valence-free presence is dropped, not rejected", () => {
-    const finding = (presence) =>
+    const observation = (presence) =>
         presence === "NOT_APPLICABLE"
-            ? notApplicableFinding(goodInapplicability, { assessment: "GOOD" })
+            ? notApplicableObservation(goodInapplicability, { assessment: "GOOD" })
             : {
-                  ...baseFinding(),
+                  ...baseObservation(),
                   presence,
                   assessment: "GOOD",
-                  evidence: { ...baseFinding().evidence, undecidability: UNDECIDABLE },
+                  evidence: { ...baseObservation().evidence, undecidability: UNDECIDABLE },
               };
     for (const presence of ["NOT_APPLICABLE", "INCONCLUSIVE"]) {
         // each of the two grounds its own claim; supply whichever this presence owes
-        const out = normalizeFinding(finding(presence));
+        const out = normalizeObservation(observation(presence));
         assert.equal("assessment" in out, false, `${presence} must not carry an assessment`);
     }
 });
@@ -222,17 +286,19 @@ test("carriesValence agrees with the presence/assessment coupling", () => {
     assert.equal(carriesValence("NOT_APPLICABLE"), false);
     assert.equal(carriesValence("INCONCLUSIVE"), false);
     // PRESENT and ABSENT still REQUIRE one.
-    assert.throws(() => normalizeFinding({ ...baseFinding(), assessment: undefined }), /invalid assessment/);
+    const missingAssessment = baseObservation();
+    missingAssessment.outcome = "BEHAVIOR_PRESENT_BAD";
+    assert.throws(() => normalizeObservation(missingAssessment), /requires a severity suffix/);
 });
 
 // ── Recorded search scope ────────────────────────────────────────────────────
 
-function absentFinding(search, overrides = {}) {
+function absentObservation(search, overrides = {}) {
     return {
-        ...baseFinding(),
+        ...baseObservation(),
         presence: "ABSENT",
         assessment: "BAD",
-        evidence: { ...baseFinding().evidence, ...(search === undefined ? {} : { search }) },
+        evidence: { ...baseObservation().evidence, ...(search === undefined ? {} : { search }) },
         ...overrides,
     };
 }
@@ -244,36 +310,51 @@ const goodSearch = {
 };
 
 test("an ABSENT observation must record where it searched", () => {
-    assert.throws(() => normalizeFinding(absentFinding(undefined)), /must record its search/);
-    assert.throws(() => normalizeFinding(absentFinding({ ...goodSearch, consulted: [] })), /at least one source/);
-    assert.throws(() => normalizeFinding(absentFinding({ ...goodSearch, lookedFor: " " })), /lookedFor is required/);
-    assert.throws(() => normalizeFinding(absentFinding({ ...goodSearch, boundary: "" })), /boundary is required/);
+    assert.throws(() => normalizeObservation(absentObservation(undefined)), /exactly exhaustiveSearch/);
+    assert.throws(
+        () => normalizeObservation(absentObservation({ ...goodSearch, consulted: [] })),
+        /at least one source/,
+    );
+    assert.throws(
+        () => normalizeObservation(absentObservation({ ...goodSearch, lookedFor: " " })),
+        /lookedFor is required/,
+    );
+    assert.throws(
+        () => normalizeObservation(absentObservation({ ...goodSearch, boundary: "" })),
+        /boundary is required/,
+    );
 
-    const out = normalizeFinding(absentFinding(goodSearch));
+    const out = normalizeObservation(absentObservation(goodSearch));
     assert.deepEqual(out.evidence.search.consulted, ["scm.review-threads"]);
 });
 
-test("a non-ABSENT observation needs no search block, but keeps one it offers", () => {
-    assert.doesNotThrow(() => normalizeFinding(baseFinding()));
-    assert.equal("search" in normalizeFinding(baseFinding()).evidence, false);
-    const withSearch = normalizeFinding({ ...baseFinding(), evidence: { ...baseFinding().evidence, search: goodSearch } });
-    assert.equal(withSearch.evidence.search.lookedFor, goodSearch.lookedFor);
+test("a non-ABSENT observation rejects an exhaustive-search branch", () => {
+    assert.doesNotThrow(() => normalizeObservation(baseObservation()));
+    assert.equal("search" in normalizeObservation(baseObservation()).evidence, false);
+    assert.throws(
+        () =>
+            normalizeObservation({
+                ...baseObservation(),
+                evidence: { ...baseObservation().evidence, search: goodSearch },
+            }),
+        /exactly citations/,
+    );
 });
 
 test("ABSENT is refused unless the search covered every source the practice asserts absence over", () => {
-    const finding = normalizeFinding(absentFinding(goodSearch));
+    const observation = normalizeObservation(absentObservation(goodSearch));
     const available = new Set(["scm.review-threads", "scm.linked-work-items"]);
 
     // Searched exactly the exhaustive domain.
-    assert.doesNotThrow(() => validateSearchScope(finding, new Set(["scm.review-threads"]), available));
+    assert.doesNotThrow(() => validateSearchScope(observation, new Set(["scm.review-threads"]), available));
     // A source the practice asserts absence over that the search never opened: the claim ranges over a
     // corpus that was not read, which is the one thing an absence may never do.
     assert.throws(
-        () => validateSearchScope(finding, new Set(["scm.review-threads", "scm.linked-work-items"]), available),
+        () => validateSearchScope(observation, new Set(["scm.review-threads", "scm.linked-work-items"]), available),
         /without searching scm.linked-work-items/,
     );
     // Claiming to have searched something this run never staged.
-    assert.throws(() => validateSearchScope(finding, new Set(), new Set()), /was not available/);
+    assert.throws(() => validateSearchScope(observation, new Set(), new Set()), /was not available/);
 });
 
 // ── ABSENT + GOOD: a clean surface, over a corpus the practice bounded ───────
@@ -289,8 +370,8 @@ test("ABSENT is refused unless the search covered every source the practice asse
 // admitted on the same evidence an ABSENT+BAD is, plus the requirement that a corpus was declared at all.
 
 test("ABSENT + GOOD needs a practice that bounded its corpus; ABSENT + BAD does not", () => {
-    const strength = normalizeFinding(absentFinding(goodSearch, { assessment: "GOOD", severity: undefined }));
-    const gap = normalizeFinding(absentFinding(goodSearch));
+    const strength = normalizeObservation(absentObservation(goodSearch, { assessment: "GOOD", severity: undefined }));
+    const gap = normalizeObservation(absentObservation(goodSearch));
     const available = new Set(["scm.review-threads"]);
 
     // Declared exhaustive over the corpus it searched → the clean result is assertable.
@@ -303,7 +384,7 @@ test("ABSENT + GOOD needs a practice that bounded its corpus; ABSENT + BAD does 
 });
 
 test("a bounded corpus does not excuse a partial search, in either direction", () => {
-    const strength = normalizeFinding(absentFinding(goodSearch, { assessment: "GOOD", severity: undefined }));
+    const strength = normalizeObservation(absentObservation(goodSearch, { assessment: "GOOD", severity: undefined }));
     const available = new Set(["scm.review-threads", "scm.linked-work-items"]);
     assert.throws(
         () => validateSearchScope(strength, new Set(["scm.review-threads", "scm.linked-work-items"]), available),
@@ -312,10 +393,8 @@ test("a bounded corpus does not excuse a partial search, in either direction", (
 });
 
 test("the search scope rule applies to ABSENT only", () => {
-    const present = normalizeFinding(baseFinding());
-    assert.doesNotThrow(() =>
-        validateSearchScope(present, new Set(["scm.review-threads"]), new Set()),
-    );
+    const present = normalizeObservation(baseObservation());
+    assert.doesNotThrow(() => validateSearchScope(present, new Set(["scm.review-threads"]), new Set()));
 });
 
 test("a claim about an earlier review is bound to the staged history like any other citation", () => {
@@ -323,8 +402,8 @@ test("a claim about an earlier review is bound to the staged history like any ot
     // The point of declaring it as a source rather than dropping it in as loose context is exactly this:
     // "we raised this before" becomes a quote that has to match staged bytes, instead of a plausible
     // sentence nothing can check.
-    const finding = normalizeFinding(
-        baseFinding({
+    const observation = normalizeObservation(
+        baseObservation({
             evidence: {
                 citations: [
                     {
@@ -342,12 +421,12 @@ test("a claim about an earlier review is bound to the staged history like any ot
     const artifacts = new Map([["inputs/history/observations.json", "hephaestus.observation-history"]]);
     const staged = new Set(["scm.pull-request.diff", "hephaestus.observation-history"]);
 
-    assert.doesNotThrow(() => validateEvidenceSources(finding, staged, artifacts));
+    assert.doesNotThrow(() => validateEvidenceSources(observation, staged, artifacts));
     const bytes = '{"observations":[{"recurrenceKey": "rec-1","title":"Caught and ignored"}]}';
-    assert.equal(citationMatchesArtifact(finding.evidence.citations[0], bytes), true);
+    assert.equal(citationMatchesArtifact(observation.evidence.citations[0], bytes), true);
     // An earlier observation that was never staged cannot be quoted into existence.
     assert.equal(
-        citationMatchesArtifact({ ...finding.evidence.citations[0], quote: '"recurrenceKey": "invented"' }, bytes),
+        citationMatchesArtifact({ ...observation.evidence.citations[0], quote: '"recurrenceKey": "invented"' }, bytes),
         false,
     );
 });
@@ -356,8 +435,8 @@ test("the history is never an exhaustive source, so it can never carry an absenc
     // It is a bounded window over a growing record: it can show that something recurred and can never
     // show that something never happened. No practice may hold it EXHAUSTIVE, so an ABSENT claim can
     // cite it as one place it looked but can never rest on it.
-    const finding = normalizeFinding(
-        absentFinding({
+    const observation = normalizeObservation(
+        absentObservation({
             consulted: ["scm.review-threads", "hephaestus.observation-history"],
             lookedFor: "a review thread raising the migration",
             boundary: "threads on this pull request, plus the earlier record for this person",
@@ -366,7 +445,7 @@ test("the history is never an exhaustive source, so it can never carry an absenc
     const staged = new Set(["scm.review-threads", "hephaestus.observation-history"]);
 
     // Consulting it is fine — it is a place the review genuinely looked.
-    assert.doesNotThrow(() => validateSearchScope(finding, new Set(["scm.review-threads"]), staged));
+    assert.doesNotThrow(() => validateSearchScope(observation, new Set(["scm.review-threads"]), staged));
 });
 
 // ── Stated inapplicability ───────────────────────────────────────────────────
@@ -376,8 +455,8 @@ test("the history is never an exhaustive source, so it can never carry an absenc
 // zero of the value that means "I looked and could not tell", a fifth of them phrased in their own
 // reasoning as could-not-tell. Naming the ground is what makes the two answers cost the same.
 
-function notApplicableFinding(inapplicability, overrides = {}) {
-    const base = baseFinding();
+function notApplicableObservation(inapplicability, overrides = {}) {
+    const base = baseObservation();
     return {
         ...base,
         presence: "NOT_APPLICABLE",
@@ -397,21 +476,21 @@ const goodInapplicability = {
 };
 
 test("a NOT_APPLICABLE observation must say what rules the practice out", () => {
-    assert.throws(() => normalizeFinding(notApplicableFinding(undefined)), /must say why the practice does not apply/);
+    assert.throws(() => normalizeObservation(notApplicableObservation(undefined)), /exactly exclusion/);
     assert.throws(
-        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, consulted: [] })),
+        () => normalizeObservation(notApplicableObservation({ ...goodInapplicability, consulted: [] })),
         /at least one source/,
     );
     assert.throws(
-        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, subject: " " })),
+        () => normalizeObservation(notApplicableObservation({ ...goodInapplicability, subject: " " })),
         /subject is required/,
     );
     assert.throws(
-        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, ruledOutBy: "" })),
+        () => normalizeObservation(notApplicableObservation({ ...goodInapplicability, ruledOutBy: "" })),
         /ruledOutBy is required/,
     );
 
-    const out = normalizeFinding(notApplicableFinding(goodInapplicability));
+    const out = normalizeObservation(notApplicableObservation(goodInapplicability));
     assert.deepEqual(out.evidence.inapplicability.consulted, ["scm.pull-request.diff"]);
     assert.equal(out.evidence.inapplicability.subject, goodInapplicability.subject);
 });
@@ -420,62 +499,71 @@ test("the refusal points at INCONCLUSIVE, because that is the answer it is askin
     // The whole point of the rule: a model that cannot name the ground has not found an inapplicable
     // practice, it has found one it could not call. If the error did not say so it would just teach the
     // model to invent a ruledOutBy.
-    assert.throws(() => normalizeFinding(notApplicableFinding(undefined)), /INCONCLUSIVE/);
+    assert.throws(() => normalizeObservation(notApplicableObservation(undefined)), /exclusion/);
     assert.throws(
-        () => normalizeFinding(notApplicableFinding({ ...goodInapplicability, ruledOutBy: "" })),
-        /INCONCLUSIVE/,
+        () => normalizeObservation(notApplicableObservation({ ...goodInapplicability, ruledOutBy: "" })),
+        /ruledOutBy/,
     );
 });
 
 test("INCONCLUSIVE needs no inapplicability block — it is not claiming anything about the work", () => {
-    const out = normalizeFinding({ ...baseFinding(), presence: "INCONCLUSIVE", assessment: undefined,
-        evidence: { ...baseFinding().evidence, undecidability: UNDECIDABLE } });
+    const out = normalizeObservation({
+        ...baseObservation(),
+        presence: "INCONCLUSIVE",
+        assessment: undefined,
+        evidence: { ...baseObservation().evidence, undecidability: UNDECIDABLE },
+    });
     assert.equal("inapplicability" in out.evidence, false);
 });
 
 test("a NOT_APPLICABLE claim may only rest on sources this run staged", () => {
-    const finding = normalizeFinding(notApplicableFinding(goodInapplicability));
-    assert.doesNotThrow(() => validateInapplicabilityScope(finding, new Set(["scm.pull-request.diff"])));
-    assert.throws(() => validateInapplicabilityScope(finding, new Set(["scm.review-threads"])), /was not available/);
+    const observation = normalizeObservation(notApplicableObservation(goodInapplicability));
+    assert.doesNotThrow(() => validateInapplicabilityScope(observation, new Set(["scm.pull-request.diff"])));
+    assert.throws(
+        () => validateInapplicabilityScope(observation, new Set(["scm.review-threads"])),
+        /was not available/,
+    );
 
     // Every other presence is none of this validator's business.
-    const present = normalizeFinding(baseFinding());
+    const present = normalizeObservation(baseObservation());
     assert.doesNotThrow(() => validateInapplicabilityScope(present, new Set()));
 });
 
-// ── Optional guidance ────────────────────────────────────────────────────────
-// guidance was REQUIRED with minLength 1 while composition still authored nothing. Now that the
-// composition stage writes what the developer reads, guidance survives only as the fallback body of an
-// in-context note — and demanding one on every finding made the measurement step invent a next step for
-// a strength, for a practice with no subject here, and for a question it could not settle. Those are
-// exactly the three answers that assert nothing is wrong.
-
-test("a finding with no guidance is accepted, and the key is simply absent", () => {
-    const finding = baseFinding();
-    delete finding.guidance;
-    const out = normalizeFinding(finding);
-    assert.equal("guidance" in out, false);
+test("removed measurement fields are rejected rather than silently accepted", () => {
+    assert.throws(
+        () => normalizeObservation(baseObservation({ guidance: "Split into two PRs." })),
+        /unknown observation field.*guidance/,
+    );
+    assert.throws(
+        () => normalizeObservation(baseObservation({ suggestedDiffNotes: [] })),
+        /unknown observation field.*suggestedDiffNotes/,
+    );
 });
 
-test("blank guidance collapses to absent rather than to an empty string", () => {
-    // One shape reaches Java, not two: DeliveryComposer falls back on guidance being null, and a "" that
-    // survived would read as an authored-but-empty next step.
-    for (const blank of ["", "   ", "\n"]) {
-        const out = normalizeFinding(baseFinding({ guidance: blank }));
-        assert.equal("guidance" in out, false, `guidance ${JSON.stringify(blank)} must not survive`);
-    }
+test("final discriminated outcomes map to the persisted vocabulary", () => {
+    const assessed = baseObservation();
+    assert.deepEqual(
+        {
+            presence: normalizeFinalObservation(assessed).presence,
+            assessment: normalizeFinalObservation(assessed).assessment,
+        },
+        { presence: "PRESENT", assessment: "BAD" },
+    );
+
+    const declined = baseObservation({ presence: "INCONCLUSIVE", evidence: { undecidability: UNDECIDABLE } });
+    const normalized = normalizeFinalObservation(declined);
+    assert.equal(normalized.presence, "INCONCLUSIVE");
+    assert.equal(normalized.assessment, undefined);
 });
 
-test("guidance is kept, trimmed, when there really is a next step", () => {
-    const out = normalizeFinding(baseFinding({ guidance: "  Split into two PRs.  " }));
-    assert.equal(out.guidance, "Split into two PRs.");
-});
+test("outcome is one exact semantic value rather than nullable peer fields", () => {
+    const objectOutcome = baseObservation();
+    objectOutcome.outcome = { kind: "ASSESSED", occurrence: "PRESENT", assessment: "GOOD" };
+    assert.throws(() => normalizeFinalObservation(objectOutcome), /invalid outcome/);
 
-test("dropping guidance changes nothing else about the finding", () => {
-    const withGuidance = normalizeFinding(baseFinding());
-    const withoutGuidance = normalizeFinding(baseFinding({ guidance: undefined }));
-    assert.equal(dedupeKeyForFinding(withGuidance), dedupeKeyForFinding(withoutGuidance));
-    assert.deepEqual({ ...withGuidance, guidance: undefined }, { ...withoutGuidance, guidance: undefined });
+    const invalidGood = baseObservation();
+    invalidGood.outcome = "BEHAVIOR_PRESENT_GOOD_MINOR";
+    assert.throws(() => normalizeFinalObservation(invalidGood), /must not carry severity/);
 });
 
 // ── Vocabulary descriptions ──────────────────────────────────────────────────
@@ -524,13 +612,13 @@ test("each presence description discriminates it from its nearest neighbour", ()
 // Measured against gpt-oss-120b: asked to quote the merge-request title
 // `Resolve "Connect data between screens"` verbatim, it returned curly quotes in 6 of 6 runs across
 // three tool-schema shapes. The transcription was faithful; only the glyphs moved. Before this fold
-// the citation failed `includes`, report_finding threw, and the observation was lost.
+// the citation failed `includes`, report_observation threw, and the observation was lost.
 test("a citation survives the typographic substitutions a model makes while transcribing", () => {
     const content = 'Resolve "Connect data between screens" — see the plan';
     const cite = (quote) => ({ sourceKind: "scm.pull-request.core", quote });
 
     assert.equal(citationMatchesArtifact(cite('Resolve "Connect data between screens"'), content), true);
-    assert.equal(citationMatchesArtifact(cite('Resolve “Connect data between screens”'), content), true);
+    assert.equal(citationMatchesArtifact(cite("Resolve “Connect data between screens”"), content), true);
     assert.equal(citationMatchesArtifact(cite("see the plan"), content), true);
 });
 
@@ -538,7 +626,7 @@ test("folding glyphs never makes a quote the artifact does not contain match", (
     const content = 'Resolve "Connect data between screens"';
     const cite = (quote) => ({ sourceKind: "scm.pull-request.core", quote });
 
-    assert.equal(citationMatchesArtifact(cite('Resolve “Disconnect data between screens”'), content), false);
+    assert.equal(citationMatchesArtifact(cite("Resolve “Disconnect data between screens”"), content), false);
     assert.equal(citationMatchesArtifact(cite("a rationale the author never wrote"), content), false);
 });
 
@@ -552,16 +640,16 @@ test("an INCONCLUSIVE observation must say what it could not settle", () => {
         title: "Rationale lives somewhere this review cannot read",
         presence: "INCONCLUSIVE",
         reasoning: "The body points at an issue for the why, and that issue was not staged.",
-        evidence: { citations: baseFinding().evidence.citations },
+        evidence: { citations: baseObservation().evidence.citations },
     };
 
-    assert.throws(() => normalizeFinding(base), /undecidability/);
+    assert.throws(() => normalizeObservation(base), /missingEvidence/);
     assert.throws(
-        () => normalizeFinding({ ...base, evidence: { ...base.evidence, undecidability: { openQuestion: "x" } } }),
+        () => normalizeObservation({ ...base, evidence: { ...base.evidence, undecidability: { openQuestion: "x" } } }),
         /wouldSettleIt/,
     );
 
-    const ok = normalizeFinding({
+    const ok = normalizeObservation({
         ...base,
         evidence: {
             ...base.evidence,

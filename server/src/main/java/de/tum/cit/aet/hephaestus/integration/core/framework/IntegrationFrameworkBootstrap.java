@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
@@ -47,7 +47,7 @@ public class IntegrationFrameworkBootstrap {
     private final List<ApiCredentialProvider> credentialProviders;
     private final List<TokenRefresher> tokenRefreshers;
     private final List<SummaryChannel> feedbackChannels;
-    private final List<InlineFindingChannel> inlineFindingChannels;
+    private final List<InlineFeedbackChannel> inlineFeedbackChannels;
     private final List<ApprovalChannel> approvalChannels;
     private final List<IntegrationLifecycleListener> lifecycleListeners;
     private final ReviewContractValidator reviewContract;
@@ -61,7 +61,7 @@ public class IntegrationFrameworkBootstrap {
         List<ApiCredentialProvider> credentialProviders,
         List<TokenRefresher> tokenRefreshers,
         List<SummaryChannel> feedbackChannels,
-        List<InlineFindingChannel> inlineFindingChannels,
+        List<InlineFeedbackChannel> inlineFeedbackChannels,
         List<ApprovalChannel> approvalChannels,
         List<IntegrationLifecycleListener> lifecycleListeners,
         ReviewContractValidator reviewContract,
@@ -74,7 +74,7 @@ public class IntegrationFrameworkBootstrap {
         this.credentialProviders = credentialProviders;
         this.tokenRefreshers = tokenRefreshers;
         this.feedbackChannels = feedbackChannels;
-        this.inlineFindingChannels = inlineFindingChannels;
+        this.inlineFeedbackChannels = inlineFeedbackChannels;
         this.approvalChannels = approvalChannels;
         this.lifecycleListeners = lifecycleListeners;
         this.reviewContract = reviewContract;
@@ -142,11 +142,11 @@ public class IntegrationFrameworkBootstrap {
         if (declared.contains(Capability.FEEDBACK_DELIVERY)) {
             require(kind, "SummaryChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
         }
-        if (declared.contains(Capability.INLINE_FINDINGS)) {
+        if (declared.contains(Capability.INLINE_FEEDBACK)) {
             require(
                 kind,
-                "InlineFindingChannel",
-                anyMatchKind(inlineFindingChannels, f -> f.kind() == kind),
+                "InlineFeedbackChannel",
+                anyMatchKind(inlineFeedbackChannels, f -> f.kind() == kind),
                 violations
             );
         }
@@ -188,7 +188,7 @@ public class IntegrationFrameworkBootstrap {
         Capability.WEBHOOK_INGEST,
         Capability.TOKEN_REFRESH,
         Capability.FEEDBACK_DELIVERY,
-        Capability.INLINE_FINDINGS,
+        Capability.INLINE_FEEDBACK,
         Capability.APPROVAL_WORKFLOW,
         Capability.SCOPE_CHANGES
     );

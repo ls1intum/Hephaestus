@@ -13,11 +13,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor.DiffAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.DeliveredSignal;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.Disposition;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineFinding;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor.DiffAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.DeliveredSignal;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.Disposition;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineFeedback;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
@@ -36,7 +36,7 @@ import org.springframework.graphql.client.ClientResponseField;
 import org.springframework.graphql.client.HttpGraphQlClient;
 import reactor.core.publisher.Mono;
 
-class GithubInlineFindingChannelTest extends BaseUnitTest {
+class GithubInlineFeedbackChannelTest extends BaseUnitTest {
 
     private static final String CK_PREFIX = "<!-- hephaestus-diff-note-ck=";
 
@@ -52,17 +52,17 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
     @Mock
     private HttpGraphQlClient client;
 
-    private GithubInlineFindingChannel channel;
+    private GithubInlineFeedbackChannel channel;
 
     @BeforeEach
     void setUp() {
-        channel = new GithubInlineFindingChannel(gitHubProvider, prNodeIdResolver, egressGuard);
+        channel = new GithubInlineFeedbackChannel(gitHubProvider, prNodeIdResolver, egressGuard);
     }
 
     @Test
     void emptyFindingsReturnsZero() {
         FeedbackTarget target = githubTarget();
-        assertThat(channel.postInlineFindings(target, List.of())).isEqualTo(InlineResult.counts(0, 0));
+        assertThat(channel.postInlineFeedback(target, List.of())).isEqualTo(InlineResult.counts(0, 0));
     }
 
     @Test
@@ -80,11 +80,11 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
             List.of(comment("RC_foo", "src/Foo.java", 10), comment("RC_bar", "src/Bar.java", 20))
         );
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
             )
         );
 
@@ -106,13 +106,13 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
         when(prNodeIdResolver.resolve(1L, "owner", "repo", 42)).thenReturn("PR_node123");
         stubReviewThreads(List.of());
-        doThrow(new OutboundEgressSuppressedException("github.post-inline-findings"))
+        doThrow(new OutboundEgressSuppressedException("github.post-inline-feedbackItems"))
             .when(egressGuard)
-            .requireDeliveryAllowed("github.post-inline-findings");
+            .requireDeliveryAllowed("github.post-inline-feedbackItems");
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             githubTarget(),
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-1"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-1"))
         );
 
         assertThat(result.suppressed()).isTrue();
@@ -139,11 +139,11 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
             )
         );
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-b", "marker", "ck-b")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-b", "marker", "ck-b")
             )
         );
 
@@ -163,9 +163,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of());
         ThreadsCaptor captor = stubAddReviewCapturingThreads("REVIEW_1");
 
-        channel.postInlineFindings(
+        channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
         );
 
         @SuppressWarnings("unchecked")
@@ -190,11 +190,11 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
             List.of(comment("RC_bar", "src/Bar.java", 20))
         );
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
             )
         );
 
@@ -219,9 +219,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         when(gitHubProvider.forScope(1L)).thenReturn(client);
         stubReviewThreads(List.of(thread("THREAD_foo", "RC_old_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
         );
 
         assertThat(result.posted()).isEqualTo(1);
@@ -242,9 +242,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of(thread("THREAD_foo", "RC_old_foo", "stale\n" + ckTag("ck-foo"), true, false)));
         stubAddReview("REVIEW_3", List.of(comment("RC_new_foo", "src/Foo.java", 10)));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"))
         );
 
         DeliveredSignal foo = signalForKey(result, "ck-foo");
@@ -257,9 +257,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         FeedbackTarget target = githubTarget();
         when(gitHubProvider.isRateLimitCritical(1L)).thenReturn(true);
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck"))
         );
 
         assertThat(result.posted()).isZero();
@@ -281,7 +281,7 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         );
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
-        channel.clearStaleFindings(target, "marker");
+        channel.clearStaleFeedback(target, "marker");
 
         verify(minimizeSpec).variable("subjectId", "RC_a");
         verify(minimizeSpec, never()).variable("subjectId", "RC_b");
@@ -301,9 +301,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
             .when(egressGuard)
             .requireDeliveryAllowed(any());
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/New.java", 12, null), "fix", "marker", "ck-new"))
+            List.of(new InlineFeedback(new DiffAnchor("src/New.java", 12, null), "fix", "marker", "ck-new"))
         );
 
         assertThat(result.suppressed()).isTrue();
@@ -322,7 +322,7 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of(thread("THREAD_h", "RC_h", "please rename this variable", false, false)));
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
-        channel.clearStaleFindings(target, "marker");
+        channel.clearStaleFeedback(target, "marker");
 
         verify(minimizeSpec, never()).variable(eq("subjectId"), any());
     }
@@ -343,9 +343,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         );
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-a"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix", "marker", "ck-a"))
         );
 
         assertThat(signalForKey(result, "ck-a").disposition()).isEqualTo(Disposition.PRESERVED_EXISTING);
@@ -371,11 +371,11 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubAddReview("REVIEW_9", List.of(comment("RC_c", "src/Baz.java", 30)));
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
-                new InlineFinding(new DiffAnchor("src/Baz.java", 30, null), "fix-c", "marker", "ck-c")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix-a", "marker", "ck-a"),
+                new InlineFeedback(new DiffAnchor("src/Baz.java", 30, null), "fix-c", "marker", "ck-c")
             )
         );
 
@@ -399,9 +399,9 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of(thread("THREAD_foo", "RC_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
         HttpGraphQlClient.RequestSpec minimizeSpec = stubMinimize();
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
-            List.of(new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "  ", "marker", "ck-foo"))
+            List.of(new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "  ", "marker", "ck-foo"))
         );
 
         // Nothing posted (blank body) and — crucially — the still-current thread is NOT minimized.
@@ -425,11 +425,11 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         stubReviewThreads(List.of(thread("THREAD_foo", "RC_old_foo", "earlier\n" + ckTag("ck-foo"), false, false)));
         stubAddReviewWithErrors();
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
             )
         );
 
@@ -456,11 +456,11 @@ class GithubInlineFindingChannelTest extends BaseUnitTest {
         when(spec.variable(any(), any())).thenReturn(spec);
         when(spec.execute()).thenReturn(Mono.error(new RuntimeException("boom")));
 
-        InlineResult result = channel.postInlineFindings(
+        InlineResult result = channel.postInlineFeedback(
             target,
             List.of(
-                new InlineFinding(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
-                new InlineFinding(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
+                new InlineFeedback(new DiffAnchor("src/Foo.java", 10, null), "fix1", "marker", "ck-foo"),
+                new InlineFeedback(new DiffAnchor("src/Bar.java", 20, null), "fix2", "marker", "ck-bar")
             )
         );
 

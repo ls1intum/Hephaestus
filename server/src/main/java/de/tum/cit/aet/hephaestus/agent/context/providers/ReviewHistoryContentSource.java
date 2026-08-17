@@ -186,7 +186,12 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         int preparedCount = -1;
 
         if (selectedKinds.contains(OBSERVATION_HISTORY)) {
-            List<Observation> observations = visibleObservations(workspaceId, subjectUserId, since);
+            List<Observation> observations = visibleObservations(
+                workspaceId,
+                subjectUserId,
+                since,
+                sourceJobExcludedFromHistory(job)
+            );
             observationCount = observations.size();
             files.put(
                 OBSERVATIONS_FILE,
@@ -248,7 +253,12 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         );
     }
 
-    private List<Observation> visibleObservations(long workspaceId, Long subjectUserId, Instant since) {
+    private List<Observation> visibleObservations(
+        long workspaceId,
+        Long subjectUserId,
+        Instant since,
+        @org.jspecify.annotations.Nullable UUID excludedJobId
+    ) {
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             subjectUserId,
             workspaceId,
@@ -263,7 +273,20 @@ public class ReviewHistoryContentSource implements EvidenceSource {
         return recent
             .stream()
             .filter(o -> visible.contains(o.getId()))
+            // Composition receives the current observations separately, with durable ids. Counting them
+            // again as history would turn a first occurrence into an apparent recurrence.
+            .filter(o -> excludedJobId == null || !excludedJobId.equals(o.getAgentJobId()))
             .toList();
+    }
+
+    private static @org.jspecify.annotations.Nullable UUID sourceJobExcludedFromHistory(AgentJob job) {
+        String raw = job.getMetadata() == null ? "" : job.getMetadata().path("source_job_id").asString();
+        if (raw.isBlank()) return null;
+        try {
+            return UUID.fromString(raw);
+        } catch (IllegalArgumentException ignored) {
+            return null;
+        }
     }
 
     private ObservationDelta.Locus locusOf(Observation observation) {
@@ -352,9 +375,9 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             node.put("channel", f.getChannel() == null ? null : f.getChannel().name());
             names.stageInto(node, f.getArtifactKind(), f.getArtifactId());
             node.put("preparedAt", f.getCreatedAt() == null ? null : f.getCreatedAt().toString());
-            // The move on the conversation lane, never the mentor's words: that lane stores an opener, the
-            // evidence to hold back and a target, and the turn itself is still written live. Null when the
-            // run that queued it composed nothing, which leaves only the fact that something is queued.
+            // Notes to the mentor on the conversation lane, never the mentor's words: that lane stores the
+            // situation, coaching goal, evidence summary and success signal, and the turn itself is still written live. Null when the run that queued it composed nothing,
+            // which leaves only the fact that something is queued.
             node.put("body", StudentTextSanitizer.sanitize(f.getBody()));
         }
         return root;
@@ -384,13 +407,13 @@ public class ReviewHistoryContentSource implements EvidenceSource {
             ObjectNode node = items.addObject();
             node.put("practiceSlug", o.getPractice() == null ? null : o.getPractice().getSlug());
             node.put("recurrenceKey", o.getRecurrenceKey());
-            node.put("title", o.getTitle());
+            node.put("summary", o.getSummary());
             node.put("presence", o.getPresence() == null ? null : o.getPresence().name());
             node.put("assessment", o.getAssessment() == null ? null : o.getAssessment().name());
             node.put("severity", o.getSeverity() == null ? null : o.getSeverity().name());
             names.stageInto(node, o.getArtifactKind(), o.getArtifactId());
             node.put("observedAt", o.getObservedAt() == null ? null : o.getObservedAt().toString());
-            node.put("reasoning", StudentTextSanitizer.sanitize(o.getReasoning()));
+            node.put("evidenceRationale", StudentTextSanitizer.sanitize(o.getEvidenceRationale()));
         }
         return root;
     }

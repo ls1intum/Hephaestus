@@ -387,8 +387,8 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     /**
      * Newest PREPARED conversational units for a developer (as recipient) — the mentor's queue. The body on
-     * these rows is never the mentor's script: it is null, or the composer's move ({@link ConversationBriefBody}),
-     * and the words of the turn are composed at delivery either way.
+     * these rows is never the mentor's script: it is null, or the composer's notes to the mentor
+     * ({@link ConversationBriefBody}), and the words of the turn are composed at delivery either way.
      */
     @Query(
         """

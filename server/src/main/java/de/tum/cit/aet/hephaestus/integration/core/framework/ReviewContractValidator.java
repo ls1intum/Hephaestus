@@ -57,7 +57,7 @@ public class ReviewContractValidator {
             FeedbackLane.IN_CONTEXT_SUMMARY,
             Capability.FEEDBACK_DELIVERY,
             FeedbackLane.IN_CONTEXT_INLINE,
-            Capability.INLINE_FINDINGS,
+            Capability.INLINE_FEEDBACK,
             FeedbackLane.IN_CHAT,
             Capability.FEEDBACK_DELIVERY
         )

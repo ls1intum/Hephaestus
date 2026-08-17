@@ -39,8 +39,8 @@ import org.mockito.ArgumentCaptor;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * The conversational reconciler reads and authorizes a whole turn's linked findings in two queries rather
- * than two per finding. This pins the answer that batching must not change, wired through the real
+ * The conversational reconciler reads and authorizes a whole turn's linked observations in two queries rather
+ * than two per observation. This pins the answer that batching must not change, wired through the real
  * {@link ObservationVisibilityPolicy} and {@link EvidenceDeliveryAuthorization} rather than a stubbed
  * verdict: the mistake being guarded against lives inside those, in how an absent key is read.
  *
@@ -48,10 +48,10 @@ import tools.jackson.databind.ObjectMapper;
  * looks like a mentor with nothing to say. A turn that delivers more quotes evidence nobody may cite, and
  * no surface reports that it did.
  *
- * <p>Run once per ledger-writing turn ending, because the answer to "which linked findings may this turn
+ * <p>Run once per ledger-writing turn ending, because the answer to "which linked observations may this turn
  * act on" cannot depend on how the turn ended. The two endings write opposite things — DELIVERED raises the
  * unit, INSTANCE_SILENCED burns it, and nothing ever writes a unit back to PREPARED — so an ending that
- * admits an id the other refuses spends a developer's coaching on a finding the turn was never allowed to
+ * admits an id the other refuses spends a developer's coaching on an observation the turn was never allowed to
  * use. {@code MentorTurnPersistence#reconcileConversationalDelivery} is the switch these correspond to; a
  * new outcome added there fails this file's switch to compile.
  */
@@ -64,18 +64,18 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
     private static final String DENIED_KIND = "hephaestus.observation-history";
 
     /**
-     * Every way a linked finding can fail to be deliverable, in one turn, with the deliverable one LAST so
+     * Every way a linked observation can fail to be deliverable, in one turn, with the deliverable one LAST so
      * that admitting any other would flip the <em>wrong</em> feedback unit rather than merely one extra: a
      * source use the catalog withdrew, an id whose observation this workspace cannot read at all, a run with
      * no {@code agent_job} row, and a claim measured against superseded review rules.
      *
-     * <p>Each refused finding has a PREPARED unit waiting behind it. Those are the trap: they are what a
-     * wrongly-admitted finding would deliver, so a batch that reads a missing key as anything other than
+     * <p>Each refused observation has a PREPARED unit waiting behind it. Those are the trap: they are what a
+     * wrongly-admitted observation would deliver, so a batch that reads a missing key as anything other than
      * "refused" fails here instead of passing quietly.
      */
     @ParameterizedTest
     @EnumSource(value = DeliveryOutcome.class, names = { "DELIVERED", "INSTANCE_SILENCED" })
-    void actsOnlyOnTheLinkedFindingEveryConjunctStillAdmits(DeliveryOutcome ending) {
+    void actsOnlyOnTheLinkedObservationEveryConjunctStillAdmits(DeliveryOutcome ending) {
         FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
         FeedbackObservationRepository feedbackObservations = mock(FeedbackObservationRepository.class);
         FeedbackPlacementRepository placements = mock(FeedbackPlacementRepository.class);
@@ -137,7 +137,7 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         UUID unreadableUnit = trapUnit(feedbackObservations, unreadable);
         UUID runWithoutRowUnit = trapUnit(feedbackObservations, runWithoutRow);
         UUID staleClaimUnit = trapUnit(feedbackObservations, staleClaim);
-        // Answered for any unit, not just the deliverable one: a wrongly-admitted finding must fail on the
+        // Answered for any unit, not just the deliverable one: a wrongly-admitted observation must fail on the
         // assertion below, which names the unit it acted on, rather than on a stubbing mismatch.
         Feedback deliveredRow = mock(Feedback.class);
         lenient().when(feedbackRepository.markConversationDelivered(any(), any())).thenReturn(1);
@@ -189,7 +189,7 @@ class ConversationalDeliveryBatchAuthorizationTest extends BaseUnitTest {
         assertThat(authorizationAskedAbout)
             .doesNotContain(staleClaim.getAgentJobId())
             .contains(deniedSource.getAgentJobId(), runWithoutRow.getAgentJobId(), deliverable.getAgentJobId());
-        // One read of each kind for the whole turn, however many findings the mentor linked.
+        // One read of each kind for the whole turn, however many observations the mentor linked.
         verify(observations, times(1)).findAllByIdInAndWorkspaceId(any(), eq(WS));
         verify(jobs, times(1)).findEvidenceContractVersions(eq(WS), any());
     }

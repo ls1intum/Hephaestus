@@ -19,11 +19,10 @@ public record ReviewBoundObservationDTO(
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @Schema(description = "Practice area; null when the practice is Unassigned") ReviewPracticeAreaDTO area,
-    @NonNull String title,
+    @NonNull String summary,
     @NonNull Presence presence,
     @Schema(description = "Assessment: GOOD or BAD (null when NOT_APPLICABLE)") Assessment assessment,
     @Schema(description = "Severity band (null unless assessment is BAD)") Severity severity,
-    @NonNull @Schema(description = "Observation confidence", minimum = "0", maximum = "1") Float confidence,
     @NonNull ReviewClaimCurrentness claimCurrentness,
     @NonNull Instant observedAt
 ) {
@@ -35,11 +34,10 @@ public record ReviewBoundObservationDTO(
             row.getPracticeSlug(),
             row.getPracticeName(),
             ReviewPracticeAreaDTO.from(row.getAreaSlug(), row.getAreaName(), row.getAreaIcon(), row.getAreaColor()),
-            row.getTitle(),
+            row.getSummary(),
             row.getPresence(),
             row.getAssessment(),
             row.getSeverity(),
-            row.getConfidence(),
             ReviewClaimCurrentness.of(
                 row.getPracticeRevisionFingerprint(),
                 row.getCurrentPracticeRevisionFingerprint()

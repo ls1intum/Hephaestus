@@ -89,9 +89,9 @@ abstract class IntegrationManifestContractTest extends BaseUnitTest {
                 .as("%s declares FEEDBACK_DELIVERY but names no artifact it would deliver to", manifest.kind())
                 .containsAnyOf(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CHAT);
         }
-        if (manifest.declaredCapabilities().contains(Capability.INLINE_FINDINGS)) {
+        if (manifest.declaredCapabilities().contains(Capability.INLINE_FEEDBACK)) {
             assertThat(lanes)
-                .as("%s declares INLINE_FINDINGS but names no artifact it would anchor them to", manifest.kind())
+                .as("%s declares INLINE_FEEDBACK but names no artifact it would anchor them to", manifest.kind())
                 .contains(FeedbackLane.IN_CONTEXT_INLINE);
         }
     }

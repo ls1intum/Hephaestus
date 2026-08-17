@@ -24,8 +24,8 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/recent_authored_work.json} for a {@link MentorChatRequest}.
  *
- * <p><b>Why this exists (the mentor must know the work, not just findings about it).</b> The other mentor
- * contexts describe the work only indirectly (findings, delivered feedback, counts), so a reference like "my
+ * <p><b>Why this exists (the mentor must know the work, not just observations about it).</b> The other mentor
+ * contexts describe the work only indirectly (observations, delivered feedback, counts), so a reference like "my
  * camera change" has no concrete anchor. This context supplies the inventory: the developer's own authored PRs
  * and issues — number, title, URL, state, size — drawn from the same tables practice reviews use, so the
  * mentor can name and link the real work and recognise what the conversation is about.

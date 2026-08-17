@@ -46,7 +46,7 @@ cross-cutting logic (context assembly, retention) treat "a documentation source"
 
 Outline contributes context; it produces no observations, findings, or reactions. Pre-baked
 Outline doc-quality practices are an explicit non-goal. Because nothing
-touches the observation/finding schema, [ADR 0021](0021-findings-feedback-synthesis-seam.md) and
+touches the observation/finding schema, [ADR 0021](0021-observations-feedback-synthesis-seam.md) and
 [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) are untouched. Documents are
 mirrored into `outline_document` and projected to the agent through an agent-owned
 `DocumentProjection` port; the agent read path carries no raw SQL against Outline's schema.

@@ -5,9 +5,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import java.util.ArrayList;
@@ -18,7 +18,7 @@ import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/** Reconciles sanitized inline findings through the provider-specific channel. */
+/** Reconciles sanitized inline observations through the provider-specific channel. */
 class DiffNotePoster {
 
     private static final Logger log = LoggerFactory.getLogger(DiffNotePoster.class);
@@ -28,21 +28,21 @@ class DiffNotePoster {
 
     private final PullRequestCommentPoster commentPoster;
     private final PracticeFeedbackCommentFormatter commentFormatter;
-    private final Map<IntegrationKind, InlineFindingChannel> channels;
+    private final Map<IntegrationKind, InlineFeedbackChannel> channels;
 
     DiffNotePoster(
         PullRequestCommentPoster commentPoster,
         PracticeFeedbackCommentFormatter commentFormatter,
-        List<InlineFindingChannel> inlineFindingChannels
+        List<InlineFeedbackChannel> inlineFeedbackChannels
     ) {
         this.commentPoster = commentPoster;
         this.commentFormatter = commentFormatter;
-        EnumMap<IntegrationKind, InlineFindingChannel> map = new EnumMap<>(IntegrationKind.class);
-        for (InlineFindingChannel channel : inlineFindingChannels) {
-            InlineFindingChannel previous = map.putIfAbsent(channel.kind(), channel);
+        EnumMap<IntegrationKind, InlineFeedbackChannel> map = new EnumMap<>(IntegrationKind.class);
+        for (InlineFeedbackChannel channel : inlineFeedbackChannels) {
+            InlineFeedbackChannel previous = map.putIfAbsent(channel.kind(), channel);
             if (previous != null) {
                 throw new IllegalStateException(
-                    "Duplicate InlineFindingChannel for kind " +
+                    "Duplicate InlineFeedbackChannel for kind " +
                         channel.kind() +
                         ": " +
                         previous.getClass().getName() +
@@ -59,10 +59,10 @@ class DiffNotePoster {
             job.getIntegrationKind(),
             "AgentJob.integrationKind must not be null"
         );
-        InlineFindingChannel channel = channels.get(kind);
+        InlineFeedbackChannel channel = channels.get(kind);
         if (channel == null) {
             throw new JobDeliveryException(
-                "No InlineFindingChannel wired for kind " +
+                "No InlineFeedbackChannel wired for kind " +
                     kind +
                     " — check that the vendor integration is enabled and its channel bean is registered"
             );
@@ -70,12 +70,14 @@ class DiffNotePoster {
 
         SummaryChannel.FeedbackTarget target = commentPoster.buildTarget(job, kind, job.getWorkspace().getId());
 
-        List<InlineFindingChannel.InlineFinding> findings = mapFindings(diffNotes == null ? List.of() : diffNotes);
+        List<InlineFeedbackChannel.InlineFeedback> observations = mapObservations(
+            diffNotes == null ? List.of() : diffNotes
+        );
 
         // An empty reconcile clears stale notes; non-empty channels reconcile by recurrence key.
-        if (findings.isEmpty()) {
+        if (observations.isEmpty()) {
             try {
-                channel.clearStaleFindings(target, HEPHAESTUS_MARKER);
+                channel.clearStaleFeedback(target, HEPHAESTUS_MARKER);
             } catch (OutboundEgressSuppressedException e) {
                 throw new JobDeliverySuppressedException(e.getMessage(), e);
             } catch (RuntimeException e) {
@@ -90,9 +92,9 @@ class DiffNotePoster {
         }
 
         try {
-            InlineFindingChannel.InlineResult result = channel.postInlineFindings(target, findings);
+            InlineFeedbackChannel.InlineResult result = channel.postInlineFeedback(target, observations);
             log.debug(
-                "Inline finding delivery: kind={}, posted={}, failed={}, jobId={}",
+                "Inline observation delivery: kind={}, posted={}, failed={}, jobId={}",
                 kind,
                 result.posted(),
                 result.failed(),
@@ -112,8 +114,8 @@ class DiffNotePoster {
         }
     }
 
-    private List<InlineFindingChannel.InlineFinding> mapFindings(List<DiffNote> diffNotes) {
-        List<InlineFindingChannel.InlineFinding> findings = new ArrayList<>(diffNotes.size());
+    private List<InlineFeedbackChannel.InlineFeedback> mapObservations(List<DiffNote> diffNotes) {
+        List<InlineFeedbackChannel.InlineFeedback> observations = new ArrayList<>(diffNotes.size());
         for (DiffNote note : diffNotes) {
             String sanitized = PullRequestCommentPoster.sanitize(note.body());
             if (sanitized.isBlank()) {
@@ -121,11 +123,11 @@ class DiffNotePoster {
             }
             // A multi-line DiffAnchor stores the end first and optional range start second.
             boolean isMultiLine = note.endLine() != null && note.endLine() > note.startLine();
-            FindingAnchor.DiffAnchor anchor = isMultiLine
-                ? new FindingAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
-                : new FindingAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
-            findings.add(
-                new InlineFindingChannel.InlineFinding(
+            FeedbackAnchor.DiffAnchor anchor = isMultiLine
+                ? new FeedbackAnchor.DiffAnchor(note.filePath(), note.endLine(), note.startLine())
+                : new FeedbackAnchor.DiffAnchor(note.filePath(), note.startLine(), null);
+            observations.add(
+                new InlineFeedbackChannel.InlineFeedback(
                     anchor,
                     commentFormatter.appendSettingsNotice(sanitized),
                     HEPHAESTUS_MARKER,
@@ -133,17 +135,17 @@ class DiffNotePoster {
                 )
             );
         }
-        return findings;
+        return observations;
     }
 
     record DiffNoteResult(
         int posted,
         int failed,
-        List<InlineFindingChannel.DeliveredSignal> signals,
+        List<InlineFeedbackChannel.DeliveredSignal> signals,
         boolean suppressed,
         List<String> suppressedRecurrenceKeys
     ) {
-        DiffNoteResult(int posted, int failed, List<InlineFindingChannel.DeliveredSignal> signals) {
+        DiffNoteResult(int posted, int failed, List<InlineFeedbackChannel.DeliveredSignal> signals) {
             this(posted, failed, signals, false, List.of());
         }
     }

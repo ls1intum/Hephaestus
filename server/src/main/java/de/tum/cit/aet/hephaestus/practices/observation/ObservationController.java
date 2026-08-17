@@ -129,7 +129,7 @@ public class ObservationController {
         @PathVariable UUID observationId
     ) {
         var observation = observationService.getObservation(workspaceContext.id(), observationId);
-        String deliveredGuidance = observationService
+        String deliveredFeedback = observationService
             .getDeliveredGuidance(workspaceContext.id(), observationId)
             .orElse(null);
         boolean includeEvidence = evidenceAuthorization.permits(
@@ -137,7 +137,7 @@ public class ObservationController {
             observation,
             SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
         );
-        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, includeEvidence));
+        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredFeedback, includeEvidence));
     }
 
     @GetMapping("/pull-request/{prId}")
@@ -155,7 +155,7 @@ public class ObservationController {
         WorkspaceContext workspaceContext,
         @PathVariable Long prId
     ) {
-        // Unlike the per-developer endpoints, this returns EVERY developer's BAD/ABSENT findings on the PR,
+        // Unlike the per-developer endpoints, this returns EVERY developer's BAD/ABSENT observations on the PR,
         // unscoped to the caller. On a public-read workspace an anonymous (membership-less) request would
         // otherwise expose them — require workspace membership.
         if (!workspaceContext.hasMembership()) {

@@ -178,7 +178,6 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             presence,
             assessment,
             severity,
-            confidence,
             "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\",\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":50,\"quote\":\"example\",\"quoteRedacted\":false}]}",
             "Reasoning for " + title,
             "recurrence-" + title,
@@ -339,11 +338,11 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(2)
-                .jsonPath("$.content[?(@.title == 'Alice problem')].subject.login")
+                .jsonPath("$.content[?(@.summary == 'Alice problem')].subject.login")
                 .isEqualTo("alice")
-                .jsonPath("$.content[?(@.title == 'Alice problem')].claimCurrentness")
+                .jsonPath("$.content[?(@.summary == 'Alice problem')].claimCurrentness")
                 .isEqualTo("UNVERIFIABLE")
-                .jsonPath("$.content[?(@.title == 'Bob problem')].subject.login")
+                .jsonPath("$.content[?(@.summary == 'Bob problem')].subject.login")
                 .isEqualTo("bob");
         }
 
@@ -356,7 +355,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(OBSERVATIONS, workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Mine");
         }
 
@@ -383,7 +382,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             )
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("A major");
         }
 
@@ -399,7 +398,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(OBSERVATIONS + "?areaSlug=communication", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("In area")
                 .jsonPath("$.content[0].area.slug")
                 .isEqualTo("communication")
@@ -437,20 +436,20 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(OBSERVATIONS + "?agentJobId={id}", workspace.getWorkspaceSlug(), job.getId())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("This run");
 
             getOk(OBSERVATIONS + "?artifactKind=scm.pull_request&artifactId=9", workspace.getWorkspaceSlug())
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Other run");
         }
 
         @Test
         @WithAdminUser
         void sortsObservationsByActionabilityWithoutChangingTheDefault() {
-            record ObservationInput(String title, String presence, String assessment, String severity) {}
+            record ObservationInput(String summary, String presence, String assessment, String severity) {}
 
             Instant base = Instant.parse("2026-01-10T00:00:00Z");
             List<ObservationInput> observations = List.of(
@@ -467,7 +466,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                     practiceA,
                     job,
                     alice,
-                    observation.title(),
+                    observation.summary(),
                     observation.presence(),
                     observation.assessment(),
                     observation.severity(),
@@ -482,21 +481,21 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 workspace.getWorkspaceSlug(),
                 job.getId()
             )
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Critical problem")
-                .jsonPath("$.content[1].title")
+                .jsonPath("$.content[1].summary")
                 .isEqualTo("Major problem")
-                .jsonPath("$.content[2].title")
+                .jsonPath("$.content[2].summary")
                 .isEqualTo("Minor problem")
-                .jsonPath("$.content[3].title")
+                .jsonPath("$.content[3].summary")
                 .isEqualTo("Info problem")
-                .jsonPath("$.content[4].title")
+                .jsonPath("$.content[4].summary")
                 .isEqualTo("Strength");
 
             getOk(OBSERVATIONS + "?agentJobId={id}&size=5", workspace.getWorkspaceSlug(), job.getId())
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Not applicable")
-                .jsonPath("$.content[4].title")
+                .jsonPath("$.content[4].summary")
                 .isEqualTo("Major problem");
         }
 
@@ -523,7 +522,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(OBSERVATIONS + "?from={from}&to={to}", workspace.getWorkspaceSlug(), from, to)
                 .jsonPath("$.page.totalElements")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Inside");
         }
 
@@ -653,7 +652,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             getOk(OBSERVATIONS + "/{id}", workspace.getWorkspaceSlug(), id)
                 .jsonPath("$.evidence.citations[0].path")
                 .isEqualTo("src/Main.java")
-                .jsonPath("$.reasoning")
+                .jsonPath("$.evidenceRationale")
                 .isEqualTo("Reasoning for Detailed")
                 .jsonPath("$.subject.login")
                 .isEqualTo("alice")
@@ -1164,7 +1163,7 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
                 .isEqualTo(0)
                 .jsonPath("$.observations.length()")
                 .isEqualTo(1)
-                .jsonPath("$.observations[0].title")
+                .jsonPath("$.observations[0].summary")
                 .isEqualTo("Would have flagged")
                 .jsonPath("$.observations[0].practiceSlug")
                 .isEqualTo("pr-description-quality")
@@ -1184,9 +1183,9 @@ class PracticeReviewOutputControllerIntegrationTest extends AbstractWorkspaceInt
             feedbackObservationRepository.insertIfAbsent(unit.getId(), first, "PRIMARY", 0);
 
             getOk(FEEDBACK + "/{id}", workspace.getWorkspaceSlug(), unit.getId())
-                .jsonPath("$.observations[0].title")
+                .jsonPath("$.observations[0].summary")
                 .isEqualTo("First")
-                .jsonPath("$.observations[1].title")
+                .jsonPath("$.observations[1].summary")
                 .isEqualTo("Second");
         }
 

@@ -44,7 +44,7 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 │   └── settings.json                #   Pi SDK config (provider, model, compaction)
 ├── pi-provider.json                 # Provider/model routing for the runner.
 ├── pi-provider.mjs                  # Provider helper module loaded by the runner.
-├── pi-finding-normalize.mjs         # Normalises the sandbox `findings` array before out/ is written.
+├── pi-observation-normalize.mjs         # Normalises sandbox observations before out/ is written.
 ├── node_modules -> /opt/pi-sdk/…    # Symlink created at container start, not staged.
 └── .run-pi.mjs                      # Runner script entry point.
 ```

@@ -160,7 +160,6 @@ class DeliveredFeedbackConsentGateIntegrationTest extends AbstractSlackConsentGa
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             evidence(artifactKind),
             null,
             null,

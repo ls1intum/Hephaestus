@@ -2,7 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -18,9 +18,9 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * The ordering four stages used to duplicate, and used to tiebreak on the detector's self-reported
  * confidence. These pin what replaced it: severity where it applies, then how much of the corpus the
- * finding's citations actually span, then a stable identity so the order is total.
+ * observation's citations actually span, then a stable identity so the order is total.
  */
-class FindingOrderTest extends BaseUnitTest {
+class ObservationOrderTest extends BaseUnitTest {
 
     private static final JsonMapper MAPPER = JsonMapper.builder().build();
 
@@ -49,17 +49,15 @@ class FindingOrderTest extends BaseUnitTest {
         return evidence;
     }
 
-    private static ValidatedFinding finding(String title, Severity severity, int loci) {
-        return new ValidatedFinding(
+    private static ValidatedObservation observation(String title, Severity severity, int loci) {
+        return new ValidatedObservation(
             "slug",
             title,
             severity == null ? Presence.ABSENT : Presence.PRESENT,
             severity == null ? Assessment.GOOD : Assessment.BAD,
             severity,
             evidence(loci, 0),
-            "reasoning",
-            "guidance",
-            List.of()
+            "reasoning"
         );
     }
 
@@ -68,29 +66,29 @@ class FindingOrderTest extends BaseUnitTest {
     void breadthCountsDistinctLoci() {
         // The lever confidence used to be was one the model could pull at will. Counting citations rather
         // than distinct places would hand the same lever back: quote one line four times and lead the list.
-        assertThat(FindingOrder.evidenceBreadth(evidence(3, 0))).isEqualTo(3);
-        assertThat(FindingOrder.evidenceBreadth(evidence(3, 5))).isEqualTo(3);
-        assertThat(FindingOrder.evidenceBreadth(evidence(0, 0))).isZero();
-        // A finding whose evidence we cannot read scores 0 and sorts last in its band — we cannot see what
+        assertThat(ObservationOrder.evidenceBreadth(evidence(3, 0))).isEqualTo(3);
+        assertThat(ObservationOrder.evidenceBreadth(evidence(3, 5))).isEqualTo(3);
+        assertThat(ObservationOrder.evidenceBreadth(evidence(0, 0))).isZero();
+        // An observation whose evidence we cannot read scores 0 and sorts last in its band — we cannot see what
         // it rests on, so it does not get to lead.
-        assertThat(FindingOrder.evidenceBreadth(null)).isZero();
-        assertThat(FindingOrder.evidenceBreadth(MAPPER.createObjectNode())).isZero();
+        assertThat(ObservationOrder.evidenceBreadth(null)).isZero();
+        assertThat(ObservationOrder.evidenceBreadth(MAPPER.createObjectNode())).isZero();
     }
 
     @Test
     @DisplayName("severity leads, breadth breaks the tie, identity makes the order total")
     void worstFirstRanksSeverityThenBreadth() {
-        ValidatedFinding majorNarrow = finding("major narrow", Severity.MAJOR, 1);
-        ValidatedFinding majorWide = finding("major wide", Severity.MAJOR, 4);
-        ValidatedFinding criticalNarrow = finding("critical narrow", Severity.CRITICAL, 1);
-        ValidatedFinding minorWide = finding("minor wide", Severity.MINOR, 9);
+        ValidatedObservation majorNarrow = observation("major narrow", Severity.MAJOR, 1);
+        ValidatedObservation majorWide = observation("major wide", Severity.MAJOR, 4);
+        ValidatedObservation criticalNarrow = observation("critical narrow", Severity.CRITICAL, 1);
+        ValidatedObservation minorWide = observation("minor wide", Severity.MINOR, 9);
 
-        List<ValidatedFinding> sorted = new ArrayList<>(List.of(minorWide, majorNarrow, criticalNarrow, majorWide));
-        sorted.sort(FindingOrder.worstFirstUnstored());
+        List<ValidatedObservation> sorted = new ArrayList<>(List.of(minorWide, majorNarrow, criticalNarrow, majorWide));
+        sorted.sort(ObservationOrder.worstFirstUnstored());
 
         // Breadth never outranks severity: the widest MINOR still sorts below the narrowest MAJOR, because
         // proportionality favours the more consequential lesson.
-        assertThat(sorted.stream().map(ValidatedFinding::title)).containsExactly(
+        assertThat(sorted.stream().map(ValidatedObservation::summary)).containsExactly(
             "critical narrow",
             "major wide",
             "major narrow",
@@ -99,32 +97,35 @@ class FindingOrderTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("the order is total and reproducible for two findings that differ in nothing rankable")
+    @DisplayName("the order is total and reproducible for two observations that differ in nothing rankable")
     void tiesResolveDeterministically() {
-        ValidatedFinding a = finding("aaa", Severity.MINOR, 2);
-        ValidatedFinding b = finding("bbb", Severity.MINOR, 2);
+        ValidatedObservation a = observation("aaa", Severity.MINOR, 2);
+        ValidatedObservation b = observation("bbb", Severity.MINOR, 2);
 
         // Both directions of the input produce the same output — this is the property the confidence
         // tiebreak was there for, and the only one it actually delivered.
-        List<ValidatedFinding> one = new ArrayList<>(List.of(a, b));
-        List<ValidatedFinding> other = new ArrayList<>(List.of(b, a));
-        one.sort(FindingOrder.worstFirstUnstored());
-        other.sort(FindingOrder.worstFirstUnstored());
+        List<ValidatedObservation> one = new ArrayList<>(List.of(a, b));
+        List<ValidatedObservation> other = new ArrayList<>(List.of(b, a));
+        one.sort(ObservationOrder.worstFirstUnstored());
+        other.sort(ObservationOrder.worstFirstUnstored());
 
-        assertThat(one.stream().map(ValidatedFinding::title)).containsExactly("aaa", "bbb");
-        assertThat(other.stream().map(ValidatedFinding::title)).containsExactly("aaa", "bbb");
+        assertThat(one.stream().map(ValidatedObservation::summary)).containsExactly("aaa", "bbb");
+        assertThat(other.stream().map(ValidatedObservation::summary)).containsExactly("aaa", "bbb");
     }
 
     @Test
     @DisplayName("strengths rank on breadth alone, since none of them carries a severity")
     void strengthsRankOnBreadthAlone() {
-        ValidatedFinding narrow = finding("narrow strength", null, 1);
-        ValidatedFinding wide = finding("wide strength", null, 5);
+        ValidatedObservation narrow = observation("narrow strength", null, 1);
+        ValidatedObservation wide = observation("wide strength", null, 5);
 
-        List<ValidatedFinding> sorted = new ArrayList<>(List.of(narrow, wide));
-        sorted.sort(FindingOrder.bestAttestedFirst());
+        List<ValidatedObservation> sorted = new ArrayList<>(List.of(narrow, wide));
+        sorted.sort(ObservationOrder.bestAttestedFirst());
 
-        assertThat(sorted.stream().map(ValidatedFinding::title)).containsExactly("wide strength", "narrow strength");
+        assertThat(sorted.stream().map(ValidatedObservation::summary)).containsExactly(
+            "wide strength",
+            "narrow strength"
+        );
         // Every one of them has a null severity, so including severity would advertise a dimension that does
         // not exist here. Ranking must still be strict.
         assertThat(sorted.get(0).severity()).isNull();
@@ -149,7 +150,7 @@ class FindingOrderTest extends BaseUnitTest {
             .build();
 
         var sorted = new ArrayList<>(List.of(later, earlier));
-        sorted.sort(FindingOrder.worstFirst());
+        sorted.sort(ObservationOrder.worstFirst());
 
         assertThat(sorted.get(0).getId()).isEqualTo(earlier.getId());
     }

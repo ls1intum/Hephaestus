@@ -258,7 +258,7 @@ public record ObservationDelta(List<LocusChange> loci) {
     }
 
     /**
-     * One run can measure the same locus twice — the fingerprint deliberately collapses two findings of
+     * One run can measure the same locus twice — the fingerprint deliberately collapses two observations of
      * one practice in one file — so a representative is chosen the same way the rendered trend chooses
      * one: worst severity, then highest confidence is unavailable here, so the first wins.
      */

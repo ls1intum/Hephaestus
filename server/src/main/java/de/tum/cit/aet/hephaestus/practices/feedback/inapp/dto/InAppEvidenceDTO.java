@@ -22,7 +22,7 @@ public record InAppEvidenceDTO(
     @NonNull @Schema(description = "Kind of work, e.g. scm.pull_request") String artifactKind,
     @NonNull @Schema(description = "Identifier of the work within its kind") Long artifactId,
     @NonNull @Schema(description = "When the measurement behind this occurrence was taken") Instant observedAt,
-    @Schema(description = "What the review recorded on this piece of work") String title
+    @Schema(description = "What the review recorded on this piece of work") String summary
 ) {
     public static InAppEvidenceDTO from(Observation observation) {
         ArtifactKind kind = observation.getArtifactKind();
@@ -30,7 +30,7 @@ public record InAppEvidenceDTO(
             kind == null ? null : kind.value(),
             observation.getArtifactId(),
             observation.getObservedAt(),
-            observation.getTitle()
+            observation.getSummary()
         );
     }
 }

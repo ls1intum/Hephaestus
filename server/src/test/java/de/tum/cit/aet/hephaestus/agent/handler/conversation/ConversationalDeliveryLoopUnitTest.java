@@ -240,68 +240,17 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     @Test
-    void preparerWritesPreparedUnitsBodyNullCappedAtThree() {
+    void preparerDoesNotInventBriefsWhenCompositionIsMissing() {
         UUID job = UUID.randomUUID();
         List<Observation> admitted = new ArrayList<>();
         for (int i = 0; i < 5; i++) {
-            admitted.add(problem(null, null, 0.9f - i * 0.1f));
+            admitted.add(problem(null, null)); // single recipient, capped at 3
         }
 
         int prepared = preparer().prepare(job, WS, admitted, List.of());
 
-        // Three are raised; the two over the cap are withheld — and a withheld locus the router admitted still
-        // gets a row, or it would read as feedback the developer saw and ignored.
-        assertThat(prepared).isEqualTo(3);
-        ArgumentCaptor<Feedback> saved = ArgumentCaptor.forClass(Feedback.class);
-        verify(feedbackRepository, times(5)).save(saved.capture());
-        assertThat(saved.getAllValues()).allSatisfy(f -> {
-            assertThat(f.getChannel()).isEqualTo(FeedbackChannel.IN_CHAT);
-            assertThat(f.getBody()).isNull();
-            assertThat(f.getRecipientUserId()).isEqualTo(RECIPIENT);
-        });
-        assertThat(saved.getAllValues())
-            .extracting(Feedback::getDeliveryState, Feedback::getSuppressionReason, Feedback::getPosition)
-            .containsExactly(
-                tuple(FeedbackDeliveryState.PREPARED, null, 3000),
-                tuple(FeedbackDeliveryState.PREPARED, null, 3001),
-                tuple(FeedbackDeliveryState.PREPARED, null, 3002),
-                tuple(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.VOLUME_CAPPED, 3003),
-                tuple(FeedbackDeliveryState.SUPPRESSED, FeedbackSuppressionReason.VOLUME_CAPPED, 3004)
-            );
-    }
-
-    @Test
-    void preparerFailsLoud_ratherThanOverflowItsOrdinalBand() {
-        // Every admitted observation takes a slot, so a pathological job could run the band into the next
-        // one — where the (agent_job_id, position) guard would read a foreign row as "already recorded" and
-        // drop the write. That is the silent drop this whole ledger exists to prevent, so it must be loud.
-        UUID job = UUID.randomUUID();
-        List<Observation> admitted = new ArrayList<>();
-        for (int i = 0; i < FeedbackLedgerRecorder.UNIT_ORDINAL_BAND_WIDTH + 1; i++) {
-            admitted.add(problem(null, null, 0.5f));
-        }
-
-        assertThatThrownBy(() -> preparer().prepare(job, WS, admitted, List.of()))
-            .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("ordinal band");
-        verify(feedbackRepository, never()).save(any());
-    }
-
-    @Test
-    void preparerPublishesOnePreparedEventPerRecipient_countingOnlyNewUnits() {
-        UUID job = UUID.randomUUID();
-        List<Observation> admitted = new ArrayList<>();
-        for (int i = 0; i < 5; i++) {
-            admitted.add(problem(null, null, 0.9f - i * 0.1f)); // single recipient, capped at 3
-        }
-
-        preparer().prepare(job, WS, admitted, List.of());
-
-        ArgumentCaptor<ConversationFeedbackPreparedEvent> event = ArgumentCaptor.forClass(
-            ConversationFeedbackPreparedEvent.class
-        );
-        verify(eventPublisher).publishEvent(event.capture());
-        assertThat(event.getValue()).isEqualTo(new ConversationFeedbackPreparedEvent(WS, RECIPIENT, 3));
+        assertThat(prepared).isZero();
+        verify(eventPublisher, never()).publishEvent(any(Object.class));
     }
 
     @Test
@@ -310,7 +259,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         // Every (job, position) already exists → pure idempotent re-run, nothing newly prepared.
         when(feedbackRepository.existsByAgentJobIdAndPosition(any(), anyInt())).thenReturn(true);
 
-        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, null, 0.9f)), List.of());
+        int prepared = preparer.prepare(UUID.randomUUID(), WS, List.of(problem(null, null)), List.of());
 
         assertThat(prepared).isZero();
         // any(Object.class), not any(): binds the publishEvent(Object) overload the record actually dispatches to.
@@ -365,7 +314,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void reconcilerWithholdsPreparedFeedbackAfterAuthorizationWithdrawal() {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        Observation observation = problem(null, null, 0.9f, observationId);
+        Observation observation = problem(null, null, observationId);
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
         ).thenReturn(List.of(feedbackId));
@@ -392,7 +341,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     void silentModeSuppressesNothingWhenTheLinkedObservationIsRefused() {
         UUID observationId = UUID.randomUUID();
         UUID feedbackId = UUID.randomUUID();
-        Observation observation = problem(null, null, 0.9f, observationId);
+        Observation observation = problem(null, null, observationId);
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, observationId)
         ).thenReturn(List.of(feedbackId));
@@ -433,7 +382,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
         ).thenReturn(List.of(fidA));
-        Observation obs = problem(null, "rk-delivered", 0.9f, a);
+        Observation obs = problem(null, "rk-delivered", a);
         doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-delivered")).thenReturn(
             true
@@ -452,7 +401,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         when(
             feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(WS, RECIPIENT, a)
         ).thenReturn(List.of(fidA));
-        Observation obs = problem(null, "rk-fresh", 0.9f, a);
+        Observation obs = problem(null, "rk-fresh", a);
         doReturn(List.of(obs)).when(observationRepository).findAllByIdInAndWorkspaceId(any(), anyLong());
         when(feedbackRepository.existsDeliveredInContextForRecurrenceKey(WS, RECIPIENT, "rk-fresh")).thenReturn(false);
         when(feedbackRepository.markConversationDelivered(eq(fidA), any())).thenReturn(1);
@@ -513,20 +462,15 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
     }
 
     private Observation problem(ObjectNode evidence, String recurrenceKey) {
-        return problem(evidence, recurrenceKey, 0.9f);
+        return problem(evidence, recurrenceKey, UUID.randomUUID());
     }
 
-    private Observation problem(ObjectNode evidence, String recurrenceKey, float confidence) {
-        return problem(evidence, recurrenceKey, confidence, UUID.randomUUID());
-    }
-
-    private Observation problem(ObjectNode evidence, String recurrenceKey, float confidence, UUID id) {
+    private Observation problem(ObjectNode evidence, String recurrenceKey, UUID id) {
         Observation o = mock(Observation.class);
         lenient().when(o.getId()).thenReturn(id);
         lenient().when(o.getPresence()).thenReturn(Presence.ABSENT);
         lenient().when(o.getAssessment()).thenReturn(Assessment.BAD);
         lenient().when(o.getSeverity()).thenReturn(Severity.MAJOR);
-        lenient().when(o.getConfidence()).thenReturn(confidence);
         lenient().when(o.getArtifactKind()).thenReturn(ArtifactKinds.PULL_REQUEST);
         lenient().when(o.getArtifactId()).thenReturn(100L);
         lenient().when(o.getAboutUserId()).thenReturn(RECIPIENT);

@@ -181,7 +181,8 @@ public class BundledPracticeCatalogLoader {
                     binding.signals(),
                     evidenceDefaults.needsFor(binding.artifactKind()),
                     binding.onDrafts(),
-                    binding.subject()
+                    binding.subject(),
+                    binding.appliesWhen()
                 );
             }
             bindings.add(binding);

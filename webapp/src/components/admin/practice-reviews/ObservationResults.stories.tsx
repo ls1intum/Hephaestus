@@ -8,7 +8,7 @@ import { reviewObservations, workspacePractices } from "./story-mock-data";
 const longContent = {
 	...reviewObservations[0],
 	id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
-	title:
+	summary:
 		"The review keeps every boundary visible even when the observation needs enough words to wrap across a narrow screen twice over",
 	subject: {
 		id: 10,

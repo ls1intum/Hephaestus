@@ -50,9 +50,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                   "basedOn": ["obs-0"], "action": "NEW",
                   "title": "This branch is untested",
-                  "body": "This branch returns early and nothing here exercises it.",
                   "nextStep": "Add a case that calls total with a tax-exempt customer.",
-                  "anchor": { "observationId": "obs-0", "citationIndex": 0 } }
+                  "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 0 } }
                 """,
                 "[]"
             )
@@ -63,25 +62,68 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             .satisfies(unit -> {
                 assertThat(unit.channel()).isEqualTo(FeedbackChannel.IN_CONTEXT);
                 assertThat(unit.basedOn()).containsExactly("obs-0");
-                assertThat(unit.anchor()).isNotNull();
-                assertThat(unit.anchor().path()).isEqualTo("src/billing/InvoiceTotals.java");
-                assertThat(unit.anchor().side()).isEqualTo("NEW");
-                assertThat(unit.anchor().startLine()).isEqualTo(47);
+                assertThat(unit.placement().diffAnchor()).isNotNull();
+                assertThat(unit.placement().diffAnchor().path()).isEqualTo("src/billing/InvoiceTotals.java");
+                assertThat(unit.placement().diffAnchor().side()).isEqualTo("NEW");
+                assertThat(unit.placement().diffAnchor().startLine()).isEqualTo(47);
             });
     }
 
     @Test
-    void readsAConversationUnitAsAMoveRatherThanAScript() {
+    void readsAnArtifactPlacedInContextUnitWithoutInventingCoordinates() {
+        List<ComposedFeedbackUnit> units = parser.parse(
+            output(
+                """
+                { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
+                  "basedOn": ["obs-0"], "action": "NEW",
+                  "title": "The decision is not yet explained",
+                  "nextStep": "Add the constraint that makes this option necessary.",
+                  "placement": { "kind": "ARTIFACT" } }
+                """,
+                "[]"
+            )
+        );
+
+        assertThat(units)
+            .singleElement()
+            .satisfies(unit -> {
+                assertThat(unit.placement().kind()).isEqualTo(
+                    ComposedFeedbackUnit.InContextPlacement.PlacementKind.ARTIFACT
+                );
+                assertThat(unit.placement().diffAnchor()).isNull();
+            });
+    }
+
+    @Test
+    void rejectsCoordinatesOnAnArtifactPlacement() {
+        assertThat(
+            parser.parse(
+                output(
+                    """
+                    { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
+                      "basedOn": ["obs-0"], "action": "NEW",
+                      "title": "The decision is not yet explained", "nextStep": "Add the constraint.",
+                      "placement": { "kind": "ARTIFACT", "observationId": "obs-0", "citationIndex": 0 } }
+                    """,
+                    "[]"
+                )
+            )
+        ).isEmpty();
+    }
+
+    @Test
+    void readsAConversationUnitAsNotesRatherThanAScript() {
         List<ComposedFeedbackUnit> units = parser.parse(
             output(
                 """
                 { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
                   "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
                   "title": "Tests arrive after review",
-                  "conversation": {
-                    "opener": "When you add a branch, at what point do you decide its test is done?",
-                    "evidence": "On the last three changes the test arrived a push later.",
-                    "target": "They name a check they could run before pushing."
+                  "notes": {
+                    "situation": "On !18, !20 and !22 the test landed a push after the review comment.",
+                    "capability": "Writing the test last is what leaves the review to find the gap.",
+                    "evidenceSummary": "On the last three changes the test arrived a push later.",
+                    "inConversationSignal": "They name a check they could run before pushing."
                   } }
                 """,
                 "[]"
@@ -92,9 +134,78 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
             .singleElement()
             .satisfies(unit -> {
                 assertThat(unit.body()).isNull();
-                assertThat(unit.conversation()).isNotNull();
-                assertThat(unit.conversation().target()).isEqualTo("They name a check they could run before pushing.");
+                assertThat(unit.notes()).isNotNull();
+                assertThat(unit.notes().situation()).isEqualTo(
+                    "On !18, !20 and !22 the test landed a push after the review comment."
+                );
+                assertThat(unit.notes().inConversationSignal()).isEqualTo(
+                    "They name a check they could run before pushing."
+                );
             });
+    }
+
+    /**
+     * Each note refuses a different degradation of the turn, so three of four is not a smaller note - it is a
+     * turn missing the part that makes it coaching. The one dropped here is the coaching goal, without which
+     * the mentor cannot tell what useful movement the conversation is meant to support.
+     *
+     * <p>The absent case and the blank case are both here because they are not the same code path: the
+     * sanitiser answers {@code ""} for a field that was never present, so a missing note arrives looking
+     * exactly like an empty one, and a check for null alone lets both through.
+     */
+    @ParameterizedTest
+    @ValueSource(
+        strings = {
+            """
+            "situation": "On !18 the test landed a push after the review comment.",
+            "evidenceSummary": "On the last three changes the test arrived a push later.",
+            "inConversationSignal": "They name a check they could run before pushing."
+            """,
+            """
+            "situation": "On !18 the test landed a push after the review comment.",
+            "capability": "   ",
+            "evidenceSummary": "On the last three changes the test arrived a push later.",
+            "inConversationSignal": "They name a check they could run before pushing."
+            """,
+        }
+    )
+    void refusesAConversationUnitMissingOneOfItsNotes(String notes) {
+        assertThat(
+            parser.parse(
+                output(
+                    """
+                    { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
+                      "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                      "title": "Tests arrive after review",
+                      "notes": { %s } }
+                    """.formatted(notes),
+                    "[]"
+                )
+            )
+        ).isEmpty();
+    }
+
+    @Test
+    void refusesAnOverlongNoteInsteadOfPersistingAnArbitrarilyTruncatedPlan() {
+        String oversized = "x".repeat(ComposedFeedbackUnit.MAX_AIM_LENGTH + 1);
+        assertThat(
+            parser.parse(
+                output(
+                    """
+                    { "channel": "IN_CHAT", "practiceSlug": "ships-tests-with-the-change",
+                      "basedOn": ["prior:ships-tests-with-the-change"], "action": "NEW",
+                      "title": "Tests arrive after review",
+                      "notes": {
+                        "situation": "Tests repeatedly arrived after review.",
+                        "capability": "%s",
+                        "evidenceSummary": "Three merge requests show the sequence.",
+                        "inConversationSignal": "The developer can name when the test belongs."
+                      } }
+                    """.formatted(oversized),
+                    "[]"
+                )
+            )
+        ).isEmpty();
     }
 
     /**
@@ -122,8 +233,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                     """
                     { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
-                      "title": "t", "body": "b", "nextStep": "n",
-                      "anchor": { "observationId": "obs-0", "citationIndex": 4 } }
+                      "title": "t", "nextStep": "n",
+                      "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 4 } }
                     """,
                     "[]"
                 )
@@ -143,8 +254,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                     """
                     { "channel": "IN_CONTEXT", "practiceSlug": "keeps-the-thread-moving",
                       "basedOn": ["obs-1"], "action": "NEW",
-                      "title": "t", "body": "b", "nextStep": "n",
-                      "anchor": { "observationId": "obs-1", "citationIndex": 0 } }
+                      "title": "t", "nextStep": "n",
+                      "placement": { "kind": "DIFF", "observationId": "obs-1", "citationIndex": 0 } }
                     """,
                     "[]"
                 )
@@ -160,7 +271,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                     """
                     { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
-                      "title": "t", "body": "b", "nextStep": "n" }
+                      "title": "t", "nextStep": "n" }
                     """,
                     "[]"
                 )
@@ -178,7 +289,7 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                     { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                       "basedOn": ["obs-0"], "action": "NEW",
                       "title": "t", "body": "b", "nextStep": "n",
-                      "anchor": { "observationId": "obs-0", "citationIndex": 0 } }
+                      "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 0 } }
                     """,
                     "[]"
                 )
@@ -268,8 +379,8 @@ class FeedbackCompositionResultParserTest extends BaseUnitTest {
                 """
                 [
                   { "channel": "IN_CONTEXT", "practiceSlug": "ships-tests-with-the-change",
-                    "basedOn": ["obs-0"], "action": "NEW", "title": "on the work", "body": "b", "nextStep": "n",
-                    "anchor": { "observationId": "obs-0", "citationIndex": 0 } },
+                    "basedOn": ["obs-0"], "action": "NEW", "title": "on the work", "nextStep": "n",
+                    "placement": { "kind": "DIFF", "observationId": "obs-0", "citationIndex": 0 } },
                   { "channel": "IN_APP", "practiceSlug": "ships-tests-with-the-change",
                     "basedOn": ["obs-0"], "action": "NEW", "title": "on the page", "body": "b", "nextStep": "n" }
                 ]

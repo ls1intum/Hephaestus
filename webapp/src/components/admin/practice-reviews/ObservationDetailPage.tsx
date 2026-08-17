@@ -117,7 +117,7 @@ export function ObservationDetailPage({
 						<ClaimCurrentnessBadge currentness={observation.claimCurrentness} />
 					</>
 				}
-				title={observation.title}
+				title={observation.summary}
 				provenance={
 					<ReviewProvenanceLine
 						workspaceSlug={workspaceSlug}
@@ -163,12 +163,14 @@ export function ObservationDetailPage({
 				</ReviewFact>
 			</ReviewFactGrid>
 
-			{observation.reasoning && (
+			{observation.evidenceRationale && (
 				<section aria-labelledby="reasoning-heading" className="space-y-2">
 					<h3 id="reasoning-heading" className="text-lg font-semibold">
 						Why this was raised
 					</h3>
-					<p className="whitespace-pre-wrap text-sm leading-relaxed">{observation.reasoning}</p>
+					<p className="whitespace-pre-wrap text-sm leading-relaxed">
+						{observation.evidenceRationale}
+					</p>
 				</section>
 			)}
 

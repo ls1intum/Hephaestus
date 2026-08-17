@@ -3,25 +3,30 @@
 **Status:** Accepted
 **Date:** 2026-08-16
 **Authors:** Felix T.J. Dietrich
-**Builds on:** [ADR 0021](0021-findings-feedback-synthesis-seam.md) (findings and feedback are separate records), [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) (observation = presence × assessment), [ADR 0007](0007-sandbox-spi-shape.md) (the Pi agent sandbox)
-**Completes:** ADR 0021's *Open calls for the owner* — "Hattie `level` derived, not stored", which was parked without a mapping. This ADR records the mapping and keeps it derived. It also revives F-2 / F-10, which the [2026-07-31 update](0021-findings-feedback-synthesis-seam.md#update--2026-07-31-issue-1423) recorded as *did not ship*: a `report_feedback` tool now exists.
+**Builds on:** [ADR 0021](0021-observations-feedback-synthesis-seam.md) (observations and feedback are separate records), [ADR 0022](0022-observation-presence-assessment-and-schema-cleanup.md) (observation = presence × assessment), [ADR 0007](0007-sandbox-spi-shape.md) (the Pi agent sandbox)
+**Completes:** ADR 0021's _Open calls for the owner_ — "Hattie `level` derived, not stored", which was parked without a mapping. This ADR records the mapping and keeps it derived. It also revives F-2 / F-10, which the [2026-07-31 update](0021-observations-feedback-synthesis-seam.md#update--2026-07-31-issue-1423) recorded as _did not ship_: a `report_feedback` tool now exists.
+
+> **IN_CHAT contract:** `notes.{situation, capability, evidenceSummary, inConversationSignal}` are notes _to_
+> the mentor, not dialogue. The mentor chooses whether a question, direct feedback, or another move fits
+> the live conversation; the brief does not force a canned Socratic sequence. This is the only accepted
+> conversation-note schema.
 
 ## Context
 
 Hephaestus does two different things to a piece of work, and until this change it did them in one
 breath.
 
-**Measurement** is recording what is there — *"this change adds a tax-exempt branch, and nothing in the
-change tests it"*. That sentence is true or false, and you check it by opening the file. It is a
+**Measurement** is recording what is there — _"this change adds a tax-exempt branch, and nothing in the
+change tests it"_. That sentence is true or false, and you check it by opening the file. It is a
 reading off an instrument, so it is kept forever and never edited.
 
-**Intervention** is deciding to say something to a person and choosing the words — *"write the
-assertion that distinguishes the new branch before you write the branch"*. That sentence cannot be
+**Intervention** is deciding to say something to a person and choosing the words — _"write the
+assertion that distinguishes the new branch before you write the branch"_. That sentence cannot be
 true or false. It can only be useful or useless, and its usefulness depends on who is reading it,
 where, what they were told last week, and whether anyone has said it already.
 
 The good version of each ruins the other. A measurement authored as advice bends toward whatever makes
-good advice — a finding you can write a nice tip about gets reported, one you cannot gets quietly
+good advice — an observation you can write a nice tip about gets reported, one you cannot gets quietly
 dropped. And advice written at the moment of measurement can only ever be about the one thing just
 measured: it cannot know this is the third time, it cannot know the developer was already told, and it
 cannot decide to stay quiet.
@@ -31,9 +36,9 @@ Three further forces made the seam urgent rather than tidy:
 - **Three lanes, three mechanisms, three moments.** In-context text was authored by the detector during
   measurement; in-app text by a second sandbox turn after the review; chat text by the mentor's own
   turn, days later. Only one of the three could see history, and no two shared a vocabulary — and the
-  three lane *names* did not share one either, which is the subject of its own subsection below.
+  three lane _names_ did not share one either, which is the subject of its own subsection below.
 - **Advice had no durable home on the lane that used it most.** `guidance` is not a column —
-  `Observation` carries `reasoning` and nothing else, per ADR 0021 and ADR 0022 — so for an
+  `Observation` carries an `evidenceRationale` and no advice, per ADR 0021 and ADR 0022 — so for an
   inline-only delivery the words the developer received survived only inside `agent_job.output`,
   unindexed and unjoined. Every downstream question ("did we already say this?", "does this supersede
   that?") was being asked against text that was never stored.
@@ -65,7 +70,7 @@ Three further forces made the seam urgent rather than tidy:
    failure modes are named above, and it structurally cannot express "we already said this", "this is
    the third time", or "last week's gap is closed".
 2. **One composer turn per lane — three turns.** Rejected on two counts. The per-lane rules are only
-   legible *in contrast* ("the note on the work is already written; do not write it again" is
+   legible _in contrast_ ("the note on the work is already written; do not write it again" is
    unstatable in a single-lane prompt), and the budget has no room: the stage runs on what the review
    left over, ceilinged at `max(60s, 15% of the agent budget)` with a 30s floor
    (`pi-runner-timings.mjs`). Three turns means three prompt payloads and three histories for the same
@@ -81,13 +86,14 @@ Three further forces made the seam urgent rather than tidy:
 
 A practice review is two phases inside one agent job.
 
-**Phase 1 — measurement.** `report_finding` records observations: presence, assessment, severity,
-confidence, citations with the quote that proves them, and `reasoning`. Observations are immutable and
-kept forever. Java assigns occurrence and recurrence identity at persistence.
+**Phase 1 — measurement.** `report_observation` records a neutral `summary`, a discriminated `outcome`,
+the exact evidence branch that outcome requires, and an `evidenceRationale`. It records no advice and no
+self-reported confidence. Observations are immutable and kept forever. Java maps the wire outcome onto
+the persisted presence/assessment vocabulary and assigns occurrence and recurrence identity.
 
 **Phase 2 — intervention.** After the review's result file is final, `runCompositionStage` opens a
 **separate in-memory session** — tools `read`, `grep`, `report_feedback`, no `bash`, no
-`report_finding`, so it cannot touch the review's state and cannot re-bill the review's conversation.
+`report_observation`, so it cannot touch the review's state and cannot re-bill the review's conversation.
 It is prompted with `agent/feedback-composer.md` and reads this run's projected observations plus four
 staged history files: prior observations, feedback already delivered, feedback **prepared but not yet
 read**, and a Java-computed delta. It emits `out/feedback.json`, parsed by
@@ -101,78 +107,53 @@ model is not a reason to relax the gate; it is a reason the gate has more to ref
 **Presence of `inputs/feedback-composition.json` is the on switch**, and it carries the lane set. Only
 pull-request and issue reviews stage it, and never for a `BACKFILL` origin.
 
-### The channel *is* the level — recorded, still derived
+### The channel _is_ the level — recorded, still derived
 
 `FeedbackChannel` is not three renderers of one message. Each value is a different level of Hattie &
 Timperley's model, and that is the whole reason a 1:1 map from observations to feedback is the wrong
 shape:
 
-| | `IN_CONTEXT` | `IN_APP` | `IN_CHAT` |
-|---|---|---|---|
-| Lands | on the work artifact — pull request summary or inline note, issue comment | on the developer's own practice pages | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
-| Level | **task** | **process** | **self-regulation** |
-| Answers | "what is wrong here?" | "what keeps happening in how I work?" | "how would I have caught this myself?" |
-| Audience | public — the team reads it | private | private, in a live turn |
-| Evidence is | a quoted line, spliced by the server from the citation | several pieces of work, named | the same, held back until they answer |
-| Next step is | one edit, in this change | a habit, for next time | a self-check they commit to |
-| Catalogue principle (`whyItMatters`) | appended verbatim by the server | situated by the composer, never appended | not used |
-| Anchor | required, and only onto this change's diff | forbidden | forbidden |
+|                                      | `IN_CONTEXT`                                                              | `IN_APP`                                 | `IN_CHAT`                                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Lands                                | on the work artifact — pull request summary or inline note, issue comment | on the developer's own practice pages    | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
+| Level                                | **task**                                                                  | **process**                              | **self-regulation**                                                                              |
+| Answers                              | "what is wrong here?"                                                     | "what keeps happening in how I work?"    | "how would I have caught this myself?"                                                           |
+| Audience                             | public — the team reads it                                                | private                                  | private, in a live turn                                                                          |
+| Evidence is                          | a quoted line, spliced by the server from the citation                    | several pieces of work, named            | the same, held back until they answer                                                            |
+| Next step is                         | one edit, in this change                                                  | a habit, for next time                   | a self-check they commit to                                                                      |
+| Catalogue principle (`whyItMatters`) | appended verbatim by the server                                           | situated by the composer, never appended | not used                                                                                         |
+| Anchor                               | required, and only onto this change's diff                                | forbidden                                | forbidden                                                                                        |
 
-Two consequences are load-bearing and neither is a matter of taste. The public lane never says *"you
-keep doing this"*, because that is a performance review in front of the team. The private lanes never
+Two consequences are load-bearing and neither is a matter of taste. The public lane never says _"you
+keep doing this"_, because that is a performance review in front of the team. The private lanes never
 re-quote a line of code, because the line is on the merge request where it can be read in context.
 
-**The level stays derived, never stored.** ADR 0021 parked this as an open call — *"Hattie `level`
-derived, not stored; persist only if the RQ analysis needs it frozen at delivery time"* — and left the
+**The level stays derived, never stored.** ADR 0021 parked this as an open call — _"Hattie `level`
+derived, not stored; persist only if the RQ analysis needs it frozen at delivery time"_ — and left the
 mapping unwritten, which is why three lanes drifted into three vocabularies. The mapping is now
 recorded here and in `FeedbackChannel`'s own javadoc, and `feedback` gains no `level` column: it is a
 function of `channel`, and a stored copy is a second truth that can disagree.
 
 ### The three names sit on one axis: where the feedback lands
 
-`IN_CONTEXT`, `IN_APP`, `IN_CHAT`. Every value answers one question and only that question — *where does
-this land?* The previous set answered three: a place (`IN_CONTEXT`), a mechanism (`CONVERSATION`) and an
+`IN_CONTEXT`, `IN_APP`, `IN_CHAT`. Every value answers one question and only that question — _where does
+this land?_ The previous set answered three: a place (`IN_CONTEXT`), a mechanism (`CONVERSATION`) and an
 activity (`REFLECTION`). A set of values on three axes cannot be reasoned about as a set, which is how
 three lanes drifted into three vocabularies for the same fact.
 
 - **`IN_CONTEXT`** — placed directly on the work artifact: the pull request summary or an inline note,
   an issue comment.
-- **`IN_CHAT`** — the dialogic channel: the unit becomes a turn in a conversation with the developer,
-  wherever that conversation runs — the in-app mentor at `/w/:slug/mentor`, or Slack.
+- **`IN_CHAT`** — the dialogic channel: the unit prepares evidence-bound notes for a later turn in a
+  conversation with the developer, wherever that conversation runs — the in-app mentor at
+  `/w/:slug/mentor`, or Slack.
 - **`IN_APP`** — the non-dialogic practice surface: the developer's own practice pages.
 
 **"But the mentor also renders in-app" is answered by those two definitions, not by a screen.**
-`IN_CHAT` is defined by being *dialogic* — the unit is a turn, and the developer can answer it — never
-by where it is rendered. `IN_APP` is defined by being the *non-dialogic* practice surface — the unit is
+`IN_CHAT` is defined by being _dialogic_ — the unit informs a turn the developer can answer — never
+by where it is rendered. `IN_APP` is defined by being the _non-dialogic_ practice surface — the unit is
 written down, and reading it is the whole of the interaction. So the in-app mentor and Slack are one
 channel because both are turns, and a second written surface inside Hephaestus is `IN_APP` rather than a
-fourth value. The question that places a message is *is it a turn?*, asked before *which screen?*
-
-**Why `REFLECTION` was wrong.** The lane was renamed twice before this — `REFLECTION_DASHBOARD`, dropped
-for naming a page, then `PROFILE`, dropped for colliding with the public profile at `/user/{username}`.
-Each of those failed on one axis; `REFLECTION` failed on three, and all three are the reason it does not
-come back:
-
-1. **It named what the developer is supposed to *do*, not where the feedback lands.** `IN_CONTEXT`
-   named a place; this named an activity. One value on a different axis is enough to stop the enum
-   being readable as a set.
-2. **It asserted an outcome the system cannot observe.** We can record that a page was opened; we cannot
-   record that anybody reflected. A value named for an effect we do not measure invites surfaces,
-   metrics and copy that quietly claim we do.
-3. **`reflection` is a taken word in Java.** Two packages carried it — `practices/feedback/reflection`
-   and `agent/handler/reflection` — and both read as `java.lang.reflect` to every engineer who has not
-   read this ADR, on every import line and in every stack trace.
-
-`CONVERSATION` went for a narrower reason: it named the container the words end up in rather than the
-landing, so "the mentor in Slack" read as a candidate fourth channel, and it collided head-on with
-`chat.conversation_thread` — a *reviewed artifact kind*, i.e. an input to a review rather than a
-destination for one.
-
-`IN_APP` and `IN_CHAT` sit on the same axis as `IN_CONTEXT`, which is precisely what the earlier names
-lacked, and is why this is meant to be the last rename of this lane. Re-opening it means naming the lane
-for a screen or for an activity again, and all three failed names did one of those: two named a
-particular page, one of which already existed elsewhere, and the third named what the developer was
-supposed to do with what it carried.
+fourth value. The question that places a message is _is it a turn?_, asked before _which screen?_
 
 ### The tool contract
 
@@ -180,23 +161,26 @@ supposed to do with what it carried.
 
 - `channel`, restricted at the schema to the lanes this run enabled; `practiceSlug`, restricted to
   composable slugs; `basedOn`, at least one entry; `action` ∈ `NEW | SUPERSEDE | WITHHOLD`.
-- `title` + `body` + `nextStep` for `IN_CONTEXT` and `IN_APP`; `conversation.{opener, evidence,
-  target}` for `IN_CHAT`, which is a **move**, not a script — the mentor still writes the words of the
-  turn, so nothing goes stale waiting to be raised.
+- `title` + `placement` + `nextStep` for `IN_CONTEXT`; `title` + `body` + `nextStep` for `IN_APP`; `notes.{situation, capability,
+evidenceSummary, inConversationSignal}` for `IN_CHAT`, which is **notes to the mentor**, not a turn — the mentor writes
+  every word of the turn, so nothing goes stale waiting to be raised.
 - `withholdReason` ∈ `NO_MATERIAL_CHANGE | ALREADY_SAID | BELOW_BAR` for `WITHHOLD`.
-- `anchor: { observationId, citationIndex }` for `IN_CONTEXT` only.
+- `placement: { kind: DIFF, observationId, citationIndex }` or `placement: { kind: ARTIFACT }` for
+  `IN_CONTEXT` only. The occasion restricts which kinds are available.
 
 Three refusals in that shape are the point:
 
 - **No `presence`, `assessment`, `severity`, `confidence` or composer-typed citation.** An intervention
   that could carry a verdict would eventually be read back as one.
-- **An anchor names an observation and one of *its* citation indexes** — never a path and never a
+- **A diff placement names an observation and one of _its_ citation indexes** — never a path and never a
   line. The server resolves file, side and line from the staged citation and refuses a citation whose
-  `anchorable` flag is false. The composer therefore cannot invent an anchor.
+  `anchorable` flag is false. An artifact placement carries no coordinates and must bind to a current
+  observation of the same practice. The composer therefore cannot invent a locus or turn history alone
+  into a public claim.
 - **`SUPERSEDE` must name a `threadKey` that was staged in `prepared.json`.** The model may not invent
   a supersession target.
 
-`ComposedFeedbackUnit.WithholdReason` is deliberately *not* `FeedbackSuppressionReason`: the latter is
+`ComposedFeedbackUnit.WithholdReason` is deliberately _not_ `FeedbackSuppressionReason`: the latter is
 a database check constraint listing reasons the **server** withheld, and the two must not merge.
 
 ### Java does the bookkeeping; the model does the writing
@@ -206,11 +190,11 @@ stages the observation history, grouped per artifact: the newest run of an artif
 runs in the window are "before". It yields `NEW`, `RECURRING` (something moved), `UNCHANGED` (still
 there, nothing moved) and `RESOLVED`.
 
-`RESOLVED` is why the delta exists. *"The gap from last week is closed"* originates from a locus that
+`RESOLVED` is why the delta exists. _"The gap from last week is closed"_ originates from a locus that
 is in the prior set and absent from the newest run — there is no current measurement to map from, so a
 1:1 mapping can never emit it. `UNCHANGED` is the matching bar in the other direction: a message about
 an unchanged locus must rest on a fact from this run, not on the fact that it is still there. A
-vanished *strength* is not classified at all, because crediting someone with fixing what was already
+vanished _strength_ is not classified at all, because crediting someone with fixing what was already
 right is worse than saying nothing.
 
 ### Supersession — nothing received may be un-said
@@ -239,11 +223,9 @@ meant to.
 
 ### Availability floor
 
-`DeliveryComposer` prefers the composed in-context unit for a practice and falls back to the finding's
-own `reasoning` and `guidance` when no unit was claimed. That fallback is not a degraded stub — it is
-the rendering that shipped before composition existed, so a run that composes nothing produces exactly
-the previous comment. This is why `report_finding` still requires `guidance` even though `guidance` is
-still not a column: it is the floor under a stage that is allowed to fail.
+There is no measurement-text fallback. If composition cannot produce an admitted unit, the system records
+that no feedback was prepared; it never turns an observation rationale into accidental advice. This keeps
+the measurement/intervention seam true during failures as well as successful runs.
 
 The lanes that have no such floor are made durable instead. `agent_job` carries a per-lane preparation
 mark, and `FeedbackLanePreparationSweeper` re-runs any lane whose async listener did not — selecting on
@@ -253,9 +235,9 @@ the missing mark rather than on missing rows, because both lanes legitimately pr
 
 These are not deferred work items; they are conditions on work that touches these surfaces.
 
-- **Any cross-person aggregate needs a small-cell rule *and its complement* before it ships.** Nothing
+- **Any cross-person aggregate needs a small-cell rule _and its complement_ before it ships.** Nothing
   in the server implements k-anonymity today and this seam adds no cross-person aggregate. Suppressing
-  small cells alone still leaks: when a category covers *almost all* of a cohort, the complement is the
+  small cells alone still leaks: when a category covers _almost all_ of a cohort, the complement is the
   small cell. Whoever builds the first cohort or team comparison meets both halves or does not ship it.
 - **Per-person rate limiting across artifacts does not exist.** Cooldowns key on the artifact and the
   budget caps the workspace, so a prolific author still receives one review per piece of work. Real for
@@ -278,7 +260,7 @@ and stages an empty observations file.
 
 **Neutral.** The measurement prompt keeps its guidance-authoring rules, because the fallback needs
 them. Advice is still not persisted per observation, and should stay that way: advice is a property of
-a *delivery*, and it now has a durable home on `feedback.body` for every lane. The naming half is paid
+a _delivery_, and it now has a durable home on `feedback.body` for every lane. The naming half is paid
 in one change rather than spread: the enum values, the `chk_feedback_channel` constraint, the
 `practices/feedback/inapp` and `agent/handler/inapp` packages, `GET /practices/feedback/in-app` and
 every `Reflection*` type move together. The alternative to paying it is a fourth rename.
@@ -305,7 +287,7 @@ Any of the following re-opens this decision:
   budget guarantee has to become a reservation rather than a leftover.
 - **A fourth surface appears** that is neither on the artifact, nor a turn, nor the practice pages, and
   is not one of the three Hattie levels — the channel/level identity above is the thing it would break,
-  and the mapping would then have to be stored rather than derived. A new *screen* is not that: it joins
+  and the mapping would then have to be stored rather than derived. A new _screen_ is not that: it joins
   `IN_APP` if it is written and `IN_CHAT` if it is a turn.
 - **A cross-person aggregate is proposed**, which activates the k-anonymity constraint above before any
   code is written.
@@ -333,4 +315,4 @@ This ADR is the decision and its rationale, not a field inventory. For what the 
   performance least. The three delivery channels are the task, process and self-regulation levels.
 - Sadler, [_Formative assessment and the design of instructional systems_](https://doi.org/10.1007/BF00117714),
   Instructional Science 18, 1989 — feedback is only formative if the learner can use it to close the
-  gap, which is why every message carries evidence *and* a next step.
+  gap, which is why every message carries evidence _and_ a next step.

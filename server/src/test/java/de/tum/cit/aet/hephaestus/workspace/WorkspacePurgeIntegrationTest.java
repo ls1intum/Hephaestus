@@ -795,7 +795,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.8f,
                 null,
                 null,
                 null,

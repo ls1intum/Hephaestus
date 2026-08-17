@@ -195,6 +195,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         Collection<AgentJobStatus> statuses
     );
 
+    Optional<AgentJob> findByWorkspaceIdAndIdempotencyKey(Long workspaceId, String idempotencyKey);
+
     /**
      * Matches on an idempotency-key prefix, so a caller can look across the varying tail of the key
      * (head SHA, revision, timestamp) for an earlier review of the same subject.
@@ -367,6 +369,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         "SELECT new de.tum.cit.aet.hephaestus.agent.job.UnpreparedFeedbackLanes(" +
             "j.id, j.workspace.id, j.inChatPreparedAt, j.inAppPreparedAt) FROM AgentJob j " +
             "WHERE j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED " +
+            "AND j.jobType IN (de.tum.cit.aet.hephaestus.agent.AgentJobType.PULL_REQUEST_REVIEW, " +
+            "de.tum.cit.aet.hephaestus.agent.AgentJobType.ISSUE_REVIEW) " +
             "AND j.completedAt >= :from AND j.completedAt < :until " +
             "AND (j.inChatPreparedAt IS NULL OR j.inAppPreparedAt IS NULL) " +
             "ORDER BY j.completedAt"
