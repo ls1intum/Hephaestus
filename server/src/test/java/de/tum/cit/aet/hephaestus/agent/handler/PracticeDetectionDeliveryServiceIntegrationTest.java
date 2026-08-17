@@ -298,9 +298,13 @@ class PracticeDetectionDeliveryServiceIntegrationTest extends BaseIntegrationTes
             assertThat(persisted)
                 .extracting(Observation::getPresence)
                 .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
+            // Confidence is no longer generated: the model never used the range (580 observations, none
+            // below 0.90, 55% exactly 1.00), so the field left report_finding and every row now carries
+            // the documented sentinel. Asserted rather than dropped, because a row that quietly went back
+            // to carrying a model-chosen number would mean the field had crept back in.
             assertThat(persisted)
                 .extracting(Observation::getConfidence)
-                .allMatch(c -> c == 0.9f);
+                .allMatch(c -> c == Observation.UNMEASURED_CONFIDENCE);
         }
 
         @Test
