@@ -7,9 +7,24 @@ description: How Hephaestus reviews pull requests, merge requests, and issues fo
 
 Practice feedback is feedback on an observable way of working, such as keeping a change reviewable, explaining why it is needed, or responding constructively to a reviewer.
 
-When practice reviews are enabled, Hephaestus uses AI to review eligible pull requests, merge requests, and issues against the practices configured for your workspace. It posts the resulting feedback as a comment on the work.
+When practice reviews are enabled, Hephaestus uses AI to review eligible pull requests, merge requests,
+and issues against the practices configured for your workspace. It records observations first, then
+decides whether any feedback would be useful and where it belongs.
 
 The feedback is advisory. It does not approve a change for merge, grade the developer, or replace human review.
+
+## Where feedback appears
+
+- **On the work:** a public, task-level comment about this change. A line-specific point can be placed
+  on the diff; an artifact-level point stays in the summary.
+- **On your practice pages:** private feedback about a pattern across multiple pieces of your work. It
+  leads with what changed in the pattern and keeps one current unread card per practice.
+- **In Heph:** private coaching context for a later conversation. The review prepares evidence-backed
+  notes, not a message for the mentor to read aloud. Heph chooses how to use them from the live
+  conversation when you chat.
+
+Not every observation becomes feedback. Hephaestus can withhold a repeated, unchanged, ungrounded, or
+already-addressed point instead of manufacturing another message.
 
 ## Pull requests and merge requests
 
@@ -79,6 +94,10 @@ Two answers there surprise people:
 - **Reviewed**, with nothing delivered, is a normal and deliberate outcome. A practice can be set to a
   quieter level, where it still runs and still records what it found but does not post a comment. Your
   workspace admins can see the result even when you were told nothing.
+- **Insufficient evidence** means the work gave the practice a real subject, but the available evidence
+  could not support a conclusion. **No review occasion** means the work had no subject for that practice.
+  If required evidence was unavailable, stale, partial, redacted, or failed to collect, the practice is
+  skipped before an observation is created; it is not treated as either answer.
 
 A review of past work is quieter still: those never produce comments at all, by design.
 

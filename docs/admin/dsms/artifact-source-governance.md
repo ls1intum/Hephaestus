@@ -20,12 +20,15 @@ defines the governance decision that permits collection, retention, processing, 
 1. **Default deny.** Approval must cover the source, purpose, audience, processor, region, and retention policy.
 2. **Necessity before benefit.** Name the capability that requires the source and why a less intrusive source is
    insufficient. Accuracy, convenience, and possible reuse are not purposes.
-3. **Collect on demand.** Collect only the union declared by eligible practice revisions. Stop collection when no
-   approved consumer remains.
+3. **Minimize the catalog, not each invocation.** For an admitted review, the runtime captures every governed
+   source that applies to that artifact kind. Practice bindings control whether a practice may use a source; they
+   do not reduce what is staged for that invocation. Keep each source's selection scope and limits minimal, and
+   remove a source from the next contract version when no approved consumer remains.
 4. **Separate purposes.** Product feedback, mentoring, operator quality assurance, and research evaluation require
    separate decisions. Product use does not authorize evaluation retention or ablation.
-5. **Separate responsibilities.** Workspace administrators select sources within the operator-approved envelope;
-   they do not approve legal basis, processors, transfers, DPIA outcomes, or new data categories.
+5. **Separate responsibilities.** Workspace administrators connect integrations and enable practices within the
+   shipped, operator-approved envelope; they do not approve sources, legal bases, processors, transfers, DPIA
+   outcomes, or new data categories.
 6. **Propagate restrictions.** Derivations inherit the strictest audience, egress, region, retention, and erasure
    rules of their dependencies. The runtime separately enforces `AUTOMATED_PRACTICE_REVIEW`,
    `PRACTICE_FEEDBACK_DELIVERY`, `CONVERSATIONAL_MENTORING`, and `OPERATOR_EVIDENCE_REVIEW` at their boundaries.

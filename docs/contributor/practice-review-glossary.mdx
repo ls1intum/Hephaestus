@@ -231,15 +231,15 @@ how it runs is in the [practice review pipeline](./practice-review-pipeline.mdx#
 | Term | Plain meaning | Do not use for this concept |
 | --- | --- | --- |
 | **Measurement** | The first phase: reading one piece of work against each practice and recording what is there. | detection pass, scan, phase one |
-| **Observation** | One measurement — one practice's answer about one piece of work, immutable, kept forever. Carries an `evidenceRationale` and never advice. | finding, verdict, result |
+| **Observation** | One measurement — one practice's answer about one piece of work, immutable for as long as it is retained. Carries an `evidenceRationale` and never advice. | finding, verdict, result |
 | **Intervention** | The second phase: deciding what is worth saying now, to whom, and on which surface. | synthesis, rendering, formatting |
-| **Composition** | The named LLM turn that performs the intervention, in its own sandbox session after the measurements are final. | the composer's turn as part of the review, second pass |
-| **Composed feedback unit** | One message the composition turn proposes for one channel and one practice, before any server gate has admitted it. | feedback row, draft feedback |
+| **Composition** | The second LLM turn in the review's existing agent session. It starts only after Java has admitted the final measurements. | the composer's turn as part of the review, second pass |
+| **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it. | feedback row, draft feedback |
 | **Feedback** | An admitted unit, written to the ledger with its channel, delivery state and the observations it rests on. | comment, message, guidance |
 | **Withhold** | The composer's own decision that a lane is not worth writing on, recorded with a reason. | suppress, skip, drop |
 | **Suppress** | The *server's* refusal to deliver a message it was given, recorded as `FeedbackSuppressionReason`. | withhold, silence |
-| **Notes** | What is composed for the mentor conversation: the situation, coaching goal, evidence summary, and an observable success signal. Notes *to* the mentor, never a sentence for it to say — it writes the turn's words from the live conversation and original evidence. | move, opener, conversation message, prepared reply, script |
-| **Anchor** | The observation and citation an in-context note is placed on. The composer names them; the server resolves the file, side and line. | line reference, position, diff note |
+| **Notes** | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes *to* the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence. | move, opener, conversation message, prepared reply, script |
+| **Placement** | Where in-context feedback belongs: `DIFF` names an admitted observation and citation for server-resolved coordinates; `ARTIFACT` stays at summary level. | model-authored path, model-authored line number |
 | **Thread key** | The identity of one continuing conversation about one thing with one person on one channel. | correlation key, idempotency key |
 | **Supersession** | Replacing a queued, still-unread message with a newer one on the same thread. | edit, update, delete |
 
@@ -257,9 +257,9 @@ on different axes is how three lanes drift into saying the same thing three time
 
 | Channel | Lands | Level | Answers | Audience |
 | --- | --- | --- | --- | --- |
-| `IN_CONTEXT` | on the work artifact — pull request summary or inline note, issue comment | task | "what is wrong here?" | public — the team reads it on the work |
+| `IN_CONTEXT` | on the work artifact — pull request summary or inline note, issue comment | task | "what is worth changing or reinforcing here?" | public — the team reads it on the work |
 | `IN_APP` | on the developer's own practice pages | process | "what keeps happening in how I work?" | private — the developer alone |
-| `IN_CHAT` | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack | self-regulation | "how would I have caught this myself?" | private — a live mentor turn |
+| `IN_CHAT` | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack | self-regulation | "what capability could this conversation support?" | private — a live mentor turn |
 
 **`IN_CHAT` is defined by being dialogic, `IN_APP` by being the non-dialogic practice surface.** The
 mentor renders inside the app as well, so "in the app" cannot be the test: `IN_CHAT` is a turn the
@@ -285,8 +285,8 @@ habit claim is about the practice and not about one merge request; the in-contex
 artifact. `thread_key` is deliberately not unique: a thread is a chain of rows over time, and the
 invariant that matters — at most one live `PREPARED` per thread — is held by a compare-and-swap.
 
-Supersession only ever claims a `PREPARED` message. Say **superseded** for a queued message that was
-replaced before anybody read it, and **continued** for a newer message written beside one that was
+Supersession only ever claims `PREPARED` feedback. Say **superseded** for feedback that was prepared but
+replaced before anybody read it, and **continued** for newer feedback written beside feedback that was
 already read: nothing received is ever un-said, and the newer row still records what it follows through
 `replaces_id`. The in-context channel is the one place a `DELIVERED` message is retired, and that is not
 an exception — the provider comment is edited in place, so the old text stops being visible and the
@@ -368,28 +368,20 @@ that a capture is *stale* — there is no such state, and the contract says why.
 
 ## Outcome states
 
-Two distinctions carry the whole weight of reading the observation table as behaviour. Do not conflate them.
+Three distinctions carry the whole weight of reading the observation table as behaviour. Do not conflate them.
 
-| Outcome | Meaning | Where it lands |
+| Generation outcome | Meaning | Result |
 | --- | --- | --- |
-| `Presence.NOT_APPLICABLE` | The practice has no subject in this work. | An observation. |
-| `Presence.INCONCLUSIVE` | The evidence was present and read, and it does not settle the question either way. | An observation. |
-| A readiness refusal | We could not look: a source was missing, incomplete, empty where content was required, or governance-blocked. | `AutomatedReviewReadinessDecision` on the review. **No observation at all.** |
+| `NO_REVIEW_OCCASION` | The practice's prerequisite situation did not occur in this work. | An observation, normalized to durable `Presence.NOT_APPLICABLE`; requires `evidence.exclusion`. |
+| `INSUFFICIENT_EVIDENCE` | The situation occurred and available evidence was read, but it did not decide the question. | An observation, normalized to durable `Presence.INCONCLUSIVE`; requires `evidence.missingEvidence`. |
+| Readiness refusal | A required source was unavailable, stale, partial, redacted, errored, or empty where content was required. | A readiness decision on the review; **no observation**. |
 
-`INCONCLUSIVE` is what a detector must say when it cannot decide. Saying `NOT_APPLICABLE` instead
-launders the detector's own uncertainty into a claim about the developer, which then enters the behaviour
-series as "nothing to see". A refusal is a fact about the instrument, is deliberately not representable as
-a `Presence` value, and is what lets the whole observation table be read as behaviour.
-
-**`NOT_APPLICABLE` must state its ground.** It is the only presence whose citation proves nothing — any
-quote from the change is equally consistent with the practice applying — which makes it the cheapest place
-for a detector's uncertainty to drain into. A `NOT_APPLICABLE` observation therefore carries
-`evidence.inapplicability`: `consulted` (source kinds read, each of which this run must have staged),
-`subject` (what the practice looks for) and `ruledOutBy` (the fact about *this* work that means the subject
-cannot occur). Enforced at both boundaries the citation and recorded-search rules already use — the
-in-sandbox normalizer and the server-side delivery gate — because a guard the constrained party can skip is
-advice, not a boundary. A detector that cannot name a `ruledOutBy` has not found an inapplicable practice;
-it has found one it could not call, and the answer is `INCONCLUSIVE`.
+The generation values are the only choices offered by `report_observation`; the `Presence` values are
+storage and read-projection vocabulary. `NO_REVIEW_OCCASION` is not a fallback for uncertainty: its
+`exclusion` must name the subject and the fact about this work that rules it out. Likewise,
+`INSUFFICIENT_EVIDENCE` cannot hide collection failure: `missingEvidence` names the open question and
+the existing evidence that would settle it. Both shapes are enforced in the sandbox and again during
+server admission.
 
 ## Lifecycle
 

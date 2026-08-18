@@ -46,4 +46,3 @@ Slug parameters across `WorkspaceController` use the shared `@WorkspaceSlug` con
 
 - Add WebTestClient or MockMvc tests that trigger the exception path and assert the `ProblemDetail` body.
 - Cover the advice indirectly via integration tests so we catch serialization regressions when upgrading Spring Boot.
-

@@ -11,8 +11,8 @@ Hephaestus may review work against a practice only from evidence with explicit s
 logical source catalog, its capture states, and how well each source must be captured. A capture manifest records
 what was supplied to one run; it does not prove that a practice is empirically observable.
 
-> If any required evidence clause is unsatisfied, record insufficient evidence and make no practice claim.
-> Missing evidence is never `NOT_APPLICABLE`, a strength, or evidence that desired behaviour is absent.
+> If any required evidence clause is unsatisfied, refuse the review and create no observation.
+> A source failure is never `NO_REVIEW_OCCASION`, a strength, or evidence that desired behaviour is absent.
 
 ## Contract boundary
 
@@ -45,12 +45,12 @@ practice review. Reusing one for review requires registering it as a source kind
 
 ### Authority and identity
 
-| Authority | Meaning |
-| --- | --- |
-| `UPSTREAM_SNAPSHOT` | Content captured from an upstream object. |
-| `SYNCHRONIZED_MIRROR` | A local projection whose currentness depends on upstream synchronization. |
-| `DETERMINISTIC_DERIVATION` | A deterministic transform of declared dependencies. |
-| `LOSSY_DERIVATION` | A sample, excerpt, aggregation, heuristic, or other information-losing transform. |
+| Authority                  | Meaning                                                                           |
+| -------------------------- | --------------------------------------------------------------------------------- |
+| `UPSTREAM_SNAPSHOT`        | Content captured from an upstream object.                                         |
+| `SYNCHRONIZED_MIRROR`      | A local projection whose currentness depends on upstream synchronization.         |
+| `DETERMINISTIC_DERIVATION` | A deterministic transform of declared dependencies.                               |
+| `LOSSY_DERIVATION`         | A sample, excerpt, aggregation, heuristic, or other information-losing transform. |
 
 A source's authority constrains what it may claim. Only a capture anchored to an immutable upstream
 identity may declare `PINNED_IDENTITY` — a `SYNCHRONIZED_MIRROR` reflects state that moves independently of
@@ -64,11 +64,11 @@ A database row is not automatically authoritative for the current state of GitHu
 How well a source must be captured is a fact about the source, recorded once in the catalog as
 `requiredQuality`, rather than restated by every practice that names it.
 
-| Value | Meaning |
-| --- | --- |
-| `ANY_CAPTURE` | The capture must have succeeded. Whatever it holds, including nothing, is reviewable. |
-| `COMPLETE` | The capture must cover the whole selected scope; a fragment cannot ground a judgement about the whole. |
-| `COMPLETE_AND_NON_EMPTY` | Complete, and containing something. |
+| Value                    | Meaning                                                                                                |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ |
+| `ANY_CAPTURE`            | The capture must have succeeded. Whatever it holds, including nothing, is reviewable.                  |
+| `COMPLETE`               | The capture must cover the whole selected scope; a fragment cannot ground a judgement about the whole. |
+| `COMPLETE_AND_NON_EMPTY` | Complete, and containing something.                                                                    |
 
 The three values are a ladder rather than two independent booleans, because the fourth cell of the
 cross-product — non-empty but possibly partial — asserts something no source can support: a partial capture
@@ -82,11 +82,11 @@ every review permanently cannot be stated.
 
 Privacy class describes risk; it does not authorize collection, disclosure, or model egress.
 
-| Class | Scope | Minimum treatment |
-| --- | --- | --- |
-| `INTERNAL` | Non-public project or workspace content without person-level review observations | Workspace authorization and purpose-bound retention |
-| `PERSONAL` | User-linked project content, authorship, reviews, comments, or activity | Personal-data access, export, and erasure coverage |
-| `SENSITIVE_PERSONAL` | Private conversations or derived person-level review observations | Restricted audience and stricter disclosure and retention controls |
+| Class                | Scope                                                                            | Minimum treatment                                                  |
+| -------------------- | -------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `INTERNAL`           | Non-public project or workspace content without person-level review observations | Workspace authorization and purpose-bound retention                |
+| `PERSONAL`           | User-linked project content, authorship, reviews, comments, or activity          | Personal-data access, export, and erasure coverage                 |
+| `SENSITIVE_PERSONAL` | Private conversations or derived person-level review observations                | Restricted audience and stricter disclosure and retention controls |
 
 Each catalog source references separate source-use decisions whose purposes are machine-enforced. Capture requires
 `AUTOMATED_PRACTICE_REVIEW`; observation persistence, delivery, and contributor evidence APIs require
@@ -112,7 +112,7 @@ The constraints with direct authoring consequences are:
 
 - Only sources anchored to an immutable upstream identity — the pull-request diff and the repository tree —
   declare `PINNED_IDENTITY`. Every mirrored source, including the pull-request and issue records themselves,
-  is `NOT_APPLICABLE`. A source's `authority` decides whether it may anchor at all: a `SYNCHRONIZED_MIRROR`
+  has identity policy `NOT_APPLICABLE`. A source's `authority` decides whether it may anchor at all: a `SYNCHRONIZED_MIRROR`
   reflects upstream state that moves independently of the capture, so calling one pinned would describe a
   copy that has since drifted as demonstrably current.
 - A `LOSSY_DERIVATION` cannot satisfy `COMPLETE`. It is a bounded summary of its subject rather than the
@@ -220,17 +220,17 @@ work type whatever state the work is in, so it is a door rather than an occasion
 
 Each entry in `needs` names a source and the stance the practice takes towards it:
 
-| Stance | Meaning |
-| --- | --- |
-| `REQUIRED` | The claim reads this source. If it could not be captured to the quality its contract demands, the review is refused rather than run. |
+| Stance       | Meaning                                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REQUIRED`   | The claim reads this source. If it could not be captured to the quality its contract demands, the review is refused rather than run.                                                  |
 | `EXHAUSTIVE` | The claim reads this source and asserts something is *not* in it. Required, and additionally not satisfiable by a partial capture whatever the source contract's floor happens to be. |
-| `CONTEXTUAL` | Used when present, noted when absent, never a reason to refuse. |
+| `CONTEXTUAL` | Used when present, noted when absent, never a reason to refuse.                                                                                                                       |
 
 `EXHAUSTIVE` exists because an absence is the one claim a fragment cannot support: a partial capture of the
 review threads is consistent both with "nobody resolved this one" and with "the resolution was in the part we
 did not fetch", and a review that cannot tell those apart still tells a developer they merged past an
-unresolved thread. Where the corpus was not whole, the honest answer is `Presence.INCONCLUSIVE`, never a
-quiet `NOT_APPLICABLE`.
+unresolved thread. Where the corpus was not whole, the honest answer is `INSUFFICIENT_EVIDENCE`, never a
+quiet `NO_REVIEW_OCCASION`.
 
 ```json
 {
@@ -308,7 +308,7 @@ edited. The [glossary](./practice-review-glossary.mdx#machine-names) maps each p
 an author sees. A skipped practice is omitted from that review request. Source readiness checks contain only
 source-quality reasons — `SOURCE_NOT_AVAILABLE`, `SOURCE_INCOMPLETE`, `SOURCE_EMPTY` — so review-mode
 limitations are never misreported as defective sources. Missing evidence never becomes a fabricated
-`NOT_APPLICABLE` observation.
+`NO_REVIEW_OCCASION` observation.
 
 Human review is outside this contract. A self-review, peer-review, or human-mentor channel carries its own
 review target, reviewer relationship, rubric, evidence provenance, consent, access, retention, result
@@ -339,7 +339,7 @@ collected at all.
 binding requires `scm.pull-request.core` and `scm.pull-request.diff` and reads `scm.repository.tree`
 contextually. The diff's contract demands a complete, non-empty capture. If the diff cannot be read, or the
 pinned commit is gone from the mirror, the runtime records insufficient evidence and makes no claim that the
-change is focused, sprawling, or `NOT_APPLICABLE`. No stance can demand a currentness the pull-request record
+change is focused, sprawling, or `NO_REVIEW_OCCASION`. No stance can demand a currentness the pull-request record
 cannot demonstrate; nothing available could substantiate one.
 
 ### Empty evidence is valid
