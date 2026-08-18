@@ -34,14 +34,16 @@ class CatalogEntryTest extends BaseUnitTest {
     void anEditIsHeldAgainstTheDefinitionItWasWrittenAgainst() {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
-        assertThat(entry(mine, SHIPPED, SHIPPED.digest(SLUG)).state()).isEqualTo(CatalogEntryState.EDITED_HERE);
+        assertThat(entry(mine, SHIPPED, CuratedDefinitionDigest.of(SLUG, SHIPPED)).state()).isEqualTo(
+            CatalogEntryState.EDITED_HERE
+        );
     }
 
     @Test
     void aBuildThatMovesOnLeavesTheEditInForceAndTheNewDefinitionWaiting() {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
         PracticeDefinition newer = practice("Small PRs", "Newer criteria", "Shipped reason");
-        CatalogEntry<PracticeDefinition> entry = entry(mine, newer, SHIPPED.digest(SLUG));
+        CatalogEntry<PracticeDefinition> entry = entry(mine, newer, CuratedDefinitionDigest.of(SLUG, SHIPPED));
 
         assertThat(entry.state()).isEqualTo(CatalogEntryState.UPDATE_WAITING);
         assertThat(entry.effective()).isEqualTo(mine);
@@ -59,7 +61,9 @@ class CatalogEntryTest extends BaseUnitTest {
     void anEntryTheBuildStopsShippingKeepsTheInstancesOwnDefinition() {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
-        assertThat(entry(mine, null, SHIPPED.digest(SLUG)).state()).isEqualTo(CatalogEntryState.NO_LONGER_SHIPPED);
+        assertThat(entry(mine, null, CuratedDefinitionDigest.of(SLUG, SHIPPED)).state()).isEqualTo(
+            CatalogEntryState.NO_LONGER_SHIPPED
+        );
     }
 
     @Test
@@ -110,7 +114,9 @@ class CatalogEntryTest extends BaseUnitTest {
         PracticeDefinition mine = practice("Small PRs", "Our criteria", "Shipped reason");
 
         assertThat(untouched.etag()).isNotBlank();
-        assertThat(entry(mine, SHIPPED, SHIPPED.digest(SLUG)).etag()).isNotEqualTo(untouched.etag());
+        assertThat(entry(mine, SHIPPED, CuratedDefinitionDigest.of(SLUG, SHIPPED)).etag()).isNotEqualTo(
+            untouched.etag()
+        );
         assertThat(retired(untouched).etag()).isNotEqualTo(untouched.etag());
         assertThat(withPosition(untouched, 1).etag()).isEqualTo(untouched.etag());
     }

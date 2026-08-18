@@ -40,7 +40,7 @@ public class CuratedAreaOverride {
     @Column(name = "color", length = 32)
     private @Nullable String color;
 
-    @Column(name = "based_on_digest", length = 64)
+    @Column(name = "based_on_digest", length = 128)
     private @Nullable String acceptedBundledDigest;
 
     @Column(name = "retired_at")

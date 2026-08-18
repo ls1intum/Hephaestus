@@ -623,7 +623,7 @@ public class AgentJobExecutor {
                     )
                 );
                 if (updated != null && updated == 1) {
-                    meterRegistry.counter("agent.job.evidence.refused").increment();
+                    recordPracticeReviewRefusal(job, "insufficient_evidence");
                     metricOutcome = "INSUFFICIENT_EVIDENCE";
                     log.info(
                         "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
@@ -1098,6 +1098,7 @@ public class AgentJobExecutor {
                 job.getWorkspace().getId(),
                 blockReason
             );
+            recordPracticeReviewRefusal(job, "budget_exhausted");
             meterRegistry.counter("agent.job.budget.refused").increment();
             return ClaimOutcome.BUDGET_BLOCKED;
         }
@@ -1125,8 +1126,15 @@ public class AgentJobExecutor {
         job.setCancellationReason(AgentJobCancellationReason.MODEL_UNAVAILABLE);
         jobRepository.save(job);
         meterRegistry.counter("agent.job.model.refused").increment();
+        recordPracticeReviewRefusal(job, "model_unavailable");
         log.info("Refusing claim — configured model unavailable: jobId={}", job.getId());
         return ClaimOutcome.MODEL_UNAVAILABLE;
+    }
+
+    private void recordPracticeReviewRefusal(AgentJob job, String reason) {
+        if (job.getPurpose() == AgentPurpose.PRACTICE_REVIEW) {
+            meterRegistry.counter("practice.review.refused", "phase", "execution", "reason", reason).increment();
+        }
     }
 
     private void releaseCapacity() {

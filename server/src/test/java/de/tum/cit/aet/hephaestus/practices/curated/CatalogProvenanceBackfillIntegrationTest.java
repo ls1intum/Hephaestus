@@ -122,6 +122,57 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
         ).isEqualTo(3);
     }
 
+    @Test
+    void shouldContinueAligningWhenAPracticeIsMalformed() {
+        String v1Fingerprint = "v1:" + "a".repeat(64);
+        seedLegacyWorkspace(
+            matching,
+            shipped().criteria(),
+            false,
+            evidenceDefaults.policyFor(shipped().artifactKind()),
+            v1Fingerprint
+        );
+        seedLegacyWorkspace(
+            edited,
+            shipped().criteria(),
+            false,
+            evidenceDefaults.policyFor(shipped().artifactKind()),
+            v1Fingerprint
+        );
+        jdbcTemplate.update(
+            "UPDATE practice SET automated_review_policy = '{\"subject\":\"INVALID\"}'::jsonb WHERE workspace_id = ?",
+            matching.getId()
+        );
+
+        backfill.run();
+
+        assertThat(sourceFingerprint(edited)).isEqualTo(shipped().provenanceFingerprint(SHIPPED_SLUG));
+        assertThat(sourceFingerprint(matching)).isEqualTo(v1Fingerprint);
+    }
+
+    @Test
+    void shouldKeepCustomizedV1DefinitionWhenItDiffersFromTheCatalog() {
+        String v1Fingerprint = "v1:" + "a".repeat(64);
+        seedLegacyWorkspace(
+            matching,
+            "The workspace intentionally changed these criteria",
+            false,
+            evidenceDefaults.policyFor(shipped().artifactKind()),
+            v1Fingerprint
+        );
+
+        backfill.run();
+
+        assertThat(sourceFingerprint(matching)).isEqualTo(v1Fingerprint);
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "SELECT criteria FROM practice WHERE workspace_id = ?",
+                String.class,
+                matching.getId()
+            )
+        ).isEqualTo("The workspace intentionally changed these criteria");
+    }
+
     private PracticeDefinition shipped() {
         return catalogService.catalog().practice(SHIPPED_SLUG).orElseThrow().effective();
     }
@@ -276,6 +327,14 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
     private long stampedPractices(Workspace workspace) {
         return count(
             "SELECT count(*) FROM practice WHERE workspace_id = ? AND source_curated_slug IS NOT NULL",
+            workspace.getId()
+        );
+    }
+
+    private String sourceFingerprint(Workspace workspace) {
+        return jdbcTemplate.queryForObject(
+            "SELECT source_curated_fingerprint FROM practice WHERE workspace_id = ?",
+            String.class,
             workspace.getId()
         );
     }

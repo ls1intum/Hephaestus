@@ -127,7 +127,7 @@ final class CuratedCatalogModel {
     }
 
     static @Nullable String digestOf(@Nullable CatalogDefinition definition, String slug) {
-        return definition == null ? null : definition.digest(slug);
+        return definition == null ? null : CuratedDefinitionDigest.of(slug, definition);
     }
 
     static List<CatalogEntry<AreaDefinition>> orderAreas(

@@ -368,6 +368,35 @@ class AgentJobExecutorTest extends BaseUnitTest {
             assertThat(captured.getValue().getStatus()).isEqualTo(AgentJobStatus.RUNNING);
             assertThat(captured.getValue().getStartedAt()).isNotNull();
         }
+
+        @Test
+        void modelRefusalKeepsGeneralTelemetryAndAddsPracticeTelemetry() {
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            executor.processJob(jobId);
+
+            assertThat(meterRegistry.get("agent.job.model.refused").counter().count()).isOne();
+            assertThat(
+                meterRegistry
+                    .get("practice.review.refused")
+                    .tags("phase", "execution", "reason", "model_unavailable")
+                    .counter()
+                    .count()
+            ).isOne();
+        }
+
+        @Test
+        void nonPracticeModelRefusalDoesNotCreatePracticeTelemetry() {
+            job.setPurpose(AgentPurpose.MENTOR);
+            when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
+            when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+            executor.processJob(jobId);
+
+            assertThat(meterRegistry.get("agent.job.model.refused").counter().count()).isOne();
+            assertThat(meterRegistry.find("practice.review.refused").counter()).isNull();
+        }
     }
 
     @Nested
@@ -516,6 +545,14 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(jobRepository).save(saved.capture());
             assertThat(saved.getValue().getStatus()).isEqualTo(AgentJobStatus.CANCELLED);
             assertThat(saved.getValue().getCancellationReason()).isEqualTo(AgentJobCancellationReason.BUDGET_EXHAUSTED);
+            assertThat(meterRegistry.get("agent.job.budget.refused").counter().count()).isOne();
+            assertThat(
+                meterRegistry
+                    .get("practice.review.refused")
+                    .tags("phase", "execution", "reason", "budget_exhausted")
+                    .counter()
+                    .count()
+            ).isOne();
             // The message must say why it was cancelled and that waiting is over — not merely "expired",
             // which reads like the job itself timed out rather than the budget never being raised.
             assertThat(saved.getValue().getErrorMessage()).contains("budget").contains("7 days old");
@@ -694,6 +731,13 @@ class AgentJobExecutorTest extends BaseUnitTest {
             ArgumentCaptor<JsonNode> output = ArgumentCaptor.forClass(JsonNode.class);
             verify(jobRepository).transitionToEvidenceRefused(eq(jobId), isNull(), eq(0), any(), output.capture());
             assertThat(output.getValue().path("outcome").asString()).isEqualTo("INSUFFICIENT_EVIDENCE");
+            assertThat(
+                meterRegistry
+                    .get("practice.review.refused")
+                    .tags("phase", "execution", "reason", "insufficient_evidence")
+                    .counter()
+                    .count()
+            ).isOne();
             verify(sandboxManager, never()).execute(any());
         }
 

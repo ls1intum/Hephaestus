@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.core.signal;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -7,6 +8,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Instant;
@@ -23,7 +25,9 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
     );
 
     private final ArtifactSignalRepository repository = mock(ArtifactSignalRepository.class);
-    private final LedgerSignalRecorder recorder = new LedgerSignalRecorder(repository);
+    private final io.micrometer.core.instrument.simple.SimpleMeterRegistry meterRegistry =
+        new io.micrometer.core.instrument.simple.SimpleMeterRegistry();
+    private final LedgerSignalRecorder recorder = new LedgerSignalRecorder(repository, meterRegistry);
 
     @Test
     void shouldNotLetAReconciliationPassDisplaceADecisionAlreadyTaken() {
@@ -47,9 +51,18 @@ class LedgerSignalRecorderTest extends BaseUnitTest {
 
     @Test
     void shouldHoldARefusalAnOperatorCanLiftAsPending() {
+        when(repository.markRefused(eq(KEY), eq("PENDING"), eq("BUDGET_EXHAUSTED"), any())).thenReturn(1);
+
         recorder.markRefused(KEY, SignalStateReason.BUDGET_EXHAUSTED);
 
         verify(repository).markRefused(eq(KEY), eq("PENDING"), eq("BUDGET_EXHAUSTED"), any());
+        assertThat(
+            meterRegistry
+                .get("practice.review.refused")
+                .tags("phase", "submission", "reason", "budget_exhausted")
+                .counter()
+                .count()
+        ).isOne();
     }
 
     @Test

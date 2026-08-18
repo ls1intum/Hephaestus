@@ -62,9 +62,17 @@ The job queue exposes its own signals — alert off these rather than reading ap
 - **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — rows pruned by the retention
   sweep.
 - **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
+- **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and
+  `reason`.
 
-Gauge sampling is periodic; timers and counters are recorded inline. None run on a request path. Metric
-names in the instrumented code are the source of truth for dashboards and alerts.
+Query `/actuator/health/readiness` for aggregate readiness. An authorized response includes the
+**`practiceReview`** component. An enabled review worker reports `OUT_OF_SERVICE` with
+`GIT_CHECKOUT_DISABLED` when repository checkout is disabled, or `SOURCE_AUTHORIZATION_EXPIRED` when an
+automated-review source authorization has expired. Missing model bindings are workspace-specific and remain
+visible in **Review activity** and the refusal counter; they do not remove the worker from service.
+
+Gauges are sampled periodically; timers and counters are recorded when the corresponding event occurs.
+Metric names in the instrumented code are the source of truth for dashboards and alerts.
 
 **Retention.** Terminal job payloads are stripped before their rows are deleted. Row retention must not be
 shorter than payload retention. Set both against the approved retention policy, verify them in the effective
@@ -94,3 +102,10 @@ behaviors matter independently of their exact defaults:
   records evidence-backed observations. After Java admits them, a second turn composes lane-specific
   feedback from those observations and their evidence. Practice criteria affect what is observed; the
   composition contract affects what is said. Nothing on the administration screens edits either prompt.
+
+## Rollback
+
+Before upgrading, create and verify a database snapshot as described in
+[Backup and restore](./backup-restore.mdx). To return to the previous release after this migration, stop all
+Hephaestus roles, restore the snapshot, then deploy the previous version. Do not run the previous version
+against the migrated schema.
