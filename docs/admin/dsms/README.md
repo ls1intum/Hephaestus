@@ -26,7 +26,7 @@ The live imprint and privacy pages are at https://hephaestus.aet.cit.tum.de/impr
 
 Re-review annually and on any material change to the processing surface (new processor, source, source
 combination, purpose, audience, data category, retention window, identity provider, or activation of an integration
-that is currently disabled). The DPIA pre-screen requires a recorded controller/DPO determination before material
+not covered by the latest review). The DPIA pre-screen requires a recorded controller/DPO determination before material
 source expansion. The amendment triggers are listed in `processor-checklist.md`,
 `dpia-prescreen.md` §5–§6, and `artifact-source-governance.md`.
 

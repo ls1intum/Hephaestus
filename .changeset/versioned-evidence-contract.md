@@ -14,8 +14,8 @@ common path.
 Required evidence that is missing, that could only be captured in part, or that turned out to be
 empty makes Hephaestus skip the practice and say which, instead of guessing from what it had.
 
-Practice review also works on a default install now: the pull requests and issues of a connected
-workspace need no extra configuration.
+After practice review and its model are enabled, the shipped pull-request and issue practices need no
+additional evidence configuration.
 
 **Operators:** if Outline is enabled, set the same `HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS`
 value on the server, worker and webhook roles, then restart all three. An empty list blocks Outline

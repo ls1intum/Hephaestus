@@ -12,78 +12,37 @@ should start with [Practice Review](./practice-review.mdx).
 
 ## Deployment configuration
 
-The **In `.env`?** column says whether the shipped Compose files forward the variable from `docker/.env`.
-Where it says no, setting it in `docker/.env` does nothing — add it to the service's own `environment:`
-block instead.
+Configuration metadata in the server is the source of truth for property names, types, and defaults. The
+reference Compose files are the source of truth for which environment variables they forward; do not copy
+those inventories into another deployment manifest from this page.
 
-| Variable | Default | In `.env`? | What it does |
-| --- | --- | --- | --- |
-| `AGENT_ENABLED` | `false` | yes | Enables the PostgreSQL-backed job queue: submission on the server, claiming and execution on the worker. Must be `true` on **both** roles |
-| `GIT_CHECKOUT_ENABLED` | `false` | server only | Enables the local repository checkout that supplies the repository-tree evidence |
-| `PRACTICE_REVIEW_FOR_ALL` | `false` | yes | Enables the feature flag and the review gate for all users |
-| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | `false` | yes | Instance default for posting after merge; a workspace may override it |
-| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | `15` | yes | Instance default for the minimum gap between reviews of the same work; a workspace may override it |
-| `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | `30` | yes | Age after which replay directories and unreferenced evidence blobs become collectable |
-| `PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` | `5` | no | The per-person hourly allowance in the table above. Keyed on the person, not the work, so it is the one limit that catches somebody asking for a review on twenty colleagues' merge requests. `0` removes it |
-| `PRACTICE_REVIEW_PROGRESS_FOOTER` | `false` | no | Appends the run-to-run progress footer and the re-review reply. Renders nothing until a target has been reviewed twice |
-| `PRACTICE_REVIEW_REACTION_SUPPRESSION` | `false` | no | Stops re-raising a point the author already disputed or marked not applicable |
+A working deployment must:
 
-Fleet-wide guard rails on campaigns over past work and on the occurrence ledger. None is forwarded from
-`docker/.env`; the defaults are the supported configuration and are worth changing only to make a campaign
-cheaper or an over-large instance quieter.
+- enable the agent runtime on both the submitting server and claiming worker;
+- enable practice review for the intended population;
+- make repository checkout and the shared fabric volume available to every worker that captures repository
+  evidence;
+- set campaign, request-rate, retry, and retention limits appropriate to its budget and governance policy.
 
-| Variable | Default | What it does |
-| --- | --- | --- |
-| `PRACTICE_REVIEW_BACKFILL_MAX_WINDOW` | `400d` | Widest lookback any campaign may request. A campaign over this is refused at the estimate, before anything is confirmed and before anything is paid for |
-| `PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS` | `5000` | Most pieces of work any one campaign may cover. Refused the same way |
-| `PRACTICE_REVIEW_BACKFILL_BATCH_SIZE` | `25` | How many pieces of work one driver tick offers. Bounds how far a campaign can overshoot a budget cap it crosses mid-batch |
-| `PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW` | `90d` | How far back the estimate looks for completed reviews to price a campaign from |
-| `SIGNAL_LEDGER_PENDING_RETRY_AFTER` | `1h` | How often a refused-but-retryable occurrence is offered again. The blockers are operator actions, so retrying faster only multiplies the refusal |
-| `SIGNAL_LEDGER_PENDING_LAPSE_AFTER` | `7d` | How long an occurrence keeps being re-offered before it is retired |
-| `SIGNAL_LEDGER_SWEEP_BATCH_SIZE` | `200` | How many pending occurrences one sweep re-offers |
+See the
+[server configuration](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/application.yml)
+and [reference Compose files](https://github.com/ls1intum/Hephaestus/tree/main/docker) before changing an
+environment variable. Unknown or unforwarded variables do not configure the application.
 
-:::caution Two variables do not behave the way their name suggests
+Repository checkouts, replay metadata, and content-addressed evidence share the fabric root. A split or
+multi-host deployment must mount the same durable read-write filesystem on every server and worker, with
+cross-process locks, atomic rename, and access controls suitable for source content.
 
-- **`PRACTICE_REVIEW_RUN_FOR_ALL` is inert in the shipped Compose files.** The `application-server`
-  service pins the underlying setting to `PRACTICE_REVIEW_FOR_ALL`, so setting the other name in
-  `docker/.env` changes nothing. Use `PRACTICE_REVIEW_FOR_ALL`.
-- **`GIT_CHECKOUT_ENABLED` is passed to `application-server` only.** The `application-worker` service's
-  `environment:` block does not forward it — and evidence capture runs on the *worker*, not the server. On
-  a split deployment, a worker without it captures a degraded repository tree and records that fact in the
-  manifest rather than failing. Add the variable to the `application-worker` service's own `environment:`
-  block, and mount the same fabric volume there.
-:::
+Source authorization is not a deployment toggle. The shipped artifact-source contract fixes which governed
+sources each purpose may use; integrations only determine which authorized sources are available. See
+[Artifact-source governance](./dsms/artifact-source-governance.md).
 
-Repository checkouts, replay metadata, and content-addressed evidence live under the fabric root, which the
-reference Compose stack pins to `/data/git-repos`. A split or multi-host deployment must mount the same
-durable read-write filesystem on **every** server and worker, with cross-process file locks, atomic
-rename, and appropriate access controls.
+## Workspace controls
 
-Which sources a review may read, and for which purpose, is not a deployment setting. It is fixed by the
-reviewed source-use decisions shipped in the artifact-source contract, and a deployment cannot widen or
-narrow them. A source a workspace has not connected is simply never captured. See
-[Artifact-Source Governance](./dsms/artifact-source-governance) for the decision record.
-
-## Workspace setting map
-
-### Settings
-
-| Setting | Where |
-| --- | --- |
-| Bind a model for reviews | Administration → AI models → **Practice reviews** card |
-| Start or stop practice reviews | Administration → Practices → Review → **When and where** → *Start practice reviews* |
-| Live events, comment command, cooldown | Administration → Practices → Review → **When and where** → *Project review triggers* |
-| Post after merge, eligible work | Administration → Practices → Review → **When and where** → *Project review rules* |
-| Target branches, repositories | Administration → Practices → Review → **When and where** → *Review scope* |
-| Workspace default tier | Administration → Practices → Review → **How much** |
-| Per-area and per-practice overrides | Administration → Practices → Review → **How much** |
-| Draft handling | On the practice itself — *Also while it is still a draft* |
-| One-off campaign | Administration → Practices → Review → **Past work** |
-| Recurring check over recent work | Administration → Practices → Review → **When and where** |
-| What actually ran, and why not | Administration → Practices → **Practice reviews**, or **Review activity** for any member |
-| Workspace AI spend and cap | Administration → **AI usage** |
-| Instance-wide budget cap | Instance admin → AI usage → **Set budget** |
-| Instance-wide silent mode | Instance admin → **Instance settings** |
+Workspace administrators configure model readiness under **AI models**, review scope and autonomy under
+**Practices**, and spend under **AI usage**. **Review activity** explains what happened to an individual
+piece of work. These product-level destinations are intentionally broader than a click-by-click path so the
+guide survives navigation changes; [Practice review](./practice-review.mdx) gives the task sequence.
 
 ### Queue health
 
@@ -104,25 +63,22 @@ The job queue exposes its own signals — alert off these rather than reading ap
   sweep.
 - **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
 
-Gauges are sampled every 30 seconds; timers and counters are recorded inline. None run on a request path.
+Gauge sampling is periodic; timers and counters are recorded inline. None run on a request path. Metric
+names in the instrumented code are the source of truth for dashboards and alerts.
 
-**Retention.** Terminal job rows are pruned automatically. `AGENT_PAYLOAD_RETENTION` (default `P14D`)
-strips container logs and output to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be at least the
-payload retention) deletes the row and its durable evidence snapshot. **Neither is forwarded by the shipped
-Compose files** — to change them, add them to the service's own `environment:` block. Tighten only against
-the deployment's approved retention policy, and treat the fabric root volume as sensitive storage.
+**Retention.** Terminal job payloads are stripped before their rows are deleted. Row retention must not be
+shorter than payload retention. Set both against the approved retention policy, verify them in the effective
+application configuration, and treat the fabric root as sensitive storage.
 
 ## Limits you should know about
 
-Each of these is deliberate, and none is configurable from `docker/.env`.
+Configuration metadata and the artifact-source catalog are the source of truth for current values. These
+behaviors matter independently of their exact defaults:
 
-- **Three background cadences are fixed in code.** The recurring-sweep opener runs every 5 minutes, the
-  campaign driver every 2 minutes, and the re-offer reaper every 15 minutes. Only their *thresholds* are
-  properties; the cadences are not, so you cannot slow them down under load.
-- **A refused-but-retryable occurrence is retried for seven days and then retired.** A workspace left
-  misconfigured accumulates a week of retries and then goes quiet again with nothing new to see. Both the
-  interval and the deadline are settable — `SIGNAL_LEDGER_PENDING_RETRY_AFTER` and
-  `SIGNAL_LEDGER_PENDING_LAPSE_AFTER` above — but not from `docker/.env`.
+- **Background task cadences are fixed in code.** Their thresholds may be configurable even when their
+  polling schedules are not.
+- **Retryable occurrences eventually lapse.** A workspace left misconfigured can accumulate retries and
+  then go quiet when their deadline passes.
 - **Nothing is ever deleted from the occurrence ledger**, in any state, including retired rows. It is the
   record of what was *not* done, and it only grows. Size it accordingly on a busy instance.
 - **The repository-tree capture is bounded**, by file count, total size, and per-file size

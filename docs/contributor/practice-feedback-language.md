@@ -82,14 +82,12 @@ the developer is supposed to do about it. The three do line up with the task, se
 levels of Hattie & Timperley's model (ADR 0029), but a level is a claim about content that a destination
 cannot enforce, so do not use the level as the name.
 
-`IN_APP` is the code noun — the enum constant, the `chk_feedback_channel` value, and the endpoint
-`GET /workspaces/{workspaceSlug}/practices/feedback/in-app`. It has been renamed three times
-(`REFLECTION_DASHBOARD`, `PROFILE`, `REFLECTION`) and this is the last one; ADR 0029 records why each earlier
-name failed. Do not reintroduce
-any of them: *profile* is the public page at `/user/{username}`, *private view* describes a property
-rather than naming one, and *reflection* names what the developer is supposed to do rather than where the
-feedback lands — an outcome nothing in the system can observe. On an operator surface, where the question
-is where a piece of feedback landed, the place reads **On their practice pages**.
+`IN_APP` is the code noun — the enum constant and the `chk_feedback_channel` value. Do not call it a
+*profile* or *reflection* channel: those words name a different surface or an outcome the system cannot
+observe.
+[ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)
+records the naming
+decision. On an operator surface, the place reads **On their practice pages**.
 
 **Feedback waiting for a mentor conversation is *prepared*, never *queued*.** A queue implies somebody has
 to work it; nothing does — `FeedbackDeliveryState.PREPARED` auto-advances to `DELIVERED` on the next chat

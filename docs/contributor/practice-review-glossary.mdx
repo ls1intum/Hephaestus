@@ -162,9 +162,8 @@ null means "this level holds no opinion":
 effective tier = practice.review_tier ?? area.review_tier ?? workspace default ?? DELIVER
 ```
 
-`ReviewTierResolver` is the only implementation of that chain, and resolution is always server-side — a
-client that resolved it would be a second implementation, drifting on the first change. Nothing pushes the
-chain into SQL either, for the same reason.
+Resolution is always server-side. A client or query that reimplemented the chain would drift when the rule
+changed.
 
 Null exists because a NOT NULL column cannot say "I have not decided", which would make every practice hold
 an opinion nobody expressed. Every API that reports a tier therefore reports four things: the effective

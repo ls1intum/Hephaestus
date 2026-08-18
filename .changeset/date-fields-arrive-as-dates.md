@@ -2,7 +2,7 @@
 ---
 
 Internal: the generated API client now revives timestamp fields into real dates, which is what its
-own types have always promised. Nothing an operator or user can observe changes today — every screen
+own types have always promised. Nothing an operator or user can observe changes — every screen
 that reads a timestamp already normalised it defensively, or passed it to a formatter that accepted
 either shape — so this removes a hazard rather than a symptom.
 

@@ -34,6 +34,6 @@ Two things a campaign deliberately does *not* do:
   mixing the two would show a dramatic improvement on the day you adopted Hephaestus that nobody
   actually made.
 
-Each artifact is measured once, as it stands today. Nothing here can reconstruct how a pull request
+Each artifact is measured once, in the state captured when the campaign runs. Nothing here can reconstruct how a pull request
 looked while it was being worked on — no draft history, no edit history, no review-thread timing is
 retained — so a backfilled measurement describes the work as it is now, not as it was.

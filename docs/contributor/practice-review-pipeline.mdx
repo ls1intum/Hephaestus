@@ -96,9 +96,8 @@ carries one entry per staged file and a TOASTed `jsonb` has no partial read.
 
 An observation is one practice's answer about one piece of work, written once and immutable. It carries a
 `Presence` — `PRESENT`, `ABSENT`, `NOT_APPLICABLE` or `INCONCLUSIVE` — and, only when the presence carries
-valence, an assessment. `PracticeDetectionResultParser` force-nulls the assessment on an `INCONCLUSIVE`
-observation, so a detector that hedges and still attaches a strength cannot slip an unearned one into the
-series.
+valence, an assessment. Admission removes assessment from an `INCONCLUSIVE` observation, so a detector that
+hedges cannot attach an unearned strength to the series.
 
 The glossary defines what each presence claims and what `NOT_APPLICABLE` has to carry to be allowed to claim
 it — see [Outcome states](./practice-review-glossary.mdx#outcome-states). Two facts belong to this stage
@@ -178,11 +177,9 @@ flowchart TB
     quiet --> compositionResult["Composition output only:<br/>retained until job payload stripping"]
 ```
 
-Note where the arrows converge. **The model proposes; the server admits.** Every gate that existed
-before composition still sits after it — `FeedbackAdmission.delivers(origin, tier, channel)`,
-`FeedbackChannelRouter`, `InAppFeedbackRouter`, the in-context admission gate and every per-lane
-cap. Giving the model more context is not a reason to relax the gate; it is a reason the gate has more
-to refuse.
+Note where the arrows converge. **The model proposes; the server admits.** Origin, effective tier,
+channel-specific routing, placement checks, and per-lane caps still apply after composition. Giving the
+model more context is not a reason to relax these gates; it gives them more proposals to assess.
 
 ### Composition inputs and outputs
 
@@ -225,10 +222,9 @@ both placements. Per-lane limits are supplied in composition configuration, not 
 
 ### What the composer is not allowed to do
 
-The tool schema and `FeedbackCompositionResultParser` refuse the same four things, once in the sandbox
-and once on the server, for the reason every other guard on this pipeline is doubled — a guard the
-constrained party can skip is advice, not a boundary. The parser never throws; a unit it cannot accept
-is dropped and logged.
+The tool schema and server admission refuse the same four things. Validation exists on both sides of the
+sandbox boundary because a guard the constrained party can skip is advice, not a boundary. An invalid unit
+is dropped and logged without failing the completed measurement.
 
 - **No verdict fields.** `report_feedback` takes no presence, assessment, severity or confidence. An
   intervention that could carry a verdict would eventually be read back as one.
@@ -306,8 +302,7 @@ served only to that developer; operator projections omit it. A `BACKFILL` origin
 but the router refuses a cluster made entirely of backfilled observations, so backfills are measured and
 never delivered.
 
-The full suppression vocabulary lives on `FeedbackSuppressionReason`, which also carries one deprecated
-constant (`ARTIFACT_DRAFT`) kept only so old rows still read back.
+The full suppression vocabulary is owned by the durable feedback contract rather than duplicated here.
 
 ## Runtime and extension points
 

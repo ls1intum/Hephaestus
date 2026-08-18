@@ -123,4 +123,4 @@ The persistence model is not an authorization boundary. Controllers define who m
 Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.
 Do not add a field matrix here: the
 [OpenAPI specification](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml) is the
-current contract for fields exposed by each endpoint.
+authoritative contract for fields exposed by each endpoint.
