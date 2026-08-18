@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.ObservationAdmissionService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import java.math.BigDecimal;
 import java.util.UUID;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.TestingAuthenticationToken;
@@ -15,6 +16,7 @@ import org.springframework.web.server.ResponseStatusException;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
+@Tag("unit")
 class ObservationAdmissionControllerTest {
 
     private final ObservationAdmissionService service = mock(ObservationAdmissionService.class);

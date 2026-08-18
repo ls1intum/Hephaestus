@@ -60,6 +60,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
@@ -236,10 +237,20 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     }
 
     private void setJobOutput(String rawOutput) {
+        agentJob = admitAndSetOutput(agentJob, rawOutput);
+    }
+
+    private AgentJob admitAndSetOutput(AgentJob job, String rawOutput) {
+        JsonNode observations = OBJECT_MAPPER.readTree(withEvidence(rawOutput)).path("observations");
+        ((PullRequestReviewHandler) handler).admitObservations(job, observations);
+        String digest = "test-admission-digest";
+        ObjectNode metadata = (ObjectNode) job.getMetadata().deepCopy();
+        metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, digest);
+        job.setMetadata(metadata);
         ObjectNode output = OBJECT_MAPPER.createObjectNode();
-        output.put("rawOutput", withEvidence(rawOutput));
-        agentJob.setOutput(output);
-        agentJob = agentJobRepository.save(agentJob);
+        output.putObject("feedback").put("admissionDigest", digest).putArray("units");
+        job.setOutput(output);
+        return agentJobRepository.save(job);
     }
 
     private void releaseSilentMode() {
@@ -265,10 +276,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         next.setConfigSnapshot(agentJob.getConfigSnapshot());
         next.setMetadata(agentJob.getMetadata().deepCopy());
         next.setEvidenceSnapshot(agentJob.getEvidenceSnapshot().deepCopy());
-        ObjectNode output = OBJECT_MAPPER.createObjectNode();
-        output.put("rawOutput", withEvidence(rawOutput));
-        next.setOutput(output);
-        return agentJobRepository.save(next);
+        next = agentJobRepository.save(next);
+        return admitAndSetOutput(next, rawOutput);
     }
 
     private ObjectNode evidenceSnapshot(Practice... practices) {
@@ -351,19 +360,19 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
               "observations": [
                 {
                   "practiceSlug": "pr-description-quality",
-                  "title": "Good PR description",
+                  "summary": "Good PR description",
                   "presence": "PRESENT",
                   "assessment": "GOOD",
                   "severity": "INFO",
-                  "reasoning": "The description names what changed."
+                  "evidenceRationale": "The description names what changed."
                 },
                 {
                   "practiceSlug": "error-handling",
-                  "title": "Missing null check",
+                  "summary": "Missing null check",
                   "presence": "ABSENT",
                   "assessment": "BAD",
                   "severity": "MAJOR",
-                  "reasoning": "The method does not check for null input."
+                  "evidenceRationale": "The method does not check for null input."
                 }
               ]""";
         return observations + "\n}";
@@ -442,17 +451,19 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                   "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
-                      "title": "Good description",
+                      "summary": "Good description",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
+                      "evidenceRationale": "The description explains the change."
                     },
                     {
                       "practiceSlug": "error-handling",
-                      "title": "Proper error handling",
+                      "summary": "Proper error handling",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
+                      "evidenceRationale": "The implementation handles errors explicitly."
                     }
                   ]
                 }""";
@@ -466,7 +477,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             // A observations summary reaches this same call, so only the body text tells an approval apart.
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
-            assertThat(body.getValue()).contains("nothing to change here");
+            assertThat(body.getValue()).contains("What's working well here");
 
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
@@ -476,48 +487,39 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     class ErrorCases {
 
         @Test
-        void invalidJsonOutputFailsGracefully() {
-            setJobOutput("this is not valid JSON at all");
-
-            assertThatThrownBy(() -> handler.deliver(agentJob))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No valid observations");
-
-            assertThat(observationRepository.findAll()).isEmpty();
-            verify(commentPoster, never()).postFormattedBody(any(), any());
-        }
-
-        @Test
         void unknownSlugRejectsDeliveryAtomically() {
             String output = """
                 {
                   "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
-                      "title": "Good description",
+                      "summary": "Good description",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
+                      "evidenceRationale": "The description explains the change."
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
-                      "title": "Unknown practice",
+                      "summary": "Unknown practice",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
+                      "evidenceRationale": "The submitted practice does not exist."
                     },
                     {
                       "practiceSlug": "error-handling",
-                      "title": "Good handling",
+                      "summary": "Good handling",
                       "presence": "ABSENT",
                       "assessment": "BAD",
                       "severity": "MINOR",
+                      "evidenceRationale": "The implementation omits the required check."
                     }
                   ]
                 }""";
-            setJobOutput(output);
+            JsonNode submitted = OBJECT_MAPPER.readTree(withEvidence(output)).path("observations");
 
-            assertThatThrownBy(() -> handler.deliver(agentJob))
+            assertThatThrownBy(() -> ((PullRequestReviewHandler) handler).admitObservations(agentJob, submitted))
                 .isInstanceOf(JobDeliveryException.class)
                 .hasMessageContaining("practice not admitted to the job");
 
@@ -601,10 +603,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
-            assertThat(events).hasSize(2);
+            assertThat(events).hasSize(1);
             assertThat(events.get(0).observationsInserted()).isEqualTo(2);
-            assertThat(events.get(1).observationsInserted()).isZero();
-            assertThat(events.get(1).observationsDiscarded()).isEqualTo(2);
         }
     }
 }

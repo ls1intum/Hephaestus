@@ -1176,7 +1176,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo(practiceA.getSlug())
                 .jsonPath("$[0].standing")
                 .isEqualTo("DEVELOPING")
-                .jsonPath("$[0].toWorkOn[0].summary")
+                .jsonPath("$[0].toWorkOn[0].title")
                 .isEqualTo("Thin PR description")
                 .jsonPath("$[0].toWorkOn[0].severity")
                 .isEqualTo("MAJOR")
@@ -1186,7 +1186,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .isEqualTo(practiceB.getSlug())
                 .jsonPath("$[1].standing")
                 .isEqualTo("STRENGTH")
-                .jsonPath("$[1].strengths[0].summary")
+                .jsonPath("$[1].strengths[0].title")
                 .isEqualTo("Thorough review")
                 .jsonPath("$[1].toWorkOn.length()")
                 .isEqualTo(0);

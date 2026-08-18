@@ -178,7 +178,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
 
         JsonNode root = objectMapper.readTree(files.get("inputs/context/observations_history.json"));
-        String shipped = root.get("recentObservations").get(0).get("reasoning").asString();
+        String shipped = root.get("recentObservations").get(0).get("evidenceRationale").asString();
         // The student-facing sentence survives; the rubric mechanics ("assessment is BAD", "capped at MINOR")
         // do NOT reach the mentor.
         assertThat(shipped).contains("swallows the IOException");
@@ -263,7 +263,7 @@ class ObservationHistoryContentSourceTest extends BaseUnitTest {
         assertThat(obs).hasSize(2);
         JsonNode bad = obs.get(0);
         assertThat(bad.get("practiceSlug").asString()).isEqualTo("robust-error-handling");
-        assertThat(bad.get("title").asString()).isEqualTo("Swallowed IOException");
+        assertThat(bad.get("summary").asString()).isEqualTo("Swallowed IOException");
         assertThat(bad.get("presence").asString()).isEqualTo("PRESENT");
         assertThat(bad.get("assessment").asString()).isEqualTo("BAD");
         assertThat(bad.get("severity").asString()).isEqualTo("MAJOR");

@@ -308,7 +308,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Finding in tenant-a");
         }
 
@@ -354,7 +354,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.guidance")
+                .jsonPath("$.deliveredFeedback")
                 .isEqualTo("Advice in tenant A");
         }
     }

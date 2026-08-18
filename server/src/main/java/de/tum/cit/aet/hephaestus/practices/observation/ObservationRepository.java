@@ -64,6 +64,7 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * artifact, and thread key from the first row, and an unordered read could re-source them differently on
      * a re-run of a multi-subject / multi-artifact job.
      */
+    @EntityGraph(attributePaths = { "practice", "practiceRevision" })
     @Query("SELECT f FROM Observation f WHERE f.agentJobId = :agentJobId ORDER BY f.id ASC")
     List<Observation> findByAgentJobId(@Param("agentJobId") UUID agentJobId);
 

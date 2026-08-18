@@ -103,7 +103,12 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         Observation activeObs = saveConversationObservation(job, "occ-active", activeThreadId);
         saveConversationObservation(job, "occ-paused", pausedThreadId);
         saveConversationObservation(job, "occ-revoked", revokedThreadId);
-        prepareFor(job);
+        preparer.prepare(
+            job.getId(),
+            workspace.getId(),
+            List.of(activeObs),
+            List.of(conversationUnit(List.of(activeObs)))
+        );
 
         assertThat(
             feedbackObservationRepository.findPreparedConversationFactsForRecipient(
@@ -111,7 +116,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                 recipient.getId(),
                 PageRequest.of(0, 10)
             )
-        ).hasSize(3);
+        ).hasSize(1);
 
         JsonNode root = contribute();
 
@@ -175,7 +180,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
                 new ComposedFeedbackUnit(
                     FeedbackChannel.IN_CHAT,
                     practice.getSlug(),
-                    List.of("obs-0"),
+                    List.of(admitted.getFirst().getId().toString()),
                     ComposedFeedbackUnit.Action.NEW,
                     null,
                     null,
@@ -214,13 +219,35 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
         // The same surface, prepared with nothing composed: no notes key at all, on that item alone.
         AgentJob uncomposed = newJob();
         savePullRequestObservation(uncomposed, "occ-uncomposed", 4343L);
-        prepareFor(uncomposed);
+        preparer.prepare(uncomposed.getId(), workspace.getId(), List.of(), List.of());
 
         JsonNode both = contribute().get("preparedConversationFeedback");
-        assertThat(both).hasSize(2);
-        assertThat(both)
-            .filteredOn(node -> node.has("notes"))
-            .hasSize(1);
+        assertThat(both).hasSize(1);
+        assertThat(both.get(0).has("notes")).isTrue();
+    }
+
+    private ComposedFeedbackUnit conversationUnit(List<Observation> observations) {
+        return new ComposedFeedbackUnit(
+            FeedbackChannel.IN_CHAT,
+            practice.getSlug(),
+            observations
+                .stream()
+                .map(o -> o.getId().toString())
+                .toList(),
+            ComposedFeedbackUnit.Action.NEW,
+            null,
+            null,
+            "Test practice",
+            null,
+            null,
+            new ComposedFeedbackUnit.ConversationBrief(
+                "The practice recurred.",
+                "Recognize the decision point.",
+                "The observations show the same pattern.",
+                "They can explain the decision in their own words."
+            ),
+            null
+        );
     }
 
     private JsonNode contribute() {
@@ -235,7 +262,7 @@ class PreparedConversationFeedbackConsentGateIntegrationTest extends AbstractSla
     private void prepareFor(AgentJob job) {
         List<Observation> observations = observationRepository.findByAgentJobId(job.getId());
         List<Observation> admitted = router.admit(observations, workspace.getId(), RoutingContext.author());
-        preparer.prepare(job.getId(), workspace.getId(), admitted, List.of());
+        preparer.prepare(job.getId(), workspace.getId(), admitted, List.of(conversationUnit(admitted)));
     }
 
     private Observation saveConversationObservation(AgentJob job, String occurrenceKey, long threadId) {
