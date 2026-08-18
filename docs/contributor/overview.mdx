@@ -25,10 +25,18 @@ incoming webhooks. See ADR 0008.
 
 ## How to use this guide
 
-- Start with **Local development** to prepare your workstation and understand the tooling expectations per service.
-- Review **Release management** and **Testing** before opening a PR – automation enforces the conventions documented there.
-- Dive into **System design** and **Database** when implementing larger features or debugging cross-service flows.
-- Follow the **Coding & design guidelines** to keep the codebase consistent across services.
+| Goal | Start here |
+| --- | --- |
+| Run the repository locally | [Local development](./local-development) |
+| Choose and run the right test tier | [Testing](./testing) |
+| Understand a cross-module change | [System design](./system-design) |
+| Change persisted data safely | [Database migration](./database-migration) |
+| Change practice review or feedback | [Practice review pipeline](./practice-review-pipeline.mdx) |
+| Prepare a release | [Release management](./release-management) |
+
+Repository-level `AGENTS.md` files hold the commands and traps an automated coding agent must follow.
+The pages here explain the system and human workflow; when they disagree with executable configuration,
+generated API output, or tests, fix the prose in the same pull request.
 
 ## Where the architecture decisions live
 
@@ -45,12 +53,5 @@ Two rules when you touch them:
   resolves to nothing here and fails the docs build (`onBrokenMarkdownLinks: 'throw'`).
 - **An ADR records a decision, not a fix log.** A bug you fixed afterwards goes in a changeset;
   amend an ADR only when the decision or one of its consequences actually changed.
-
-## Shared principles
-
-1. **Security first** - OAuth scopes are scoped to least privilege; secrets are injected via managed infrastructure.
-2. **Observability by default** - We ship structured logs and OpenTelemetry traces in every service.
-3. **Accessible experiences** - The React webapp targets WCAG 2.1 AA; accessibility regressions must be addressed before release.
-4. **Research friendly** - Experiments and short-lived features sit behind feature flags and are documented for replication.
 
 Continue with [Local development](./local-development) to set up your environment.

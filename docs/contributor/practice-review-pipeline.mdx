@@ -15,14 +15,33 @@ flowchart TB
     Occasion -->|yes| Capture{Capture: can we look?}
     Capture -->|no| Unready[agent_job.review_readiness]
     Capture -->|yes| Observe{Observation: what do we see?}
+    Observe -->|no practice subject| NotApplicable[observation.presence NOT_APPLICABLE]
     Observe -->|cannot tell| Inconclusive[observation.presence INCONCLUSIVE]
-    Observe -->|a claim| Deliver{Delivery: do we say it?}
+    Observe -->|behaviour claim| Deliver{Delivery: do we say it?}
     Deliver -->|no| Quiet[feedback.suppression_reason]
     Deliver -->|yes| Said[Feedback recorded and routed to an eligible surface]
 ```
 
 Use the stage that stopped the review to decide what to fix. Do not translate one stage's reason into
 another stage's vocabulary.
+
+## Choose the page for your change
+
+This page owns the runtime sequence and the seams between its stages. Start elsewhere when your change
+belongs to one contract:
+
+| You are changing | Start with |
+| --- | --- |
+| A source, its capture states, retention, or permitted uses | [Artifact-source contract](./artifact-source-contract.mdx) |
+| A practice's criteria, occasion, or evidence requirements | [Practice catalogue](./practice-catalogue.md) |
+| Observation or feedback persistence, identity, or API projections | [Practice review data model](./practice-feedback-schema.md) |
+| Product and model-facing terminology | [Practice feedback language](./practice-feedback-language.md) |
+| Evaluation joins, claim currentness, or stale results | [Evaluation provenance](./evaluation-provenance.md) |
+| An exact enum meaning after you know the stage | [Practice review glossary](./practice-review-glossary.mdx) |
+
+Return here when a change crosses two stages. That boundary is usually where an apparently harmless
+shortcut can turn a capture failure into a claim about someone's work, or a delivery choice into a missing
+measurement.
 
 ## Where a review can stop
 
@@ -46,103 +65,17 @@ answer is "two of them", the reason is really two reasons.
 
 ## Occasion
 
-An occasion is an *occurrence* — one named signal on one revision of one artifact — recorded in
-`artifact_signal` before any decision is taken about it. Recording first is what makes silence auditable:
-every review that did not happen has a row saying so.
+An occasion is one named signal on one revision of one artifact. It is recorded in
+`artifact_signal` before admission, so a review that does not start still has an auditable outcome.
 
-```mermaid
-stateDiagram-v2
-    [*] --> RECORDED: an occurrence is recorded
-    RECORDED --> TRIGGERED: a review starts
-    RECORDED --> SUPPRESSED: refused for a reason that cannot change
-    RECORDED --> PENDING: refused for a reason someone can change
-    RECORDED --> LAPSED: the work is gone
-    PENDING --> PENDING: re-offered about hourly
-    PENDING --> TRIGGERED: the reason went away
-    PENDING --> SUPPRESSED: a later offer refuses terminally
-    PENDING --> LAPSED: still pending after seven days
-```
+The ledger distinguishes `TRIGGERED`, terminal `SUPPRESSED`, retryable `PENDING`, and retired `LAPSED`
+rows. Terminal rows never reopen; pending rows are re-offered until their reason clears or their deadline
+passes. Retryability belongs to the reason, not to the caller. The canonical reason list, provenance mapping,
+and UI labels are in [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
+Operator remediation is in [When a workspace goes quiet](/admin/practice-review#when-a-workspace-goes-quiet).
 
-`TRIGGERED`, `SUPPRESSED` and `LAPSED` are terminal — every ledger update is guarded on
-`state IN ('RECORDED','PENDING')`, so nothing walks a decided row back. `PENDING` is the only state that
-costs anything later: `PendingSignalReaper` re-offers it and `PendingSignalResubmitter` runs the gate
-again.
-
-Which state a refusal produces is a property of the reason, not of the caller —
-`SignalStateReason.resultingState()` decides, and `isRetryable()` is defined as
-`resultingState() == PENDING`. That is why the tables below are the reason's own classification and not a
-policy applied on top of it.
-
-**Terminal — refused, never re-offered.** The fact that caused the refusal cannot change for this
-occurrence.
-
-| Reason                      | Why it can never come out differently                                    |
-| --------------------------- | ------------------------------------------------------------------------ |
-| `GATE_SKIPPED`              | A workspace review gate turned it away                                   |
-| `COOLDOWN_ACTIVE`           | This work was reviewed too recently; a later occurrence gets its own row |
-| `REQUEST_COOLDOWN_ACTIVE`   | A review of this was asked for moments ago                               |
-| `REQUESTER_QUOTA_EXHAUSTED` | The asker's hourly allowance is spent; asking again is a new occurrence  |
-| `CONCURRENT_DUPLICATE`      | The same review was already running                                      |
-| `OUT_OF_REVIEW_SCOPE`       | The branch a merge request targeted will not change                      |
-
-**Retryable — parked as `PENDING`, re-offered until it lapses.** Somebody can lift these without the
-artifact changing.
-
-Most of them also carry a destination. `webapp/src/components/practice-trace/trace-format.ts` maps a
-reason to the screen that undoes it, and the trace renders that as a link — but only for a reader who may
-open workspace administration, since every member of a workspace can read a trace. A reason with no entry
-in that map renders as a sentence and nothing more, which is the correct answer for the self-healing and
-terminal ones below: sending somebody to a settings page that cannot affect what they just read is how a
-limit gets widened to fix a non-fault.
-
-| Reason                 | What lifts it                                                                                         | Where the trace links                                                |
-| ---------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `WORKSPACE_INACTIVE`   | The workspace becomes active again                                                                    | — no screen reactivates a workspace; the status endpoint has no UI   |
-| `PRACTICES_DISABLED`   | An admin starts practice reviews                                                                      | Practices → Review → *When and where*                                |
-| `NO_ACTIVE_PRACTICE`   | A practice covering this kind of work is installed                                                    | Practices → Practice setup                                           |
-| `REVIEW_MODEL_UNBOUND` | An admin binds a model for practice review                                                            | Administration → AI models                                           |
-| `PRACTICE_TIER_OFF`    | An admin raises a watching practice above `OFF` — at the practice, its area, or the workspace default | Practices → Review → *How much*                                      |
-| `BUDGET_EXHAUSTED`     | The cap is raised, or the month rolls over                                                            | Administration → AI usage                                            |
-| `SUBJECT_UNLINKED`     | The author links a Hephaestus account                                                                 | — the author's own account page, which an admin cannot open for them |
-| `MODEL_UNAVAILABLE`    | The bound model or its connection becomes usable                                                      | Administration → AI models                                           |
-
-**Retired — terminal, but not a decision.** These close a row nobody will come back to.
-
-| Reason                      | Meaning                                      |
-| --------------------------- | -------------------------------------------- |
-| `PENDING_DEADLINE_EXCEEDED` | Re-offered for seven days and never admitted |
-| `ARTIFACT_GONE`             | The work no longer exists                    |
-
-Two properties of this ledger you have to know before you reason about volume. A `PENDING` row is retried
-on a cadence (`hephaestus.signal-ledger.pending-retry-after`, default one hour) until
-`pending-lapse-after` (default seven days) retires it — so a workspace left mis-configured accumulates
-re-offer work for a week and then goes quiet again with no further signal. And **nothing ever deletes from
-`artifact_signal`**: there is no pruning job for any state, `LAPSED` included. That is deliberate — the
-table is the record of what we did not do — but it means the table only grows.
-
-`SignalStateReason.describe()` is exhaustive over every constant and returns one reader-facing sentence
-each. Both the API and the webapp print it; when you add a constant, the compiler will make you write that
-sentence.
-
-### Provenance, and the collapse
-
-Every occurrence also records **how we came to know about it** — `DiscoveredVia` — which is a free health
-measurement rather than a routing decision. `SignalOrigins` maps it once onto `ObservationOrigin`, which is
-what later reads use to keep populations apart. The glossary holds that mapping and the operator-facing
-label for each door: [How a review was occasioned](./practice-review-glossary.mdx#how-a-review-was-occasioned).
-
-Two things about it are facts about the code rather than about the vocabulary, so they live here. Neither
-is visible from the enum, and assuming otherwise is a mistake the enum will not stop you making:
-
-- **Three doors collapse into `MANUAL`.** `ManualReviewRequests` is the single recording site for both the
-  `/hephaestus review` comment command (via `BotCommandProcessor`) and the *Review this now* button (via
-  `PracticeReviewRequestController`); `DevTriggerController` is a third, gated on
-  `hephaestus.dev.trigger-enabled`. Provenance cannot tell you which one was used.
-- **`SYNC` is a dead end for connected project work.** `AgentJobEventListener` and
-  `IssueAgentJobEventListener` both return immediately when the context is a sync, leaving the row
-  `RECORDED` and undecided. The one exception is `ConversationThreadTriggerScheduler`, which records
-  `SYNC` and then submits — Slack thread reviews are occasioned this way. Write "reconciliation never
-  starts a review" only about pull requests and issues.
+The occurrence ledger has no pruning job; capacity planning must treat it as append-only. Retry and lapse
+thresholds are documented in the admin guide.
 
 ## Capture
 
@@ -223,21 +156,22 @@ flowchart TB
     end
 
     obs --> compose
-    record["Everything measured before<br/>about this person"] --> compose
-    said["Everything already delivered,<br/>and feedback prepared but unread"] --> compose
+    record["Bounded recent observation history<br/>for this person"] --> compose
+    said["Bounded recent delivered feedback<br/>and feedback prepared but unread"] --> compose
 
     subgraph compositionTurn["Composition turn"]
         compose["Decide what is worth saying now,<br/>to whom, and on which surface"]
         compose --> incontext["IN_CONTEXT: this change, one edit"]
         compose --> page["IN_APP: the habit, one thing to try"]
         compose --> chat["IN_CHAT: notes for a future mentor turn"]
-        compose --> quiet["WITHHOLD: say nothing,<br/>recorded with a reason"]
+        compose --> quiet["WITHHOLD: say nothing"]
     end
 
     incontext --> gate{"Admission, tier, routers, caps"}
     page --> gate
     chat --> gate
     gate --> ledger["The feedback ledger"]
+    quiet --> compositionResult["Composition output only:<br/>retained until job payload stripping"]
 ```
 
 Note where the arrows converge. **The model proposes; the server admits.** Every gate that existed
@@ -248,46 +182,25 @@ to refuse.
 
 ### Composition inputs and outputs
 
-After Java admits the observations, `pi-runner.mjs` resumes the same in-memory session with
-`agent/feedback-composer.md`. Reusing the session avoids making the agent reconstruct the artifact context. The provider still receives the prior conversation on the resumed turn; prompt caching may reduce, but does not erase, that input cost.
-The runner closes the measurement phase before that turn: `report_observation` refuses every later call,
-and `report_feedback` can only bind to the admitted observations returned by Java. Composition has a
-reserved timeout, so detection cannot consume its entire container budget.
+After Java admits observations, the runner resumes the same model session with the composition prompt. The
+measurement tool is closed, and feedback may bind only to the durable observations returned by admission.
+The resumed session retains artifact context without weakening the server boundary.
 
-It is prompted with `agent/feedback-composer.md` and reads:
+The composer receives the current admitted observations, bounded recent observation and feedback history,
+unread prepared feedback, per-locus deltas, practice definitions, and the enabled lanes with their limits.
+The exact files belong to the [agent workspace ABI](agent/workspace-abi.mdx), not this guide.
 
-| Input                                                      | Where                                                       | Staged by                                          |
-| ---------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
-| This run's admitted observations                           | `work/composition/observations.json`                        | the runner, from Java's admission response         |
-| Prior observations about this person                       | `inputs/history/observations.json`                          | `ReviewHistoryContentSource` — 90 days, at most 50 |
-| Feedback already delivered                                 | `inputs/history/feedback.json`                              | the same, at most 30                               |
-| Feedback prepared but not yet read                         | `inputs/history/prepared.json`                              | the same, at most 20                               |
-| How each measured locus moved                              | `inputs/history/delta.json`                                 | the same, computed by `ObservationDelta`           |
-| The practices, by slug                                     | `inputs/practices/index.json`, `inputs/practices/<slug>.md` | `PracticeCatalogInjector`                          |
-| Which lanes are open, and how many messages each may carry | `inputs/feedback-composition.json`                          | `FeedbackCompositionInputs`                        |
+Three constraints shape how that context may be used:
 
-Output is `out/feedback.json`, collected into the job output and parsed by
-`FeedbackCompositionResultParser` into `ComposedFeedbackUnit`s.
+- Only pull-request and issue handlers enable composition, and not for backfills. Document and conversation
+  reviews record observations but compose no feedback.
+- History is bounded and therefore supports recurrence claims, never claims that something has *never*
+  happened before.
+- Deltas describe a locus on one artifact as `NEW`, `RECURRING`, `UNCHANGED`, or `RESOLVED`. Cross-artifact
+  habits require distinct-artifact evidence from history; an unobserved prior strength is not `RESOLVED`.
 
-Three properties matter more than the paths:
-
-- **Presence of `inputs/feedback-composition.json` is the on switch, and it carries the lane set.**
-  Only `PullRequestReviewHandler` and `IssueReviewHandler` stage it, and never for a `BACKFILL` origin.
-  A document or conversation-thread review composes nothing at all, which is not an oversight — the
-  file's absence is how a handler says "review, but do not compose", and that is what every review did
-  before this existed. The lane set is carried rather than inferred so that a stage with no artifact in
-  hand can disable `IN_CONTEXT` from the outside; that is the seam a scheduled workspace sweep will use.
-- **The history window is never reported `COMPLETE`.** It is a bounded read of a record that keeps
-  growing, so it can show that something recurred but never that something has never happened before.
-- **The delta is arithmetic, not judgement.** `ObservationDelta.classify` groups a person's window by
-  artifact, treats the newest run of each artifact as "now", and returns `NEW`, `RECURRING` (still
-  there and the assessment or severity moved), `UNCHANGED` (still there, nothing moved) or `RESOLVED`.
-  `RESOLVED` is the whole reason it exists: *"the gap from last week is closed"* originates from a locus
-  that is in the prior set and absent from the newest run, so no mapping that walks this run's
-  observations can ever reach it. A vanished *strength* is deliberately not `RESOLVED` — that would
-  credit somebody with fixing what was already right. And because the recurrence key folds the artifact
-  id, the delta can never say "this keeps happening across your work"; that claim comes from the staged
-  observation history, and the composer has to clear a distinct-artifact floor to make it.
+Accepted tool calls update the composition output incrementally. The server parses proposed units and applies
+all delivery gates; the model never writes the feedback ledger directly.
 
 ### The three channels are three levels
 
@@ -381,64 +294,26 @@ withhold reason is the composer's own judgement, and `FeedbackSuppressionReason`
 constraint listing reasons the *server* refused. Merging them would make "we had nothing worth saying"
 indistinguishable from "the tier held it back".
 
-### Supersession — nothing received may be un-said
+### Supersession preserves read feedback
 
-`FeedbackThreadKey` is one hash over `kind ␟ locus ␟ recipient ␟ channel`. The longitudinal lanes call
-`forPractice(practiceSlug, recipientUserId, channel)`, because a habit claim is about the practice
-rather than about one merge request: a second card about the same habit should replace the queued
-first, not stack beside it. The in-context lane keys on the artifact, as it always did.
-
-`FeedbackSupersession` is a per-channel compare-and-swap. It finds the latest row on the thread, then
-runs `UPDATE feedback SET delivery_state='SUPERSEDED' WHERE id = ? AND delivery_state='PREPARED'`,
-retrying a bounded number of times while the head of the thread keeps moving. There are three outcomes
-and **the new unit is written in all three**:
-
-| Outcome      | What happened                                     | `replaces_id`         |
-| ------------ | ------------------------------------------------- | --------------------- |
-| `SUPERSEDED` | A queued message was claimed and retired          | the retired row       |
-| `CONTINUED`  | The recipient read it first; it keeps `DELIVERED` | the row that was read |
-| `NEW`        | Nothing live on the thread                        | not set               |
-
-`DELIVERED` is never retired on the longitudinal lanes, because on those lanes delivered means *read*.
-The in-context lane still retires a `DELIVERED` summary, and that is not an exception to the rule: the
-provider comment is **edited in place**, so the old text stops being visible and the ledger has to say
-so.
-
-`thread_key` stays non-unique. A thread is a chain of rows over time; the uniqueness that matters — at
-most one live `PREPARED` per thread — is the compare-and-swap's job, not a constraint's. And the two
-mechanisms here have two different jobs that should not be merged: **the compare-and-swap protects the
-ledger's integrity, and the per-practice cooldown protects the developer's inbox.** The swap cannot
-stop a near-duplicate and is not meant to.
+A thread identifies one continuing topic for one recipient and channel. Longitudinal lanes key it by
+practice; in-context feedback keys it by artifact. New feedback supersedes a queued unread row, continues
+an already-read row without changing it, or starts a new thread. The ledger permits a history of rows but
+at most one live `PREPARED` row per thread. Provider comments differ only because editing in place makes
+the old text no longer visible, so the ledger retires it.
 
 ### When composition does not run
 
-It is allowed to fail, and the design leans on that. The stage runs on whatever budget the review left
-over, ceilinged at `max(60s, 15% of the agent budget)` with a 30-second floor below which it is skipped
-outright; a prompt error is caught and logged, a watchdog abort is logged, and the review's exit code
-is unaffected. `out/feedback.json` is rewritten on every accepted tool call, so a stage killed
-mid-flight still leaves behind what it had already decided — and it is written even when empty, because
-"the composer looked and composed nothing" is a different fact from "the stage never ran".
-
-Each lane absorbs that differently, and the difference is the design:
-
-- **In context has a fallback, so it needs no durability.** `DeliveryComposer` prefers the composed
-  unit for a practice and otherwise renders the observation's own `evidenceRationale`, with the catalogue's
-  "why this matters" under it. **The fallback carries no next step, because no measurement writes one.**
-  An uncomposed practice tells the developer what was seen at that locus and stops — that is the honest
-  output of a stage that was not asked what to do, and it is the price of not biasing the measurement.
-  What the composer will never post is the shell of a note: an observation whose `evidenceRationale` scrubs away
-  to nothing places no inline comment at all, and lands in full in the summary instead.
-- **The longitudinal lanes have no fallback, so they are made durable instead.** `agent_job` carries a
-  per-lane preparation mark recording that a lane ran at all, and
-  `FeedbackLanePreparationSweeper` re-runs any lane whose async listener did not. It selects on the
-  **missing mark**, never on missing feedback rows, because both lanes legitimately prepare nothing —
-  and it leaves a short settling window so it does not race a submission still queued in the async pool.
+A composition failure does not invalidate admitted observations. An empty result is distinct from a turn
+that never ran. In-context feedback may fall back to the observation's `evidenceRationale` and the
+practice's `whyItMatters`, but invents no next step. Longitudinal lanes have no content fallback; per-lane
+preparation marks let a sweeper retry only turns that did not run.
 
 ## Delivery
 
-Delivery turns admitted observations into feedback and records what happened to it, including when nothing was
-sent. A withheld observation is written to the ledger as `SUPPRESSED` with a reason rather than dropped, so "we
-saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation.
+Delivery applies server policy to composed units. A composer `WITHHOLD` remains in the retained composition
+output and creates no feedback row. If the server refuses a proposed unit, it writes `SUPPRESSED` feedback
+with the server reason. This keeps “nothing worth saying” distinct from “not allowed to deliver.”
 
 Two gates decide admission, and they are ANDed. `FeedbackAdmission.delivers(origin, tier, channel)`
 is the single place they meet, so a new channel, tier or origin has one place to be reasoned about.
@@ -447,12 +322,13 @@ never inside it.
 
 ```mermaid
 flowchart LR
-    P["practice.review_tier"] -->|null| A["area.review_tier"]
-    A -->|null| W["workspace default"]
-    W -->|null| D["DELIVER"]
-    P --> T{{"effective tier"}}
-    A --> T
-    W --> T
+    P{"practice.review_tier set?"}
+    P -->|yes| T{{"effective tier"}}
+    P -->|no| A{"area.review_tier set?"}
+    A -->|yes| T
+    A -->|no| W{"workspace default set?"}
+    W -->|yes| T
+    W -->|no| D["DELIVER default"]
     D --> T
     T --> AND{"do both say yes?"}
     O["observation origin"] --> AND
@@ -470,20 +346,10 @@ flowchart LR
 - **`ObservationOrigin`** — `LIVE` and `MANUAL` deliver everywhere; `BACKFILL` is entitled only to
   `IN_APP`. Withheld here means `BACKFILL_QUIET`.
 
-`FeedbackChannel.IN_APP` is the developer's own practice feedback: the process level of the three, where
-a habit that recurs across several pieces of their work is named along with what to do differently next
-time. It is composed, admitted and stored per developer and served to that developer alone from
-`GET /workspaces/{workspaceSlug}/practices/feedback/in-app`; the developer's practice pages are where it
-will surface. Its body is
-the only text the system composes that is read verbatim by a named person who is its sole audience —
-`IN_CONTEXT` feedback is already public on the work, and `IN_CHAT` stores structured notes for the mentor
-rather than words for the developer — so an
-ArchUnit rule (`InAppChannelProducerArchTest`) keeps the set of classes that may write one or read one
-back small and named, and `ReviewFeedbackQueryService` withholds the body from every operator surface. The `BACKFILL` entitlement is a ceiling, not an instruction: a
-backfilled observation may reach only this channel, and the router refuses a cluster made entirely of
-backfilled measurements, so it is still measured and not delivered — by construction, not by
-configuration. `BACKFILL_QUIET` is deliberately distinct from `PRACTICE_TIER_QUIET` because a tier is a
-dial an admin can turn and this is not one.
+`FeedbackChannel.IN_APP` is private, process-level feedback for the developer concerned. Its body is
+served only to that developer; operator projections omit it. A `BACKFILL` origin may target only this lane,
+but the router refuses a cluster made entirely of backfilled observations, so backfills are measured and
+never delivered.
 
 The full suppression vocabulary lives on `FeedbackSuppressionReason`, which also carries one deprecated
 constant (`ARTIFACT_DRAFT`) kept only so old rows still read back.
@@ -515,8 +381,10 @@ sequenceDiagram
     SB->>W: out/ files and an exit code
     W->>W: verify the admission digest and apply delivery gates
     W->>DB: write the feedback ledger
-    W->>SCM: post the comment
-    W->>DB: record whether delivery succeeded
+    opt admitted IN_CONTEXT feedback
+        W->>SCM: post or update provider feedback
+        W->>DB: record whether delivery succeeded
+    end
 ```
 
 - **The `agent_job` table is the queue.** There is no broker between server and worker. Submission is one
@@ -556,8 +424,8 @@ The durable boundaries, which the implementation may reschedule freely behind:
   recurrence identity.
 - **Feedback** — after admission, the same agent session reports through `report_feedback` in a closed
   intervention phase;
-  `FeedbackCompositionResultParser` validates and never throws, and every attempt, withholding,
-  replacement and placement is recorded in the ledger. The seam itself is
+  `FeedbackCompositionResultParser` validates and never throws. Admitted feedback, server suppressions,
+  replacements, and placements enter the ledger; a model `WITHHOLD` remains only in the bounded job output. The seam itself is
   [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md).
 
 When changing sandbox inputs or outputs: update the owning runtime type or parser first; update the ABI
