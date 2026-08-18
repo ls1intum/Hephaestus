@@ -49,8 +49,6 @@ export interface AdminAuditTableProps {
 	resolveWorkspaceName?: (id: number) => string | undefined;
 }
 
-/** Read-only table of auth audit events, newest first. The actor column attributes an impersonated
- * action to the operator. */
 export function AdminAuditTable({
 	events,
 	isLoading,

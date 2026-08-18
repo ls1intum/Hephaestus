@@ -25,6 +25,7 @@ const adminUser: AdminAccountView = {
 const meta = {
 	component: ChangeRoleDialog,
 	parameters: { layout: "centered" },
+	tags: ["autodocs"],
 	args: { onOpenChange: fn(), onConfirm: fn(), isPending: false },
 } satisfies Meta<typeof ChangeRoleDialog>;
 
@@ -36,7 +37,7 @@ export const GrantAdmin: Story = {
 	args: { user: regularUser, icon: ShieldCheck },
 	play: async ({ args }) => {
 		await screen.findByRole("alertdialog");
-		await expect(screen.getByText(/Grant application admin\?/i)).toBeInTheDocument();
+		screen.getByText(/Grant application admin\?/i);
 		await userEvent.click(screen.getByRole("button", { name: "Grant admin" }));
 		await expect(args.onConfirm).toHaveBeenCalledWith(regularUser, "APP_ADMIN");
 	},

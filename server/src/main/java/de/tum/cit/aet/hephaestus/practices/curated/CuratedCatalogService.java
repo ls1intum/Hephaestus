@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -32,6 +33,7 @@ public class CuratedCatalogService {
     private final CuratedAreaOverrideRepository areaOverrides;
     private final ConfigAuditPort configAudit;
     private final Clock clock;
+    private final PracticeDefinitionValidator definitionValidator;
 
     @Transactional(readOnly = true)
     public EffectiveCatalog catalog() {
@@ -60,7 +62,8 @@ public class CuratedCatalogService {
     ) {
         lockCatalog();
         EffectiveCatalog before = catalog();
-        CuratedCatalogModel.validatePractice(before, definition);
+        CuratedCatalogModel.validatePracticeArea(before, definition);
+        definitionValidator.validate(definition);
         CatalogEntry<PracticeDefinition> entry = CuratedCatalogModel.requireEntry(
             before.practice(slug),
             CATALOG_PRACTICE,
@@ -86,7 +89,8 @@ public class CuratedCatalogService {
     public CatalogEntry<PracticeDefinition> createPractice(String slug, PracticeDefinition definition) {
         lockCatalog();
         EffectiveCatalog before = catalog();
-        CuratedCatalogModel.validatePractice(before, definition);
+        CuratedCatalogModel.validatePracticeArea(before, definition);
+        definitionValidator.validate(definition);
         if (before.practice(slug).isPresent()) {
             throw new CuratedCatalogConflictException("A practice with slug '" + slug + "' already exists.");
         }
@@ -423,10 +427,10 @@ public class CuratedCatalogService {
         PracticeDefinition definition = entry.effective();
         PracticeDefinition moved = new PracticeDefinition(
             definition.name(),
-            definition.artifactType(),
-            definition.triggerEvents(),
+            definition.bindings(),
             definition.criteria(),
             definition.precomputeScript(),
+            definition.automatedReviewPolicy(),
             definition.whyItMatters(),
             definition.whatGoodLooksLike(),
             areaSlug
@@ -483,14 +487,6 @@ public class CuratedCatalogService {
             CuratedPracticeOverride override = practiceOverride(orderedSlugs.get(position), now);
             override.setPosition(position, now);
             practiceOverrides.save(override);
-        }
-    }
-
-    private void resequenceAreas(List<String> orderedSlugs, Instant now) {
-        for (int position = 0; position < orderedSlugs.size(); position++) {
-            CuratedAreaOverride override = areaOverride(orderedSlugs.get(position), now);
-            override.setPosition(position, now);
-            areaOverrides.save(override);
         }
     }
 

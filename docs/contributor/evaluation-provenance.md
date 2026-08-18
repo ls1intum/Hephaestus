@@ -39,15 +39,15 @@ reproducible.
 
 ## Delivery evidence
 
-Every composed message that reaches the delivery layer has a `feedback` row. The Java
+Every composed piece of feedback that reaches the delivery layer has a `feedback` row. The Java
 [`FeedbackDeliveryState`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackDeliveryState.java)
 and
 [`FeedbackSuppressionReason`](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/java/de/tum/cit/aet/hephaestus/practices/feedback/FeedbackSuppressionReason.java)
 types own the domain values; Liquibase owns the persisted constraints.
 
 `DELIVERED` and `SUPERSEDED` prove that a placement was recorded. They do not prove that a person read
-the message. `SUPPRESSED` records a policy decision to withhold a message and always carries a reason.
-Any new decision point that can withhold a composed message must write the suppressed row instead of
+the feedback. `SUPPRESSED` records a policy decision to withhold feedback and always carries a reason.
+Any new decision point that can withhold composed feedback must write the suppressed row instead of
 silently dropping it.
 
 ## Evaluation joins
@@ -56,12 +56,12 @@ silently dropping it.
   digests, repository revision, and usage; join `observation.practice_revision_id` to the criteria used
   for that observation.
 - **Observation to delivery outcome:** join through `feedback_observation` to feedback state and
-  suppression reason. A link to a delivered or superseded message proves placement. Links only to
-  prepared, suppressed, or failed messages do not. No link means no feedback was composed from that
+  suppression reason. A link to delivered or superseded feedback proves placement. Links only to
+  prepared, suppressed, or failed feedback do not. No link means no feedback was composed from that
   observation.
 - **Reaction to delivered evidence:** join `reaction.feedback_id` to feedback, then through
-  `feedback_observation` to its observations. Reactions are accepted only for delivered messages; a later
-  review may supersede that message.
+  `feedback_observation` to its observations. Reactions are accepted only for delivered feedback; a later
+  review may supersede that feedback.
 - **Feedback to posted location:** join `feedback_placement` and inspect `posted_comment_ref` or
   `chat_message_id`.
 

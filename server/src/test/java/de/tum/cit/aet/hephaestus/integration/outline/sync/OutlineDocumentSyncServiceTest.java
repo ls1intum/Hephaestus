@@ -42,6 +42,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -112,7 +113,15 @@ class OutlineDocumentSyncServiceTest extends BaseUnitTest {
             webhookRegistrar,
             properties,
             mirrorWriter,
-            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties)
+            new OutlineMirrorRetentionService(documentRepository, mirrorWriter, properties),
+            org.mockito.Mockito.mock(
+                de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder.class
+            ),
+            // No review trigger: this suite is about mirroring, and a node that cannot submit a review
+            // still records every signal — which is exactly the ObjectProvider's absent case.
+            new org.springframework.beans.factory.support.StaticListableBeanFactory().getBeanProvider(
+                de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger.class
+            )
         );
     }
 

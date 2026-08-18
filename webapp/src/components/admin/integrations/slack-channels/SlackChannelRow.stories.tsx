@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { expectSettledVisible } from "@/test/overlay";
 import { SlackChannelRow } from "./SlackChannelRow";
 
 const iso = (days: number) => new Date(Date.now() - days * 24 * 60 * 60 * 1000);
@@ -71,33 +72,31 @@ export const NotStarted: Story = {
 			consentAnnouncedAt: undefined,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Not started")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Not started");
 		// No announcement yet — the empty timestamp is the screen-reader-visible "Never", not an
 		// aria-hidden em-dash that vanishes for assistive tech.
-		await expect(canvas.getByText("Never")).toBeInTheDocument();
+		canvas.getByText("Never");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-intro/i }));
-		await expect(
+		await expectSettledVisible(
 			await screen.findByRole("menuitem", { name: /activate monitoring/i }),
-		).toBeInTheDocument();
+		);
 		await expect(screen.queryByRole("menuitem", { name: /^pause$/i })).not.toBeInTheDocument();
 	},
 };
 
 /** ACTIVE — messages are being read; the row offers Pause, history and the destructive erase. */
 export const Monitoring: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Monitoring")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Monitoring");
 		// The announced time is the shared ticking RelativeTime, exposed as a real tooltip button so
 		// its absolute time is one hover away and reachable by keyboard.
 		const announced = canvas.getByRole("button", { name: /ago$/i });
 		await expect(announced.tagName).toBe("BUTTON");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
-		await expect(await screen.findByRole("menuitem", { name: /^pause$/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /^pause$/i }));
 		await expect(
 			screen.queryByRole("menuitem", { name: /activate monitoring/i }),
 		).not.toBeInTheDocument();
@@ -107,29 +106,23 @@ export const Monitoring: Story = {
 /** PAUSED — reading stopped, collected data kept; Resume is the way back. */
 export const Paused: Story = {
 	args: { channel: { ...channel, consentState: "PAUSED" } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Paused")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Paused");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
-		await expect(await screen.findByRole("menuitem", { name: /^resume$/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /^resume$/i }));
 	},
 };
 
 /** REVOKED — terminal. Nothing is left to erase, so only history and a fresh setup remain. */
 export const Revoked: Story = {
 	args: { channel: { ...channel, consentState: "REVOKED" } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Revoked")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Revoked");
 
 		await userEvent.click(canvas.getByRole("button", { name: /actions for team-standup/i }));
-		await expect(
-			await screen.findByRole("menuitem", { name: /set up again/i }),
-		).toBeInTheDocument();
-		await expect(
-			await screen.findByRole("menuitem", { name: /view history/i }),
-		).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /set up again/i }));
+		await expectSettledVisible(await screen.findByRole("menuitem", { name: /view history/i }));
 
 		await expect(
 			screen.queryByRole("menuitem", { name: /activate monitoring/i }),
@@ -145,8 +138,7 @@ export const Revoked: Story = {
 /** Members who opted out are a first-class trust signal, with a keyboard-reachable tooltip. */
 export const WithOptOuts: Story = {
 	args: { channel: { ...channel, optedOutMemberCount: 3 } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// A bare non-interactive <span> trigger has no accessible role for keyboard/SR users; the
 		// tooltip trigger must be a real, enabled <button> so Tab can reach it.
 		const trigger = canvas.getByRole("button", { name: "3" });
@@ -158,8 +150,7 @@ export const WithOptOuts: Story = {
 /** No name from Slack — the row falls back to the stable id rather than rendering "#undefined". */
 export const NoChannelName: Story = {
 	args: { channel: { ...channel, channelName: undefined } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText(/C01ACTIVE001/).length).toBeGreaterThan(0);
 	},
 };

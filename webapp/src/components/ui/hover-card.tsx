@@ -21,9 +21,11 @@ function HoverCardContent({
 	Pick<PreviewCardPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
 	return (
 		<PreviewCardPrimitive.Portal data-slot="hover-card-portal">
+			{/* Viewport-relative, not `absolute` — see `overlay-reflow.stories.tsx`. */}
 			<PreviewCardPrimitive.Positioner
 				align={align}
 				alignOffset={alignOffset}
+				positionMethod="fixed"
 				side={side}
 				sideOffset={sideOffset}
 				className="isolate z-50"

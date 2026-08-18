@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.LocusObservation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
@@ -39,9 +39,9 @@ public class ObservationTrendService {
      * when fewer than two runs exist — the first review has nothing to trend against.
      */
     @Transactional(readOnly = true)
-    public Optional<TrendDelta> computeForTarget(WorkArtifact artifactType, Long artifactId, Long workspaceId) {
+    public Optional<TrendDelta> computeForTarget(ArtifactKind artifactKind, Long artifactId, Long workspaceId) {
         List<RunRef> runs = observationRepository.findRecentRunRefsForTarget(
-            artifactType,
+            artifactKind,
             artifactId,
             workspaceId,
             PageRequest.of(0, 2)
@@ -57,7 +57,7 @@ public class ObservationTrendService {
         );
         return Optional.of(
             new TrendDelta(
-                artifactType,
+                artifactKind,
                 artifactId,
                 curr.getAgentJobId(),
                 prev.getAgentJobId(),
@@ -80,10 +80,10 @@ public class ObservationTrendService {
     }
 
     /**
-     * Diff two runs' loci. Each run is collapsed to one representative finding per recurrence_key (a run can
-     * emit the same locus twice — ObservationFingerprint deliberately collapses two findings of one practice in one
-     * file); the representative is the highest-severity, then highest-confidence, finding so the rendered
-     * severity is the worst the run saw.
+     * Diff two runs' loci. Each run is collapsed to one representative observation per recurrence_key (a run can
+     * emit the same locus twice — ObservationFingerprint deliberately collapses two observations of one practice in one
+     * file); the representative is the highest-severity observation so the rendered severity is the worst
+     * the run saw.
      */
     private List<LocusTransition> classify(List<LocusObservation> priorRun, List<LocusObservation> currentRun) {
         Map<String, LocusObservation> prevMap = collapse(priorRun);
@@ -139,15 +139,14 @@ public class ObservationTrendService {
             key,
             status,
             represent.getPracticeSlug(),
-            represent.getTitle(),
+            represent.getSummary(),
             priorAssessment,
             currentAssessment,
-            represent.getSeverity(),
-            represent.getConfidence()
+            represent.getSeverity()
         );
     }
 
-    /** Collapse a run to one representative finding per recurrence_key (worst severity, then highest confidence). */
+    /** Collapse a run to one representative observation per recurrence_key (worst severity, then first). */
     private static Map<String, LocusObservation> collapse(List<LocusObservation> run) {
         Map<String, LocusObservation> map = new LinkedHashMap<>();
         for (LocusObservation lf : run) {
@@ -158,14 +157,12 @@ public class ObservationTrendService {
 
     private static LocusObservation worse(LocusObservation a, LocusObservation b) {
         // Severity is null for a GOOD (strength) observation (ADR 0022): treat absent as least-severe
-        // (ordinal beyond INFO) so a BAD finding always wins the representative slot.
+        // (ordinal beyond INFO) so a BAD observation always wins the representative slot.
         int sev = Integer.compare(severityOrdinal(a), severityOrdinal(b));
         if (sev != 0) {
             return sev < 0 ? a : b; // lower ordinal = more severe (CRITICAL=0)
         }
-        float ca = a.getConfidence() == null ? 0f : a.getConfidence();
-        float cb = b.getConfidence() == null ? 0f : b.getConfidence();
-        return ca >= cb ? a : b;
+        return a;
     }
 
     private static int severityOrdinal(LocusObservation f) {

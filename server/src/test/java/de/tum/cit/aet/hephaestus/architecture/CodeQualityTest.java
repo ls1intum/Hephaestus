@@ -441,6 +441,7 @@ class CodeQualityTest extends HephaestusArchitectureTest {
                 "SyncPushService", // Qualified NATS connection is optional when sync push is disabled or under specs
                 "GitlabConnectionSyncStateProvider", // Rate-limit tracker is conditional with the GitLab runtime beans
                 "OutlineConnectionSyncStateProvider", // Rate-limit tracker (OutlineRateLimitTracker) is @ConditionalOnProperty(outline.enabled) — same optional-bean break as the GitLab provider
+                "OutlineDocumentSyncService", // DocumentReviewTrigger's sole impl is @ConditionalOnProperty(hephaestus.agent.enabled); the mirror records every document signal on every runtime role and only skips the review offer where nothing could run one
                 "InstanceLlmSettingsService" // LlmSettingsAudit's sole impl is @ConditionalOnServerRole, but this service is also consumed by the ungated Workspace{Llm}Service pair (BYO gate check) which load on every runtime role
             );
 

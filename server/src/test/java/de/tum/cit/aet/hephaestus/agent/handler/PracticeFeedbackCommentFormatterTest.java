@@ -22,10 +22,13 @@ class PracticeFeedbackCommentFormatterTest extends BaseUnitTest {
         assertThat(result)
             .contains(PullRequestCommentPoster.summaryMarkerFor(job))
             .contains("Test body content")
-            .contains("Hephaestus Agent", "model&lt;&amp;&gt;", "1m 30s")
+            .contains("<sub>Practice review &middot; model&lt;&amp;&gt; &middot; 1m 30s</sub>")
             .contains(
                 "[Manage comments and Slack reminders](https://hephaestus.example.com/settings#practice-feedback)"
-            );
+            )
+            // Every developer who receives feedback reads this footer, so the product name staying out of
+            // it is pinned rather than left to review.
+            .doesNotContain("Hephaestus Agent");
     }
 
     @Test

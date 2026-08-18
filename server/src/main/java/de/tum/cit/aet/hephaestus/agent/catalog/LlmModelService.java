@@ -22,8 +22,8 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * CRUD, pricing, and sharing for instance-owned LLM catalog models.
  *
- * <p>Audited on {@code auth_event} rather than {@code config_audit_event} because this catalog is
- * global and {@code config_audit_event.workspace_id} is NOT NULL.
+ * <p>Audited on {@code auth_event} rather than {@code config_audit_event}: the config trail is
+ * workspace-scoped and this catalog is global.
  */
 @Service
 @RequiredArgsConstructor

@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Pattern;
@@ -17,34 +19,48 @@ public record UpdatePracticeRequestDTO(
     @Nullable
     String name,
 
-    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
-    @ValidTriggerEvents
-    @Schema(description = "Domain events that trigger detection; empty for scheduled conversation reviews")
+    @Size(
+        min = 1,
+        max = 1,
+        message = "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
+            "split this into two practices."
+    )
+    @Valid
+    @Schema(description = "Replacement occasion and its evidence; omit to leave it unchanged")
     @Nullable
-    List<String> triggerEvents,
+    List<PracticeBinding> bindings,
 
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Criteria must not be blank")
-    @Schema(description = "Practice evaluation criteria")
+    @Schema(description = "Practice review criteria")
     @Nullable
     String criteria,
 
-    @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
-    @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    @Size(
+        max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
+        message = "Precompute script must be at most 100000 characters"
+    )
+    @Schema(description = "TypeScript/Bun static analysis run before automated review")
     @Nullable
     String precomputeScript,
 
-    @Schema(description = "Artifact this practice evaluates", example = "ISSUE") @Nullable WorkArtifact artifactType,
+    @Valid
+    @Schema(
+        description = "Replacement review settings; omit to preserve them, or to take the recommended ones " +
+            "when the bindings move the practice to a different kind of work"
+    )
+    @Nullable
+    PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "Why-it-matters must not be blank")
-    @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")
+    @Schema(description = "Plain-language rationale shown to the developer")
     @Nullable
     String whyItMatters,
 
     @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
     @Pattern(regexp = ".*\\S.*", message = "What-good-looks-like must not be blank")
-    @Schema(description = "Developer-facing exemplar (learner layer); a concrete instance, not the rubric")
+    @Schema(description = "Concrete example shown to the developer; not review criteria")
     @Nullable
     String whatGoodLooksLike,
 

@@ -1,14 +1,9 @@
 # API Error Handling Guidelines
 
-This document explains how we use Spring Boot's `@RestControllerAdvice` + `ProblemDetail` to keep our REST APIs predictable across services.
-
-## Why `RestControllerAdvice`?
-
-Industry guidance for Spring Boot 3 in 2025 recommends centralizing REST exception handling through `@RestControllerAdvice` so every controller returns a single, structured schema (see [BootcampToProd, 2025](https://bootcamptoprod.com/spring-boot-restcontrolleradvice-annotation/) and the Spring Boot best-practices roundups on [Medium](https://medium.com/towardsdev/stop-the-stacktrace-chaos-exception-handling-in-spring-boot-2025-best-practices-guide-b8c662f56e00)). The advantages align with what we want in Hephaestus:
-
-- **Consistency**: Every error comes back as RFC-7807 `application/problem+json` regardless of which controller threw it.
-- **Security**: We decide exactly what detail leaves the server, instead of leaking stack traces.
-- **Reduced duplication**: Controllers focus on domain logic and throw meaningful exceptions; advice classes translate them into HTTP semantics.
+Every REST error this server returns is an RFC-7807 `application/problem+json` body produced by a
+`@RestControllerAdvice`. A controller throws a meaningful exception; an advice class translates it
+into HTTP semantics and decides exactly what detail leaves the server. No controller formats an error
+itself, and no stack trace reaches a client.
 
 ## How `WorkspaceControllerAdvice` works
 
@@ -37,7 +32,7 @@ If controllers reuse the same exception hierarchy (e.g., Git provider controller
 
 ## Validation errors deserve structure, too
 
-Spring Boot 3 surfaces method-argument validation failures as `MethodArgumentNotValidException` (body binding) or `ConstraintViolationException` (query/path parameters). Best-practice guides such as [codecentric’s deep dive into RFC 7807/RFC 9457](https://www.codecentric.de/en/knowledge-hub/blog/charge-your-apis-volume-19-understanding-problem-details-for-http-apis-a-deep-dive-into-rfc-7807-and-rfc-9457) and the 2025 Spring exception-handling roundups on [Medium](https://towardsdev.com/stop-the-stacktrace-chaos-exception-handling-in-spring-boot-2025-best-practices-guide-b8c662f56e00) recommend turning both into structured JSON so clients can highlight the right fields. Our convention:
+Spring surfaces method-argument validation failures as `MethodArgumentNotValidException` (body binding) or `ConstraintViolationException` (query/path parameters). Both become structured JSON, so a client can highlight the field that failed rather than print a sentence. See [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) for the media type. Our convention:
 
 - Use the same advice class to `@ExceptionHandler` both exception types.
 - Return `ProblemDetail` with `title = "Validation failed"`, `status = 400`, and a short descriptive `detail`.
@@ -51,5 +46,3 @@ Slug parameters across `WorkspaceController` use the shared `@WorkspaceSlug` con
 
 - Add WebTestClient or MockMvc tests that trigger the exception path and assert the `ProblemDetail` body.
 - Cover the advice indirectly via integration tests so we catch serialization regressions when upgrading Spring Boot.
-
-Following these steps ensures we remain aligned with current Spring Boot recommendations while keeping our API contracts brutally consistent for every consumer.

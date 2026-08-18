@@ -10,9 +10,9 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlClientFactory;
 import de.tum.cit.aet.hephaestus.integration.core.egress.SilentModeGraphQlInterceptor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.slack.messaging.SlackMessageService;
 import java.util.function.Consumer;
 import org.junit.jupiter.api.Test;
@@ -31,9 +31,9 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
     void shouldDeclareEveryScmWriterAsGateway() {
         ArchRule rule = classes()
             .that()
-            .areAssignableTo(FeedbackChannel.class)
+            .areAssignableTo(SummaryChannel.class)
             .or()
-            .areAssignableTo(InlineFindingChannel.class)
+            .areAssignableTo(InlineFeedbackChannel.class)
             .or()
             .areAssignableTo(ApprovalChannel.class)
             .or()
@@ -67,9 +67,9 @@ class OutboundEgressArchitectureTest extends HephaestusArchitectureTest {
             .that()
             .areAnnotatedWith(OutboundEgressGateway.class)
             .should()
-            .beAssignableTo(FeedbackChannel.class)
+            .beAssignableTo(SummaryChannel.class)
             .orShould()
-            .beAssignableTo(InlineFindingChannel.class)
+            .beAssignableTo(InlineFeedbackChannel.class)
             .orShould()
             .beAssignableTo(ApprovalChannel.class)
             .orShould()

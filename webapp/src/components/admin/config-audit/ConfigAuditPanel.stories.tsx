@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { HttpResponse, http } from "msw";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { AdminConfigAuditPanel, WorkspaceConfigAuditPanel } from "./ConfigAuditPanel";
 
@@ -10,7 +10,7 @@ const entries: ConfigAuditEntryView[] = [
 		occurredAt: "2026-07-24T09:14:32Z" as unknown as Date,
 		action: "UPDATED",
 		entityType: "AGENT_BINDING",
-		entityId: "PRACTICE_DETECTION",
+		entityId: "PRACTICE_REVIEW",
 		actorKind: "USER",
 		actorAccountId: 7,
 		actor: { id: 7, displayName: "Ada Lovelace", email: "ada@example.com" },
@@ -59,12 +59,16 @@ function page(content: ConfigAuditEntryView[]) {
 
 const handlers = (content: ConfigAuditEntryView[] = entries) => [
 	http.get("*/admin/config-audit", () => HttpResponse.json(page(content))),
-	http.get("*/workspaces/*/config-audit", () => HttpResponse.json(page(content))),
 ];
 
 const meta = {
 	component: AdminConfigAuditPanel,
-	parameters: { layout: "padded", msw: { handlers: handlers() } },
+	parameters: {
+		layout: "padded",
+		msw: { handlers: handlers() },
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 	args: {
 		search: {},
@@ -77,8 +81,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const InstanceScope: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect((await canvas.findAllByText("Acme"))[0]).toBeVisible();
 		await expect(await canvas.findByText("System")).toBeVisible();
 	},
@@ -87,6 +90,11 @@ export const InstanceScope: Story = {
 export const WorkspaceScope: StoryObj<typeof WorkspaceConfigAuditPanel> = {
 	render: (args) => <WorkspaceConfigAuditPanel {...args} />,
 	args: { search: {}, onSearchChange: fn(), workspaceSlug: "acme" },
+	parameters: {
+		msw: {
+			handlers: [http.get("*/workspaces/*/config-audit", () => HttpResponse.json(page(entries)))],
+		},
+	},
 };
 
 export const Empty: Story = {

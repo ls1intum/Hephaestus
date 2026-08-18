@@ -27,19 +27,19 @@ into them by absolute GitHub URL rather than a relative path.
 pnpm run docs:dev       # Start dev server at http://localhost:3000/Hephaestus/
 
 # Or from docs directory
-cd docs && npm start
+cd docs && pnpm start
 ```
 
 ## Prerequisites
 
-- Node.js ≥ 22.22 (matches `.node-version`)
-- npm ≥ 10.8
+- Node.js as pinned in `.node-version`
+- pnpm as pinned by the root `packageManager` field
 
-Install dependencies:
+Install dependencies from the repo root — the docs site is a workspace package, so a root
+`pnpm install` covers it:
 
 ```bash
-pnpm install   # in docs directory
-# or from repo root: cd docs && pnpm install
+pnpm install
 ```
 
 ## Available Scripts

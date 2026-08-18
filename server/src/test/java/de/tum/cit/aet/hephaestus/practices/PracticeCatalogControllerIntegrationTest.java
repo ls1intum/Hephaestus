@@ -1,19 +1,28 @@
 package de.tum.cit.aet.hephaestus.practices;
 
+import static org.assertj.core.api.Assertions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.containsInAnyOrder;
 
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeActiveRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierSource;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -33,11 +42,13 @@ import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.assertj.core.api.InstanceOfAssertFactories;
+import org.assertj.core.api.InstanceOfAssertFactories;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
@@ -66,6 +77,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     @Autowired
     private PracticeService practiceService;
 
+    @Autowired
+    private PracticeEvidenceDefaults evidenceDefaults;
+
     private Workspace workspace;
 
     @BeforeEach
@@ -79,9 +93,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setWorkspace(workspace);
         practice.setSlug(slug);
         practice.setName(name);
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Detect prompt for " + slug);
-        practice.setActive(active);
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
+        practice.setReviewTier(active ? PracticeReviewTier.DELIVER : PracticeReviewTier.OFF);
         return practiceRepository.save(practice);
     }
 
@@ -104,10 +119,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return new CreatePracticeRequestDTO(
             slug,
             "Practice " + slug,
-            List.of("PullRequestCreated", "ReviewSubmitted"),
+            PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED),
             "Detect if the PR follows best practices",
             null,
-            null,
+            PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
             null,
             null,
             null
@@ -118,18 +133,80 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         return new CreatePracticeRequestDTO(
             request.slug(),
             request.name(),
-            request.triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             request.criteria(),
             request.precomputeScript(),
-            request.artifactType(),
+            request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             areaSlug
         );
     }
 
+    private CreatePracticeRequestDTO withEvidence(
+        CreatePracticeRequestDTO request,
+        PracticeAutomatedReviewPolicy evidence
+    ) {
+        boolean automatedReview = evidence.automatedReview().mode() != PracticeAutomatedReviewMode.NONE;
+        return new CreatePracticeRequestDTO(
+            request.slug(),
+            request.name(),
+            automatedReview
+                ? PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST)
+                : PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST)
+                      .stream()
+                      .map(binding -> new PracticeBinding(binding.signals(), List.of(), binding.onDrafts()))
+                      .toList(),
+            request.criteria(),
+            automatedReview ? request.precomputeScript() : null,
+            evidence,
+            request.whyItMatters(),
+            request.whatGoodLooksLike(),
+            request.areaSlug()
+        );
+    }
+
+    private static PracticeAutomatedReviewPolicy withoutAutomatedReview(PracticeAutomatedReviewPolicy evidence) {
+        return new PracticeAutomatedReviewPolicy(
+            evidence.sourceContractVersion(),
+            new PracticeAutomatedReview(PracticeAutomatedReviewMode.NONE, PracticeEvidenceSufficiency.NONE),
+            evidence.whenEvidenceIsInsufficient(),
+            List.of(),
+            null
+        );
+    }
+
+    private static List<SignalName> signalsOf(PracticeDTO practice) {
+        return PracticeBinding.signalsOf(practice.bindings());
+    }
+
     private Consumer<HttpHeaders> withCsrfForAnonymousWrite() {
         return TestAuthUtils.withCsrf(TestAuthUtils.fetchCsrfToken(webTestClient));
+    }
+
+    @Test
+    @WithAdminUser
+    void workspaceAdminCanReadEvidenceAuthoringOptions() {
+        ensureAdminMembership(workspace);
+
+        webTestClient
+            .get()
+            .uri(BASE_URI + "/definition-options", workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            // Selected by kind rather than by position: the list is whatever the registered domains
+            // declare reviewable, so an index would pin the wrong thing the first time a domain is added.
+            .jsonPath("$.workTypes[*].artifactKind")
+            .value(containsInAnyOrder("scm.pull_request", "scm.issue", "chat.conversation_thread", "docs.document"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].recommendedNeeds[1].sourceKind")
+            .value(contains("scm.pull-request.diff"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].allowedSources[0].displayName")
+            .value(contains("Pull request details"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'scm.pull_request')].allowedSources[0].description")
+            .exists();
     }
 
     @Nested
@@ -199,14 +276,14 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
         @Test
         @WithAdminUser
-        void shouldFilterByActive() {
+        void shouldFilterByUseInNewReviews() {
             ensureAdminMembership(workspace);
             persistPractice("active-one", "Active", true);
             persistPractice("inactive-one", "Inactive", false);
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?active=true", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?reviewTier=DELIVER", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -265,8 +342,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("target-practice");
             assertThat(result.name()).isEqualTo("Target Practice");
-            assertThat(result.active()).isTrue();
-            assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().inherited()).isFalse();
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
@@ -349,9 +428,20 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("new-practice");
             assertThat(result.name()).isEqualTo("Practice new-practice");
-            assertThat(result.triggerEvents()).containsExactly("PullRequestCreated", "ReviewSubmitted");
+            assertThat(signalsOf(result)).containsExactly(
+                ScmSignals.PULL_REQUEST_OPENED,
+                ScmSignals.PULL_REQUEST_REVIEWED
+            );
             assertThat(result.criteria()).isEqualTo("Detect if the PR follows best practices");
-            assertThat(result.active()).isTrue();
+            assertThat(result.automatedReviewPolicy()).isEqualTo(
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
+            );
+            // A new practice states no tier of its own; the tier in force is the workspace's, which is
+            // DELIVER until the workspace says otherwise.
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
+            assertThat(result.reviewTier().inherited()).isTrue();
             assertThat(result.id()).isNotNull();
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
@@ -362,7 +452,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("Practice new-practice");
-            assertThat(persisted.get().isActive()).isTrue();
+            assertThat(persisted.get().getReviewTier()).isNull();
         }
 
         @Test
@@ -373,7 +463,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "minimal-practice",
                 "Minimal Practice",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 "Minimal criteria",
                 null,
                 null,
@@ -398,7 +488,38 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
-            assertThat(result.active()).isTrue();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.automatedReviewPolicy()).isEqualTo(
+                evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
+            );
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldCreatePracticeInactiveWithoutAutomatedReview() {
+            ensureAdminMembership(workspace);
+            CreatePracticeRequestDTO baseline = validCreateRequest("human-assessment-only");
+            var request = withEvidence(baseline, withoutAutomatedReview(baseline.automatedReviewPolicy()));
+
+            PracticeDTO result = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isCreated()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            // Held on the practice, not inherited: a practice that cannot run a review must stay off
+            // whatever its area or its workspace later decides.
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
         }
 
         @Test
@@ -533,10 +654,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 badSlug,
                 "Name",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 null,
                 null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null
@@ -566,18 +687,30 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             return Stream.of("INVALID_SLUG", "bad-slug-", "bad--slug", "-bad-slug", "ab", "a".repeat(65));
         }
 
+        /**
+         * An unknown signal is refused by the practice validator, not by bean validation: whether a
+         * signal exists is a question only the registered domains can answer, so the answer arrives as
+         * a message about the request rather than as a field error.
+         */
         @Test
         @WithAdminUser
-        void shouldReturn400ForInvalidTriggerEvents() {
+        void shouldReturn400ForASignalNoDomainDeclares() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
                 "valid-slug",
                 "Name",
-                List.of("NonExistentEvent"),
+                List.of(
+                    new PracticeBinding(
+                        List.of(SignalName.of("scm.pull_request.no_such_signal")),
+                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST),
+                        false
+                    )
+                ),
+                // Everything else valid, or bean validation answers first and the signal is never reached.
+                "Reviewable criteria",
                 null,
-                null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null
@@ -597,24 +730,29 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(problem).isNotNull();
-            assertThat(problem.getTitle()).isEqualTo("Validation failed");
-            assertThat(problem.getProperties().get("errors"))
-                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
-                .containsKey("triggerEvents");
+            assertThat(problem.getTitle()).isEqualTo("Invalid workspace request");
+            assertThat(problem.getDetail()).isEqualTo("Choose signals declared for the selected work type");
         }
 
+        /**
+         * Naming the same signal twice is normalised, not refused.
+         *
+         * <p>A binding sorts and de-duplicates its signals on construction, because the list is digested
+         * into the review-rule fingerprint and two authors writing the same occasion in a different order
+         * must not read as two different rules.
+         */
         @Test
         @WithAdminUser
-        void shouldReturn400ForDuplicateTriggerEvents() {
+        void shouldStoreARepeatedSignalOnce() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
                 "dup-events",
                 "Name",
-                List.of("PullRequestCreated", "PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_OPENED),
+                "Reviewable criteria",
                 null,
-                null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null
@@ -628,7 +766,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.bindings[0].signals")
+                .value(contains(ScmSignals.PULL_REQUEST_OPENED.value()));
         }
 
         @Test
@@ -636,7 +777,17 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturn400ForBlankFields() {
             ensureAdminMembership(workspace);
 
-            var request = new CreatePracticeRequestDTO("", "", List.of(), null, null, null, null, null, null);
+            var request = new CreatePracticeRequestDTO(
+                "",
+                "",
+                PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+                null,
+                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
+                null,
+                null,
+                null
+            );
 
             ProblemDetail problem = webTestClient
                 .post()
@@ -658,6 +809,59 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .containsKeys("slug", "name", "criteria");
         }
 
+        /**
+         * The authoring API refuses a second occasion at the request boundary, so the answer names the
+         * alternative — split the practice — instead of a generic list-size complaint.
+         */
+        @Test
+        @WithAdminUser
+        void shouldReturn400ForASecondOccasion() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "two-occasions",
+                "Two occasions",
+                List.of(
+                    PracticeBinding.on(
+                        ScmSignals.PULL_REQUEST_OPENED,
+                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
+                    ),
+                    PracticeBinding.on(
+                        ScmSignals.PULL_REQUEST_MERGED,
+                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST)
+                    )
+                ),
+                "Reviewable criteria",
+                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
+                null,
+                null,
+                null
+            );
+
+            ProblemDetail problem = webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest()
+                .expectBody(ProblemDetail.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(problem).isNotNull();
+            assertThat(problem.getProperties().get("errors"))
+                .asInstanceOf(InstanceOfAssertFactories.map(String.class, Object.class))
+                .hasEntrySatisfying("bindings", messages ->
+                    assertThat(messages)
+                        .asInstanceOf(InstanceOfAssertFactories.list(String.class))
+                        .anySatisfy(message -> assertThat(message).contains("split this into two practices"))
+                );
+        }
+
         @Test
         @WithAdminUser
         void shouldReturn400ForNameTooShort() {
@@ -666,10 +870,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "valid-slug",
                 "AB",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 null,
                 null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null
@@ -694,10 +898,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "no-events",
                 "Name",
-                List.of(),
+                PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 null,
                 null,
                 null
@@ -775,10 +979,81 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("Updated Name");
-            assertThat(result.triggerEvents()).containsExactly("PullRequestCreated");
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
-            assertThat(result.active()).isTrue();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
             assertThat(result.areaSlug()).isEqualTo("existing-area");
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldResolveEvidenceWhenArtifactChanges() {
+            ensureAdminMembership(workspace);
+            persistPractice("change-artifact", "Change Artifact", true);
+            var request = new UpdatePracticeRequestDTO(
+                null,
+                PracticeTestEvidence.bindings(ScmSignals.ISSUE_OPENED),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            PracticeDTO result = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "change-artifact")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.ISSUE);
+            assertThat(result.automatedReviewPolicy()).isEqualTo(evidenceDefaults.policyFor(ArtifactKinds.ISSUE));
+        }
+
+        @Test
+        @WithAdminUser
+        void shouldStopUsingPracticeInNewReviewsWhenAutomatedReviewIsRemoved() {
+            ensureAdminMembership(workspace);
+            Practice practice = persistPractice("remove-automated-review", "Remove assessment", true);
+            PracticeAutomatedReviewPolicy requirements = withoutAutomatedReview(practice.getAutomatedReviewPolicy());
+            var request = new UpdatePracticeRequestDTO(null, null, null, null, requirements, null, null, null, null);
+
+            PracticeDTO result = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), practice.getSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
+            // The occasion survives — it is where the practice's kind comes from — but a practice
+            // nobody automates reads nothing, so the evidence goes with the automation that read it.
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
+            assertThat(result.bindings()).allSatisfy(binding -> assertThat(binding.needs()).isEmpty());
+            assertThat(
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), practice.getSlug())
+                    .orElseThrow()
+                    .getReviewTier()
+            ).isEqualTo(PracticeReviewTier.OFF);
         }
 
         @Test
@@ -791,7 +1066,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             var request = new UpdatePracticeRequestDTO(
                 "New Name",
-                List.of("ReviewSubmitted"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED),
                 "New prompt",
                 null,
                 null,
@@ -816,7 +1091,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             assertThat(result).isNotNull();
             assertThat(result.name()).isEqualTo("New Name");
-            assertThat(result.triggerEvents()).containsExactly("ReviewSubmitted");
+            assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_REVIEWED);
             assertThat(result.criteria()).isEqualTo("New prompt");
             assertThat(result.areaSlug()).isEqualTo("target-area");
 
@@ -1059,7 +1334,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             var request = new UpdatePracticeRequestDTO(
                 null,
-                List.of("FakeEvent"),
+                List.of(
+                    new PracticeBinding(
+                        List.of(SignalName.of("scm.pull_request.no_such_signal")),
+                        PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST),
+                        false
+                    )
+                ),
                 null,
                 null,
                 null,
@@ -1306,21 +1587,30 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Nested
-    @DisplayName("PATCH /practices/{practiceSlug}/active")
-    class SetActive {
+    @DisplayName("PATCH /practices/{practiceSlug}/review-tier")
+    class SetUsedInNewReviews {
 
-        @Test
+        /**
+         * Every rung is settable on a practice, and setting one is the practice's own decision. PROPOSE is
+         * in the list on purpose: it is the only way to turn one practice down without turning its
+         * measurement off, so refusing it here would make the tier a boolean again. The seed is always the
+         * opposite end of the ladder, so every case is a real change rather than a re-send of the tier
+         * already in force.
+         */
+        @ParameterizedTest
+        @EnumSource(PracticeReviewTier.class)
         @WithAdminUser
-        void shouldSetActiveToFalse() {
+        @DisplayName("stores any tier as the practice's own and reports the practice as the source")
+        void shouldSetThePracticesOwnTier(PracticeReviewTier tier) {
             ensureAdminMembership(workspace);
-            persistPractice("deactivate-me", "Name", true);
+            persistPractice("retier-me", "Name", tier == PracticeReviewTier.OFF);
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "deactivate-me")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "retier-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeActiveRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(tier))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1329,52 +1619,47 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.active()).isFalse();
+            assertThat(result.reviewTier().effective()).isEqualTo(tier);
+            assertThat(result.reviewTier().override()).isEqualTo(tier);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.PRACTICE);
 
-            Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(
-                workspace.getId(),
-                "deactivate-me"
-            );
+            Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "retier-me");
             assertThat(persisted).isPresent();
-            assertThat(persisted.get().isActive()).isFalse();
+            assertThat(persisted.get().getReviewTier()).isEqualTo(tier);
         }
 
         @Test
         @WithAdminUser
-        void shouldSetActiveToTrue() {
+        void shouldRejectActivationWithoutSupportedAutomatedReview() {
             ensureAdminMembership(workspace);
-            persistPractice("activate-me", "Name", false);
+            Practice practice = persistPractice("no-automated-review", "No automated review", false);
+            practice.setAutomatedReviewPolicy(withoutAutomatedReview(practice.getAutomatedReviewPolicy()));
+            practiceRepository.save(practice);
 
-            PracticeDTO result = webTestClient
+            webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "activate-me")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "no-automated-review")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeActiveRequestDTO(true))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
                 .exchange()
                 .expectStatus()
-                .isOk()
-                .expectBody(PracticeDTO.class)
-                .returnResult()
-                .getResponseBody();
-
-            assertThat(result).isNotNull();
-            assertThat(result.active()).isTrue();
+                .isBadRequest();
         }
 
         @Test
         @WithAdminUser
-        @DisplayName("is idempotent — setting active=true when already true")
+        @DisplayName("is idempotent when the practice is already used in new reviews")
         void shouldBeIdempotent() {
             ensureAdminMembership(workspace);
             persistPractice("already-active", "Name", true);
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "already-active")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "already-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeActiveRequestDTO(true))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1383,7 +1668,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.active()).isTrue();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
         }
 
         @Test
@@ -1394,10 +1679,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "non-existent")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "non-existent")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeActiveRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isNotFound();
@@ -1412,30 +1697,55 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "forbidden-toggle")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "forbidden-toggle")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeActiveRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isForbidden();
         }
 
+        /**
+         * A null tier is the only way back out of an override. Without it the chain would be write-once:
+         * an administrator who set one practice explicitly could never return it to its area's decision.
+         */
         @Test
         @WithAdminUser
-        void shouldReturn400ForNullActive() {
+        @DisplayName("a null tier clears the practice's own setting and it inherits again")
+        void shouldClearTheOverrideOnNullTier() {
             ensureAdminMembership(workspace);
-            persistPractice("null-active", "Name", true);
+            PracticeArea area = persistArea("area-with-a-tier");
+            area.setReviewTier(PracticeReviewTier.PROPOSE);
+            practiceAreaRepository.save(area);
+            Practice practice = persistPractice("null-active", "Name", true);
+            practice.setArea(area);
+            practiceRepository.save(practice);
 
-            webTestClient
+            PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "null-active")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "null-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"active\": null}")
+                .bodyValue("{\"reviewTier\": null}")
                 .exchange()
                 .expectStatus()
-                .isBadRequest();
+                .isOk()
+                .expectBody(PracticeDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
+            assertThat(result.reviewTier().inherited()).isTrue();
+            assertThat(
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "null-active")
+                    .orElseThrow()
+                    .getReviewTier()
+            ).isNull();
         }
 
         @Test
@@ -1443,10 +1753,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturnUnauthorized() {
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/active", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(withCsrfForAnonymousWrite())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeActiveRequestDTO(false))
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();
@@ -1534,11 +1844,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(wsB);
 
             Practice practice = new Practice();
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             practice.setWorkspace(wsA);
             practice.setSlug("isolated-practice");
             practice.setName("Isolated");
             practice.setCriteria("Description");
-            practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practiceRepository.save(practice);
 
             webTestClient
@@ -1570,11 +1881,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(wsB);
 
             Practice practice = new Practice();
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             practice.setWorkspace(wsA);
             practice.setSlug("only-in-a");
             practice.setName("Only in A");
             practice.setCriteria("Description");
-            practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practiceRepository.save(practice);
 
             webTestClient
@@ -1632,11 +1944,12 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             ensureAdminMembership(wsB);
 
             Practice practice = new Practice();
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             practice.setWorkspace(wsA);
             practice.setSlug("write-isolated");
             practice.setName("Write Isolated");
             practice.setCriteria("Desc");
-            practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practiceRepository.save(practice);
 
             var request = new UpdatePracticeRequestDTO("Hacked Name", null, null, null, null, null, null, null, null);
@@ -1691,13 +2004,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(revisions.get(0).getRevisionNumber()).isEqualTo(1);
             assertThat(revisions.get(0).getSlug()).isEqualTo("versioned-practice");
             assertThat(revisions.get(0).getName()).isEqualTo("Practice versioned-practice");
-            assertThat(revisions.get(0).getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
-            assertThat(TriggerEventsConverter.toList(revisions.get(0).getTriggerEvents())).containsExactly(
-                "PullRequestCreated",
-                "ReviewSubmitted"
-            );
+            assertThat(revisions.get(0).getArtifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
+            assertThat(revisions.get(0).getBindings())
+                .singleElement()
+                .extracting(PracticeBinding::signals, as(InstanceOfAssertFactories.list(SignalName.class)))
+                .containsExactly(ScmSignals.PULL_REQUEST_OPENED, ScmSignals.PULL_REQUEST_REVIEWED);
             assertThat(revisions.get(0).getCriteria()).isEqualTo("Detect if the PR follows best practices");
-            assertThat(revisions.get(0).getDetectionFingerprint()).hasSize(64);
+            assertThat(revisions.get(0).getReviewRuleFingerprint()).hasSize(67).startsWith("v3:");
             assertThat(revisions.get(0).getCreatedAt()).isNotNull();
         }
 
@@ -1886,72 +2199,34 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         }
     }
 
+    /**
+     * A practice's artifact kind is read off its signals, so a pull-request signal makes it a
+     * pull-request practice and there is no separately declared focus left to contradict. What can still
+     * be wrong is naming signals about two different kinds of work at once.
+     */
     @Nested
-    @DisplayName("Trigger events must be compatible with the practice focus")
-    class TriggerFocusCompatibility {
+    @DisplayName("A practice's kind of work comes from its signals")
+    class ArtifactKindFromSignals {
 
         @Test
         @WithAdminUser
-        @DisplayName("PATCH artifactType=ISSUE on a PR practice with PR-only triggers → 400 (merged-state check)")
-        void changingFocusToIssueWithStalePrTriggersIsRejected() {
-            ensureAdminMembership(workspace);
-            persistPractice("focus-flip", "Focus Flip", true);
-
-            var request = new UpdatePracticeRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                WorkArtifact.ISSUE,
-                null,
-                null,
-                null,
-                null
-            );
-
-            ProblemDetail problem = webTestClient
-                .patch()
-                .uri(BASE_URI + "/{slug}", workspace.getWorkspaceSlug(), "focus-flip")
-                .headers(TestAuthUtils.withCurrentUser())
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(request)
-                .exchange()
-                .expectStatus()
-                .isBadRequest()
-                .expectBody(ProblemDetail.class)
-                .returnResult()
-                .getResponseBody();
-
-            assertThat(problem).isNotNull();
-            assertThat(problem.getStatus()).isEqualTo(400);
-            assertThat(problem.getDetail()).isEqualTo("Choose review events available for the selected work type");
-            assertThat(
-                practiceRepository
-                    .findByWorkspaceIdAndSlug(workspace.getId(), "focus-flip")
-                    .orElseThrow()
-                    .getArtifactType()
-            ).isEqualTo(WorkArtifact.PULL_REQUEST);
-        }
-
-        @Test
-        @WithAdminUser
-        @DisplayName("create an ISSUE practice with a PR-only trigger event → 400")
-        void creatingIssuePracticeWithPrTriggerIsRejected() {
+        @DisplayName("a pull-request signal makes it a pull-request practice, whatever the policy names")
+        void readsTheKindOffTheSignalRatherThanTheDeclaredPolicy() {
             ensureAdminMembership(workspace);
 
             var request = new CreatePracticeRequestDTO(
-                "issue-with-pr-trigger",
-                "Issue With PR Trigger",
-                List.of("ReviewSubmitted"),
-                "Detect something",
+                "kind-from-signal",
+                "Kind From Signal",
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED),
+                "Review something",
                 null,
-                WorkArtifact.ISSUE,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.ISSUE),
                 null,
                 null,
                 null
             );
 
-            ProblemDetail problem = webTestClient
+            webTestClient
                 .post()
                 .uri(BASE_URI, workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
@@ -1959,17 +2234,51 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .bodyValue(request)
                 .exchange()
                 .expectStatus()
-                .isBadRequest()
-                .expectBody(ProblemDetail.class)
-                .returnResult()
-                .getResponseBody();
+                .isCreated()
+                .expectBody()
+                .jsonPath("$.artifactKind")
+                .isEqualTo(ArtifactKinds.PULL_REQUEST.value());
 
-            assertThat(problem).isNotNull();
-            assertThat(problem.getStatus()).isEqualTo(400);
-            assertThat(problem.getDetail()).isEqualTo("Choose review events available for the selected work type");
             assertThat(
-                practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "issue-with-pr-trigger")
-            ).isEmpty();
+                practiceRepository
+                    .findByWorkspaceIdAndSlug(workspace.getId(), "kind-from-signal")
+                    .orElseThrow()
+                    .getArtifactKind()
+            ).isEqualTo(ArtifactKinds.PULL_REQUEST);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("one practice cannot be about two kinds of work at once → 400")
+        void refusesBindingsThatDisagreeAboutTheKindOfWork() {
+            ensureAdminMembership(workspace);
+
+            var request = new CreatePracticeRequestDTO(
+                "two-minds",
+                "Two Minds",
+                List.of(
+                    PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED).getFirst(),
+                    PracticeTestEvidence.bindings(ScmSignals.ISSUE_OPENED).getFirst()
+                ),
+                "Review something",
+                null,
+                null,
+                null,
+                null,
+                null
+            );
+
+            webTestClient
+                .post()
+                .uri(BASE_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(request)
+                .exchange()
+                .expectStatus()
+                .isBadRequest();
+
+            assertThat(practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "two-minds")).isEmpty();
         }
 
         @Test
@@ -1979,10 +2288,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "conversation-practice",
                 "Conversation Practice",
-                List.of(),
+                PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD),
                 "Detect constructive conversations",
                 null,
-                WorkArtifact.CONVERSATION_THREAD,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.CONVERSATION_THREAD),
                 null,
                 null,
                 null
@@ -2002,8 +2311,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.artifactType()).isEqualTo(WorkArtifact.CONVERSATION_THREAD);
-            assertThat(result.triggerEvents()).isEmpty();
+            assertThat(result.artifactKind()).isEqualTo(ArtifactKinds.CONVERSATION_THREAD);
+            // No ingested event raises it — a scheduler decides a thread has settled — but the occasion
+            // is still declared, so the catalog says what started the review.
+            assertThat(signalsOf(result)).containsExactly(ChatSignals.CONVERSATION_THREAD_SETTLED);
         }
     }
 
@@ -2020,10 +2331,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var request = new CreatePracticeRequestDTO(
                 "learner-practice",
                 "Learner Practice",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 "INTERNAL detection rubric — must never reach a learner",
                 null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 "Small, focused PRs are easier to review.",
                 "A PR that changes one thing and explains why in the description.",
                 null
@@ -2068,10 +2379,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             return new CreatePracticeRequestDTO(
                 slug,
                 "Guard Practice",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 "Detect prompt",
                 null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 "Why it matters.",
                 whatGoodLooksLike,
                 null
@@ -2129,10 +2440,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             var dto = new CreatePracticeRequestDTO(
                 "guard-why",
                 "Guard Practice",
-                List.of("PullRequestCreated"),
+                PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED),
                 "Detect prompt",
                 null,
-                null,
+                PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST),
                 "The error handler is PRESENT in every case.",
                 "A clean exemplar.",
                 null

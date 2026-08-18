@@ -5,10 +5,11 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
@@ -106,7 +107,7 @@ class FeedbackDeliveryService {
             feedbackLedgerRecorder.recordWithoutConversation(
                 job,
                 delivery,
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 List.of(),
                 true,
                 false
@@ -124,7 +125,7 @@ class FeedbackDeliveryService {
     ) {
         TrendDelta trend = reviewProperties.progressFooter()
             ? observationTrendService
-                  .computeForTarget(WorkArtifact.PULL_REQUEST, pullRequest.getId(), job.getWorkspace().getId())
+                  .computeForTarget(ArtifactKinds.PULL_REQUEST, pullRequest.getId(), job.getWorkspace().getId())
                   .orElse(null)
             : null;
 
@@ -142,7 +143,7 @@ class FeedbackDeliveryService {
             }
             return;
         }
-        List<InlineFindingChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
+        List<InlineFeedbackChannel.DeliveredSignal> inlineSignals = inlineResult.signals();
 
         if (summaryOutcome == SummaryOutcome.DELIVERED && !inlineResult.suppressed()) {
             reEditSummaryWithSignals(job, summaryComposer, inlineSignals, trend);
@@ -165,7 +166,7 @@ class FeedbackDeliveryService {
                 feedbackLedgerRecorder.recordWithoutConversation(
                     job,
                     delivery,
-                    WorkArtifact.PULL_REQUEST,
+                    ArtifactKinds.PULL_REQUEST,
                     inlineSignals,
                     summaryOutcome == SummaryOutcome.DELIVERED,
                     inlineDelivered
@@ -174,7 +175,7 @@ class FeedbackDeliveryService {
                 feedbackLedgerRecorder.record(
                     job,
                     delivery,
-                    WorkArtifact.PULL_REQUEST,
+                    ArtifactKinds.PULL_REQUEST,
                     inlineSignals,
                     summaryOutcome == SummaryOutcome.DELIVERED,
                     inlineDelivered
@@ -287,7 +288,7 @@ class FeedbackDeliveryService {
     private void reEditSummaryWithSignals(
         AgentJob job,
         @Nullable InlineAwareSummaryComposer summaryComposer,
-        List<InlineFindingChannel.DeliveredSignal> inlineSignals,
+        List<InlineFeedbackChannel.DeliveredSignal> inlineSignals,
         @Nullable TrendDelta trend
     ) {
         String summaryRef = job.getDeliveryCommentId();
@@ -296,8 +297,8 @@ class FeedbackDeliveryService {
         }
         Set<String> deliveredKeys = inlineSignals
             .stream()
-            .filter(signal -> signal.disposition() != InlineFindingChannel.Disposition.FAILED)
-            .map(InlineFindingChannel.DeliveredSignal::recurrenceKey)
+            .filter(signal -> signal.disposition() != InlineFeedbackChannel.Disposition.FAILED)
+            .map(InlineFeedbackChannel.DeliveredSignal::recurrenceKey)
             .filter(key -> key != null && !key.isBlank())
             .collect(Collectors.toSet());
         if (deliveredKeys.isEmpty()) {

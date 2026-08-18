@@ -1,14 +1,16 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.milestone.Milestone;
@@ -177,7 +179,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(files).containsKey(OUTPUT);
         JsonNode root = objectMapper.readTree(files.get(OUTPUT));
         assertThat(root.get("repository").asString()).isEqualTo("acme/widgets");
-        assertThat(root.get("focal").get("type").asString()).isEqualTo("ISSUE");
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("scm.issue");
         assertThat(root.get("focal").get("number").asInt()).isEqualTo(99);
 
         JsonNode issues = root.get("issues");
@@ -241,36 +243,56 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         provider.contribute(prRequest(42), files);
 
         JsonNode root = objectMapper.readTree(files.get(OUTPUT));
-        assertThat(root.get("focal").get("type").asString()).isEqualTo("PULL_REQUEST");
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("scm.pull_request");
         JsonNode prs = root.get("pullRequests");
         assertThat(prs).hasSize(1);
         assertThat(prs.get(0).get("number").asInt()).isEqualTo(41);
         assertThat(prs.get(0).get("isDraft").asBoolean()).isTrue();
     }
 
+    /** A repository tracking no work still stages the inventory, holding empty lists. */
     @Test
-    void writesNothingWhenRepositoryHasNoArtifacts() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(issueRequest(1), files);
-        assertThat(files).doesNotContainKey(OUTPUT);
+    void stagesAnEmptyInventoryWhenRepositoryHasNoArtifacts() {
+        var captured = provider.capture(issueRequest(1), provider.sourceKinds());
+
+        assertThat(captured.files()).containsKey(OUTPUT);
+        // Present, and still EMPTY: emptiness is read out of the counts, not out of the file list.
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
-    void writesNothingWhenRepositoryIdMissing() {
+    void reportsEmptyWhenOnlyTheExcludedFocalArtifactExists() {
+        when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenReturn(
+            List.of(issue(1, "Focal issue", Issue.State.OPEN, "alice"))
+        );
+
+        var captured = provider.capture(issueRequest(1), provider.sourceKinds());
+
+        assertThat(captured.files()).containsKey(OUTPUT);
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
+    }
+
+    @Test
+    void reportsCollectionErrorWhenRepositoryIdMissing() {
         var job = new AgentJob();
         job.setMetadata(objectMapper.createObjectNode());
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(new ContextRequest.IssueReviewRequest(job), files);
-        assertThat(files).doesNotContainKey(OUTPUT);
+
+        // An empty inventory reads as "this workspace tracks no work" — the inverse of the truth
+        // when the job simply arrived without its focal repository.
+        assertThatThrownBy(() -> provider.contribute(new ContextRequest.IssueReviewRequest(job), new LinkedHashMap<>()))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasRootCauseMessage("Workspace-inventory collection has no repository_id");
     }
 
     @Test
-    void neverThrowsOnRepositoryFailure() {
+    void reportsRepositoryFailure() {
         when(issueRepository.findIssueInventoryByRepositoryId(eq(REPO_ID), any(Pageable.class))).thenThrow(
             new RuntimeException("db down")
         );
         Map<String, byte[]> files = new LinkedHashMap<>();
-        assertThatCode(() -> provider.contribute(issueRequest(1), files)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> provider.contribute(issueRequest(1), files))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("Workspace-inventory collection failed");
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 
@@ -306,7 +328,7 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(repos.get(0).asString()).isEqualTo("acme/widgets");
         assertThat(repos.get(1).asString()).isEqualTo("acme/gadgets");
 
-        assertThat(root.get("focal").get("type").asString()).isEqualTo("CONVERSATION_THREAD");
+        assertThat(root.get("focal").get("type").asString()).isEqualTo("chat.conversation_thread");
         // A conversation isn't itself an issue/PR, so nothing is excluded.
         assertThat(root.get("focal").has("number")).isFalse();
 
@@ -320,11 +342,13 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
         assertThat(root.get("truncated").asBoolean()).isFalse();
     }
 
+    /** A workspace monitoring nothing stages the inventory too — an empty index, not a missing one. */
     @Test
-    void conversationFlow_writesNothingWhenWorkspaceMonitorsNoRepositories() {
-        Map<String, byte[]> files = new LinkedHashMap<>();
-        provider.contribute(conversationRequest(), files);
-        assertThat(files).doesNotContainKey(OUTPUT);
+    void conversationFlow_stagesAnEmptyInventoryWhenWorkspaceMonitorsNoRepositories() {
+        var captured = provider.capture(conversationRequest(), provider.sourceKinds());
+
+        assertThat(captured.files()).containsKey(OUTPUT);
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
@@ -360,10 +384,12 @@ class WorkspaceInventoryContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void conversationFlow_neverThrowsOnRepositoryFailure() {
+    void conversationFlow_reportsRepositoryFailure() {
         when(repositoryRepository.findAllByWorkspaceMonitors(WORKSPACE_ID)).thenThrow(new RuntimeException("db down"));
         Map<String, byte[]> files = new LinkedHashMap<>();
-        assertThatCode(() -> provider.contribute(conversationRequest(), files)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> provider.contribute(conversationRequest(), files))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("Workspace-inventory collection failed");
         assertThat(files).doesNotContainKey(OUTPUT);
     }
 }

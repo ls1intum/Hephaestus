@@ -2,12 +2,27 @@ package de.tum.cit.aet.hephaestus.agent.context;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Path;
+import java.time.Clock;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -15,11 +30,16 @@ import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Stream;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.core.Ordered;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.json.JsonMapper;
 
 class WorkspaceContextBuilderTest extends BaseUnitTest {
 
@@ -44,14 +64,8 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         return new WorkspaceContextBuilder(List.of(providers), sharedRegistry, null);
     }
 
-    /** Helper to construct a stub provider inline. */
     private static ContentSource stubProvider(boolean required, String pathSuffix, byte[] payload, boolean throwError) {
         return new ContentSource() {
-            @Override
-            public String originId() {
-                return "test";
-            }
-
             @Override
             public boolean supports(ContextRequest request) {
                 return true;
@@ -65,7 +79,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             @Override
             public void contribute(ContextRequest request, Map<String, byte[]> files) {
                 if (throwError) {
-                    throw new IllegalStateException("provider boom");
+                    throw new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure"));
                 }
                 files.put(OUTPUT_PREFIX + pathSuffix, payload);
             }
@@ -87,12 +101,9 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         void emitsRequiredFailureCounter() {
             var bad = stubProvider(true, "x.txt", new byte[0], true);
-            try {
-                builderWithSharedRegistry(bad).build(reviewRequest());
-            } catch (JobPreparationException expected) {
-                // expected
-            }
-            // The provider class name is appended as the `provider` tag.
+            assertThatThrownBy(() -> builderWithSharedRegistry(bad).build(reviewRequest())).isInstanceOf(
+                JobPreparationException.class
+            );
             String providerName = bad.getClass().getSimpleName();
             assertThat(
                 sharedRegistry.counter("agent.context.provider.required.failure", "provider", providerName).count()
@@ -126,11 +137,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void skipsUnsupported() {
             var supports = stubProvider(true, "a.txt", "A".getBytes(StandardCharsets.UTF_8), false);
             var skips = new ContentSource() {
-                @Override
-                public String originId() {
-                    return "test";
-                }
-
                 @Override
                 public boolean supports(ContextRequest request) {
                     return false;
@@ -166,14 +172,263 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         @Test
+        void unexpectedProviderBugPropagates() {
+            var bad = new ContentSource() {
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    throw new IllegalStateException("programmer bug");
+                }
+            };
+
+            assertThatThrownBy(() -> builderOf(bad).build(reviewRequest()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessage("programmer bug");
+        }
+
+        @Test
+        void rejectsDetectorProviderWithoutSourceKinds() {
+            ContentSource provider = stubProvider(true, "untracked.json", new byte[0], false);
+            ContextManifestBuilder manifests = mock(ContextManifestBuilder.class);
+            when(manifests.stagedSources(any())).thenReturn(Set.of(new SourceKind("scm.pull-request.core")));
+            var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
+            EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
+
+            assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("must declare source kinds");
+        }
+
+        static Stream<RuntimeException> collectionFailures() {
+            return Stream.of(
+                new EvidenceCollectionException("provider boom", new RuntimeException("downstream failure")),
+                // The shape a repository actually throws, and the reason the catch cannot be narrowed to
+                // the declared one: letting it escape would abort every source that had already succeeded.
+                new org.springframework.dao.QueryTimeoutException("statement timed out")
+            );
+        }
+
+        /**
+         * A required source that fails costs its own source and nothing else, and the refusal is persisted:
+         * the manifest is what a later reader has to tell a conservative refusal from a clean review.
+         */
+        @ParameterizedTest
+        @MethodSource("collectionFailures")
+        void aFailedRequiredSourceIsRecordedAndIsolated(RuntimeException failure, @TempDir Path root) {
+            SourceKind comments = new SourceKind("scm.pull-request.comments");
+            EvidenceSource bad = new EvidenceSource() {
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public boolean required() {
+                    return true;
+                }
+
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(comments);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return comments;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    throw failure;
+                }
+            };
+            JsonMapper mapper = JsonMapper.builder().build();
+            FabricLayout layout = new FabricLayout(root.toString());
+            ContextManifestBuilder manifestBuilder = new ContextManifestBuilder(
+                new ContentAddressedStore(layout),
+                layout,
+                mapper,
+                new ClasspathArtifactSourceCatalogRegistry(mapper, java.time.Clock.systemUTC()),
+                new PracticeSubjectEvaluator(mapper),
+                Clock.systemUTC()
+            );
+            var builder = new WorkspaceContextBuilder(List.of(bad), new SimpleMeterRegistry(), manifestBuilder);
+            EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
+            ContextRequest.PracticeReviewRequest request = reviewRequest();
+
+            PreparedEvidence prepared = builder.prepare(request, plan);
+
+            var capture = prepared
+                .manifest()
+                .sources()
+                .stream()
+                .filter(source -> source.kind().equals(comments))
+                .findFirst()
+                .orElseThrow();
+            assertThat(capture.state()).isEqualTo(
+                new SourceCaptureState.CollectionError(SourceAbsenceReason.PROVIDER_FAILURE)
+            );
+            assertThat(
+                layout.jobDir(String.valueOf(request.job().getId())).resolve("artifact-source-manifest.json")
+            ).exists();
+        }
+
+        @Test
+        void preservesSerializedArtifactsForAValidEmptySource(@TempDir Path root) {
+            SourceKind diff = new SourceKind("scm.pull-request.diff");
+            EvidenceSource provider = new EvidenceSource() {
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(diff);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return diff;
+                }
+
+                @Override
+                public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+                    return new EvidenceContribution(
+                        Map.of("inputs/context/diff.patch", new byte[0]),
+                        Map.of(diff, SourceCompleteness.COMPLETE),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(diff, SourceContentState.EMPTY)
+                    );
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {}
+            };
+            JsonMapper mapper = JsonMapper.builder().build();
+            FabricLayout layout = new FabricLayout(root.toString());
+            ContextManifestBuilder manifests = new ContextManifestBuilder(
+                new ContentAddressedStore(layout),
+                layout,
+                mapper,
+                new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC()),
+                new PracticeSubjectEvaluator(mapper),
+                Clock.systemUTC()
+            );
+            var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
+            EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
+
+            var capture = builder
+                .prepare(reviewRequest(), plan)
+                .manifest()
+                .sources()
+                .stream()
+                .filter(source -> source.kind().equals(diff))
+                .findFirst()
+                .orElseThrow();
+
+            assertThat(capture.kind()).isEqualTo(diff);
+            assertThat(capture.state()).isInstanceOfSatisfying(SourceCaptureState.Available.class, available ->
+                assertThat(available.content()).isEqualTo(SourceContentState.EMPTY)
+            );
+            assertThat(capture.artifacts()).extracting("path").containsExactly("inputs/context/diff.patch");
+        }
+
+        @Test
+        void rejectsCaptureFactsForAnotherSource() {
+            SourceKind comments = new SourceKind("scm.pull-request.comments");
+            SourceKind core = new SourceKind("scm.pull-request.core");
+            EvidenceSource provider = new EvidenceSource() {
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(comments);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return comments;
+                }
+
+                @Override
+                public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+                    return new EvidenceContribution(Map.of(), Map.of(core, SourceCompleteness.COMPLETE));
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {}
+            };
+            ContextManifestBuilder manifests = mock(ContextManifestBuilder.class);
+            when(manifests.isSourceUsePermitted(any(), any())).thenReturn(true);
+            when(manifests.stagedSources(any())).thenReturn(Set.of(comments, core));
+            var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
+            EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
+
+            assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("undeclared or unselected sources");
+        }
+
+        @Test
+        void rejectsFilesEmittedForAnotherIndependentCapture() {
+            SourceKind comments = new SourceKind("scm.pull-request.comments");
+            SourceKind core = new SourceKind("scm.pull-request.core");
+            EvidenceSource provider = new EvidenceSource() {
+                @Override
+                public Set<SourceKind> sourceKinds() {
+                    return Set.of(comments, core);
+                }
+
+                @Override
+                public SourceKind sourceKindFor(String path) {
+                    return path.endsWith("core.json") ? core : comments;
+                }
+
+                @Override
+                public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+                    return new EvidenceContribution(
+                        Map.of("inputs/context/core.json", new byte[] { 1 }),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of(),
+                        Map.of()
+                    );
+                }
+
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
+
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {}
+            };
+            ContextManifestBuilder manifests = mock(ContextManifestBuilder.class);
+            when(manifests.isSourceUsePermitted(any(), any())).thenReturn(true);
+            when(manifests.stagedSources(any())).thenReturn(Set.of(comments, core));
+            var builder = new WorkspaceContextBuilder(List.of(provider), new SimpleMeterRegistry(), manifests);
+            EvidencePlan plan = new EvidencePlan(new SourceContractVersion("1.0.0"), ArtifactKinds.PULL_REQUEST);
+
+            assertThatThrownBy(() -> builder.prepare(reviewRequest(), plan))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("outside this capture");
+        }
+
+        @Test
         @DisplayName("re-raises JobPreparationException without re-wrapping")
         void jpePassThrough() {
             var bad = new ContentSource() {
-                @Override
-                public String originId() {
-                    return "test";
-                }
-
                 @Override
                 public boolean supports(ContextRequest request) {
                     return true;
@@ -196,7 +451,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @Test
         @DisplayName("two providers writing the same path is a wiring bug")
         void detectsConflictingKey() {
-            // Distinct concrete classes so dedup distinguishes ownership.
             ContentSource first = new ProviderA();
             ContentSource second = new ProviderB();
             assertThatThrownBy(() -> builderOf(first, second).build(reviewRequest()))
@@ -204,12 +458,29 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
                 .hasMessageContaining("Duplicate workspace key");
         }
 
-        private final class ProviderA implements ContentSource {
+        @Test
+        void isolatesPreviouslyCollectedBytesFromLaterProviders() {
+            byte[] shared = "FIRST".getBytes(StandardCharsets.UTF_8);
+            ContentSource first = stubProvider(true, "first.txt", shared, false);
+            ContentSource mutating = new ContentSource() {
+                @Override
+                public boolean supports(ContextRequest request) {
+                    return true;
+                }
 
-            @Override
-            public String originId() {
-                return "test";
-            }
+                @Override
+                public void contribute(ContextRequest request, Map<String, byte[]> files) {
+                    shared[0] = 'X';
+                    files.put(OUTPUT_PREFIX + "second.txt", new byte[0]);
+                }
+            };
+
+            Map<String, byte[]> files = builderOf(first, mutating).build(reviewRequest());
+
+            assertThat(files.get("inputs/context/first.txt")).asString(StandardCharsets.UTF_8).isEqualTo("FIRST");
+        }
+
+        private final class ProviderA implements ContentSource {
 
             @Override
             public boolean supports(ContextRequest request) {
@@ -223,11 +494,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
 
         private final class ProviderB implements ContentSource {
-
-            @Override
-            public String originId() {
-                return "test";
-            }
 
             @Override
             public boolean supports(ContextRequest request) {
@@ -248,11 +514,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         @DisplayName("rejects providers that write outside inputs/context/")
         void rejectsBadPrefix() {
             var wrong = new ContentSource() {
-                @Override
-                public String originId() {
-                    return "test";
-                }
-
                 @Override
                 public boolean supports(ContextRequest request) {
                     return true;
@@ -277,7 +538,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         void respectsOrderedInterface() {
             var first = new OrderedStubProvider(1, "first.txt");
             var second = new OrderedStubProvider(2, "second.txt");
-            // Inject in reverse — sort should pick {first, second}.
             Map<String, byte[]> files = builderOf(second, first).build(reviewRequest());
             var iter = files.keySet().iterator();
             assertThat(iter.next()).isEqualTo("inputs/context/first.txt");
@@ -295,7 +555,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             CountDownLatch firstMayFinish = new CountDownLatch(1);
             ContentSource gatedFirst = new LatchedProvider(firstInside, firstMayFinish);
             ContentSource unboundedSecond = new LatchedProvider(null, null);
-            // Two distinct concrete provider classes → injection-order semantics, not dedup.
             var builder = new WorkspaceContextBuilder(
                 List.of(gatedFirst, unboundedSecond),
                 new SimpleMeterRegistry(),
@@ -365,7 +624,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
     }
 
-    /** Wait until {@code thread} enters one of {@code wanted} or the timeout elapses. */
     private static void awaitState(Thread thread, Set<Thread.State> wanted, long timeoutMillis)
         throws InterruptedException {
         long deadline = System.nanoTime() + timeoutMillis * 1_000_000L;
@@ -381,16 +639,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         );
     }
 
-    /**
-     * Provider that releases on {@code entered} and waits on {@code mayFinish}. Both latches
-     * may be {@code null} for the unbounded variant.
-     */
     private static final class LatchedProvider implements ContentSource {
-
-        @Override
-        public String originId() {
-            return "test";
-        }
 
         private final CountDownLatch entered;
         private final CountDownLatch mayFinish;
@@ -421,7 +670,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
     }
 
-    /** Provider that records whether two builds were allowed into the provider body at the same time. */
     private static final class ConcurrentProbeProvider implements ContentSource {
 
         private final CountDownLatch bothInside;
@@ -439,11 +687,6 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
             this.mayFinish = mayFinish;
             this.inFlight = inFlight;
             this.maxInFlight = maxInFlight;
-        }
-
-        @Override
-        public String originId() {
-            return "test";
         }
 
         @Override
@@ -467,13 +710,7 @@ class WorkspaceContextBuilderTest extends BaseUnitTest {
         }
     }
 
-    /** Ordered provider: writes a single file; reports a fixed precedence. */
     private static final class OrderedStubProvider implements ContentSource, Ordered {
-
-        @Override
-        public String originId() {
-            return "test";
-        }
 
         private final int order;
         private final String pathSuffix;

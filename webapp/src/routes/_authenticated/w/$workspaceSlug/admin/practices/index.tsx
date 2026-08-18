@@ -1,8 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
-import { listAreasOptions, listPracticesOptions } from "@/api/@tanstack/react-query.gen";
+import {
+	getPracticeDefinitionOptionsOptions,
+	listAreasOptions,
+	listPracticesOptions,
+} from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
@@ -49,25 +53,44 @@ function PracticeCatalogRoute() {
 	const practicesQuery = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
 	});
+	const definitionOptionsQuery = useQuery({
+		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
+	});
 
 	return (
 		<PageLayout>
 			<PageHeader
 				icon={<ListChecks />}
 				title="Practices"
-				description="Choose the practices Hephaestus uses for new reviews in this workspace. Changes affect only this workspace."
+				description={
+					<>
+						Define practices and group them into areas. Changes apply to this workspace only. The
+						autonomy tier — whether each practice is reviewed, and how far its reviews go on their
+						own — is set on{" "}
+						<Link
+							to="/w/$workspaceSlug/admin/practices/review"
+							params={{ workspaceSlug }}
+							search={{}}
+							className="font-medium underline underline-offset-4 hover:text-foreground"
+						>
+							Review
+						</Link>
+						.
+					</>
+				}
 			/>
-			{areasQuery.isPending || practicesQuery.isPending ? (
+			{areasQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
 				<div className="flex h-64 items-center justify-center">
 					<Spinner className="size-8" />
 				</div>
-			) : areasQuery.isError || practicesQuery.isError ? (
+			) : areasQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError ? (
 				<QueryErrorAlert
-					error={areasQuery.error ?? practicesQuery.error}
+					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
 						areasQuery.refetch();
 						practicesQuery.refetch();
+						definitionOptionsQuery.refetch();
 					}}
 				/>
 			) : (
@@ -75,6 +98,7 @@ function PracticeCatalogRoute() {
 					workspaceSlug={workspaceSlug}
 					areas={areasQuery.data}
 					practices={practicesQuery.data}
+					definitionOptions={definitionOptionsQuery.data}
 					pending={{
 						areaSlugs: catalog.pendingAreaSlugs,
 						practiceSlugs: catalog.pendingPracticeSlugs,
@@ -111,8 +135,11 @@ function PracticeCatalogRoute() {
 							return false;
 						}
 					}}
-					onToggleAreaActive={(areaSlug, active) =>
-						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: { active } })
+					onSetAreaDashboardVisibility={(areaSlug, visibleInPracticeDashboards) =>
+						catalog.updateArea.mutate({
+							path: { workspaceSlug, areaSlug },
+							body: { visibleInPracticeDashboards },
+						})
 					}
 					onDeleteArea={(areaSlug) =>
 						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
@@ -122,12 +149,6 @@ function PracticeCatalogRoute() {
 					}
 					onSetAreaVisual={(areaSlug, patch) =>
 						catalog.updateArea.mutate({ path: { workspaceSlug, areaSlug }, body: patch })
-					}
-					onSetPracticeActive={(practiceSlug, active) =>
-						catalog.setActive.mutate({
-							path: { workspaceSlug, practiceSlug },
-							body: { active },
-						})
 					}
 					onDeletePractice={setDeletingPractice}
 					onPlacePractice={(practiceSlug, areaSlug, position) =>
@@ -183,7 +204,7 @@ function PracticeCatalogRoute() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete &ldquo;{deletingPractice?.name}&rdquo;?</AlertDialogTitle>
 						<AlertDialogDescription>
-							This permanently deletes the practice and its findings. This can't be undone.
+							This permanently deletes the practice and its observations. This can't be undone.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

@@ -61,6 +61,7 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
         assertThat(body)
             .as("orchestrator prompt references the repo mount at SandboxLayout.REPO_MOUNT_RELATIVE")
             .contains(SandboxLayout.REPO_MOUNT_RELATIVE);
+        assertThat(body).doesNotContain("evidence.locations", "evidence.location", "evidence.snippets");
     }
 
     @Test

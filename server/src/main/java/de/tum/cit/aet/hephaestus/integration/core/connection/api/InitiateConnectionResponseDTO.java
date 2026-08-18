@@ -6,11 +6,11 @@ import org.jspecify.annotations.Nullable;
 /**
  * Flat response for {@code POST /workspaces/{workspaceSlug}/connections}.
  *
- * <p>Two outcomes, distinguished by {@link #type}:
+ * <p>Two outcomes, distinguished by {@code type}:
  * <ul>
- *   <li>{@code REDIRECT} — OAuth / App-install flows (GitHub, Slack). {@link #vendorUrl} is the
+ *   <li>{@code REDIRECT} — OAuth / App-install flows (GitHub, Slack). {@code vendorUrl} is the
  *       URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
- *   <li>{@code LINKED} — inline-credential flows (GitLab PAT). {@link #connectionId} is the
+ *   <li>{@code LINKED} — inline-credential flows (GitLab PAT). {@code connectionId} is the
  *       newly-created Connection; no further round-trip is needed.</li>
  * </ul>
  *

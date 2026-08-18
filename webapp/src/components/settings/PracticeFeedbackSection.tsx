@@ -33,7 +33,7 @@ export function PracticeFeedbackSection({
 					<FieldDescription>
 						When off, Hephaestus won't post new practice-feedback comments on issues, pull requests,
 						or merge requests you author or send related Slack reminders. Reviews still run,
-						findings remain stored, and workspace admins can still view them.
+						observations remain stored, and workspace admins can still view them.
 					</FieldDescription>
 				</FieldContent>
 				<Switch

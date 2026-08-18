@@ -71,9 +71,9 @@ describe("WorkspaceLlmProviderPanel", () => {
 		renderPanel();
 
 		expect(await screen.findByText("OpenAI production")).toBeTruthy();
-		expect(screen.getByText("Local GPU")).toBeTruthy();
+		screen.getByText("Local GPU");
 		expect(await screen.findByText("GPT shared endpoint")).toBeTruthy();
-		expect(screen.getByText("GPU coder")).toBeTruthy();
+		screen.getByText("GPU coder");
 	});
 
 	it("keeps each provider's probe pending independently when two run at once", async () => {
@@ -205,8 +205,8 @@ describe("WorkspaceLlmProviderPanel", () => {
 		expect(await screen.findByText("Existing model")).toBeTruthy();
 		expect(screen.queryByRole("button", { name: "Add provider" })).toBeNull();
 		expect(screen.queryByRole("button", { name: "Add model" })).toBeNull();
-		expect(screen.getByRole("button", { name: "Edit OpenAI production" })).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Edit Existing model" })).toBeTruthy();
-		expect(screen.getByRole("button", { name: "Delete Existing model" })).toBeTruthy();
+		screen.getByRole("button", { name: "Edit OpenAI production" });
+		screen.getByRole("button", { name: "Edit Existing model" });
+		screen.getByRole("button", { name: "Delete Existing model" });
 	});
 });

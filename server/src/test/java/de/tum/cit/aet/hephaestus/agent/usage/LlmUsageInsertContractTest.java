@@ -43,13 +43,13 @@ import org.xml.sax.SAXException;
  * {@code ON CONFLICT (source_type, source_id, source_attempt) DO NOTHING}, whose return value tells
  * the recorder whether a redelivered attempt was absorbed. Neither Spring Data's {@code save()} nor
  * {@code EntityManager.persist()} can express that, and {@code save()} on an entity with an assigned
- * id would route through {@code merge()} and cost a SELECT on both hot paths (see
- * {@link LlmUsageEvent#getId()}). So the SQL stays hand-written.
+ * id would route through {@code merge()} and cost a SELECT on both hot paths. So the SQL stays
+ * hand-written.
  *
- * <p><b>What that costs, and what this test buys back.</b> One new ledger column otherwise means five
- * edits that nothing forces to agree: the Liquibase changelog, the entity, {@link LlmUsageInsert}, the
- * INSERT's column list and its VALUES list. The sixth site — {@link LlmUsageRecorder} — is chained by
- * the compiler, since {@code LlmUsageInsert} is a record and a new component breaks the recorder's
+ * <p><b>What that costs, and what this test buys back.</b> One new ledger column otherwise means edits
+ * that nothing forces to agree: the Liquibase changelog, the entity, {@link LlmUsageInsert}, the
+ * INSERT's column list and its VALUES list. Only {@link LlmUsageRecorder} is chained by the compiler,
+ * since {@code LlmUsageInsert} is a record and a new component breaks the recorder's
  * canonical-constructor call until it supplies a value.
  *
  * <p><b>The table is the arbiter, not a second guess at it.</b> Both the insert and the entity are
@@ -154,6 +154,20 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         return columns;
     }
 
+    /**
+     * A {@code <rollback>} states how to undo a change, not what the table holds. Its {@code dropColumn}
+     * describes removing the column the same changeSet just added, so replaying it would cancel the add
+     * and leave the reader believing a shipped column does not exist.
+     */
+    private static boolean insideRollback(Element element) {
+        for (Node node = element.getParentNode(); node != null; node = node.getParentNode()) {
+            if ("rollback".equals(node.getNodeName())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private static List<Resource> changelogsInApplyOrder() {
         Resource[] found;
         try {
@@ -185,7 +199,7 @@ class LlmUsageInsertContractTest extends BaseUnitTest {
         NodeList elements = parse(bytes, changelog).getElementsByTagName("*");
         for (int i = 0; i < elements.getLength(); i++) {
             Element element = (Element) elements.item(i);
-            if (!TABLE.equals(element.getAttribute("tableName"))) {
+            if (!TABLE.equals(element.getAttribute("tableName")) || insideRollback(element)) {
                 continue;
             }
             switch (element.getNodeName()) {

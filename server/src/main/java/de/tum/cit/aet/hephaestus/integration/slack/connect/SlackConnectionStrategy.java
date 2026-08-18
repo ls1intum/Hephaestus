@@ -25,7 +25,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Slack OAuth strategy. Token rotation is rejected until refresh is supported. */
+/** Slack OAuth strategy. A rotating installation is rejected rather than stored: no refresh path exists,
+ *  so accepting one would leave a connection that stops working at the first rotation. */
 @ConditionalOnServerRole
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.slack.enabled", havingValue = "true", matchIfMissing = false)

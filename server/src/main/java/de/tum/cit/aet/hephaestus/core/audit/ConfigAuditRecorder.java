@@ -16,9 +16,8 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 /**
  * Writes {@link ConfigAuditEvent} rows. Sole implementation of {@link ConfigAuditPort}.
  *
- * <p>Not {@code @ConditionalOnServerRole}, unlike every bean in {@code core.auth.audit}: a producer
- * on the webhook or worker role would fail to start on a missing bean, and the trail is meant to
- * accept writes from every role.
+ * <p>Not {@code @ConditionalOnServerRole}: a producer on the webhook or worker role would fail to start
+ * on a missing bean, and the trail is meant to accept writes from every role.
  */
 @Component
 @RequiredArgsConstructor
@@ -63,11 +62,10 @@ class ConfigAuditRecorder implements ConfigAuditPort {
      *
      * <p>{@code MANDATORY} alone is not enough, and an ArchUnit rule asserting the caller carries
      * {@code @Transactional} would not be either — both check for the annotation, not for what it
-     * resolves to. Under {@code readOnly = true} (which {@code AiSettingsService} declares at class
-     * level) a transaction genuinely exists, so {@code MANDATORY} is satisfied and the build stays
-     * green, but Hibernate sets {@code FlushMode.MANUAL} and the INSERT is silently never flushed:
-     * a config change commits with no audit row and nothing anywhere goes red. That is the precise
-     * failure this port exists to prevent, so it is checked against the runtime fact instead.
+     * resolves to. Under a class-level {@code @Transactional(readOnly = true)} a transaction genuinely
+     * exists, so {@code MANDATORY} is satisfied and the build stays green, but Hibernate sets
+     * {@code FlushMode.MANUAL} and the INSERT is silently never flushed: a config change commits with
+     * no audit row and nothing anywhere goes red. Hence the check against the runtime fact.
      */
     private static void requireWritableTransaction() {
         if (!TransactionSynchronizationManager.isActualTransactionActive()) {

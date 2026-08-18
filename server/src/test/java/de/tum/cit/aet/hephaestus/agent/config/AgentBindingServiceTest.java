@@ -11,7 +11,6 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.catalog.WorkspaceLlmModelRepository;
 import de.tum.cit.aet.hephaestus.agent.usage.FundingSource;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
@@ -67,33 +66,34 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void upsertBindsAnAvailableInstanceModel() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.empty()
         );
         LlmModel model = new LlmModel();
         model.setId(99L);
         when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
+        when(llmModelResolver.isAvailable(any(WorkspaceAgentBinding.class))).thenReturn(true);
         when(bindingRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
         var request = new AgentBindingRequestDTO(99L, null, 300, 2, true, true);
-        WorkspaceAgentBinding saved = service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request);
+        WorkspaceAgentBinding saved = service.upsertBinding(context(), AgentPurpose.PRACTICE_REVIEW, request);
 
         assertThat(saved.getWorkspace()).isSameAs(w);
-        assertThat(saved.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
+        assertThat(saved.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_REVIEW);
         assertThat(saved.getInstanceModel().getId()).isEqualTo(99L);
         assertThat(saved.getWorkspaceModel()).isNull();
         assertThat(saved.getTimeoutSeconds()).isEqualTo(300);
         assertThat(saved.getMaxConcurrentJobs()).isEqualTo(2);
         assertThat(saved.isAllowInternet()).isTrue();
         assertThat(saved.isEnabled()).isTrue();
-        verify(llmModelResolver).resolve(any(WorkspaceAgentBinding.class));
+        verify(llmModelResolver).isAvailable(any(WorkspaceAgentBinding.class));
 
         // The two model columns are interchangeable in shape but not in meaning — an entry that filed
         // the id under workspaceModelId would claim the workspace pays for a model the instance owns.
         ArgumentCaptor<ConfigAuditEntry> entry = ArgumentCaptor.forClass(ConfigAuditEntry.class);
         verify(configAudit).record(entry.capture());
         assertThat(entry.getValue().entityType()).isEqualTo(ConfigAuditEntityType.AGENT_BINDING);
-        assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.PRACTICE_DETECTION.name());
+        assertThat(entry.getValue().entityId()).isEqualTo(AgentPurpose.PRACTICE_REVIEW.name());
         assertThat(entry.getValue().workspaceId()).isEqualTo(1L);
         assertThat(entry.getValue().action()).isEqualTo(ConfigAuditAction.UPDATED);
         assertThat(entry.getValue().before()).hasFieldOrPropertyWithValue("instanceModelId", null);
@@ -107,20 +107,18 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void upsertRejectsAModelThatIsNotAvailableToTheWorkspace() {
         Workspace w = workspace();
         when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(w));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurpose(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.empty()
         );
         LlmModel model = new LlmModel();
         model.setId(99L);
         when(llmModelRepository.findById(99L)).thenReturn(Optional.of(model));
-        when(llmModelResolver.resolve(any(WorkspaceAgentBinding.class))).thenThrow(
-            new IllegalStateException("unavailable")
-        );
+        when(llmModelResolver.isAvailable(any(WorkspaceAgentBinding.class))).thenReturn(false);
 
         var request = new AgentBindingRequestDTO(99L, null, null, null, null, true);
-        assertThatThrownBy(() ->
-            service.upsertBinding(context(), AgentPurpose.PRACTICE_DETECTION, request)
-        ).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> service.upsertBinding(context(), AgentPurpose.PRACTICE_REVIEW, request)).isInstanceOf(
+            IllegalArgumentException.class
+        );
         verify(bindingRepository, never()).save(any());
     }
 
@@ -175,9 +173,7 @@ class AgentBindingServiceTest extends BaseUnitTest {
     void isReadyIsTrueWhenAnEnabledBindingStillResolves() {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setEnabled(true);
-        when(llmModelResolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel("https://api.openai.com", "openai-completions", "gpt-test", null, null, false)
-        );
+        when(llmModelResolver.isAvailable(binding)).thenReturn(true);
 
         assertThat(service.isReady(binding)).isTrue();
     }
@@ -188,14 +184,14 @@ class AgentBindingServiceTest extends BaseUnitTest {
         binding.setEnabled(false);
 
         assertThat(service.isReady(binding)).isFalse();
-        verify(llmModelResolver, never()).resolve(any(WorkspaceAgentBinding.class));
+        verify(llmModelResolver, never()).isAvailable(any(WorkspaceAgentBinding.class));
     }
 
     @Test
     void isReadyIsFalseWhenTheBoundModelIsNoLongerAvailable() {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setEnabled(true);
-        when(llmModelResolver.resolve(binding)).thenThrow(new IllegalStateException("unavailable"));
+        when(llmModelResolver.isAvailable(binding)).thenReturn(false);
 
         assertThat(service.isReady(binding)).isFalse();
     }

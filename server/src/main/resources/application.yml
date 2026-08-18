@@ -150,6 +150,17 @@ management:
                 include: readinessState,integrationConsumer
 
 springdoc:
+    # Off unless a profile asks for it. SecurityConfig permitAll()s /v3/api-docs/** and /swagger-ui/**
+    # on both filter chains so the `specs` profile — which boots with no JwtDecoder — can scrape the
+    # description; that carve-out is not profile-guarded, so wherever springdoc registers its endpoints
+    # they answer unauthenticated. Defaulting on therefore published the complete route list, admin
+    # routes included, from every deployment that was not `prod`. springdoc's own
+    # SpringDocConfiguration is @ConditionalOnProperty on this flag, so `false` means the endpoints are
+    # never registered and the permitAll matchers match nothing.
+    api-docs:
+        enabled: ${SPRINGDOC_API_DOCS_ENABLED:false}
+    swagger-ui:
+        enabled: ${SPRINGDOC_SWAGGER_UI_ENABLED:false}
     default-produces-media-type: application/json
     writer-with-order-by-keys: true
 
@@ -318,16 +329,20 @@ hephaestus:
             - ${APPLICATION_HOST_URL:http://localhost:4200}
 
     # ═══════════════════════════════════════════════════════════════════════════
-    # LOCAL GIT REPOSITORY STORAGE
+    # CONTEXT FABRIC AND LOCAL GIT CHECKOUT
     # ═══════════════════════════════════════════════════════════════════════════
-    # When enabled, repositories are cloned as bare git repos for file-level
-    # commit analysis. The Pi agent reads these repos directly inside the sandbox.
+    fabric:
+        root: ${HEPHAESTUS_FABRIC_ROOT:/data/git-repos}
+        gc-retention-days: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:30}
+
     git:
-        # Whether local git checkout is enabled (default: false)
         enabled: ${GIT_CHECKOUT_ENABLED:false}
-        # Base path for bare git repositories
-        # Each repo stored at: {storage-path}/{repositoryId}.git
-        storage-path: ${GIT_STORAGE_PATH:/data/git-repos}
+        # Bounds on one repository-tree capture. The defaults are the numbers the shipped
+        # scm.repository.tree source contract promises; a tree that exceeds them is staged up to the
+        # bound and reported PARTIAL, never COMPLETE.
+        tree-max-files: ${GIT_TREE_MAX_FILES:20000}
+        tree-max-total-size: ${GIT_TREE_MAX_TOTAL_SIZE:32MB}
+        tree-max-file-size: ${GIT_TREE_MAX_FILE_SIZE:10MB}
 
     webapp:
         url: ${HEPHAESTUS_WEBAPP_URL:${APPLICATION_HOST_URL:http://localhost:4200}}
@@ -382,12 +397,10 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # CONFIG-backed feature flags evaluated by FeatureFlagService.
     # ROLE-backed flags (mentor_access, admin, etc.) are stored per account in the account_feature table.
-    # Each flag names its own env var so the SHORT name works everywhere. The long relaxed-binding form
-    # (HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION) also reaches these keys and still wins when
-    # both are set — but it is not the name anyone writes down. docker/.env, the compose files and the
-    # admin docs all say GITLAB_WORKSPACE_CREATION / PRACTICE_REVIEW_FOR_ALL, and before these
-    # placeholders existed those were compose-file aliases that fanned out to the long form: setting one
-    # anywhere but a shipped compose file did nothing at all, silently. Pinned by FeatureFlagEnvBindingTest.
+    # Each flag names its own env var so the SHORT name works everywhere: docker/.env, the compose files
+    # and the admin docs all say GITLAB_WORKSPACE_CREATION / PRACTICE_REVIEW_FOR_ALL. The long
+    # relaxed-binding form (HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION) also reaches these keys
+    # and still wins when both are set. Pinned by FeatureFlagEnvBindingTest.
     features:
         flags:
             practice-review-for-all: ${PRACTICE_REVIEW_FOR_ALL:false}
@@ -401,12 +414,44 @@ hephaestus:
     practice-review:
         # true = run for ALL users (bypass role check); false = require the run_practice_review feature flag
         run-for-all-users: ${PRACTICE_REVIEW_RUN_FOR_ALL:false}
-        # true = skip practice review for draft PRs
-        skip-drafts: ${PRACTICE_REVIEW_SKIP_DRAFTS:true}
         # whether to deliver feedback to already-merged PRs
         deliver-to-merged: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:false}
         # minimum minutes between reviews for the same PR (0 = no cooldown)
         cooldown-minutes: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:15}
+        # How many reviews one person may ask for by hand, per workspace, per hour (0 = no limit).
+        # The only limit keyed on a person rather than on a piece of work, so it is the only one that
+        # catches somebody asking for one review each on twenty colleagues' merge requests. The cooldown
+        # above will not: those are twenty different PRs.
+        max-requests-per-requester-per-hour: ${PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR:5}
+        # Append the cross-run progress-delta footer and post the re-review notifying reply. Needs at
+        # least two runs on a target before it renders anything.
+        progress-footer: ${PRACTICE_REVIEW_PROGRESS_FOOTER:false}
+        # Stop re-raising a locus the student already disputed or marked not-applicable. Inert until a
+        # reaction exists for a recurring locus.
+        reaction-suppression: ${PRACTICE_REVIEW_REACTION_SUPPRESSION:false}
+        # Fleet-wide limits on backfill campaigns (ReviewBackfillProperties). max-window and
+        # max-artifacts are the spend guard rails: a campaign wider than either is refused at preflight,
+        # before anything is confirmed and before anything is paid for.
+        backfill:
+            # artifacts one driver tick offers to the review path; bounds how far a campaign can
+            # overshoot a budget cap it crosses mid-batch
+            batch-size: ${PRACTICE_REVIEW_BACKFILL_BATCH_SIZE:25}
+            max-window: ${PRACTICE_REVIEW_BACKFILL_MAX_WINDOW:400d}
+            max-artifacts: ${PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS:5000}
+            # how far back the estimator looks for completed reviews to price a new campaign from
+            cost-history-window: ${PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW:90d}
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SIGNAL LEDGER (SignalLedgerProperties)
+    # ═══════════════════════════════════════════════════════════════════════════
+    # The pending-signal reaper: what happens to a signal the review gate refused. The blockers are
+    # operator actions (re-activate a workspace, re-point a binding, wait for a budget month to roll
+    # over), so the retry interval is a human timescale — retrying fast only multiplies the refusal.
+    # A signal still refused after pending-lapse-after is retired rather than re-offered for ever.
+    signal-ledger:
+        pending-retry-after: ${SIGNAL_LEDGER_PENDING_RETRY_AFTER:1h}
+        pending-lapse-after: ${SIGNAL_LEDGER_PENDING_LAPSE_AFTER:7d}
+        sweep-batch-size: ${SIGNAL_LEDGER_SWEEP_BATCH_SIZE:200}
 
     posthog:
         enabled: ${POSTHOG_ENABLED:false}
@@ -443,8 +488,8 @@ hephaestus:
     # ═══════════════════════════════════════════════════════════════════════════
     # AGENT JOB QUEUE (PostgreSQL-backed)
     # ═══════════════════════════════════════════════════════════════════════════
-    # The queue IS the agent_job table — a QUEUED insert is the enqueue. AgentJobExecutor polls
-    # for QUEUED rows on a fixed interval instead of a NATS push consumer. Disabled by default.
+    # The queue IS the agent_job table — a QUEUED insert is the enqueue, and AgentJobExecutor polls
+    # for QUEUED rows on a fixed interval. Disabled by default.
     agent:
         enabled: ${AGENT_ENABLED:false}
         # How long the poll loop sleeps when there is nothing to claim.
@@ -633,6 +678,7 @@ hephaestus:
             # Master switch for the Outline documentation integration (install, sync, content projection).
             # Off by default; a workspace admin still installs per-workspace with a base URL + token.
             enabled: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:false}
+            allowed-origins: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:}
             sync:
                 # Reconcile schedule for the per-workspace document mirror (default every six hours).
                 cron: ${HEPHAESTUS_INTEGRATION_OUTLINE_SYNC_CRON:0 0 */6 * * *}

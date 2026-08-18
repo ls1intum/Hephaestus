@@ -1,0 +1,436 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, fn, screen, within } from "storybook/test";
+import { withWidePage } from "@/stories/decorators";
+import { Stateful } from "@/stories/stateful";
+import { expectSettledVisible } from "@/test/overlay";
+import { expectNoPageOverflow } from "@/test/reflow";
+import { ReviewAutonomyPage } from "./ReviewAutonomyPage";
+import { type AutonomyFixture, buildAutonomyFixture, scaleFixture } from "./story-mock-data";
+
+const from = ({ settings, rollup, practices }: AutonomyFixture) => ({
+	settings,
+	rollup,
+	practices,
+});
+
+const small = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "pull-request-hygiene",
+			name: "Pull request hygiene",
+			practices: [
+				{
+					name: "States the motivation",
+					whyItMatters:
+						"Your reviewer was not in your head when you wrote the code. A sentence on why you made the change spares them from reverse-engineering your intent from the diff.",
+				},
+				{ name: "Links the issue it closes", override: "PROPOSE" },
+			],
+		},
+		{
+			slug: "testing",
+			name: "Testing",
+			override: "OFF",
+			practices: [{ name: "Covers the new branch" }, { name: "Names what it asserts" }],
+		},
+		{
+			slug: null,
+			name: null,
+			practices: [{ name: "Handles the error state" }],
+		},
+	],
+});
+
+const chosenByTheWorkspace = buildAutonomyFixture({
+	workspaceDefault: "PROPOSE",
+	areas: [
+		{
+			slug: "pull-request-hygiene",
+			name: "Pull request hygiene",
+			practices: [{ name: "States the motivation" }, { name: "Links the issue it closes" }],
+		},
+	],
+});
+
+const oneDescribedAndOneBare = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "documentation",
+			name: "Documentation",
+			practices: [
+				{
+					name: "Explains the trade-off it chose",
+					artifactKind: "docs.document",
+					whyItMatters:
+						"A decision without its alternatives reads as arbitrary six months later. Naming what you did not do is what lets the next person tell a considered choice from an accident.",
+				},
+				{ name: "Written by hand, and says nothing more" },
+			],
+		},
+	],
+});
+
+const oneDescribedPractice = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "documentation",
+			name: "Documentation",
+			practices: [
+				{
+					name: "Explains the trade-off it chose",
+					artifactKind: "docs.document",
+					whyItMatters: "A decision without its alternatives reads as arbitrary six months later.",
+				},
+			],
+		},
+	],
+});
+
+const nothingSetByHand = buildAutonomyFixture({
+	areas: [{ slug: "testing", name: "Testing", practices: [{ name: "Covers the new branch" }] }],
+});
+
+const oneUnreviewablePractice = buildAutonomyFixture({
+	areas: [
+		{
+			slug: "observability",
+			name: "Observability",
+			practices: [{ name: "Alerts a human on failure", reviewable: false }],
+		},
+	],
+});
+
+/** Built once and shared: resolving the whole inheritance chain over this many rows is not free. */
+const atScale = scaleFixture();
+
+const idle = {
+	workspace: false,
+	areaSlugs: new Set<string>(),
+	practiceSlugs: new Set<string>(),
+	bulk: null,
+};
+
+const meta = {
+	title: "Workspace admin/Practices/Review/How much",
+	component: ReviewAutonomyPage,
+	parameters: {
+		layout: "padded",
+		chromatic: { viewports: [320, 1440] },
+		viewport: { defaultViewport: "reflow" },
+	},
+	args: {
+		workspaceSlug: "demo",
+		settings: small.settings,
+		rollup: small.rollup,
+		practices: small.practices,
+		pending: idle,
+		overridesOnly: false,
+		onOverridesOnlyChange: fn(),
+		onSetWorkspaceDefault: fn(),
+		onClearWorkspaceDefault: fn(),
+		onSetAreaTier: fn(),
+		onClearAreaTier: fn(),
+		onSetPracticeTier: fn(),
+		onClearPracticeTier: fn(),
+		onBulkSetTier: fn(),
+	},
+	decorators: [withWidePage],
+	tags: ["autodocs"],
+	/**
+	 * Only the scope filter is held in state; the tier setters stay spies. {@link buildAutonomyFixture}
+	 * resolves the three-level inheritance chain the way the server does, so applying a tier locally
+	 * would mean resolving it a second time by hand — and the page would show a rollup its own rows
+	 * contradict the first time the two disagreed.
+	 */
+	render: (args) => (
+		<Stateful initial={args.overridesOnly}>
+			{(overridesOnly, setOverridesOnly) => (
+				<ReviewAutonomyPage
+					{...args}
+					overridesOnly={overridesOnly}
+					onOverridesOnlyChange={(next) => {
+						args.onOverridesOnlyChange(next);
+						setOverridesOnly(next);
+					}}
+				/>
+			)}
+		</Stateful>
+	),
+} satisfies Meta<typeof ReviewAutonomyPage>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const WorkspaceDefaultUnset: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Workspace default" })).toBeVisible();
+		await expect(canvas.getByText("Not chosen yet, so Deliver applies.")).toBeVisible();
+		await expect(
+			canvas.getByRole("radiogroup", { name: "How far reviews go without you" }),
+		).toBeVisible();
+		// The workspace makes one decision, not two: how far a review goes is the only axis, and
+		// Deliver means delivered wherever the practice's channel allows.
+		await expect(canvas.queryByText(/feedback may go/i)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/mentor conversation/i)).not.toBeInTheDocument();
+		await expectNoPageOverflow();
+	},
+};
+
+export const WorkspaceDefaultSet: Story = {
+	args: from(chosenByTheWorkspace),
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(
+			within(canvas.getByRole("radiogroup", { name: "How far reviews go without you" })).getByRole(
+				"radio",
+				{ name: "Propose" },
+			),
+		).toBeChecked();
+
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Use the default for how far reviews go without you" }),
+		);
+		await expect(args.onClearWorkspaceDefault).toHaveBeenCalled();
+	},
+};
+
+export const AreaOverride: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		const testing = canvas.getByRole("radiogroup", {
+			name: "How far reviews go in Testing",
+		});
+		await expect(within(testing).getByRole("radio", { name: "Off" })).toBeChecked();
+		await userEvent.click(within(testing).getByRole("radio", { name: "Deliver" }));
+		await expect(args.onSetAreaTier).toHaveBeenCalledWith("testing", "DELIVER");
+
+		// The bucket for practices in no area holds no tier of its own — it is not a row anywhere.
+		const unassigned = canvas.getByText("Not in an area").closest('[data-slot="accordion-item"]');
+		if (!(unassigned instanceof HTMLElement)) throw new Error("No-area group not rendered");
+		await expect(within(unassigned).getByText("Follows the workspace default")).toBeVisible();
+		await expect(
+			within(unassigned).queryByRole("radiogroup", { name: /How far reviews go in/ }),
+		).not.toBeInTheDocument();
+	},
+};
+
+export const PracticeOverrideWithReset: Story = {
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
+		const row = canvas.getByText("Links the issue it closes").closest("li");
+		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
+
+		// `getByText` matches an element's own text nodes, so this is the paragraph and not the button
+		// inside it; the button is asserted by role below.
+		await expect(within(row).getByText("Set here.")).toBeVisible();
+		await expect(
+			within(row).getByRole("radiogroup", {
+				name: "How far reviews go on Links the issue it closes",
+			}),
+		).toBeVisible();
+
+		const sibling = canvas.getByText("States the motivation").closest("li");
+		if (!(sibling instanceof HTMLElement)) throw new Error("Sibling row not rendered");
+		await expect(within(sibling).getByText(/^Follows/)).toBeVisible();
+
+		await userEvent.click(
+			within(row).getByRole("button", { name: /Use the default for Links the issue it closes/ }),
+		);
+		await expect(args.onClearPracticeTier).toHaveBeenCalledWith(
+			"pull-request-hygiene-links-the-issue-it-closes",
+		);
+	},
+};
+
+/**
+ * A practice carrying no prose gets no preview card at all, rather than an empty popup appearing
+ * under the pointer. Locally written practices usually carry none, so this is a state production
+ * reaches routinely.
+ */
+export const PracticeContext: Story = {
+	args: from(oneDescribedAndOneBare),
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Documentation/ }));
+
+		const described = canvas.getByText("Explains the trade-off it chose").closest("li");
+		if (!(described instanceof HTMLElement)) throw new Error("Practice row not rendered");
+		await expect(within(described).getByText("Document")).toBeVisible();
+		await expect(
+			within(described).queryByText(/reads as arbitrary six months later/),
+		).not.toBeInTheDocument();
+
+		// The card is portalled, so it is found on the screen and not in the row.
+		await userEvent.hover(
+			within(described).getByRole("link", { name: "Explains the trade-off it chose" }),
+		);
+		await expectSettledVisible(await screen.findByText(/reads as arbitrary six months later/));
+
+		const bare = canvas.getByText("Written by hand, and says nothing more").closest("li");
+		if (!(bare instanceof HTMLElement)) throw new Error("Bare row not rendered");
+		await expect(within(bare).getByText("Pull or merge request")).toBeVisible();
+		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
+		// as well if the card were merely slow.
+		await expect(
+			within(bare).getByRole("link", { name: "Written by hand, and says nothing more" }),
+		).not.toHaveAttribute("data-slot", "hover-card-trigger");
+		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * The card hangs off the practice's own link rather than a help icon, so the tab stop the row already
+ * has is the keyboard path and no row grows a second one. This story is what keeps that a fact rather
+ * than a claim: Base UI's hover card opens on focus-visible, Radix's does not.
+ */
+export const PracticeDetailOnKeyboardFocus: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	args: from(oneDescribedPractice),
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Documentation/ }));
+		const link = canvas.getByRole("link", { name: "Explains the trade-off it chose" });
+
+		await expect(screen.queryByText(/reads as arbitrary six months later/)).not.toBeInTheDocument();
+		// `link.focus()` would not do: the card opens on focus-*visible*, so focus has to arrive by
+		// keyboard. Bounded, so a DOM change ahead of the link fails the story instead of hanging it.
+		for (let step = 0; step < 12 && document.activeElement !== link; step++) {
+			await userEvent.tab();
+		}
+		await expect(link).toHaveFocus();
+		await expectSettledVisible(await screen.findByText(/reads as arbitrary six months later/));
+	},
+};
+
+/** An area whose own tier was set survives the filter even though none of its practices were. */
+export const OverridesOnly: Story = {
+	args: { overridesOnly: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Links the issue it closes")).toBeVisible();
+		await expect(canvas.queryByText("States the motivation")).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: /^Testing/ })).toBeVisible();
+		await expect(canvas.getByText("No practices here were set by hand.")).toBeVisible();
+		await expect(canvas.queryByText("Handles the error state")).not.toBeInTheDocument();
+	},
+};
+
+export const OverridesOnlyEmpty: Story = {
+	args: { overridesOnly: true, ...from(nothingSetByHand) },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Nothing was set by hand")).toBeVisible();
+	},
+};
+
+export const BulkSet: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
+		await userEvent.click(
+			canvas.getByRole("button", { name: /Select all 2 practices in Pull request hygiene/ }),
+		);
+		await expect(canvas.getByText("2 practices selected")).toBeVisible();
+
+		await userEvent.click(canvas.getByRole("button", { name: "Change the selected" }));
+		const menu = within(await screen.findByRole("menu"));
+		await userEvent.click(await menu.findByRole("menuitem", { name: "Propose" }));
+		await expect(args.onBulkSetTier).toHaveBeenCalledWith(
+			[
+				"pull-request-hygiene-states-the-motivation",
+				"pull-request-hygiene-links-the-issue-it-closes",
+			],
+			"PROPOSE",
+		);
+	},
+};
+
+export const BulkClearToInherited: Story = {
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ args, canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Pull request hygiene/ }));
+		await userEvent.click(
+			canvas.getByRole("checkbox", { name: "Select Links the issue it closes" }),
+		);
+		await expect(canvas.getByText("1 practice selected")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Change the selected" }));
+		const menu = within(await screen.findByRole("menu"));
+		await userEvent.click(await menu.findByRole("menuitem", { name: "Use the inherited setting" }));
+		await expect(args.onBulkSetTier).toHaveBeenCalledWith(
+			["pull-request-hygiene-links-the-issue-it-closes"],
+			null,
+		);
+	},
+};
+
+export const BulkInFlight: Story = {
+	args: { pending: { ...idle, bulk: { done: 7, total: 24 } } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Changing 7 of 24…")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Change the selected" })).toBeDisabled();
+	},
+};
+
+/**
+ * The summary comes from the server's rollup, not from counting the rendered rows, so it stays
+ * correct when a shut area renders none of its practices — which is what the radiogroup count below
+ * pins.
+ */
+export const AtScale: Story = {
+	args: from(atScale),
+	play: async ({ canvas }) => {
+		await expect(
+			canvas.getByText(
+				/^100 practices: 6 off, 89 propose and 5 deliver\. \d+ practices and \d+ areas set by hand\.$/,
+			),
+		).toBeVisible();
+		// One ladder for the workspace and one per area, and nothing else on the screen is a
+		// radiogroup: every area is shut, so no practice ladder is rendered.
+		await expect(canvas.getAllByRole("radiogroup")).toHaveLength(26);
+		await expect(canvas.queryByRole("checkbox", { name: /^Select / })).not.toBeInTheDocument();
+		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * A geometry assertion, because a ladder laid out after a content-width header takes its left edge
+ * from the length of the area's name — and nothing about the DOM, the roles or the text changes when
+ * that happens, so no other kind of assertion catches it.
+ */
+export const DecisionsShareOneColumn: Story = {
+	args: from(atScale),
+	globals: { viewport: { value: "desktop" } },
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		// Below `sm` every ladder is full width and shares a left edge regardless, so a runner that
+		// ignored the viewport would pass this story for the wrong reason.
+		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
+
+		await userEvent.click(canvas.getByRole("button", { name: /^Pull request hygiene/ }));
+
+		const lefts = canvas
+			.getAllByRole("radiogroup", { name: /^How far reviews go (in|on) / })
+			.map((group) => Math.round(group.getBoundingClientRect().left));
+
+		await expect(lefts.length).toBeGreaterThan(25);
+		// One column, to within the sub-pixel rounding of a grid track inside a grid track.
+		await expect(Math.max(...lefts) - Math.min(...lefts)).toBeLessThanOrEqual(2);
+	},
+};
+
+export const AtScaleOverridesOnly: Story = {
+	args: { overridesOnly: true, ...from(atScale) },
+	play: async ({ canvas }) => {
+		await expect(canvas.getAllByRole("checkbox", { name: /^Select / })).toHaveLength(3);
+		await expect(canvas.getByText(/^Observability: keeps the change/)).toBeVisible();
+		await expectNoPageOverflow();
+	},
+};
+
+export const NotReviewable: Story = {
+	args: from(oneUnreviewablePractice),
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: /Observability/ }));
+		await expect(
+			canvas.getByText("This practice can't be reviewed automatically, so it stays off."),
+		).toBeVisible();
+		await expect(canvas.getByRole("checkbox", { name: /^Select / })).toHaveAttribute(
+			"aria-disabled",
+			"true",
+		);
+	},
+};

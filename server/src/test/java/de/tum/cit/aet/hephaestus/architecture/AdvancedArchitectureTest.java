@@ -202,7 +202,7 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                     }
 
                     // Sub-SPI interfaces (e.g. family-typed extensions like ScmFeedbackChannel,
-                    // sealed permits like FindingAnchor.DocumentAnchor) are contracts, not adapters.
+                    // sealed permits like FeedbackAnchor.DocumentAnchor) are contracts, not adapters.
                     if (javaClass.isInterface()) {
                         return;
                     }
@@ -233,9 +233,12 @@ class AdvancedArchitectureTest extends HephaestusArchitectureTest {
                         javaClass.getPackageName().contains(".adapter") ||
                         javaClass.getPackageName().contains(".impl") ||
                         javaClass.getPackageName().contains(".handler") || // Job type handlers implement handler SPI
+                        javaClass.getPackageName().contains(".context.providers") || // Content sources declare ReviewContextBuilder
                         javaClass.getPackageName().contains(".notification") || // Notification module implements activity SPIs
                         javaClass.getPackageName().contains(".manifest") || // IntegrationManifest impls + bootstrap utilities
                         javaClass.getPackageName().contains(".registry") || // ConnectionPurgeContributor lives with the entity
+                        // A domain descriptor belongs beside the artifact it describes, not in a vendor package.
+                        javaClass.getSimpleName().endsWith("ArtifactDescriptor") ||
                         javaClass.getSimpleName().endsWith("Adapter") ||
                         javaClass.getSimpleName().endsWith("Provider") ||
                         javaClass.getSimpleName().endsWith("Tracker") || // Rate limit trackers implement RateLimitTracker SPI

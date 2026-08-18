@@ -1,21 +1,19 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
-import static de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent.TriggerEventNames;
-
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.core.settings.spi.SilentModeQuery;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
-import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
-import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.util.EnumMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +39,15 @@ import org.springframework.transaction.event.TransactionalEventListener;
  * <ul>
  *   <li>{@code /hephaestus review} — retrigger a practice review on the MR</li>
  * </ul>
+ *
+ * <h2>Who may command it</h2>
+ * <p>Every command is authorized against the commenter through {@link ReviewRequestAuthority}, which owns
+ * the rule and the identity it fails closed on.
+ *
+ * <h2>What the review is recorded as</h2>
+ * <p>The command raises the kind's declared manual-request signal, and the run is filed as
+ * {@link ObservationOrigin#MANUAL} — filing it as LIVE would mix a self-selected sample (people ask for
+ * reviews of work they were already unsure of) into the population the trend line is read from.
  */
 @Component
 @ConditionalOnProperty(prefix = "hephaestus.agent", name = "enabled", havingValue = "true")
@@ -48,22 +55,25 @@ public class BotCommandProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(BotCommandProcessor.class);
 
-    private final AgentJobService agentJobService;
+    private final ManualReviewRequests manualReviewRequests;
     private final PullRequestRepository pullRequestRepository;
-    private final PracticeReviewDetectionGate practiceReviewDetectionGate;
+    private final UserRepository userRepository;
+    private final WorkspaceResolver workspaceResolver;
     private final Map<IntegrationKind, ScmCommentReactionSink> reactionSinks;
     private final SilentModeQuery silentModeQuery;
 
     public BotCommandProcessor(
-        AgentJobService agentJobService,
+        ManualReviewRequests manualReviewRequests,
         PullRequestRepository pullRequestRepository,
-        PracticeReviewDetectionGate practiceReviewDetectionGate,
+        UserRepository userRepository,
+        WorkspaceResolver workspaceResolver,
         List<ScmCommentReactionSink> reactionSinkList,
         SilentModeQuery silentModeQuery
     ) {
-        this.agentJobService = agentJobService;
+        this.manualReviewRequests = manualReviewRequests;
         this.pullRequestRepository = pullRequestRepository;
-        this.practiceReviewDetectionGate = practiceReviewDetectionGate;
+        this.userRepository = userRepository;
+        this.workspaceResolver = workspaceResolver;
         this.silentModeQuery = silentModeQuery;
         Map<IntegrationKind, ScmCommentReactionSink> map = new EnumMap<>(IntegrationKind.class);
         for (ScmCommentReactionSink sink : reactionSinkList) {
@@ -72,35 +82,44 @@ public class BotCommandProcessor {
         this.reactionSinks = map;
     }
 
+    /**
+     * No transaction, deliberately. {@link AgentJobService#submit} opens its own so the idempotency-key
+     * race it absorbs rolls back that insert alone. Joined to an outer transaction, the same race would
+     * mark the whole unit of work rollback-only — so a second person asking at the same moment as the
+     * first would lose the ledger row recording that they asked, not just the duplicate job.
+     */
     @Async
     @TransactionalEventListener
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     public void onBotCommandReceived(BotCommandReceivedEvent event) {
         // The ack is itself an external write: while silenced it would promise a review that won't post.
         if (!silentModeQuery.isSilentModeEngaged()) {
             addEyesReaction(event);
         }
 
-        processCommand(event.repositoryId(), event.mrNumber(), event.noteBody(), event.noteAuthor());
+        processCommand(event);
     }
 
-    private void processCommand(long repositoryId, int mrNumber, String noteBody, String noteAuthor) {
-        String command = noteBody.strip().toLowerCase();
+    private void processCommand(BotCommandReceivedEvent event) {
+        String command = event.noteBody().strip().toLowerCase(Locale.ROOT);
 
         if (command.equals("/hephaestus review") || command.startsWith("/hephaestus review ")) {
-            handleReviewCommand(repositoryId, mrNumber, noteAuthor);
+            handleReviewCommand(event);
         } else {
             log.debug(
                 "Unknown bot command: command={}, repoId={}, mrNumber={}, author={}",
                 command,
-                repositoryId,
-                mrNumber,
-                noteAuthor
+                event.repositoryId(),
+                event.mrNumber(),
+                event.noteAuthor()
             );
         }
     }
 
-    private void handleReviewCommand(long repositoryId, int mrNumber, String noteAuthor) {
+    private void handleReviewCommand(BotCommandReceivedEvent event) {
+        long repositoryId = event.repositoryId();
+        int mrNumber = event.mrNumber();
+        String noteAuthor = event.noteAuthor();
         try {
             // Found by (repo, number), then re-fetched with the association graph the gate needs.
             PullRequest stub = pullRequestRepository.findByRepositoryIdAndNumber(repositoryId, mrNumber).orElse(null);
@@ -138,51 +157,50 @@ public class BotCommandProcessor {
                 return;
             }
 
-            // PullRequestCreated is used deliberately: it matches the broadest set of practices.
-            GateDecision decision = practiceReviewDetectionGate.evaluate(
-                pr,
-                TriggerEventNames.PULL_REQUEST_CREATED,
-                TriggerMode.MANUAL
-            );
+            // Resolved before anything is authorized or spent: the workspace is what the commenter's
+            // standing is judged against and what the ledger row and the job belong to.
+            Workspace workspace = workspaceResolver
+                .resolveForRepository(pr.getRepository() != null ? pr.getRepository().getNameWithOwner() : null)
+                .orElse(null);
+            if (workspace == null) {
+                log.debug("Bot command: no workspace monitors this repository, prId={}", pr.getId());
+                return;
+            }
 
-            switch (decision) {
-                case GateDecision.Skip skip -> log.info(
-                    "Bot command: review skipped by gate, prId={}, mrNumber={}, reason={}, author={}",
+            // By the identity the provider knows them by, never by login — a login's owner can change it,
+            // so authorizing on one authorizes whoever holds it now. Exactly one identity, never the
+            // account's whole set: a comment carries no Hephaestus account, so an admin under a second
+            // provider would otherwise be authorized by a link this comment does not prove they hold.
+            List<User> commenter = userRepository
+                .findByNativeIdAndProviderId(event.authorNativeId(), event.providerId())
+                .map(List::of)
+                .orElseGet(List::of);
+
+            ManualReviewOutcome outcome = manualReviewRequests.requestPullRequestReview(workspace, pr, commenter);
+            switch (outcome.status()) {
+                case SUBMITTED -> log.info(
+                    "Bot command: review triggered, jobId={}, prId={}, mrNumber={}, author={}",
+                    outcome.jobId(),
                     pr.getId(),
                     mrNumber,
-                    skip.reason(),
                     noteAuthor
                 );
-                case GateDecision.Detect detect -> {
-                    ScmEventPayload.PullRequestData prData = ScmEventPayload.PullRequestData.from(pr);
-                    PullRequestReviewSubmissionRequest request = new PullRequestReviewSubmissionRequest(
-                        prData,
-                        pr.getHeadRefName(),
-                        pr.getHeadRefOid(),
-                        pr.getBaseRefName()
-                    );
-
-                    agentJobService
-                        .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request)
-                        .ifPresentOrElse(
-                            job ->
-                                log.info(
-                                    "Bot command: review triggered, jobId={}, prId={}, mrNumber={}, author={}, matchedPractices={}",
-                                    job.getId(),
-                                    pr.getId(),
-                                    mrNumber,
-                                    noteAuthor,
-                                    detect.matchedPractices().size()
-                                ),
-                            () ->
-                                log.warn(
-                                    "Bot command: no job created (practice detection unbound/disabled, or the " +
-                                        "workspace's monthly LLM budget is exhausted), prId={}, mrNumber={}",
-                                    pr.getId(),
-                                    mrNumber
-                                )
-                        );
-                }
+                case REFUSED -> log.info(
+                    "Bot command: no review, prId={}, mrNumber={}, author={}, reason={}",
+                    pr.getId(),
+                    mrNumber,
+                    noteAuthor,
+                    outcome.reason()
+                );
+                // Logged at warn: a request from somebody with no standing on the artifact is the shape
+                // an attempt to aim coaching at a colleague takes, and it should be visible as one.
+                case FORBIDDEN -> log.warn(
+                    "Bot command: refused, the commenter is neither an actor on this merge request nor a " +
+                        "workspace admin, prId={}, mrNumber={}, author={}",
+                    pr.getId(),
+                    mrNumber,
+                    noteAuthor
+                );
             }
         } catch (Exception e) {
             log.error(
@@ -194,8 +212,6 @@ public class BotCommandProcessor {
             );
         }
     }
-
-    // Emoji reaction
 
     /**
      * Add an eyes emoji reaction to the bot command note. Dispatches through the

@@ -1,6 +1,6 @@
 # Single-commit form of the commit-enrichment request.
 #
-# CommitMetadataEnrichmentService does not send this document: it batches up to 50 commits into one
+# CommitMetadataEnrichmentService does not send this document: it batches many commits into one
 # request under generated commit0…commitN aliases, and an alias is syntax that no GraphQL variable can
 # stand in for. What it does send is this selection set, spread from CommitEnrichmentFields, once per
 # alias.

@@ -2,4 +2,7 @@
 "hephaestus": patch
 ---
 
-Fixes agent-job scheduling so a workspace with a large backlog of practice-detection jobs at its concurrency cap can no longer starve other workspaces' ready jobs: the poll queue now enforces fairness per workspace-and-purpose (matching the per-purpose model bindings), instead of the obsolete per-config grouping that had stopped taking effect.
+One busy workspace can no longer hold up everyone else's reviews. A workspace sitting at its
+concurrent-run limit with a long queue of practice reviews was repeatedly picked ahead of workspaces
+that had work ready and capacity to run it, so those waited behind reviews that could not start. Work
+is now shared out per workspace and purpose, which is how models are assigned.

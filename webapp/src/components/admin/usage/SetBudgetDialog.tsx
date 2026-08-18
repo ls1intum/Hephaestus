@@ -15,9 +15,9 @@ export interface SetBudgetDialogProps {
 }
 
 /**
- * Instance-admin dialog for a workspace's monthly shared-model budget — the spend the *host* pays
- * for. $0 pauses shared-model work immediately; removing it leaves that spend uncapped. Spend on
- * the workspace's own provider is separate money, capped by `SetOwnProviderBudgetDialog`.
+ * A workspace's monthly shared-model budget — the spend the *host* pays for. $0 pauses shared-model
+ * work immediately; removing it leaves that spend uncapped. Spend on the workspace's own provider is
+ * separate money with its own cap.
  */
 export function SetBudgetDialog({
 	workspace,

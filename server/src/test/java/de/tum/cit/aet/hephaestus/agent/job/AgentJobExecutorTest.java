@@ -5,6 +5,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doThrow;
@@ -21,12 +22,15 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
 import de.tum.cit.aet.hephaestus.agent.runtime.AgentResult;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.runtime.worker.WorkerProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.NetworkPolicy;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxCancelledException;
@@ -40,6 +44,16 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetBlockReason;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetDecision;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmBudgetService;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessDecision;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCapture;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceContractVersion;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessCheck;
+import de.tum.cit.aet.hephaestus.evidence.SourceReadinessReason;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
@@ -73,6 +87,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 class AgentJobExecutorTest extends BaseUnitTest {
@@ -155,7 +170,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
         binding = new WorkspaceAgentBinding();
         binding.setId(10L);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setEnabled(true);
         binding.setMaxConcurrentJobs(3);
 
@@ -180,7 +195,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
         job = new AgentJob();
         job.prePersist();
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setConfigSnapshot(snapshot.toJson(objectMapper));
         job.setJobToken("test-token");
         job.setStatus(AgentJobStatus.QUEUED);
@@ -282,15 +297,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             JobTypeHandler handler = setupFullExecution();
@@ -321,15 +332,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void returnsFalseAndLeavesJobQueuedWhenConcurrencyLimitReached() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(3L); // equals max
 
             boolean claimed = executor.processJob(jobId);
@@ -342,15 +349,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void shouldTransitionToRunningOnSuccessfulClaim() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -379,7 +382,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             if (fundingSource == FundingSource.INSTANCE) {
                 binding.setInstanceModel(new de.tum.cit.aet.hephaestus.agent.catalog.LlmModel());
             }
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
         }
@@ -425,11 +428,7 @@ class AgentJobExecutorTest extends BaseUnitTest {
             bindFundedBy(FundingSource.WORKSPACE); // no instance model bound = the workspace pays
             when(llmBudgetService.decide(99L)).thenReturn(instanceBlocked(LlmBudgetBlockReason.EXHAUSTED));
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -542,15 +541,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             // a cap raise fast-forward a job that is backing off for an entirely different reason.
             job.setHoldReason(AgentJob.HOLD_REASON_BUDGET);
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -566,15 +561,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         void proceedsToConcurrencyGateWhenBudgetIsNotBlocked() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
             when(llmBudgetService.decide(99L)).thenReturn(LlmBudgetDecision.ALLOWED);
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -595,15 +586,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void areStampedBeforeTheSandboxRuns_soAFailedRunKeepsThem() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             setupFullExecution();
@@ -612,33 +599,33 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
             // The adapter's prompt digest, and an inputs digest over the merged file set — written first, so an
             // observation can always be tied to what produced it even when the sandbox then fails.
-            ArgumentCaptor<String> inputsDigest = ArgumentCaptor.forClass(String.class);
+            ArgumentCaptor<AgentJobRepository.ProvenanceStamp> stamp = ArgumentCaptor.forClass(
+                AgentJobRepository.ProvenanceStamp.class
+            );
             InOrder order = inOrder(jobRepository, sandboxManager);
-            order.verify(jobRepository).updateProvenanceDigests(eq(jobId), eq("prompt-digest"), inputsDigest.capture());
+            order.verify(jobRepository).updateProvenanceDigests(eq(jobId), isNull(), eq(0), stamp.capture());
             order.verify(sandboxManager).execute(any());
-            assertThat(inputsDigest.getValue()).matches("[0-9a-f]{64}");
+            assertThat(stamp.getValue().promptDigest()).isEqualTo("prompt-digest");
+            assertThat(stamp.getValue().inputsDigest()).matches("[0-9a-f]{64}");
         }
 
         @Test
         void aWriteMatchingNoJobRow_failsTheRunRatherThanBurningTheLlmBudget() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
-            // Only the prepare chain — the run must abort before the sandbox, so nothing past it is stubbed.
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputFiles(any())).thenReturn(Map.of("task.json", "{}".getBytes()));
+            when(handler.prepareInputs(any())).thenReturn(
+                PreparedJobInputs.filesOnly(Map.of("task.json", "{}".getBytes()))
+            );
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
-            when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(0); // job row is gone
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(0);
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             executor.processJob(jobId);
@@ -648,26 +635,84 @@ class AgentJobExecutorTest extends BaseUnitTest {
             verify(usageRecorder, never()).record(any(), any());
         }
 
+        @Test
+        void insufficientEvidencePersistsTypedReadinessWithoutStartingTheSandbox() {
+            stubClaimableJob();
+            JobTypeHandler handler = mock(JobTypeHandler.class);
+            when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
+            Instant now = Instant.parse("2026-08-03T10:00:00Z");
+            SourceContractVersion version = new SourceContractVersion("1.0.0");
+            String artifactKind = "scm.pull_request";
+            SourceKind source = new SourceKind("scm.pull-request.diff");
+            ArtifactSourceManifest manifest = new ArtifactSourceManifest(
+                version,
+                "a".repeat(64),
+                artifactKind,
+                now,
+                List.of(
+                    new SourceCapture(
+                        source,
+                        new SourceCaptureState.NotCollected(SourceAbsenceReason.DISABLED),
+                        List.of()
+                    )
+                )
+            );
+            SourceReadinessCheck assessment = new SourceReadinessCheck(
+                source,
+                version,
+                now,
+                now,
+                false,
+                List.of(SourceReadinessReason.SOURCE_NOT_AVAILABLE)
+            );
+            AutomatedReviewReadinessReport readiness = new AutomatedReviewReadinessReport(
+                version,
+                "a".repeat(64),
+                artifactKind,
+                now,
+                now,
+                List.of(new AutomatedReviewReadinessDecision("example", now, false, List.of(), List.of(assessment)))
+            );
+            PreparedJobInputs inputs = new PreparedJobInputs(
+                Map.of(SandboxLayout.MANIFEST_PATH, "{}".getBytes()),
+                manifest,
+                readiness
+            );
+            when(handler.prepareInputs(any())).thenThrow(
+                new InsufficientEvidenceException("No practice has sufficient evidence", inputs)
+            );
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
+            when(jobRepository.transitionToEvidenceRefused(any(), any(), anyInt(), any(), any())).thenReturn(1);
+
+            executor.processJob(jobId);
+
+            ArgumentCaptor<AgentJobRepository.ProvenanceStamp> stamp = ArgumentCaptor.forClass(
+                AgentJobRepository.ProvenanceStamp.class
+            );
+            verify(jobRepository).updateProvenanceDigests(eq(jobId), isNull(), eq(0), stamp.capture());
+            assertThat(stamp.getValue().reviewReadiness().path("decisions").get(0).path("ready").asBoolean()).isFalse();
+            ArgumentCaptor<JsonNode> output = ArgumentCaptor.forClass(JsonNode.class);
+            verify(jobRepository).transitionToEvidenceRefused(eq(jobId), isNull(), eq(0), any(), output.capture());
+            assertThat(output.getValue().path("outcome").asString()).isEqualTo("INSUFFICIENT_EVIDENCE");
+            verify(sandboxManager, never()).execute(any());
+        }
+
         @ParameterizedTest
         @ValueSource(strings = { "Pinned review head is unavailable", "Review diff is empty or unavailable" })
         void contextPreparationFailureBeforeSandboxDoesNotCreateUnpricedUsage(String failureMessage) {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.FAILED), any(), any(), any())).thenReturn(1);
 
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputFiles(any())).thenThrow(new IllegalStateException(failureMessage));
+            when(handler.prepareInputs(any())).thenThrow(new IllegalStateException(failureMessage));
 
             executor.processJob(jobId);
 
@@ -683,15 +728,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void shouldCompleteJobSuccessfully() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -720,15 +761,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void shouldMarkFailedWithAnErrorMessageNamingTheExitCode() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -754,15 +791,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void emitsEnvelopeMismatchOnExit42() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -795,15 +828,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void shouldMarkTimedOutOnTimeout() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -833,15 +862,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void shouldTransitionToCancelledOnCancellation() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -861,15 +886,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void shouldMarkFailedCarryingTheThrownMessageOntoTheRow() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -943,15 +964,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("infra-retry-worker"))
             );
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(
@@ -1023,15 +1040,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("infra-retry-worker-2"))
             );
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.requeueOrphan(any(), any(), anyInt(), any(), any(), any())).thenReturn(0);
@@ -1076,15 +1089,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
                 Optional.of(workerProps("infra-retry-worker-3"))
             );
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(
@@ -1114,15 +1123,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void cancelledAfterStart_recordsAnUnpricedLedgerEntry() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
@@ -1163,15 +1168,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             job.setConfigSnapshot(snapshot.withPriceSnapshot(priced).toJson(objectMapper));
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
@@ -1202,15 +1203,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         )
         void cancelledAfterStart_fenceLost_doesNotRecordOutsideWinningTransaction() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.transitionStatus(any(), eq(AgentJobStatus.CANCELLED), any(), any(), any())).thenReturn(
@@ -1290,15 +1287,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void missingOrMalformedUsageJson_recordsAnUnpricedLedgerEntryOnNormalCompletion() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1328,15 +1321,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void reportedCallWithZeroTokens_recordsAnUnpricedLedgerEntryThatKeepsTheCall() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1583,15 +1572,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -1803,15 +1788,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             doThrow(new java.util.concurrent.RejectedExecutionException("pool saturated"))
@@ -1848,15 +1829,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
             );
 
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             doThrow(new java.util.concurrent.RejectedExecutionException("pool saturated"))
@@ -2032,22 +2009,18 @@ class AgentJobExecutorTest extends BaseUnitTest {
         @Test
         void lostFenceAfterPreparationNeverStartsSandboxOrWritesUsage() {
             when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+            when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
                 Optional.of(binding)
             );
             when(
-                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
-                    eq(99L),
-                    eq(AgentPurpose.PRACTICE_DETECTION),
-                    any()
-                )
+                jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
             ).thenReturn(0L);
             when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
             when(jobRepository.markExecutionStarted(any(), any(), any())).thenReturn(0);
-            when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+            when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-            when(handler.prepareInputFiles(any())).thenReturn(Map.of());
+            when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
             when(practiceAgent.buildSandboxSpec(any())).thenReturn(minimalSpec());
 
             executor.processJob(jobId);
@@ -2060,11 +2033,11 @@ class AgentJobExecutorTest extends BaseUnitTest {
 
     private void stubClaimableJob() {
         when(jobRepository.findByIdQueuedForUpdateSkipLocked(eq(jobId), any())).thenReturn(Optional.of(job));
-        when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurpose(99L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding)
         );
         when(
-            jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_DETECTION), any())
+            jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(eq(99L), eq(AgentPurpose.PRACTICE_REVIEW), any())
         ).thenReturn(0L);
         when(jobRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
@@ -2090,10 +2063,12 @@ class AgentJobExecutorTest extends BaseUnitTest {
     private JobTypeHandler setupFullExecution(SandboxResult sandboxResult) {
         // Every execution stamps its provenance digests before the sandbox starts, and fails loud if the write
         // matches no row — so the standard path must report the row it updated.
-        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-        when(handler.prepareInputFiles(any())).thenReturn(Map.of("code.py", "print('hi')".getBytes()));
+        when(handler.prepareInputs(any())).thenReturn(
+            PreparedJobInputs.filesOnly(Map.of("code.py", "print('hi')".getBytes()))
+        );
 
         PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",
@@ -2138,10 +2113,10 @@ class AgentJobExecutorTest extends BaseUnitTest {
     }
 
     private void setupFullExecutionWithException(Exception exception) {
-        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), any())).thenReturn(1);
+        lenient().when(jobRepository.updateProvenanceDigests(any(), any(), anyInt(), any())).thenReturn(1);
         JobTypeHandler handler = mock(JobTypeHandler.class);
         when(handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).thenReturn(handler);
-        when(handler.prepareInputFiles(any())).thenReturn(Map.of());
+        when(handler.prepareInputs(any())).thenReturn(PreparedJobInputs.filesOnly(Map.of()));
 
         PracticeSandboxSpec agentSpec = new PracticeSandboxSpec(
             "ghcr.io/agent:latest",

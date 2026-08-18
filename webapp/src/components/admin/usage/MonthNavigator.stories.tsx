@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { MonthNavigator } from "./MonthNavigator";
 
@@ -21,8 +21,7 @@ export const Default: Story = {};
 
 export const CurrentMonth: Story = {
 	args: { canGoNext: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Next month" }));
 		await expect(canvas.getByRole("link", { name: "Previous month" })).toHaveAttribute(
 			"href",

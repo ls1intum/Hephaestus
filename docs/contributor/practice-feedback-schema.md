@@ -11,7 +11,7 @@ Use the executable sources for exact details:
 - [Liquibase changelogs](https://github.com/ls1intum/Hephaestus/tree/main/server/src/main/resources/db/changelog)
   for persisted constraints and indexes;
 - [`openapi.yaml`](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml) for HTTP projections;
-- [ADR 0021](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0021-findings-feedback-synthesis-seam.md)
+- [ADR 0021](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0021-observations-feedback-synthesis-seam.md)
   and
   [ADR 0022](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0022-observation-presence-assessment-and-schema-cleanup.md)
   for design history;
@@ -19,29 +19,29 @@ Use the executable sources for exact details:
 
 ## Model at a glance
 
-| Concept | Role | Relationships |
-| --- | --- | --- |
-| `PracticeArea` | Workspace-defined grouping for practices | Has many practices; a practice may be unassigned |
-| `Practice` | Configurable criterion used by detection | Belongs to a workspace and may belong to an area |
-| `PracticeRevision` | Criteria snapshot used to interpret a past result | Belongs to one practice; an observation may pin one revision |
-| `Observation` | Evidence produced by one review job | Belongs to one practice and one job; may support many feedback messages |
-| `Feedback` | One recipient-specific message and its delivery outcome | Belongs to one job; may draw on many observations and have many placements |
-| `FeedbackObservation` | Ordered evidence binding between a message and an observation | Joins feedback to observations with a primary or supporting role |
-| `FeedbackPlacement` | Where a feedback message was placed | Belongs to one feedback message; records a summary, inline, or conversation placement |
-| `Reaction` | A developer response to delivered feedback | Belongs to one feedback message and retains its recurrence key |
+| Concept               | Role                                                                       | Relationships                                                                   |
+| --------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| `PracticeArea`        | Workspace-defined grouping for practices                                   | Has many practices; a practice may be unassigned                                |
+| `Practice`            | Configurable criterion used by detection                                   | Belongs to a workspace and may belong to an area                                |
+| `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice; an observation may pin one revision                    |
+| `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job; may support many pieces of feedback        |
+| `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job; may draw on many observations and have many placements      |
+| `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
+| `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
+| `Reaction`            | A developer response to delivered feedback                                 | Belongs to one `Feedback` and retains its recurrence key                        |
 
 ## Invariants
 
-### Evidence and messages are separate
+### Evidence and feedback are separate
 
-An observation records what a review detected. Feedback records the message prepared from one or more
-observations and what happened to that message. A placement records where that message appeared. This
-separation preserves findings even when no message is composed or delivery is withheld.
+An observation records what a review detected. Feedback records the guidance prepared from one or more
+observations and what happened to it. A placement records where that feedback appeared. This
+separation preserves observations even when no feedback is composed or delivery is withheld.
 
 Observation rows are immutable. Practice criteria are mutable, so each observation can reference the
 criteria revision that applied to its review. Feedback content, provenance, and replacement link are
-immutable. A replacement is inserted with a link to the prior message before guarded lifecycle updates
-supersede that message. Other guarded updates may change delivery state, delivery timestamp, or
+immutable. A replacement is inserted with a link to the prior feedback before guarded lifecycle updates
+supersede it. Other guarded updates may change delivery state, delivery timestamp, or
 suppression reason.
 
 ### Occurrence and recurrence have different identities
@@ -50,18 +50,52 @@ suppression reason.
 correlates the same evidence locus across review jobs. A new review therefore creates a new observation
 even when it reports a recurring issue.
 
-### Presence and assessment are orthogonal
+### The generation tool uses one outcome
 
-Presence says whether the reviewed work contains the practice signal. Assessment says whether the
-result is good or bad for the developer.
+`report_observation` asks the model for one `outcome`, rather than three fields whose valid combinations
+the model must reconstruct. Behaviour outcomes encode occurrence, assessment, and—only for a bad
+assessment—severity:
 
-| | `GOOD` | `BAD` |
-| --- | --- | --- |
-| `PRESENT` | desired behaviour is present | undesirable behaviour is present |
-| `ABSENT` | undesirable behaviour is absent | desired behaviour is missing |
+- `BEHAVIOR_PRESENT_GOOD`
+- `BEHAVIOR_PRESENT_BAD_MINOR|MAJOR|CRITICAL`
+- `BEHAVIOR_ABSENT_GOOD`
+- `BEHAVIOR_ABSENT_BAD_MINOR|MAJOR|CRITICAL`
+- `NO_REVIEW_OCCASION`: a prerequisite situation named by the practice did not occur
+- `INSUFFICIENT_EVIDENCE`: the situation occurred, but the evidence read did not decide it
 
-For `NOT_APPLICABLE`, assessment is null; the database enforces that pairing. Severity is present only
-for a bad assessment; validation and persistence paths enforce that invariant.
+This is the model-facing contract. The normalizer maps it to the durable `presence`, `assessment`, and
+`severity` columns so existing projections can query each dimension. `NO_REVIEW_OCCASION` maps to
+`NOT_APPLICABLE`; `INSUFFICIENT_EVIDENCE` maps to `INCONCLUSIVE`. Do not expose the persistence names
+in practice criteria or generation prompts: they are storage vocabulary, not choices the model makes.
+
+### Each non-positive claim carries its proof shape
+
+Every observation cites exact staged text. Outcomes that claim more than their citations also require
+exactly one structured evidence branch:
+
+| Outcome                 | Required branch             | What it records                                                     |
+| ----------------------- | --------------------------- | ------------------------------------------------------------------- |
+| `BEHAVIOR_ABSENT_*`     | `evidence.exhaustiveSearch` | sources searched, the concrete target, and the boundary not covered |
+| `NO_REVIEW_OCCASION`    | `evidence.exclusion`        | sources read, the practice subject, and the fact that rules it out  |
+| `INSUFFICIENT_EVIDENCE` | `evidence.missingEvidence`  | the open question and the existing evidence that would settle it    |
+| `BEHAVIOR_PRESENT_*`    | none beyond citations       | the cited behaviour is the proof                                    |
+
+A missing, errored, redacted, or inadequate **required source never becomes
+`INSUFFICIENT_EVIDENCE`**. Readiness refuses that practice before generation, so no observation is
+created. `INSUFFICIENT_EVIDENCE` is only for available evidence that was read and remained
+non-dispositive.
+
+An absent behaviour is a claim about a corpus. Every source a practice declares `EXHAUSTIVE` must appear
+in `exhaustiveSearch.consulted`. `BEHAVIOR_ABSENT_GOOD` additionally requires at least one exhaustive
+source, because “the harmful behaviour is nowhere here” is sound only over a bounded corpus covered
+whole. The claim reaches no further than the recorded boundary; it is not a clean bill of health for the
+repository or runtime. Both the sandbox normalizer and server admission enforce these rules.
+
+### Ordering uses observable properties
+
+Observations have no model-reported confidence score. `ObservationOrder` sorts by severity where it
+applies, then by the number of distinct cited loci, then by stable identity. This makes ordering
+deterministic and derives every input from admitted evidence instead of model self-assessment.
 
 ### Recipient and subject remain distinct
 
@@ -81,12 +115,12 @@ The persistence model is not an authorization boundary. Controllers define who m
 
 - developer observation list, detail, summary, and reflection endpoints are scoped to the authenticated
   developer;
-- the pull-request observation projection shows workspace members every relevant finding for that pull
+- the pull-request observation projection shows workspace members every relevant observation for that pull
   request;
-- the workspace-admin practice-review endpoints expose findings and feedback across that workspace;
+- the workspace-admin practice-review endpoints expose observations and feedback across that workspace;
 - learner-facing practice projections omit detector criteria by construction.
 
 Keep these rules enforceable in controller authorization, repository predicates, DTO shape, and tests.
 Do not add a field matrix here: the
 [OpenAPI specification](https://github.com/ls1intum/Hephaestus/blob/main/server/openapi.yaml) is the
-current contract for fields exposed by each endpoint.
+authoritative contract for fields exposed by each endpoint.

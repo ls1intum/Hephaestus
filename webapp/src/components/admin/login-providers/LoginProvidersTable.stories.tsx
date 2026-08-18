@@ -68,27 +68,23 @@ type Story = StoryObj<typeof meta>;
  * copyable field for registering on the upstream OAuth app.
  */
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("ACME GitLab")).toBeInTheDocument();
-		await expect(canvas.getByText("ACME Outline")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("ACME GitLab");
+		canvas.getByText("ACME Outline");
 		// The type column shows "Outline", never the raw enum "OUTLINE".
-		await expect(canvas.getByText("Outline")).toBeInTheDocument();
+		canvas.getByText("Outline");
 		await expect(canvas.queryByText("OUTLINE")).not.toBeInTheDocument();
 		await expect(canvas.queryByText("GITLAB")).not.toBeInTheDocument();
 		// The env-seeded row carries the "seeded" badge; the admin-created ones do not.
-		await expect(canvas.getByText("seeded")).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("button", { name: /Copy redirect URI for GitHub/i }),
-		).toBeInTheDocument();
+		canvas.getByText("seeded");
+		canvas.getByRole("button", { name: /Copy redirect URI for GitHub/i });
 	},
 };
 
 /** A row mid-mutation disables its own toggle/edit/delete so concurrent edits can't race. */
 export const RowBusy: Story = {
 	args: { mutatingIds: new Set(["github"]) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /Edit GitHub/i })).toBeDisabled();
 		await expect(canvas.getByRole("button", { name: /Edit ACME GitLab/i })).toBeEnabled();
 		await expect(canvas.getByRole("switch", { name: /Disable GitHub/i })).toHaveAttribute(
@@ -100,8 +96,7 @@ export const RowBusy: Story = {
 
 /** Deleting is a destructive, irreversible action: one hoisted dialog, destructive confirm button. */
 export const ConfirmDelete: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /Delete ACME Outline/i }));
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(within(dialog).getByRole("heading")).toHaveTextContent("Delete “ACME Outline”?");
@@ -117,8 +112,7 @@ export const ConfirmDelete: Story = {
 /** While the delete is in flight the confirm button is disabled and states what is happening. */
 export const DeletePending: Story = {
 	args: { mutatingIds: new Set(["outline-acme"]) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// The row's delete trigger is disabled mid-mutation, so open the dialog on a quiet row and
 		// assert the busy affordance on the mutating row instead.
 		await expect(canvas.getByRole("button", { name: /Delete ACME Outline/i })).toBeDisabled();
@@ -128,9 +122,8 @@ export const DeletePending: Story = {
 /** Empty state is not a dead end — it carries the Add-provider action. */
 export const Empty: Story = {
 	args: { providers: [] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/No login providers yet/i)).toBeInTheDocument();
+	play: async ({ args, canvas }) => {
+		canvas.getByText(/No login providers yet/i);
 		await userEvent.click(canvas.getByRole("button", { name: /Add provider/i }));
 		await expect(args.onAdd).toHaveBeenCalled();
 	},
@@ -143,10 +136,9 @@ export const ErrorState: Story = {
 		isError: true,
 		error: { detail: "Upstream database unavailable." },
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Could not load login providers/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/Upstream database unavailable/i)).toBeInTheDocument();
+	play: async ({ args, canvas }) => {
+		canvas.getByText(/Could not load login providers/i);
+		canvas.getByText(/Upstream database unavailable/i);
 		await userEvent.click(canvas.getByRole("button", { name: /Retry/i }));
 		await expect(args.onRetry).toHaveBeenCalled();
 	},

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { ActivateChannelDialog } from "./ActivateChannelDialog";
 
 const channel: SlackMonitoredChannel = {
@@ -36,9 +37,9 @@ type Story = StoryObj<typeof meta>;
 export const Open: Story = {
 	play: async ({ args }) => {
 		const dialog = within(await screen.findByRole("dialog"));
-		await expect(dialog.getByText(/post a visible announcement/i)).toBeInTheDocument();
-		await expect(dialog.getByText(/begin reading new messages/i)).toBeInTheDocument();
-		await expect(dialog.getByText(/opt out/i)).toBeInTheDocument();
+		dialog.getByText(/post a visible announcement/i);
+		dialog.getByText(/begin reading new messages/i);
+		dialog.getByText(/opt out/i);
 
 		await userEvent.click(dialog.getByRole("button", { name: /activate monitoring/i }));
 		await expect(args.onConfirm).toHaveBeenCalledWith(channel);
@@ -64,7 +65,7 @@ export const Rejected: Story = {
 	play: async () => {
 		const dialog = within(await screen.findByRole("dialog"));
 		await userEvent.click(dialog.getByRole("button", { name: /activate monitoring/i }));
-		await expect(await screen.findByRole("dialog")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("dialog"));
 	},
 };
 

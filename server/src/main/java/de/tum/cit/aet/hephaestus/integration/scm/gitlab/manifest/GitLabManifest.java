@@ -1,37 +1,40 @@
 package de.tum.cit.aet.hephaestus.integration.scm.gitlab.manifest;
 
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackLane;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.Set;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 /**
- * GitLab integration manifest. {@code GitlabWebhookSignatureVerifier} runs dual-mode
- * (legacy plaintext {@code X-Gitlab-Token} + GitLab 19.0+ HMAC {@code whsec_*}).
+ * GitLab integration manifest.
  *
- * <p>Feedback-delivery / inline-finding / approval capabilities are gated on the
- * {@code hephaestus.integration.gitlab.enabled} flag — the underlying GraphQL provider and the
- * channel beans share that flag, and the bootstrap demands matching SPI beans for any
- * declared capability. GitLab is opt-in (default off): the manifest is only present when the
- * flag is explicitly {@code true}, matching the gated beans.
+ * <p>Feedback-delivery, inline-finding and approval capabilities are gated on
+ * {@code hephaestus.integration.gitlab.enabled}, the same flag the GraphQL provider and channel beans require —
+ * the bootstrap demands matching SPI beans for every declared capability. GitLab is opt-in (default off), but
+ * the manifest bean stays registered either way so a workspace can be told that connecting GitLab would wake a
+ * dormant practice.
  *
- * <p>No {@code RATE_LIMITED}: GitLab has no per-kind {@code RateLimitTracker} impl.
- * No {@code SCOPE_CHANGES}: GitLab has no install/uninstall/scope webhooks, so
- * {@code GitlabLifecycleListener.onScopeChanged} would never fire — declaring the
- * capability would lie to the UI's practice-gating check.
+ * <p>No {@code RATE_LIMITED}: no per-kind {@code RateLimitTracker}. No {@code SCOPE_CHANGES}: GitLab has no
+ * install/uninstall/scope webhooks to fire it.
  */
 @Component
-@ConditionalOnProperty(name = "hephaestus.integration.gitlab.enabled", havingValue = "true", matchIfMissing = false)
 public class GitLabManifest implements IntegrationManifest {
 
     private final boolean gitlabStackEnabled;
 
     public GitLabManifest(@Value("${hephaestus.integration.gitlab.enabled:false}") boolean gitlabStackEnabled) {
         this.gitlabStackEnabled = gitlabStackEnabled;
+    }
+
+    @Override
+    public boolean enabled() {
+        return gitlabStackEnabled;
     }
 
     @Override
@@ -48,11 +51,45 @@ public class GitLabManifest implements IntegrationManifest {
     public Set<Capability> declaredCapabilities() {
         EnumSet<Capability> capabilities = EnumSet.of(Capability.WEBHOOK_INGEST);
         if (gitlabStackEnabled) {
-            // GraphQL provider + channel beans only load when hephaestus.integration.gitlab.enabled=true.
             capabilities.add(Capability.FEEDBACK_DELIVERY);
-            capabilities.add(Capability.INLINE_FINDINGS);
+            capabilities.add(Capability.INLINE_FEEDBACK);
             capabilities.add(Capability.APPROVAL_WORKFLOW);
         }
         return Set.copyOf(capabilities);
+    }
+
+    /**
+     * {@code scm.pull_request.synchronized} is deliberately absent: a push does fire the merge-request hook, but
+     * the processor derives no "new commits" transition from it, so a practice watching that signal stays a
+     * dormant binding on GitLab rather than one indistinguishable from a quiet week.
+     *
+     * <p>Delivery lanes track the same enablement flag as the channel beans; claiming a lane whose
+     * {@code SummaryChannel} is not wired fails at boot.
+     */
+    @Override
+    public ReviewContribution reviewContribution() {
+        return new ReviewContribution(
+            Set.of(ScmSignals.PULL_REQUEST, ScmSignals.ISSUE),
+            Map.of(
+                ScmSignals.PULL_REQUEST,
+                Set.of(
+                    ScmSignals.PULL_REQUEST_OPENED,
+                    ScmSignals.PULL_REQUEST_READY,
+                    ScmSignals.PULL_REQUEST_REVIEWED,
+                    ScmSignals.PULL_REQUEST_MERGED,
+                    ScmSignals.PULL_REQUEST_CLOSED
+                ),
+                ScmSignals.ISSUE,
+                Set.of(ScmSignals.ISSUE_OPENED, ScmSignals.ISSUE_LABELED, ScmSignals.ISSUE_CLOSED)
+            ),
+            gitlabStackEnabled
+                ? Map.of(
+                      ScmSignals.PULL_REQUEST,
+                      Set.of(FeedbackLane.IN_CONTEXT_SUMMARY, FeedbackLane.IN_CONTEXT_INLINE),
+                      ScmSignals.ISSUE,
+                      Set.of(FeedbackLane.IN_CONTEXT_SUMMARY)
+                  )
+                : Map.of()
+        );
     }
 }

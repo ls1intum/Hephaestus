@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,9 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
     private static final Set<String> STABLE_SUBJECT_ATTRIBUTES = Set.of("id", "sub");
+    private static final OutlineOriginPolicy OUTLINE_ORIGINS = new OutlineOriginPolicy(
+        Set.of("https://wiki.example.com")
+    );
 
     private static LoginProvider provider(
         String registrationId,
@@ -52,7 +56,8 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
         List<ClientRegistration> registrations = new LoginProviderClientRegistrationRepository(
             repo,
-            ""
+            "",
+            OUTLINE_ORIGINS
         ).listRegistrations();
 
         assertThat(registrations).hasSize(2);
@@ -81,7 +86,11 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
             )
         );
 
-        LoginProviderClientRegistrationRepository repository = new LoginProviderClientRegistrationRepository(repo, "");
+        LoginProviderClientRegistrationRepository repository = new LoginProviderClientRegistrationRepository(
+            repo,
+            "",
+            OUTLINE_ORIGINS
+        );
 
         // Link-only in the SPA, but discoverable so the authenticated settings page can offer account linking.
         List<ClientRegistration> picker = repository.listRegistrations();
@@ -107,9 +116,11 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
             Optional.of(provider("outline", LoginProvider.ProviderType.OUTLINE, "https://wiki.example.com", "read"))
         );
 
-        ClientRegistration outline = new LoginProviderClientRegistrationRepository(repo, "").findByRegistrationId(
-            "outline"
-        );
+        ClientRegistration outline = new LoginProviderClientRegistrationRepository(
+            repo,
+            "",
+            OUTLINE_ORIGINS
+        ).findByRegistrationId("outline");
 
         // Plain OAuth2 (NOT OIDC): endpoints hang off the per-instance base URL; the userinfo URI points
         // at POST /api/auth.info, which OutlineAuthInfoUserService (not the framework default) calls.
@@ -126,15 +137,33 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
     }
 
     @Test
+    void outlineRegistrationDisappearsAfterOriginApprovalIsRemoved() {
+        LoginProviderRepository repo = mock(LoginProviderRepository.class);
+        when(repo.findByRegistrationId("outline")).thenReturn(
+            Optional.of(provider("outline", LoginProvider.ProviderType.OUTLINE, "https://wiki.example.com", "read"))
+        );
+
+        ClientRegistration outline = new LoginProviderClientRegistrationRepository(
+            repo,
+            "",
+            new OutlineOriginPolicy(Set.of())
+        ).findByRegistrationId("outline");
+
+        assertThat(outline).isNull();
+    }
+
+    @Test
     void gitlabEndpointsHangOffTheInstanceBaseUrl() {
         LoginProviderRepository repo = mock(LoginProviderRepository.class);
         when(repo.findByRegistrationId("gitlab-lrz")).thenReturn(
             Optional.of(provider("gitlab-lrz", LoginProvider.ProviderType.GITLAB, "https://gitlab.lrz.de", "openid"))
         );
 
-        ClientRegistration reg = new LoginProviderClientRegistrationRepository(repo, "").findByRegistrationId(
-            "gitlab-lrz"
-        );
+        ClientRegistration reg = new LoginProviderClientRegistrationRepository(
+            repo,
+            "",
+            OUTLINE_ORIGINS
+        ).findByRegistrationId("gitlab-lrz");
 
         assertThat(reg.getProviderDetails().getAuthorizationUri()).isEqualTo("https://gitlab.lrz.de/oauth/authorize");
         assertThat(reg.getProviderDetails().getTokenUri()).isEqualTo("https://gitlab.lrz.de/oauth/token");
@@ -152,14 +181,18 @@ class LoginProviderClientRegistrationRepositoryTest extends BaseUnitTest {
 
         // Behind a proxy that strips /api, the redirect_uri the IdP gets must re-add it so the callback
         // lands on the proxied API path, not the SPA. {baseUrl} is expanded by Spring at request time.
-        ClientRegistration prefixed = new LoginProviderClientRegistrationRepository(repo, "/api").findByRegistrationId(
-            "github"
-        );
+        ClientRegistration prefixed = new LoginProviderClientRegistrationRepository(
+            repo,
+            "/api",
+            OUTLINE_ORIGINS
+        ).findByRegistrationId("github");
         assertThat(prefixed.getRedirectUri()).isEqualTo("{baseUrl}/api/login/oauth2/code/{registrationId}");
 
-        ClientRegistration root = new LoginProviderClientRegistrationRepository(repo, "").findByRegistrationId(
-            "github"
-        );
+        ClientRegistration root = new LoginProviderClientRegistrationRepository(
+            repo,
+            "",
+            OUTLINE_ORIGINS
+        ).findByRegistrationId("github");
         assertThat(root.getRedirectUri()).isEqualTo("{baseUrl}/login/oauth2/code/{registrationId}");
     }
 }

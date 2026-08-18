@@ -32,5 +32,6 @@ public record LlmUsageInsert(
     BigDecimal appliedPer1mInputUsd,
     BigDecimal appliedPer1mOutputUsd,
     BigDecimal appliedPer1mCacheReadUsd,
-    BigDecimal appliedPer1mCacheWriteUsd
+    BigDecimal appliedPer1mCacheWriteUsd,
+    String usageProvenance
 ) {}

@@ -21,8 +21,8 @@ git diff --name-only HEAD
 
 Map paths to components (mirrors CI's dorny/paths-filter config):
 - `webapp/**` → webapp changed
-- `server/**` OR `scripts/db-utils.sh` → app-server changed (includes webhook receiver since ADR 0008)
-- `package.json` OR `pnpm-lock.yaml` OR `pnpm-workspace.yaml` OR `.npmrc` OR `.node-version` → webapp changed
+- `server/**` OR `scripts/**` → app-server changed (includes webhook receiver, ADR 0008)
+- `webapp/**` OR `docs/images/readme/**` OR `package.json` OR `pnpm-lock.yaml` OR `pnpm-workspace.yaml` OR `.npmrc` OR `.node-version` → webapp changed
 - `docs/**` → docs-only (skip all validation if nothing else changed)
 
 ## 3. Format
@@ -71,7 +71,7 @@ pnpm run test:webapp
 If app-server changed (and mvn available):
 
 ```bash
-cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ../..
+cd server && ./mvnw test -Dsurefire.includedGroups="unit" -Dmaven.test.skip=false -T 2C --batch-mode -q && cd ..
 ```
 
 ALL tests must pass before proceeding.

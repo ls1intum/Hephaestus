@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
@@ -23,6 +24,7 @@ import io.nats.client.Message;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Stream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -61,7 +63,8 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
             connectionService,
             syncScheduler,
             documentEventRepository,
-            JsonMapper.builder().build()
+            JsonMapper.builder().build(),
+            new OutlineOriginPolicy(Set.of("https://wiki.example.com"))
         );
     }
 
@@ -96,12 +99,23 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
 
     private void resolves(String subscriptionId, long workspaceId) {
         when(connectionService.findOutlineSubscription(subscriptionId)).thenReturn(
-            Optional.of(new OutlineSubscription(workspaceId, "secret"))
+            Optional.of(new OutlineSubscription(workspaceId, "https://wiki.example.com", "secret"))
         );
         lenient().when(connection.getId()).thenReturn(CONNECTION_ID);
         lenient()
             .when(connectionService.findActive(workspaceId, IntegrationKind.OUTLINE))
             .thenReturn(Optional.of(connection));
+    }
+
+    @Test
+    void removedOriginIsNotPersistedOrRefreshed() {
+        when(connectionService.findOutlineSubscription("sub-1")).thenReturn(
+            Optional.of(new OutlineSubscription(42L, "https://removed.example.com", "secret"))
+        );
+
+        handler().onMessage(message("sub-1", "documents.update", "doc-9"));
+
+        verifyNoInteractions(syncScheduler, documentEventRepository);
     }
 
     @Test
@@ -238,7 +252,7 @@ class OutlineWebhookMessageHandlerTest extends BaseUnitTest {
     @Test
     void missingActiveConnection_skipsTheEventRowButStillRoutes() {
         when(connectionService.findOutlineSubscription("sub-1")).thenReturn(
-            Optional.of(new OutlineSubscription(42L, "secret"))
+            Optional.of(new OutlineSubscription(42L, "https://wiki.example.com", "secret"))
         );
         when(connectionService.findActive(42L, IntegrationKind.OUTLINE)).thenReturn(Optional.empty());
 

@@ -68,7 +68,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
 
     /**
      * The ids of every thread aggregate on one channel — collected on channel erasure so the derived
-     * {@code CONVERSATION_THREAD} observations/feedback (keyed by these {@code slack_thread} ids as
+     * {@code chat.conversation_thread} observations/feedback (keyed by these {@code slack_thread} ids as
      * {@code artifact_id}) can be hard-deleted through the practices erasure port before the aggregates themselves
      * are dropped.
      */
@@ -164,6 +164,36 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     )
     List<SettledCandidateRow> findSettledCandidateRows(@Param("minMessageCount") int minMessageCount);
 
+    /**
+     * One thread by id, carrying the same consent condition the sweep applies.
+     *
+     * <p>Workspace-pinned, and the {@code ACTIVE} join is not optional: this is the lookup the pending-
+     * signal reaper uses days after the fact, and a channel whose consent was withdrawn in the meantime
+     * must stop producing reviews immediately rather than at the next sweep.
+     */
+    @Query(
+        """
+        SELECT t.workspaceId AS workspaceId,
+               t.id AS threadId,
+               t.slackChannelId AS slackChannelId,
+               c.channelName AS slackChannelName,
+               t.slackThreadTs AS slackThreadTs,
+               t.lastTs AS lastTs,
+               t.lastReviewedTs AS lastReviewedTs,
+               t.participantMemberIds AS participantMemberIds
+        FROM SlackThread t
+        JOIN SlackMonitoredChannel c ON c.workspaceId = t.workspaceId AND c.slackChannelId = t.slackChannelId
+        WHERE c.consentState = de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannel.ConsentState.ACTIVE
+          AND t.workspaceId = :workspaceId
+          AND t.id = :threadId
+          AND t.lastTs IS NOT NULL
+        """
+    )
+    Optional<SettledCandidateRow> findConsentedCandidateRow(
+        @Param("workspaceId") long workspaceId,
+        @Param("threadId") long threadId
+    );
+
     interface SettledCandidateRow {
         long getWorkspaceId();
         long getThreadId();
@@ -184,7 +214,7 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     /**
      * Agent-owned {@code ConversationSourceLiveness} SPI: the subset of {@code threadIds} whose source channel
      * consent is still {@code ACTIVE} in this workspace — the fail-closed allow-set a
-     * {@code CONVERSATION_THREAD}-derived row must belong to before it may reach the mentor. Callers guard an
+     * {@code chat.conversation_thread}-derived row must belong to before it may reach the mentor. Callers guard an
      * empty {@code threadIds}.
      */
     @Query(
@@ -196,6 +226,31 @@ public interface SlackThreadRepository extends JpaRepository<SlackThread, Long> 
     List<Long> findActiveThreadIds(
         @Param("workspaceId") long workspaceId,
         @Param("threadIds") Collection<Long> threadIds
+    );
+
+    @Query(
+        value = """
+        SELECT EXISTS (
+            SELECT 1
+            FROM slack_thread t
+            JOIN slack_monitored_channel c
+              ON c.workspace_id = t.workspace_id AND c.slack_channel_id = t.slack_channel_id
+            WHERE t.id = :threadId
+              AND t.workspace_id = :workspaceId
+              AND t.slack_channel_id = :channelId
+              AND t.slack_thread_ts = :threadTs
+              AND c.consent_state = 'ACTIVE'
+              AND :participantId = ANY(t.participant_member_ids)
+        )
+        """,
+        nativeQuery = true
+    )
+    boolean existsDeliverableThread(
+        @Param("threadId") long threadId,
+        @Param("workspaceId") long workspaceId,
+        @Param("channelId") String channelId,
+        @Param("threadTs") String threadTs,
+        @Param("participantId") long participantId
     );
 
     /**

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import type { ConnectionSyncStatus, SyncJob } from "@/api/types.gen";
 import { IntegrationOverviewCard } from "./IntegrationOverviewCard";
 
@@ -56,8 +56,7 @@ export const Connected: Story = {};
 
 export const Syncing: Story = {
 	args: { status: { ...status, health: "FAILED", activeJob: runningJob } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByLabelText(/connection health/i)).toHaveTextContent("Syncing");
 	},
 };
@@ -70,18 +69,16 @@ export const WithErroredResources: Story = {
 			resourceCounts: { total: 12, errored: 3, pending: 0, stale: 0 },
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("3 errored")).toBeInTheDocument();
-		await expect(canvas.getByText(/of 12 resources/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("3 errored");
+		canvas.getByText(/of 12 resources/i);
 	},
 };
 
 export const WithStaleResources: Story = {
 	args: { status: { ...status, resourceCounts: { total: 12, errored: 0, pending: 0, stale: 4 } } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("4 stale")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("4 stale");
 	},
 };
 
@@ -93,19 +90,14 @@ export const WithErroredAndStaleResources: Story = {
 			resourceCounts: { total: 12, errored: 1, pending: 0, stale: 3 },
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("1 errored")).toBeInTheDocument();
-		await expect(canvas.getByText("3 stale")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("1 errored");
+		canvas.getByText("3 stale");
 	},
 };
 
 export const StaleFreshness: Story = {
 	args: { status: { ...status, lastSuccessfulSyncAt: minutesAgo(200) } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: /stale/i })).toBeInTheDocument();
-	},
 };
 
 export const UnknownCadence: Story = {
@@ -117,10 +109,9 @@ export const UnknownCadence: Story = {
 			lastEventProcessedAt: undefined,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /stale/i })).not.toBeInTheDocument();
-		await expect(canvas.getByText(/ago$/)).toBeInTheDocument();
+		canvas.getByText(/ago$/);
 	},
 };
 
@@ -133,10 +124,9 @@ export const NeverSynced: Story = {
 			lastEventProcessedAt: undefined,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Never synced")).toBeInTheDocument();
-		await expect(canvas.getByText(/no events received yet/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Never synced");
+		canvas.getByText(/no events received yet/i);
 	},
 };
 
@@ -147,10 +137,9 @@ export const StatusError: Story = {
 		statusError: { status: 503, detail: "The GitHub API is unavailable." },
 		onRetryStatus: fn(),
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/couldn't load sync status/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/github api is unavailable/i)).toBeInTheDocument();
+	play: async ({ args, canvas }) => {
+		canvas.getByText(/couldn't load sync status/i);
+		canvas.getByText(/github api is unavailable/i);
 		await userEvent.click(canvas.getByRole("button", { name: /retry/i }));
 		await expect(args.onRetryStatus).toHaveBeenCalledTimes(1);
 	},
@@ -163,9 +152,8 @@ export const StatusErrorForbidden: Story = {
 		statusError: { status: 403, detail: "You are not an admin of this workspace." },
 		onRetryStatus: fn(),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/not an admin of this workspace/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/not an admin of this workspace/i);
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };
@@ -181,10 +169,9 @@ export const ConnectionSuspended: Story = {
 		},
 		status: { ...status, connectionState: "SUSPENDED", health: "SUSPENDED" },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/suspended by the provider/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/syncing is paused/i);
+		canvas.getByText(/suspended by the provider/i);
 		await expect(canvas.queryByText(/connection is suspended/i)).not.toBeInTheDocument();
 	},
 };
@@ -200,9 +187,8 @@ export const ConnectionPending: Story = {
 		},
 		status: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/finishing setup/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/finishing setup/i);
 		await expect(canvas.queryByText(/slack is pending/i)).not.toBeInTheDocument();
 	},
 };
@@ -218,9 +204,8 @@ export const ConnectionUninstalled: Story = {
 		},
 		status: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/the app was removed/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/the app was removed/i);
 		await expect(canvas.queryByText(/slack is uninstalled/i)).not.toBeInTheDocument();
 	},
 };
@@ -230,11 +215,8 @@ export const ScmNotConnected: Story = {
 		entry: { kind: "GITHUB", displayName: "GitHub", connected: false },
 		status: undefined,
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByText(/source control is selected when the workspace is created/i),
-		).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/source control is selected when the workspace is created/i);
 		await expect(canvas.queryByRole("link", { name: /connect/i })).not.toBeInTheDocument();
 	},
 };

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { CatalogEntryStatus, CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
@@ -14,6 +14,11 @@ const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus
 	offered: true,
 	...overrides,
 });
+
+const automatedReview: CuratedPracticeSummary["automatedReview"] = {
+	mode: "LANGUAGE_MODEL",
+	evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
+};
 
 const areas: CuratedArea[] = [
 	{
@@ -46,7 +51,8 @@ const practices: CuratedPracticeSummary[] = [
 		slug: "small-focused-prs",
 		position: 0,
 		name: "Keep a change to one concern",
-		artifactType: "PULL_REQUEST",
+		artifactKind: "scm.pull_request",
+		automatedReview,
 		areaSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status(),
@@ -55,7 +61,8 @@ const practices: CuratedPracticeSummary[] = [
 		slug: "explains-the-change",
 		position: 1,
 		name: "Say what changed and why",
-		artifactType: "PULL_REQUEST",
+		artifactKind: "scm.pull_request",
+		automatedReview,
 		areaSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
@@ -64,7 +71,8 @@ const practices: CuratedPracticeSummary[] = [
 		slug: "reworded-upstream",
 		position: 2,
 		name: "Respond to each review comment",
-		artifactType: "PULL_REQUEST",
+		artifactKind: "scm.pull_request",
+		automatedReview,
 		areaSlug: "review-ready-work",
 		effectivelyOffered: true,
 		status: status({ state: "UPDATE_WAITING", changeKind: "WORDING" }),
@@ -73,7 +81,8 @@ const practices: CuratedPracticeSummary[] = [
 		slug: "our-release-notes",
 		position: 0,
 		name: "Write the release note with the change",
-		artifactType: "PULL_REQUEST",
+		artifactKind: "scm.pull_request",
+		automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
 		areaSlug: "house-rules",
 		effectivelyOffered: true,
 		status: status({ state: "YOURS" }),
@@ -82,7 +91,11 @@ const practices: CuratedPracticeSummary[] = [
 		slug: "link-the-issue",
 		position: 0,
 		name: "Link the issue the change closes",
-		artifactType: "ISSUE",
+		artifactKind: "scm.issue",
+		automatedReview: {
+			mode: "LANGUAGE_MODEL",
+			evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
+		},
 		effectivelyOffered: true,
 		status: status({ state: "NO_LONGER_SHIPPED" }),
 	},
@@ -90,7 +103,8 @@ const practices: CuratedPracticeSummary[] = [
 		slug: "orphaned-practice",
 		position: 0,
 		name: "Outlived the area it was filed under",
-		artifactType: "PULL_REQUEST",
+		artifactKind: "scm.pull_request",
+		automatedReview,
 		areaSlug: "an-area-hephaestus-stopped-shipping",
 		effectivelyOffered: false,
 		status: status({ state: "NO_LONGER_SHIPPED", offered: false }),
@@ -98,7 +112,7 @@ const practices: CuratedPracticeSummary[] = [
 ];
 
 const meta = {
-	title: "Instance admin/Practice catalog",
+	title: "Instance admin/Practice catalog/Overview",
 	component: CuratedCatalog,
 	parameters: { layout: "fullscreen", chromatic: { viewports: [1440] } },
 	decorators: [withStandardPage],
@@ -132,10 +146,16 @@ type Story = StoryObj<typeof meta>;
 
 export const Everything: Story = {};
 
+export const MentoringLimitsAreVisible: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Guidance only")).toBeVisible();
+		await expect(canvas.getByText("Human review needed")).toBeVisible();
+	},
+};
+
 export const CustomOrder: Story = {
 	args: { customOrder: true },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Use Hephaestus order" }));
 		const dialog = await screen.findByRole("alertdialog");
 		await expect(dialog).toHaveAccessibleDescription(/Definitions and inclusion will not change/);
@@ -147,8 +167,7 @@ export const CustomOrder: Story = {
 export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 
 export const APracticeWhoseAreaIsGone: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await canvas.findByText("Outlived the area it was filed under");
 		await canvas.findByText("Area no longer exists");
 		await expect(
@@ -179,8 +198,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 
 export const UnavailableMoveDestinationIsNamed: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(
 			canvas.getByRole("button", { name: "More actions for Link the issue the change closes" }),
 		);
@@ -190,16 +208,16 @@ export const UnavailableMoveDestinationIsNamed: Story = {
 	},
 };
 
-function FilterTransition() {
+/** Owns the search term, so filtering is a state transition rather than two separate renders. */
+function FilterTransition(props: ComponentProps<typeof CuratedCatalog>) {
 	const [search, setSearch] = useState<CuratedCatalogSearch>({});
-	return <CuratedCatalog {...meta.args} search={search} onSearchChange={setSearch} />;
+	return <CuratedCatalog {...props} search={search} onSearchChange={setSearch} />;
 }
 
 export const FilteringOpensMatchingAreas: Story = {
-	render: () => <FilterTransition />,
+	render: (args) => <FilterTransition {...args} />,
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const area = canvas.getByRole("button", { name: /^Packaging work for review 3$/ });
 		await userEvent.click(area);
 		await userEvent.click(canvas.getByRole("combobox", { name: "Filter by work type" }));
@@ -212,8 +230,7 @@ export const FilteringOpensMatchingAreas: Story = {
 
 export const SearchOpensTheAreaHoldingTheMatch: Story = {
 	args: { search: { q: "release note" } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await canvas.findByText("Write the release note with the change");
 	},
 };
@@ -237,8 +254,7 @@ export const NothingHasBeenChanged: Story = {
 
 export const ExcludingAnAreaListsItsPractices: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
 				name: "Include Packaging work for review in new workspaces",
@@ -267,8 +283,7 @@ export const PracticeInsideExcludedArea: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const inheritedSwitch = await canvas.findByRole("switch", {
 			name: "Keep a change to one concern is excluded because its area is excluded",
 		});
@@ -295,9 +310,9 @@ export const ExcludingAnAreaCountsOnlyIncludedPractices: Story = {
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
+	play: async ({ canvas }) => {
 		await userEvent.click(
-			await within(canvasElement).findByRole("switch", {
+			await canvas.findByRole("switch", {
 				name: "Include Packaging work for review in new workspaces",
 			}),
 		);
@@ -328,8 +343,7 @@ export const ExcludingAnAreaDoesNotRecountExcludedPractices: Story = {
 		},
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(
 			await canvas.findByRole("switch", {
 				name: "Include Packaging work for review in new workspaces",

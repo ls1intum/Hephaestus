@@ -41,21 +41,11 @@ public class AgentBindingService {
     }
 
     /**
-     * True when the binding resolves to an available model right now (UI readiness).
-     *
-     * <p>Deliberately NOT transactional: swallowing the resolver's throw inside a shared transaction
-     * would leave it rollback-only, so the binding must arrive with its model graph already fetched.
+     * True when the binding resolves to an available model right now (UI readiness). The binding must
+     * arrive with its model graph already fetched — this walks it outside any transaction.
      */
     public boolean isReady(WorkspaceAgentBinding binding) {
-        if (!binding.isEnabled()) {
-            return false;
-        }
-        try {
-            llmModelResolver.resolve(binding);
-            return true;
-        } catch (IllegalStateException unavailable) {
-            return false;
-        }
+        return binding.isEnabled() && llmModelResolver.isAvailable(binding);
     }
 
     /**
@@ -143,9 +133,7 @@ public class AgentBindingService {
     }
 
     private void requireModelAvailableToWorkspace(WorkspaceAgentBinding binding) {
-        try {
-            llmModelResolver.resolve(binding);
-        } catch (IllegalStateException unavailable) {
+        if (!llmModelResolver.isAvailable(binding)) {
             throw new IllegalArgumentException("This model isn't available to this workspace.");
         }
     }

@@ -3,7 +3,10 @@ package de.tum.cit.aet.hephaestus.integration.slack;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -11,8 +14,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.time.Instant;
@@ -30,13 +33,9 @@ import tools.jackson.databind.ObjectMapper;
  *
  * <ul>
  *   <li>{@link #ensureUnmappedSlackThreadColumns()} — idempotent {@code IF NOT EXISTS} DDL for the
- *       {@code participant_member_ids bigint[]} + GIN index and {@code last_reviewed_ts VARCHAR(32)} column.
- *       {@code SlackThread} now maps both fields (changelog changesets -12/-13; see
- *       {@code SlackThread#participantMemberIds}/{@code #lastReviewedTs}), so the entity-derived integration
- *       profile's {@code ddl-auto: create} already builds them from the entity metadata — this method is a no-op
- *       there today. It stays as the single place that also lays down the GIN index (which entity mapping alone
- *       does not express) and as a defensive idempotent guard, so the two SPI ITs cannot drift from each other on
- *       this DDL. That the shape actually matches the production Liquibase migration is proven independently by
+ *       {@code participant_member_ids bigint[]} + GIN index and {@code last_reviewed_ts VARCHAR(32)} column,
+ *       so the two SPI ITs cannot drift from each other on this DDL. That the shape actually matches the
+ *       production Liquibase migration is proven independently by
  *       {@code SlackConversationSchemaContractIntegrationTest} against the real schema.</li>
  *   <li>{@link #seedChannel}/{@link #seedThread}/{@link #seedMessage} — the raw {@code INSERT}s the projector and
  *       detection scans read over. Superset signatures so both callers share one SQL string per table.</li>
@@ -139,16 +138,18 @@ public final class SlackConversationTestSupport {
     /** Saves a minimal {@link Practice} owned by the given workspace, slugged so repeated calls do not collide. */
     public static Practice newPractice(PracticeRepository practiceRepository, Workspace workspace, String slugPrefix) {
         Practice practice = new Practice();
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
         practice.setWorkspace(workspace);
         practice.setSlug(slugPrefix + "-" + UUID.randomUUID());
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         return practiceRepository.save(practice);
     }
 
     /**
-     * Inserts a derived CONVERSATION_THREAD {@link de.tum.cit.aet.hephaestus.practices.observation.Observation} +
+     * Inserts a derived chat.conversation_thread {@link de.tum.cit.aet.hephaestus.practices.observation.Observation} +
      * {@link Feedback} pair about {@code aboutUserId}, anchored to {@code threadId} — the shape the Slack consent
      * erasure paths (person opt-out, channel revoke) must sweep.
      */
@@ -169,28 +170,28 @@ public final class SlackConversationTestSupport {
             jobId,
             practiceId,
             null,
-            WorkArtifact.CONVERSATION_THREAD.name(),
+            ArtifactKinds.CONVERSATION_THREAD.value(),
             threadId,
             aboutUserId,
             "Observation title",
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             null,
             null,
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(jobId)
                 .workspaceId(workspaceId)
-                .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
                 .artifactId(threadId)
                 .recipientUserId(aboutUserId)
                 .aboutUserId(aboutUserId)
-                .channel(FeedbackChannel.CONVERSATION)
+                .channel(FeedbackChannel.IN_CHAT)
                 .position((int) ((threadId * 10 + aboutUserId) % 1000))
                 .deliveryState(FeedbackDeliveryState.PREPARED)
                 .source(FeedbackSource.AGENT)

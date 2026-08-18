@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.conversation;
 
 import java.util.List;
+import java.util.Optional;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -16,20 +17,29 @@ import org.jspecify.annotations.Nullable;
 public interface ConversationCandidateSource {
     /**
      * Threads on an {@code ACTIVE} channel that have grown past their review watermark and have at least
-     * {@code minMessageCount} messages, oldest {@code last_ts} first. Cross-workspace; each candidate carries its
-     * own {@code workspaceId}. Gate evaluation (quiescence/depth/growth) and enqueue are the caller's job.
+     * {@code minMessageCount} messages, oldest {@code last_ts} first. Gate evaluation (quiescence/depth/growth)
+     * and enqueue are the caller's job.
      */
     List<ConversationThreadCandidate> settledCandidates(int minMessageCount);
 
-    /** Count of non-tombstoned turns in the thread (root + replies), workspace-pinned. */
+    /**
+     * One thread by its own id, gated by the same {@code ACTIVE}-channel consent as {@link #settledCandidates}.
+     *
+     * <p>Used by the reaper, which knows only a workspace and thread id from the ledger row. Empty covers
+     * both "no such thread" and "channel consent was withdrawn since the row was written" — a withdrawn
+     * channel must not be re-read even though the underlying signal is still retryable.
+     */
+    Optional<ConversationThreadCandidate> candidateById(long workspaceId, long threadId);
+
+    /** Count of non-tombstoned turns in the thread (root + replies). */
     long liveTurnCount(long workspaceId, String channelId, String threadTs);
 
     /**
-     * Count of non-tombstoned turns with {@code slack_ts} strictly greater than {@code watermark} (lexicographic;
-     * a null watermark counts everything), workspace-pinned.
+     * Count of non-tombstoned turns with {@code slack_ts} strictly greater than {@code watermark}
+     * (lexicographic; a null watermark counts everything).
      */
     long liveTurnCountSince(long workspaceId, String channelId, String threadTs, @Nullable String watermark);
 
-    /** Advance the thread's {@code last_reviewed_ts} watermark to {@code lastTs}, workspace-pinned. */
+    /** Advance the thread's {@code last_reviewed_ts} watermark to {@code lastTs}. */
     void markReviewed(long workspaceId, long threadId, String lastTs);
 }

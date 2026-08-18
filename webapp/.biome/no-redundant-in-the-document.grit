@@ -1,0 +1,39 @@
+language js(typescript)
+
+// `getBy*` throws when it finds nothing, so it already is the assertion. Wrapping it in
+// `expect(...).toBeInTheDocument()` or `.toBeTruthy()` adds a matcher that can only ever run against
+// an element that exists and is therefore never null — it asserts nothing, and a file full of them
+// trains the reader to skim past the assertions that do.
+//
+// The second pattern is the same no-op with the matcher missing altogether — `await expect(getBy(…));`
+// — which reads like an assertion someone meant to finish. It shipped on main undetected, because a
+// rule keyed on the matcher cannot see a statement that has none.
+//
+// Deliberately narrow, so the neighbouring shapes that DO assert something keep working:
+//   expect(queryBy(...)).not.toBeInTheDocument()   — an absence check
+//   expect(await findBy(...)).toBeInTheDocument()  — the await is the assertion, not the matcher
+//   expect(getBy(...).parentElement).toBeTruthy()  — the subject can be null, so the check is real
+// Matching `expect($subject)` directly also excludes `.not`, whose subject sits one level deeper.
+or {
+  `expect($subject).$matcher()` where {
+    $matcher <: or { `toBeInTheDocument`, `toBeTruthy` },
+    $subject <: `$query($...)`,
+    $query <: r".*\bgetBy[A-Za-z]+",
+    register_diagnostic(
+      span = $subject,
+      message = "`getBy*` already throws when the element is missing, so this matcher asserts nothing. Drop the `expect(...)` wrapper and let the query stand as the assertion. `toBeVisible()` is a real strengthening, but it reads a just-opened Base UI overlay as invisible for one frame, so use `expectSettledVisible` from `@/test/overlay` when the target is inside an overlay.",
+      severity = "error"
+    )
+  },
+  `await expect($subject)` where {
+    $subject <: `$query($...)`,
+    // Non-capturing: a capture group here binds a Grit variable the pattern does not declare, and
+    // the plugin then degrades to an `info` that fails nothing rather than to an error.
+    $query <: r".*\b(?:getBy|findBy)[A-Za-z]+",
+    register_diagnostic(
+      span = $subject,
+      message = "This `expect(...)` has no matcher, so it asserts nothing at all — the query inside it is doing the only work. Drop the wrapper and let the query stand as the assertion, or finish it with a matcher that says what is being claimed.",
+      severity = "error"
+    )
+  }
+}

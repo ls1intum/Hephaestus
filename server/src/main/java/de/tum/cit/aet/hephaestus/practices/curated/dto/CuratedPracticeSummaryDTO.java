@@ -1,15 +1,17 @@
 package de.tum.cit.aet.hephaestus.practices.curated.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReview;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.CatalogEntry;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 public record CuratedPracticeSummaryDTO(
     @NonNull String slug,
     @NonNull String name,
-    @NonNull WorkArtifact artifactType,
+    @NonNull ArtifactKind artifactKind,
+    @NonNull PracticeAutomatedReview automatedReview,
     @Nullable String areaSlug,
     @NonNull Integer position,
     @NonNull Boolean effectivelyOffered,
@@ -19,7 +21,8 @@ public record CuratedPracticeSummaryDTO(
         return new CuratedPracticeSummaryDTO(
             entry.slug(),
             entry.effective().name(),
-            entry.effective().artifactType(),
+            entry.effective().artifactKind(),
+            entry.effective().automatedReviewPolicy().automatedReview(),
             entry.effective().areaSlug(),
             entry.position(),
             effectivelyOffered,

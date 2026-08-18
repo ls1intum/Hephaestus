@@ -24,10 +24,9 @@ class SlackConversationContentSourceTest extends BaseUnitTest {
     private ConversationThreadProjection projection;
 
     @Test
-    void supportsOnlyMentorChatRequestsAndIsOptionalSlackOrigin() {
+    void supportsOnlyMentorChatRequestsAndIsOptional() {
         SlackConversationContentSource source = new SlackConversationContentSource(projection, objectMapper);
 
-        assertThat(source.originId()).isEqualTo("slack");
         assertThat(source.required()).isFalse();
         assertThat(source.supports(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()))).isTrue();
         assertThat(source.supports(new ContextRequest.PracticeReviewRequest(new AgentJob()))).isFalse();

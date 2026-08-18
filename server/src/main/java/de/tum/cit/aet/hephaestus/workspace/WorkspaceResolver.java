@@ -37,6 +37,12 @@ public class WorkspaceResolver {
     /**
      * Resolves the workspace for a repository by monitor mapping or account login fallback.
      *
+     * <p>The workspace comes back initialized, not as a proxy. The monitor's association is lazy, so
+     * handing back {@code monitor.getWorkspace()} used to return something that reads fine inside the
+     * caller's session and throws {@code LazyInitializationException} outside one — which made this
+     * method's answer depend on the caller's transaction rather than on the repository it was asked
+     * about. Anyone who resolves a workspace goes on to read one, so fetching it is the contract.
+     *
      * @param nameWithOwner the full repository name (e.g., "ls1intum/Hephaestus"), may be null
      * @return the workspace if found, empty otherwise
      */
@@ -47,7 +53,7 @@ public class WorkspaceResolver {
         }
 
         // Step 1: Authoritative — explicit monitor configuration
-        var monitor = repositoryToMonitorRepository.findByNameWithOwner(nameWithOwner);
+        var monitor = repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner(nameWithOwner);
         if (monitor.isPresent()) {
             return Optional.ofNullable(monitor.get().getWorkspace());
         }

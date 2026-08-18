@@ -16,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Erases the ingested channel content ({@code slack_message} PII, {@code slack_thread} aggregates), the
  * per-channel consent registrations ({@code slack_monitored_channel}), the per-person opt-out records
  * ({@code slack_participant_consent}), the mentor DM threads ({@code mentor_slack_thread}), and the
- * derived {@code CONVERSATION_THREAD} observations/feedback (through the practices
+ * derived {@code chat.conversation_thread} observations/feedback (through the practices
  * {@link ConversationFeedbackErasure} port so no Spring Modulith cycle forms).
  *
  * <p>Shared by two callers so both erase the exact same rows: the workspace-purge contributor (full

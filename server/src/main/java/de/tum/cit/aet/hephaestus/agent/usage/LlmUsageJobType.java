@@ -7,6 +7,7 @@ public enum LlmUsageJobType {
     PULL_REQUEST_REVIEW,
     ISSUE_REVIEW,
     CONVERSATION_REVIEW,
+    DOCUMENT_REVIEW,
     MENTOR_TURN;
 
     public static LlmUsageJobType from(AgentJobType jobType) {
@@ -14,6 +15,7 @@ public enum LlmUsageJobType {
             case PULL_REQUEST_REVIEW -> PULL_REQUEST_REVIEW;
             case ISSUE_REVIEW -> ISSUE_REVIEW;
             case CONVERSATION_REVIEW -> CONVERSATION_REVIEW;
+            case DOCUMENT_REVIEW -> DOCUMENT_REVIEW;
         };
     }
 }

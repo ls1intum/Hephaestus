@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
-import type { Practice } from "@/api/types.gen";
-import { mockPractices } from "@/components/admin/practices/story-mock-data";
+import type { Practice, PracticeBinding } from "@/api/types.gen";
+import {
+	chosenTier,
+	inheritedTier,
+	mockPractices,
+} from "@/components/admin/practices/story-mock-data";
 import {
 	applyDisplayOrder,
 	applyPracticePlacements,
@@ -92,18 +96,18 @@ describe("practice catalog cache updates", () => {
 
 	it("supports empty destinations and structural-only rollback", () => {
 		const practices = [
-			{ ...practice("moving", "quality", 0), active: true },
+			{ ...practice("moving", "quality", 0), reviewTier: inheritedTier("DELIVER") },
 			practice("remaining", "quality", 1),
 		];
 		const snapshot = practicePlacementSnapshot(practices, "moving", null);
 		const moved = placePractice(practices, "moving", null, 0).map((item) =>
-			item.slug === "moving" ? { ...item, active: false } : item,
+			item.slug === "moving" ? { ...item, reviewTier: chosenTier("OFF") } : item,
 		);
 
 		const restored = applyPracticePlacements(moved, snapshot);
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
-			active: false,
+			reviewTier: chosenTier("OFF"),
 			areaSlug: "quality",
 			displayOrder: 0,
 		});
@@ -113,7 +117,7 @@ describe("practice catalog cache updates", () => {
 	it("reconciles only fields owned by the edit request", () => {
 		const updated = {
 			...practice("edited", "delivery", 4),
-			active: false,
+			reviewTier: chosenTier("OFF"),
 			name: "Updated",
 		};
 
@@ -126,5 +130,22 @@ describe("practice catalog cache updates", () => {
 		expect(
 			selectPracticePatch({ ...updated, whyItMatters: undefined }, { clear: ["WHY_IT_MATTERS"] }),
 		).toEqual({ whyItMatters: undefined });
+		expect(
+			selectPracticePatch(updated, {
+				automatedReviewPolicy: updated.automatedReviewPolicy,
+			}),
+		).toEqual({
+			automatedReviewPolicy: updated.automatedReviewPolicy,
+			automatedReviewValidation: updated.automatedReviewValidation,
+		});
+		// Replacing the occasion can move the practice to a different kind of work, and with it to that
+		// kind's recommended review settings — so the optimistic patch carries those too.
+		const occasion: [PracticeBinding] = [updated.bindings[0]];
+		expect(selectPracticePatch(updated, { bindings: occasion })).toEqual({
+			bindings: occasion,
+			artifactKind: updated.artifactKind,
+			automatedReviewPolicy: updated.automatedReviewPolicy,
+			automatedReviewValidation: updated.automatedReviewValidation,
+		});
 	});
 });

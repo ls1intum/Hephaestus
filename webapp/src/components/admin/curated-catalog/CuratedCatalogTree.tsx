@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
-import { WORK_ARTIFACT_LABELS } from "@/components/admin/practice-catalog/constants";
+import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
@@ -25,6 +25,7 @@ import {
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
+import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
 
@@ -171,7 +172,9 @@ function AreaActions({
 }) {
 	return (
 		<>
-			{pending && <Spinner className="size-4 text-muted-foreground" />}
+			{pending && (
+				<Spinner className="size-4 text-muted-foreground" role="status" aria-label="Saving" />
+			)}
 			<Switch
 				className="hidden sm:inline-flex"
 				checked={area.status.offered}
@@ -236,6 +239,7 @@ function AreaActions({
 function PracticeDetails({ practice }: { practice: TreePractice }) {
 	const parentUnavailable =
 		Boolean(practice.missingAreaSlug) || (practice.status.offered && !practice.effectivelyOffered);
+	const reviewLimitation = automatedReviewLimitationLabel(practice.automatedReview);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">
@@ -250,7 +254,8 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 				</Link>
 			</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{WORK_ARTIFACT_LABELS[practice.artifactType]}</span>
+				<span>{artifactKindLabel(practice.artifactKind)}</span>
+				{reviewLimitation && <Badge variant="outline">{reviewLimitation}</Badge>}
 				{parentUnavailable && (
 					<Badge variant="outline">
 						{practice.missingAreaSlug
@@ -302,7 +307,9 @@ function PracticeActions({
 		: practice;
 	return (
 		<>
-			{pending && <Spinner className="size-4 text-muted-foreground" />}
+			{pending && (
+				<Spinner className="size-4 text-muted-foreground" role="status" aria-label="Saving" />
+			)}
 			<Switch
 				className="hidden sm:inline-flex"
 				checked={practice.effectivelyOffered}
@@ -413,7 +420,7 @@ function PracticeDragPreview({ practice }: { practice: TreePractice }) {
 			</div>
 			<ItemContent className="min-w-0">
 				<ItemTitle className="break-words line-clamp-none">{practice.name}</ItemTitle>
-				<ItemDescription>{WORK_ARTIFACT_LABELS[practice.artifactType]}</ItemDescription>
+				<ItemDescription>{artifactKindLabel(practice.artifactKind)}</ItemDescription>
 			</ItemContent>
 		</Item>
 	);

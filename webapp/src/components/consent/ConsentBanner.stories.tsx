@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { ConsentBanner, type ConsentCategory } from "./ConsentBanner";
 
 const analytics: ConsentCategory = {
@@ -21,6 +21,7 @@ const errorReports: ConsentCategory = {
 const meta = {
 	component: ConsentBanner,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	args: {
 		values: { analytics: false, errorMonitoring: false },
 		editing: false,
@@ -43,22 +44,20 @@ type Story = StoryObj<typeof meta>;
 /** Both integrations configured: granular toggles + equal-prominence Reject all / Accept all. */
 export const BothCategories: Story = {
 	args: { categories: [analytics, errorReports] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("region", { name: /your privacy/i })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Reject all" })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Accept all" })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Save choices" })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("region", { name: /your privacy/i });
+		canvas.getByRole("button", { name: "Reject all" });
+		canvas.getByRole("button", { name: "Accept all" });
+		canvas.getByRole("button", { name: "Save choices" });
 	},
 };
 
 /** Only analytics configured: no granular toggles, just a clear Allow / Decline pair. */
 export const AnalyticsOnly: Story = {
 	args: { categories: [analytics] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: "Allow" })).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: "Decline" })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("button", { name: "Allow" });
+		canvas.getByRole("button", { name: "Decline" });
 		await expect(canvas.queryByRole("button", { name: "Save choices" })).not.toBeInTheDocument();
 	},
 };
@@ -75,8 +74,7 @@ export const Editing: Story = {
 		editing: true,
 		values: { analytics: true, errorMonitoring: false },
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("button", { name: "Cancel" });
 	},
 };

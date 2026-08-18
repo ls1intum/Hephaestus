@@ -1,60 +1,53 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Best-effort provider that materialises the <em>general (conversation-tab) review discussion</em>
- * of a merge request into {@code inputs/context/general_comments.json}.
- *
- * <p>{@code comments.json} ({@link PullRequestContentSource}) models only position-anchored inline
- * notes; GitLab routes every <em>position-less</em> note (conversation-tab comment, non-anchored
- * suggestion) to {@code IssueComment} storage. Without those, the reviewer-craft practices see an
- * empty inline thread and can fire a false "rubber-stamp" NEGATIVE on an MR whose real review lives
- * in the conversation tab. A {@code PullRequest} IS an {@code Issue}, so its conversation notes are
- * {@code IssueComment} rows keyed by the same id. Output is a judgement-free fact sheet:
- * {@code {"comments":[{"author","body","createdAt"}],"count"}}.
- *
- * <p><b>Self-exclusion.</b> Hephaestus' own MR comments carry the {@code <!-- hephaestus:... -->}
- * marker and are dropped so the agent never assesses its own output as reviewer input; author/bot
- * exclusion stays in the criteria.
- *
- * <p>Best-effort ({@link #required()} == {@code false}): a missing PR id, absent rows, or any
- * failure degrades to writing nothing and never aborts the job, preserving the practices'
- * empty-context behaviour.
- */
 @Component
 @Order(210)
-public class GeneralReviewCommentContentSource implements ContentSource {
+public class GeneralReviewCommentContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("scm.general-review-comments");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(GeneralReviewCommentContentSource.class);
 
-    /** Output filename under {@link ContentSource#OUTPUT_PREFIX}. */
     static final String FILE_NAME = "general_comments.json";
 
-    /** Cap on comments materialised — keeps the artefact a few KB even on a very chatty MR. */
-    static final int MAX_COMMENTS = 200;
+    static final int MAX_COMMENTS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
-    /**
-     * Namespace prefix embedded in every Hephaestus-authored MR comment (the practice-review summary AND the
-     * re-review ping). A general comment containing it is the bot's own output and must never be surfaced as
-     * reviewer input. Matches the whole {@code <!-- hephaestus:* -->} namespace so a new marker can't leak back.
-     */
     static final String HEPHAESTUS_MARKER = "<!-- hephaestus:";
 
     private final ObjectMapper objectMapper;
@@ -63,11 +56,6 @@ public class GeneralReviewCommentContentSource implements ContentSource {
     public GeneralReviewCommentContentSource(ObjectMapper objectMapper, IssueCommentRepository issueCommentRepository) {
         this.objectMapper = objectMapper;
         this.issueCommentRepository = issueCommentRepository;
-    }
-
-    @Override
-    public String originId() {
-        return "scm";
     }
 
     @Override
@@ -80,6 +68,30 @@ public class GeneralReviewCommentContentSource implements ContentSource {
         return false;
     }
 
+    /**
+     * Derives completeness/emptiness from the payload itself rather than the default: the file is
+     * always written, even with zero comments, so the default's file-presence check would report
+     * NON_EMPTY on an empty result and COMPLETE past the truncation cap.
+     */
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        byte[] emitted = captured.files().get(OUTPUT_PREFIX + FILE_NAME);
+        if (!selectedKinds.contains(KIND) || emitted == null) {
+            return captured;
+        }
+        JsonNode root = objectMapper.readTree(emitted);
+        boolean truncated = root.path("truncated").asBoolean(false);
+        return new EvidenceContribution(
+            captured.files(),
+            Map.of(KIND, truncated ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE),
+            captured.immutableIdentities(),
+            captured.observedAt(),
+            captured.sourceEffectiveAt(),
+            Map.of(KIND, root.path("comments").isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+        );
+    }
+
     @Override
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
         if (!(request instanceof ContextRequest.PracticeReviewRequest pr)) {
@@ -88,51 +100,38 @@ public class GeneralReviewCommentContentSource implements ContentSource {
         try {
             AgentJob job = pr.job();
             JsonNode m = job.getMetadata();
+            // A missing key is a malformed job; failing loud avoids silently telling the model there
+            // were no comments (as ReviewThreadContentSource does for its own metadata key).
             if (m == null || m.isNull() || m.isMissingNode()) {
-                return;
+                throw new EvidenceCollectionException("Review-comment collection has no job metadata", null);
             }
             Long pullRequestId = MetaJson.optLong(m, "pull_request_id");
             if (pullRequestId == null) {
-                return;
+                throw new EvidenceCollectionException("Review-comment collection has no pull_request_id", null);
             }
 
-            List<IssueComment> comments = issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(pullRequestId);
-            if (comments == null || comments.isEmpty()) {
-                return;
+            List<IssueComment> comments = new java.util.ArrayList<>(
+                issueCommentRepository.findRecentHumanByIssueIdWithAuthor(
+                    pullRequestId,
+                    HEPHAESTUS_MARKER,
+                    PageRequest.of(0, MAX_COMMENTS + 1)
+                )
+            );
+            comments.removeIf(comment -> {
+                String body = comment == null ? null : comment.getBody();
+                return body == null || body.isBlank() || body.contains(HEPHAESTUS_MARKER);
+            });
+            if (comments.size() > MAX_COMMENTS + 1) {
+                comments = new java.util.ArrayList<>(comments.subList(0, MAX_COMMENTS + 1));
             }
-
-            // When over the cap keep the MOST RECENT MAX_COMMENTS: the query is oldest-first, and
-            // keeping the head would drop the latest approval/resolution on a chatty MR —
-            // manufacturing the exact false "rubber-stamp" verdict this provider exists to prevent.
-            List<IssueComment> eligible = new ArrayList<>();
-            int skippedSelf = 0;
-            for (IssueComment c : comments) {
-                if (c == null) {
-                    continue;
-                }
-                String body = c.getBody();
-                if (body == null || body.isBlank()) {
-                    continue;
-                }
-                if (body.contains(HEPHAESTUS_MARKER)) {
-                    skippedSelf++;
-                    continue;
-                }
-                eligible.add(c);
-            }
-
-            if (eligible.isEmpty()) {
-                // Only the bot's own comment(s) were present — emit nothing rather than a hollow file.
-                return;
-            }
-
-            boolean truncated = eligible.size() > MAX_COMMENTS;
-            List<IssueComment> kept = truncated
-                ? eligible.subList(eligible.size() - MAX_COMMENTS, eligible.size())
-                : eligible;
+            boolean truncated = comments.size() > MAX_COMMENTS;
+            if (truncated) comments.remove(comments.size() - 1);
+            comments.sort(
+                Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+            );
 
             ArrayNode commentArray = objectMapper.createArrayNode();
-            for (IssueComment c : kept) {
+            for (IssueComment c : comments) {
                 commentArray.add(toComment(c, c.getBody()));
             }
             int emitted = commentArray.size();
@@ -142,12 +141,9 @@ public class GeneralReviewCommentContentSource implements ContentSource {
             root.put("count", emitted);
             root.put("truncated", truncated);
             files.put(OUTPUT_PREFIX + FILE_NAME, objectMapper.writeValueAsBytes(root));
-            log.info("GeneralReviewComments: prId={} emitted={} skippedSelf={}", pullRequestId, emitted, skippedSelf);
+            log.info("GeneralReviewComments: prId={} emitted={} truncated={}", pullRequestId, emitted, truncated);
         } catch (Exception e) {
-            log.warn(
-                "GeneralReviewCommentContentSource failed, continuing without general discussion: {}",
-                e.getMessage()
-            );
+            throw new EvidenceCollectionException("General-review-comment collection failed", e);
         }
     }
 

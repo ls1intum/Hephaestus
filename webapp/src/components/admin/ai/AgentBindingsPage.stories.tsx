@@ -19,7 +19,7 @@ async function openPracticeReviewAdvanced(canvas: Canvas) {
 }
 
 const detectionBinding: AgentBinding = {
-	purpose: "PRACTICE_DETECTION",
+	purpose: "PRACTICE_REVIEW",
 	instanceModelId: 1,
 	enabled: true,
 	ready: true,
@@ -77,7 +77,7 @@ export const LoadForbidden: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(await canvas.findByText("Couldn't load AI models")).toBeInTheDocument();
+		await expect(await canvas.findByText("Couldn't load AI models")).toBeVisible();
 		await expect(canvas.queryByRole("button", { name: "Retry" })).toBeNull();
 	},
 };
@@ -86,18 +86,18 @@ export const ProjectReviewsDisabled: Story = {
 	args: { practicesEnabled: false },
 	play: async ({ canvas }) => {
 		const card = within(canvas.getByRole("region", { name: "Practice reviews" }));
-		await expect(card.getByText("Ready")).toBeInTheDocument();
-		await expect(card.getByText("Practice reviews off")).toBeInTheDocument();
-		await expect(card.getByRole("link", { name: "Open Review settings" })).toHaveAttribute(
+		card.getByText("Ready");
+		card.getByText("Practice reviews off");
+		await expect(card.getByRole("link", { name: "Open Review: When and where" })).toHaveAttribute(
 			"href",
-			"/w/acme/admin/practices/settings",
+			"/w/acme/admin/practices/review?section=when-and-where",
 		);
 		await expect(card.getByRole("button", { name: "Save assignment" })).toBeEnabled();
 	},
 };
 
 export const OnlyThePendingCardIsFrozen: Story = {
-	args: { pendingPurposes: new Set(["PRACTICE_DETECTION" as const]) },
+	args: { pendingPurposes: new Set(["PRACTICE_REVIEW" as const]) },
 	play: async ({ canvas }) => {
 		await expect(
 			purposeCard(canvas, "Practice reviews").getByRole("button", { name: "Save assignment" }),
@@ -111,9 +111,7 @@ export const OnlyThePendingCardIsFrozen: Story = {
 export const AdvancedDisclosure: Story = {
 	play: async ({ canvas }) => {
 		await openPracticeReviewAdvanced(canvas);
-		await expect(
-			purposeCard(canvas, "Practice reviews").getByLabelText("Timeout (seconds)"),
-		).toBeInTheDocument();
+		purposeCard(canvas, "Practice reviews").getByLabelText("Timeout (seconds)");
 	},
 };
 
@@ -125,7 +123,7 @@ export const InvalidRunLimit: Story = {
 		await userEvent.clear(card.getByLabelText("Timeout (seconds)"));
 		await userEvent.click(card.getByRole("button", { name: "Save assignment" }));
 
-		await expect(await canvas.findByText("Enter a number of seconds.")).toBeInTheDocument();
+		await expect(await canvas.findByText("Enter a number of seconds.")).toBeVisible();
 		await expect(screen.queryByRole("status")).toBeNull();
 	},
 };

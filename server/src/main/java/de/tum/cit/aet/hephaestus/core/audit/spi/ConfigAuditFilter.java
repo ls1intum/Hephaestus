@@ -23,12 +23,10 @@ public record ConfigAuditFilter(
     @Nullable Instant from,
     @Nullable Instant to
 ) {
-    /** Entity-type names as a bindable {@code text[]}, or null when unconstrained. */
     public String@Nullable [] entityTypeNames() {
         return names(entityTypes);
     }
 
-    /** Action names as a bindable {@code text[]}, or null when unconstrained. */
     public String@Nullable [] actionNames() {
         return names(actions);
     }

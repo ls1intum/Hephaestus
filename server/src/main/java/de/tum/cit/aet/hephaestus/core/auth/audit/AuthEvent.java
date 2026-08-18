@@ -113,7 +113,7 @@ public class AuthEvent {
         EXPORT_REQUESTED,
         APP_ROLE_CHANGED,
         RESEARCH_CONSENT_REVOKED,
-        // Instance LLM catalog: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
+        // Instance LLM catalog: GLOBAL, so the workspace-scoped config trail cannot carry it.
         LLM_CONNECTION_CREATED,
         LLM_CONNECTION_UPDATED,
         LLM_CONNECTION_DELETED,
@@ -127,7 +127,7 @@ public class AuthEvent {
         LOGIN_PROVIDER_CREATED,
         LOGIN_PROVIDER_UPDATED,
         LOGIN_PROVIDER_DELETED,
-        // Instance emergency brake: GLOBAL, so config_audit_event cannot carry it (workspace_id is NOT NULL).
+        // Instance emergency brake: GLOBAL, so the workspace-scoped config trail cannot carry it.
         SILENT_MODE_CHANGED,
     }
 

@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFindingDTO;
-import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFindingDetailDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDTO;
+import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
@@ -38,16 +38,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 @RequireAtLeastWorkspaceAdmin
 public class PracticeReviewOutputController {
 
-    private final ReviewFindingQueryService findingQueryService;
+    private final ReviewObservationQueryService observationQueryService;
     private final ReviewFeedbackQueryService feedbackQueryService;
 
-    @GetMapping("/findings")
+    @GetMapping("/observations")
     @Operation(
-        summary = "List practice review findings across the workspace",
+        summary = "List practice review observations across the workspace",
         description = "Results include linked feedback outcomes and are ordered newest first by default.",
-        operationId = "listPracticeReviewFindings"
+        operationId = "listPracticeReviewObservations"
     )
-    @ApiResponse(responseCode = "200", description = "Paginated findings returned")
+    @ApiResponse(responseCode = "200", description = "Paginated observations returned")
     @ApiResponse(
         responseCode = "400",
         description = "Invalid filter or pagination",
@@ -56,46 +56,46 @@ public class PracticeReviewOutputController {
             schema = @Schema(implementation = ProblemDetail.class)
         )
     )
-    public ResponseEntity<PagedModel<ReviewFindingDTO>> listFindings(
+    public ResponseEntity<PagedModel<ReviewObservationDTO>> listObservations(
         WorkspaceContext workspaceContext,
         @RequestParam(defaultValue = "0") @Min(0) int page,
         @RequestParam(defaultValue = "50") @Min(1) @Max(100) int size,
         @Parameter(
             description = "Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, " +
-                "then not-applicable findings; ties are newest first."
-        ) @RequestParam(defaultValue = "NEWEST") ReviewFindingSort sort,
-        @Valid @ParameterObject ReviewFindingFilterParams filter
+                "then not-applicable observations; ties are newest first."
+        ) @RequestParam(defaultValue = "NEWEST") ReviewObservationSort sort,
+        @Valid @ParameterObject ReviewObservationFilterParams filter
     ) {
         return ResponseEntity.ok(
             new PagedModel<>(
-                findingQueryService.list(workspaceContext.id(), filter.toFilter(), sort, PageRequest.of(page, size))
+                observationQueryService.list(workspaceContext.id(), filter.toFilter(), sort, PageRequest.of(page, size))
             )
         );
     }
 
-    @GetMapping("/findings/{findingId}")
+    @GetMapping("/observations/{observationId}")
     @Operation(
-        summary = "Get a finding with its evidence and linked feedback",
-        operationId = "getPracticeReviewFinding"
+        summary = "Get an observation with its evidence and linked feedback",
+        operationId = "getPracticeReviewObservation"
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Finding detail returned",
-        content = @Content(schema = @Schema(implementation = ReviewFindingDetailDTO.class))
+        description = "Observation detail returned",
+        content = @Content(schema = @Schema(implementation = ReviewObservationDetailDTO.class))
     )
     @ApiResponse(
         responseCode = "404",
-        description = "Finding not found in this workspace",
+        description = "Observation not found in this workspace",
         content = @Content(
             mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
             schema = @Schema(implementation = ProblemDetail.class)
         )
     )
-    public ResponseEntity<ReviewFindingDetailDTO> getFinding(
+    public ResponseEntity<ReviewObservationDetailDTO> getObservation(
         WorkspaceContext workspaceContext,
-        @PathVariable UUID findingId
+        @PathVariable UUID observationId
     ) {
-        return ResponseEntity.ok(findingQueryService.get(workspaceContext.id(), findingId));
+        return ResponseEntity.ok(observationQueryService.get(workspaceContext.id(), observationId));
     }
 
     @GetMapping("/feedback")
@@ -104,7 +104,7 @@ public class PracticeReviewOutputController {
         description = "Results are ordered newest first and include every delivery state.",
         operationId = "listPracticeReviewFeedback"
     )
-    @ApiResponse(responseCode = "200", description = "Paginated messages returned")
+    @ApiResponse(responseCode = "200", description = "Paginated feedback returned")
     @ApiResponse(
         responseCode = "400",
         description = "Invalid filter or pagination",
@@ -128,12 +128,12 @@ public class PracticeReviewOutputController {
 
     @GetMapping("/feedback/{feedbackId}")
     @Operation(
-        summary = "Get feedback with its stored body, findings and placements",
+        summary = "Get feedback with its stored body, observations and placements",
         operationId = "getPracticeReviewFeedback"
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Message details returned",
+        description = "Feedback detail returned",
         content = @Content(schema = @Schema(implementation = ReviewFeedbackDetailDTO.class))
     )
     @ApiResponse(

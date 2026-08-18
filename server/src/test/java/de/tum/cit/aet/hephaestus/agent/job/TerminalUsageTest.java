@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageSourceType;
 import de.tum.cit.aet.hephaestus.agent.usage.PricingState;
+import de.tum.cit.aet.hephaestus.agent.usage.UsageProvenance;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -29,7 +30,7 @@ class TerminalUsageTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a usable runner report is authoritative")
+    @DisplayName("a runner report that saw more than the proxy is billed in full")
     void runnerReportWins() {
         TerminalUsage usage = TerminalUsage.resolve(runner(1000, 700, 6), new AgentJobLlmUsage(4, 900, 600, 0, 0, 0));
 
@@ -37,6 +38,74 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.totalCalls()).isEqualTo(6);
         assertThat(usage.inputTokens()).isEqualTo(1000);
         assertThat(usage.outputTokens()).isEqualTo(700);
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.RUNNER);
+    }
+
+    // The live defect, at its measured scale. The proxy forwarded 143 calls and 4,274,916 input tokens;
+    // the runner's report — derived by walking a compacted session's surviving messages — claimed 26 and
+    // 969,765. Preferring the runner because it was non-zero billed a quarter of the spend, and the
+    // monthly cap reads this ledger.
+    @Test
+    @DisplayName("compaction eating the runner's calls no longer under-bills: the proxy's larger count wins")
+    void aCompactedRunnerReportDoesNotBeatTheProxy() {
+        TerminalUsage usage = TerminalUsage.resolve(
+            runner(969_765, 120_000, 26),
+            new AgentJobLlmUsage(143, 4_274_916, 500_000, 0, 0, 0)
+        );
+
+        assertThat(usage.totalCalls()).isEqualTo(143);
+        assertThat(usage.inputTokens()).isEqualTo(4_274_916);
+        assertThat(usage.outputTokens()).isEqualTo(500_000);
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
+    }
+
+    // Each source is blind to something the other sees, so the resolved row can match neither. That is
+    // what the provenance column exists to say.
+    @Test
+    @DisplayName("each bucket is taken from whichever source saw more, and the row says it was merged")
+    void bucketsAreTakenIndependently() {
+        LlmUsage runnerUsage = new LlmUsage("m", 100, 4_000, 7, 50, 900, 0.0, 3);
+        AgentJobLlmUsage proxy = new AgentJobLlmUsage(9, 8_000, 200, 11, 20, 0);
+
+        TerminalUsage usage = TerminalUsage.resolve(runnerUsage, proxy);
+
+        assertThat(usage.inputTokens()).isEqualTo(8_000);
+        assertThat(usage.outputTokens()).isEqualTo(4_000);
+        assertThat(usage.reasoningTokens()).isEqualTo(11);
+        assertThat(usage.cacheReadTokens()).isEqualTo(50);
+        assertThat(usage.totalCalls()).isEqualTo(9);
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.MERGED);
+    }
+
+    // The proxy never accumulates a cache write, so a maximum against it must not read the missing
+    // column as a zero that beats the only source that has the number.
+    @Test
+    @DisplayName("cache writes survive the maximum even though the proxy never counts them")
+    void cacheWritesSurviveTheMaximum() {
+        TerminalUsage usage = TerminalUsage.resolve(
+            new LlmUsage("m", 100, 200, 0, 0, 12_345, 0.0, 2),
+            new AgentJobLlmUsage(9, 8_000, 900, 0, 0, 0)
+        );
+
+        assertThat(usage.cacheWriteTokens()).isEqualTo(12_345);
+    }
+
+    // Neither source double-counts within itself, so no bucket of the maximum can exceed what was really
+    // spent. The property this asserts is the whole safety argument for taking a maximum at all.
+    @Test
+    @DisplayName("no bucket is ever billed above the larger of the two records")
+    void neverBillsAboveEitherRecord() {
+        LlmUsage runnerUsage = new LlmUsage("m", 100, 4_000, 7, 50, 900, 0.0, 3);
+        AgentJobLlmUsage proxy = new AgentJobLlmUsage(9, 8_000, 200, 11, 20, 0);
+
+        TerminalUsage usage = TerminalUsage.resolve(runnerUsage, proxy);
+
+        assertThat(usage.inputTokens()).isEqualTo(Math.max(100, 8_000));
+        assertThat(usage.outputTokens()).isEqualTo(Math.max(4_000, 200));
+        assertThat(usage.reasoningTokens()).isEqualTo(Math.max(7, 11));
+        assertThat(usage.cacheReadTokens()).isEqualTo(Math.max(50, 20));
+        assertThat(usage.cacheWriteTokens()).isEqualTo(Math.max(900, 0));
+        assertThat(usage.totalCalls()).isEqualTo(Math.max(3, 9));
     }
 
     @Test
@@ -49,6 +118,7 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.inputTokens()).isEqualTo(900);
         assertThat(usage.cacheReadTokens()).isEqualTo(100);
         assertThat(usage.reasoningTokens()).isEqualTo(30);
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.PROXY);
     }
 
     @Test
@@ -80,6 +150,7 @@ class TerminalUsageTest extends BaseUnitTest {
         assertThat(usage.verifiable()).isFalse();
         assertThat(usage.inputTokens()).isZero();
         assertThat(usage.totalCalls()).isZero();
+        assertThat(usage.provenance()).isEqualTo(UsageProvenance.NONE);
     }
 
     @Test
@@ -126,6 +197,9 @@ class TerminalUsageTest extends BaseUnitTest {
             }
             assertThat(sample.getValue().sourceType()).isEqualTo(LlmUsageSourceType.AGENT_JOB);
             assertThat(sample.getValue().model()).isEqualTo("gpt-5");
+            // Provenance rides onto the row on BOTH append paths: an unpriced row's tokens are still the
+            // evidence somebody will reconcile once a price exists for them.
+            assertThat(sample.getValue().provenance()).isNotNull();
         }
 
         @Test

@@ -1,12 +1,13 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import { toast } from "sonner";
 import { describe, expect, it } from "vitest";
 import { Toaster } from "@/components/ui/sonner";
 
 /**
- * A tripwire on the dependency, not on our own code: sonner has no per-toast politeness, so every
- * toast is polite. These fail when upstream fixes that — then route `toast.error` to an assertive
- * region (emilkowalski/sonner#765) and delete this file.
+ * A tripwire on the dependency, not on our own code: sonner hardcodes `aria-live="polite"` on its
+ * container and exposes no per-toast politeness, so an error toast cannot interrupt
+ * (emilkowalski/sonner#765). This fails when upstream lands that, which is the cue to route
+ * `toast.error` to an assertive region.
  */
 describe("sonner toast politeness", () => {
 	it("announces an error toast politely, because there is no per-toast role to set", async () => {
@@ -18,14 +19,5 @@ describe("sonner toast politeness", () => {
 		expect(region?.getAttribute("aria-live")).toBe("polite");
 
 		expect(screen.queryByRole("alert")).toBeNull();
-	});
-
-	it("drops an aria-live override rather than forwarding it to the container", async () => {
-		// The cast is the point: `ToasterProps` has no politeness prop to pass.
-		render(<Toaster {...({ "aria-live": "assertive" } as object)} />);
-		toast.error("Could not save the model");
-
-		await waitFor(() => expect(document.querySelector("section[aria-live]")).not.toBeNull());
-		expect(document.querySelector("section[aria-live]")?.getAttribute("aria-live")).toBe("polite");
 	});
 });

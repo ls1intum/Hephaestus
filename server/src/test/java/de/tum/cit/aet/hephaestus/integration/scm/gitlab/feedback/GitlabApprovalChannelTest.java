@@ -12,11 +12,11 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackContent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -40,7 +40,7 @@ class GitlabApprovalChannelTest extends BaseUnitTest {
     private GitLabTokenService tokenService;
 
     @Mock
-    private GitlabFeedbackChannel feedbackChannel;
+    private GitlabSummaryChannel feedbackChannel;
 
     @Mock
     private OutboundEgressGuard egressGuard;

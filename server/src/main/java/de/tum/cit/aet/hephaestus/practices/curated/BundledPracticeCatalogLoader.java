@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.practices.AreaDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.curated.BundledPracticeCatalog.BundledEntry;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -25,15 +28,23 @@ public class BundledPracticeCatalogLoader {
 
     private final BundledPracticeCatalog catalog;
 
-    BundledPracticeCatalogLoader(JsonMapper objectMapper) {
-        this.catalog = parse(objectMapper);
+    BundledPracticeCatalogLoader(
+        JsonMapper objectMapper,
+        PracticeDefinitionValidator definitionValidator,
+        PracticeEvidenceDefaults evidenceDefaults
+    ) {
+        this.catalog = parse(objectMapper, definitionValidator, evidenceDefaults);
     }
 
     BundledPracticeCatalog catalog() {
         return catalog;
     }
 
-    private static BundledPracticeCatalog parse(JsonMapper objectMapper) {
+    private static BundledPracticeCatalog parse(
+        JsonMapper objectMapper,
+        PracticeDefinitionValidator definitionValidator,
+        PracticeEvidenceDefaults evidenceDefaults
+    ) {
         JsonNode root = readCatalog(objectMapper);
         List<BundledEntry<AreaDefinition>> areas = new ArrayList<>();
         List<BundledEntry<PracticeDefinition>> practices = new ArrayList<>();
@@ -73,7 +84,19 @@ public class BundledPracticeCatalogLoader {
                     throw new IllegalStateException("duplicate bundled practice slug: " + slug);
                 }
                 practices.add(
-                    new BundledEntry<>(slug, definition(root, areaSlug, practiceNode, slug), practicePosition++)
+                    new BundledEntry<>(
+                        slug,
+                        definition(
+                            objectMapper,
+                            definitionValidator,
+                            evidenceDefaults,
+                            root,
+                            areaSlug,
+                            practiceNode,
+                            slug
+                        ),
+                        practicePosition++
+                    )
                 );
             }
         }
@@ -83,44 +106,98 @@ public class BundledPracticeCatalogLoader {
         return new BundledPracticeCatalog(List.copyOf(areas), List.copyOf(practices));
     }
 
-    private static PracticeDefinition definition(JsonNode catalog, String areaSlug, JsonNode node, String slug) {
-        WorkArtifact artifactType = WorkArtifact.valueOf(requiredText(node, "artifactType"));
-        JsonNode triggersNode = node.path("triggerEvents");
-        if (!triggersNode.isArray()) {
-            throw new IllegalStateException("bundled practice triggerEvents must be an array: " + slug);
-        }
-        List<String> rawTriggerEvents = new ArrayList<>();
-        triggersNode.forEach(trigger -> {
-            if (!trigger.isString()) {
-                throw new IllegalStateException("bundled practice trigger event must be text: " + slug);
-            }
-            rawTriggerEvents.add(trigger.asString());
-        });
-        List<String> triggerEvents = rawTriggerEvents.stream().sorted().toList();
+    private static PracticeDefinition definition(
+        JsonMapper objectMapper,
+        PracticeDefinitionValidator definitionValidator,
+        PracticeEvidenceDefaults evidenceDefaults,
+        JsonNode catalog,
+        String areaSlug,
+        JsonNode node,
+        String slug
+    ) {
+        List<PracticeBinding> bindings = bindings(objectMapper, evidenceDefaults, node, slug);
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
         String preambleKey = text(node, "preamble");
         if (preambleKey == null) {
-            preambleKey = artifactType.name();
+            preambleKey = artifactKind.value();
         }
         String criteria = composeCriteria(catalog, preambleKey, requiredText(node, "criteria"));
         String whyItMatters = text(node, "whyItMatters");
         String whatGoodLooksLike = text(node, "whatGoodLooksLike");
-        PracticeDefinitionValidator.validate(artifactType, triggerEvents, whyItMatters, whatGoodLooksLike);
-        return new PracticeDefinition(
+        PracticeDefinition definition = new PracticeDefinition(
             requiredText(node, "name"),
-            artifactType,
-            triggerEvents,
+            bindings,
             criteria,
-            loadPrecomputeScript(slug),
+            loadPrecomputeScript(node, slug),
+            // The authoring file cannot override the review frame: every bundled practice takes its
+            // kind's default contract, mode and limits.
+            evidenceDefaults.policyFor(artifactKind),
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
         );
+        definitionValidator.validate(definition);
+        return definition;
     }
 
-    private static @Nullable String loadPrecomputeScript(String slug) {
-        var resource = new ClassPathResource("practices/precompute/" + slug + ".ts");
-        if (!resource.exists()) {
+    /**
+     * Reads the {@code on} list.
+     *
+     * <p>A bare string is a binding on that signal reading the kind's default evidence; requiring each
+     * practice to spell those out would only let the copies drift. An object names the evidence instead,
+     * and is how a practice that must establish an <em>absence</em> declares the exhaustive capture that
+     * licenses the claim.
+     */
+    private static List<PracticeBinding> bindings(
+        JsonMapper objectMapper,
+        PracticeEvidenceDefaults evidenceDefaults,
+        JsonNode node,
+        String slug
+    ) {
+        JsonNode on = node.path("on");
+        if (!on.isArray() || on.isEmpty()) {
+            throw new IllegalStateException("bundled practice must declare a non-empty 'on' array: " + slug);
+        }
+        List<PracticeBinding> bindings = new ArrayList<>();
+        for (JsonNode entry : on) {
+            if (entry.isString()) {
+                SignalName signal = SignalName.of(entry.asString());
+                bindings.add(PracticeBinding.on(signal, evidenceDefaults.needsFor(signal.artifactKind())));
+                continue;
+            }
+            if (!entry.isObject()) {
+                throw new IllegalStateException("bundled practice binding must be a signal name or object: " + slug);
+            }
+            PracticeBinding binding;
+            try {
+                binding = objectMapper.treeToValue(entry, PracticeBinding.class);
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException("invalid bundled practice binding: " + slug, exception);
+            }
+            if (binding.needs().isEmpty()) {
+                // Every component but `needs` is carried through: filling in the kind's default evidence
+                // must not quietly reset whose conduct the occasion judges.
+                binding = new PracticeBinding(
+                    binding.signals(),
+                    evidenceDefaults.needsFor(binding.artifactKind()),
+                    binding.onDrafts(),
+                    binding.subject(),
+                    binding.appliesWhen()
+                );
+            }
+            bindings.add(binding);
+        }
+        return List.copyOf(bindings);
+    }
+
+    private static @Nullable String loadPrecomputeScript(JsonNode node, String slug) {
+        String resourcePath = text(node, "precomputeScript");
+        if (resourcePath == null) {
             return null;
+        }
+        var resource = new ClassPathResource(resourcePath);
+        if (!resource.exists()) {
+            throw new IllegalStateException("bundled precompute script does not exist: " + resourcePath);
         }
         try (InputStream input = resource.getInputStream()) {
             return new String(input.readAllBytes(), StandardCharsets.UTF_8);

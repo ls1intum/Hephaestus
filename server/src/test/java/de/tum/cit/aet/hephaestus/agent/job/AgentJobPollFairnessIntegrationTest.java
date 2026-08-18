@@ -158,7 +158,7 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
     private void binding(Workspace workspace, int maxConcurrentJobs) {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setInstanceModel(instanceModel);
         binding.setEnabled(true);
         binding.setMaxConcurrentJobs(maxConcurrentJobs);
@@ -168,7 +168,7 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
     private UUID runningJob(Workspace workspace) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setStartedAt(Instant.now());
@@ -180,7 +180,7 @@ class AgentJobPollFairnessIntegrationTest extends BaseIntegrationTest {
     private UUID queuedJob(Workspace workspace, Instant createdAt) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.QUEUED);
         job.setConfigSnapshot(objectMapper.createObjectNode());

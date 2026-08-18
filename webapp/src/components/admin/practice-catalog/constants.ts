@@ -1,59 +1,37 @@
-import type { Practice } from "@/api/types.gen";
+import { ARTIFACT_KIND, type ArtifactKindId, artifactKindPluralLabel } from "@/lib/artifact-kinds";
 
-export type WorkArtifact = NonNullable<Practice["artifactType"]>;
+export type WorkArtifact = ArtifactKindId;
 
-export const TRIGGER_EVENTS_BY_FOCUS: Record<
-	WorkArtifact,
-	ReadonlyArray<{ value: string; label: string }>
-> = {
-	PULL_REQUEST: [
-		{ value: "PullRequestCreated", label: "Pull or merge request is opened" },
-		{ value: "PullRequestReady", label: "Marked ready for review" },
-		{ value: "PullRequestSynchronized", label: "New commits are pushed" },
-		{ value: "ReviewSubmitted", label: "A review is submitted" },
-		{ value: "PullRequestMerged", label: "Pull or merge request is merged" },
-	],
-	ISSUE: [
-		{ value: "IssueCreated", label: "Issue is opened" },
-		{ value: "IssueLabeled", label: "Issue is labeled" },
-		{ value: "IssueClosed", label: "Issue is closed" },
-	],
-	CONVERSATION_THREAD: [],
+const WORK_ARTIFACT_HINTS: Record<string, string> = {
+	[ARTIFACT_KIND.pullRequest]: "Reviews work submitted in a pull or merge request",
+	[ARTIFACT_KIND.issue]: "Reviews work described or discussed in an issue",
+	[ARTIFACT_KIND.conversationThread]: "Reviews messages in a conversation thread",
+	[ARTIFACT_KIND.document]: "Reviews the writing in a published document",
 };
 
-export function triggerEventsForFocus(focus: WorkArtifact): string[] {
-	return TRIGGER_EVENTS_BY_FOCUS[focus].map((e) => e.value);
+/** Undefined for a kind this build has never heard of, which is still offered under its own name. */
+export function workArtifactHint(kind: string): string | undefined {
+	return WORK_ARTIFACT_HINTS[kind];
 }
 
-export const WORK_ARTIFACT_LABELS = {
-	PULL_REQUEST: "Pull or merge request",
-	ISSUE: "Issue",
-	CONVERSATION_THREAD: "Conversation",
-} satisfies Record<WorkArtifact, string>;
-
-export const FOCUS_ARTIFACT_OPTIONS = [
-	{
-		value: "PULL_REQUEST",
-		label: WORK_ARTIFACT_LABELS.PULL_REQUEST,
-		hint: "Evaluates the diff, commits, and review thread",
-	},
-	{
-		value: "ISSUE",
-		label: WORK_ARTIFACT_LABELS.ISSUE,
-		hint: "Evaluates the issue title, body, labels, and comments",
-	},
-	{
-		value: "CONVERSATION_THREAD",
-		label: WORK_ARTIFACT_LABELS.CONVERSATION_THREAD,
-		hint: "Evaluates recent messages when the scheduled conversation review runs",
-	},
-] as const;
-
 export const WORK_ARTIFACT_FILTER_OPTIONS = [
-	{ value: "PULL_REQUEST", label: "Pull or merge requests" },
-	{ value: "ISSUE", label: "Issues" },
-	{ value: "CONVERSATION_THREAD", label: "Conversations" },
+	{ value: ARTIFACT_KIND.pullRequest, label: artifactKindPluralLabel(ARTIFACT_KIND.pullRequest) },
+	{ value: ARTIFACT_KIND.issue, label: artifactKindPluralLabel(ARTIFACT_KIND.issue) },
+	{
+		value: ARTIFACT_KIND.conversationThread,
+		label: artifactKindPluralLabel(ARTIFACT_KIND.conversationThread),
+	},
+	{ value: ARTIFACT_KIND.document, label: artifactKindPluralLabel(ARTIFACT_KIND.document) },
 ] as const;
+
+/**
+ * The same list with the "no filter" choice at its head. "ALL" is a value rather than an absent one
+ * because a Base UI `Select` must hold one, and it is the sentinel the URL already carries.
+ */
+export const WORK_ARTIFACT_FILTER_ITEMS: {
+	value: "ALL" | ArtifactKindId;
+	label: string;
+}[] = [{ value: "ALL", label: "All work types" }, ...WORK_ARTIFACT_FILTER_OPTIONS];
 
 export function generateSlug(name: string): string {
 	return name

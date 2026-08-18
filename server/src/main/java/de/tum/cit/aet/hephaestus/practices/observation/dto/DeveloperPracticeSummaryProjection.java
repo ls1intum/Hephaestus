@@ -3,9 +3,9 @@ package de.tum.cit.aet.hephaestus.practices.observation.dto;
 import java.time.Instant;
 
 /**
- * Interface projection for per-practice aggregation of developer findings.
+ * Interface projection for per-practice aggregation of developer observations.
  *
- * <p>Used by the summary query that groups findings by practice and computes assessment
+ * <p>Used by the summary query that groups observations by practice and computes assessment
  * counts (ADR 0022). Spring Data JPA maps the query result columns to these getter methods.
  */
 public interface DeveloperPracticeSummaryProjection {

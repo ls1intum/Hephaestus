@@ -19,8 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * GitLab-specific REST endpoints used during the workspace creation wizard: one validates a personal
- * access token, the other lists the groups that token can reach. Both require the
+ * GitLab-specific REST endpoints used during the workspace creation wizard. Gated on the
  * {@code GITLAB_WORKSPACE_CREATION} feature flag.
  */
 @RestController

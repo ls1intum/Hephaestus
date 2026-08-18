@@ -80,6 +80,7 @@ services:
       # secret is per-subscription (minted on the app pod, stored encrypted on the connection row) and
       # is read back through JPA. Keep in lockstep with the app stack's value.
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
+      HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:-}
       # Previews run non-release images with no release-pin, so don't require a digest-pinned agent image.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-false}
       THC_PORT: "8080"

@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 
-/** Two axes decide the copy: *whose* cap tripped (`scope`) and *why* (`verdict`). */
 const meta = {
 	component: BudgetExhaustedAlert,
 	parameters: { layout: "padded" },

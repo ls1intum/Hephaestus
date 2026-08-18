@@ -292,7 +292,7 @@ class SlackIngestServiceTest extends BaseUnitTest {
 
         // Consent flip stops future ingestion + drops threads out of the ACTIVE-consent projectors…
         verify(monitoredChannelRepository).revokeConsent(7L, "C1");
-        // …the derived CONVERSATION_THREAD observations/feedback are hard-deleted through the practices port
+        // …the derived chat.conversation_thread observations/feedback are hard-deleted through the practices port
         // (true erasure, not inert-by-gate)…
         verify(conversationFeedbackErasure).eraseForThreads(7L, List.of(11L, 22L));
         // …and the channel's raw content (messages) + thread aggregates are deleted now, not left for the sweep.

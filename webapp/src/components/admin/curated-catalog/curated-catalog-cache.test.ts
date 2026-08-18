@@ -14,6 +14,11 @@ const status: CatalogEntryStatus = {
 	offered: true,
 };
 
+const automatedReview = {
+	mode: "LANGUAGE_MODEL",
+	evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
+} as const;
+
 const catalog = {
 	etag: "structure",
 	customOrder: false,
@@ -35,7 +40,8 @@ const catalog = {
 		{
 			slug: "one",
 			name: "One",
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
+			automatedReview,
 			areaSlug: "a",
 			position: 0,
 			effectivelyOffered: true,
@@ -44,7 +50,8 @@ const catalog = {
 		{
 			slug: "two",
 			name: "Two",
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
+			automatedReview,
 			areaSlug: "a",
 			position: 1,
 			effectivelyOffered: true,
@@ -53,7 +60,8 @@ const catalog = {
 		{
 			slug: "three",
 			name: "Three",
-			artifactType: "ISSUE",
+			artifactKind: "scm.issue",
+			automatedReview,
 			areaSlug: "b",
 			position: 0,
 			effectivelyOffered: false,

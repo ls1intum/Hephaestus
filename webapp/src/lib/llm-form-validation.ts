@@ -2,8 +2,8 @@ import { z } from "zod";
 import type { PricingMode } from "@/lib/llm-pricing";
 
 /**
- * Validation for the LLM forms, which set `noValidate` — so `required`, `min`, `step` and
- * `type="url"` are inert and this is the only thing enforcing them.
+ * The LLM forms set `noValidate`, so the native constraint attributes never fire and this is the
+ * only thing enforcing them.
  *
  * Deliberately does not mirror the server's instance-state rules (host resolution, egress allowlist,
  * loopback): guessing at those here would reject setups an operator has legitimately enabled.

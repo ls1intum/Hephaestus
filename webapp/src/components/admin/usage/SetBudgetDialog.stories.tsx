@@ -3,7 +3,6 @@ import { fn } from "storybook/test";
 import { expectAmountRejected } from "@/test/budget-amount-field";
 import { SetBudgetDialog } from "./SetBudgetDialog";
 
-/** Instance-admin dialog to set or remove a workspace's monthly shared-model budget. */
 const meta = {
 	component: SetBudgetDialog,
 	parameters: { layout: "centered" },
@@ -52,8 +51,9 @@ export const Pending: Story = {
 	args: { isPending: true },
 };
 
-/** The dialog is portalled, so {@link expectAmountRejected} queries the document, not the canvas. */
+/** The caller names the field and the button; an empty amount is refused with the caller's words. */
 export const PassesItsFieldAndButtonCopyThrough: Story = {
+	// The dialog is portalled, so {@link expectAmountRejected} queries the document, not the canvas.
 	play: async ({ args }) =>
 		await expectAmountRejected({
 			fieldLabel: /monthly budget/i,

@@ -22,7 +22,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * One test per producer wired on this branch. {@code ConfigAuditRecorder} throws outside a writable
+ * One test per config-audit producer. {@code ConfigAuditRecorder} throws outside a writable
  * transaction, so an unexercised producer is a latent 500 rather than merely a missing row — and it
  * drops an UPDATE whose diff is empty, which is silent when a snapshot is built so it never differs.
  */

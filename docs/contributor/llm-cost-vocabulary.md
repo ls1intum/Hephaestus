@@ -11,10 +11,9 @@ Money surfaces go wrong in a particular way: two screens use one word for two di
 two words for one number, and nobody notices because both render fine. This page is the vocabulary the
 LLM cost and pricing surfaces enforce, written down so a citation can resolve to something.
 
-Rules are numbered and referenced by number from code (`glossary rule #2`). **Renumbering breaks those
-citations — append, do not reorder.** Every rule below describes what the code does today; where a
-rule has a single owner in code, that owner is named, and the rule belongs there rather than at each
-call site.
+Code cites these rules by number. **Renumbering breaks those citations — append, do not reorder.**
+Where a rule has a single owner in code, that owner is named, and the rule belongs there rather than
+at each call site.
 
 ---
 
@@ -127,8 +126,8 @@ pace in the browser. All four are rendering. A meter that read 99.9997% while th
 be a wart; a meter that *decided* would be a bug. FX in particular is never an input to a budget, a
 price or the ledger.
 
-Note what this means for anyone reading the API: there is no `remaining` field. Meters print "X of Y"
-and derive the difference for display only.
+Note what this means for anyone reading the API: no budget or cap payload carries a `remaining`
+field. Meters print "X of Y" and derive the difference for display only.
 
 ## Rule 7 — Say what the bound is, not how it feels
 

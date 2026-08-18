@@ -9,26 +9,22 @@ import type {
 } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
 	Field,
 	FieldContent,
 	FieldDescription,
 	FieldError,
 	FieldLabel,
+	FieldLegend,
+	FieldSet,
+	FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import { Spinner } from "@/components/ui/spinner";
+import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
+import { reviewModelRunnable } from "./review/review-readiness";
 
 export type PracticeReviewField = NonNullable<UpdatePracticeReviewSettingsRequest["reset"]>[number];
 export type PracticeReviewWorkspaceUpdate = Pick<
@@ -61,11 +57,16 @@ export interface PracticeReviewSettingsProps {
 
 const COVERAGE_ALL = "all";
 const COVERAGE_ROLE = "role";
-const COVERAGE_ITEMS = [
-	{ value: COVERAGE_ALL, label: "All matching work" },
-	{ value: COVERAGE_ROLE, label: "Assigned review participants" },
-];
+const COVERAGE_LABEL: Record<string, string> = {
+	[COVERAGE_ALL]: "All matching work",
+	[COVERAGE_ROLE]: "Only assignees with the review role",
+};
 
+/**
+ * Sections rather than cards, and no rules between them: hierarchy is carried by the heading and the
+ * spacing, so the only borders left on this surface are the row lists — the boxes the reader is meant
+ * to count. The sweep schedule below renders as one more section of the same shape.
+ */
 export function PracticeReviewSettings({
 	workspaceSlug,
 	model,
@@ -73,86 +74,69 @@ export function PracticeReviewSettings({
 	policy,
 }: PracticeReviewSettingsProps) {
 	return (
-		<div className="space-y-6">
-			<ProjectReviewStatusCard workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
-			<ReviewTimingCard workspace={workspace} policy={policy} />
-			<ProjectReviewRulesCard policy={policy} />
+		<div className="space-y-8">
+			<ReviewStatusSection workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
+			<ReviewTimingSection workspace={workspace} policy={policy} />
+			<ReviewedWorkSection policy={policy} />
 		</div>
 	);
 }
 
-function ProjectReviewStatusCard({
+function ReviewStatusSection({
 	workspaceSlug,
 	model,
 	workspace,
 }: Pick<PracticeReviewSettingsProps, "workspaceSlug" | "model" | "workspace">) {
-	const modelRunnable =
-		!model.isLoading && !model.isError && model.binding?.ready === true && model.binding.enabled;
-	const hasTrigger = workspace.autoTriggerEnabled || workspace.manualTriggerEnabled;
-
-	let status: string;
-	if (workspace.enabled) {
-		if (model.isLoading) status = "Practice reviews are on while model readiness is being checked.";
-		else if (model.isError)
-			status = "Practice reviews are on, but model readiness couldn't be confirmed.";
-		else if (!modelRunnable)
-			status = "Practice reviews are on, but none can start until the review model is ready.";
-		else if (!hasTrigger)
-			status = "Practice reviews are on. Automatic and manual project triggers are off.";
-		else status = "Practice reviews can start when their source and review rules allow it.";
-	} else if (model.isLoading || model.isError || !modelRunnable) {
-		status = "Choose a runnable review model before starting reviews.";
-	} else {
-		status = "No new practice reviews will start. Reviews already running may finish.";
-	}
+	const modelRunnable = reviewModelRunnable(model);
+	// Loading and failed both count as not ready: the switch is closed against them, so the sentence
+	// explaining why it is closed has to cover them too.
+	const modelNotReady = model.isLoading || model.isError || !modelRunnable;
 
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Practice review status</h2>
-				</CardTitle>
-				<CardDescription>Control whether new practice reviews can start.</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="practice-reviews-enabled">Start practice reviews</FieldLabel>
-						<FieldDescription>{status}</FieldDescription>
-					</FieldContent>
-					<Switch
-						id="practice-reviews-enabled"
-						checked={workspace.enabled}
-						disabled={
-							workspace.isSaving ||
-							(!workspace.enabled && (model.isLoading || model.isError || !modelRunnable))
-						}
-						onCheckedChange={(checked) => workspace.onUpdate({ practicesEnabled: checked })}
-					/>
-				</Field>
-				<ModelReadiness workspaceSlug={workspaceSlug} model={model} runnable={modelRunnable} />
-			</CardContent>
-		</Card>
+		<section className="space-y-4" aria-labelledby="review-status-heading">
+			<div className="space-y-1">
+				<h2 id="review-status-heading" className="font-semibold text-lg">
+					Practice reviews
+				</h2>
+				{/* Whether reviews are actually running is the page banner's sentence, not a second one
+				    here: two prose state machines over the same facts drift apart. */}
+				<p className="text-muted-foreground text-sm">
+					Whether new practice reviews can start in this workspace.
+				</p>
+			</div>
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="practice-reviews-enabled">Start practice reviews</FieldLabel>
+					<FieldDescription>
+						{!workspace.enabled && modelNotReady
+							? "This can be turned on once a review model is ready to run."
+							: "New work is reviewed while this is on. Switching it off stops new reviews; any already running may finish."}
+					</FieldDescription>
+				</FieldContent>
+				<Switch
+					id="practice-reviews-enabled"
+					checked={workspace.enabled}
+					disabled={workspace.isSaving || (!workspace.enabled && modelNotReady)}
+					onCheckedChange={(checked) => workspace.onUpdate({ practicesEnabled: checked })}
+				/>
+			</Field>
+			<ModelReadiness workspaceSlug={workspaceSlug} model={model} runnable={modelRunnable} />
+		</section>
 	);
 }
 
+/**
+ * Only the states that need an action of their own. Whether the model is ready is already the page
+ * banner's headline; repeating it here as a third widget said the same thing three times on one page,
+ * so the healthy state is left as the one thing the banner cannot offer — the way to change it.
+ */
 function ModelReadiness({
 	workspaceSlug,
 	model,
 	runnable,
 }: Pick<PracticeReviewSettingsProps, "workspaceSlug" | "model"> & { runnable: boolean }) {
 	if (model.isLoading) {
-		return (
-			<Item variant="outline" size="sm">
-				<ItemContent>
-					<ItemTitle>Review model</ItemTitle>
-					<ItemDescription>Checking readiness…</ItemDescription>
-				</ItemContent>
-				<ItemActions>
-					<Spinner className="size-4" />
-				</ItemActions>
-			</Item>
-		);
+		return null;
 	}
 
 	if (model.isError) {
@@ -171,21 +155,13 @@ function ModelReadiness({
 
 	if (runnable) {
 		return (
-			<Item variant="outline" size="sm">
-				<ItemContent>
-					<ItemTitle>Review model</ItemTitle>
-					<ItemDescription>Ready to run</ItemDescription>
-				</ItemContent>
-				<ItemActions>
-					<Link
-						to="/w/$workspaceSlug/admin/models"
-						params={{ workspaceSlug }}
-						className={buttonVariants({ variant: "outline", size: "sm" })}
-					>
-						Change
-					</Link>
-				</ItemActions>
-			</Item>
+			<Link
+				to="/w/$workspaceSlug/admin/models"
+				params={{ workspaceSlug }}
+				className={cn(buttonVariants({ variant: "link", size: "sm" }), "h-auto self-start p-0")}
+			>
+				Change the review model
+			</Link>
 		);
 	}
 
@@ -213,61 +189,78 @@ function ModelReadiness({
 	);
 }
 
-function ReviewTimingCard({
+function ReviewTimingSection({
 	workspace,
 	policy,
 }: Pick<PracticeReviewSettingsProps, "workspace" | "policy">) {
+	// Reviews on, but no door open. The page banner cannot see this — it knows the switch and the
+	// model, not the triggers — so the only place it can be said is beside the switches that cause it.
+	const noWayIn =
+		workspace.enabled && !workspace.autoTriggerEnabled && !workspace.manualTriggerEnabled;
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Project review triggers</h2>
-				</CardTitle>
-				<CardDescription>
-					Choose how connected GitHub or GitLab work can start a review.
-				</CardDescription>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="trigger-auto">Automatic reviews</FieldLabel>
-						<FieldDescription>
-							Start reviews from the GitHub or GitLab events selected on each active practice.
-						</FieldDescription>
-					</FieldContent>
-					<Switch
-						id="trigger-auto"
-						checked={workspace.autoTriggerEnabled}
-						disabled={workspace.isSaving}
-						onCheckedChange={(checked) =>
-							workspace.onUpdate({ practiceReviewAutoTriggerEnabled: checked })
-						}
-					/>
-				</Field>
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="trigger-manual">Manual reviews</FieldLabel>
-						<FieldDescription>
-							Allow <code>/hephaestus review</code> in a pull or merge request comment.
-						</FieldDescription>
-					</FieldContent>
-					<Switch
-						id="trigger-manual"
-						checked={workspace.manualTriggerEnabled}
-						disabled={workspace.isSaving}
-						onCheckedChange={(checked) =>
-							workspace.onUpdate({ practiceReviewManualTriggerEnabled: checked })
-						}
-					/>
-				</Field>
-				<CooldownField
-					key={policy.settings.cooldownMinutes}
-					value={policy.settings.cooldownMinutes}
-					overridden={policy.settings.cooldownMinutesOverride != null}
-					policy={policy}
+		<section className="space-y-4" aria-labelledby="review-timing-heading">
+			<div className="space-y-1">
+				<h2 id="review-timing-heading" className="font-semibold text-lg">
+					How reviews start
+				</h2>
+				<p className="text-muted-foreground text-sm">
+					Two ways in: the work itself reaches a moment a practice watches for, or somebody asks.
+				</p>
+			</div>
+			{noWayIn ? (
+				<Alert variant="warning" role="status">
+					<AlertCircle />
+					<AlertTitle>Nothing can start a review</AlertTitle>
+					<AlertDescription>
+						Practice reviews are on, but both ways in are switched off.
+					</AlertDescription>
+				</Alert>
+			) : null}
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="trigger-auto">Reviews the work starts</FieldLabel>
+					<FieldDescription>
+						Connected work reaching one of the moments a practice watches for — opened, merged,
+						published — starts a review on its own.
+					</FieldDescription>
+				</FieldContent>
+				<Switch
+					id="trigger-auto"
+					checked={workspace.autoTriggerEnabled}
+					disabled={workspace.isSaving}
+					onCheckedChange={(checked) =>
+						workspace.onUpdate({ practiceReviewAutoTriggerEnabled: checked })
+					}
 				/>
-			</CardContent>
-		</Card>
+			</Field>
+			<Field orientation="horizontal">
+				<FieldContent>
+					{/* One switch, four doors — and only GitLab publishes the comment command, so the copy
+						    scopes it rather than promising it to every workspace. */}
+					<FieldLabel htmlFor="trigger-manual">Reviews somebody asks for</FieldLabel>
+					<FieldDescription>
+						The <strong>Review this now</strong> button, a backfill of past work, a recurring check,
+						and <code>/hephaestus review</code> in a GitLab merge request comment. Turning this off
+						stops every one of them.
+					</FieldDescription>
+				</FieldContent>
+				<Switch
+					id="trigger-manual"
+					checked={workspace.manualTriggerEnabled}
+					disabled={workspace.isSaving}
+					onCheckedChange={(checked) =>
+						workspace.onUpdate({ practiceReviewManualTriggerEnabled: checked })
+					}
+				/>
+			</Field>
+			<CooldownField
+				key={policy.settings.cooldownMinutes}
+				value={policy.settings.cooldownMinutes}
+				overridden={policy.settings.cooldownMinutesOverride != null}
+				policy={policy}
+			/>
+		</section>
 	);
 }
 
@@ -320,93 +313,251 @@ function CooldownField({
 	);
 }
 
-function ProjectReviewRulesCard({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
+/**
+ * Who the work belongs to, where it lives, and whether feedback still lands once it merges — one
+ * section, because every one of them answers the same question, and three headings over four fields
+ * made the reader look for a difference that was not there.
+ *
+ * <p>Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
+ * holds the pull request row and not the diff.
+ */
+function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
 	const settings = policy.settings;
+	const scope = settings.reviewScope;
+	const targetBranches = scope?.targetBranches ?? [];
+	const repositories = scope?.repositories ?? [];
+	const restricted = targetBranches.length > 0 || repositories.length > 0;
+
+	const update = (next: { targetBranches?: string[]; repositories?: string[] }) =>
+		policy.onUpdate({ reviewScope: { targetBranches, repositories, ...next } });
+
 	return (
-		<Card>
-			<CardHeader>
-				<CardTitle>
-					<h2>Project review rules</h2>
-				</CardTitle>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="policy-skip-drafts">Skip drafts</FieldLabel>
-						<InheritedSettingHint
-							label="Skip drafts"
-							overridden={settings.skipDraftsOverride != null}
-							field="SKIP_DRAFTS"
-							inheritedValue={settings.skipDrafts ? "On" : "Off"}
-							policy={policy}
-						/>
-					</FieldContent>
-					<Switch
-						id="policy-skip-drafts"
-						checked={settings.skipDrafts}
-						disabled={policy.isSaving}
-						onCheckedChange={(checked) => policy.onUpdate({ skipDrafts: checked })}
-					/>
-				</Field>
+		<section className="space-y-6" aria-labelledby="reviewed-work-heading">
+			<div className="space-y-1">
+				<h2 id="reviewed-work-heading" className="font-semibold text-lg">
+					What gets reviewed
+				</h2>
+				<p className="text-muted-foreground text-sm">
+					Which work a review may open, and whether feedback still lands once that work has merged.
+				</p>
+			</div>
 
-				<Field orientation="horizontal">
-					<FieldContent>
-						<FieldLabel htmlFor="policy-deliver-merged">Post feedback after merge</FieldLabel>
-						<InheritedSettingHint
-							label="Post feedback after merge"
-							overridden={settings.deliverToMergedOverride != null}
-							field="DELIVER_TO_MERGED"
-							inheritedValue={settings.deliverToMerged ? "On" : "Off"}
-							policy={policy}
-						/>
-					</FieldContent>
-					<Switch
-						id="policy-deliver-merged"
-						checked={settings.deliverToMerged}
-						disabled={policy.isSaving}
-						onCheckedChange={(checked) => policy.onUpdate({ deliverToMerged: checked })}
-					/>
-				</Field>
+			<CoverageField policy={policy} />
 
-				<Field>
-					<FieldLabel htmlFor="policy-coverage">Eligible work</FieldLabel>
-					<Select
-						items={COVERAGE_ITEMS}
-						value={settings.runForAllUsers ? COVERAGE_ALL : COVERAGE_ROLE}
-						disabled={policy.isSaving}
-						onValueChange={(value) => {
-							if (value) policy.onUpdate({ runForAllUsers: value === COVERAGE_ALL });
-						}}
-					>
-						<SelectTrigger id="policy-coverage" className="max-w-full">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{COVERAGE_ITEMS.map((item) => (
-								<SelectItem key={item.value} value={item.value}>
-									{item.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-					{!settings.runForAllUsers && (
-						<FieldDescription>
-							A review starts only when an assignee has the review role. This role is managed by
-							Hephaestus.
-						</FieldDescription>
-					)}
+			<ScopeList
+				id="scope-branches"
+				label="Target branches"
+				description="A pull request is reviewed only if it targets one of these. Issues are unaffected. Exact names — no wildcards."
+				placeholder="main"
+				values={targetBranches}
+				disabled={policy.isSaving}
+				onChange={(next) => update({ targetBranches: next })}
+			/>
+			<ScopeList
+				id="scope-repositories"
+				label="Repositories"
+				description="Only work in these repositories is reviewed. Use the full owner/name."
+				placeholder="acme/widgets"
+				values={repositories}
+				disabled={policy.isSaving}
+				onChange={(next) => update({ repositories: next })}
+			/>
+			{restricted ? (
+				<Button
+					variant="link"
+					size="sm"
+					className="h-auto p-0 text-xs"
+					disabled={policy.isSaving}
+					onClick={() => policy.onReset("REVIEW_SCOPE")}
+				>
+					{/* The visible words open the accessible name rather than being replaced by an
+						    `aria-label`, so a voice-control user can say what they read (WCAG 2.2 SC 2.5.3). */}
+					Review everything again
+					<span className="sr-only"> — use the default for Review scope</span>
+				</Button>
+			) : (
+				<span className="text-muted-foreground text-xs">
+					Default: every repository and every target branch
+				</span>
+			)}
+
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="policy-deliver-merged">Post feedback after merge</FieldLabel>
+					<FieldDescription>
+						A review that finishes after the work merged still posts its feedback.
+					</FieldDescription>
 					<InheritedSettingHint
-						label="Eligible work"
-						overridden={settings.runForAllUsersOverride != null}
-						field="RUN_FOR_ALL_USERS"
-						inheritedValue={
-							settings.runForAllUsers ? "All matching work" : "Assigned review participants"
-						}
+						label="Post feedback after merge"
+						overridden={settings.deliverToMergedOverride != null}
+						field="DELIVER_TO_MERGED"
+						inheritedValue={settings.deliverToMerged ? "On" : "Off"}
 						policy={policy}
 					/>
-				</Field>
-			</CardContent>
-		</Card>
+				</FieldContent>
+				<Switch
+					id="policy-deliver-merged"
+					checked={settings.deliverToMerged}
+					disabled={policy.isSaving}
+					onCheckedChange={(checked) => policy.onUpdate({ deliverToMerged: checked })}
+				/>
+			</Field>
+		</section>
+	);
+}
+
+/**
+ * Two options, both of which need a sentence to be understood, so they are radio rows rather than a
+ * closed menu: a select hides the option not chosen, and with it the reason to choose it.
+ */
+function CoverageField({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
+	const settings = policy.settings;
+	const value = settings.runForAllUsers ? COVERAGE_ALL : COVERAGE_ROLE;
+
+	return (
+		<FieldSet>
+			<FieldLegend variant="label" id="policy-coverage-legend">
+				Eligible work
+			</FieldLegend>
+			{/* Named by the visible legend rather than by a second string of its own, so the group a
+			    screen reader announces is the one the page shows. */}
+			<RadioGroup
+				value={value}
+				disabled={policy.isSaving}
+				aria-labelledby="policy-coverage-legend"
+				onValueChange={(next) => {
+					if (next && next !== value) policy.onUpdate({ runForAllUsers: next === COVERAGE_ALL });
+				}}
+			>
+				<FieldLabel htmlFor="policy-coverage-all">
+					<Field orientation="horizontal">
+						<RadioGroupItem id="policy-coverage-all" value={COVERAGE_ALL} />
+						<FieldContent>
+							<FieldTitle>{COVERAGE_LABEL[COVERAGE_ALL]}</FieldTitle>
+							<FieldDescription>
+								Every piece of connected work a practice watches for, whoever it belongs to.
+							</FieldDescription>
+						</FieldContent>
+					</Field>
+				</FieldLabel>
+				<FieldLabel htmlFor="policy-coverage-role">
+					<Field orientation="horizontal">
+						<RadioGroupItem id="policy-coverage-role" value={COVERAGE_ROLE} />
+						<FieldContent>
+							<FieldTitle>{COVERAGE_LABEL[COVERAGE_ROLE]}</FieldTitle>
+							{/* The role is an account flag granted per person outside this workspace, so the copy
+							    says where it comes from rather than naming the product as its owner. */}
+							<FieldDescription>
+								A review starts only when an assignee holds the review role. An instance admin
+								grants that role per person; it is not set here.
+							</FieldDescription>
+						</FieldContent>
+					</Field>
+				</FieldLabel>
+			</RadioGroup>
+			<InheritedSettingHint
+				label="Eligible work"
+				overridden={settings.runForAllUsersOverride != null}
+				field="RUN_FOR_ALL_USERS"
+				inheritedValue={COVERAGE_LABEL[value]}
+				policy={policy}
+			/>
+		</FieldSet>
+	);
+}
+
+function ScopeList({
+	id,
+	label,
+	description,
+	placeholder,
+	values,
+	disabled,
+	onChange,
+}: {
+	id: string;
+	label: string;
+	description: string;
+	placeholder: string;
+	values: string[];
+	disabled: boolean;
+	onChange: (next: string[]) => void;
+}) {
+	const [draft, setDraft] = useState("");
+	const trimmed = draft.trim();
+	const duplicate = trimmed.length > 0 && values.includes(trimmed);
+	const descriptionId = `${id}-description`;
+	const errorId = `${id}-error`;
+
+	const add = () => {
+		if (trimmed.length === 0 || duplicate) return;
+		onChange([...values, trimmed]);
+		setDraft("");
+	};
+
+	return (
+		<Field data-invalid={duplicate || undefined}>
+			<FieldLabel htmlFor={id}>{label}</FieldLabel>
+			<FieldDescription id={descriptionId}>{description}</FieldDescription>
+			<div className="flex gap-2">
+				<Input
+					id={id}
+					value={draft}
+					placeholder={placeholder}
+					disabled={disabled}
+					aria-invalid={duplicate || undefined}
+					aria-describedby={duplicate ? `${descriptionId} ${errorId}` : descriptionId}
+					onChange={(event) => setDraft(event.target.value)}
+					onKeyDown={(event) => {
+						if (event.key === "Enter") {
+							event.preventDefault();
+							add();
+						}
+					}}
+				/>
+				<Button
+					variant="outline"
+					disabled={disabled || trimmed.length === 0 || duplicate}
+					onClick={add}
+				>
+					{/* Two lists, so two buttons that would otherwise both answer to "Add"; the visible word
+					    still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
+					Add
+					<span className="sr-only"> to {label.toLowerCase()}</span>
+				</Button>
+			</div>
+			{/* The live region is mounted empty: a region inserted together with its message is not
+			    reliably announced, and the only other sign of a duplicate is Add greying out. */}
+			<div aria-live="polite" aria-atomic="true">
+				{duplicate ? (
+					<p id={errorId} className="font-normal text-destructive text-sm">
+						{trimmed} is already listed.
+					</p>
+				) : null}
+			</div>
+			{values.length > 0 ? (
+				<div className="space-y-2">
+					{values.map((value) => (
+						<Item key={value} variant="outline" size="sm">
+							<ItemContent>
+								<ItemTitle className="font-mono">{value}</ItemTitle>
+							</ItemContent>
+							<ItemActions>
+								<Button
+									variant="ghost"
+									size="sm"
+									aria-label={`Remove ${value}`}
+									disabled={disabled}
+									onClick={() => onChange(values.filter((entry) => entry !== value))}
+								>
+									Remove
+								</Button>
+							</ItemActions>
+						</Item>
+					))}
+				</div>
+			) : null}
+		</Field>
 	);
 }
 

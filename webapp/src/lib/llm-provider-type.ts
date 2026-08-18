@@ -55,7 +55,7 @@ export interface OpenAiConnectionIdentity {
 	baseUrl: string;
 }
 
-/** Deliberately does not recognise Azure: nothing persisted distinguishes it from any other host. */
+/** Azure is not inferred back from a stored connection; the preset only seeds the create form. */
 export function presetForConnection(connection: OpenAiConnectionIdentity): ProviderPreset {
 	try {
 		if (new URL(connection.baseUrl).hostname.toLowerCase() === "api.openai.com") return "OPENAI";

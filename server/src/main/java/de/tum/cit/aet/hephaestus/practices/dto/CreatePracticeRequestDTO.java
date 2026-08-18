@@ -1,7 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -26,38 +29,46 @@ public record CreatePracticeRequestDTO(
     @Schema(description = "Human-readable name", example = "PR Description Quality")
     String name,
 
-    @NotNull(message = "Trigger events are required")
-    @Size(max = 10, message = "Trigger events must contain at most 10 entries")
-    @ValidTriggerEvents
-    @Schema(
-        description = "Domain events that trigger detection; empty for scheduled conversation reviews",
-        example = "[\"PullRequestCreated\", \"ReviewSubmitted\"]"
+    @NotNull(message = "An occasion is required")
+    @Size(
+        min = 1,
+        max = 1,
+        message = "A practice is reviewed on one occasion. To read different evidence at a different moment, " +
+            "split this into two practices."
     )
-    List<String> triggerEvents,
+    @Valid
+    @Schema(
+        description = "The one occasion this practice is reviewed on, with the evidence that review reads. " +
+            "The kind of work reviewed is read off the signals."
+    )
+    List<PracticeBinding> bindings,
 
     @NotBlank(message = "Criteria is required")
     @Size(max = 50000, message = "Criteria must be at most 50000 characters")
-    @Schema(description = "Practice evaluation criteria")
+    @Schema(description = "Practice review criteria")
     String criteria,
 
-    @Size(max = 100000, message = "Precompute script must be at most 100000 characters")
-    @Schema(description = "TypeScript/Bun precompute script for static analysis before AI review")
+    @Size(
+        max = PracticeDefinition.MAX_PRECOMPUTE_SCRIPT_LENGTH,
+        message = "Precompute script must be at most 100000 characters"
+    )
+    @Schema(description = "TypeScript/Bun static analysis run before automated review")
     String precomputeScript,
 
+    @Valid
     @Schema(
-        description = "Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.",
-        example = "PULL_REQUEST"
+        description = "Versioned review settings; omit to use the recommended ones for the work type the bindings name"
     )
     @Nullable
-    WorkArtifact artifactType,
+    PracticeAutomatedReviewPolicy automatedReviewPolicy,
 
     @Size(max = 2000, message = "Why-it-matters must be at most 2000 characters")
-    @Schema(description = "Developer-facing rationale (learner layer); plain language, never the detection rubric")
+    @Schema(description = "Plain-language rationale shown to the developer")
     @Nullable
     String whyItMatters,
 
     @Size(max = 2000, message = "What-good-looks-like must be at most 2000 characters")
-    @Schema(description = "Developer-facing exemplar; a concrete instance, not the assessment criteria")
+    @Schema(description = "Developer-facing exemplar; a concrete instance, not the review criteria")
     @Nullable
     String whatGoodLooksLike,
 

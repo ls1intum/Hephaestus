@@ -1,0 +1,160 @@
+package de.tum.cit.aet.hephaestus.agent.runtime;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
+import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Stream;
+import org.junit.jupiter.api.Test;
+
+class AgentVocabularySyncTest extends BaseUnitTest {
+
+    private static final Path NORMALIZER = resolveResource("agent/pi-observation-normalize.mjs");
+    private static final Path RUNNER = resolveResource("agent/pi-runner.mjs");
+    private static final Path ORCHESTRATOR = resolveResource("agent/pi-orchestrator.md");
+
+    @Test
+    void presenceVocabularyMatches() throws IOException {
+        assertThat(jsArray("PRESENCE_VALUES"))
+            .as("PRESENCE_VALUES in pi-observation-normalize.mjs vs Presence.values()")
+            .containsExactlyInAnyOrderElementsOf(names(Presence.values()));
+    }
+
+    @Test
+    void assessmentVocabularyMatches() throws IOException {
+        assertThat(jsArray("ASSESSMENT_VALUES"))
+            .as("ASSESSMENT_VALUES in pi-observation-normalize.mjs vs Assessment.values()")
+            .containsExactlyInAnyOrderElementsOf(names(Assessment.values()));
+    }
+
+    @Test
+    void severityVocabularyMatches() throws IOException {
+        assertThat(jsArray("SEVERITY_VALUES"))
+            .as("SEVERITY_VALUES in pi-observation-normalize.mjs vs Severity.values()")
+            .containsExactlyInAnyOrderElementsOf(names(Severity.values()));
+    }
+
+    @Test
+    void carriesValenceAgrees() throws IOException {
+        String body = Files.readString(NORMALIZER, StandardCharsets.UTF_8);
+        Matcher fn = Pattern.compile(
+            "export function carriesValence\\(presence\\) \\{(.*?)\\n\\}",
+            Pattern.DOTALL
+        ).matcher(body);
+        assertThat(fn.find()).as("carriesValence() is declared in pi-observation-normalize.mjs").isTrue();
+
+        Set<String> jsValenced = quotedStrings(fn.group(1));
+        Set<String> javaValenced = Arrays.stream(Presence.values())
+            .filter(Presence::carriesValence)
+            .map(Enum::name)
+            .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
+
+        assertThat(jsValenced)
+            .as("presences the JS carriesValence() accepts vs Presence::carriesValence")
+            .containsExactlyInAnyOrderElementsOf(javaValenced);
+    }
+
+    @Test
+    void runnerImportsTheVocabulary() throws IOException {
+        String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
+
+        assertThat(body)
+            .as("pi-runner.mjs imports the shared vocabularies from pi-observation-normalize.mjs")
+            .contains("PRESENCE_VALUES")
+            .contains("ASSESSMENT_VALUES")
+            .contains("SEVERITY_VALUES");
+
+        assertThat(body)
+            .contains("\"BEHAVIOR_PRESENT_GOOD\"")
+            .contains("\"BEHAVIOR_ABSENT_BAD_MAJOR\"")
+            .contains("\"NO_REVIEW_OCCASION\"")
+            .contains("\"INSUFFICIENT_EVIDENCE\"");
+    }
+
+    @Test
+    void conversationNoteShapeMatches() throws IOException {
+        List<String> javaFields = Arrays.stream(ComposedFeedbackUnit.ConversationBrief.class.getRecordComponents())
+            .map(component -> component.getName())
+            .toList();
+        String required =
+            "required: [" +
+            javaFields
+                .stream()
+                .map(field -> "\"" + field + "\"")
+                .collect(java.util.stream.Collectors.joining(", ")) +
+            "]";
+
+        assertThat(Files.readString(RUNNER, StandardCharsets.UTF_8))
+            .as("pi-runner.mjs conversation-note schema vs ConversationBrief")
+            .contains(required);
+        assertThat(Files.readString(resolveResource("agent/feedback-composer.md"), StandardCharsets.UTF_8))
+            .as("feedback-composer.md conversation-note shape vs ConversationBrief")
+            .contains("notes: { " + String.join(", ", javaFields) + " }");
+    }
+
+    @Test
+    void toolPhasesAreGated() throws IOException {
+        String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
+
+        assertThat(body)
+            .contains("if (measurementClosed)")
+            .contains("measurementClosed = true")
+            .contains("if (!compositionAdmitted)")
+            .contains("compositionAdmitted = true");
+    }
+
+    @Test
+    void orchestratorPromptCoversEveryOutcome() throws IOException {
+        String body = Files.readString(ORCHESTRATOR, StandardCharsets.UTF_8);
+        assertThat(body)
+            .contains("BEHAVIOR_PRESENT_")
+            .contains("BEHAVIOR_ABSENT_")
+            .contains("NO_REVIEW_OCCASION")
+            .contains("INSUFFICIENT_EVIDENCE")
+            .doesNotContain("NOT_APPLICABLE")
+            .doesNotContain("INCONCLUSIVE");
+    }
+
+    private static List<String> names(Enum<?>[] values) {
+        return Stream.of(values).map(Enum::name).toList();
+    }
+
+    private static Set<String> jsArray(String constantName) throws IOException {
+        String body = Files.readString(NORMALIZER, StandardCharsets.UTF_8);
+        Matcher matcher = Pattern.compile(
+            "export const " + Pattern.quote(constantName) + "\\s*=\\s*\\[(.*?)]",
+            Pattern.DOTALL
+        ).matcher(body);
+        assertThat(matcher.find()).as("%s is declared in pi-observation-normalize.mjs", constantName).isTrue();
+        Set<String> values = quotedStrings(matcher.group(1));
+        assertThat(values).as("%s is not empty", constantName).isNotEmpty();
+        return values;
+    }
+
+    private static Set<String> quotedStrings(String source) {
+        Set<String> values = new LinkedHashSet<>();
+        Matcher matcher = Pattern.compile("\"([A-Z_]+)\"").matcher(source);
+        while (matcher.find()) {
+            values.add(matcher.group(1));
+        }
+        return values;
+    }
+
+    private static Path resolveResource(String relativePath) {
+        Path candidate = Path.of("src/main/resources").resolve(relativePath);
+        return Files.exists(candidate) ? candidate : Path.of("server/src/main/resources").resolve(relativePath);
+    }
+}

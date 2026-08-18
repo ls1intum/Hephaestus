@@ -8,8 +8,10 @@ import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.membership.TeamMembership;
@@ -19,13 +21,20 @@ import de.tum.cit.aet.hephaestus.leaderboard.LeaderboardEntryDTO;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackThreadKey;
+import de.tum.cit.aet.hephaestus.practices.feedback.InAppFeedbackBody;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -79,6 +88,10 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String SHARED_LOGIN = "shared-org";
+    private static final String DIFF_EVIDENCE_JSON =
+        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
+        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
+        "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -94,6 +107,12 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
 
     @Autowired
     private FeedbackRepository feedbackRepository;
+
+    @Autowired
+    private FeedbackObservationRepository feedbackObservationRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private ChatThreadRepository chatThreadRepository;
@@ -153,12 +172,13 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
     private TenantData seed(Workspace ws) {
         String practiceSlug = "practice-" + ws.getWorkspaceSlug();
         Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(ws);
         practice.setSlug(practiceSlug);
         practice.setName("Practice of " + ws.getWorkspaceSlug());
         practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         practice = practiceRepository.save(practice);
 
         AgentJob job = new AgentJob();
@@ -174,25 +194,25 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             job.getId(),
             practice.getId(),
             null,
-            "PULL_REQUEST",
+            "scm.pull_request",
             1L,
             overlapUser.getId(),
             "Finding in " + ws.getWorkspaceSlug(),
             "PRESENT",
             "GOOD",
             "INFO",
-            0.9f,
             null,
             "reasoning",
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
 
         Feedback feedback = feedbackRepository.save(
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(ws.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)
                 .recipientUserId(overlapUser.getId())
                 .aboutUserId(overlapUser.getId())
@@ -288,7 +308,7 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Finding in tenant-a");
         }
 
@@ -298,6 +318,72 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             expectDetailStatus("/practices/observations/{key}", tenantA.observationId()).isOk();
             expectDetailStatus("/practices/observations/{key}", tenantB.observationId()).isNotFound();
         }
+
+        /**
+         * The advice on a detail read is the body of a {@link Feedback} row, and the join table that binds
+         * feedback to observations is written by native SQL that carries no tenancy check of its own. The
+         * observation is correctly scoped by the read above; without a workspace predicate on the advice
+         * query, the newest-bound unit wins whatever tenant it belongs to — so a row written in B decides
+         * what a reader in A is shown.
+         */
+        @Test
+        @WithMentorUser
+        void adviceOnTheDetailReadComesOnlyFromThisWorkspace() {
+            bindAdvice(
+                workspaceA,
+                tenantA.observationId(),
+                "Advice in tenant A",
+                Instant.parse("2026-01-01T00:00:00Z")
+            );
+            bindAdvice(
+                workspaceB,
+                tenantA.observationId(),
+                "Advice in tenant B",
+                Instant.parse("2026-02-01T00:00:00Z")
+            );
+
+            webTestClient
+                .get()
+                .uri(
+                    "/workspaces/{slug}/practices/observations/{key}",
+                    workspaceA.getWorkspaceSlug(),
+                    tenantA.observationId()
+                )
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.deliveredFeedback")
+                .isEqualTo("Advice in tenant A");
+        }
+    }
+
+    /** A DELIVERED in-context unit in one tenant, bound as evidence to an observation named by the caller. */
+    private void bindAdvice(Workspace ws, UUID observationId, String body, Instant createdAt) {
+        AgentJob job = new AgentJob();
+        job.setWorkspace(ws);
+        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+        job = agentJobRepository.save(job);
+
+        Feedback unit = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(ws.getId())
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
+                .artifactId(42L)
+                .recipientUserId(overlapUser.getId())
+                .aboutUserId(overlapUser.getId())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(0)
+                .deliveryState(FeedbackDeliveryState.DELIVERED)
+                .body(body)
+                .source(FeedbackSource.AGENT)
+                .createdAt(createdAt)
+                .build()
+        );
+        feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
     }
 
     @Nested
@@ -311,6 +397,158 @@ class CrossTenantIsolationIntegrationTest extends AbstractWorkspaceIntegrationTe
             expectDetailStatus("/practices/feedback/{key}/reactions", tenantA.feedbackId()).isNoContent();
             expectDetailStatus("/practices/feedback/{key}/reactions", tenantB.feedbackId()).isNotFound();
         }
+    }
+
+    @Nested
+    @DisplayName("In-app feedback (the developer's own practice pages)")
+    class InAppFeedback {
+
+        /**
+         * The in-app lane is recipient-scoped rather than slug-scoped in its own right — the same person
+         * is a member of both tenants here — so the workspace predicate on the query is the only thing
+         * keeping tenant B's private text off tenant A's page.
+         */
+        @Test
+        @WithMentorUser
+        void readsOnlyTheMessagesPreparedInThisWorkspace() {
+            seedInAppUnit(workspaceA, "A habit measured in tenant A");
+            seedInAppUnit(workspaceB, "A habit measured in tenant B");
+
+            webTestClient
+                .get()
+                .uri("/workspaces/{slug}/practices/feedback/in-app", workspaceA.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].headline")
+                .isEqualTo("A habit measured in tenant A");
+        }
+
+        /**
+         * Two tenants that installed the same curated practice legitimately hold the same continuity key
+         * for the same person, because the key is computed from the habit and the recipient and knows
+         * nothing about workspaces. So on the supersession path the {@code workspace_id} predicate is the
+         * entire boundary: without it a review in tenant A would retire a card queued in tenant B and
+         * that message would never be said.
+         */
+        @Test
+        @WithMentorUser
+        void neverRetiresACardQueuedInAnotherTenant() {
+            String sharedKey = FeedbackThreadKey.forPractice(
+                "ships-tests-with-the-change",
+                overlapUser.getId(),
+                FeedbackChannel.IN_APP
+            );
+            Feedback inA = seedInAppUnit(workspaceA, "A habit measured in tenant A", sharedKey);
+            Feedback inB = seedInAppUnit(workspaceB, "A habit measured in tenant B", sharedKey);
+
+            assertThat(
+                feedbackRepository.findLatestOnThread(
+                    workspaceA.getId(),
+                    overlapUser.getId(),
+                    FeedbackChannel.IN_APP.name(),
+                    sharedKey
+                )
+            ).contains(inA.getId());
+            assertThat(feedbackRepository.markSuperseded(workspaceA.getId(), inB.getId()))
+                .as("tenant A cannot retire tenant B's card even holding its id")
+                .isZero();
+            assertThat(feedbackRepository.markSuperseded(workspaceB.getId(), inB.getId()))
+                .as("positive control: the card was still queued, so the refusal above was the predicate")
+                .isEqualTo(1);
+        }
+
+        /**
+         * The practice behind a queued card is staged for the composer to recognise it by, and it is read
+         * through a join to {@code observation}. That join is exactly where a missing predicate hides — it
+         * is how another workspace's advice once reached an observation's detail page.
+         */
+        @Test
+        @WithMentorUser
+        void namesOnlyThisTenantsPracticeForAQueuedCard() {
+            Feedback inA = seedInAppUnit(workspaceA, "A habit measured in tenant A");
+            Feedback inB = seedInAppUnit(workspaceB, "A habit measured in tenant B");
+
+            assertThat(feedbackRepository.findHeadlinePractices(workspaceA.getId(), List.of(inA.getId(), inB.getId())))
+                .singleElement()
+                .satisfies(row -> {
+                    assertThat(row.getFeedbackId()).isEqualTo(inA.getId());
+                    assertThat(row.getPracticeSlug()).isEqualTo("in-app-" + workspaceA.getWorkspaceSlug());
+                });
+        }
+    }
+
+    /**
+     * An IN_APP unit for {@link #overlapUser} in one tenant, with the evidence a read has to clear:
+     * a practice revision to pin the claim to, and cited evidence the delivery purpose admits.
+     */
+    private Feedback seedInAppUnit(Workspace ws, String headline) {
+        return seedInAppUnit(ws, headline, null);
+    }
+
+    private Feedback seedInAppUnit(Workspace ws, String headline, String threadKey) {
+        Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
+        practice.setWorkspace(ws);
+        practice.setSlug("in-app-" + ws.getWorkspaceSlug());
+        practice.setName("In-app practice of " + ws.getWorkspaceSlug());
+        practice.setCriteria("Criteria for " + ws.getWorkspaceSlug());
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice = practiceRepository.saveAndFlush(practice);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
+        practice.setCurrentRevision(revision);
+        practice = practiceRepository.saveAndFlush(practice);
+
+        AgentJob job = new AgentJob();
+        job.setWorkspace(ws);
+        job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+        job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+        job.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.0.0"))));
+        job = agentJobRepository.save(job);
+
+        UUID observationId = UUID.randomUUID();
+        observationRepository.insertIfAbsent(
+            observationId,
+            "in-app-occ-" + observationId,
+            job.getId(),
+            practice.getId(),
+            revision.getId(),
+            "scm.pull_request",
+            2L,
+            overlapUser.getId(),
+            "In-app evidence in " + ws.getWorkspaceSlug(),
+            "ABSENT",
+            "BAD",
+            "MAJOR",
+            DIFF_EVIDENCE_JSON,
+            "reasoning",
+            null,
+            Instant.now(),
+            "LIVE"
+        );
+
+        Feedback unit = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(ws.getId())
+                .recipientUserId(overlapUser.getId())
+                .aboutUserId(overlapUser.getId())
+                .channel(FeedbackChannel.IN_APP)
+                .position(7000)
+                .deliveryState(FeedbackDeliveryState.PREPARED)
+                .body(InAppFeedbackBody.render(headline, "The message.", "The habit to try."))
+                .source(FeedbackSource.AGENT)
+                .threadKey(threadKey)
+                .createdAt(Instant.now())
+                .build()
+        );
+        feedbackObservationRepository.insertIfAbsent(unit.getId(), observationId, "PRIMARY", 0);
+        return unit;
     }
 
     @Nested

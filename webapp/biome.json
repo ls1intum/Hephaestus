@@ -1,5 +1,10 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+	"plugins": [
+		"./.biome/no-redundant-in-the-document.grit",
+		"./.biome/no-within-canvas-element.grit",
+		"./.biome/typed-story-meta.grit"
+	],
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",

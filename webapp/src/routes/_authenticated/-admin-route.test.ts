@@ -32,7 +32,7 @@ async function land(url: string) {
 	return router.state.location.pathname;
 }
 
-/** Guards the bypass a route file cannot show: an /admin URL that does not nest under the gate. */
+/** Catches the bypass a route file cannot show: an /admin URL that does not nest under the gate. */
 describe("instance-admin route gate", () => {
 	it("enumerates the instance-admin routes rather than trusting a hand-written list", () => {
 		// A filter that matched nothing would leave every case below vacuously green.

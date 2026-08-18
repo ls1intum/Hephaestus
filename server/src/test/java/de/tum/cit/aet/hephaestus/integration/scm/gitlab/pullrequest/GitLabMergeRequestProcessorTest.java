@@ -1315,6 +1315,68 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
         }
 
         @Test
+        void shouldPublishReadyWhenSyncFindsAMergeRequestThatLeftDraft() {
+            // Detected as a diff against the prior row, before the upsert below overwrites it.
+            PullRequest existingDraft = createPullRequestEntity();
+            existingDraft.setDraft(true);
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
+                Optional.of(existingDraft)
+            );
+
+            processor.processFromSync(createSyncData(false), testRepo, 1L);
+
+            assertThat(publishedEvents()).anyMatch(e -> e instanceof ScmDomainEvent.PullRequestReady);
+        }
+
+        @Test
+        void shouldPublishDraftedWhenSyncFindsAMergeRequestSentBackToDraft() {
+            PullRequest existingReady = createPullRequestEntity();
+            existingReady.setDraft(false);
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
+                Optional.of(existingReady)
+            );
+
+            processor.processFromSync(createSyncData(true), testRepo, 1L);
+
+            assertThat(publishedEvents()).anyMatch(e -> e instanceof ScmDomainEvent.PullRequestDrafted);
+        }
+
+        @Test
+        void shouldNotPublishADraftTransitionWhenNothingAboutTheDraftFlagMoved() {
+            PullRequest existingReady = createPullRequestEntity();
+            existingReady.setDraft(false);
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID)).thenReturn(
+                Optional.of(existingReady)
+            );
+
+            processor.processFromSync(createSyncData(false), testRepo, 1L);
+
+            assertThat(publishedEvents()).noneMatch(
+                e -> e instanceof ScmDomainEvent.PullRequestReady || e instanceof ScmDomainEvent.PullRequestDrafted
+            );
+        }
+
+        @Test
+        void shouldNotInventATransitionForAMergeRequestSyncIsSeeingForTheFirstTime() {
+            // No prior row to diff against, so a backfill must not read as a wave of new transitions.
+            when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(createPullRequestEntity()));
+
+            processor.processFromSync(createSyncData(false), testRepo, 1L);
+
+            assertThat(publishedEvents()).noneMatch(
+                e -> e instanceof ScmDomainEvent.PullRequestReady || e instanceof ScmDomainEvent.PullRequestDrafted
+            );
+        }
+
+        private List<Object> publishedEvents() {
+            var captor = ArgumentCaptor.forClass(Object.class);
+            verify(eventPublisher, atLeastOnce()).publishEvent(captor.capture());
+            return captor.getAllValues();
+        }
+
+        @Test
         void processFromSyncLinksMilestone() {
             PullRequest pr = createPullRequestEntity();
             when(pullRequestRepository.findByRepositoryIdAndNumber(REPO_ID, MR_IID))
@@ -2179,13 +2241,17 @@ class GitLabMergeRequestProcessorTest extends BaseUnitTest {
     }
 
     private GitLabMergeRequestProcessor.SyncMergeRequestData createSyncData() {
+        return createSyncData(false);
+    }
+
+    private GitLabMergeRequestProcessor.SyncMergeRequestData createSyncData(boolean draft) {
         return new GitLabMergeRequestProcessor.SyncMergeRequestData(
             "gid://gitlab/MergeRequest/999555",
             "5",
             "Add awesome feature",
             "This MR adds an awesome feature",
             "opened",
-            false,
+            draft,
             null,
             null,
             false,

@@ -145,7 +145,7 @@ public class OutlineCollectionAdminController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @AuditExempt(
-        reason = "content-ingestion scope; the collection row carries its own state and no history is recorded yet"
+        reason = "which collections are mirrored is ingestion scope, not a control that gates delivery; not recorded"
     )
     public ResponseEntity<OutlineCollectionDTO> registerOutlineCollection(
         WorkspaceContext workspace,
@@ -175,7 +175,7 @@ public class OutlineCollectionAdminController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @AuditExempt(
-        reason = "content-ingestion scope; the collection row carries its own state and no history is recorded yet"
+        reason = "which collections are mirrored is ingestion scope, not a control that gates delivery; not recorded"
     )
     public ResponseEntity<OutlineCollectionDTO> updateOutlineCollectionState(
         WorkspaceContext workspace,
@@ -197,7 +197,7 @@ public class OutlineCollectionAdminController {
         content = @Content(schema = @Schema(hidden = true))
     )
     @AuditExempt(
-        reason = "content-ingestion scope; the collection row carries its own state and no history is recorded yet"
+        reason = "which collections are mirrored is ingestion scope, not a control that gates delivery; not recorded"
     )
     public ResponseEntity<Void> deleteOutlineCollection(WorkspaceContext workspace, @PathVariable String collectionId) {
         adminService.delete(workspace.id(), collectionId);

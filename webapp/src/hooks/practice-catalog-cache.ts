@@ -43,7 +43,9 @@ export function selectAreaPatch(
 	request: UpdatePracticeAreaRequest,
 ): UpdatePracticeAreaRequest {
 	return {
-		...("active" in request ? { active: area.active } : {}),
+		...(request.visibleInPracticeDashboards !== undefined
+			? { visibleInPracticeDashboards: area.visibleInPracticeDashboards }
+			: {}),
 		...("color" in request ? { color: area.color } : {}),
 		...("description" in request ? { description: area.description } : {}),
 		...("displayOrder" in request ? { displayOrder: area.displayOrder } : {}),
@@ -78,13 +80,22 @@ export function selectPracticePatch(
 ): Partial<Practice> {
 	const clear = new Set(request.clear);
 	return {
-		...("artifactType" in request ? { artifactType: practice.artifactType } : {}),
+		// The kind of work is read off the bindings server-side, so replacing them can move it — and can
+		// therefore swap in a different work type's recommended review settings.
+		...("bindings" in request
+			? { bindings: practice.bindings, artifactKind: practice.artifactKind }
+			: {}),
 		...("criteria" in request ? { criteria: practice.criteria } : {}),
+		...("automatedReviewPolicy" in request || "bindings" in request
+			? {
+					automatedReviewPolicy: practice.automatedReviewPolicy,
+					automatedReviewValidation: practice.automatedReviewValidation,
+				}
+			: {}),
 		...("name" in request ? { name: practice.name } : {}),
 		...("precomputeScript" in request || clear.has("PRECOMPUTE_SCRIPT")
 			? { precomputeScript: practice.precomputeScript }
 			: {}),
-		...("triggerEvents" in request ? { triggerEvents: practice.triggerEvents } : {}),
 		...("whatGoodLooksLike" in request || clear.has("WHAT_GOOD_LOOKS_LIKE")
 			? { whatGoodLooksLike: practice.whatGoodLooksLike }
 			: {}),

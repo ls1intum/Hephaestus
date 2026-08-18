@@ -37,13 +37,13 @@ describe("DangerZoneSection — data export", () => {
 		fireEvent.click(screen.getByRole("button", { name: /Request export/ }));
 
 		// First status poll returns PENDING; the in-progress copy proves we're polling.
-		await waitFor(() => expect(screen.getByText(/Preparing your export/i)).toBeTruthy());
+		await waitFor(() => screen.getByText(/Preparing your export/i));
 
 		// Drive the 2s poll interval forward; the next poll lands READY.
 		await act(() => vi.advanceTimersByTimeAsync(2000));
 
-		await waitFor(() => expect(screen.getByRole("button", { name: /Download/ })).toBeTruthy());
-		expect(screen.getByText(/ready to download/i)).toBeTruthy();
+		await waitFor(() => screen.getByRole("button", { name: /Download/ }));
+		screen.getByText(/ready to download/i);
 	});
 });
 

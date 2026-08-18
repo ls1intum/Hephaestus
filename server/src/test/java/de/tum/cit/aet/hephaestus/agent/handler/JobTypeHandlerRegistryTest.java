@@ -2,17 +2,20 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import org.junit.jupiter.api.Nested;
@@ -24,16 +27,13 @@ import tools.jackson.databind.json.JsonMapper;
 class JobTypeHandlerRegistryTest extends BaseUnitTest {
 
     @Mock
-    private GitRepositoryManager gitRepositoryManager;
+    private ContentAddressedStore cas;
 
     @Mock
     private PracticeRepository practiceRepository;
 
     @Mock
     private WorkspaceContextBuilder workspaceContextBuilder;
-
-    @Mock
-    private GitDiffOperations gitDiffOperations;
 
     @Mock
     private PracticeDetectionDeliveryService deliveryService;
@@ -51,16 +51,24 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
         return new PullRequestReviewHandler(
             objectMapper,
-            gitRepositoryManager,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            cas,
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             workspaceContextBuilder,
             envelopeWriter,
-            gitDiffOperations,
             parser,
+            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
             feedbackService,
             new SecretDiffScanner(),
-            org.mockito.Mockito.mock(ReactionSuppressionFilter.class)
+            org.mockito.Mockito.mock(ReactionSuppressionFilter.class),
+            new InContextDeliveryGate(
+                practiceRepository,
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                workspaceDefaults()
+            ),
+            org.mockito.Mockito.mock(ApplicationEventPublisher.class),
+            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
     }
 
@@ -71,15 +79,21 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             parser,
+            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
-            commentPoster,
+            new InContextDeliveryGate(
+                practiceRepository,
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
+                workspaceDefaults()
+            ),
+            org.mockito.Mockito.mock(PullRequestCommentPoster.class),
             org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
             org.mockito.Mockito.mock(PracticeFeedbackDeliveryPolicy.class),
-            new PracticeFeedbackCommentFormatter(
-                new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
-            )
+            org.mockito.Mockito.mock(PracticeFeedbackCommentFormatter.class),
+            org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
     }
 
@@ -90,7 +104,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             parser,
             deliveryService,
             org.mockito.Mockito.mock(ApplicationEventPublisher.class),
@@ -98,10 +112,23 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         );
     }
 
+    private JobTypeHandler documentReviewHandler() {
+        var parser = new PracticeDetectionResultParser(objectMapper);
+        var envelopeWriter = new TaskEnvelopeWriter(objectMapper);
+        return new DocumentReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            envelopeWriter,
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            parser,
+            deliveryService
+        );
+    }
+
     /** A registry with the full handler set (every {@link AgentJobType} mapped). */
     private JobTypeHandlerRegistry fullRegistry() {
         return new JobTypeHandlerRegistry(
-            List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler())
+            List.of(prReviewHandler(), issueReviewHandler(), conversationReviewHandler(), documentReviewHandler())
         );
     }
 
@@ -113,13 +140,17 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             var pr = prReviewHandler();
             var issue = issueReviewHandler();
             var conversation = conversationReviewHandler();
-            var registry = new JobTypeHandlerRegistry(List.of(pr, issue, conversation));
+            var document = documentReviewHandler();
+            var registry = new JobTypeHandlerRegistry(List.of(pr, issue, conversation, document));
 
             assertThat(registry.getHandler(AgentJobType.PULL_REQUEST_REVIEW)).isSameAs(pr);
             assertThat(registry.getHandler(AgentJobType.ISSUE_REVIEW)).isSameAs(issue);
             // Handler-registered contract: the conversation job type resolves to its handler, so a boot
             // with this bean set never trips the registry's "no handler registered" fail-fast.
             assertThat(registry.getHandler(AgentJobType.CONVERSATION_REVIEW)).isSameAs(conversation);
+            // Same for the document job type. It is also what ReviewContractValidator's executability rule
+            // reads: a reviewable kind with no handler here fails the boot rather than going quiet.
+            assertThat(registry.getHandler(AgentJobType.DOCUMENT_REVIEW)).isSameAs(document);
         }
 
         @Test
@@ -150,5 +181,12 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             var registry = fullRegistry();
             assertThatThrownBy(() -> registry.getHandler(null)).isInstanceOf(NullPointerException.class);
         }
+    }
+
+    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

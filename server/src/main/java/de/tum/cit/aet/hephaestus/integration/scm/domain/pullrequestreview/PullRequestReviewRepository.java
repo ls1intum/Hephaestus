@@ -6,6 +6,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -72,6 +73,17 @@ public interface PullRequestReviewRepository extends JpaRepository<PullRequestRe
         """
     )
     List<PullRequestReview> findAllByPullRequestIdWithAuthor(@Param("pullRequestId") Long pullRequestId);
+
+    @Query(
+        "SELECT prr FROM PullRequestReview prr LEFT JOIN FETCH prr.author " +
+            "WHERE prr.pullRequest.id = :pullRequestId AND prr.state NOT IN :excludedStates " +
+            "ORDER BY prr.submittedAt DESC, prr.id DESC"
+    )
+    List<PullRequestReview> findRecentByPullRequestIdWithAuthor(
+        @Param("pullRequestId") Long pullRequestId,
+        @Param("excludedStates") Collection<PullRequestReview.State> excludedStates,
+        Pageable pageable
+    );
 
     /**
      * Batch fetch reviews by IDs with all related entities eagerly loaded.

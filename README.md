@@ -36,7 +36,7 @@ Hephaestus gives developers feedback on the engineering practices they use in so
 
 Hephaestus is built for software engineering courses, open-source projects, and teams where mentors and maintainers cannot review every contribution themselves.
 
-## What Hephaestus does today
+## What Hephaestus does
 
 - **Practice feedback.** Hephaestus uses AI to review pull requests, merge requests, and issues against the engineering practices configured for a workspace. It can post the feedback as comments on the work.
 - **Heph, the AI mentor.** Developers can talk with Heph about feedback and recent issues, commits, reviews, and pull or merge requests. Heph is available in the web app and, when connected, in Slack.

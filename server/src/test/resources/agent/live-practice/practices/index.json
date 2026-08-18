@@ -1,6 +1,6 @@
 [
   {
-    "slug": "hardcoded-secrets",
+    "slug": "avoids-insecure-defaults-and-over-broad-permissions",
     "name": "Hardcoded Secrets",
     "category": "security"
   }

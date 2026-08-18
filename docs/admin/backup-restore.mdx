@@ -5,8 +5,8 @@ title: Backup & Restore
 description: What to back up on a self-hosted instance, and how to restore it.
 ---
 
-For the [self-host compose stack](./install). The database holds irreplaceable derived data
-(observations, the feedback ledger); everything else is re-creatable.
+For the [self-host compose stack](./install). PostgreSQL holds the application state. The Context Fabric holds
+bounded evidence copies that may no longer be reproducible after upstream content changes or is erased.
 
 ## What to back up
 
@@ -15,7 +15,7 @@ For the [self-host compose stack](./install). The database holds irreplaceable d
 | PostgreSQL database | `postgresql-data` volume | **Everything.** Accounts, workspaces, observations, feedback, encrypted provider tokens, JWT signing keys. |
 | `.env` | `/opt/hephaestus/docker/self-host/.env` | **Equal priority.** `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` encrypts the tokens *inside* the database backup — a database backup without the key is partially unreadable (all stored provider credentials are lost, and all sessions invalidate). |
 | TLS certificates | `./letsencrypt/` | Optional — Let's Encrypt re-issues on first boot (rate limits permitting). |
-| Git checkout cache | `git-repos` volume | Skip — re-cloned on demand. |
+| Context Fabric | `git-repos` volume | Back up when replayable evidence is required. Skipping it discards repository clones and bounded replay/CAS content; durable job provenance remains in PostgreSQL, but the exact source bytes may be unrecoverable. |
 | NATS JetStream | `nats-data` volume | Skip — a transient event buffer, not a source of truth. |
 
 ## Backup

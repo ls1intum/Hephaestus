@@ -5,7 +5,12 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -40,11 +45,6 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 @RequiredArgsConstructor
 public class PracticeCatalogContentSource implements ContentSource {
-
-    @Override
-    public String originId() {
-        return "core";
-    }
 
     /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "practice_catalog.json";
@@ -90,9 +90,22 @@ public class PracticeCatalogContentSource implements ContentSource {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // Active practices only — the mentor should not talk about practices the workspace
-        // has explicitly disabled.
-        List<Practice> practices = practiceRepository.findByWorkspaceIdAndActiveTrue(workspaceId);
+        // Only the practices this workspace may actually raise in a conversation. A PROPOSE practice is
+        // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
+        // subject it is not allowed to raise, and an OFF practice is not reviewed at all. Tier is the
+        // effective one, resolved through the practice -> area -> workspace chain.
+        WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
+        List<Practice> practices = practiceRepository
+            .findByWorkspaceId(workspaceId)
+            .stream()
+            .filter(p ->
+                FeedbackAdmission.delivers(
+                    ObservationOrigin.LIVE,
+                    ReviewTierResolver.effectiveTierOf(p, defaults.defaultTier()),
+                    FeedbackChannel.IN_CHAT
+                )
+            )
+            .toList();
 
         ObjectNode root = objectMapper.createObjectNode();
         root.putObject("workspace").put("slug", workspace.getWorkspaceSlug());

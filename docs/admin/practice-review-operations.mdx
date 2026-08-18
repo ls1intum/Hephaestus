@@ -1,0 +1,96 @@
+---
+id: practice-review-operations
+sidebar_position: 5
+title: Practice review operations
+description: Deployment variables, queue health, retention, and fixed limits for practice review.
+---
+
+# Practice review operations
+
+Use this reference to configure the runtime and monitor a deployed instance. Workspace administrators
+should start with [Practice Review](./practice-review.mdx).
+
+## Deployment configuration
+
+Configuration metadata in the server is the source of truth for property names, types, and defaults. The
+reference Compose files are the source of truth for which environment variables they forward; do not copy
+those inventories into another deployment manifest from this page.
+
+A working deployment must:
+
+- enable the agent runtime on both the submitting server and claiming worker;
+- enable practice review for the intended population;
+- make repository checkout and the shared fabric volume available to every worker that captures repository
+  evidence;
+- set campaign, request-rate, retry, and retention limits appropriate to its budget and governance policy.
+
+See the
+[server configuration](https://github.com/ls1intum/Hephaestus/blob/main/server/src/main/resources/application.yml)
+and [reference Compose files](https://github.com/ls1intum/Hephaestus/tree/main/docker) before changing an
+environment variable. Unknown or unforwarded variables do not configure the application.
+
+Repository checkouts, replay metadata, and content-addressed evidence share the fabric root. A split or
+multi-host deployment must mount the same durable read-write filesystem on every server and worker, with
+cross-process locks, atomic rename, and access controls suitable for source content.
+
+Source authorization is not a deployment toggle. The shipped artifact-source contract fixes which governed
+sources each purpose may use; integrations only determine which authorized sources are available. See
+[Artifact-source governance](./dsms/artifact-source-governance.md).
+
+## Workspace controls
+
+Workspace administrators configure model readiness under **AI models**, review scope and autonomy under
+**Practices**, and spend under **AI usage**. **Review activity** explains what happened to an individual
+piece of work. These product-level destinations are intentionally broader than a click-by-click path so the
+guide survives navigation changes; [Practice review](./practice-review.mdx) gives the task sequence.
+
+### Queue health
+
+The job queue exposes its own signals — alert off these rather than reading application logs.
+
+- **`agent.queue.oldest_age_seconds`** — age of the oldest eligible queued job, `0` when empty. **This is
+  the one to alert on**: a briefly busy queue and a stuck one both show non-zero depth, but only a stuck
+  queue shows a climbing age.
+- **`agent.queue.depth`** — queued jobs eligible to run now.
+- **`agent.queue.held`** — jobs parked on an exhausted budget.
+- **`agent.queue.running`** — jobs running fleet-wide.
+- **`agent.queue.health.sampler.failures`** — failed samples; the gauges keep their last-good value rather
+  than reporting a false empty queue.
+- **`agent.job.claim.latency`** — time between a job becoming eligible and being claimed.
+- **`agent.job.execution.duration`** — tagged by `jobType` and outcome `status`.
+- **`agent.job.delivery.recovered`** — deliveries stuck by an executor crash and successfully re-attempted.
+- **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — rows pruned by the retention
+  sweep.
+- **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
+
+Gauge sampling is periodic; timers and counters are recorded inline. None run on a request path. Metric
+names in the instrumented code are the source of truth for dashboards and alerts.
+
+**Retention.** Terminal job payloads are stripped before their rows are deleted. Row retention must not be
+shorter than payload retention. Set both against the approved retention policy, verify them in the effective
+application configuration, and treat the fabric root as sensitive storage.
+
+## Limits you should know about
+
+Configuration metadata and the artifact-source catalog are the source of truth for current values. These
+behaviors matter independently of their exact defaults:
+
+- **Background task cadences are fixed in code.** Their thresholds may be configurable even when their
+  polling schedules are not.
+- **Retryable occurrences eventually lapse.** A workspace left misconfigured can accumulate retries and
+  then go quiet when their deadline passes.
+- **Nothing is ever deleted from the occurrence ledger**, in any state, including retired rows. It is the
+  record of what was *not* done, and it only grows. Size it accordingly on a busy instance.
+- **The repository-tree capture is bounded**, by file count, total size, and per-file size
+  (`GIT_TREE_MAX_FILES`, `GIT_TREE_MAX_TOTAL_SIZE`, `GIT_TREE_MAX_FILE_SIZE`). When a bound bites, the
+  capture reports itself **partial** and names which bound it hit rather than silently truncating. The
+  values in force are the ones declared in the artifact-source catalog's selection scope for that source —
+  read them there rather than from a copy. None of the three is forwarded by the shipped Compose files.
+- **Linked Outline documents are retrieval-limited, and the mentor and review paths do not agree.** A
+  review resolves documents *linked from* the work first and only tops up a small number by search; the
+  mentor searches the whole corpus and truncates each document. Neither path can report that it found
+  everything, and neither is a substitute for the other when you are diagnosing missing context.
+- **Observation and feedback wording come from different turns in one agent session.** The first turn
+  records evidence-backed observations. After Java admits them, a second turn composes lane-specific
+  feedback from those observations and their evidence. Practice criteria affect what is observed; the
+  composition contract affects what is said. Nothing on the administration screens edits either prompt.

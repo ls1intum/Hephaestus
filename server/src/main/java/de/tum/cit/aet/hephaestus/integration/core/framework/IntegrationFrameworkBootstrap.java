@@ -4,13 +4,13 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Capability;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationLifecycleListener;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationManifest;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectParser;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.TokenRefresher;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier;
 import jakarta.annotation.PostConstruct;
@@ -30,6 +30,9 @@ import org.springframework.stereotype.Component;
  * per-kind SPI beans wired. Throws so misconfigurations surface immediately, not at
  * the first request. Gated to the application-server runtime role since worker pods
  * intentionally wire only a subset of SPI beans.
+ *
+ * <p>Also the single place the review contract is enforced, via {@link ReviewContractValidator}; violations
+ * are collected before anything throws so an operator sees every problem in one message.
  */
 @Component
 @ConditionalOnProperty(name = RuntimeRole.SERVER_PROPERTY, havingValue = "true", matchIfMissing = true)
@@ -43,10 +46,11 @@ public class IntegrationFrameworkBootstrap {
     private final List<SubjectParser> subjectParsers;
     private final List<ApiCredentialProvider> credentialProviders;
     private final List<TokenRefresher> tokenRefreshers;
-    private final List<FeedbackChannel> feedbackChannels;
-    private final List<InlineFindingChannel> inlineFindingChannels;
+    private final List<SummaryChannel> feedbackChannels;
+    private final List<InlineFeedbackChannel> inlineFeedbackChannels;
     private final List<ApprovalChannel> approvalChannels;
     private final List<IntegrationLifecycleListener> lifecycleListeners;
+    private final ReviewContractValidator reviewContract;
     private final boolean webhookRoleEnabled;
 
     public IntegrationFrameworkBootstrap(
@@ -56,10 +60,11 @@ public class IntegrationFrameworkBootstrap {
         List<SubjectParser> subjectParsers,
         List<ApiCredentialProvider> credentialProviders,
         List<TokenRefresher> tokenRefreshers,
-        List<FeedbackChannel> feedbackChannels,
-        List<InlineFindingChannel> inlineFindingChannels,
+        List<SummaryChannel> feedbackChannels,
+        List<InlineFeedbackChannel> inlineFeedbackChannels,
         List<ApprovalChannel> approvalChannels,
         List<IntegrationLifecycleListener> lifecycleListeners,
+        ReviewContractValidator reviewContract,
         @Value("${" + RuntimeRole.WEBHOOK_PROPERTY + ":true}") boolean webhookRoleEnabled
     ) {
         this.manifests = manifests;
@@ -69,19 +74,30 @@ public class IntegrationFrameworkBootstrap {
         this.credentialProviders = credentialProviders;
         this.tokenRefreshers = tokenRefreshers;
         this.feedbackChannels = feedbackChannels;
-        this.inlineFindingChannels = inlineFindingChannels;
+        this.inlineFeedbackChannels = inlineFeedbackChannels;
         this.approvalChannels = approvalChannels;
         this.lifecycleListeners = lifecycleListeners;
+        this.reviewContract = reviewContract;
         this.webhookRoleEnabled = webhookRoleEnabled;
     }
 
     @PostConstruct
     public void validate() {
         List<String> violations = new ArrayList<>();
+        // Descriptor rules first: they hold regardless of which vendors are enabled, so reporting them
+        // ahead of the per-vendor ones puts the root cause on top.
+        violations.addAll(reviewContract.validateDescriptors());
         for (IntegrationKind kind : manifests.registeredKinds()) {
             IntegrationManifest manifest = manifests.manifestFor(kind).orElseThrow();
+            if (!manifest.enabled()) {
+                // A disabled integration wires none of the required beans, so running these checks would
+                // just report the feature flag back as violations; see IntegrationManifest#enabled().
+                log.info("Integration {} is disabled; skipping its capability and provenance checks", kind);
+                continue;
+            }
             Set<Capability> declared = manifest.declaredCapabilities();
             checkRequired(kind, declared, violations);
+            violations.addAll(reviewContract.validateContribution(manifest));
         }
         if (!violations.isEmpty()) {
             String joined = String.join("\n  - ", violations);
@@ -124,13 +140,13 @@ public class IntegrationFrameworkBootstrap {
             require(kind, "TokenRefresher", anyMatchKind(tokenRefreshers, t -> t.kind() == kind), violations);
         }
         if (declared.contains(Capability.FEEDBACK_DELIVERY)) {
-            require(kind, "FeedbackChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
+            require(kind, "SummaryChannel", anyMatchKind(feedbackChannels, f -> f.kind() == kind), violations);
         }
-        if (declared.contains(Capability.INLINE_FINDINGS)) {
+        if (declared.contains(Capability.INLINE_FEEDBACK)) {
             require(
                 kind,
-                "InlineFindingChannel",
-                anyMatchKind(inlineFindingChannels, f -> f.kind() == kind),
+                "InlineFeedbackChannel",
+                anyMatchKind(inlineFeedbackChannels, f -> f.kind() == kind),
                 violations
             );
         }
@@ -172,7 +188,7 @@ public class IntegrationFrameworkBootstrap {
         Capability.WEBHOOK_INGEST,
         Capability.TOKEN_REFRESH,
         Capability.FEEDBACK_DELIVERY,
-        Capability.INLINE_FINDINGS,
+        Capability.INLINE_FEEDBACK,
         Capability.APPROVAL_WORKFLOW,
         Capability.SCOPE_CHANGES
     );

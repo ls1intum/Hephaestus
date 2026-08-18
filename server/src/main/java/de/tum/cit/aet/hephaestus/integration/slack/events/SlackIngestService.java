@@ -229,7 +229,7 @@ public class SlackIngestService {
      * which covers messages only. Transactional and idempotent (an unknown or already-erased channel deletes 0 rows).
      *
      * <p>Derived CONVERSATION feedback is hard-deleted too (GDPR Art. 17 for the derived copies, not inert-by-gate):
-     * those rows carry {@code artifact_type = CONVERSATION_THREAD} + {@code artifact_id = slack_thread.id} with no
+     * those rows carry {@code artifact_kind = chat.conversation_thread} + {@code artifact_id = slack_thread.id} with no
      * FK back to {@code slack_thread}, so the channel's thread ids are collected first and passed to the
      * practices-owned {@link ConversationFeedbackErasure} port, which deletes exactly those rows (cascading their
      * observation/placement/reaction children) — PR/ISSUE rows and other tenants' rows are untouched. The port

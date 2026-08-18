@@ -3,6 +3,7 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { toast } from "sonner";
 import {
 	createPracticeMutation,
+	getPracticeDefinitionOptionsOptions,
 	listAreasOptions,
 	listPracticesQueryKey,
 } from "@/api/@tanstack/react-query.gen";
@@ -16,6 +17,7 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
 import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-catalog-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
 	head: workspaceAdminHead("Create practice"),
@@ -32,8 +34,11 @@ function CreatePracticeContainer() {
 	const areasQuery = useQuery({
 		...listAreasOptions({
 			path: { workspaceSlug },
-			query: { activeOnly: true },
+			query: { visibleInPracticeDashboardsOnly: true },
 		}),
+	});
+	const definitionOptionsQuery = useQuery({
+		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
 	});
 
 	const practicesQueryKey = listPracticesQueryKey({ path: { workspaceSlug } });
@@ -41,36 +46,34 @@ function CreatePracticeContainer() {
 		...createPracticeMutation(),
 		scope: practiceCatalogStructureScope(workspaceSlug),
 		onMutate: () => queryClient.cancelQueries({ queryKey: practicesQueryKey }),
-	});
-
-	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
-		try {
-			const created = await createPractice.mutateAsync({
-				path: { workspaceSlug },
-				body: { ...data, areaSlug },
-			});
-			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices) =>
-				practices ? upsertPractice(practices, created) : practices,
-			);
-			void queryClient.invalidateQueries({
-				queryKey: practicesQueryKey,
-			});
-			toast.success("Practice created");
-			navigate({ to: ".." });
-		} catch (error) {
-			const status =
-				typeof error === "object" && error !== null && "status" in error
-					? (error as { status: number }).status
-					: undefined;
+		onError: (error) => {
+			const status = problemStatusOf(error);
 			toast.error(
 				status === 409
 					? "A practice with this identifier already exists in this workspace"
 					: "Couldn't create the practice",
 			);
-		}
+		},
+	});
+
+	// Rejects rather than swallowing the failure: the form holds its unsaved-changes guard down from
+	// submit until it hears one way or the other, so resolving on failure would lose the draft.
+	const handleSubmit = async (data: CreatePracticeRequest, areaSlug: string | null) => {
+		const created = await createPractice.mutateAsync({
+			path: { workspaceSlug },
+			body: { ...data, areaSlug },
+		});
+		queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices) =>
+			practices ? upsertPractice(practices, created) : practices,
+		);
+		void queryClient.invalidateQueries({
+			queryKey: practicesQueryKey,
+		});
+		toast.success("Practice created");
+		navigate({ to: ".." });
 	};
 
-	if (areasQuery.isPending) {
+	if (areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
 				<div className="flex h-64 max-w-3xl items-center justify-center">
@@ -79,14 +82,17 @@ function CreatePracticeContainer() {
 			</PracticeFormShell>
 		);
 	}
-	if (areasQuery.isError) {
+	if (areasQuery.isError || definitionOptionsQuery.isError) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
 				<div className="max-w-3xl">
 					<QueryErrorAlert
-						error={areasQuery.error}
-						title="Couldn't load practice areas"
-						onRetry={() => areasQuery.refetch()}
+						error={areasQuery.error ?? definitionOptionsQuery.error}
+						title="Couldn't load the practice editor"
+						onRetry={() => {
+							areasQuery.refetch();
+							definitionOptionsQuery.refetch();
+						}}
 					/>
 				</div>
 			</PracticeFormShell>
@@ -98,6 +104,7 @@ function CreatePracticeContainer() {
 			mode="create"
 			workspaceSlug={workspaceSlug}
 			areas={areasQuery.data}
+			definitionOptions={definitionOptionsQuery.data}
 			onSubmit={handleSubmit}
 			isPending={createPractice.isPending}
 		/>

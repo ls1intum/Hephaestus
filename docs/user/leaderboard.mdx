@@ -27,21 +27,19 @@ The overview card summarises your position on the current leaderboard:
 Selecting your rank in the overview card scrolls the table to highlight your entry.
 :::
 
-## Table columns and reviewer drawer
+## Table columns and the reviewed-work popover
 
-The leaderboard table includes rank, contributor, leaderboard score, and activity summary. Selecting any reviewer opens a detailed drawer that shows:
-
-- Pull requests or merge requests reviewed that week, with links to the source platform.
-- Key statistics such as additions, deletions, and review sentiment.
-- A **Copy** action that formats review highlights for sharing in standups or retrospectives.
+The leaderboard table includes rank, contributor, leaderboard score, and activity summary. Selecting a
+contributor opens their profile. Selecting their reviewed-work count opens a popover listing the pull
+requests or merge requests they reviewed in the selected period, each linked to the source platform,
+with a **Copy** action that formats the list for sharing in standups or retrospectives.
 
 ![Leaderboard pull request overview](./img/leaderboard/leaderboard-pr-overview.png)
 
 ## Exploring previous weeks and teams
 
-- Use the **time period** dropdown to switch between the current and previous weeks (the last four are stored by default).
-- Apply the **team filter** to view review activity within a specific team. Your personal rank only appears when the selected team includes you.
-- Filter by **labels** when your organisation tags pull requests per exercise or milestone.
+- Use the **Timeframe** dropdown to switch between this week, last week, this month, last month, or a custom range. Each selection is ranked on demand from synced activity, so any range you pick works.
+- Apply the **Team** filter to view review activity within a specific team. Your personal rank only appears when the selected team includes you.
 
 ![Leaderboard filters](./img/leaderboard/leaderboard-filter.png)
 
@@ -51,4 +49,4 @@ When a workspace admin enables leagues, weekly points feed into the Elo-inspired
 
 ## Recognition and notifications
 
-A workspace admin can configure a weekly Slack digest for a selected channel and team. The admin chooses the day, time, timezone, and destination under **Admin → Integrations → Slack**. Hephaestus does not send a leaderboard digest unless this option is enabled.
+A workspace admin can configure a weekly Slack digest for a selected channel and team. The admin chooses the day, the time, and the destination under **Administration → Integrations → Slack**; the time is read in the workspace timezone. Hephaestus does not send a leaderboard digest unless this option is enabled.

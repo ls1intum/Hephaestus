@@ -38,7 +38,7 @@ class ConfigSnapshotTest extends BaseUnitTest {
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setId(42L);
         binding.setWorkspace(ws);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         LlmModel model = new LlmModel();
         model.setId(20L);
         binding.setInstanceModel(model);
@@ -131,9 +131,8 @@ class ConfigSnapshotTest extends BaseUnitTest {
 
         @Test
         void shouldNotContainAuthHeaderMaterialInJson() {
-            // Locked decision: NEVER freeze the credential OR any header material —
-            // authHeaderName/authValuePrefix are re-resolved live from the connection, never from the
-            // snapshot.
+            // authHeaderName/authValuePrefix are re-resolved live from the connection on every use, so
+            // freezing them here would pin a job to a header shape the connection has since moved off.
             WorkspaceAgentBinding binding = createBinding();
             stubResolver(binding);
 

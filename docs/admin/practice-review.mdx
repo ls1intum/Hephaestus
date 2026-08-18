@@ -1,0 +1,271 @@
+---
+id: practice-review
+sidebar_position: 4
+title: Practice Review
+description: Turn practice review on, decide how much autonomy it has and how wide it runs, know what it costs, and find out why a workspace stopped hearing from it.
+---
+
+Practice review reads a workspace's connected work — pull requests, merge requests, issues, documents,
+and settled Slack threads — against the practices that workspace has installed. It records grounded
+observations first and, where that artifact and review occasion permit delivery, may compose feedback for
+the work, the developer's private practice pages, or a later mentor conversation. This page is how you
+switch it on, keep it from costing more than intended, and find out why it went quiet.
+
+Many review gates refuse work without raising a user-facing error, so a workspace can simply go quiet.
+Every refusal is recorded; **Review activity**, available to every member, is the first place to inspect it.
+
+## First successful review
+
+Use this short path before tuning campaigns, scopes, or per-practice overrides:
+
+1. Connect GitHub or GitLab and confirm a recent pull or merge request appears under **Review activity**.
+   If it does not, fix ingestion first; practice-review settings cannot make missing work appear.
+2. Under **AI models**, assign a ready model to practice reviews.
+3. On the practice **Review** screen, start practice reviews and enable automatic reviews.
+4. Under **How much**, choose **Propose** for a delivery-free trial or **Deliver** to allow feedback to
+   reach its eligible lanes. Leave repository and target-branch scope empty for the first test.
+5. Open a small pull or merge request, then follow it in **Review activity**. The trace distinguishes
+   ingestion, admission, observation, composition, withholding, and delivery; do not use the presence of
+   a provider comment as the success test.
+
+Once that works, narrow the scope, add practice overrides, or configure past-work reviews. The rest of
+this page is reference and troubleshooting for those decisions.
+
+### Follow one review end to end
+
+Suppose a developer opens **Update dependencies** with no explanation in its description:
+
+1. The provider event creates an occurrence visible under **Review activity**.
+2. The review gate selects practices whose occasions match that pull request. Capture must satisfy each
+   selected practice's evidence requirements before that practice can run.
+3. A practice about explaining why a change is needed can record that the explanation is absent, bounded
+   to the description it searched. This is the observation; it is retained even if nobody is contacted.
+4. Composition considers that observation alongside recent observations and feedback. It may propose a
+   public summary, private process feedback, mentor context, or no feedback.
+5. Server-side policy admits or refuses each proposal. **Review activity** explains the result. Workspace
+   admins can inspect the run in the practice-review run list; a provider comment
+   exists only when public delivery was both useful and permitted.
+
+This is the smallest useful diagnostic slice: occurrence → readiness → observation → composition →
+delivery. Stop at the first missing stage rather than changing downstream settings at random.
+
+### Use the right screen
+
+| Question | Open |
+| --- | --- |
+| Did this piece of work enter the system, and why was it quiet? | **Review activity**, then open the work |
+| Did a job run, fail, or produce observations and feedback? | The practice-review run list |
+| Which work may start reviews, and may feedback be delivered? | The practice **Review** screen |
+| What does one practice review and which evidence does it require? | Practice setup |
+| Is the review model ready? | **AI models** |
+| Did a budget stop new work? | **AI usage** |
+
+## What starts a review
+
+Five doors start reviews. Provider reconciliation is shown too because it records an occurrence but stops
+before a review starts.
+
+```mermaid
+flowchart LR
+    accTitle: Events that do and do not start practice reviews
+    accDescr: Live events, manual requests, campaigns, and recurring checks start reviews. Provider reconciliation records an occurrence but does not start a pull request or issue review.
+    Event[A live event from GitHub or GitLab] --> Live[Live event]
+    Command[The /hephaestus review comment command] --> Hand[Requested by hand]
+    Button[The Review this now button] --> Hand
+    Campaign[A confirmed Past work campaign] --> Back[Backfill of past work]
+    Sweep[A recurring Keep checking new work schedule] --> Rec[Found by a recurring check]
+    Reconcile[Reconciling with the provider] --> Sync[Noticed during a sync]
+    Live --> Review[A review starts]
+    Hand --> Review
+    Back --> Review
+    Rec --> Review
+    Sync --> Stop[Recorded only. No review starts.]
+```
+
+The labels on the right are the ones **Review activity** prints, so you can read a trace back against this
+diagram directly. Two things in it will bite you if you assume otherwise:
+
+- **The comment command and the button are indistinguishable afterwards.** Both record
+  `Requested by hand`. If you need to know which was used, the answer is not in the data.
+- **Reconciling with the provider records the occurrence but starts no review.** For pull requests and
+  issues this is a deliberate dead end: a sync tells us something happened, not when, and paying to review
+  it later would spend money on a stale event. (Settled Slack threads are the exception — the thread sweep
+  both records and starts.)
+
+| Door | Who may use it | Rate limit | Spends from |
+| --- | --- | --- | --- |
+| Live event | Nobody — it is automatic, per the practices' occasions | The per-workspace cooldown between reviews of the same work | The workspace's AI budget |
+| `/hephaestus review` in a **GitLab merge request** comment | The work's author or assignees, or a workspace admin | Per-person hourly allowance | The workspace's AI budget |
+| **Review this now** on Review activity | The same people. Every member sees the button; anyone else is refused with an explanation on the page | Per-person hourly allowance | The workspace's AI budget |
+| **Past work** campaign | A workspace admin, and only after confirming a priced estimate | Bounded by the campaign's own scope | The workspace's AI budget |
+| **Keep checking new work** schedule | A workspace admin | One campaign at a time per workspace | The workspace's AI budget |
+
+There is no equivalent comment command on GitHub pull requests. Reviews there start from live events, from
+the button, or from a campaign.
+
+## Turn it on
+
+Practice review is not one switch. It needs a deployment part and a per-workspace part, and a workspace is
+quiet until both are done.
+
+### Deployment
+
+Enable the agent runtime on both server and worker roles, enable repository checkout where evidence capture
+runs, and expose the practice-review feature. Variables, Compose forwarding, storage requirements, queue
+metrics, retention, and fixed limits are in
+[Practice review operations](./practice-review-operations.mdx).
+
+### Workspace setup
+
+Configure the workspace in this order:
+
+1. Under **AI models**, assign a ready model to practice reviews.
+2. On the practice **Review** screen, start practice reviews and enable the desired live or manual doors.
+3. Choose whether merged work remains eligible, who may be reviewed, and which repositories or target
+   branches are in scope. Empty scope lists include all monitored work.
+4. Set the workspace autonomy tier under **How much**, then add area or practice overrides only where the
+   inherited value is wrong.
+
+Draft eligibility belongs to each practice because it changes when that practice has a meaningful occasion;
+it is not a workspace-wide switch.
+
+## How much, and how wide
+
+Two independent settings, and confusing them is the most common misconfiguration.
+
+- **How much the system does on its own** — `Off`, `Propose`, `Deliver`. Only `Off` stops the review.
+  `Propose` runs it and records every observation exactly as `Deliver` does, and sends nothing to anybody.
+  Turning a noisy practice down therefore does not put a hole in the measurement; turning it `Off` does.
+  What a `Propose` practice held back is not lost: **Review activity** shows it as reviewed, with the
+  measurements it took, nothing delivered, and the tier named as the reason. Raise the practice to
+  `Deliver` when you want it heard. `Deliver` then delivers wherever the reviewed work allows — there is no
+  second setting choosing between the mentor conversation and the work itself, so a practice that reviews
+  on its own but speaks only in private is not a shape you can configure.
+- **Review scope** is per workspace: two exact-match lists, target branches and repositories, ANDed onto
+  every practice. Exact names only, no patterns, and a branch list cannot narrow issue review because an
+  issue has no target branch.
+
+### You set this once, not a hundred times
+
+**How much** is answered once for the **workspace**, and every area and every practice follows that answer
+until you say otherwise. An area can override the workspace, and a practice can override its area:
+
+> practice → its area → the workspace
+
+Anything you have not decided shows as **inherited**, with the level it came from, and can be reset back to
+inheriting at any time. Start with the one workspace answer, then override the handful of areas where it is
+wrong; a workspace runs dozens of practices across a dozen areas, and a setting you have to apply per row is
+a setting nobody applies. (Review scope is not inherited — it is one workspace-wide pair of lists.)
+
+The **Review → How much** section shows, above the list, how many practices sit at each setting — for the
+workspace and per area. Read that line before changing anything; it is the fastest way to see whether an
+override somebody made long ago is still doing what you think.
+
+Both settings are defined in full, with their refusal semantics, in the
+[practice review glossary](/contributor/practice-review-glossary). Do not re-derive them from this page.
+
+## What costs money
+
+Every started review is a model call, and there are exactly four things standing between a
+misconfiguration and a bill.
+
+1. **The monthly AI budget.** There are two, and they are never added together: the *instance* budget caps
+   a workspace's spend on shared models you registered, and the *workspace's own* budget caps its spend on
+   its own connected provider. Each pauses only the work it funds. Setting either to exactly `0` is the
+   supported way to hard-stop that purse mid-month; clearing the field removes the cap.
+2. **The cooldown.** The minimum gap between reviews of the same pull or merge request.
+3. **The per-person hourly allowance** on hand-requested reviews.
+4. **Review scope, and how much the system does on its own**, which decide how much work is eligible in the
+   first place.
+
+A budget pause is a **hold**, not a cancellation: queued jobs are released automatically when the cap is
+raised or the month rolls over. A job still over cap seven days after it was queued is cancelled rather
+than held forever.
+
+**Practice reviews go silent when a budget is exhausted, and the mentor does not.** A queued review is
+refused before it runs and nothing is posted, so no end user sees an error; a user who sends a mentor
+message into an exhausted purse gets a reply naming the cap and who can lift it. Staff for the difference —
+you will hear about the mentor and you will have to go looking for the reviews.
+
+Full budget mechanics, including what an unverifiable month does, are on
+[Integrations & Reference Deployment](./production-setup#instance-wide-llm-settings).
+
+## Reviewing past work
+
+Two instruments, and the difference between them is the difference between a purchase and a standing
+order. The campaign is on
+**Administration → Practices → Review → Past work**; the recurring check is on the same page's
+**When and where** section, beside the other things that start a review.
+
+**A campaign — *Past work*.** You choose a kind of work and a lookback window, press
+**Estimate this backfill**, and see how many pieces of work are in range and what they are estimated to
+cost. Nothing is reviewed until you confirm. It is one bounded, priced, named decision, and it finishes.
+
+**A schedule — *Keep checking new work*.** You choose a kind of work, a cadence, and how far back each
+check reaches. This exists because work that never raised a notification is otherwise never reviewed and
+nothing says so.
+
+:::warning A recurring check is a standing authorisation to spend
+A schedule opens each of its campaigns **directly in a running state**, using the authority of whoever
+created the schedule. There is no per-run estimate and no per-run confirmation, and no cap that is specific
+to sweeping — the only thing that stops it is the workspace's AI budget, the schedule's own scope, or
+switching it off. The screen says as much before you commit: *"This authorises the AI spend for every
+future check, not just the first."* Treat creating one as an ongoing budget decision, not a one-off.
+
+Stop it by **Pause** or **Remove** on the schedule, or by cancelling the campaign it opened. Windows
+overlap on purpose so that work missed once gets a second chance; work already reviewed is not paid for
+twice.
+:::
+
+Observations from either instrument are **measured and never delivered**. Backfill runs do not enter the
+composition stage, and the in-app router separately refuses a pattern supported only by backfilled
+observations. They therefore land in the read models and on **Review activity**, never as comments,
+practice-page cards, or mentor briefs. That is by construction, not a setting you can change: a campaign
+changes what you can read about past work and does not contact the people whose work it measured.
+
+## When a workspace goes quiet
+
+Work down this list. Step 0 usually ends the investigation; steps 1 to 4 are per workspace and
+5 to 7 are instance-wide, so if several workspaces went quiet at once, start at the bottom.
+
+**0. Open Review activity and read the trace.** **Review activity** in the workspace sidebar lists every
+piece of work Hephaestus recorded. Open one and you get two things: what was recorded about it and how it
+was discovered, and what every practice made of it, each with a sentence saying what would change the
+answer. A quiet workspace with rows here is configured differently from a quiet workspace with none. The
+sentences the trace prints are the same reasons the rest of this list enumerates — reading them first tells
+you which step to jump to.
+
+If the trace says the review model is not set up, or the practices that watch this are set to off, or the
+budget was used up, you are done; go fix that. If it says nothing was recorded at all, the problem is
+upstream of practice review — check the integration's sync.
+
+1. **Is a review model bound and enabled?** Administration → **AI models**, the **Practice reviews** card.
+2. **Is the bound model still usable?** A model is usable only if the model *and* its connection are
+   enabled, the protocol is supported, and — for a shared instance model — the workspace still has a grant.
+   Revoking a grant or disabling a connection stops every workspace bound to it, and the binding stays in
+   place looking correct.
+3. **Is a budget exhausted?** Administration → **AI usage** names which purse paused the workspace and who
+   can lift it. `agent.queue.held` counts jobs parked on a cap; `agent.queue.depth` counts only what a
+   worker could claim now, so alert on held rather than reading depth.
+4. **Is practice review, or the workspace, switched off?** The switch is **Start practice reviews** on
+   Administration → Practices → **Review → When and where** — *not* on the Workspace settings page. A paused
+   workspace runs nothing regardless of its AI configuration.
+5. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates submission,
+   execution *and* orphan recovery independently of the worker role. Set on the worker only, nothing is
+   submitted; set on the server only, jobs queue and are never claimed. Confirm by presence, not value: if
+   the flag never reached a pod, `agent.queue.depth`, `agent.queue.oldest_age_seconds` and
+   `agent.queue.running` are **absent** from that pod's metrics rather than reading zero.
+6. **Are jobs being claimed at all?** Watch `agent.queue.oldest_age_seconds`. It should rise and fall.
+   Climbing monotonically means the server is submitting and no worker is claiming.
+7. **Is instance-wide silent mode engaged?** Instance admin → **Instance settings**. While it is on, every
+   workspace's feedback is suppressed across the instance, and a banner says so on every instance-admin
+   page.
+
+The per-workspace review list under Administration → **Practices → Practice reviews** shows each review's
+status, the model it ran on, and its error message — the fastest way to tell "never submitted" from
+"submitted and failed".
+
+## Operational reference
+
+For deployment variables, the workspace setting map, queue metrics, retention, and non-configurable limits,
+see [Practice review operations](./practice-review-operations.mdx).

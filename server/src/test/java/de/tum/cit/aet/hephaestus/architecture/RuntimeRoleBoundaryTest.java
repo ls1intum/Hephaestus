@@ -187,8 +187,7 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     /**
      * Beans that must wire <em>unconditionally</em> (no {@code @ConditionalOnProperty}): mentoring
      * is always-on; per-workspace enablement lives in the DB ({@code WorkspaceFeatures.mentor_enabled}),
-     * not in a capability flag. These previously carried a (now-removed) {@code hephaestus.sandbox.enabled}
-     * gate — see the group-1 config-cohesion change.
+     * not in a capability flag.
      */
     private static final List<String> UNCONDITIONAL_MENTOR_BEANS = List.of(
         "de.tum.cit.aet.hephaestus.agent.mentor.chat.MentorChatService",
@@ -279,10 +278,9 @@ class RuntimeRoleBoundaryTest extends HephaestusArchitectureTest {
     /**
      * Every ungated bean that injects a server-gated bean crash-loops the worker and webhook pods at
      * context refresh — a failure no test tier can see, because none boots with
-     * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is the case that
-     * actually bit: its only provider used to be the server-gated {@code AuthJwtConfig}, so the first
-     * ungated consumer (the config-audit recorder, which must load on every role) broke both pods
-     * while the whole suite stayed green. Pin the provider ungated so it cannot regress.
+     * {@code hephaestus.runtime.server.enabled=false}. {@link java.time.Clock} is injected by beans that
+     * must load on every role — the config-audit recorder among them — so gating its provider breaks both
+     * pods with the whole suite green.
      */
     @Test
     void clockBeanIsAvailableToEveryRuntimeRole() {

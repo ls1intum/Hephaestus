@@ -46,6 +46,34 @@ public class SpringAsyncConfig implements AsyncConfigurer {
         return executor;
     }
 
+    /**
+     * The two feedback-preparation lanes, off the shared pool.
+     *
+     * <p>They shared {@link #applicationTaskExecutor} with every other {@code @Async} listener in the
+     * tree, including the twenty-odd activity listeners a provider sync fans out. A concurrent sync
+     * therefore decided whether a developer's feedback was prepared at all: the default
+     * {@code AbortPolicy} throws once the 500-deep queue is full, and a rejected {@code AFTER_COMMIT}
+     * event is not redelivered.
+     *
+     * <p>Small and deep: the work is short, database-bound and bursty — one submission per finished
+     * review — so depth absorbs a burst better than width, and width here only competes for the same
+     * Hikari connections the web tier needs. It can still reject; {@code FeedbackLanePreparationSweeper}
+     * is what makes that survivable, and this pool only makes it rare and unrelated to sync load.
+     */
+    @Bean(name = FeedbackLaneExecutor.BEAN_NAME)
+    public AsyncTaskExecutor feedbackLaneExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(2);
+        executor.setMaxPoolSize(4);
+        executor.setQueueCapacity(1000);
+        executor.setThreadNamePrefix("feedback-lane-");
+        // Same reason as applicationTaskExecutor: let in-flight DB work finish before the
+        // EntityManagerFactory closes.
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        return executor;
+    }
+
     /** Long-running provider reconciliations must not queue behind or starve ordinary async work. */
     @Bean(name = "syncJobExecutor")
     public AsyncTaskExecutor syncJobExecutor() {

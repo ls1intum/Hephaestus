@@ -1,6 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { Gauge } from "lucide-react";
-import { expect, within } from "storybook/test";
 import type { InstanceSettings } from "@/api/types.gen";
 import { PageHeader } from "@/components/core/PageHeader";
 import { SilentModeBanner } from "./SilentModeBanner";
@@ -24,11 +23,10 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Engaged: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/silent mode is engaged/i, { exact: false })).toBeInTheDocument();
-		await expect(canvas.getByText(/incident #42/i, { exact: false })).toBeInTheDocument();
-		await expect(canvas.getByRole("link", { name: /manage/i })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/silent mode is engaged/i, { exact: false });
+		canvas.getByText(/incident #42/i, { exact: false });
+		canvas.getByRole("link", { name: /manage/i });
 	},
 };
 

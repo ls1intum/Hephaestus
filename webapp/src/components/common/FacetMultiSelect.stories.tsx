@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import { FacetMultiSelect } from "./FacetMultiSelect";
 
 const eventTypes = [
@@ -66,18 +66,17 @@ export const AccentInsensitiveSearch: Story = {
 			{ value: "12", label: "Ärztliche Fortbildung", description: "aerzte" },
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: "Workspaces" }));
 		await userEvent.type(await screen.findByPlaceholderText("Search…"), "arztliche");
-		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeInTheDocument();
+		await expect(await screen.findByRole("option", { name: /Ärztliche/ })).toBeVisible();
 		await expect(screen.queryByRole("option", { name: /Teaching/ })).toBeNull();
 	},
 };
 
 export const SelectsAnOption: Story = {
-	play: async ({ args, canvasElement }) => {
-		await userEvent.click(within(canvasElement).getByRole("combobox", { name: "Event" }));
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("combobox", { name: "Event" }));
 		await userEvent.click(await screen.findByRole("option", { name: "Sign-in succeeded" }));
 		await expect(args.onChange).toHaveBeenCalledWith(["LOGIN_SUCCESS"]);
 	},
@@ -85,8 +84,7 @@ export const SelectsAnOption: Story = {
 
 export const ClearsTheSelection: Story = {
 	args: { selected: ["LOGIN_SUCCESS"] },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox", { name: /Event:/ }));
 		await userEvent.click(await screen.findByRole("button", { name: "Clear selection" }));
 		await expect(args.onChange).toHaveBeenCalledWith([]);

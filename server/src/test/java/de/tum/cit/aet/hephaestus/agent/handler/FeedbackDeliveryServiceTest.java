@@ -16,8 +16,9 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedExceptio
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -25,9 +26,9 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
@@ -252,7 +253,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 any(),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of()),
                 eq(false),
                 eq(false)
@@ -268,10 +269,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
             );
             var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
-            var signal = new InlineFindingChannel.DeliveredSignal(
+            var signal = new InlineFeedbackChannel.DeliveredSignal(
                 "ck-foo",
-                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFindingChannel.Disposition.POSTED,
+                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFeedbackChannel.Disposition.POSTED,
                 "note-1",
                 "disc-1"
             );
@@ -286,7 +287,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
                 eq(true)
@@ -315,7 +316,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_ping");
             when(
-                observationTrendService.computeForTarget(WorkArtifact.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
+                observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
 
             footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
@@ -411,7 +412,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
                 delivery,
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 List.of(),
                 true,
                 false
@@ -471,10 +472,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 ),
                 List.of()
             );
-            InlineFindingChannel.DeliveredSignal signal = new InlineFindingChannel.DeliveredSignal(
+            InlineFeedbackChannel.DeliveredSignal signal = new InlineFeedbackChannel.DeliveredSignal(
                 "key-1",
-                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFindingChannel.Disposition.POSTED,
+                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFeedbackChannel.Disposition.POSTED,
                 "note-1",
                 "discussion-1"
             );
@@ -488,7 +489,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
                 delivery,
-                WorkArtifact.PULL_REQUEST,
+                ArtifactKinds.PULL_REQUEST,
                 List.of(signal),
                 true,
                 true
@@ -539,22 +540,23 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             assertThat(body.getValue()).contains("Fix stuff.");
         }
 
+        // A draft is not a reason to withhold: the binding already decided this was worth reviewing before
+        // the job was submitted, so suppressing here would silently drop feedback it asked for.
         @Test
-        void skipsWhenPrDraft() {
+        void deliversToADraftBecauseTheBindingAlreadyDecidedItWasWorthReviewing() {
             AgentJob job = createJob();
             var pr = createOpenPr();
             pr.setDraft(true);
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
+            when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_draft123");
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
             service.deliverFeedback(job, delivery);
 
-            verifyNoInteractions(commentPoster);
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_DRAFT)
-            );
+            verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
+            var body = ArgumentCaptor.forClass(String.class);
+            verify(commentPoster).postFormattedBody(eq(job), body.capture());
+            assertThat(body.getValue()).contains("Fix stuff.");
         }
 
         @Test
@@ -725,10 +727,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             var note = new DiffNote("src/Foo.java", 10, null, "Fix this", "ck-foo");
-            var signal = new InlineFindingChannel.DeliveredSignal(
+            var signal = new InlineFeedbackChannel.DeliveredSignal(
                 "ck-foo",
-                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFindingChannel.Disposition.POSTED,
+                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFeedbackChannel.Disposition.POSTED,
                 "note-1",
                 "disc-1"
             );
@@ -742,7 +744,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of(signal)),
                 eq(false),
                 eq(true)
@@ -803,17 +805,17 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         void postsDiffNotesWhenMrNoteNull() {
             AgentJob job = createJob();
             stubOpenPr();
-            var firstSignal = new InlineFindingChannel.DeliveredSignal(
+            var firstSignal = new InlineFeedbackChannel.DeliveredSignal(
                 "ck-foo",
-                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFindingChannel.Disposition.POSTED,
+                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFeedbackChannel.Disposition.POSTED,
                 "note-1",
                 "disc-1"
             );
-            var secondSignal = new InlineFindingChannel.DeliveredSignal(
+            var secondSignal = new InlineFeedbackChannel.DeliveredSignal(
                 "ck-bar",
-                new FindingAnchor.DiffAnchor("src/Bar.java", 20, null),
-                InlineFindingChannel.Disposition.POSTED,
+                new FeedbackAnchor.DiffAnchor("src/Bar.java", 20, null),
+                InlineFeedbackChannel.Disposition.POSTED,
                 "note-2",
                 "disc-2"
             );
@@ -832,7 +834,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             verify(feedbackLedgerRecorder).record(
                 eq(job),
                 eq(delivery),
-                eq(WorkArtifact.PULL_REQUEST),
+                eq(ArtifactKinds.PULL_REQUEST),
                 eq(List.of(firstSignal, secondSignal)),
                 eq(false),
                 eq(true)
@@ -905,11 +907,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Nested
     class SummaryDemotion {
 
-        private InlineFindingChannel.DeliveredSignal landedSignal(String findingFingerprint) {
-            return new InlineFindingChannel.DeliveredSignal(
+        private InlineFeedbackChannel.DeliveredSignal landedSignal(String findingFingerprint) {
+            return new InlineFeedbackChannel.DeliveredSignal(
                 findingFingerprint,
-                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFindingChannel.Disposition.POSTED,
+                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFeedbackChannel.Disposition.POSTED,
                 "note-1",
                 "thread-1"
             );
@@ -969,10 +971,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
             stubOpenPr();
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
-            var failed = new InlineFindingChannel.DeliveredSignal(
+            var failed = new InlineFeedbackChannel.DeliveredSignal(
                 "corr-failed",
-                new FindingAnchor.DiffAnchor("src/Foo.java", 10, null),
-                InlineFindingChannel.Disposition.FAILED,
+                new FeedbackAnchor.DiffAnchor("src/Foo.java", 10, null),
+                InlineFeedbackChannel.Disposition.FAILED,
                 null,
                 null
             );
@@ -1010,7 +1012,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private static PracticeReviewProperties reviewProperties(boolean progressFooter) {
-        return new PracticeReviewProperties(false, true, false, 15, progressFooter, false);
+        return new PracticeReviewProperties(false, false, 15, 5, progressFooter, false);
     }
 
     private static TrendDelta resolvedTrend() {
@@ -1021,11 +1023,10 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             "Unused import removed",
             Assessment.BAD, // priorAssessment — the gap the student last saw (RESOLVED ⇒ currentAssessment null)
             null,
-            Severity.MINOR,
-            0.8f
+            Severity.MINOR
         );
         return new TrendDelta(
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             PULL_REQUEST_ID,
             UUID.randomUUID(),
             UUID.randomUUID(),

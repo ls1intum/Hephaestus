@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The validator's own guard. A response-shape check that quietly accepts everything is worse than none: it
- * leaves a green tick where a proof used to be. These pin both directions — the two shapes that shipped the
+ * leaves a green tick where a proof should be. These pin both directions — the two shapes behind the
  * GitLab {@code iid} defect are rejected, and the traversal features that would otherwise reject correct
  * fixtures (fragment spreads, inline fragments, subset stubs) are honoured.
  */
@@ -37,7 +37,7 @@ class GraphQlResponseStubValidatorTest extends BaseUnitTest {
 
     @Test
     void rejectsAnIntegerWhereTheSchemaDeclaresAString() {
-        // The shipped defect: MergeRequest.iid is String!, so GitLab sends "42" and never 42.
+        // MergeRequest.iid is String!, so GitLab sends "42" and never 42.
         Map<String, Object> node = Map.of("iid", 42);
 
         assertThatThrownBy(() -> assertVendorCouldReturn(GITLAB, LINK_COMMITS, MERGE_REQUEST_NODES, List.of(node)))

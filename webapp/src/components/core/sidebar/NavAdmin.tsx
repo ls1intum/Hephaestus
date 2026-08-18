@@ -9,9 +9,9 @@ import {
 	ListChecks,
 	Map as MapIcon,
 	PlugZapIcon,
+	ScanEye,
 	ScrollText,
 	Settings2,
-	SlidersHorizontal,
 	Trophy,
 	Users,
 	Workflow,
@@ -60,14 +60,17 @@ export function NavAdmin({
 	const onAchievementDesigner = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/achievement-designer", fuzzy: true }),
 	);
-	const onReviewSettings = Boolean(
-		matchRoute({ to: "/w/$workspaceSlug/admin/practices/settings", fuzzy: true }),
+	const onReview = Boolean(
+		matchRoute({ to: "/w/$workspaceSlug/admin/practices/review", fuzzy: true }),
 	);
 	const onReviews = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/practices/reviews", fuzzy: true }),
 	);
 	const onSection = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/practices", fuzzy: true }));
-	const onCatalog = onSection && !onReviewSettings && !onReviews;
+	// The catalogue is what is left when neither of the other two claimed the route, so it needs no
+	// match of its own. `review` and `reviews` do not collide — the router matches whole segments —
+	// but the section landing link is a prefix of all three, so it cannot be the test for any of them.
+	const onCatalog = onSection && !onReview && !onReviews;
 
 	const onIntegrationsScm = Boolean(
 		matchRoute({ to: "/w/$workspaceSlug/admin/integrations/scm", fuzzy: true }),
@@ -197,6 +200,21 @@ export function NavAdmin({
 					</SidebarMenuSubItem>
 					<SidebarMenuSubItem>
 						<SidebarMenuSubButton
+							isActive={onReview}
+							render={
+								<Link
+									to="/w/$workspaceSlug/admin/practices/review"
+									params={{ workspaceSlug }}
+									search={{}}
+								/>
+							}
+						>
+							<ScanEye />
+							<span>Review</span>
+						</SidebarMenuSubButton>
+					</SidebarMenuSubItem>
+					<SidebarMenuSubItem>
+						<SidebarMenuSubButton
 							isActive={onReviews}
 							render={
 								<Link to="/w/$workspaceSlug/admin/practices/reviews" params={{ workspaceSlug }} />
@@ -204,17 +222,6 @@ export function NavAdmin({
 						>
 							<Workflow />
 							<span>Practice reviews</span>
-						</SidebarMenuSubButton>
-					</SidebarMenuSubItem>
-					<SidebarMenuSubItem>
-						<SidebarMenuSubButton
-							isActive={onReviewSettings}
-							render={
-								<Link to="/w/$workspaceSlug/admin/practices/settings" params={{ workspaceSlug }} />
-							}
-						>
-							<SlidersHorizontal />
-							<span>Review settings</span>
 						</SidebarMenuSubButton>
 					</SidebarMenuSubItem>
 				</AdminNavSection>
@@ -373,7 +380,9 @@ function AdminNavSection({
 				</CollapsibleTrigger>
 			)}
 			<CollapsibleContent>
-				<SidebarMenuSub>{children}</SidebarMenuSub>
+				{/* The list carries the section's name: a screen reader jumping by list otherwise
+				    announces "list, 3 items" with nothing saying which section it landed in. */}
+				<SidebarMenuSub aria-label={label}>{children}</SidebarMenuSub>
 			</CollapsibleContent>
 		</Collapsible>
 	);

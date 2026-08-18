@@ -29,7 +29,9 @@ public record UpdatePracticeAreaRequestDTO(
     @Nullable
     Integer displayOrder,
 
-    @Schema(description = "Whether this area is active") @Nullable Boolean active,
+    @Schema(description = "Whether this area is shown in practice dashboards")
+    @Nullable
+    Boolean visibleInPracticeDashboards,
 
     @Size(max = 64, message = "Icon must be at most 64 characters")
     @Pattern(regexp = "^[A-Za-z0-9]+$", message = "Icon must be a lucide icon name (letters and digits only)")

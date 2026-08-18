@@ -1,10 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { ProjectManagerCard } from "./ProjectManagerCard";
 
-/**
- * ProjectManagerCard component for displaying project manager information.
- * Features avatar, contact details, and professional description with external links.
- */
 const meta = {
 	component: ProjectManagerCard,
 	parameters: { layout: "padded" },
@@ -19,9 +15,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default project manager card with the current project information.
- */
 export const Default: Story = {
 	args: {
 		projectManager: {
@@ -38,9 +31,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * Project manager card with placeholder data for design testing.
- */
 export const Placeholder: Story = {
 	args: {
 		projectManager: {
@@ -57,9 +47,6 @@ export const Placeholder: Story = {
 	},
 };
 
-/**
- * Project manager card with longer description text to test layout.
- */
 export const LongDescription: Story = {
 	args: {
 		projectManager: {

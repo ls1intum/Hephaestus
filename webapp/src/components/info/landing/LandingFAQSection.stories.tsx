@@ -2,10 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { LandingFAQSection } from "./LandingFAQSection";
 
-/**
- * FAQ section component that displays frequently asked questions and answers
- * through an accordion interface, along with a community link.
- */
 const meta = {
 	component: LandingFAQSection,
 	parameters: {
@@ -36,20 +32,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default FAQ section for first-time visitors.
- * Features the FAQ accordion and the community link.
- */
 export const Default: Story = {
 	args: {
 		isSignedIn: false,
 	},
 };
 
-/**
- * FAQ section for authenticated users.
- * The section content does not change with authentication state.
- */
 export const SignedIn: Story = {
 	args: {
 		isSignedIn: true,

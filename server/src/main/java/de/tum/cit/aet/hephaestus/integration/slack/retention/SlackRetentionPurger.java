@@ -25,7 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
  * activity ({@code last_ts}) is older than the cutoff — equivalently every message in it is older than the cutoff,
  * since {@code last_ts} is the maximum message {@code ts}. For each aged thread the purge, in one transaction:
  * <ol>
- *   <li>erases the derived {@code CONVERSATION_THREAD} observations/feedback via the practices
+ *   <li>erases the derived {@code chat.conversation_thread} observations/feedback via the practices
  *       {@link ConversationFeedbackErasure} port <b>before</b> the aggregates are dropped, so the derived rows
  *       (and their cascade children) never outlive the {@code slack_thread} they were composed over;</li>
  *   <li>deletes the raw {@code slack_message} rows belonging to those aged thread aggregates; and</li>
@@ -59,7 +59,6 @@ public class SlackRetentionPurger {
         String cutoffTs = SlackTs.ofInstant(cutoff);
         List<Long> agedThreadIds = slackThreadRepository.findAgedThreadIds(workspaceId, cutoffTs);
 
-        // 1) Erase the derived CONVERSATION_THREAD feedback/observations BEFORE dropping the aggregates they point at.
         conversationFeedbackErasure.eraseForThreads(workspaceId, agedThreadIds);
 
         if (agedThreadIds.isEmpty()) {

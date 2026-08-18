@@ -43,7 +43,7 @@ describe("ChannelHistorySheet — failed load offers a retry", () => {
 
 		fireEvent.click(retry);
 
-		await waitFor(() => expect(screen.getByText(/no consent changes recorded yet/i)).toBeTruthy());
+		await waitFor(() => screen.getByText(/no consent changes recorded yet/i));
 		expect(requestCount).toBe(2);
 	});
 });

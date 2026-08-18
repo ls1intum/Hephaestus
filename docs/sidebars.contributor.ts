@@ -41,15 +41,19 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'AI Development',
-      items: ['ai-agent-workflow', 'ai-code-review', 'unified-pi-runtime', 'agent/agent-workspace-abi', 'llm-cost-vocabulary'],
+      items: ['ai-agent-workflow', 'unified-pi-runtime', 'agent/agent-workspace-abi', 'llm-cost-vocabulary'],
     },
     {
       type: 'category',
       label: 'Practices & Feedback',
       items: [
-        'practice-feedback-language',
+        'practice-review-pipeline',
+        'practice-review-runtime',
+        'artifact-source-contract',
         'practice-catalogue',
         'practice-feedback-schema',
+        'practice-feedback-language',
+        'practice-review-glossary',
         'evaluation-provenance',
       ],
     },

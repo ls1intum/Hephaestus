@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.fabric;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalArgumentException;
 
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.nio.charset.StandardCharsets;
@@ -31,17 +32,22 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
         gc = new FabricGarbageCollector(layout, cas, mapper, 30);
     }
 
+    @Test
+    void rejectsNonPositiveRetention() {
+        assertThatIllegalArgumentException().isThrownBy(() -> new FabricGarbageCollector(layout, cas, mapper, 0));
+    }
+
     /** Write a job manifest referencing the given blob shas and return the job directory. */
     private Path writeJob(String jobId, String... shas) throws Exception {
         var manifest = mapper.createObjectNode();
-        manifest.put("jobId", jobId);
-        var entries = manifest.putArray("entries");
+        var source = manifest.putArray("sources").addObject();
+        var entries = source.putArray("artifacts");
         for (String sha : shas) {
             entries.addObject().put("sha256", sha);
         }
         Path dir = layout.jobDir(jobId);
         Files.createDirectories(dir);
-        Files.write(dir.resolve("manifest.json"), mapper.writeValueAsBytes(manifest));
+        Files.write(dir.resolve("artifact-source-manifest.json"), mapper.writeValueAsBytes(manifest));
         return dir;
     }
 
@@ -68,40 +74,49 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
 
     @Test
     void referencedShas_skipsCorruptManifestWithoutDroppingSurvivingJobs() throws Exception {
-        // A truncated/half-written manifest (the worker-writes/server-reads race) must be skipped, NOT clear
-        // the live set — otherwise the surviving job's shas vanish and its in-flight blobs get swept. Resilient
-        // degradation of the mark phase is what keeps the empty-set mass-sweep guard from being defeated.
         writeJob("valid", "1111", "2222");
         Path corrupt = layout.jobDir("corrupt");
         Files.createDirectories(corrupt);
-        Files.write(corrupt.resolve("manifest.json"), "{\"entries\":".getBytes(StandardCharsets.UTF_8));
+        Files.write(corrupt.resolve("artifact-source-manifest.json"), "{\"sources\":".getBytes(StandardCharsets.UTF_8));
 
         assertThat(gc.referencedShas()).containsExactlyInAnyOrder("1111", "2222");
     }
 
     @Test
-    void pruneLegacyClones_removesAllDigitTopLevelDirsOnly() throws Exception {
-        Files.createDirectories(root.resolve("42")); // legacy {repoId} clone
-        Files.createDirectories(root.resolve("bulk")); // current region — must survive
-        Files.createDirectories(root.resolve("cas"));
-
-        int pruned = gc.pruneLegacyClones();
-
-        assertThat(pruned).isEqualTo(1);
-        assertThat(root.resolve("42")).doesNotExist();
-        assertThat(root.resolve("bulk")).exists();
-        assertThat(root.resolve("cas")).exists();
-    }
-
-    @Test
-    void collect_doesNotMassSweepWhenNoManifestsAreVisible() throws Exception {
-        // Split-deployment safety net: blobs present but zero job manifests (unshared volume) must NOT
-        // be swept — an empty live set means "not visible here", not "all garbage".
-        String blob = cas.put("worker-wrote-this".getBytes(StandardCharsets.UTF_8));
+    void collect_skipsSweepWhenAnyManifestIsUnreadable() throws Exception {
+        String orphan = cas.put("old-orphan".getBytes(StandardCharsets.UTF_8));
+        Files.setLastModifiedTime(cas.pathFor(orphan), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Path corrupt = layout.jobDir("corrupt");
+        Files.createDirectories(corrupt);
+        Files.write(corrupt.resolve("artifact-source-manifest.json"), "{".getBytes(StandardCharsets.UTF_8));
 
         gc.collect();
 
-        assertThat(cas.exists(blob)).isTrue();
+        assertThat(cas.exists(orphan)).isTrue();
+    }
+
+    @Test
+    void collect_sweepsOldOrphansWhenNoJobsRemainButKeepsActiveWrites() throws Exception {
+        String old = cas.put("old-orphan".getBytes(StandardCharsets.UTF_8));
+        String active = cas.put("active-write".getBytes(StandardCharsets.UTF_8));
+        Files.setLastModifiedTime(cas.pathFor(old), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+
+        gc.collect();
+
+        assertThat(cas.exists(old)).isFalse();
+        assertThat(cas.exists(active)).isTrue();
+    }
+
+    @Test
+    void collect_keepsAnOldBlobReusedByAnInFlightCapture() throws Exception {
+        byte[] content = "reused-content".getBytes(StandardCharsets.UTF_8);
+        String reused = cas.put(content);
+        Files.setLastModifiedTime(cas.pathFor(reused), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+
+        cas.put(content);
+        gc.collect();
+
+        assertThat(cas.exists(reused)).isTrue();
     }
 
     @Test
@@ -113,6 +128,8 @@ class FabricGarbageCollectorTest extends BaseUnitTest {
         writeJob("recent", keep);
         Path old = writeJob("old", expired);
         Files.setLastModifiedTime(old, FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Files.setLastModifiedTime(cas.pathFor(expired), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
+        Files.setLastModifiedTime(cas.pathFor(orphan), FileTime.from(Instant.now().minus(Duration.ofDays(60))));
 
         gc.collect();
 

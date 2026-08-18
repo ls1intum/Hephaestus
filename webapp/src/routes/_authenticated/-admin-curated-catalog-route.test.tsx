@@ -1,6 +1,13 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeDefinitionOptions,
+	mockPullRequestBinding,
+	mockPullRequestPolicy,
+} from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
@@ -22,10 +29,12 @@ const areaDefinition = {
 };
 const practiceDefinition = {
 	name: "Say what changed and why",
-	artifactType: "PULL_REQUEST",
-	triggerEvents: ["PullRequestCreated"],
+	artifactKind: "scm.pull_request",
+	bindings: [mockPullRequestBinding],
 	criteria: "Our own criteria",
 	whyItMatters: "Reviewers need context",
+	automatedReviewPolicy: mockPullRequestPolicy,
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 };
 
 function mockCatalog(overrides: Record<string, unknown> = {}) {
@@ -47,7 +56,8 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 			{
 				slug: "describe-what-and-why",
 				name: practiceDefinition.name,
-				artifactType: "PULL_REQUEST",
+				artifactKind: "scm.pull_request",
+				automatedReview: mockPullRequestPolicy.automatedReview,
 				areaSlug: "packaging",
 				position: 0,
 				effectivelyOffered: true,
@@ -57,6 +67,11 @@ function mockCatalog(overrides: Record<string, unknown> = {}) {
 		...overrides,
 	};
 	server.use(http.get("*/admin/practice-catalog", () => HttpResponse.json(catalog)));
+	server.use(
+		http.get("*/admin/practice-catalog/definition-options", () =>
+			HttpResponse.json(mockPracticeDefinitionOptions),
+		),
+	);
 	return catalog;
 }
 
@@ -66,7 +81,7 @@ describe("instance catalog routes", () => {
 		renderRouteAt("/admin/catalog");
 
 		await screen.findByText("1 Hephaestus change needs review", undefined, ROUTE_RENDER_WAIT);
-		expect(screen.getByText("1 update would change review behavior")).toBeTruthy();
+		screen.getByText("1 update would change review behavior");
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
 		expect(await screen.findByRole("button", { name: "Show all entries" })).toBeTruthy();
 	});
@@ -301,10 +316,8 @@ describe("instance catalog routes", () => {
 			),
 		);
 		const confirmation = screen.getByRole("alertdialog");
-		expect(
-			within(confirmation).getByText(/also excludes 1 currently included practice/),
-		).toBeTruthy();
-		expect(within(confirmation).getByText("Say what changed and why")).toBeTruthy();
+		within(confirmation).getByText(/also excludes 1 currently included practice/);
+		within(confirmation).getByText("Say what changed and why");
 		fireEvent.click(within(confirmation).getByRole("button", { name: "Exclude area" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
@@ -617,5 +630,51 @@ describe("instance catalog routes", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
 		await waitFor(() => expect(retriedIfMatch).toBe('"tag-2"'));
+	});
+
+	it.each([
+		["unchanged", false, mockPullRequestPolicy, mockPullRequestBinding.signals],
+		[
+			"changed",
+			true,
+			mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
+			["chat.conversation_thread.settled"],
+		],
+	] as const)("%s artifact sends the visible review rule", async (_label, changeArtifact, expectedPolicy, expectedSignals) => {
+		mockCatalog();
+		let requestBody: Record<string, unknown> | undefined;
+		server.use(
+			http.get("*/admin/practice-catalog/practices/:slug", () =>
+				HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status(),
+				}),
+			),
+			http.put("*/admin/practice-catalog/practices/:slug", async ({ request }) => {
+				requestBody = (await request.json()) as Record<string, unknown>;
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: practiceDefinition,
+					status: status({ etag: "tag-2" }),
+				});
+			}),
+		);
+		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
+
+		await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
+		if (changeArtifact) {
+			const user = userEvent.setup();
+			await user.click(screen.getByRole("radio", { name: /Conversation/ }));
+		}
+		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+		await waitFor(() => expect(requestBody).toBeDefined());
+		expect(requestBody?.automatedReviewPolicy).toEqual(expectedPolicy);
+		// The kind of work is read off the signals, so switching it has to rewrite the occasions
+		// rather than send a kind alongside bindings that still name the old one.
+		expect(
+			(requestBody?.bindings as Array<{ signals: string[] }>).map((binding) => binding.signals),
+		).toEqual([[...expectedSignals]]);
 	});
 });

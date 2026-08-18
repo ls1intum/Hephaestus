@@ -11,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Stream;
+import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,19 +22,14 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Garbage-collects the Context-Fabric cache (ADR 0020). Disk is a rebuildable cache, so collection is
- * safe and best-effort: it first prunes per-job replay directories older than the retention window, then
- * mark-and-sweeps the {@link ContentAddressedStore} against the blobs still referenced by the surviving
- * job manifests. A blob wrongly swept is simply rebuilt on next access; SQL stays the source of truth.
- *
- * <p>Mirrors the established {@code @Scheduled} sweepers (ExportRetentionSweeper, AccountHardDeleteSweeper),
- * including their {@link ConditionalOnServerRole} gate so the bean only exists on the server role rather than
- * relying incidentally on {@code @EnableScheduling} placement to keep {@link #collect()} from firing off-role.
+ * best-effort: it first prunes per-job replay directories older than the retention window, then sweeps
+ * blobs that are both unreferenced and older than that same window. The age barrier protects captures
+ * that have written a blob but have not yet published their manifest.
  */
 @ConditionalOnServerRole
 @Component
 @WorkspaceAgnostic(
-    "The fabric cache (content-addressed blob store + job-replay dirs) is shared across all workspaces " +
-        "by design — like the git clone it generalises — so GC operates globally with no per-workspace iteration."
+    "Content-addressed blobs and job replay directories are shared storage regions, so retention runs globally."
 )
 public class FabricGarbageCollector {
 
@@ -50,6 +46,9 @@ public class FabricGarbageCollector {
         JsonMapper objectMapper,
         @Value("${hephaestus.fabric.gc-retention-days:30}") long retentionDays
     ) {
+        if (retentionDays < 1) {
+            throw new IllegalArgumentException("hephaestus.fabric.gc-retention-days must be positive");
+        }
         this.layout = layout;
         this.cas = cas;
         this.objectMapper = objectMapper;
@@ -60,58 +59,17 @@ public class FabricGarbageCollector {
         fixedRateString = "${hephaestus.fabric.gc-rate:86400000}",
         initialDelayString = "${hephaestus.fabric.gc-initial-delay:3600000}"
     )
+    @SchedulerLock(name = "context-fabric-garbage-collection", lockAtMostFor = "PT1H", lockAtLeastFor = "PT30S")
     public void collect() {
         Instant cutoff = Instant.now().minus(retention);
         int prunedJobs = pruneExpiredJobs(cutoff);
-        int prunedLegacy = pruneLegacyClones();
-        Set<String> live = referencedShas();
-        // Safety net: this GC runs under the SERVER role's scheduler, while jobs/manifests are written on
-        // the job-execution path. In a split deployment that does NOT share hephaestus.fabric.root, an
-        // EMPTY live set here means "manifests are not visible on this volume", NOT "every blob is
-        // garbage" — so never mass-sweep the CAS on zero references. (When server+worker share the volume,
-        // a genuinely-idle root has no blobs either, so the guard costs nothing.)
-        int sweptBlobs = live.isEmpty() ? 0 : cas.sweep(live);
-        if (prunedJobs > 0 || prunedLegacy > 0 || sweptBlobs > 0) {
-            log.info(
-                "Fabric GC: pruned {} expired job dir(s), {} legacy clone(s), swept {} orphaned CAS blob(s)",
-                prunedJobs,
-                prunedLegacy,
-                sweptBlobs
-            );
+        ReferenceScan references = scanReferences();
+        int sweptBlobs = references.complete() ? cas.sweep(references.shas(), cutoff) : 0;
+        if (prunedJobs > 0 || sweptBlobs > 0) {
+            log.info("Fabric GC: pruned {} expired job dir(s), swept {} orphaned CAS blob(s)", prunedJobs, sweptBlobs);
         }
     }
 
-    /**
-     * Reclaim git clones left at the pre-Fabric layout ({@code {root}/{repoId}}, all-digit names directly
-     * under the root) after {@code GitRepositoryManager.getRepositoryPath} moved them to
-     * {@code sources/scm/{repoId}}. Idempotent — once removed, later runs find none. The current regions
-     * ({@code sources/}, {@code cas/}, {@code jobs/}) are never all-digit, so they are safe.
-     */
-    int pruneLegacyClones() {
-        Path root = layout.root();
-        if (!Files.isDirectory(root)) {
-            return 0;
-        }
-        int pruned = 0;
-        try (Stream<Path> children = Files.list(root)) {
-            for (Path child : children.filter(Files::isDirectory).toList()) {
-                String name = child.getFileName().toString();
-                if (!name.isEmpty() && name.chars().allMatch(Character::isDigit)) {
-                    try {
-                        deleteRecursively(child);
-                        pruned++;
-                    } catch (IOException e) {
-                        log.warn("Fabric GC could not prune legacy clone {}: {}", child, e.getMessage());
-                    }
-                }
-            }
-        } catch (IOException e) {
-            log.warn("Fabric GC could not list fabric root {}: {}", root, e.getMessage());
-        }
-        return pruned;
-    }
-
-    /** Delete {@code jobs/{jobId}} directories last modified before {@code cutoff}. Returns the count removed. */
     int pruneExpiredJobs(Instant cutoff) {
         Path jobsRoot = layout.jobsRoot();
         if (!Files.isDirectory(jobsRoot)) {
@@ -135,33 +93,54 @@ public class FabricGarbageCollector {
         return pruned;
     }
 
-    /** Collect every {@code sha256} referenced by a surviving job manifest under {@code jobs/}. */
     Set<String> referencedShas() {
+        return scanReferences().shas();
+    }
+
+    private ReferenceScan scanReferences() {
         Set<String> shas = new HashSet<>();
+        boolean[] complete = { true };
         Path jobsRoot = layout.jobsRoot();
         if (!Files.isDirectory(jobsRoot)) {
-            return shas;
+            return new ReferenceScan(shas, true);
         }
         try (Stream<Path> manifests = Files.walk(jobsRoot)) {
             manifests
-                .filter(p -> p.getFileName().toString().equals("manifest.json"))
+                .filter(FabricGarbageCollector::isManifest)
                 .forEach(manifest -> {
                     try {
                         JsonNode root = objectMapper.readTree(Files.readAllBytes(manifest));
                         for (JsonNode entry : root.path("entries")) {
-                            String sha = entry.path("sha256").asString("");
-                            if (!sha.isBlank()) {
-                                shas.add(sha);
+                            addSha(shas, entry.path("sha256"));
+                        }
+                        for (JsonNode source : root.path("sources")) {
+                            for (JsonNode artifact : source.path("artifacts")) {
+                                addSha(shas, artifact.path("sha256"));
                             }
                         }
                     } catch (IOException | RuntimeException e) {
-                        log.debug("Fabric GC could not read manifest {}: {}", manifest, e.getMessage());
+                        complete[0] = false;
+                        log.warn("Fabric GC skipped blob sweep because manifest {} is unreadable", manifest);
                     }
                 });
         } catch (IOException e) {
             log.warn("Fabric GC could not walk jobs root {}: {}", jobsRoot, e.getMessage());
+            complete[0] = false;
         }
-        return shas;
+        return new ReferenceScan(Set.copyOf(shas), complete[0]);
+    }
+
+    private record ReferenceScan(Set<String> shas, boolean complete) {}
+
+    private static boolean isManifest(Path path) {
+        return path.getFileName().toString().equals("artifact-source-manifest.json");
+    }
+
+    private static void addSha(Set<String> shas, JsonNode value) {
+        String sha = value.asString("");
+        if (!sha.isBlank()) {
+            shas.add(sha);
+        }
     }
 
     private static void deleteRecursively(Path dir) throws IOException {

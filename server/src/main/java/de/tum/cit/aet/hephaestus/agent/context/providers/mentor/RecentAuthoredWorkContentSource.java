@@ -24,10 +24,10 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises {@code inputs/context/recent_authored_work.json} for a {@link MentorChatRequest}.
  *
- * <p><b>Why this exists (the mentor must know the work, not just findings about it).</b> The other mentor
- * contexts describe the work only indirectly (findings, delivered feedback, counts), so a reference like "my
+ * <p><b>Why this exists (the mentor must know the work, not just observations about it).</b> The other mentor
+ * contexts describe the work only indirectly (observations, delivered feedback, counts), so a reference like "my
  * camera change" has no concrete anchor. This context supplies the inventory: the developer's own authored PRs
- * and issues — number, title, URL, state, size — drawn from the SAME tables practice detection uses, so the
+ * and issues — number, title, URL, state, size — drawn from the same tables practice reviews use, so the
  * mentor can name and link the real work and recognise what the conversation is about.
  *
  * <p>The work itself only (no diffs — those are fetched on demand for a specific artifact, not pre-mounted
@@ -36,11 +36,6 @@ import tools.jackson.databind.node.ObjectNode;
 @Component
 @RequiredArgsConstructor
 public class RecentAuthoredWorkContentSource implements ContentSource {
-
-    @Override
-    public String originId() {
-        return "core";
-    }
 
     /** Workspace-relative output key. Whitelisted in {@code MentorContextKeys#ALLOWED_OUTPUT_KEYS}. */
     public static final String OUTPUT_KEY = OUTPUT_PREFIX + "recent_authored_work.json";

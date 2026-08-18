@@ -83,7 +83,7 @@ public class ReactionService {
             .reactorUserId(currentUser.getId())
             .action(request.action())
             .explanation(request.explanation())
-            // A2: denormalize the stable headline locus at write time so B2 can follow it across re-runs.
+            // Denormalize the stable headline locus at write time so reaction suppression can follow it across re-runs.
             .recurrenceKey(feedbackRepository.findHeadlineRecurrenceKey(feedbackId).orElse(null))
             .build();
 

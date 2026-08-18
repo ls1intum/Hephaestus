@@ -26,7 +26,7 @@ This page covers the other two.
 | Setup effort | Paste a token in the workspace UI | Create + install an App, manage a private key |
 | Environment variables | None | `GH_APP_ID`, `GH_APP_PRIVATE_KEY`, `GH_APP_INSTALLATION_URL` |
 | Rate limits | 5,000 req/h, shared across all of that user's tokens | 5,000+ req/h **per installation**, scaling with org size (up to 12,500) |
-| AI-review feedback posted back to GitHub (PR comments, inline findings, approvals) | Posted as the token's user | Posted as the App (recommended) |
+| AI-review feedback posted back to GitHub (PR comments, inline notes, approvals) | Posted as the token's user | Posted as the App (recommended) |
 | Webhooks | Create manually (below) | Configured once on the App |
 
 Tokens are stored encrypted (AES-256-GCM) per workspace in the database.
@@ -60,7 +60,7 @@ is granted):
 | --- | --- | --- |
 | Metadata | Read | Baseline (mandatory) |
 | Contents | Read | Push/commit sync, repo checkout for AI review |
-| Pull requests | Read & write | PR/review sync; posting review feedback, inline findings, approvals |
+| Pull requests | Read & write | PR/review sync; posting review feedback, inline notes, approvals |
 | Issues | Read & write | Issue sync; delivering feedback as issue/PR comments (GraphQL `addComment`) |
 | Discussions | Read | Discussion sync |
 

@@ -1,16 +1,15 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { FindingDetailPage } from "@/components/admin/practice-reviews/FindingDetailPage";
-import { workspaceAdminHead } from "@/lib/page-title";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/findings/$findingId",
 )({
-	head: workspaceAdminHead("Finding details"),
-	component: FindingDetailRoute,
+	beforeLoad: ({ params }) => {
+		const { workspaceSlug, findingId } = params;
+		throw redirect({
+			to: "/w/$workspaceSlug/admin/practices/reviews/observations/$observationId",
+			params: { workspaceSlug, observationId: findingId },
+			search: true,
+			replace: true,
+		});
+	},
 });
-
-function FindingDetailRoute() {
-	const { workspaceSlug, findingId } = Route.useParams();
-	const search = Route.useSearch();
-	return <FindingDetailPage workspaceSlug={workspaceSlug} findingId={findingId} search={search} />;
-}

@@ -114,7 +114,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setEnabled(true);
         binding.setInstanceModel(instanceModel);
         agentBinding = agentBindingRepository.save(binding);
@@ -202,8 +202,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
 
         sweeper.recoverOrphanedJobs();
 
-        // The backoff-computed available_at from AgentJobBackoff.compute(1) is >= 15s in the future
-        // (base 1^4 + 15 = 16s, jittered ±10%) — comfortably beyond "now" for this assertion.
+        // The requeue's backoff puts available_at far enough out that this is not a race with the clock.
         AgentJob requeued = jobRepository.findById(jobId).orElseThrow();
         assertThat(requeued.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
         assertThat(requeued.getAvailableAt()).isAfter(Instant.now());
@@ -283,7 +282,7 @@ class AgentOrphanRecoveryIntegrationTest extends BaseIntegrationTest {
     private UUID runningJobOwnedBy(String workerId, Instant startedAt, int retryCount) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.RUNNING);
         job.setConfigSnapshot(

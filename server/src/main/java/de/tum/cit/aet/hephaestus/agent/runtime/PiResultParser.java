@@ -48,6 +48,10 @@ public class PiResultParser {
         addWatchdogState(output, sandboxResult.outputFiles().get("watchdog-killed.json"));
         AgentResult.LlmUsage usage = parseUsage(sandboxResult.outputFiles().get("usage.json"));
         addRunnerDebug(output, sandboxResult.outputFiles().get("runner-debug.json"));
+        // Before the result-file branches below, which early-return: the composition stage's output is
+        // independent of whether the review's own observations parsed, and losing it because the observations
+        // were malformed would silently couple two things that must not be coupled.
+        addComposedFeedback(output, sandboxResult.outputFiles().get(SandboxLayout.FEEDBACK_FILENAME));
 
         byte[] resultFile = sandboxResult.outputFiles().get("result.json");
         if (resultFile == null) {
@@ -58,7 +62,7 @@ public class PiResultParser {
         }
 
         String rawContent = sanitizeSwiftEscapes(new String(resultFile, StandardCharsets.UTF_8));
-        if (isValidJsonWithFindings(rawContent)) {
+        if (isValidJsonWithObservations(rawContent)) {
             output.put("rawOutput", rawContent);
             return new AgentResult(success, output, usage);
         }
@@ -120,6 +124,22 @@ public class PiResultParser {
         }
     }
 
+    /**
+     * Surfaces the feedback-composition stage's payload under {@code feedback}, for each lane's producer to
+     * read off the job. Best-effort like its siblings: a malformed payload costs the surfaces one cycle's
+     * messages and costs the review nothing.
+     */
+    void addComposedFeedback(Map<String, Object> output, byte[] feedbackFile) {
+        if (feedbackFile == null || feedbackFile.length == 0) {
+            return;
+        }
+        try {
+            output.put("feedback", objectMapper.readValue(feedbackFile, Object.class));
+        } catch (JacksonException e) {
+            recordFailure("composed_feedback", e);
+        }
+    }
+
     void addWatchdogState(Map<String, Object> output, byte[] watchdogFile) {
         if (watchdogFile == null || watchdogFile.length == 0) {
             return;
@@ -137,12 +157,12 @@ public class PiResultParser {
         }
         try {
             JsonNode root = objectMapper.readTree(reviewStateFile);
-            JsonNode findings = root.get("findings");
-            if (findings == null || !findings.isArray() || findings.isEmpty()) {
+            JsonNode observations = root.get("observations");
+            if (observations == null || !observations.isArray() || observations.isEmpty()) {
                 return null;
             }
             Map<String, Object> assembled = new LinkedHashMap<>();
-            assembled.put("findings", objectMapper.treeToValue(findings, Object.class));
+            assembled.put("observations", objectMapper.treeToValue(observations, Object.class));
             return objectMapper.writeValueAsBytes(assembled);
         } catch (JacksonException e) {
             recordFailure("review_state", e);
@@ -182,7 +202,7 @@ public class PiResultParser {
         return sb.toString();
     }
 
-    /** Find the first '{'…'}' object containing 'findings' (max {@value MAX_BRACE_ATTEMPTS} attempts). */
+    /** Find the first '{'…'}' object containing an observations array (max {@value MAX_BRACE_ATTEMPTS} attempts). */
     String extractJsonFromText(String text) {
         int searchFrom = 0;
         char[] chars = text.toCharArray();
@@ -197,7 +217,7 @@ public class PiResultParser {
                 var parser = objectMapper.tokenStreamFactory().createParser(chars, bracePos, chars.length - bracePos)
             ) {
                 JsonNode node = objectMapper.readTree(parser);
-                if (node != null && node.isObject() && node.has("findings")) {
+                if (node != null && node.isObject() && observationsNode(node) != null) {
                     return objectMapper.writeValueAsString(node);
                 }
             } catch (JacksonException e) {
@@ -208,13 +228,18 @@ public class PiResultParser {
         return null;
     }
 
-    boolean isValidJsonWithFindings(String text) {
+    boolean isValidJsonWithObservations(String text) {
         try {
             JsonNode node = objectMapper.readTree(text);
-            return node != null && node.isObject() && node.has("findings");
+            return node != null && node.isObject() && observationsNode(node) != null;
         } catch (JacksonException e) {
             return false;
         }
+    }
+
+    private static JsonNode observationsNode(JsonNode root) {
+        JsonNode observations = root.get("observations");
+        return observations != null && observations.isArray() ? observations : null;
     }
 
     private void recordFailure(String stage, JacksonException e) {

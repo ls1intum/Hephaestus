@@ -4,10 +4,22 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
+import de.tum.cit.aet.hephaestus.agent.conversation.ChatSignals;
 import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadProjection;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceAbsenceReason;
+import de.tum.cit.aet.hephaestus.evidence.SourceCaptureState;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
+import java.time.Instant;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -17,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Materialises the CONVERSATION_THREAD detection context under {@code inputs/context/} — the repo-less,
+ * Materialises the chat.conversation_thread detection context under {@code inputs/context/} — the repo-less,
  * no-diff counterpart of {@link IssueContentSource} for a settled Slack thread:
  *
  * <ul>
@@ -31,11 +43,28 @@ import tools.jackson.databind.node.ObjectNode;
  * does not name a thread is a preparation failure.
  */
 @Component
-public class ConversationThreadContentSource implements ContentSource {
+public class ConversationThreadContentSource implements EvidenceSource, ReviewContextBuilder {
+
+    /** Declares that this artifact kind is reviewable, gating whether practices may target it. */
+    @Override
+    public ArtifactKind artifactKind() {
+        return ChatSignals.CONVERSATION_THREAD;
+    }
+
+    private static final SourceKind KIND = new SourceKind("slack.conversation.thread");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(ConversationThreadContentSource.class);
 
-    /** The single context file this provider emits. */
     static final String OUTPUT_KEY = OUTPUT_PREFIX + "conversation_thread.json";
 
     private final ObjectMapper objectMapper;
@@ -44,11 +73,6 @@ public class ConversationThreadContentSource implements ContentSource {
     public ConversationThreadContentSource(ObjectMapper objectMapper, ConversationThreadProjection projection) {
         this.objectMapper = objectMapper;
         this.projection = projection;
-    }
-
-    @Override
-    public String originId() {
-        return "slack";
     }
 
     @Override
@@ -84,5 +108,59 @@ public class ConversationThreadContentSource implements ContentSource {
             payload.path("messageCount").asInt(),
             job.getId()
         );
+    }
+
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        if (!selectedKinds.contains(KIND)) return captured;
+        AgentJob job = ((ContextRequest.ConversationReviewRequest) request).job();
+        JsonNode metadata = job.getMetadata();
+        JsonNode payload;
+        try {
+            payload = objectMapper.readTree(captured.files().get(OUTPUT_KEY));
+        } catch (Exception e) {
+            throw new IllegalStateException("Serialized conversation thread could not be read", e);
+        }
+        int messageCount = payload.path("messageCount").asInt();
+        Instant effectiveTime = projection.sourceEffectiveAt(metadata.path("slack_last_ts").asString(null));
+        Map<SourceKind, Instant> effectiveAt = effectiveTime == null ? Map.of() : Map.of(KIND, effectiveTime);
+        // An empty payload isn't necessarily a thread with no messages — a paused/withdrawn consent or a
+        // deleted thread must not be misreported as a conversation the developer did not have.
+        Map<SourceKind, SourceCaptureState> stateOverrides =
+            messageCount == 0
+                ? absenceOf(
+                      projection.threadReadability(
+                          job.getWorkspace().getId(),
+                          metadata.path("slack_channel_id").asString(null),
+                          metadata.path("slack_thread_ts").asString(null)
+                      )
+                  )
+                : Map.of();
+        return new EvidenceContribution(
+            captured.files(),
+            Map.of(
+                KIND,
+                payload.path("truncated").asBoolean() ? SourceCompleteness.PARTIAL : SourceCompleteness.COMPLETE
+            ),
+            Map.of(),
+            Map.of(),
+            effectiveAt,
+            Map.of(KIND, messageCount == 0 ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY),
+            stateOverrides
+        );
+    }
+
+    private static Map<SourceKind, SourceCaptureState> absenceOf(
+        ConversationThreadProjection.ThreadReadability readability
+    ) {
+        return switch (readability) {
+            case READABLE -> Map.of();
+            case CONSENT_NOT_ACTIVE -> Map.of(
+                KIND,
+                new SourceCaptureState.Redacted(SourceAbsenceReason.CONSENT_NOT_ACTIVE)
+            );
+            case NOT_FOUND -> Map.of(KIND, new SourceCaptureState.Unavailable(SourceAbsenceReason.NOT_FOUND));
+        };
     }
 }

@@ -25,6 +25,9 @@ public interface WorkspaceLlmModelRepository extends JpaRepository<WorkspaceLlmM
 
     Optional<WorkspaceLlmModel> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
+    /** The own-provider mirror of {@code LlmModelRepository#findByUpstreamModelId}, scoped to one tenant. */
+    List<WorkspaceLlmModel> findByWorkspaceIdAndUpstreamModelId(Long workspaceId, String upstreamModelId);
+
     /** Tenancy-safe lookup for a client-supplied id (path variable) — never trust a bare {@code findById}. */
     Optional<WorkspaceLlmModel> findByIdAndWorkspaceId(Long id, Long workspaceId);
 

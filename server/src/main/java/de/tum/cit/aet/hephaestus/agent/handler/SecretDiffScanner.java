@@ -7,30 +7,9 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/**
- * Deterministic, LLM-independent secret pre-pass over a unified diff.
- *
- * <p>This is a delivery-grade safety net for the {@code hardcoded-secrets} practice. The LLM agent
- * (and its Bun precompute helper) can miss a committed credential — most commonly because the local
- * clone is checked out at the merge base, not the MR head, so a working-tree grep finds nothing. The
- * raw unified diff, by contrast, always carries the added {@code '+'} lines regardless of checkout
- * state. Scanning it here, in plain Java, means a secret introduced on a changed line is caught even
- * when the model abstains, the precompute crashes, or the GPU gateway fails entirely.
- *
- * <p>Rule design follows the high-precision structural rules used by gitleaks / trufflehog /
- * GitHub secret scanning: known credential prefixes (the prefix <em>is</em> the signal, so they
- * bypass the entropy gate) plus a generic {@code secret-named-variable = "literal"} arm gated by
- * Shannon entropy and a placeholder/env-reference allowlist to kill false positives.
- */
 final class SecretDiffScanner {
 
-    /** A single detected secret on an added diff line. */
-    record SecretHit(String path, int newLine, String addedLine, String ruleId, String matchedToken) {
-        /** Structural/private-key/connection-string hits are unambiguous credentials → CRITICAL. */
-        boolean isCritical() {
-            return !"generic-entropy".equals(ruleId);
-        }
-    }
+    record SecretHit(String path, int newLine, String addedLine, String ruleId, String matchedToken) {}
 
     /** {@code @@ -a,b +c,d @@} — capture the new-side start line. */
     private static final Pattern HUNK_HEADER = Pattern.compile("^@@ -\\d+(?:,\\d+)? \\+(\\d+)(?:,\\d+)? @@");
@@ -112,7 +91,7 @@ final class SecretDiffScanner {
     );
 
     /**
-     * Scan a raw (un-annotated) unified diff for hardcoded secrets on added lines.
+     * Scan a raw or Hephaestus-annotated unified diff for hardcoded secrets on added lines.
      *
      * @param unifiedDiff the output of {@code git diff base head} (may be null/blank)
      * @return one {@link SecretHit} per credential found on a {@code '+'} line
@@ -125,7 +104,9 @@ final class SecretDiffScanner {
 
         String currentPath = null;
         int newLine = 0;
-        for (String raw : unifiedDiff.split("\n", -1)) {
+        for (String storedLine : unifiedDiff.split("\n", -1)) {
+            int annotationEnd = storedLine.startsWith("[L") ? storedLine.indexOf("] ") : -1;
+            String raw = annotationEnd > 0 ? storedLine.substring(annotationEnd + 2) : storedLine;
             if (raw.startsWith("+++ ")) {
                 currentPath = parseNewPath(raw);
                 continue;

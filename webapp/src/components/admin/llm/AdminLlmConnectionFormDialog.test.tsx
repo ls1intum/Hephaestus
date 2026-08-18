@@ -38,13 +38,13 @@ describe("AdminLlmConnectionFormDialog", () => {
 	it("offers the three OpenAI-compatible create-time presets", () => {
 		renderDialog();
 		expect(screen.queryByRole("switch", { name: "Active" })).toBeNull();
-		expect(screen.getByText(/new connections start inactive/i)).toBeTruthy();
+		screen.getByText(/new connections start inactive/i);
 		expect(screen.queryByLabelText("Slug")).toBeNull();
 		fireEvent.click(screen.getByRole("combobox", { name: "Endpoint preset" }));
 		expect(screen.queryByRole("option", { name: "Anthropic" })).toBeNull();
-		expect(screen.getByRole("option", { name: "OpenAI" })).toBeTruthy();
-		expect(screen.getByRole("option", { name: "Other OpenAI-compatible endpoint" })).toBeTruthy();
-		expect(screen.getByRole("option", { name: "Azure OpenAI v1" })).toBeTruthy();
+		screen.getByRole("option", { name: "OpenAI" });
+		screen.getByRole("option", { name: "Other OpenAI-compatible endpoint" });
+		screen.getByRole("option", { name: "Azure OpenAI v1" });
 	});
 
 	it("keeps routing immutable and tests the saved connection with its stored credential", () => {
@@ -67,7 +67,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 		const onProbeSaved = vi.fn();
 		renderDialog({ editing: connection, onProbe, onProbeSaved });
 
-		expect(screen.getByRole("button", { name: "Test saved connection" })).toBeTruthy();
+		screen.getByRole("button", { name: "Test saved connection" });
 		fireEvent.change(screen.getByLabelText("API key"), { target: { value: "replacement-key" } });
 		expect(screen.queryByRole("button", { name: "Test saved connection" })).toBeNull();
 
@@ -95,7 +95,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 			baseUrl: "https://gw.example.com/v1?api-key=SECRET",
 		}).baseUrl;
 		expect(rejection).toBeTruthy();
-		expect(screen.getByText(rejection as string)).toBeTruthy();
+		screen.getByText(rejection as string);
 		expect(onCreate).not.toHaveBeenCalled();
 	});
 
@@ -105,11 +105,11 @@ describe("AdminLlmConnectionFormDialog", () => {
 		renderDialog({ onProbe, onProbed });
 		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
 		act(() => onProbe.mock.calls[0]?.[1].onSuccess({ reachable: true, models: ["gpt-5"] }));
-		expect(screen.getByText("gpt-5")).toBeTruthy();
+		screen.getByText("gpt-5");
 
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Production" } });
 
-		expect(screen.getByText("gpt-5")).toBeTruthy();
+		screen.getByText("gpt-5");
 		expect(onProbed).toHaveBeenLastCalledWith(["gpt-5"]);
 	});
 

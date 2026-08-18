@@ -90,7 +90,6 @@ public record ConfigSnapshot(
         );
     }
 
-    /** Attaches claim-time accounting while preserving all submit-time behaviour exactly. */
     public ConfigSnapshot withPriceSnapshot(LlmPriceSnapshot price) {
         return new ConfigSnapshot(
             schemaVersion,

@@ -14,16 +14,17 @@ import org.springframework.transaction.annotation.Transactional;
  * Ages out config audit rows past the retention window — the only sanctioned way a row leaves this
  * table, since the immutability trigger blocks DELETE inside the window.
  *
- * <p>{@link #RETENTION_DAYS} is passed into the DELETE, but the trigger's carve-out has to hardcode
- * the same interval — SQL cannot read a Java constant. {@code ConfigAuditImmutabilityIntegrationTest} runs this sweep against the migrated schema, so a
- * trigger window longer than this constant — the direction that kills the sweep — fails the build.
+ * <p>{@link #RETENTION_DAYS} is passed into the DELETE, but the trigger's carve-out has to hardcode the
+ * same interval — SQL cannot read a Java constant. {@code ConfigAuditImmutabilityIntegrationTest} runs
+ * this sweep against the migrated schema, so a trigger window longer than this constant — the direction
+ * that kills the sweep — fails the build.
  */
 @ConditionalOnServerRole
 @Component
 @RequiredArgsConstructor
 public class ConfigAuditRetentionJob {
 
-    /** Matches {@code auth_event}'s 12-month window. */
+    /** Matches {@code auth_event}'s retention window. */
     public static final int RETENTION_DAYS = 365;
 
     private static final Logger log = LoggerFactory.getLogger(ConfigAuditRetentionJob.class);

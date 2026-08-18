@@ -179,7 +179,7 @@ export function AdminLlmConnectionsTable({
 											size="sm"
 											disabled={busy}
 											// No `aria-controls`: the route swaps that region between a spinner, an error
-											// alert and the models section, so the IDREF would dangle for two of the three.
+											// alert and the models section, so the IDREF dangles unless the models are up.
 											aria-expanded={selectedId === connection.id}
 											aria-label={`Manage models for ${connection.displayName}`}
 											onClick={() => onSelect(connection)}
@@ -231,7 +231,7 @@ export function AdminLlmConnectionsTable({
 					<>
 						This immediately stops requests through{" "}
 						{modelsOn(connection) === 1 ? "the model" : `all ${modelsOn(connection)} models`} on
-						this connection. Practice detection and Mentor can't run on them until you turn the
+						this connection. Practice reviews and Mentor can't run on them until you turn the
 						connection back on, or until each workspace picks another model.
 					</>
 				)}

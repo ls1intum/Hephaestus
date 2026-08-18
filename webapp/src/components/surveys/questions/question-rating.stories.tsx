@@ -2,7 +2,7 @@
  * Rating survey question capturing scaled feedback with number or emoji display.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { QuestionRating } from "./question-rating";
 
 const meta = {
@@ -43,14 +43,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 /**
- * Standard five-point number scale with descriptive bounds. The selected rating (4)
- * must be visibly highlighted: Base UI's ToggleGroupItem emits `data-pressed`, which the
- * component's `data-pressed:*` classes style (a Radix-style `data-[state=on]` selector
- * would have matched nothing and left the selection invisible).
+ * Standard five-point number scale with descriptive bounds. Which rating is selected (4) reads from
+ * the attribute Base UI puts on the pressed item; how it then looks is the kit's, styled once in
+ * `ui/toggle.tsx` and covered by `ui/toggle.stories.tsx`. Nothing here restyles the pressed state —
+ * a scale whose selection has to be repainted locally is a scale whose kit is broken.
  */
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const selected = canvas.getByRole("button", { name: "Rating 4 out of 5" });
 		await expect(selected).toHaveAttribute("data-pressed");
 		const unselected = canvas.getByRole("button", { name: "Rating 3 out of 5" });

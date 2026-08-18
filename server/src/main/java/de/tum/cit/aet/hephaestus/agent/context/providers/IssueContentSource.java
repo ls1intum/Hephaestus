@@ -4,18 +4,31 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceLimits;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceCompleteness;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewContextBuilder;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.databind.ObjectMapper;
@@ -35,24 +48,44 @@ import tools.jackson.databind.node.ObjectNode;
  * transactionally so the lazy collections (labels, assignees, comments) load within the same tx.
  */
 @Component
-public class IssueContentSource implements ContentSource {
+public class IssueContentSource implements EvidenceSource, ReviewContextBuilder {
+
+    private static final SourceKind CORE = new SourceKind("scm.issue.core");
+    private static final SourceKind COMMENTS = new SourceKind("scm.issue.comments");
+
+    /** Checked by the integration framework against every descriptor that calls itself reviewable. */
+    @Override
+    public ArtifactKind artifactKind() {
+        return ScmSignals.ISSUE;
+    }
 
     @Override
-    public String originId() {
-        return "scm";
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(CORE, COMMENTS);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return path.endsWith("comments.json") ? COMMENTS : CORE;
     }
 
     private static final Logger log = LoggerFactory.getLogger(IssueContentSource.class);
 
     /** Cap the thread included in context; most recent kept on truncation. */
-    static final int MAX_COMMENTS = 200;
+    static final int MAX_COMMENTS = EvidenceLimits.MAX_ITEMS_PER_SOURCE;
 
     private final ObjectMapper objectMapper;
     private final IssueRepository issueRepository;
+    private final IssueCommentRepository issueCommentRepository;
 
-    public IssueContentSource(ObjectMapper objectMapper, IssueRepository issueRepository) {
+    public IssueContentSource(
+        ObjectMapper objectMapper,
+        IssueRepository issueRepository,
+        IssueCommentRepository issueCommentRepository
+    ) {
         this.objectMapper = objectMapper;
         this.issueRepository = issueRepository;
+        this.issueCommentRepository = issueCommentRepository;
     }
 
     @Override
@@ -63,6 +96,22 @@ public class IssueContentSource implements ContentSource {
     @Override
     @Transactional(readOnly = true)
     public void contribute(ContextRequest request, Map<String, byte[]> files) {
+        contributeSelected(request, sourceKinds(), files);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void contributeSelected(ContextRequest request, Set<SourceKind> selectedKinds, Map<String, byte[]> files) {
+        files.putAll(captureSelected(request, selectedKinds).files());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        return captureSelected(request, selectedKinds);
+    }
+
+    private EvidenceContribution captureSelected(ContextRequest request, Set<SourceKind> selectedKinds) {
         AgentJob job = ((ContextRequest.IssueReviewRequest) request).job();
         var metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
@@ -76,111 +125,132 @@ public class IssueContentSource implements ContentSource {
             .orElseThrow(() ->
                 new JobPreparationException("Issue not found: issueId=" + issueId + ", jobId=" + job.getId())
             );
+        Map<String, byte[]> files = new java.util.LinkedHashMap<>();
+        Map<SourceKind, SourceCompleteness> completeness = new java.util.HashMap<>();
+        Map<SourceKind, java.time.Instant> observedAt = new java.util.HashMap<>();
+        Map<SourceKind, SourceContentState> contentStates = new java.util.HashMap<>();
 
-        String repoFullName = issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
-
-        ObjectNode meta = objectMapper.createObjectNode();
-        meta.put("issue_number", issue.getNumber());
-        meta.put("title", issue.getTitle());
-        meta.put("body", issue.getBody() != null ? issue.getBody() : "");
-        meta.put("state", issue.getState() != null ? issue.getState().name() : "UNKNOWN");
-        meta.put("state_reason", issue.getStateReason() != null ? issue.getStateReason().name() : null);
-        meta.put("html_url", issue.getHtmlUrl());
-        meta.put("repository_full_name", repoFullName);
-        meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
-        meta.put("is_locked", issue.isLocked());
-        meta.put("comments_count", issue.getCommentsCount());
-        meta.put("sub_issues_total", issue.getSubIssuesTotal());
-        meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
-        meta.put("milestone", issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
-        meta.put("closed_at", issue.getClosedAt() != null ? issue.getClosedAt().toString() : null);
-        ArrayNode labels = meta.putArray("labels");
-        issue
-            .getLabels()
-            .stream()
-            .map(l -> l.getName())
-            .sorted()
-            .forEach(labels::add);
-        ArrayNode assignees = meta.putArray("assignees");
-        issue
-            .getAssignees()
-            .stream()
-            .map(u -> u.getLogin())
-            .filter(Objects::nonNull)
-            .sorted()
-            .forEach(assignees::add);
-        writeJson(files, "metadata.json", meta);
-
-        List<IssueComment> ordered = issue
-            .getComments()
-            .stream()
-            .sorted(Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-            .toList();
-        if (ordered.size() > MAX_COMMENTS) {
-            ordered = ordered.subList(ordered.size() - MAX_COMMENTS, ordered.size());
-        }
-        ArrayNode commentsArr = objectMapper.createArrayNode();
-        for (IssueComment c : ordered) {
-            ObjectNode cn = objectMapper.createObjectNode();
-            cn.put("author", c.getAuthor() != null ? c.getAuthor().getLogin() : null);
-            cn.put("created_at", c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
-            cn.put("body", c.getBody() != null ? c.getBody() : "");
-            commentsArr.add(cn);
-        }
-        writeJson(files, "comments.json", commentsArr);
-
-        StringBuilder md = new StringBuilder(512);
-        md.append("# Issue #").append(issue.getNumber()).append(" — ").append(issue.getTitle()).append("\n\n");
-        md.append("- **State:** ").append(issue.getState());
-        if (issue.getStateReason() != null) md.append(" (").append(issue.getStateReason()).append(")");
-        md.append("\n");
-        md.append("- **Repository:** ").append(repoFullName).append("\n");
-        if (!issue.getLabels().isEmpty()) {
-            md
-                .append("- **Labels:** ")
-                .append(
-                    String.join(
-                        ", ",
-                        issue
-                            .getLabels()
-                            .stream()
-                            .map(l -> l.getName())
-                            .sorted()
-                            .toList()
-                    )
-                )
-                .append("\n");
-        }
-        if (issue.getSubIssuesTotal() != null && issue.getSubIssuesTotal() > 0) {
-            md
-                .append("- **Sub-issues:** ")
-                .append(issue.getSubIssuesCompleted() != null ? issue.getSubIssuesCompleted() : 0)
-                .append("/")
-                .append(issue.getSubIssuesTotal())
-                .append(" completed\n");
-        }
-        md.append("\n## Description\n\n").append(issue.getBody() != null ? issue.getBody() : "_(empty)_").append("\n");
-        if (!ordered.isEmpty()) {
-            md.append("\n## Discussion (").append(ordered.size()).append(" comments)\n\n");
-            for (IssueComment c : ordered) {
+        if (selectedKinds.contains(CORE)) {
+            String repoFullName = issue.getRepository() != null ? issue.getRepository().getNameWithOwner() : "";
+            ObjectNode meta = objectMapper.createObjectNode();
+            meta.put("issue_number", issue.getNumber());
+            meta.put("title", issue.getTitle());
+            meta.put("body", issue.getBody() != null ? issue.getBody() : "");
+            meta.put("state", issue.getState() != null ? issue.getState().name() : "UNKNOWN");
+            meta.put("state_reason", issue.getStateReason() != null ? issue.getStateReason().name() : null);
+            meta.put("html_url", issue.getHtmlUrl());
+            meta.put("repository_full_name", repoFullName);
+            meta.put("author", issue.getAuthor() != null ? issue.getAuthor().getLogin() : null);
+            meta.put("is_locked", issue.isLocked());
+            meta.put("comments_count", issue.getCommentsCount());
+            meta.put("sub_issues_total", issue.getSubIssuesTotal());
+            meta.put("sub_issues_completed", issue.getSubIssuesCompleted());
+            meta.put("milestone", issue.getMilestone() != null ? issue.getMilestone().getTitle() : null);
+            meta.put("closed_at", issue.getClosedAt() != null ? issue.getClosedAt().toString() : null);
+            ArrayNode labels = meta.putArray("labels");
+            issue
+                .getLabels()
+                .stream()
+                .map(l -> l.getName())
+                .sorted()
+                .forEach(labels::add);
+            ArrayNode assignees = meta.putArray("assignees");
+            issue
+                .getAssignees()
+                .stream()
+                .map(u -> u.getLogin())
+                .filter(Objects::nonNull)
+                .sorted()
+                .forEach(assignees::add);
+            writeJson(files, "metadata.json", meta);
+            StringBuilder md = new StringBuilder(512);
+            md.append("# Issue #").append(issue.getNumber()).append(" — ").append(issue.getTitle()).append("\n\n");
+            md.append("- **State:** ").append(issue.getState());
+            if (issue.getStateReason() != null) md.append(" (").append(issue.getStateReason()).append(")");
+            md.append("\n");
+            md.append("- **Repository:** ").append(repoFullName).append("\n");
+            if (!issue.getLabels().isEmpty()) {
                 md
-                    .append("**")
-                    .append(c.getAuthor() != null ? c.getAuthor().getLogin() : "unknown")
-                    .append("** wrote:\n\n")
-                    .append(c.getBody() != null ? c.getBody() : "")
-                    .append("\n\n---\n\n");
+                    .append("- **Labels:** ")
+                    .append(
+                        String.join(
+                            ", ",
+                            issue
+                                .getLabels()
+                                .stream()
+                                .map(l -> l.getName())
+                                .sorted()
+                                .toList()
+                        )
+                    )
+                    .append("\n");
+            }
+            if (issue.getSubIssuesTotal() != null && issue.getSubIssuesTotal() > 0) {
+                md
+                    .append("- **Sub-issues:** ")
+                    .append(issue.getSubIssuesCompleted() != null ? issue.getSubIssuesCompleted() : 0)
+                    .append("/")
+                    .append(issue.getSubIssuesTotal())
+                    .append(" completed\n");
+            }
+            md
+                .append("\n## Description\n\n")
+                .append(issue.getBody() != null ? issue.getBody() : "_(empty)_")
+                .append("\n");
+            files.put(OUTPUT_PREFIX + "issue_summary.md", md.toString().getBytes(StandardCharsets.UTF_8));
+            completeness.put(CORE, SourceCompleteness.COMPLETE);
+            if (issue.getLastSyncAt() != null) {
+                observedAt.put(CORE, issue.getLastSyncAt());
             }
         }
-        files.put(OUTPUT_PREFIX + "issue_summary.md", md.toString().getBytes(StandardCharsets.UTF_8));
+
+        int commentCount = 0;
+        if (selectedKinds.contains(COMMENTS)) {
+            CommentCapture commentCapture = recentComments(issueId);
+            List<IssueComment> ordered = commentCapture.comments();
+            ArrayNode commentsArr = objectMapper.createArrayNode();
+            for (IssueComment c : ordered) {
+                ObjectNode cn = objectMapper.createObjectNode();
+                cn.put("author", c.getAuthor() != null ? c.getAuthor().getLogin() : null);
+                cn.put("created_at", c.getCreatedAt() != null ? c.getCreatedAt().toString() : null);
+                cn.put("body", c.getBody() != null ? c.getBody() : "");
+                commentsArr.add(cn);
+            }
+            commentCount = ordered.size();
+            writeJson(files, "comments.json", commentsArr);
+            completeness.put(
+                COMMENTS,
+                commentCapture.complete() ? SourceCompleteness.COMPLETE : SourceCompleteness.PARTIAL
+            );
+            contentStates.put(COMMENTS, ordered.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY);
+        }
 
         log.info(
             "Issue context built: issueId={}, number={}, comments={}, jobId={}",
             issueId,
             issue.getNumber(),
-            ordered.size(),
+            commentCount,
             job.getId()
         );
+        return new EvidenceContribution(files, completeness, Map.of(), observedAt, Map.of(), contentStates);
     }
+
+    private CommentCapture recentComments(long issueId) {
+        List<IssueComment> comments = new ArrayList<>(
+            issueCommentRepository.findRecentByIssueIdWithAuthor(issueId, PageRequest.of(0, MAX_COMMENTS + 1))
+        );
+        if (comments.size() > MAX_COMMENTS + 1) {
+            comments = new ArrayList<>(comments.subList(0, MAX_COMMENTS + 1));
+        }
+        boolean complete = comments.size() <= MAX_COMMENTS;
+        if (!complete) comments.remove(comments.size() - 1);
+        comments.sort(
+            Comparator.comparing(IssueComment::getCreatedAt, Comparator.nullsLast(Comparator.naturalOrder()))
+        );
+        return new CommentCapture(List.copyOf(comments), complete);
+    }
+
+    private record CommentCapture(List<IssueComment> comments, boolean complete) {}
 
     private void writeJson(Map<String, byte[]> files, String name, Object node) {
         try {

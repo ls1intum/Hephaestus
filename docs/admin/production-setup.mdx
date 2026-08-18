@@ -40,13 +40,31 @@ The required secrets — `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, `HEPHAESTUS_AUTH_
 [Install guide](./install#2-configure-env), along with how to generate each and the warning about
 never changing the encryption key. Everything there applies to this stack too.
 
-Three variables exist only in the reference deployment, so they live here:
+These variables exist only in the reference deployment, so they live here:
 
 | Variable | Purpose |
 | --- | --- |
-| `HEPHAESTUS_AUTH_ISSUER` | Public issuer origin, e.g. `https://<host>` (sets the JWT `iss` + `/.well-known` issuer). The self-host compose file derives this from `APP_HOSTNAME`; the multi-file stack does not. |
 | `LEGAL_PROFILE` | Selects a bundled imprint/privacy profile. Use `tumaet` only for the canonical AET deployment; self-hosters leave empty and mount `/legal-overrides/`. See [Legal Pages](./legal-pages). |
-| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
+| `HEPHAESTUS_INTEGRATION_OAUTH_SUCCESS_REDIRECT` / `HEPHAESTUS_INTEGRATION_OAUTH_FAILURE_REDIRECT` | Post-callback landing URLs for integration OAuth. Success defaults to `/integrations?status=success`, failure to the success base + `?status=error`. Set absolute URLs when the SPA host differs from the API host. |
+| `SPRINGDOC_API_DOCS_ENABLED` / `SPRINGDOC_SWAGGER_UI_ENABLED` | Publish the OpenAPI description at `/v3/api-docs` and the interactive Swagger UI. Both default to `false`. |
+
+:::danger The API description is unauthenticated wherever it is enabled
+`SPRINGDOC_API_DOCS_ENABLED` does not put the description behind a login — it decides whether the
+endpoint exists. Whenever springdoc registers, `/v3/api-docs/**` and `/swagger-ui/**` answer any
+request, so switching it on publishes the instance's complete route list, admin routes included, to
+anyone who asks. Leave both off in production; generate the spec at build time instead.
+:::
+
+:::caution Not everything the container reads is settable from `docker/.env`
+`LEGAL_PROFILE` is forwarded by the shipped Compose files, so setting it in `docker/.env` works.
+These are **not**, and a value in `docker/.env` for them is silently ignored:
+
+- **`HEPHAESTUS_AUTH_ISSUER`** — the `application-server` service hardcodes it to `https://${APP_HOSTNAME}`.
+  Change `APP_HOSTNAME` to change the issuer.
+- **The two OAuth redirect variables** — no Compose file passes them through, so the defaults stay in force.
+
+To override any of them, add them to the `application-server` service's own `environment:` block.
+:::
 
 :::warning `GH_`, not `GITHUB_`
 In `docker/.env` the GitHub OAuth keys are `GH_OAUTH_CLIENT_ID` / `GH_OAUTH_CLIENT_SECRET`: GitHub
@@ -77,8 +95,8 @@ When Slack is enabled, configure one Slack app. Use the public application-serve
 prefix for OAuth URLs. In the production compose stack that base is `https://<host>/api`.
 
 - **OAuth redirect URLs** (include any API path prefix your proxy uses):
-    - `<api-public-base-url>/oauth/callback/slack` for workspace app installation.
-    - `<api-public-base-url>/login/oauth2/code/slack` for member account linking.
+  - `<api-public-base-url>/oauth/callback/slack` for workspace app installation.
+  - `<api-public-base-url>/login/oauth2/code/slack` for member account linking.
 - **Events request URL:** `https://<host>/webhooks/slack`
 - **Interactivity request URL:** `https://<host>/webhooks/slack/interactivity`
 - **App Home:** enabled. Slack opens the Home tab when someone clicks the app; that is expected. Hephaestus uses
@@ -131,12 +149,18 @@ channels through this same bot token, so it needs no scopes beyond the set above
 ### Outline integration
 
 Outline is a documentation content source: a workspace admin connects one Outline instance from
-**Settings → Integrations** with the wiki's base URL and an API key, then registers the collections to
+**Administration → Integrations → Outline** with the wiki's base URL and an API key, then registers the collections to
 mirror. The key is encrypted at rest in the `connection` table.
+
+There is no default Outline operator. Before enabling the integration, record the exact origin's legal role,
+hosting region, transfer basis, retention terms, and AVV status in the
+[processor checklist](./dsms/processor-checklist.md). A workspace administrator cannot approve a new operator by
+entering its URL.
 
 | Variable | Purpose |
 | --- | --- |
 | `HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED` | Enables the Outline beans (connect, sync, webhook, content projection). Every Outline bean is gated on it and defaults to **off**, so an unset flag means the integration is entirely absent — no admin surface, no sync, no webhook verification. |
+| `HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS` | Comma-separated, publicly routable HTTPS origins approved by the instance operator, for example `https://wiki.example.com`. Values must contain no path, query, fragment, credentials, or private/site-local address; any invalid entry fails startup. Empty by default. The server, worker, and webhook roles must receive the same value and be restarted after it changes. Removing an origin then blocks connections, API sync, webhook collection, evidence projection, and identity linking for it. The existing mirror remains until the workspace disconnects the integration. |
 | `OUTLINE_OAUTH_BASE_URL` | Outline instance the account-linking flow federates to, e.g. `https://wiki.example.com`. **Required whenever `OUTLINE_OAUTH_CLIENT_ID` is set** — Outline is self-hosted, so there is no default origin. Blank or invalid, the provider seed is skipped and the reason is logged at `ERROR` naming the offending variable (the app still boots; the linking button is simply never there). |
 | `OUTLINE_OAUTH_CLIENT_ID` | Outline OAuth app client ID (redirect `https://<host>/api/login/oauth2/code/outline`) |
 | `OUTLINE_OAUTH_CLIENT_SECRET` | Outline OAuth app client secret |
@@ -148,8 +172,8 @@ it to each with the same value:
 - **application-server** — connect/admin API, collection registration, the reconcile scheduler, and the
   webhook-subscription registrar.
 - **application-worker** — the agent context is assembled on the worker, and the Outline content source
-  carries no runtime-role gate. Without the flag there, reviews and mentor turns run with a context that
-  silently contains no wiki documents.
+  carries no runtime-role gate. Without the flag there, reviews requiring wiki evidence decline and mentor
+  turns omit wiki context.
 - **webhook-server** — without the flag no Outline signature verifier is registered, so the receiver
   answers `501` to every delivery on `POST /webhooks/outline`. Outline counts those as failures and
   **auto-disables the subscription after 25 of them**.
@@ -179,7 +203,8 @@ the provider can also be added later under **Instance admin → Login providers*
 **API keys do not self-rotate.** Outline's `apiKeys.create` and `apiKeys.delete` accept only an
 interactive session, never a bearer token, so Hephaestus cannot roll its own key. The connection's
 admin card surfaces the key's expiry (via `apiKeys.list`, when the key may see itself) ahead of the
-lapse; renewing means creating a new key in Outline and re-entering it in **Settings → Integrations**.
+lapse; renewing means creating a new key in Outline and re-entering it in
+**Administration → Integrations → Outline**.
 A lapsed key reports `accepted=false` and the mirror stops refreshing until it is replaced.
 
 ### GitHub integration
@@ -202,7 +227,7 @@ GitLab login, GitLab workspaces, webhook auto-registration, and practice review 
 | `GITLAB_ENABLED` | Enables server-side GitLab beans in the application server |
 | `GITLAB_WORKSPACE_CREATION` | Enables GitLab workspace creation in the UI and API |
 | `WEBHOOK_SECRET` | Shared secret used for GitLab webhook verification and auto-registration |
-| `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab |
+| `WEBHOOK_EXTERNAL_URL` | Public webhook base URL registered on GitLab. The reference Compose files deliberately leave it unset so auto-registration derives it from the application host URL; add it to the `application-server` service's `environment:` block if you need to override that. |
 
 The login provider is instance-agnostic: gitlab.com works out of the box, and any self-hosted GitLab works by pointing `GITLAB_OAUTH_BASE_URL` at it. Create the GitLab OAuth application on that instance with these settings:
 
@@ -211,39 +236,18 @@ The login provider is instance-agnostic: gitlab.com works out of the box, and an
 
 This env-seeds **one** default GitLab login provider (registration id `gitlab`). Additional GitLab instances are added at runtime by an instance admin under **Instance admin → Login providers** — no redeploy.
 
-### Practice review rollout bundle
+### Practice review
 
-Practice review is not enabled by a single flag. The following settings must be aligned:
+Practice review has its own page: **[Practice Review](./practice-review)** covers the deployment
+variables, the per-workspace setup in screen order, what each door costs, campaigns versus recurring
+sweeps, the agent queue-health metrics and retention, and the checklist for a workspace that went quiet.
 
-| Variable | Purpose |
-| --- | --- |
-| `PRACTICE_REVIEW_FOR_ALL` | Enables the feature flag and the detection gate for all users. Also sets the detection gate via `PRACTICE_REVIEW_RUN_FOR_ALL`. |
-| `PRACTICE_REVIEW_SKIP_DRAFTS` | Skips draft PRs and draft merge requests |
-| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | Allows delivery after merge |
-| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | Minimum delay between repeated reviews of the same PR/MR |
-| `AGENT_ENABLED` | Enables the PostgreSQL-backed agent job queue and executor |
-| `GIT_CHECKOUT_ENABLED` | Enables local repo checkout and bind-mount into agent containers |
-| `NATS_ENABLED` | Enables webhook-driven sync consumption (unrelated to the agent job queue) |
-| `NATS_DURABLE_CONSUMER_NAME` | Durable consumer name for sync processing |
-
-The Docker sandbox itself is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by `AGENT_ENABLED`. Keep that capability and Docker access on the application server because interactive mentor sandboxes are request-affine and run there; a dedicated `application-worker` adds capacity for queued practice reviews. When `AGENT_ENABLED` is also true, any worker-capable replica may claim those PostgreSQL jobs. `AGENT_ENABLED` and `GIT_CHECKOUT_ENABLED` must be `true` together for practice review — anything else is a half-configured deployment. `NATS_ENABLED` still gates webhook-driven sync consumption and must stay on for that, but it is no longer part of the practice-review bundle.
-
-### Agent queue health & retention
-
-The agent job queue (`agent_job`, polled by `AgentJobExecutor`) exposes its own health signals — wire an alert off these rather than guessing from application logs:
-
-- **`agent.queue.depth`** — QUEUED jobs currently eligible to run (`available_at <= now()`).
-- **`agent.queue.oldest_age_seconds`** — age of the oldest eligible QUEUED job; `0` when the queue is empty. This is the signal to alert on, not depth alone: a briefly busy queue and a stuck one can both show non-zero depth, but only a stuck queue shows a climbing age.
-- **`agent.queue.running`** — jobs currently RUNNING fleet-wide.
-- **`agent.queue.health.sampler.failures`** — failed queue-health samples; gauges keep their last-good values instead of reporting a false empty queue.
-- **`agent.job.claim.latency`** — time between a job becoming eligible and being claimed.
-- **`agent.job.execution.duration`** — tagged by `jobType` and outcome `status` (`COMPLETED`, `FAILED`, `TIMED_OUT`, `CANCELLED`, `REQUEUED`).
-- **`agent.job.delivery.recovered`** — stuck `PENDING` deliveries (executor crashed mid-delivery) successfully re-attempted by the recovery sweep.
-- **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — terminal rows whose heavy payload columns were nulled out, and rows deleted outright, by the retention sweep below.
-
-The queue-health gauges are sampled every 30s; timers and counters are recorded inline. None run on a request path.
-
-**Retention:** terminal `agent_job` rows are pruned automatically so the table doesn't grow unbounded on a busy instance. `AGENT_PAYLOAD_RETENTION` (default `P14D`) strips `container_logs`/`output` to `NULL` past that age; `AGENT_ROW_RETENTION` (default `P90D`, must be `>= AGENT_PAYLOAD_RETENTION`) deletes the row outright past that age. Both accept an ISO-8601 duration. The defaults are deliberately generous — tighten them only if storage pressure demands it, since a stripped-but-present row is still useful for a "how many jobs ran" count even after its diagnostic payload is gone.
+Two facts belong here because they are deployment topology rather than feature configuration. The Docker
+sandbox is activated by the **worker runtime role** (`hephaestus.runtime.worker.enabled`), not by
+`AGENT_ENABLED`: keep that capability and Docker access on the application server, because interactive
+mentor sandboxes are request-affine and run there, and add a dedicated `application-worker` for queued
+review capacity. And `NATS_ENABLED` gates webhook-driven sync consumption and must stay on for that; it is
+not part of the practice-review bundle.
 
 ### Rollout tiers
 
@@ -283,13 +287,13 @@ There are two monthly LLM budgets, and **they are never added together**:
 - **The instance budget** caps a workspace's spend on **shared** models — your money, on connections you registered. An instance admin sets it under **Instance admin → AI usage → Set budget** (per-workspace, per calendar month, UTC).
 - **The workspace's own budget** caps that workspace's spend on **its own connected provider** — their money, billed to their provider account. A workspace admin sets it on their own **AI usage** page.
 
-For either cap: clearing the field removes it (**No cap** — uncapped, the default); setting it to exactly `0` pauses that purse immediately, which is the supported way to hard-stop spending mid-month.
+For either cap: **Remove cap** clears it (uncapped is the default); setting it to exactly `0` pauses that purse immediately, which is the supported way to hard-stop spending mid-month.
 
 **Each cap pauses only the work it funds.** Exhausting the instance budget stops shared-model work and leaves the workspace's own-provider work running; exhausting the workspace's own budget does the reverse. This is deliberate — an instance budget that also paused work you are not billed for would be stopping spending you cannot see the price of. If you need to stop *all* AI work in a workspace, change the workspace's status or its feature switches; a budget is not that instrument.
 
 Once a month's confirmed spend reaches a cap, that purse's budget verdict flips to **EXHAUSTED**. New agent jobs funded from it are refused at submission, queued jobs are checked again immediately before claim, and mentor turns are refused before starting a sandbox. Work resumes automatically at the next UTC calendar month, or within about a minute of the cap being raised or cleared. A workspace admin sees the pause explained on their workspace's **AI usage** page and, so it isn't only visible on that one screen, on the **AI models** page too.
 
-**The two surfaces fail differently, and you should staff for the difference.** Practice detection goes silent — a queued job is refused before it runs and nothing is posted, so no end user sees an error. The **mentor does not go silent**: a user who sends a message into an exhausted purse gets a reply in the chat saying the monthly cap is reached and naming who can lift it (a workspace admin for the workspace's own-provider cap, an instance admin for the shared budget). That is deliberate — silently dropping a turn someone is waiting on reads as a broken product — but it does mean **users will see and report a cap being hit**, so expect the support contact rather than only a dashboard change.
+**The two surfaces fail differently, and you should staff for the difference.** Practice reviews go silent — a queued job is refused before it runs and nothing is posted, so no end user sees an error. The **mentor does not go silent**: a user who sends a message into an exhausted purse gets a reply in the chat saying the monthly cap is reached and naming who can lift it (a workspace admin for the workspace's own-provider cap, an instance admin for the shared budget). That is deliberate — silently dropping a turn someone is waiting on reads as a broken product — but it does mean **users will see and report a cap being hit**, so expect the support contact rather than only a dashboard change.
 
 Some started attempts may not return trustworthy usage counters, and migrated legacy attempts may not have an admission price snapshot. Such events are recorded but carry no price, and are **excluded from the monthly totals** — so the reported total is a floor, not the confirmed spend. The UI does not fold them into the number; it shows the confirmed total alongside a separate count of unpriced calls, and the purse's verdict reads **UNVERIFIABLE** instead of **WITHIN** (**EXHAUSTED** still takes priority). A non-zero unpriced count is your signal that real spend may be higher than displayed. New models cannot be enabled until an administrator declares either a price or **No metered API cost**; the latter counts as confirmed $0 spend, not unpriced.
 
@@ -309,45 +313,6 @@ Reasoning tokens are retained as telemetry when the compatible endpoint reports 
 priced separately: OpenAI-compatible usage includes reasoning tokens in billable output tokens, so a
 second reasoning rate would double-count the same work.
 
-### A workspace stopped running practice reviews
-
-Nothing errors when practice review stops — the workspace simply goes quiet, so this is the one
-failure you have to go looking for. Work down the list; the first four are per-workspace and the last
-two are instance-wide, so if several workspaces went quiet at once, start at the bottom.
-
-1. **Is a detection model bound and enabled?** Workspace → Administration → **AI models**, the
-   "Detection runs on …" card. A workspace with no binding runs no reviews at all — this is the
-   expected state immediately after upgrading from named agent configurations, where everything is
-   carried over switched off (see `MIGRATION.md`). The card's readiness indicator also covers the
-   next case.
-2. **Is the bound model still usable?** A model is only usable if the model *and* its connection are
-   both enabled, the protocol is supported, and — for a shared instance model — the workspace still
-   has a grant. Revoking a grant or disabling a connection stops every workspace bound to it, and the
-   binding stays in place looking correct.
-3. **Is a budget exhausted?** Administration → **AI usage** names which purse paused the workspace
-   and who can lift it. Jobs already queued are *held*, not cancelled, and released automatically
-   when the cap is raised or the month rolls over — but a job still over cap seven days after it was
-   queued is cancelled rather than held forever. `agent.queue.held` counts jobs parked on a cap;
-   `agent.queue.depth` counts only what a worker could claim now, so alert on held rather than
-   reading depth.
-4. **Is the feature or the workspace switched off?** Practice review is a workspace feature flag, and
-   a paused workspace runs nothing regardless of its AI configuration.
-5. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates
-   submission, execution *and* orphan recovery independently of the worker role. Set on the worker
-   only, jobs are submitted by nobody; set on the server only, they queue and are never claimed.
-   Confirm by presence, not value: if the flag never reached a pod, `agent.queue.depth`,
-   `agent.queue.oldest_age_seconds` and `agent.queue.running` are absent from that pod's metrics
-   rather than reading zero.
-6. **Are jobs being claimed at all?** Watch `agent.queue.oldest_age_seconds`. It should rise and
-   fall. Climbing monotonically means the server is submitting and no worker is claiming — check
-   `AGENT_ENABLED` and the worker role on the worker pod. Reviews also need `GIT_CHECKOUT_ENABLED`;
-   it and `AGENT_ENABLED` must be true together.
-
-The per-workspace job list under Administration → **Practices → Runs** shows each run's status, the
-model it ran on, and its error message — the fastest way to tell "never submitted" from "submitted
-and failed". A held job says it is held, why, and when it
-is next due; **AI usage** names which purse is capped.
-
 ### Data sync and backfill
 
 The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for monitored repositories. Backfill optionally syncs historical data in batches to avoid rate limit exhaustion.
@@ -365,7 +330,7 @@ The sync scheduler fetches recent GitHub activity (issues, PRs, reviews) for mon
 
 **Backfill behavior:** After recent sync completes, backfill works backwards from the highest issue number, syncing in small batches. It pauses when rate limits drop below the threshold and resumes on the next cycle. Progress is checkpointed per repository.
 
-**Disconnecting erases the mirror.** Disconnecting a workspace's GitHub, GitLab, Slack, or Outline connection — and purging a workspace — hard-deletes the data mirrored through it, keeping only the operational sync history. It is irreversible and reconnecting performs a fresh initial sync. See the erasure triggers in the [record of processing](./dsms/record-of-processing.md).
+**Disconnecting erases the active mirror.** Disconnecting a workspace's GitHub, GitLab, Slack, or Outline connection — and purging a workspace — hard-deletes its active PostgreSQL mirror. Materialized diagnostic output, replay/CAS artifacts, and broker messages expire under their documented bounded retention windows. The operation is irreversible, and reconnecting performs a fresh initial sync. See the erasure triggers in the [record of processing](./dsms/record-of-processing.md).
 
 ## Deployment steps (reference stack)
 
@@ -412,7 +377,7 @@ This allows platform administrators to troubleshoot and manage workspaces where 
 - Monitor services with the central Prometheus/Loki stack; ensure trace IDs appear in logs.
 - Schedule regular backups for PostgreSQL (it now holds auth state — accounts, identity links, sessions — in addition to application data).
 - Review weekly leaderboard Slack posts to ensure the automation is active.
-- Preview deployments do not currently represent the full GitLab practice-review rollout unless they are explicitly wired with the same GitLab IdP, sandbox, git checkout, and agent job queue settings.
+- A preview deployment only represents the GitLab practice-review rollout if it is wired with the same GitLab IdP, sandbox, git-checkout, and agent-job-queue settings. Verify a rollout on staging, not on a preview.
 
 ## Support
 

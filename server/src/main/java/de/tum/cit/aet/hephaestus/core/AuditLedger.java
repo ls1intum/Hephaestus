@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
  * the vocabulary that table types its rows with.
  */
 public enum AuditLedger {
-    /** {@code config_audit_event} — per-workspace configuration changes. */
+    /** {@code config_audit_event} — admin configuration changes, per workspace or instance-curated. */
     CONFIG_AUDIT(ConfigAuditEntityType.values()),
 
     /** {@code auth_event} — authentication, impersonation, and instance-level administration. */

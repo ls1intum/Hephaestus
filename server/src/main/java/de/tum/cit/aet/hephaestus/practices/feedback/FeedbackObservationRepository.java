@@ -1,10 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
@@ -38,6 +39,36 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     );
 
     /**
+     * The observations behind a batch of delivered feedback, carrying what decides their visibility.
+     *
+     * <p>Both revisions are fetch-joined because every caller compares them the moment it has a row:
+     * an observation is only shown if the rules it was evaluated under are still the practice's current
+     * ones. Fetched rather than joined — a plain join narrows the result and preloads nothing, so the
+     * comparison would lazy-load its way through the batch one row at a time.
+     */
+    @Query(
+        """
+        SELECT fo.feedback.id AS feedbackId, observation AS observation
+        FROM FeedbackObservation fo
+        JOIN fo.observation observation
+        JOIN FETCH observation.practice practice
+        LEFT JOIN FETCH practice.currentRevision
+        LEFT JOIN FETCH observation.practiceRevision
+        WHERE fo.feedback.workspaceId = :workspaceId
+          AND fo.feedback.id IN :feedbackIds
+        """
+    )
+    List<FeedbackObservationVisibility> findForVisibility(
+        @Param("workspaceId") Long workspaceId,
+        @Param("feedbackIds") Collection<UUID> feedbackIds
+    );
+
+    interface FeedbackObservationVisibility {
+        UUID getFeedbackId();
+        Observation getObservation();
+    }
+
+    /**
      * Observation ids already bound to a SUPPRESSED unit of this job (reaction suppression writes its
      * {@code REACTED_*} units before the DELIVERED unit is recorded). The DELIVERED binding excludes
      * these so a withheld observation is never also counted as delivered.
@@ -52,7 +83,27 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     )
     List<UUID> findObservationIdsSuppressedForJob(@Param("agentJobId") UUID agentJobId);
 
-    /** Private reflection uses the newest available body, including {@code FAILED}; other states are ineligible. */
+    /**
+     * The newest body said to this observation's subject <em>about this observation</em>, per observation,
+     * on the lanes the caller names. {@code FAILED} counts: the words were composed and the developer may
+     * have seen them on the artifact; only states where nothing was ever said are ineligible.
+     *
+     * <p><b>{@code channels} is required, and deliberately has no default.</b> A {@link Feedback} body is
+     * "what we told them", but three lanes can tell them something and they are not interchangeable: an
+     * IN_CONTEXT note and a mentor turn are about the one observation they are bound to, while an IN_APP
+     * unit is a cross-artifact message that binds every problem behind it as PRIMARY evidence and is
+     * about none of them individually. With no channel predicate this query's newest-first tie-break
+     * hands a per-observation surface the process message instead — so the lane a caller means is a fact only
+     * the caller holds, and it has to state it.
+     *
+     * <p>Bound as names rather than as {@link FeedbackChannel} values because this is a native query, where
+     * an enum parameter's JDBC mapping is not the string the column stores.
+     *
+     * <p><b>Scoped by {@code workspace_id}, like every other read here.</b> An observation id is a UUID
+     * and looks unguessable, but this join row is written by native SQL with no tenancy check of its own,
+     * so the only thing standing between one tenant's private advice and another tenant's detail page is
+     * this predicate. Without it the newest-first tie-break decides which tenant's words a reader gets.
+     */
     @Query(
         value = """
         SELECT DISTINCT ON (fo.observation_id)
@@ -61,17 +112,21 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         FROM feedback_observation fo
         JOIN feedback f ON f.id = fo.feedback_id
         WHERE fo.observation_id IN (:observationIds)
+          AND f.workspace_id = :workspaceId
+          AND f.channel IN (:channels)
           AND f.delivery_state IN ('DELIVERED', 'FAILED')
           AND f.body IS NOT NULL
         ORDER BY fo.observation_id, f.created_at DESC, f.id DESC
         """,
         nativeQuery = true
     )
-    List<ObservationAdviceBody> findLatestAdviceBodiesByObservationIds(
-        @Param("observationIds") Collection<UUID> observationIds
+    List<ObservationFeedbackBody> findLatestFeedbackBodiesByObservationIds(
+        @Param("workspaceId") Long workspaceId,
+        @Param("observationIds") Collection<UUID> observationIds,
+        @Param("channels") Collection<String> channels
     );
 
-    interface ObservationAdviceBody {
+    interface ObservationFeedbackBody {
         UUID getObservationId();
         String getBody();
     }
@@ -79,8 +134,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     // --- conversational feedback delivery loop ---
 
     /**
-     * The id(s) of the PREPARED CONVERSATION feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
-     * given observation. Maps a mentor {@code link_finding} observation id back to the unit to flip to DELIVERED.
+     * The id(s) of the PREPARED IN_CHAT feedback unit(s) for this recipient/workspace bound (as PRIMARY) to the
+     * given observation. Maps a mentor {@code link_observation} id back to the unit to flip to DELIVERED.
      * Ordered newest-first so a caller can take the first; the reconciler's CAS makes any duplicate flip a no-op.
      */
     @Query(
@@ -91,7 +146,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
           AND fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
           AND fo.feedback.workspaceId = :workspaceId
           AND fo.feedback.recipientUserId = :recipientUserId
-          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
           AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
         ORDER BY fo.feedback.createdAt DESC
         """
@@ -102,21 +157,18 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         @Param("observationId") UUID observationId
     );
 
-    /**
-     * Facts + practice (NO body) for the newest PREPARED CONVERSATION units of a recipient - the payload the
-     * {@code PreparedConversationFeedbackContentSource} ships to the mentor. Body is deliberately absent (the mentor
-     * composes the words at delivery). Ordered newest-first, bounded by the caller's {@code Pageable}.
-     */
+    /** Newest prepared conversation facts and optional {@link ConversationBriefBody} bodies for a recipient. */
     @Query(
         """
         SELECT fo.feedback.id AS feedbackId,
                o.id AS observationId,
                p.slug AS practiceSlug,
                p.name AS practiceName,
-               o.title AS title,
-               o.reasoning AS reasoning,
+               o.summary AS summary,
+               o.evidenceRationale AS evidenceRationale,
                o.severity AS severity,
-               fo.feedback.artifactType AS artifactType,
+               fo.feedback.body AS body,
+               fo.feedback.artifactKind AS artifactKind,
                fo.feedback.artifactId AS artifactId,
                fo.feedback.createdAt AS preparedAt
         FROM FeedbackObservation fo
@@ -125,7 +177,7 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         WHERE fo.role = de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole.PRIMARY
           AND fo.feedback.workspaceId = :workspaceId
           AND fo.feedback.recipientUserId = :recipientUserId
-          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.CONVERSATION
+          AND fo.feedback.channel = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel.IN_CHAT
           AND fo.feedback.deliveryState = de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState.PREPARED
         ORDER BY fo.feedback.createdAt DESC
         """
@@ -139,13 +191,18 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     @Query(
         """
         SELECT fo.observation.id AS observationId, fo.role AS role, fo.ordinal AS ordinal,
-               p.slug AS practiceSlug, p.name AS practiceName, o.title AS title,
+               p.slug AS practiceSlug, p.name AS practiceName, o.summary AS summary,
                pa.slug AS areaSlug, pa.name AS areaName, pa.icon AS areaIcon, pa.color AS areaColor,
                o.presence AS presence, o.assessment AS assessment, o.severity AS severity,
-               o.confidence AS confidence, o.observedAt AS observedAt
+               evaluatedRevision.id AS practiceRevisionId,
+               evaluatedRevision.reviewRuleFingerprint AS practiceRevisionFingerprint,
+               currentRevision.reviewRuleFingerprint AS currentPracticeRevisionFingerprint,
+               o.observedAt AS observedAt
         FROM FeedbackObservation fo
         JOIN fo.observation o
         JOIN o.practice p
+        LEFT JOIN o.practiceRevision evaluatedRevision
+        LEFT JOIN p.currentRevision currentRevision
         LEFT JOIN p.area pa
         WHERE fo.feedback.id = :feedbackId
           AND fo.feedback.workspaceId = :workspaceId
@@ -184,11 +241,13 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getAreaName();
         String getAreaIcon();
         String getAreaColor();
-        String getTitle();
+        String getSummary();
         Presence getPresence();
         Assessment getAssessment();
         Severity getSeverity();
-        Float getConfidence();
+        Long getPracticeRevisionId();
+        String getPracticeRevisionFingerprint();
+        String getCurrentPracticeRevisionFingerprint();
         Instant getObservedAt();
     }
 
@@ -209,10 +268,15 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         UUID getObservationId();
         String getPracticeSlug();
         String getPracticeName();
-        String getTitle();
-        String getReasoning();
+        String getSummary();
+        String getEvidenceRationale();
+        /**
+         * The composer's notes to the mentor, or null when nothing was composed for this unit. See
+         * {@link ConversationBriefBody}.
+         */
+        String getBody();
         Severity getSeverity();
-        WorkArtifact getArtifactType();
+        ArtifactKind getArtifactKind();
         Long getArtifactId();
         Instant getPreparedAt();
     }

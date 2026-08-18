@@ -1,6 +1,6 @@
 # ADR 0020: Context Fabric — everything is an integration, only practice-detection and mentor are native
 
-**Status:** Proposed
+**Status:** Accepted (amended 2026-08-04 — see the update below)
 **Date:** 2026-06-12
 **Authors:** Hephaestus maintainers
 **Builds on:** [ADR 0015](0015-unified-integration-framework.md) (the integration framework and `Connection` aggregate), [ADR 0004](0004-sql-layer-tenancy-via-statement-inspector.md) (SQL-layer tenancy), [ADR 0014](0014-per-row-aes-gcm-aad-binding.md) (per-row AAD), [ADR 0007](0007-sandbox-spi-shape.md) (the agent sandbox / `ContentSource` seam)
@@ -260,3 +260,116 @@ spec and schema-evolution guidance; Databricks medallion (bronze/silver/gold) ar
 guidance; W3C PROV-O provenance ontology. Internal: ADR 0015 (integration framework),
 ADR 0004 (SQL-layer tenancy), ADR 0007 (sandbox/ContentSource seam), ADR 0014 (per-row
 AAD), and internal mentor-quality evaluation.
+## Update — 2026-08-04 (issue #1430)
+
+The status moves from **Proposed** to **Accepted**: revisit triggers §3 and §8 above have both fired,
+and the answer shipped as a versioned artifact-source contract. This update records that contract and
+supersedes the parts of the decision register it replaces. Everything above it is left as decided,
+including the industry triangulation that produced this shape — the reasoning is the reusable part.
+
+### What changed in the register
+
+- **§3 `Connector` SPI (target state) → superseded.** The forcing function the revisit trigger
+  predicted (a second non-SCM connector) arrived. What shipped is not a `Connector` interface rename
+  but an **evidence-source contract**: every input that may support a practice-review judgment has a
+  logical *source kind* in a versioned artifact-source catalog. The catalog defines authority,
+  capture time, freshness, completeness, privacy class, supported absence states, purpose, retention,
+  erasure, and its governance decision. Evidence profiles close the set of source kinds available to
+  each reviewed artifact type. Contract tests reject any uncatalogued `EvidenceSource` provider.
+- **§4 five PROV-O Kinds → not adopted in that form.** The typed vocabulary is the source-kind
+  catalog, not a five-Kind entity taxonomy. PROV-DM remains the reference for explicit
+  entity/activity/provenance; the closed-vocabulary role went to the catalog.
+- **§5 `entity_node`/`entity_edge` with split confidence → still open.** No node/edge graph shipped.
+  Citations bind a finding to a declared, available source and exact artifact instead.
+- **§7 telescope manifest → holds, and hardened.** The sandbox sees only materialized files beneath
+  `/workspace/inputs`; handlers add no host mounts. A repository tree, when explicitly selected by an
+  evidence plan, is copied into `inputs/sources/scm/repo/` and inventoried like any other source. The
+  model-visible manifest carries the *selected* artifact index; the complete source manifest and the
+  readiness report are persisted in the job evidence snapshot for audit after replay-cache collection.
+- **§8 audience-scoped privacy → shipped as purpose-scoped grants.** See "Governance" below. The
+  audience tag became a `source:purpose` grant, which is the narrower and more auditable form.
+- **§1, §2 SQL-truth and CAS → unchanged, layout finalised** (see "Filesystem layout" below).
+- **§6, §9, §10 (capability registry, fail-CLOSED tenancy, `workspace_binding` de-spine) → still
+  open**, unchanged from the staged list.
+
+### Readiness replaces silent absence
+
+A practice revision declares required and optional source kinds. The runtime records a full source
+manifest and a per-automated-review readiness report. If required evidence is unavailable, stale,
+incomplete, redacted or denied, that practice is marked **not ready** with typed evidence reasons. If
+no practice remains ready, the job completes with `INSUFFICIENT_EVIDENCE` **without starting the
+detector** — it never manufactures a semantic `NOT_APPLICABLE` result. This is the substantive
+consequence of the ADR's original complaint that "an empty result is ambiguous": empty, missing,
+stale, partial, redacted, failed and ablated inputs are now distinguishable from one another.
+
+The contract applies to practice reviews. Mentor conversation context is governed by the mentor
+consent and integration contracts and cannot be cited as practice-review evidence; reusing a mentor
+input for detection means first making it a catalogued source kind.
+
+### Filesystem layout (finalises §1/§2)
+
+`FabricLayout` owns the cache root:
+
+```text
+sources/scm/{repositoryId}/     local integration cache
+cas/sha256/{ab}/{rest}          immutable content-addressed blobs
+jobs/{jobId}/                   bounded replay manifest and readiness report
+```
+
+CAS writes and collection use cross-process prefix locks. Collection removes only blobs that are
+unreferenced *and* older than the retention cutoff; reusing a blob refreshes its retention age before
+a new manifest is published; an unreadable manifest stops the sweep rather than risking deletion of
+live evidence.
+
+### Governance and minimization (supersedes §8's audience tag)
+
+A checked-in, unexpired decision is what authorizes a source for one purpose, and it is recorded per
+`source:purpose` pair rather than per source. Capture, feedback delivery, mentoring reuse and
+operator evidence review each check their own decision, so withdrawing one stops that use without
+widening or rewriting the others. A source whose decision is missing, refused or expired is never
+read, and Hephaestus skips the practice rather than collecting the data.
+
+A per-deployment override of those decisions was considered and is not part of this decision: a
+deployment that could widen a grant would make the shipped contract unfalsifiable, and one that could
+narrow it would silently disable practices the workspace had switched on. Changing what may be read
+is therefore a contract change, reviewed and versioned.
+
+Adding or widening a source requires an updated source descriptor, profile inventory, governance
+decision, retention/erasure coverage and contract tests. **Accuracy benefit alone is not
+authorization.** Published contract versions are immutable; renewal or semantic change creates a new
+version.
+
+### Provenance and delivery
+
+Artifacts are addressed by SHA-256, and a citation binds a finding to a declared, available source and
+an exact artifact; diff citations additionally bind file, side and line range. Deterministic secret
+scanning validates a transient line digest but removes that digest before persistence, retaining only
+redacted location evidence. This proves source *attribution*, not causal isolation inside a shared
+model invocation — the runtime still rejects any finding that cites a source outside its practice
+declaration.
+
+### Added consequences
+
+- Retained job records preserve the exact contract, manifest and readiness outcome for authorized
+  operator audits. This ADR does not add a dedicated audit UI.
+- Source-contract changes require explicit version migration and mark dependent claims stale.
+- The CAS and replay cache have bounded residual windows; immediate selective erasure would require
+  reference-aware collection and remains a deployment approval consideration.
+- `branches-from-the-integration-branch`, listed among the consuming practices in "What this PR
+  ships" above, has since been withdrawn from the catalog. The other two remain.
+
+### Added evidence
+
+The original triangulation (Port Ocean / Backstage / Airbyte, MCP, Zanzibar, Iceberg, Databricks)
+stands. The contract layer adds: [W3C PROV-DM](https://www.w3.org/TR/prov-dm/) for explicit entities,
+activities and provenance; [SLSA provenance v1.2](https://slsa.dev/spec/v1.2/provenance) for immutable
+subject identity; [JSON Schema 2020-12](https://json-schema.org/draft/2020-12/json-schema-core) for
+closed machine contracts; and [GDPR Article 5](https://eur-lex.europa.eu/eli/reg/2016/679/art_5/oj)
+and [Article 25](https://eur-lex.europa.eu/eli/reg/2016/679/art_25/oj) for minimization, storage
+limitation and protection by default.
+
+### Revisit trigger (amends the list above)
+
+Triggers §3 and §8 have fired and are answered. Still live: a cross-context link that needs to be
+*asserted* rather than hinted (`entity_node`/`entity_edge`, §5), and ADR 0004's counter reading clean
+for a calendar week so prod can flip to `throw` and fold RLS in (§9).

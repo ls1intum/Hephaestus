@@ -5,18 +5,21 @@ import jakarta.persistence.Embeddable;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
 
 /**
  * Per-workspace overrides for practice-review trigger/delivery policy. Embedded on
  * {@link de.tum.cit.aet.hephaestus.workspace.Workspace}.
  *
- * <p>Every field is <strong>nullable</strong> on purpose: {@code null} means "inherit the fleet
- * default" ({@code hephaestus.practice-review.*}). Read via the {@code resolveX(fallback)}
- * accessors, passing the property default as the fallback.
+ * <p>Every field is nullable on purpose: {@code null} means "this workspace has not decided". Scalars
+ * resolve to the fleet default ({@code hephaestus.practice-review.*}) via the {@code resolveX(fallback)}
+ * accessors; {@link #reviewScope} and {@link #defaultReviewTier} have no fleet default and resolve
+ * {@code null} to a constant instead, documented at each field.
  *
- * <p>PATCH {@code null} means "no change"; to reset a previously-set field back to inherit, name it
- * in the PATCH {@code reset} set (see {@link #reset(java.util.Set)}).
+ * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
+ * {@code reset} set (see {@link #reset(java.util.Set)}).
  */
 @Embeddable
 @Getter
@@ -28,7 +31,8 @@ public class PracticeReviewSettings {
     @Nullable
     private Boolean runForAllUsers;
 
-    /** Skip practice review for draft PRs/MRs. */
+    /** Unused; kept one release under deprecate-then-remove so schema and entity agree meanwhile. */
+    @Deprecated(forRemoval = true)
     @Column(name = "practice_skip_drafts")
     @Nullable
     private Boolean skipDrafts;
@@ -43,12 +47,33 @@ public class PracticeReviewSettings {
     @Nullable
     private Integer cooldownMinutes;
 
+    /**
+     * Which of the workspace's work is reviewed at all — ANDed onto every practice binding. No fleet
+     * default to inherit (a trunk name is a fact about one deployment); {@code null} means unrestricted.
+     *
+     * @see WorkspaceReviewScope
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "practice_review_scope", columnDefinition = "jsonb")
+    @Nullable
+    private WorkspaceReviewScope reviewScope;
+
+    /**
+     * Autonomy tier for every practice in this workspace that holds no opinion (and whose area holds
+     * none either). A {@code PracticeReviewTier} name, or {@code null} for that tier's own default; no
+     * fleet default to inherit.
+     *
+     * <p>Stored as a String, not the enum: {@code PracticeReviewTier} belongs to the practices module,
+     * which already depends on this one, so naming it here would close a cycle {@code
+     * ModulithVerificationTest} rejects. Held to the vocabulary by the DB CHECK
+     * {@code chk_workspace_default_review_tier}.
+     */
+    @Column(name = "practice_default_review_tier", length = 16)
+    @Nullable
+    private String defaultReviewTier;
+
     public boolean resolveRunForAllUsers(boolean fallback) {
         return runForAllUsers != null ? runForAllUsers : fallback;
-    }
-
-    public boolean resolveSkipDrafts(boolean fallback) {
-        return skipDrafts != null ? skipDrafts : fallback;
     }
 
     public boolean resolveDeliverToMerged(boolean fallback) {
@@ -59,17 +84,40 @@ public class PracticeReviewSettings {
         return cooldownMinutes != null ? cooldownMinutes : fallback;
     }
 
+    public WorkspaceReviewScope resolveReviewScope() {
+        return reviewScope != null ? reviewScope : WorkspaceReviewScope.UNRESTRICTED;
+    }
+
     /** PATCH semantics: only non-null fields overwrite; null leaves the current value untouched. */
     public void applyPatch(
         @Nullable Boolean runForAllUsers,
-        @Nullable Boolean skipDrafts,
         @Nullable Boolean deliverToMerged,
         @Nullable Integer cooldownMinutes
     ) {
         if (runForAllUsers != null) this.runForAllUsers = runForAllUsers;
-        if (skipDrafts != null) this.skipDrafts = skipDrafts;
         if (deliverToMerged != null) this.deliverToMerged = deliverToMerged;
         if (cooldownMinutes != null) this.cooldownMinutes = cooldownMinutes;
+    }
+
+    /**
+     * Replace the review scope wholesale. Deliberately not a merge: the lists ARE the setting, so
+     * "remove develop" has to be expressible, and a merging patch could only ever add.
+     */
+    public void applyScope(@Nullable WorkspaceReviewScope scope) {
+        if (scope != null) {
+            this.reviewScope = scope.isUnrestricted() ? null : scope;
+        }
+    }
+
+    /**
+     * PATCH semantics, same as the scalars. Clearing back to the tier vocabulary's own default is a
+     * {@link PracticeReviewField#DEFAULT_REVIEW_TIER} reset, not a null here — otherwise a client that
+     * simply omitted the field would silently reset it.
+     */
+    public void applyDefaultReviewTier(@Nullable String tierName) {
+        if (tierName != null) {
+            this.defaultReviewTier = tierName;
+        }
     }
 
     /** Clear the named fields back to {@code null} (inherit the fleet default). */
@@ -78,14 +126,14 @@ public class PracticeReviewSettings {
             return;
         }
         for (PracticeReviewField field : fields) {
-            // Switch EXPRESSION (not statement) so the compiler forces every PracticeReviewField constant to
-            // be handled here — a statement switch would silently no-op an unhandled field. The yielded value
-            // is unused; the exhaustiveness check is the point.
+            // Switch EXPRESSION, not statement: the compiler then forces every constant to be handled
+            // here. The yielded value is unused; the exhaustiveness check is the point.
             boolean ignored = switch (field) {
                 case RUN_FOR_ALL_USERS -> {
                     this.runForAllUsers = null;
                     yield true;
                 }
+                // Kept so a reset request naming this field from an older client is still understood.
                 case SKIP_DRAFTS -> {
                     this.skipDrafts = null;
                     yield true;
@@ -96,6 +144,14 @@ public class PracticeReviewSettings {
                 }
                 case COOLDOWN_MINUTES -> {
                     this.cooldownMinutes = null;
+                    yield true;
+                }
+                case REVIEW_SCOPE -> {
+                    this.reviewScope = null;
+                    yield true;
+                }
+                case DEFAULT_REVIEW_TIER -> {
+                    this.defaultReviewTier = null;
                     yield true;
                 }
             };

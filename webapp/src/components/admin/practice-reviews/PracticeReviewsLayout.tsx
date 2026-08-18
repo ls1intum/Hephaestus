@@ -3,7 +3,7 @@ import { MessageSquareText, ScanSearch, Workflow } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
-import { buttonVariants } from "@/components/ui/button";
+import { tabsListVariants } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import { reviewArtifactTypeFromSlug } from "./ReviewArtifact";
 import type { ReviewScopeSearch } from "./review-search";
@@ -23,11 +23,13 @@ const VIEWS = [
 		icon: Workflow,
 	},
 	{
-		id: "findings",
-		to: "/w/$workspaceSlug/admin/practices/reviews/findings",
-		label: "Findings",
-		title: "Findings",
-		description: "Explore strengths and improvements, with evidence from reviewed work.",
+		id: "observations",
+		to: "/w/$workspaceSlug/admin/practices/reviews/observations",
+		label: "Observations",
+		title: "Observations",
+		// "Observed", not "found": the vocabulary reserves *finding* for a note pinned to a position in a
+		// diff, and this surface is the measurement.
+		description: "What the reviews observed in the work, with the passages they read it from.",
 		icon: ScanSearch,
 	},
 	{
@@ -35,12 +37,24 @@ const VIEWS = [
 		to: "/w/$workspaceSlug/admin/practices/reviews/delivery",
 		label: "Delivery",
 		title: "Feedback delivery",
-		description: "See each message Hephaestus prepared and whether it reached its recipient.",
+		// No product name, and no "prepared": nothing is prepared outside the conversation queue, and
+		// the operator's question is what became of the feedback, not which service composed it.
+		description: "Every piece of feedback a review composed, and what became of it.",
 		icon: MessageSquareText,
 	},
 ] as const;
 
 export type PracticeReviewSection = (typeof VIEWS)[number]["id"];
+
+/**
+ * These are router links carrying `aria-current="page"`, not tabs — a nav that changes the URL must not
+ * claim `role="tab"` — so `TabsTrigger` itself cannot be reused. The track below does reuse the exported
+ * `tabsListVariants`, and this is that component's own recipe with `data-active` swapped for
+ * `aria-[current=page]` and the icon/line-variant selectors dropped, so the two surfaces stay one idiom
+ * rather than two hand-tuned lookalikes. If `ui/tabs.tsx` ever exports a trigger variant, use it here.
+ */
+const SECTION_LINK_CLASS =
+	"relative inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center rounded-md border border-transparent px-1.5 py-0.5 text-sm font-medium whitespace-nowrap text-foreground/60 transition-all hover:text-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1 focus-visible:outline-ring dark:text-muted-foreground dark:hover:text-foreground aria-[current=page]:bg-background aria-[current=page]:text-foreground aria-[current=page]:shadow-sm dark:aria-[current=page]:border-input dark:aria-[current=page]:bg-input/30 dark:aria-[current=page]:text-foreground";
 
 export interface PracticeReviewsHeaderProps {
 	workspaceSlug: string;
@@ -61,11 +75,11 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 	const scope = {
 		agentJobId:
 			"jobId" in params ? params.jobId : "agentJobId" in search ? search.agentJobId : undefined,
-		artifactType:
-			"artifactType" in params && typeof params.artifactType === "string"
-				? reviewArtifactTypeFromSlug(params.artifactType)
-				: "artifactType" in search
-					? search.artifactType
+		artifactKind:
+			"artifactKind" in params && typeof params.artifactKind === "string"
+				? reviewArtifactTypeFromSlug(params.artifactKind)
+				: "artifactKind" in search
+					? search.artifactKind
 					: undefined,
 		artifactId: Number.isSafeInteger(artifactId) ? artifactId : undefined,
 		from: "from" in search ? search.from : undefined,
@@ -77,15 +91,15 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 			fuzzy: true,
 		}),
 	);
-	const findingsActive = Boolean(
+	const observationsActive = Boolean(
 		matchRoute({
-			to: "/w/$workspaceSlug/admin/practices/reviews/findings",
+			to: "/w/$workspaceSlug/admin/practices/reviews/observations",
 			fuzzy: true,
 		}),
 	);
 	const targetActive = Boolean(
 		matchRoute({
-			to: "/w/$workspaceSlug/admin/practices/reviews/targets/$artifactType/$artifactId",
+			to: "/w/$workspaceSlug/admin/practices/reviews/targets/$artifactKind/$artifactId",
 			fuzzy: true,
 		}),
 	);
@@ -93,8 +107,8 @@ export function PracticeReviewsLayout({ workspaceSlug, children }: PracticeRevie
 		? undefined
 		: deliveryActive
 			? "delivery"
-			: findingsActive
-				? "findings"
+			: observationsActive
+				? "observations"
 				: "reviews";
 
 	return (
@@ -113,14 +127,14 @@ export function PracticeReviewsHeader({
 	const activeView = VIEWS.find((view) => view.id === activeSection);
 	const title = activeView?.title ?? "Reviewed work";
 	const description =
-		activeView?.description ?? "See the review output associated with one piece of work.";
+		activeView?.description ?? "Everything the reviews have said about one piece of work.";
 	const Icon = activeView?.icon ?? ScanSearch;
 	return (
 		<div className="space-y-4">
 			<PageHeader icon={<Icon />} title={title} description={description} />
 			<nav
 				aria-label="Practice review sections"
-				className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1 sm:inline-grid"
+				className={cn(tabsListVariants(), "h-8 w-full sm:w-fit")}
 			>
 				{VIEWS.map(({ id, to, label }) => (
 					<Link
@@ -130,10 +144,7 @@ export function PracticeReviewsHeader({
 						search={id === "reviews" ? {} : scope}
 						aria-current={id === activeSection ? "page" : undefined}
 						activeOptions={{ exact: true }}
-						className={cn(
-							buttonVariants({ variant: "ghost", size: "sm" }),
-							"min-w-0 px-2 text-muted-foreground aria-[current=page]:bg-background aria-[current=page]:text-foreground aria-[current=page]:shadow-sm aria-[current=page]:hover:bg-background",
-						)}
+						className={SECTION_LINK_CLASS}
 					>
 						{label}
 					</Link>

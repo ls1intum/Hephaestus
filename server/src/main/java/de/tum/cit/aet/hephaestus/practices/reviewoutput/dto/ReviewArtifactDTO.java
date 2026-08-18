@@ -1,12 +1,12 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput.dto;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 
 public record ReviewArtifactDTO(
-    @NonNull WorkArtifact type,
+    @NonNull ArtifactKind type,
     @NonNull @Schema(description = "Internal artifact entity ID") Long id,
     @Schema(description = "Source provider, when recorded") IntegrationKind provider,
     @Schema(description = "Provider-visible work-item number") Integer number,

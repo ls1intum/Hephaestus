@@ -1,13 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { capState } from "./CapMeter";
-import { BUDGET_WARN_PERCENT } from "./usage-utils";
 
-/** Both consoles read this, and its threshold also raises the pace warning and turns the bar amber. */
+/**
+ * The percentages are written out rather than derived from `BUDGET_WARN_PERCENT`: a row spelled
+ * `BUDGET_WARN_PERCENT - 1` restates the implementation and stays green for any threshold at all.
+ */
 describe("capState", () => {
 	it.each<[string, number | undefined, boolean, boolean, "paused" | "near" | null]>([
 		["nothing to say well below the threshold", 24.8, false, true, null],
-		["still nothing one point short of it", BUDGET_WARN_PERCENT - 1, false, true, null],
-		["a warning exactly at the threshold", BUDGET_WARN_PERCENT, false, true, "near"],
+		["still nothing one point short of it", 79, false, true, null],
+		["a warning exactly at the threshold", 80, false, true, "near"],
 		["a warning past it", 92, false, true, "near"],
 		["a pause, which outranks the warning", 92, true, true, "paused"],
 		["a pause even at zero spend, because a $0 cap pauses at once", 100, true, true, "paused"],

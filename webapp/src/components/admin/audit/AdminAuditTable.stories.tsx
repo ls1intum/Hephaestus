@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { AdminAuditTable } from "./AdminAuditTable";
 
 const events: AuthEventView[] = [
@@ -63,11 +64,9 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getAllByText("Ada Lovelace").length).toBeGreaterThan(0);
-		await expect(canvas.getAllByText("Grace Hopper").length).toBeGreaterThan(0);
-		await expect(canvas.getByText("Failure")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		// The table's own rendering of `result`, not `args.events` read back.
+		canvas.getByText("Failure");
 	},
 };
 
@@ -84,59 +83,52 @@ export const DeletedAccountFallback: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("#1234")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("#1234");
 	},
 };
 
 export const RowDetail: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
-		await expect(await screen.findByText("User agent")).toBeInTheDocument();
-		await expect(screen.getByText("Workspace")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("User agent"));
+		screen.getByText("Workspace");
 	},
 };
 
 export const EmptyInitial: Story = {
 	args: { events: [], hasFilter: false },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No events yet")).toBeInTheDocument();
-		await expect(canvas.getByText(/Sign-ins, impersonation, role changes/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("No events yet");
+		canvas.getByText(/Sign-ins, impersonation, role changes/i);
 	},
 };
 
 export const EmptyWithFilter: Story = {
 	args: { events: [], hasFilter: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No events match your filters")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("No events match your filters");
 	},
 };
 
 export const ErrorState: Story = {
 	args: { events: [], isError: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/Couldn’t load the audit log/i);
 	},
 };
 
 export const Loading: Story = {
 	args: { events: [], isLoading: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Event" })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("columnheader", { name: "Event" });
 	},
 };
 
 export const ColumnCountMatchesHeader: Story = {
 	args: {},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const headers = canvas.getAllByRole("columnheader");
 		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
 		await expect(headers).toHaveLength(cells.length);

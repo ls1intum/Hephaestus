@@ -7,6 +7,7 @@ import { Chat } from "./Chat";
 const meta = {
 	component: Chat,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	argTypes: {
 		status: {
 			control: "select",

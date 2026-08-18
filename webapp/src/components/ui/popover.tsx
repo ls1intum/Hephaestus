@@ -22,9 +22,11 @@ function PopoverContent({
 	Pick<PopoverPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
 	return (
 		<PopoverPrimitive.Portal>
+			{/* Viewport-relative, not `absolute` — see `overlay-reflow.stories.tsx`. */}
 			<PopoverPrimitive.Positioner
 				align={align}
 				alignOffset={alignOffset}
+				positionMethod="fixed"
 				side={side}
 				sideOffset={sideOffset}
 				className="isolate z-50"

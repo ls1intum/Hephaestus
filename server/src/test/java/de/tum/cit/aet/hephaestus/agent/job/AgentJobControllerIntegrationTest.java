@@ -42,7 +42,7 @@ class AgentJobControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         AgentJob job = new AgentJob();
         job.setJobToken(seededJobToken());
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(status);
         job.setConfigSnapshot(

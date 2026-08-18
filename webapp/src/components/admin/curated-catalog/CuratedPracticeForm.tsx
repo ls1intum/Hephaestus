@@ -1,11 +1,16 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
-import type { CatalogEntryStatus, CuratedPracticeRequest } from "@/api/types.gen";
+import type {
+	CatalogEntryStatus,
+	CuratedPracticeDefinition,
+	PracticeDefinitionOptions,
+} from "@/api/types.gen";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
+import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -20,6 +25,7 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
@@ -28,7 +34,9 @@ export type CuratedPracticeFormValue = PracticeDefinitionValue;
 
 export interface CuratedPracticeFormInitialValue extends CuratedPracticeFormValue {
 	status: CatalogEntryStatus;
-	shipped?: CuratedPracticeRequest;
+	automatedReviewPolicy: CuratedPracticeDefinition["automatedReviewPolicy"];
+	automatedReviewValidation: CuratedPracticeDefinition["automatedReviewValidation"];
+	shipped?: CuratedPracticeDefinition;
 }
 
 interface CuratedPracticeFormBaseProps {
@@ -40,6 +48,7 @@ interface CuratedPracticeFormBaseProps {
 	isKeepPending?: boolean;
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
+	definitionOptions: PracticeDefinitionOptions;
 }
 
 interface CuratedPracticeFormCreateProps extends CuratedPracticeFormBaseProps {
@@ -69,6 +78,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 		isKeepPending = false,
 		onUseHephaestusVersion,
 		initialData,
+		definitionOptions,
 		onKeepCurrentDefinition,
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
@@ -97,8 +107,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 						<AlertDialogDescription>
 							This replaces the customization and discards unsaved changes. It does not change
 							whether the practice is included in new workspaces. Existing workspaces remain
-							unchanged. Future Hephaestus updates apply automatically until the practice is
-							customized again.
+							unchanged. Future updates apply automatically until the practice is customized again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -139,6 +148,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					status={initialData.status}
 					kind="practice"
 					shipped={initialData.shipped}
+					definitionOptions={definitionOptions}
 					areaNames={Object.fromEntries(areas.map((area) => [area.slug, area.name]))}
 					isResetPending={isResetPending}
 					isKeepPending={isKeepPending}
@@ -150,7 +160,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 
 			{conflict && (
 				<div className="max-w-3xl space-y-2">
-					<Alert variant="warning">
+					<Alert variant="warning" role="alert">
 						<RotateCcw />
 						<AlertTitle>This practice changed while you were editing</AlertTitle>
 						<AlertDescription>
@@ -171,6 +181,7 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
+					definitionOptions={definitionOptions}
 					disabled={formDisabled}
 					cancelAction={cancelAction}
 					onSubmit={props.onSubmit}
@@ -181,9 +192,28 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 					initialData={initialData}
 					areas={areas}
 					isPending={isPending}
+					definitionOptions={definitionOptions}
 					disabled={formDisabled}
 					isSubmitDisabled={conflict || isResetPending || isKeepPending}
 					cancelAction={cancelAction}
+					afterFields={
+						<>
+							<Separator />
+							<section className="space-y-4">
+								<div>
+									<h2 className="text-lg font-semibold">What the author declared</h2>
+									<p className="text-sm text-muted-foreground">
+										The evidence requirements above are the author's own claim about this practice.
+										Nobody has checked them independently. The digests record the exact rules that
+										were declared, so a later change to them is visible rather than silent.
+									</p>
+								</div>
+								<PracticeAutomatedReviewValidationSummary
+									validation={initialData.automatedReviewValidation}
+								/>
+							</section>
+						</>
+					}
 					onSubmit={props.onSubmit}
 				/>
 			)}

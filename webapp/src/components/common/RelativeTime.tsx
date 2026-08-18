@@ -5,7 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { asDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
-/** The coarsest phrase printed is a minute, so this keeps every label within half a step of correct. */
+/** The finest phrase printed is a minute, so this keeps every label within half a step. */
 const TICK_MS = 30_000;
 
 const listeners = new Set<() => void>();
@@ -63,7 +63,7 @@ const FRESHNESS_LABEL = {
 export interface RelativeTimeProps {
 	value?: Date | string | null;
 	tone?: FreshnessTone;
-	/** Copy for a missing or invalid timestamp. Never "now": an absent time must not read as fresh. */
+	/** Never pass "now" or similar: an absent time must not read as fresh. */
 	fallback?: string;
 	/** Turn off only inside a hover surface that already states the absolute time. */
 	tooltip?: boolean;
@@ -71,8 +71,8 @@ export interface RelativeTimeProps {
 }
 
 /**
- * A timestamp as "4 minutes ago", against a clock shared by every relative time on the page, with the
- * absolute instant one hover away for correlating a row against a server log.
+ * A relative timestamp against a clock shared by every relative time on the page, with the absolute
+ * instant one hover away for correlating a row against a server log.
  */
 export function RelativeTime({
 	value,

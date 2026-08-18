@@ -100,7 +100,7 @@ class MentorTurnPersistenceDeliveryOutcomeTest extends BaseUnitTest {
         assistant.setThread(thread);
         when(chatMessageRepository.findById(assistantId)).thenReturn(java.util.Optional.of(assistant));
         TranslatorState state = new TranslatorState(assistantId);
-        state.recordDataFinding(observationId);
+        state.recordDataObservation(observationId);
         return new Fixture(cookie(assistantId), state, observationId);
     }
 

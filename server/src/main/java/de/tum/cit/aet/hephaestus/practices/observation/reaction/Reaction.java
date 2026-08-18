@@ -103,9 +103,9 @@ public class Reaction {
      * non-null {@code recurrence_key} ({@code FeedbackRepository.findHeadlineRecurrenceKey} skips null-key PRIMARY
      * rows and takes the earliest one that has a key), so the reaction cannot participate in cross-run suppression.
      *
-     * <p><b>Headline-only by design.</b> A {@link Feedback} unit can fuse several findings (one PRIMARY per
+     * <p><b>Headline-only by design.</b> A {@link Feedback} unit can fuse several observations (one PRIMARY per
      * problem, ADR 0022), but only the headline locus is captured here. So when a recipient disputes a
-     * multi-finding unit, suppression matches only the headline locus on re-run; the non-headline loci bundled
+     * multi-observation unit, suppression matches only the headline locus on re-run; the non-headline loci bundled
      * into the same unit recur and may re-nag. This is the known suppression grain, not a defect. Full-unit
      * suppression would require capturing every member recurrence key (e.g. a child {@code reaction_locus}
      * table keyed off {@code FeedbackObservation}), which is out of scope.

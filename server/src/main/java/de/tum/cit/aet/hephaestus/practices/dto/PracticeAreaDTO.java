@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
@@ -17,13 +19,27 @@ public record PracticeAreaDTO(
     @Nullable @Schema(description = "What this area develops") String description,
     @Nullable @Schema(description = "Optional lucide icon name for the area's chip") String icon,
     @Nullable @Schema(description = "Optional palette colour key for the area's chip") String color,
-    @NonNull @Schema(description = "Whether this area is active") Boolean active,
+    @NonNull
+    @Schema(description = "Whether this area is shown in practice dashboards")
+    Boolean visibleInPracticeDashboards,
     @NonNull @Schema(description = "Sort order within the workspace") Integer displayOrder,
+    @NonNull
+    @Schema(
+        description = "How much autonomy the system has over every practice in this area that holds no " +
+            "tier of its own, whether that was set here or inherited from the workspace, and which level " +
+            "decided it"
+    )
+    ReviewTierAssignmentDTO reviewTier,
     @NonNull @Schema(description = "Timestamp when the area was created") Instant createdAt,
     @Nullable @Schema(description = "Timestamp when the area was last updated") Instant updatedAt,
     @Nullable CatalogOriginDTO catalogOrigin
 ) {
-    public static PracticeAreaDTO from(PracticeArea area, @Nullable CatalogOriginDTO catalogOrigin) {
+    /** @param workspaceDefault the workspace's effective default tier, the bottom of the inheritance chain */
+    public static PracticeAreaDTO from(
+        PracticeArea area,
+        @Nullable CatalogOriginDTO catalogOrigin,
+        PracticeReviewTier workspaceDefault
+    ) {
         return new PracticeAreaDTO(
             area.getId(),
             area.getSlug(),
@@ -31,8 +47,9 @@ public record PracticeAreaDTO(
             area.getDescription(),
             area.getIcon(),
             area.getColor(),
-            area.isActive(),
+            area.isVisibleInPracticeDashboards(),
             area.getDisplayOrder(),
+            ReviewTierAssignmentDTO.of(ReviewTierResolver.resolveArea(area, workspaceDefault), area.getReviewTier()),
             area.getCreatedAt(),
             area.getUpdatedAt(),
             catalogOrigin

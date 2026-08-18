@@ -1,4 +1,3 @@
-// Pi SDK runner — embedded in-process; persists findings via custom tools.
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 
@@ -11,8 +10,25 @@ import {
     defineTool,
 } from "@earendil-works/pi-coding-agent";
 
-import { dedupeKeyForFinding, normalizeFinding } from "./pi-finding-normalize.mjs";
+import {
+    ASSESSMENT_DESCRIPTIONS,
+    ASSESSMENT_VALUES,
+    PRESENCE_DESCRIPTIONS,
+    PRESENCE_VALUES,
+    SEVERITY_DESCRIPTIONS,
+    SEVERITY_VALUES,
+    carriesValence,
+    citationMatchesArtifact,
+    dedupeKeyForObservation,
+    describeVocabulary,
+    normalizeObservation,
+    validateEvidenceSources,
+    validateSearchScope,
+    validateInapplicabilityScope,
+} from "./pi-observation-normalize.mjs";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
+import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi-runner-usage.mjs";
+import { deriveTimeouts } from "./pi-runner-timings.mjs";
 
 const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
@@ -20,26 +36,32 @@ const RESULT_PATH = `${OUTPUT}/result.json`;
 const REVIEW_STATE_PATH = `${OUTPUT}/review-state.json`;
 const AGENT_BUDGET_MS = Number(process.env.AGENT_BUDGET_MS);
 if (!Number.isFinite(AGENT_BUDGET_MS) || AGENT_BUDGET_MS <= 0) {
-    throw new Error(`AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`);
+    throw new Error(
+        `AGENT_BUDGET_MS env var is required and must be a positive number, got: ${process.env.AGENT_BUDGET_MS}`,
+    );
 }
 const AGENT_DIR = process.env.PI_CODING_AGENT_DIR;
 if (!AGENT_DIR) {
     throw new Error("PI_CODING_AGENT_DIR env var is required");
 }
-// 85% initial / 15% retry; soft nudge at 50% of initial.
-const INITIAL_TIMEOUT_MS = Math.max(60_000, Math.floor(AGENT_BUDGET_MS * 0.85));
-const RETRY_TIMEOUT_MS = Math.max(30_000, AGENT_BUDGET_MS - INITIAL_TIMEOUT_MS);
-const SOFT_TIMEOUT_MS = Math.max(45_000, Math.floor(INITIAL_TIMEOUT_MS * 0.5));
+const {
+    initialMs: INITIAL_TIMEOUT_MS,
+    retryMs: RETRY_TIMEOUT_MS,
+    softNudgeMs: SOFT_TIMEOUT_MS,
+    compositionMs: COMPOSITION_TIMEOUT_MS,
+} = deriveTimeouts(AGENT_BUDGET_MS, existsSync(`${CWD}/inputs/feedback-composition.json`));
 
-// Watchdog: hard exit if an SDK abort hangs past the budget.
 setTimeout(() => {
     console.error(`[pi-runner] Watchdog: ${AGENT_BUDGET_MS + 30_000}ms elapsed, hard-exiting`);
     try {
-        writeFileSync(`${OUTPUT}/watchdog-killed.json`, JSON.stringify({
-            budgetMs: AGENT_BUDGET_MS,
-            elapsedMs: AGENT_BUDGET_MS + 30_000,
-            reason: "runtime exceeded budget + 30s grace, hard-killed by watchdog",
-        }));
+        writeFileSync(
+            `${OUTPUT}/watchdog-killed.json`,
+            JSON.stringify({
+                budgetMs: AGENT_BUDGET_MS,
+                elapsedMs: AGENT_BUDGET_MS + 30_000,
+                reason: "runtime exceeded budget + 30s grace, hard-killed by watchdog",
+            }),
+        );
     } catch {
         /* best-effort — already exiting */
     }
@@ -47,6 +69,20 @@ setTimeout(() => {
 }, AGENT_BUDGET_MS + 30_000).unref();
 
 mkdirSync(OUTPUT, { recursive: true });
+
+const manifest = JSON.parse(readFileSync(`${CWD}/inputs/manifest.json`, "utf8"));
+const availableSourceKinds = new Set(
+    manifest.sources.filter((source) => source.state.availability === "AVAILABLE").map((source) => source.kind),
+);
+const artifactSources = new Map(
+    manifest.sources.flatMap((source) => (source.artifacts ?? []).map((artifact) => [artifact.path, source.kind])),
+);
+const practiceIndex = JSON.parse(readFileSync(`${CWD}/inputs/practices/index.json`, "utf8"));
+const admittedPractices = new Set(practiceIndex.map((practice) => practice.slug));
+// ABSENT is sound only over sources the practice declares exhaustive.
+const practiceExhaustiveSources = new Map(
+    practiceIndex.map((practice) => [practice.slug, new Set(practice.exhaustiveSources ?? [])]),
+);
 
 const usageTotals = {
     model: null,
@@ -60,69 +96,171 @@ const usageTotals = {
 };
 const runnerDebug = { attempts: [], usageTotals };
 const reviewState = {
-    findings: [],
-    findingKeys: [],
+    observations: [],
+    observationKeys: [],
 };
-const presenceSchema = { type: "string", enum: ["PRESENT", "ABSENT", "NOT_APPLICABLE"] };
-const assessmentSchema = { type: "string", enum: ["GOOD", "BAD"] };
-const severitySchema = { type: "string", enum: ["CRITICAL", "MAJOR", "MINOR", "INFO"] };
+const presenceSchema = {
+    type: "string",
+    enum: PRESENCE_VALUES,
+    description:
+        "Is the behaviour this practice names in the work? Every practice names one — read its criteria for " +
+        "what the behaviour is, then pick the value whose test you can actually pass.\n" +
+        describeVocabulary(PRESENCE_VALUES, PRESENCE_DESCRIPTIONS),
+};
+const assessmentSchema = {
+    type: "string",
+    enum: ASSESSMENT_VALUES,
+    description:
+        "Is what presence recorded good or bad FOR THE DEVELOPER? Required for PRESENT and ABSENT; omit it " +
+        "entirely for NOT_APPLICABLE and INCONCLUSIVE, which assert no direction and are not quiet verdicts.\n" +
+        describeVocabulary(ASSESSMENT_VALUES, ASSESSMENT_DESCRIPTIONS),
+};
+const severitySchema = {
+    type: "string",
+    enum: SEVERITY_VALUES,
+    description:
+        "How much the problem costs. Set it only when assessment is BAD, and read it off the practice's own " +
+        "severity table keyed to the fact you quoted — never from a feeling of how bad it is, so identical " +
+        "facts land in the same band every run.\n" +
+        describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS),
+};
+const searchSchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["consulted", "lookedFor", "boundary"],
+    properties: {
+        consulted: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+            description: "Evidence source kinds you actually searched, e.g. scm.review-threads.",
+        },
+        lookedFor: {
+            type: "string",
+            minLength: 1,
+            description: "The concrete thing whose absence you are reporting.",
+        },
+        boundary: {
+            type: "string",
+            minLength: 1,
+            description: "What this search did NOT cover, so a reader can judge how far the absence reaches.",
+        },
+    },
+};
+const inapplicabilitySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["consulted", "subject", "ruledOutBy"],
+    properties: {
+        consulted: {
+            type: "array",
+            minItems: 1,
+            items: { type: "string", minLength: 1 },
+            description: "Evidence source kinds you read to reach this conclusion, e.g. scm.pull-request.diff.",
+        },
+        subject: {
+            type: "string",
+            minLength: 1,
+            description: "What this practice looks for, e.g. error handling around outbound network calls.",
+        },
+        ruledOutBy: {
+            type: "string",
+            minLength: 1,
+            description:
+                "The fact about THIS work that means the subject cannot occur in it, e.g. the change touches " +
+                "only Markdown documentation and makes no network calls.",
+        },
+    },
+};
+const undecidabilitySchema = {
+    type: "object",
+    additionalProperties: false,
+    required: ["openQuestion", "wouldSettleIt"],
+    properties: {
+        openQuestion: {
+            type: "string",
+            minLength: 1,
+            description: "The question the evidence you actually read left open, in one sentence.",
+        },
+        wouldSettleIt: {
+            type: "string",
+            minLength: 1,
+            description:
+                "The EVIDENCE that would have decided it — something that already exists and you could not " +
+                "read, named concretely: 'the body of issue #7', 'the test file the description says covers " +
+                "this'. NOT what the author should have written: advice belongs to a later step, and " +
+                "answering with it leaves nobody any wiser about which source this practice is missing.",
+        },
+    },
+};
 const evidenceSchema = {
     type: "object",
     additionalProperties: false,
-    required: ["locations", "snippets"],
+    required: ["citations"],
     properties: {
-        locations: {
+        search: searchSchema,
+        inapplicability: inapplicabilitySchema,
+        undecidability: undecidabilitySchema,
+        citations: {
             type: "array",
+            minItems: 1,
             items: {
                 type: "object",
                 additionalProperties: false,
-                // endLine is optional (a single-line note omits it; normalizers + the Java parser treat it as
-                // optional). Keeping it REQUIRED would reject the whole tool call at the SDK boundary.
-                required: ["path", "startLine"],
+                required: ["sourceKind", "artifactPath", "path", "startLine", "quote"],
                 properties: {
+                    sourceKind: { type: "string", minLength: 1 },
+                    artifactPath: { type: "string", minLength: 1 },
                     path: { type: "string", minLength: 1 },
+                    side: { type: "string", enum: ["OLD", "NEW"] },
                     startLine: { type: "integer", minimum: 1 },
                     endLine: { type: "integer", minimum: 1 },
+                    quote: { type: "string", minLength: 1 },
                 },
             },
         },
-        snippets: { type: "array", items: { type: "string" } },
     },
 };
-const diffNoteSchema = {
+const observationSchema = {
     type: "object",
     additionalProperties: false,
-    // endLine is optional (single-line suggestion); normalizers + the Java parser treat it as optional, so
-    // keeping it REQUIRED would reject an otherwise-valid single-line note at the SDK boundary.
-    required: ["filePath", "startLine", "body"],
-    properties: {
-        filePath: { type: "string", minLength: 1 },
-        startLine: { type: "integer", minimum: 1 },
-        endLine: { type: "integer", minimum: 1 },
-        body: { type: "string", minLength: 1 },
-    },
-};
-// `assessment` is REQUIRED unless presence=NOT_APPLICABLE. JSON Schema cannot express that
-// conditional cleanly across all validators the SDK may use, so we keep it out of `required`
-// here and enforce the (presence, assessment) coupling in normalizeFinding().
-const findingSchema = {
-    type: "object",
-    additionalProperties: false,
-    required: ["practiceSlug", "title", "presence", "confidence", "evidence", "reasoning", "guidance"],
+    required: ["practiceSlug", "summary", "outcome", "evidence", "evidenceRationale"],
     properties: {
         practiceSlug: { type: "string", minLength: 1 },
-        title: { type: "string", minLength: 1, maxLength: 120 },
-        presence: presenceSchema,
-        assessment: assessmentSchema,
-        severity: severitySchema,
-        // Upper bound is 100, not 1, so a model emitting percentage-style confidence (e.g. 85)
-        // is not rejected at the SDK boundary; normalizeFinding rescales (1,100] -> /100 to
-        // mirror the Java consumer PracticeDetectionResultParser.parseConfidence.
-        confidence: { type: "number", minimum: 0, maximum: 100 },
-        evidence: evidenceSchema,
-        reasoning: { type: "string", minLength: 1 },
-        guidance: { type: "string", minLength: 1 },
-        suggestedDiffNotes: { type: "array", items: diffNoteSchema },
+        summary: { type: "string", minLength: 1, maxLength: 120 },
+        outcome: {
+            type: "string",
+            enum: [
+                "BEHAVIOR_PRESENT_GOOD",
+                "BEHAVIOR_PRESENT_BAD_MINOR",
+                "BEHAVIOR_PRESENT_BAD_MAJOR",
+                "BEHAVIOR_PRESENT_BAD_CRITICAL",
+                "BEHAVIOR_ABSENT_GOOD",
+                "BEHAVIOR_ABSENT_BAD_MINOR",
+                "BEHAVIOR_ABSENT_BAD_MAJOR",
+                "BEHAVIOR_ABSENT_BAD_CRITICAL",
+                "NO_REVIEW_OCCASION",
+                "INSUFFICIENT_EVIDENCE",
+            ],
+            description:
+                "Choose a BEHAVIOR result whenever the practice has something to judge. An absent target behaviour is BEHAVIOR_ABSENT, never NO_REVIEW_OCCASION. NO_REVIEW_OCCASION means a prerequisite situation explicitly named by the practice did not occur.",
+        },
+        evidence: {
+            ...evidenceSchema,
+            properties: {
+                citations: evidenceSchema.properties.citations,
+                exhaustiveSearch: searchSchema,
+                exclusion: inapplicabilitySchema,
+                missingEvidence: undecidabilitySchema,
+            },
+        },
+        evidenceRationale: {
+            type: "string",
+            minLength: 1,
+            description:
+                "A concise explanation of how the cited evidence warrants this outcome. Describe evidence, " +
+                "not advice, intent, confidence, or hidden chain-of-thought.",
+        },
     },
 };
 
@@ -133,10 +271,7 @@ function persistRunnerDebug() {
     writeFileSync(`${OUTPUT}/runner-debug.json`, JSON.stringify(runnerDebug, null, 2));
 }
 function persistReviewState() {
-    writeFileSync(
-        REVIEW_STATE_PATH,
-        JSON.stringify({ findings: reviewState.findings }, null, 2),
-    );
+    writeFileSync(REVIEW_STATE_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
 }
 
 const SECRET_PATTERN =
@@ -149,32 +284,26 @@ function redact(text) {
     });
 }
 
-
-function isValidFinding(f) {
+function isValidObservation(f) {
     if (!f || typeof f !== "object") return false;
     if (typeof f.practiceSlug !== "string" || !f.practiceSlug.trim()) return false;
-    if (typeof f.title !== "string" || !f.title.trim()) return false;
+    if (typeof f.summary !== "string" || !f.summary.trim()) return false;
     if (typeof f.presence !== "string") return false;
-    // assessment is required unless presence=NOT_APPLICABLE (which has no valence).
-    if (f.presence !== "NOT_APPLICABLE" && typeof f.assessment !== "string") return false;
-    // Number(null) === 0 — reject nullish before isNaN check.
-    if (f.confidence == null || f.confidence === "") return false;
-    if (Number.isNaN(Number(f.confidence))) return false;
+    if (carriesValence(f.presence) && typeof f.assessment !== "string") return false;
     return true;
 }
 
-function isValidFindingsPayload(p) {
+function isValidObservationsPayload(p) {
     return (
         p &&
         typeof p === "object" &&
-        Array.isArray(p.findings) &&
-        p.findings.length > 0 &&
-        p.findings.some(isValidFinding)
+        Array.isArray(p.observations) &&
+        p.observations.length > 0 &&
+        p.observations.every(isValidObservation)
     );
 }
 
 function lenientJsonParse(text) {
-    // Strip C0 + DEL control chars (mirrors Java ALLOW_UNESCAPED_CONTROL_CHARS).
     try {
         return JSON.parse(text);
     } catch {}
@@ -191,14 +320,17 @@ function checkResultFile() {
     if (!existsSync(RESULT_PATH)) return false;
     try {
         const data = lenientJsonParse(readFileSync(RESULT_PATH, "utf-8"));
-        const valid = isValidFindingsPayload(data);
+        const valid = isValidObservationsPayload(data);
         if (!valid) {
-            const hasFindings = Array.isArray(data?.findings);
-            const count = hasFindings ? data.findings.length : 0;
-            const validCount = hasFindings ? data.findings.filter(isValidFinding).length : 0;
-            console.error(`[pi-runner] result.json validation failed: findings=${count}, valid=${validCount}`);
+            const hasObservations = Array.isArray(data?.observations);
+            const count = hasObservations ? data.observations.length : 0;
+            const validCount = hasObservations ? data.observations.filter(isValidObservation).length : 0;
+            console.error(`[pi-runner] result.json validation failed: observations=${count}, valid=${validCount}`);
         }
-        return valid;
+        if (!valid) return false;
+        const normalized = data.observations.map(normalizeAndValidateObservation);
+        writeFileSync(RESULT_PATH, JSON.stringify({ observations: normalized }, null, 2));
+        return true;
     } catch (e) {
         console.error(`[pi-runner] result.json parse error: ${e.message}`);
         return false;
@@ -206,30 +338,35 @@ function checkResultFile() {
 }
 
 function maybeWriteResultFile() {
-    if (reviewState.findings.length === 0) return false;
-    writeFileSync(RESULT_PATH, JSON.stringify({ findings: reviewState.findings }, null, 2));
+    if (reviewState.observations.length === 0) return false;
+    writeFileSync(RESULT_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
     return true;
 }
 
 function hasPersistedReviewState() {
-    return reviewState.findings.length > 0;
+    return reviewState.observations.length > 0;
 }
 
+function resolveResultFile() {
+    if (checkResultFile()) return "agent";
+    if (maybeWriteResultFile() && checkResultFile()) return "tool-state";
+    return null;
+}
 
-function appendFindings(findings) {
+function appendObservations(observations) {
     let inserted = 0;
     let duplicates = 0;
-    const seen = new Set(reviewState.findingKeys);
-    for (const rawFinding of findings) {
-        const finding = normalizeFinding(rawFinding);
-        const key = dedupeKeyForFinding(finding);
+    const seen = new Set(reviewState.observationKeys);
+    for (const rawObservation of observations) {
+        const observation = normalizeAndValidateObservation(rawObservation);
+        const key = dedupeKeyForObservation(observation);
         if (seen.has(key)) {
             duplicates++;
             continue;
         }
         seen.add(key);
-        reviewState.findingKeys.push(key);
-        reviewState.findings.push(finding);
+        reviewState.observationKeys.push(key);
+        reviewState.observations.push(observation);
         inserted++;
     }
     persistReviewState();
@@ -237,78 +374,61 @@ function appendFindings(findings) {
     return { inserted, duplicates };
 }
 
-const reportFindingTool = defineTool({
-    name: "report_finding",
-    label: "Report Finding",
+function normalizeAndValidateObservation(rawObservation) {
+    const observation = normalizeObservation(rawObservation);
+    if (!admittedPractices.has(observation.practiceSlug))
+        throw new Error(`unknown practice '${observation.practiceSlug}'`);
+    validateEvidenceSources(observation, availableSourceKinds, artifactSources);
+    validateSearchScope(
+        observation,
+        practiceExhaustiveSources.get(observation.practiceSlug) ?? new Set(),
+        availableSourceKinds,
+    );
+    validateInapplicabilityScope(observation, availableSourceKinds);
+    for (const citation of observation.evidence.citations) {
+        const content = readFileSync(`${CWD}/${citation.artifactPath}`, "utf8");
+        if (!citationMatchesArtifact(citation, content)) {
+            throw new Error(`citation does not match artifact location '${citation.artifactPath}'`);
+        }
+    }
+    return observation;
+}
+
+let measurementClosed = false;
+
+const reportObservationTool = defineTool({
+    name: "report_observation",
+    label: "Report Observation",
     description:
-        "Persist exactly one structured finding immediately so it survives retries and timeouts. Call this as soon as one finding is ready. Do not wait to batch findings.",
+        "Persist exactly one structured observation immediately so it survives retries and timeouts. Call this as soon as one observation is ready. Do not wait to batch observations.",
     parameters: {
         type: "object",
         additionalProperties: false,
-        required: ["finding"],
+        required: ["observation"],
         properties: {
-            finding: findingSchema,
+            observation: observationSchema,
         },
     },
     execute: async (_toolCallId, params) => {
-        const { inserted, duplicates } = appendFindings([params.finding]);
-        const negativeCount = params.finding.assessment === "BAD" ? 1 : 0;
+        if (measurementClosed) {
+            return {
+                content: [{ type: "text", text: "Measurement is closed; this turn may only compose feedback." }],
+                details: { inserted: 0, measurementClosed: true },
+            };
+        }
+        const { inserted, duplicates } = appendObservations([params.observation]);
+        const negativeCount = params.observation.assessment === "BAD" ? 1 : 0;
         return {
             content: [
                 {
                     type: "text",
-                    text: `Stored ${inserted} finding${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative findings in this call: ${negativeCount}.`,
+                    text: `Stored ${inserted} observation${duplicates > 0 ? ` (${duplicates} duplicate skipped)` : ""}. Negative observations in this call: ${negativeCount}.`,
                 },
             ],
-            details: { inserted, duplicates, totalFindings: reviewState.findings.length },
+            details: { inserted, duplicates, totalObservations: reviewState.observations.length },
         };
     },
 });
-
-function extractUsageFromSession(session) {
-    const messages = session.messages || [];
-    let model = null,
-        inputTokens = 0,
-        outputTokens = 0,
-        reasoningTokens = 0,
-        cacheReadTokens = 0,
-        cacheWriteTokens = 0,
-        costUsd = 0,
-        totalCalls = 0,
-        assistantMessages = 0;
-    const stopReasons = {};
-
-    for (const msg of messages) {
-        if (msg.role !== "assistant" || !msg.usage) continue;
-        assistantMessages++;
-        totalCalls++;
-        model = msg.model || model;
-        inputTokens += Number(msg.usage.input || 0);
-        outputTokens += Number(msg.usage.output || 0);
-        // Responses-path shape (output_tokens_details.reasoning_tokens) surfaced by the SDK as
-        // usage.reasoning when the upstream model reports it (e.g. o-series/gpt-5 reasoning models);
-        // absent for chat/completions-only models, so this stays 0 for those.
-        reasoningTokens += Number(msg.usage.reasoning || msg.usage.reasoningTokens || 0);
-        cacheReadTokens += Number(msg.usage.cacheRead || 0);
-        cacheWriteTokens += Number(msg.usage.cacheWrite || 0);
-        costUsd += Number(msg.usage.cost?.total || 0);
-        const sr = msg.stopReason || "unknown";
-        stopReasons[sr] = (stopReasons[sr] || 0) + 1;
-    }
-
-    return {
-        model,
-        inputTokens,
-        outputTokens,
-        reasoningTokens,
-        cacheReadTokens,
-        cacheWriteTokens,
-        costUsd,
-        totalCalls,
-        assistantMessages,
-        stopReasons,
-    };
-}
 
 function accumulateUsage(prev, curr) {
     usageTotals.model = curr.model || usageTotals.model;
@@ -321,28 +441,23 @@ function accumulateUsage(prev, curr) {
     usageTotals.totalCalls += Math.max(0, curr.totalCalls - (prev?.totalCalls || 0));
 }
 
-
 function extractLastAssistantText(sessionState) {
     const messages = sessionState.messages || [];
     for (let i = messages.length - 1; i >= 0; i--) {
         const msg = messages[i];
         if (msg.role !== "assistant") continue;
-        // Pi SDK uses "text" and "thinking" content types — check both
         const textBlocks = (msg.content || []).filter((c) => c.type === "text" || c.type === "thinking");
         const text = textBlocks
             .map((c) => c.text || c.thinking || "")
             .join("")
             .trim();
         if (!text || text.length < 20) continue;
-        // Only return text that looks like it might contain JSON (has braces)
         if (text.includes("{") && text.includes("}")) return text;
     }
     return null;
 }
 
-// Mirror PracticeDetectionResultParser.MAX_RAW_OUTPUT_LENGTH on the Java side: a well-formed agent
-// rawOutput never approaches this, so a larger blob is junk and the brace-scan below would burn the
-// remaining grace window parsing growing slices for nothing.
+// Keep the recovery scan bounded consistently with PracticeDetectionResultParser.
 const MAX_RESCUE_TEXT_LENGTH = 1_000_000;
 
 function tryParseJsonFromText(text) {
@@ -350,31 +465,28 @@ function tryParseJsonFromText(text) {
     if (text.length > MAX_RESCUE_TEXT_LENGTH) return null;
     try {
         const parsed = JSON.parse(text);
-        if (isValidFindingsPayload(parsed)) return parsed;
+        if (isValidObservationsPayload(parsed)) return parsed;
     } catch {}
     const jsonBlockPattern = /```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g;
     let match = jsonBlockPattern.exec(text);
     while (match !== null) {
         try {
             const parsed = JSON.parse(match[1].trim());
-            if (isValidFindingsPayload(parsed)) return parsed;
+            if (isValidObservationsPayload(parsed)) return parsed;
         } catch {}
         match = jsonBlockPattern.exec(text);
     }
-    // Find {"findings": ... } object (tolerates whitespace).
-    const findingsMatch = text.match(/\{\s*"findings"/);
-    if (!findingsMatch || findingsMatch.index === undefined) return null;
-    const braceStart = findingsMatch.index;
-    // Cap the closing-brace scan: a valid payload's outermost `}` is found within the first few
-    // candidates, so an unbounded walk over a brace-heavy blob is pure waste (mirrors the Java twin
-    // extractJsonFromText, which caps at a small fixed number of attempts).
+    const observationsMatch = text.match(/\{\s*"observations"/);
+    if (!observationsMatch || observationsMatch.index === undefined) return null;
+    const braceStart = observationsMatch.index;
+    // Bound brace-heavy recovery input consistently with the Java parser.
     let attempts = 0;
     for (let end = text.indexOf("}", braceStart); end >= 0 && attempts < 256; end = text.indexOf("}", end + 1)) {
         attempts++;
         try {
             const candidate = text.slice(braceStart, end + 1);
             const parsed = JSON.parse(candidate);
-            if (isValidFindingsPayload(parsed)) return parsed;
+            if (isValidObservationsPayload(parsed)) return parsed;
         } catch {}
     }
     return null;
@@ -393,11 +505,10 @@ function tryRescueFromTextResponse(sessionState) {
         );
         return false;
     }
-    console.error(`[pi-runner] Text rescue: extracted ${payload.findings.length} findings`);
+    console.error(`[pi-runner] Text rescue: extracted ${payload.observations.length} observations`);
     writeFileSync(RESULT_PATH, JSON.stringify(payload, null, 2));
     return checkResultFile();
 }
-
 
 function chunkArray(arr, size) {
     const out = [];
@@ -407,8 +518,6 @@ function chunkArray(arr, size) {
     return out;
 }
 
-// Group practice slugs by their area (from index.json), preserving order. A area forms one coherent,
-// focused evaluation; ungrouped practices fall back to their own one-practice group.
 function loadPracticeGroups() {
     try {
         const indexPath = `${CWD}/inputs/practices/index.json`;
@@ -440,30 +549,24 @@ function loadPracticeSlugs() {
     }
 }
 
-// Shared persist-discipline tail — reused by the soft-timeout steer and every retry branch so the wording
-// cannot drift between the sites that emit it.
 const PERSIST_DISCIPLINE =
     `There is no target count and no quota. ` +
-    `For a GOOD (strength) finding or a NOT_APPLICABLE finding, guidance can simply be "No change needed." ` +
-    `Only keep GOOD findings that add real review value. ` +
-    `Do not add derivative low-signal findings when a stronger finding already covers the problem. ` +
+    `Record what you saw; you are not asked for a next step, so do not write one. ` +
+    `Only keep GOOD observations that add real review value. ` +
+    `Do not add derivative low-signal observations when a stronger observation already covers the problem. ` +
     `Use tools only from this point onward. Do not write planning prose or plain-text commentary.`;
 
 function buildRetryScaffold(slugs) {
     if (!slugs.length) return "";
     return (
         `\n\nThe practice slugs you must cover: ${slugs.join(", ")}. ` +
-        `Persist every justified finding with report_finding, one finding per call. ` +
+        `Persist every justified observation with report_observation, one observation per call. ` +
         `There is no target count and no quota. ` +
-        `Only report GOOD findings that add real review value. ` +
-        `Do not emit derivative low-signal findings when a stronger root-cause finding already covers the problem.`
+        `Only report GOOD observations that add real review value. ` +
+        `Do not emit derivative low-signal observations when a stronger root-cause observation already covers the problem.`
     );
 }
 
-
-// Task envelope: /workspace/task.json (TaskEnvelope<PracticeReviewTask>).
-// Exit 42 on schema-version mismatch or unknown kind so the executor can log
-// envelope/image drift distinctly from agent failures.
 const ENVELOPE_MISMATCH_EXIT = 42;
 const SUPPORTED_SCHEMA_VERSION = 1;
 const SUPPORTED_KIND = "practice_review";
@@ -514,15 +617,431 @@ console.error(
         `prNumber=${taskEnvelope.task.pullRequestNumber ?? "?"}`,
 );
 
+const COMPOSITION_REQUEST_PATH = `${CWD}/inputs/feedback-composition.json`;
+const FEEDBACK_PATH = `${OUTPUT}/feedback.json`;
+const COMPOSER_PROMPT_PATH = `${CWD}/feedback-composer.md`;
+const OBSERVATION_HISTORY_PATH = `${CWD}/inputs/history/observations.json`;
+const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
+const COMPOSITION_OBSERVATIONS_PATH = `${CWD}/work/composition/observations.json`;
+let compositionAdmitted = false;
+let admissionDigest = null;
+const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"];
+const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"];
+const WITHHOLD_REASONS = ["NO_MATERIAL_CHANGE", "ALREADY_SAID", "BELOW_BAR"];
+
+// Echo the exact composition inputs so Java validates references against the same snapshot.
+const composedFeedback = { admissionDigest: null, observations: [], preparedThreadKeys: [], units: [] };
+
+function loadCompositionRequest() {
+    try {
+        if (!existsSync(COMPOSITION_REQUEST_PATH)) return null;
+        const request = JSON.parse(readFileSync(COMPOSITION_REQUEST_PATH, "utf8"));
+        if (!request || request.enabled !== true) return null;
+        const channels = {};
+        for (const channel of CHANNELS) {
+            const bounds = request.channels?.[channel];
+            channels[channel] = {
+                enabled: bounds?.enabled === true,
+                maxUnits: Math.max(0, Math.min(Number(bounds?.maxUnits) || 0, 10)),
+            };
+        }
+        if (!CHANNELS.some((channel) => channels[channel].enabled && channels[channel].maxUnits > 0)) return null;
+        const inContextPlacementKinds = (request.inContextPlacementKinds ?? []).filter((kind) =>
+            ["DIFF", "ARTIFACT"].includes(kind),
+        );
+        if (channels.IN_CONTEXT.enabled && inContextPlacementKinds.length === 0) return null;
+        return {
+            channels,
+            inContextPlacementKinds,
+            minDistinctArtifacts: Math.max(2, Number(request.minDistinctArtifacts) || 2),
+        };
+    } catch (e) {
+        console.error(`[pi-runner] composition request unreadable: ${e.message}`);
+        return null;
+    }
+}
+
+// Longitudinal feedback may reference practices found only in this developer's history.
+function composablePracticeSlugs() {
+    const slugs = new Set(admittedPractices);
+    try {
+        if (existsSync(OBSERVATION_HISTORY_PATH)) {
+            const history = JSON.parse(readFileSync(OBSERVATION_HISTORY_PATH, "utf8"));
+            for (const entry of history?.observations ?? []) {
+                if (typeof entry?.practiceSlug === "string" && entry.practiceSlug.trim()) {
+                    slugs.add(entry.practiceSlug);
+                }
+            }
+        }
+    } catch (e) {
+        console.error(`[pi-runner] observation history unreadable for composition: ${e.message}`);
+    }
+    return [...slugs].sort();
+}
+
+// Supersession is limited to unread thread keys present in this snapshot.
+function stagedPreparedThreadKeys() {
+    try {
+        if (!existsSync(PREPARED_FEEDBACK_PATH)) return [];
+        const prepared = JSON.parse(readFileSync(PREPARED_FEEDBACK_PATH, "utf8"));
+        return [
+            ...new Set(
+                (prepared?.prepared ?? [])
+                    .map((entry) => entry?.threadKey)
+                    .filter((key) => typeof key === "string" && key.trim().length > 0),
+            ),
+        ];
+    } catch (e) {
+        console.error(`[pi-runner] prepared feedback unreadable for composition: ${e.message}`);
+        return [];
+    }
+}
+
+// Inline placement requires a citation inside the current diff.
+function leanObservations(observations) {
+    return observations.map((observation) => ({
+        id: observation.id,
+        practiceSlug: observation.practiceSlug,
+        assessment: observation.assessment,
+        severity: observation.severity,
+        anchorable: observation.anchorable,
+        citations: observation.citations.map((citation) => ({
+            index: citation.index,
+            sourceKind: citation.sourceKind,
+            path: citation.path,
+            side: citation.side,
+            startLine: citation.startLine,
+            endLine: citation.endLine,
+            anchorable: citation.anchorable,
+        })),
+    }));
+}
+
+function persistComposedFeedback() {
+    writeFileSync(FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
+}
+
+// The composer references admitted observations; it cannot author verdicts, citations, or locations.
+function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys) {
+    const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
+    const placementKinds = request.inContextPlacementKinds || [];
+    const usedPerChannel = Object.fromEntries(CHANNELS.map((channel) => [channel, 0]));
+    const seen = new Set();
+    const refuse = (text) => ({ content: [{ type: "text", text }], details: { stored: 0 } });
+
+    return defineTool({
+        name: "report_feedback",
+        label: "Report Feedback",
+        description:
+            "Persist exactly one feedback unit for one channel. Call it as soon as one unit is ready, one call " +
+            "per unit. This is an intervention, not a measurement: it takes no presence, assessment, severity " +
+            "or confidence, and no citation you typed yourself.",
+        parameters: {
+            type: "object",
+            additionalProperties: false,
+            required: ["unit"],
+            properties: {
+                unit: {
+                    type: "object",
+                    additionalProperties: false,
+                    required: ["channel", "practiceSlug", "basedOn", "action"],
+                    properties: {
+                        channel: {
+                            type: "string",
+                            enum: enabledChannels,
+                            description: "Which surface this unit is for. Each has its own level and its own rules.",
+                        },
+                        practiceSlug: {
+                            type: "string",
+                            enum: practiceSlugs,
+                            description: "The practice this unit is about. One unit per practice per channel.",
+                        },
+                        basedOn: {
+                            type: "array",
+                            minItems: 1,
+                            items: { type: "string", minLength: 1 },
+                            description:
+                                "What this rests on: ids from this run's observations, and/or 'prior:<practiceSlug>' " +
+                                "for a claim that rests on the staged record rather than on this run.",
+                        },
+                        action: {
+                            type: "string",
+                            enum: ACTIONS,
+                            description:
+                                "NEW to say something; SUPERSEDE to replace a message that is queued and unread; " +
+                                "WITHHOLD to record, with a reason, that you decided to stay quiet.",
+                        },
+                        supersedesThreadKey: {
+                            type: "string",
+                            maxLength: 64,
+                            description:
+                                "Required for SUPERSEDE: the threadKey of an entry in inputs/history/prepared.json. " +
+                                "You may not name a key that is not in that file.",
+                        },
+                        withholdReason: { type: "string", enum: WITHHOLD_REASONS },
+                        title: {
+                            type: "string",
+                            maxLength: 255,
+                            description: "Names the issue in a few words. Never names the person.",
+                        },
+                        body: {
+                            type: "string",
+                            maxLength: 8000,
+                            description:
+                                "IN_APP only: begin with what delta.json says changed, then name the cross-artifact work pattern; never quote a line. Markdown, read verbatim.",
+                        },
+                        nextStep: {
+                            type: "string",
+                            maxLength: 2000,
+                            description:
+                                "IN_CONTEXT: one edit before merging. IN_APP: one repeatable habit for the next piece of work. Name the missing decision, not a heading/template unless the practice requires one; never provide paste-ready prose.",
+                        },
+                        notes: {
+                            type: "object",
+                            additionalProperties: false,
+                            required: ["situation", "capability", "evidenceSummary", "inConversationSignal"],
+                            description:
+                                "IN_CHAT only. Notes TO the mentor, which composes the whole turn itself, later, " +
+                                "with the live conversation in front of it. Write what it needs to know, never a " +
+                                "sentence for it to say: anything phrased as a line of dialogue will be spoken, and " +
+                                "will sound like a script.",
+                            properties: {
+                                situation: {
+                                    type: "string",
+                                    maxLength: 4000,
+                                    description:
+                                        "What you saw: factual, specific, the artifacts named. Your words about them, " +
+                                        "not words for them - third person, never addressed to the developer as 'you', " +
+                                        "and never a judgement of the person.",
+                                },
+                                capability: {
+                                    type: "string",
+                                    maxLength: 2000,
+                                    description:
+                                        "The understanding or self-check this conversation should support. State the capability, not a solution such as a required heading/template, and not a question, script, diagnosis, or fixed tactic.",
+                                },
+                                evidenceSummary: {
+                                    type: "string",
+                                    maxLength: 4000,
+                                    description:
+                                        "A concise account of the artifacts and observations that ground this note. " +
+                                        "Summarise rather than inventing a quote; the original observation evidence is " +
+                                        "staged separately for the mentor to inspect.",
+                                },
+                                inConversationSignal: {
+                                    type: "string",
+                                    maxLength: 2000,
+                                    description:
+                                        "A sign detectable before the conversation ends: a distinction, decision, question, or self-check the developer can articulate. Not a promise, future artifact, message text, or compliance target.",
+                                },
+                            },
+                        },
+                        placement: {
+                            description:
+                                "IN_CONTEXT only. DIFF places a note at one verified observation citation. " +
+                                "ARTIFACT places it in the issue or change summary without inventing a line.",
+                            oneOf: placementKinds.map((kind) =>
+                                kind === "DIFF"
+                                    ? {
+                                          type: "object",
+                                          additionalProperties: false,
+                                          required: ["kind", "observationId", "citationIndex"],
+                                          properties: {
+                                              kind: { type: "string", enum: ["DIFF"] },
+                                              observationId: { type: "string", minLength: 1 },
+                                              citationIndex: { type: "integer", minimum: 0 },
+                                          },
+                                      }
+                                    : {
+                                          type: "object",
+                                          additionalProperties: false,
+                                          required: ["kind"],
+                                          properties: { kind: { type: "string", enum: ["ARTIFACT"] } },
+                                      },
+                            ),
+                        },
+                    },
+                },
+            },
+        },
+        execute: async (_toolCallId, params) => {
+            if (!compositionAdmitted) {
+                return refuse("Feedback composition opens only after Java admits the completed observations.");
+            }
+            const unit = params.unit;
+            const observationsById = new Map(observations.map((observation) => [observation.id, observation]));
+            const bounds = request.channels[unit.channel];
+            if (!bounds?.enabled) {
+                return refuse(`${unit.channel} is not a lane this run may write for; skipped.`);
+            }
+            const key = `${unit.channel}:${unit.practiceSlug}`;
+            if (seen.has(key)) {
+                return refuse(`Already have a ${unit.channel} unit for ${unit.practiceSlug}; skipped.`);
+            }
+            if (usedPerChannel[unit.channel] >= bounds.maxUnits) {
+                return refuse(`${unit.channel} cap of ${bounds.maxUnits} reached; skipped.`);
+            }
+            const rejection = validateUnit(unit, observationsById, preparedThreadKeys, placementKinds);
+            if (rejection) {
+                return refuse(rejection);
+            }
+            seen.add(key);
+            usedPerChannel[unit.channel]++;
+            composedFeedback.units.push(unit);
+            persistComposedFeedback();
+            return {
+                content: [
+                    {
+                        type: "text",
+                        text: `Stored a ${unit.channel} unit for ${unit.practiceSlug} (${unit.action}). ${usedPerChannel[unit.channel]}/${bounds.maxUnits} used on that lane.`,
+                    },
+                ],
+                details: { stored: 1, channel: unit.channel, total: composedFeedback.units.length },
+            };
+        },
+    });
+}
+
+// Enforce snapshot-dependent constraints here for fast model correction; Java rechecks them.
+function validateUnit(unit, observationsById, preparedThreadKeys, placementKinds) {
+    const invalidEvidence = unit.basedOn.find((reference) => {
+        if (reference === `prior:${unit.practiceSlug}`) return false;
+        return observationsById.get(reference)?.practiceSlug !== unit.practiceSlug;
+    });
+    if (invalidEvidence) {
+        return `Evidence '${invalidEvidence}' does not name an admitted observation for ${unit.practiceSlug}; skipped.`;
+    }
+    if (unit.action === "WITHHOLD") {
+        if (!unit.withholdReason) return "WITHHOLD needs a withholdReason; skipped.";
+        return null;
+    }
+    if (!unit.title?.trim()) return "A unit that is not a WITHHOLD needs a title; skipped.";
+    if (unit.action === "SUPERSEDE") {
+        if (!unit.supersedesThreadKey) return "SUPERSEDE needs a supersedesThreadKey; skipped.";
+        if (!preparedThreadKeys.includes(unit.supersedesThreadKey)) {
+            return `No queued message has threadKey '${unit.supersedesThreadKey}'; it must come from inputs/history/prepared.json. Skipped.`;
+        }
+    }
+    if (unit.channel === "IN_CHAT") {
+        if (unit.body || unit.nextStep) {
+            return "IN_CHAT takes notes{situation,capability,evidenceSummary,inConversationSignal}, not body/nextStep - nothing on this lane is read out; skipped.";
+        }
+        if (!unit.notes?.situation?.trim()) return "IN_CHAT needs notes.situation; skipped.";
+        if (!unit.notes?.capability?.trim()) return "IN_CHAT needs notes.capability; skipped.";
+        if (!unit.notes?.evidenceSummary?.trim()) return "IN_CHAT needs notes.evidenceSummary; skipped.";
+        if (!unit.notes?.inConversationSignal?.trim()) return "IN_CHAT needs notes.inConversationSignal; skipped.";
+        if (unit.placement) return "Only IN_CONTEXT units may carry a placement; skipped.";
+        return null;
+    }
+    if (unit.notes) return "Only IN_CHAT units may carry a notes block; skipped.";
+    if (!unit.nextStep?.trim()) return `${unit.channel} needs a nextStep; skipped.`;
+    if (unit.channel === "IN_APP") {
+        if (!unit.body?.trim()) return "IN_APP needs a body; skipped.";
+        if (unit.placement) return "Only IN_CONTEXT units may carry a placement; skipped.";
+        const normalizedBody = normalizeQuotedText(unit.body);
+        const repeatsCurrentEvidence = unit.basedOn.some((id) =>
+            (observationsById.get(id)?.citations ?? []).some((citation) => {
+                const quote = normalizeQuotedText(citation.quote ?? "");
+                return quote.length >= 12 && normalizedBody.includes(quote);
+            }),
+        );
+        if (repeatsCurrentEvidence) {
+            return "IN_APP describes a cross-artifact pattern; do not copy a current artifact quote into it. Skipped.";
+        }
+        return null;
+    }
+    if (unit.body) return "IN_CONTEXT takes title, placement, and nextStep only; skipped.";
+    if (!unit.placement) return "IN_CONTEXT needs a DIFF or ARTIFACT placement; skipped.";
+    if (!placementKinds.includes(unit.placement.kind)) {
+        return `${unit.placement.kind} placement is unavailable on this artifact; skipped.`;
+    }
+    if (unit.placement.kind === "ARTIFACT") {
+        if (unit.placement.observationId != null || unit.placement.citationIndex != null) {
+            return "ARTIFACT placement takes no observationId or citationIndex; skipped.";
+        }
+        const grounded = unit.basedOn.some((id) => observationsById.get(id)?.practiceSlug === unit.practiceSlug);
+        if (!grounded) {
+            return "ARTIFACT placement must be based on a current observation for this practice; skipped.";
+        }
+        return null;
+    }
+    if (unit.placement.kind !== "DIFF") return "Unknown IN_CONTEXT placement kind; skipped.";
+    if (!unit.placement.observationId || !Number.isInteger(unit.placement.citationIndex)) {
+        return "DIFF placement needs observationId and citationIndex; skipped.";
+    }
+    const observation = observationsById.get(unit.placement.observationId);
+    if (!observation) return `No observation '${unit.placement.observationId}' in this run; skipped.`;
+    const citation = observation.citations[unit.placement.citationIndex];
+    if (!citation) return `Observation '${observation.id}' has no citation ${unit.placement.citationIndex}; skipped.`;
+    if (!citation.anchorable) {
+        return `Citation ${unit.placement.citationIndex} of '${observation.id}' is not on this change's diff, so no note can be placed on it. Skipped.`;
+    }
+    return null;
+}
+
+function normalizeQuotedText(value) {
+    return value
+        .normalize("NFKC")
+        .replace(/[“”„‟]/g, '"')
+        .replace(/[‘’‚‛]/g, "'")
+        .replace(/\s+/g, " ")
+        .trim()
+        .toLowerCase();
+}
+
+function buildCompositionTurn(request, observations) {
+    const lanes = CHANNELS.filter((channel) => request.channels[channel].enabled)
+        .map((channel) => `${channel} (at most ${request.channels[channel].maxUnits})`)
+        .join(", ");
+    const closed = CHANNELS.filter((channel) => !request.channels[channel].enabled);
+    const anchorable = observations.filter((observation) => observation.anchorable).length;
+    return (
+        `## This turn\n` +
+        `The review just finished. Its ${observations.length} measurement(s) are in ` +
+        `\`work/composition/observations.json\`; ${anchorable} of them cite a line inside this change and can ` +
+        `therefore carry a note on the work. Read that file first, then the history.\n\n` +
+        `Lanes open this turn: ${lanes}.` +
+        (closed.length > 0 ? ` Closed this turn, so write nothing for them: ${closed.join(", ")}.` : "") +
+        (request.channels.IN_CONTEXT.enabled
+            ? ` IN_CONTEXT placements available here: ${request.inContextPlacementKinds.join(", ")}.`
+            : "") +
+        `\nA pattern claim needs at least ${request.minDistinctArtifacts} distinct pieces of work.\n\n` +
+        `Persist each unit with report_feedback as soon as it is ready. Writing nothing on a lane is a ` +
+        `correct and common outcome; say in one line why, and stop.`
+    );
+}
+
+async function admitObservations() {
+    const response = await fetch(`${process.env.LLM_PROXY_URL}/admit-observations`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${process.env.LLM_PROXY_TOKEN}`, "content-type": "application/json" },
+        body: JSON.stringify({ schemaVersion: 1, observations: reviewState.observations }),
+    });
+    if (!response.ok) throw new Error(`observation admission failed: HTTP ${response.status}`);
+    const admitted = await response.json();
+    if (
+        admitted?.schemaVersion !== 1 ||
+        typeof admitted?.admissionDigest !== "string" ||
+        !Array.isArray(admitted?.observations)
+    ) {
+        throw new Error("observation admission returned an invalid contract");
+    }
+    reviewState.observations.splice(0, reviewState.observations.length, ...admitted.observations);
+    admissionDigest = admitted.admissionDigest;
+    compositionAdmitted = true;
+    composedFeedback.admissionDigest = admissionDigest;
+    composedFeedback.observations = leanObservations(reviewState.observations);
+    mkdirSync(`${CWD}/work/composition`, { recursive: true });
+    writeFileSync(COMPOSITION_OBSERVATIONS_PATH, JSON.stringify({ observations: reviewState.observations }, null, 2));
+}
+
 async function main() {
     console.error(`[pi-runner] Embedded SDK mode`);
     console.error(
         `[pi-runner] Budget: total=${AGENT_BUDGET_MS}ms, initial=${INITIAL_TIMEOUT_MS}ms (soft=${SOFT_TIMEOUT_MS}ms), retry=${RETRY_TIMEOUT_MS}ms`,
     );
 
-    // `tools` is an allowlist of tool *names* (Pi 0.74+ filters customTools through the same
-    // allowlist), so both built-in and custom tool names must appear here. Edit/write are omitted
-    // — findings are persisted only via report_finding.
+    // Pi filters custom tools through this allowlist; omit filesystem mutation tools.
     const settingsManager = SettingsManager.create(CWD, AGENT_DIR);
     const sessionManager = SessionManager.inMemory();
     const authStorage = AuthStorage.create();
@@ -543,18 +1062,22 @@ async function main() {
         console.error(`[pi-runner] hephaestus provider NOT registered — missing pi-provider.json or proxy env vars`);
     }
 
+    const compositionRequest = loadCompositionRequest();
+    const preparedThreadKeys = stagedPreparedThreadKeys();
+    const feedbackTool = compositionRequest
+        ? buildFeedbackTool(composablePracticeSlugs(), compositionRequest, reviewState.observations, preparedThreadKeys)
+        : null;
     const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,
         agentDir: AGENT_DIR,
-        tools: ["read", "bash", "grep", "report_finding"],
-        customTools: [reportFindingTool],
+        tools: ["read", "bash", "grep", "report_observation", ...(feedbackTool ? ["report_feedback"] : [])],
+        customTools: [reportObservationTool, ...(feedbackTool ? [feedbackTool] : [])],
         sessionManager,
         settingsManager,
         authStorage,
         modelRegistry,
     });
-    // Extension load failures are silent in Pi — surface them so the agent doesn't fall through
-    // to a built-in provider's default endpoint (e.g. api.openai.com).
+    // Fail closed: Pi otherwise silently falls back to a built-in provider.
     if (extensionsResult?.extensions?.length) {
         for (const ext of extensionsResult.extensions) {
             console.error(`[pi-runner] extension loaded: ${ext.path}`);
@@ -566,19 +1089,39 @@ async function main() {
         }
     }
 
-    // ── Attempt 1: Initial analysis ──────────────────────────────
+    async function completeWithAdmittedComposition() {
+        measurementClosed = true;
+        await admitObservations();
+        const result = JSON.parse(readFileSync(RESULT_PATH, "utf8"));
+        result.admissionDigest = admissionDigest;
+        writeFileSync(RESULT_PATH, JSON.stringify(result));
+        if (!compositionRequest || reviewState.observations.length === 0) return;
+        const instructions = readFileSync(COMPOSER_PROMPT_PATH, "utf8");
+        const compositionTimer = setTimeout(() => {
+            console.error(`[pi-runner] Composition timeout — preserving observations and composed units so far`);
+            session.abort().catch((error) => console.error(`[pi-runner] composition abort failed: ${error.message}`));
+        }, COMPOSITION_TIMEOUT_MS);
+        try {
+            await session.prompt(
+                `${instructions}\n\n${buildCompositionTurn(compositionRequest, reviewState.observations)}`,
+            );
+        } finally {
+            clearTimeout(compositionTimer);
+        }
+        persistComposedFeedback();
+    }
+
 
     let softTimeoutFired = false;
     let hardAborted = false;
     let prevUsage = null;
 
-    // Soft nudge: steer the agent to persist findings before the hard timeout aborts.
     const softTimer = setTimeout(() => {
         softTimeoutFired = true;
         console.error(`[pi-runner] Soft timeout fired — nudging agent to persist review state`);
         const steerMessage =
             `Stop analyzing and persist output now. ` +
-            `Use report_finding immediately for any finding you already have, one finding per call. ` +
+            `Use report_observation immediately for any observation you already have, one observation per call. ` +
             PERSIST_DISCIPLINE;
         session.steer(steerMessage).catch((err) => console.error(`[pi-runner] steer failed: ${err.message}`));
     }, SOFT_TIMEOUT_MS);
@@ -590,11 +1133,14 @@ async function main() {
     }, INITIAL_TIMEOUT_MS);
 
     const events = [];
+    const streamUsage = newUsageLedger();
     const unsubscribe = session.subscribe((event) => {
         if (event.type === "tool_execution_start") {
             console.error(`[pi-runner] tool: ${event.toolName ?? "?"}`);
         }
         if (event.type === "message_end" && event.message?.role === "assistant") {
+            // Compaction removes messages but does not undo their token usage.
+            addAssistantUsage(streamUsage, event.message);
             const stopReason = event.message.stopReason;
             const types = (event.message.content || []).map((c) => c.type);
             const toolCalls = types.filter((t) => t === "tool_use" || t === "tool_call").length;
@@ -610,18 +1156,11 @@ async function main() {
     console.error(`[pi-runner] Starting initial analysis`);
     const startMs = Date.now();
 
-    // Fan-out: a single agent turn cannot reliably evaluate many practices — on a large diff it runs out
-    // of budget and skips most, and a long all-criteria bundle mid-context degrades recall. Instead we keep
-    // ONE session (it reads the diff once) and drive it through the practices in focused turns, ONE PER AREA
-    // (a coherent 2-4 practice group); each turn reads only that area's per-practice criteria. report_finding
-    // accumulates across turns. A coverage gate then re-prompts any practice no turn reported, so every active
-    // practice gets a finding. The overall hard timeout + watchdog bound total time; turns stop when it aborts.
     const allSlugs = loadPracticeSlugs();
     const batchSize = Number(process.env.PI_PRACTICE_BATCH_SIZE) || 6;
     const groups = loadPracticeGroups();
     const batches = [];
     if (groups.length > 0) {
-        // One batch per area; sub-chunk a area that exceeds batchSize so context stays bounded.
         for (const g of groups) {
             for (const chunk of chunkArray(g.slugs, batchSize)) batches.push(chunk);
         }
@@ -642,8 +1181,8 @@ async function main() {
             const readHint = `Read inputs/practices/${batch.length === 1 ? `${batch[0]}.md` : "<slug>.md for each"}`;
             const batchPrompt =
                 bi === 0
-                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`
-                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_finding (one call per finding): ${batch.join(", ")}.`;
+                    ? `${prompt}\n\n## Scope for this turn\n${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`
+                    : `Continue the SAME review. Using the diff and context you ALREADY read (do NOT re-read the diff), ${readHint} and evaluate ONLY these practices, persisting each with report_observation (one call per observation): ${batch.join(", ")}.`;
             try {
                 await session.prompt(batchPrompt);
             } catch (err) {
@@ -653,24 +1192,23 @@ async function main() {
             console.error(`[pi-runner] turn ${bi + 1}/${batches.length} complete (slugs=${batch.length})`);
         }
 
-        // Coverage gate: every active practice must get a finding. Re-prompt the ones no turn reported.
         if (!hardAborted && allSlugs.length > 0) {
-            const covered = new Set(reviewState.findings.map((f) => f.practiceSlug).filter(Boolean));
+            const covered = new Set(reviewState.observations.map((f) => f.practiceSlug).filter(Boolean));
             const missing = allSlugs.filter((s) => !covered.has(s));
             if (missing.length > 0) {
                 console.error(`[pi-runner] Coverage gate: ${missing.length} unreported -> ${missing.join(", ")}`);
                 const gatePrompt =
-                    `Coverage check. You have NOT yet reported a finding for these practices: ${missing.join(", ")}. ` +
+                    `Coverage check. You have NOT yet reported an observation for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
-                    `(do NOT re-read the diff). Persist a finding for EVERY one with report_finding, one call per finding ` +
-                    `— set presence (PRESENT/ABSENT/NOT_APPLICABLE) and, unless NOT_APPLICABLE, assessment (GOOD/BAD).`;
+                    `(do NOT re-read the diff). Persist an observation for EVERY one with report_observation, one call per observation ` +
+                    `— choose a BEHAVIOR_* outcome when evidence settles the claim. Use NO_REVIEW_OCCASION only when a prerequisite situation explicitly named by the practice did not occur; target-behaviour absence is BEHAVIOR_ABSENT_*, never a decline. Use INSUFFICIENT_EVIDENCE only when the available evidence was read but does not settle the claim. Fill exactly the evidence branch the tool schema requires.`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {
                     console.error(`[pi-runner] coverage-gate prompt error: ${err.message}`);
                 }
                 const stillMissing = allSlugs.filter(
-                    (s) => !new Set(reviewState.findings.map((f) => f.practiceSlug)).has(s),
+                    (s) => !new Set(reviewState.observations.map((f) => f.practiceSlug)).has(s),
                 );
                 console.error(
                     `[pi-runner] Coverage gate done: ${allSlugs.length - stillMissing.length}/${allSlugs.length} practices covered`,
@@ -685,7 +1223,7 @@ async function main() {
     }
 
     const initialDurationMs = Date.now() - startMs;
-    const initialUsage = extractUsageFromSession(session.state);
+    const initialUsage = extractUsageFromSession(session.state, streamUsage);
     accumulateUsage(null, initialUsage);
     prevUsage = initialUsage;
 
@@ -706,22 +1244,22 @@ async function main() {
         `[pi-runner] Initial: ${(initialDurationMs / 1000).toFixed(1)}s, calls=${initialUsage.totalCalls}, softTimeout=${softTimeoutFired}, hardAbort=${hardAborted}, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
-    if (checkResultFile()) {
+    const resultFileSource = resolveResultFile();
+
+    if (resultFileSource === "agent") {
         console.error(`[pi-runner] SUCCESS: result.json valid after initial run`);
+        await completeWithAdmittedComposition();
         unsubscribe();
         process.exit(0);
     }
-
-    maybeWriteResultFile();
-    if (checkResultFile()) {
+    if (resultFileSource === "tool-state") {
         console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after initial run`);
+        await completeWithAdmittedComposition();
         unsubscribe();
         process.exit(0);
     }
 
-    // ── Validate & retry: if durable state is incomplete, re-prompt the agent ──
 
-    // Extract what the agent actually said — log message structure for diagnostics
     const lastMsgs = (session.state.messages || []).filter((m) => m.role === "assistant").slice(-2);
     for (const m of lastMsgs) {
         const types = (m.content || []).map((c) => c.type);
@@ -740,6 +1278,7 @@ async function main() {
         );
         if (tryRescueFromTextResponse(session.state)) {
             console.error(`[pi-runner] SUCCESS: rescued valid JSON from agent text`);
+            await completeWithAdmittedComposition();
             unsubscribe();
             process.exit(0);
         }
@@ -760,26 +1299,28 @@ async function main() {
 
     const retryStartMs = Date.now();
 
-    // Recovery strategy varies by failure mode (timeout vs no-persist vs nothing-said).
     let retryPrompt;
     if (softTimeoutFired || hardAborted) {
         retryPrompt =
             `You ran out of time before finalizing the review. ` +
             `Do NOT restart analysis from scratch. Do NOT read more files. ` +
-            `Persist every remaining justified finding with report_finding immediately, one finding per call. ` +
-            PERSIST_DISCIPLINE + ` ` +
+            `Persist every remaining justified observation with report_observation immediately, one observation per call. ` +
+            PERSIST_DISCIPLINE +
+            ` ` +
             scaffold;
     } else if (agentText) {
         retryPrompt =
             `You completed analysis but did not persist the final review output. ` +
-            `Do NOT read any more files. Persist the remaining findings with report_finding NOW, one finding per call. ` +
-            PERSIST_DISCIPLINE + ` ` +
+            `Do NOT read any more files. Persist the remaining observations with report_observation NOW, one observation per call. ` +
+            PERSIST_DISCIPLINE +
+            ` ` +
             scaffold;
     } else {
         retryPrompt =
             `You did not persist the review output. The review will fail unless you persist it NOW. ` +
-            `Use your analysis from above. Do NOT read more files. Persist findings with report_finding immediately, one finding per call. ` +
-            PERSIST_DISCIPLINE + ` ` +
+            `Use your analysis from above. Do NOT read more files. Persist observations with report_observation immediately, one observation per call. ` +
+            PERSIST_DISCIPLINE +
+            ` ` +
             scaffold;
     }
 
@@ -794,7 +1335,7 @@ async function main() {
     }
 
     const retryDurationMs = Date.now() - retryStartMs;
-    const retryUsage = extractUsageFromSession(session.state);
+    const retryUsage = extractUsageFromSession(session.state, streamUsage);
     accumulateUsage(prevUsage, retryUsage);
     prevUsage = retryUsage;
 
@@ -814,22 +1355,25 @@ async function main() {
         `[pi-runner] Retry: ${(retryDurationMs / 1000).toFixed(1)}s, resultFile=${existsSync(RESULT_PATH)}, reviewState=${hasPersistedReviewState()}`,
     );
 
-    unsubscribe();
-
     if (checkResultFile()) {
         console.error(`[pi-runner] SUCCESS: result.json valid after retry`);
+        await completeWithAdmittedComposition();
+        unsubscribe();
         process.exit(0);
     }
 
     maybeWriteResultFile();
     if (checkResultFile()) {
         console.error(`[pi-runner] SUCCESS: composed result.json from persisted tool state after retry`);
+        await completeWithAdmittedComposition();
+        unsubscribe();
         process.exit(0);
     }
 
-    // Last attempt: try to rescue from text
     if (tryRescueFromTextResponse(session.state)) {
         console.error(`[pi-runner] SUCCESS: rescued valid JSON from text`);
+        await completeWithAdmittedComposition();
+        unsubscribe();
         process.exit(0);
     }
 

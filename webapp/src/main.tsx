@@ -28,8 +28,7 @@ import reportWebVitals from "./reportWebVitals";
 
 // No default request timeout, deliberately: it would have to clear the slowest honest response (a
 // workspace purge is unbounded by design), and aborting a mutation does not abort the server — it
-// would report a write the server went on to apply as a failure. Requests that can hang stay
-// dismissible where they are shown.
+// would report a write the server went on to apply as a failure.
 client.setConfig({
 	baseUrl: environment.serverUrl,
 	// Cookie-session auth (ADR 0017): the __Host-HEPHAESTUS_AT cookie is sent automatically

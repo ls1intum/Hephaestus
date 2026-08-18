@@ -1,17 +1,23 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -23,60 +29,28 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Cross-context, best-effort provider that gives the agent a WHOLE-PROJECT inventory — every issue and
- * every pull request the request can be scoped to, not just the focal artifact — under
- * {@code inputs/context/project_inventory.json}.
- *
- * <p><b>Why this exists.</b> The focal providers ({@link PullRequestContentSource},
- * {@link IssueContentSource}) and {@link LinkedWorkItemContentSource} de-blind the artifact under
- * review and the work-items it explicitly references. But several practices are inherently
- * <em>cross-artifact</em> — judging "is this issue a duplicate of an existing one?", "is this issue
- * already being worked in an open PR?", "is the issue scoped to a single concern, or does it overlap others?",
- * "does this change trace to an open issue?" — needs awareness of what ELSE exists in the project. That
- * signal lives in SQL and is absent from the mounted worktree, so it is genuine integration content the
- * agent cannot reconstruct by reading the repo.
- *
- * <p><b>Telescope, not cage.</b> The inventory is a compact INDEX (number, title, state, author, milestone,
- * url) — never full bodies. Titles + state are the cross-artifact signal; the agent opens the focal
- * artifact for depth and follows {@code linked_work_items.json} for resolved bodies. It does NOT carry the
- * PR-to-issue closing-reference edge (not synced), so "already covered by an open PR" is answerable only via
- * title/number overlap (a candidate signal, not a hard link). Capped at {@link #MAX_PER_TYPE} newest entries
- * per type so the file stays bounded (tens of KB) even on large repos; a {@code truncated} flag tells the agent the
- * listing is not exhaustive (so the absence of a match does NOT prove uniqueness).
- *
- * <p><b>EXTRACT+LOAD only.</b> Per the {@link ContentSource} contract this connector emits raw native
- * rows and names no practice and no observation — which artifacts overlap, duplicate, or trace is the agent's
- * (and the per-practice precompute's) Transform to compute.
- *
- * <p><b>Repository-scoped vs. workspace-scoped.</b> This provider is pure SQL — it never touches the mounted
- * worktree — so its applicability boundary is the SQL scope it can resolve, not a clone. A
- * {@link ContextRequest.PracticeReviewRequest}/{@link ContextRequest.IssueReviewRequest} names one
- * {@code repository_id} and gets that repository's inventory with the focal artifact excluded. A
- * {@link ContextRequest.ConversationReviewRequest} is not anchored to any single repository, so it instead
- * gets the inventory aggregated across every repository monitored by the job's workspace (no focal artifact
- * to exclude). Providers that DO require a mounted clone (diff, file tree, inline review threads) stay
- * {@code PracticeReviewRequest}-only — that boundary is decided in their own {@code supports()}, not here.
- *
- * <p>Best-effort ({@link #required()} == {@code false}): a missing repository/workspace scope or any failure
- * degrades to writing nothing and never aborts the job.
- */
 @Component
 @Order(210)
-public class WorkspaceInventoryContentSource implements ContentSource {
+public class WorkspaceInventoryContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("workspace.project-inventory");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(WorkspaceInventoryContentSource.class);
 
-    /** Output filename under {@link ContentSource#OUTPUT_PREFIX}. */
     static final String OUTPUT_FILE = OUTPUT_PREFIX + "project_inventory.json";
 
-    /** Newest-N cap per artifact type; keeps the index bounded (tens of KB) on large repos. */
     static final int MAX_PER_TYPE = 200;
 
-    /**
-     * Cap on repositories scanned for a workspace-wide (conversation) build — bounds query fan-out on a
-     * workspace that monitors many repositories. A workspace beyond this size reports {@code truncated=true}.
-     */
     static final int MAX_REPOS_SCANNED = 25;
 
     private final ObjectMapper objectMapper;
@@ -97,11 +71,6 @@ public class WorkspaceInventoryContentSource implements ContentSource {
     }
 
     @Override
-    public String originId() {
-        return "scm";
-    }
-
-    @Override
     public boolean supports(ContextRequest request) {
         return (
             request instanceof ContextRequest.PracticeReviewRequest ||
@@ -110,7 +79,6 @@ public class WorkspaceInventoryContentSource implements ContentSource {
         );
     }
 
-    /** Cross-context enrichment: never abort the job if the inventory cannot be built. */
     @Override
     public boolean required() {
         return false;
@@ -126,8 +94,30 @@ public class WorkspaceInventoryContentSource implements ContentSource {
                 contributeRepositoryScoped(request, files);
             }
         } catch (Exception e) {
-            // Best-effort: cross-context enrichment must never fail the job.
-            log.warn("WorkspaceInventoryContentSource failed, continuing without inventory: {}", e.getMessage());
+            throw new EvidenceCollectionException("Workspace-inventory collection failed", e);
+        }
+    }
+
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        byte[] inventory = captured.files().get(OUTPUT_FILE);
+        if (!selectedKinds.contains(KIND) || inventory == null) {
+            return captured;
+        }
+        try {
+            JsonNode counts = objectMapper.readTree(inventory).path("counts");
+            boolean empty = counts.path("issuesListed").asInt() == 0 && counts.path("pullRequestsListed").asInt() == 0;
+            return new EvidenceContribution(
+                captured.files(),
+                captured.completeness(),
+                captured.immutableIdentities(),
+                captured.observedAt(),
+                captured.sourceEffectiveAt(),
+                Map.of(KIND, empty ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+            );
+        } catch (Exception exception) {
+            throw new IllegalStateException("Serialized workspace inventory could not be read", exception);
         }
     }
 
@@ -139,14 +129,20 @@ public class WorkspaceInventoryContentSource implements ContentSource {
         }
         JsonNode m = job.getMetadata();
         Long repositoryId = m == null ? null : MetaJson.optLong(m, "repository_id");
+        // Without the focal repository the inventory cannot say what else exists, and an empty
+        // inventory reads as "this workspace tracks no work" — the inverse of the truth.
         if (repositoryId == null) {
-            return;
+            throw new EvidenceCollectionException("Workspace-inventory collection has no repository_id", null);
         }
 
         // Identify the focal artifact so the agent can tell "what else exists" from "the one under review".
-        String focalType = request instanceof ContextRequest.IssueReviewRequest ? "ISSUE" : "PULL_REQUEST";
+        String focalType = (
+            request instanceof ContextRequest.IssueReviewRequest ? ArtifactKinds.ISSUE : ArtifactKinds.PULL_REQUEST
+        ).value();
         Integer focalNumber =
-            m == null ? null : MetaJson.optInteger(m, focalType.equals("ISSUE") ? "issue_number" : "pr_number");
+            m == null
+                ? null
+                : MetaJson.optInteger(m, focalType.equals(ArtifactKinds.ISSUE.value()) ? "issue_number" : "pr_number");
 
         PageRequest cap = PageRequest.of(0, MAX_PER_TYPE);
         List<Issue> issues = issueRepository.findIssueInventoryByRepositoryId(repositoryId, cap);
@@ -154,10 +150,6 @@ public class WorkspaceInventoryContentSource implements ContentSource {
             repositoryId,
             cap
         );
-
-        if (issues.isEmpty() && pullRequests.isEmpty()) {
-            return;
-        }
 
         ObjectNode root = objectMapper.createObjectNode();
         String repositoryName = m == null ? null : MetaJson.optString(m, "repository_full_name");
@@ -177,9 +169,19 @@ public class WorkspaceInventoryContentSource implements ContentSource {
         );
 
         ArrayNode issuesArr = root.putArray("issues");
-        int issuesEmitted = emit(issuesArr, issues, focalType.equals("ISSUE") ? focalNumber : null, false);
+        int issuesEmitted = emit(
+            issuesArr,
+            issues,
+            focalType.equals(ArtifactKinds.ISSUE.value()) ? focalNumber : null,
+            false
+        );
         ArrayNode prsArr = root.putArray("pullRequests");
-        int prsEmitted = emit(prsArr, pullRequests, focalType.equals("PULL_REQUEST") ? focalNumber : null, true);
+        int prsEmitted = emit(
+            prsArr,
+            pullRequests,
+            focalType.equals(ArtifactKinds.PULL_REQUEST.value()) ? focalNumber : null,
+            true
+        );
 
         ObjectNode counts = root.putObject("counts");
         counts.put("issuesListed", issuesEmitted);
@@ -211,9 +213,6 @@ public class WorkspaceInventoryContentSource implements ContentSource {
         }
         long workspaceId = job.getWorkspace().getId();
         List<Repository> repos = repositoryRepository.findAllByWorkspaceMonitors(workspaceId);
-        if (repos.isEmpty()) {
-            return;
-        }
         boolean repoCapHit = repos.size() > MAX_REPOS_SCANNED;
         List<Repository> scanned = repos.size() > MAX_REPOS_SCANNED ? repos.subList(0, MAX_REPOS_SCANNED) : repos;
 
@@ -238,19 +237,18 @@ public class WorkspaceInventoryContentSource implements ContentSource {
             pullRequests = pullRequests.subList(0, MAX_PER_TYPE);
         }
 
-        if (issues.isEmpty() && pullRequests.isEmpty()) {
-            return;
-        }
-
         ObjectNode root = objectMapper.createObjectNode();
         ArrayNode repoNames = root.putArray("repositories");
-        for (Repository repo : repos) {
+        // Only the scanned repositories were searched. Listing the others would show a repository
+        // name with no work items beside it, which reads as an empty repository rather than an
+        // unsearched one.
+        for (Repository repo : scanned) {
             if (repo.getNameWithOwner() != null) {
                 repoNames.add(repo.getNameWithOwner());
             }
         }
         ObjectNode focal = root.putObject("focal");
-        focal.put("type", "CONVERSATION_THREAD");
+        focal.put("type", ArtifactKinds.CONVERSATION_THREAD.value());
         root.put(
             "note",
             "Whole-workspace index of issues and pull requests across every monitored repository (titles + " +

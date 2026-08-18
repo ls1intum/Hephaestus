@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
 import { RecentAuthActivityCard } from "./RecentAuthActivityCard";
 
@@ -51,17 +51,15 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Failed sign-in")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Failed sign-in");
 	},
 };
 
 export const Empty: Story = {
 	args: { events: [] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no activity yet/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/no activity yet/i);
 	},
 };
 
@@ -71,19 +69,17 @@ export const Loading: Story = {
 
 export const LoadFailed: Story = {
 	args: { events: [], error: { status: 500 }, onRetry: fn() },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// The failure must not read as "no activity"; a 5xx is retryable so the affordance shows.
 		await expect(canvas.queryByText(/no activity yet/i)).not.toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+		canvas.getByRole("button", { name: /retry/i });
 	},
 };
 
 /** A 403 cannot be retried into success, so the alert must not offer a button that always fails. */
 export const Forbidden: Story = {
 	args: { events: [], error: { status: 403 }, onRetry: fn() },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
 	},
 };

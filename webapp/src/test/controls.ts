@@ -1,4 +1,22 @@
-import { expect } from "storybook/test";
+import { expect, type within } from "storybook/test";
+
+type Canvas = ReturnType<typeof within>;
+
+/**
+ * A closed Base UI select shows the *label* for its value, looked up from the options.
+ *
+ * When that lookup misses, the trigger falls back to printing the raw value — so asserting the label
+ * is what tells a review form that offers "Pull or merge requests" apart from one that asks an admin
+ * to authorise "scm.pull_request", which is not a decision anyone outside the schema can check.
+ * Worth stating because the fallback is silent: the control still renders, and still reads as filled.
+ */
+export async function expectClosedSelectShows(
+	canvas: Canvas,
+	name: RegExp | string,
+	label: string,
+) {
+	await expect(canvas.getByRole("combobox", { name })).toHaveTextContent(label);
+}
 
 /**
  * SC 4.1.2: `pointer-events-none` blocks the mouse and nothing else, so the contract is the native

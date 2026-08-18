@@ -24,10 +24,9 @@ import org.jspecify.annotations.Nullable;
  *   <li>ISO-8601 timestamps rather than epoch numbers, so a snapshot stays readable years later.</li>
  * </ul>
  *
- * <p>Records serialize their components in declaration order, which is what makes the output stable
- * enough for {@code ConfigAuditDiff} and for no-op suppression to mean anything. Note that {@code jsonb}
- * renormalizes key order at rest, so this determinism holds for the diff (computed pre-insert), not for
- * the bytes on disk.
+ * <p>Records serialize their components in declaration order, which is what makes the diff and no-op
+ * suppression meaningful. That determinism holds only up to the insert: {@code jsonb} renormalizes key
+ * order at rest, so the bytes on disk are not the bytes compared.
  */
 final class ConfigAuditSnapshotMapper {
 

@@ -1,144 +1,71 @@
-import { useQuery } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, WorkflowIcon } from "lucide-react";
-import { useEffect, useId } from "react";
-import { listPracticeReviewsOptions } from "@/api/@tanstack/react-query.gen";
-import type { ReviewRunSummary } from "@/api/types.gen";
-import { STATUS_LABELS, statusBadgeVariant } from "@/components/admin/ai/job-utils";
-import { FilterToolbar } from "@/components/common/FilterToolbar";
+import { WorkflowIcon } from "lucide-react";
+import type { ListPracticeReviewsResponse } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { RelativeTime } from "@/components/common/RelativeTime";
-import { ResultCount } from "@/components/common/ResultCount";
 import { TablePagination } from "@/components/common/TablePagination";
-import { Badge } from "@/components/ui/badge";
+import { REVIEW_STATUS_DEFS } from "@/components/practice-vocabulary/review-status-defs";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldLabel } from "@/components/ui/field";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@/components/ui/item";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
-import {
-	Table,
-	TableBody,
-	TableCaption,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
-import { ReviewArtifact } from "./ReviewArtifact";
-import { FeedbackCountsSummary, FindingCountsSummary } from "./ReviewBadges";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
-import type { RunsSearch } from "./review-search";
-
-const PAGE_SIZE = 20;
-const ACTIVE_REVIEW_POLL_MS = 5_000;
-const STATUSES = ["QUEUED", "RUNNING", "COMPLETED", "FAILED", "TIMED_OUT", "CANCELLED"] as const;
-const STATUS_ITEMS = [
-	{ value: "ALL", label: "All statuses" },
-	...STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status] })),
-] as const;
-
-function isReviewStatus(value: string | null): value is NonNullable<RunsSearch["status"]> {
-	return STATUSES.some((status) => status === value);
-}
+import { ReviewRowList } from "./ReviewRow";
+import { clearedRunFilters, hasRunFilter, ReviewRunFilters } from "./ReviewRunFilters";
+import { ReviewRunRow } from "./ReviewRunRow";
+import { REVIEW_PAGE_SIZE, type RunsSearch } from "./review-search";
 
 export interface ReviewRunsPageProps {
 	workspaceSlug: string;
 	search: RunsSearch;
 	onSearchChange: (patch: Partial<RunsSearch>) => void;
+	/** The page of reviews the current search asked for. Absent until the first answer arrives. */
+	reviews: ListPracticeReviewsResponse | undefined;
+	isLoading: boolean;
+	error: unknown;
+	onRetry: () => void;
 }
 
-export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: ReviewRunsPageProps) {
-	const statusId = useId();
-	const query = useQuery({
-		...listPracticeReviewsOptions({
-			path: { workspaceSlug },
-			query: { page: search.page ?? 0, size: PAGE_SIZE, status: search.status },
-		}),
-		refetchInterval: (result) =>
-			result.state.data?.content?.some(
-				(review) => review.status === "QUEUED" || review.status === "RUNNING",
-			)
-				? ACTIVE_REVIEW_POLL_MS
-				: false,
-	});
-	const reviews = query.data?.content ?? [];
-	const hasFilter = Boolean(search.status);
-	const totalPages = query.data?.page?.totalPages;
-
-	useEffect(() => {
-		if (totalPages !== undefined && search.page && search.page >= totalPages) {
-			onSearchChange({ page: Math.max(0, totalPages - 1) });
-		}
-	}, [onSearchChange, search.page, totalPages]);
+/**
+ * The list of reviews, given its page of results. It neither fetches nor polls: the route asks for
+ * the page the URL names and keeps asking while a review is still running, and this screen only ever
+ * sees the answer — which is why a still-running review looks the same here as anywhere else.
+ */
+export function ReviewRunsPage({
+	workspaceSlug,
+	search,
+	onSearchChange,
+	reviews,
+	isLoading,
+	error,
+	onRetry,
+}: ReviewRunsPageProps) {
+	const rows = reviews?.content ?? [];
+	const hasFilter = hasRunFilter(search);
+	// The toolbar's Reset and the empty state's button are one action, not two copies of it.
+	const reset = () => onSearchChange(clearedRunFilters());
+	// Page one, because a narrowed list is a different list: page 4 of the old one is very likely
+	// past the end of the new one. The screen owns the URL, so the screen owns this — the toolbar
+	// reports the facet the reader changed and nothing else.
+	const patchFilter = (patch: Partial<RunsSearch>) => onSearchChange({ ...patch, page: 0 });
 
 	return (
 		<section aria-label="Practice reviews" className="space-y-4">
-			<FilterToolbar
-				hasFilter={hasFilter}
-				onReset={() => onSearchChange({ status: undefined, page: 0 })}
-				actions={
-					<ResultCount
-						total={query.data?.page?.totalElements}
-						noun={["review", "reviews"]}
-						hasFilter={hasFilter}
-					/>
-				}
-			>
-				<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
-					<FieldLabel htmlFor={statusId} className="text-muted-foreground">
-						Status
-					</FieldLabel>
-					<Select
-						items={STATUS_ITEMS}
-						value={search.status ?? "ALL"}
-						onValueChange={(value) =>
-							onSearchChange({
-								status: isReviewStatus(value) ? value : undefined,
-								page: 0,
-							})
-						}
-					>
-						<SelectTrigger id={statusId} size="sm" className="w-44 max-w-full">
-							<SelectValue />
-						</SelectTrigger>
-						<SelectContent>
-							{STATUS_ITEMS.map((item) => (
-								<SelectItem key={item.value} value={item.value}>
-									{item.label}
-								</SelectItem>
-							))}
-						</SelectContent>
-					</Select>
-				</Field>
-			</FilterToolbar>
-			{query.isError ? (
-				<QueryErrorAlert
-					error={query.error}
-					title="Couldn't load reviews"
-					onRetry={() => query.refetch()}
-				/>
-			) : query.isLoading ? (
-				<ReviewResultsSkeleton label="Loading reviews" />
-			) : reviews.length === 0 ? (
+			<ReviewRunFilters
+				search={search}
+				onPatch={patchFilter}
+				onReset={reset}
+				total={reviews?.page?.totalElements}
+			/>
+			{error != null ? (
+				<QueryErrorAlert error={error} title="Couldn't load reviews" onRetry={onRetry} />
+			) : isLoading ? (
+				<ReviewResultsSkeleton label="Loading reviews" rows={REVIEW_PAGE_SIZE} />
+			) : rows.length === 0 ? (
 				<Empty className="border">
 					<EmptyHeader>
 						<EmptyMedia variant="icon">
@@ -146,179 +73,49 @@ export function ReviewRunsPage({ workspaceSlug, search, onSearchChange }: Review
 						</EmptyMedia>
 						<EmptyTitle>No reviews found</EmptyTitle>
 						<EmptyDescription>
-							{search.status
-								? "Try another status."
-								: "Reviews appear when an enabled practice is triggered or a contributor requests one."}
+							{/* A range can empty this list too, so "never triggered" is not the only reason and
+							    must not be said to a reader who has just picked a window. */}
+							{!hasFilter
+								? "Reviews appear when an enabled practice is triggered or a contributor requests one."
+								: search.status && !search.from && !search.to
+									? `No review is ${REVIEW_STATUS_DEFS[search.status].label.toLowerCase()}. Other reviews may exist under another status.`
+									: "No review matches these filters. Other reviews may exist outside them."}
 						</EmptyDescription>
 					</EmptyHeader>
+					{hasFilter && (
+						<EmptyContent>
+							<Button variant="outline" size="sm" onClick={reset}>
+								Clear all filters
+							</Button>
+						</EmptyContent>
+					)}
 				</Empty>
 			) : (
-				<ReviewList workspaceSlug={workspaceSlug} reviews={reviews} search={search} />
+				<ReviewRowList label="Practice reviews, newest first">
+					{rows.map((review) => (
+						<ReviewRunRow
+							key={review.id}
+							workspaceSlug={workspaceSlug}
+							review={review}
+							search={search}
+						/>
+					))}
+				</ReviewRowList>
 			)}
 			<TablePagination
-				page={query.data?.page?.number ?? search.page ?? 0}
-				totalPages={query.data?.page?.totalPages ?? 0}
+				page={reviews?.page?.number ?? search.page ?? 0}
+				totalPages={reviews?.page?.totalPages ?? 0}
 				renderPageLink={(page, props) => (
 					<Link
 						{...props}
 						to="/w/$workspaceSlug/admin/practices/reviews"
 						params={{ workspaceSlug }}
-						search={{ page: page === 0 ? undefined : page, status: search.status }}
+						// Spread rather than list the filters: page 2 of a filtered list has to stay
+						// filtered, and naming them one by one is what silently dropped the next one.
+						search={{ ...search, page: page === 0 ? undefined : page }}
 					/>
 				)}
 			/>
 		</section>
-	);
-}
-
-function RunFindingSummary({ review }: { review: ReviewRunSummary }) {
-	if (review.status === "COMPLETED" || hasFindingOutput(review)) {
-		return <FindingCountsSummary counts={review.findings} />;
-	}
-	if (review.status === "QUEUED" || review.status === "RUNNING") {
-		return <span className="text-muted-foreground">Pending</span>;
-	}
-	return (
-		<span className="text-muted-foreground">
-			<span aria-hidden>—</span>
-			<span className="sr-only">No findings produced</span>
-		</span>
-	);
-}
-
-function RunFeedbackSummary({ review }: { review: ReviewRunSummary }) {
-	if (review.status === "COMPLETED" || hasFeedbackOutput(review)) {
-		return <FeedbackCountsSummary counts={review.feedback} />;
-	}
-	if (review.status === "QUEUED" || review.status === "RUNNING") {
-		return <span className="text-muted-foreground">Pending</span>;
-	}
-	return (
-		<span className="text-muted-foreground">
-			<span aria-hidden>—</span>
-			<span className="sr-only">No feedback composed</span>
-		</span>
-	);
-}
-
-function hasFindingOutput(review: ReviewRunSummary) {
-	const { strengths, problems, notApplicable } = review.findings;
-	return strengths + problems + notApplicable > 0;
-}
-
-function hasFeedbackOutput(review: ReviewRunSummary) {
-	const { delivered, failed, prepared, superseded, suppressed } = review.feedback;
-	return delivered + failed + prepared + superseded + suppressed > 0;
-}
-
-function RunCardOutputSummary({ review }: { review: ReviewRunSummary }) {
-	const hasOutput = hasFindingOutput(review) || hasFeedbackOutput(review);
-	if (review.status === "COMPLETED" || hasOutput) {
-		return (
-			<>
-				<FindingCountsSummary counts={review.findings} />
-				<FeedbackCountsSummary counts={review.feedback} />
-			</>
-		);
-	}
-	if (review.status === "QUEUED" || review.status === "RUNNING") {
-		return <span className="text-sm text-muted-foreground">Awaiting output</span>;
-	}
-	return <span className="text-sm text-muted-foreground">No output</span>;
-}
-
-function ReviewList({
-	workspaceSlug,
-	reviews,
-	search,
-}: {
-	workspaceSlug: string;
-	reviews: ReviewRunSummary[];
-	search: RunsSearch;
-}) {
-	return (
-		<>
-			<div className="hidden xl:block">
-				<Table containerClassName="rounded-lg border">
-					<TableCaption className="sr-only">Practice reviews, newest first</TableCaption>
-					<TableHeader>
-						<TableRow>
-							<TableHead scope="col">Reviewed work</TableHead>
-							<TableHead scope="col">Status</TableHead>
-							<TableHead scope="col">Findings</TableHead>
-							<TableHead scope="col">Feedback</TableHead>
-							<TableHead scope="col" className="w-32">
-								Created
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{reviews.map((review) => (
-							<TableRow key={review.id}>
-								<TableCell className="max-w-md whitespace-normal align-top">
-									<Link
-										to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
-										params={{ workspaceSlug, jobId: review.id }}
-										search={{ page: search.page, status: search.status }}
-										className="block rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-									>
-										<ReviewArtifact artifact={review.target} />
-									</Link>
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<Badge variant={statusBadgeVariant(review.status)}>
-										{STATUS_LABELS[review.status]}
-									</Badge>
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<RunFindingSummary review={review} />
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<RunFeedbackSummary review={review} />
-								</TableCell>
-								<TableCell className="align-top text-muted-foreground">
-									<RelativeTime value={review.createdAt} />
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-			</div>
-			<ItemGroup className="xl:hidden">
-				{reviews.map((review) => (
-					<div key={review.id} role="listitem">
-						<Item
-							variant="outline"
-							render={
-								<Link
-									to="/w/$workspaceSlug/admin/practices/reviews/$jobId"
-									params={{ workspaceSlug, jobId: review.id }}
-									search={{ page: search.page, status: search.status }}
-								/>
-							}
-						>
-							<ItemContent className="min-w-0">
-								<ItemTitle className="w-full min-w-0 line-clamp-none">
-									<ReviewArtifact artifact={review.target} variant="label" display="full" />
-								</ItemTitle>
-								<ItemDescription>{review.target.title}</ItemDescription>
-								<div className="mt-1">
-									<Badge variant={statusBadgeVariant(review.status)}>
-										{STATUS_LABELS[review.status]}
-									</Badge>
-								</div>
-								<RunCardOutputSummary review={review} />
-								<span className="text-xs text-muted-foreground">
-									Created <RelativeTime value={review.createdAt} />
-								</span>
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
-							</ItemActions>
-						</Item>
-					</div>
-				))}
-			</ItemGroup>
-		</>
 	);
 }

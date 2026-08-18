@@ -4,7 +4,7 @@
   "workspaceId" : 99,
   "task" : {
     "kind" : "practice_review",
-    "prompt" : "Review merge request #42 in owner/repo. Read the context files, then persist every justified finding via the report_finding tool. Follow .pi/AGENTS.md for the schema and rules.",
+    "prompt" : "Review merge request #42 in owner/repo. Read the context files, then persist every justified observation via the report_observation tool. Follow .pi/AGENTS.md for the schema and rules.",
     "pullRequestNumber" : 42,
     "repositoryFullName" : "owner/repo"
   }

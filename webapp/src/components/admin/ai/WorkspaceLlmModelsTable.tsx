@@ -18,13 +18,12 @@ import { priceLabel } from "@/lib/llm-pricing";
 
 export interface WorkspaceLlmModelsTableProps {
 	models: WorkspaceLlmModel[];
-	/** Ids of the models with a write in flight — see {@link usePendingMutationIds}. */
+	/** Ids of the models with a write in flight. */
 	mutatingIds: ReadonlySet<number>;
 	onEdit: (model: WorkspaceLlmModel) => void;
 	onDelete: (model: WorkspaceLlmModel) => void;
 }
 
-/** Models on the workspace's own connected provider — price framing uses workspace wording. */
 export function WorkspaceLlmModelsTable({
 	models,
 	mutatingIds,
@@ -68,8 +67,8 @@ export function WorkspaceLlmModelsTable({
 								<TableCell>
 									<div className="font-medium">{model.displayName}</div>
 								</TableCell>
-								{/* Left-aligned: `priceLabel` is a sentence, not a figure. `tabular-nums` only
-								    lines the digits inside it up down the column. */}
+								{/* Left-aligned: `priceLabel` is a sentence, not a figure; `tabular-nums` only
+								    aligns the digits inside it. */}
 								<TableCell className="tabular-nums">{priceLabel(model, "workspace")}</TableCell>
 								<TableCell>
 									<Badge variant={model.enabled ? "default" : "secondary"}>

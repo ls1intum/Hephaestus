@@ -1,9 +1,8 @@
 import { expect, screen, userEvent, within } from "storybook/test";
 
 /**
- * Types a value the form must refuse, then asserts both halves: nothing was submitted, *and* the
- * field explains why. The submit button stays enabled precisely so pressing it explains the
- * rejection, and a form that silently swallowed the submit would satisfy "nothing was sent" alone.
+ * Both halves of a refusal: nothing was submitted, *and* the field says why. The submit button
+ * stays enabled precisely so pressing it explains the rejection instead of doing nothing.
  */
 export async function expectAmountRejected(options: {
 	fieldLabel: RegExp;

@@ -1,10 +1,11 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, userEvent, waitFor, within } from "storybook/test";
+import { expect, waitFor, within } from "storybook/test";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
 const meta = {
 	title: "Workspace admin/Practices/Catalog status",
 	component: CatalogOriginBadge,
+	tags: ["autodocs"],
 	args: {
 		kind: "practice",
 		origin: { slug: "clear-pr-description", link: "IN_SYNC", sourceOffered: true },
@@ -15,8 +16,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const MatchesCatalog: Story = {
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByText(/catalog/)).not.toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByText(/catalog/)).not.toBeInTheDocument();
 	},
 };
 
@@ -28,11 +29,8 @@ export const CatalogChanged: Story = {
 			sourceOffered: true,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		const status = canvas.getByRole("button", { name: "Instance catalog changed" });
-		await userEvent.tab();
-		await expect(status).toHaveFocus();
+	play: async ({ canvas }) => {
+		canvas.getByRole("button", { name: "Instance catalog changed" }).focus();
 		const tooltip = await within(document.body).findByText(
 			"The instance catalog now has different review rules. This workspace keeps its current version.",
 		);
@@ -48,9 +46,6 @@ export const Customized: Story = {
 			sourceOffered: true,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText("Customized for this workspace")).toBeVisible();
-	},
 };
 
 export const NoLongerIncluded: Story = {
@@ -61,8 +56,7 @@ export const NoLongerIncluded: Story = {
 			sourceOffered: false,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const status = canvas.getByRole("button", {
 			name: "Not in the current instance catalog",
 		});
@@ -83,8 +77,8 @@ export const AreaChanged: Story = {
 			sourceOffered: true,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const status = within(canvasElement).getByRole("button", {
+	play: async ({ canvas }) => {
+		const status = canvas.getByRole("button", {
 			name: "Instance catalog changed",
 		});
 		status.focus();

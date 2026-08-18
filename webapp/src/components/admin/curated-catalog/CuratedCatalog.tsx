@@ -7,8 +7,7 @@ import type {
 	CuratedCatalogSummary as Summary,
 } from "@/api/types.gen";
 import {
-	WORK_ARTIFACT_FILTER_OPTIONS,
-	WORK_ARTIFACT_LABELS,
+	WORK_ARTIFACT_FILTER_ITEMS,
 	type WorkArtifact,
 } from "@/components/admin/practice-catalog/constants";
 import {
@@ -39,6 +38,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 import { CuratedCatalogTree } from "./CuratedCatalogTree";
@@ -114,7 +114,7 @@ export function CuratedCatalog({
 				practice.status.state === "UPDATE_WAITING" ||
 				(practice.status.state === "NO_LONGER_SHIPPED" && practice.effectivelyOffered)) &&
 			matchesStatus(practice.effectivelyOffered) &&
-			(artifact === "ALL" || practice.artifactType === artifact) &&
+			(artifact === "ALL" || practice.artifactKind === artifact) &&
 			matches(
 				[
 					practice.name,
@@ -167,7 +167,7 @@ export function CuratedCatalog({
 				{customOrder && (
 					<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
 						<p className="text-muted-foreground">
-							This catalog keeps your custom order when Hephaestus changes.
+							This catalog keeps your custom order when the Hephaestus defaults change.
 						</p>
 						<Button
 							variant="outline"
@@ -406,6 +406,9 @@ function CatalogFilters({
 					))}
 				</SelectContent>
 			</Select>
+			{/* `toolbar`, not the default `group`: Base UI gives the group a roving tabindex, and
+			    `toolbar` is the role that contract belongs to. `radiogroup` would be worse — the items
+			    are `aria-pressed`, not radios. */}
 			<ToggleGroup
 				role="toolbar"
 				value={[status]}
@@ -428,22 +431,20 @@ function CatalogFilters({
 				))}
 			</ToggleGroup>
 			<Select
+				items={WORK_ARTIFACT_FILTER_ITEMS}
 				value={artifact}
 				onValueChange={(value) =>
 					onSearchChange({
 						...search,
-						artifact: value === "ALL" ? undefined : (value as WorkArtifact),
+						artifact: value === "ALL" || !isKnownArtifactKind(value) ? undefined : value,
 					})
 				}
 			>
 				<SelectTrigger className="w-full lg:w-52" aria-label="Filter by work type">
-					<SelectValue>
-						{artifact === "ALL" ? "All work types" : WORK_ARTIFACT_LABELS[artifact]}
-					</SelectValue>
+					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
-					<SelectItem value="ALL">All work types</SelectItem>
-					{WORK_ARTIFACT_FILTER_OPTIONS.map(({ value, label }) => (
+					{WORK_ARTIFACT_FILTER_ITEMS.map(({ value, label }) => (
 						<SelectItem key={value} value={value}>
 							{label}
 						</SelectItem>

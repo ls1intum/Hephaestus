@@ -1,16 +1,16 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -18,7 +18,6 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import org.jspecify.annotations.Nullable;
-import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(name = "curated_practice_override")
@@ -35,19 +34,23 @@ public class CuratedPracticeOverride {
     @Column(name = "name", length = 128)
     private @Nullable String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "applies_to", length = 32)
-    private @Nullable WorkArtifact artifactType;
+    /** Projection of {@link #bindings}, kept for the same reason {@code practice.applies_to} is. */
+    @Column(name = "applies_to", length = ArtifactKind.MAX_LENGTH)
+    private @Nullable ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "trigger_events", columnDefinition = "jsonb")
-    private @Nullable JsonNode triggerEvents;
+    @Column(name = "bindings", columnDefinition = "jsonb")
+    private @Nullable List<PracticeBinding> bindings;
 
     @Column(name = "criteria", columnDefinition = "TEXT")
     private @Nullable String criteria;
 
     @Column(name = "precompute_script", columnDefinition = "TEXT")
     private @Nullable String precomputeScript;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "automated_review_policy", columnDefinition = "jsonb")
+    private @Nullable PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     private @Nullable String whyItMatters;
@@ -84,15 +87,21 @@ public class CuratedPracticeOverride {
     }
 
     public @Nullable PracticeDefinition definition() {
-        if (name == null || artifactType == null || triggerEvents == null || criteria == null) {
+        if (
+            name == null ||
+            artifactKind == null ||
+            bindings == null ||
+            criteria == null ||
+            automatedReviewPolicy == null
+        ) {
             return null;
         }
         return new PracticeDefinition(
             name,
-            artifactType,
-            TriggerEventsConverter.toList(triggerEvents),
+            bindings,
             criteria,
             precomputeScript,
+            automatedReviewPolicy,
             whyItMatters,
             whatGoodLooksLike,
             areaSlug
@@ -101,10 +110,11 @@ public class CuratedPracticeOverride {
 
     public void write(PracticeDefinition definition, @Nullable String acceptedBundledDigest, Instant now) {
         this.name = definition.name();
-        this.artifactType = definition.artifactType();
-        this.triggerEvents = definition.triggerEventsJson();
+        this.artifactKind = definition.artifactKind();
+        this.bindings = definition.bindings();
         this.criteria = definition.criteria();
         this.precomputeScript = definition.precomputeScript();
+        this.automatedReviewPolicy = definition.automatedReviewPolicy();
         this.whyItMatters = definition.whyItMatters();
         this.whatGoodLooksLike = definition.whatGoodLooksLike();
         this.areaSlug = definition.areaSlug();
@@ -114,10 +124,11 @@ public class CuratedPracticeOverride {
 
     public void clearDefinition(Instant now) {
         this.name = null;
-        this.artifactType = null;
-        this.triggerEvents = null;
+        this.artifactKind = null;
+        this.bindings = null;
         this.criteria = null;
         this.precomputeScript = null;
+        this.automatedReviewPolicy = null;
         this.whyItMatters = null;
         this.whatGoodLooksLike = null;
         this.areaSlug = null;

@@ -1,0 +1,26 @@
+language js(typescript)
+
+// A story `meta` that names a `component` must be typed `Meta<typeof That>`, because that type
+// parameter is the only thing tying `args` to the component's real props. A bare `satisfies Meta`
+// types `args` as an open bag: a renamed prop, a misspelled one, or one that no longer exists all
+// keep type-checking, and the story keeps rendering — it just stops passing what it claims to pass.
+// The Controls panel drifts with it, since Storybook infers controls from the same types.
+//
+// Narrow on purpose, so the two shapes that are legitimately untyped keep working:
+//   `satisfies Meta<typeof Button>` — already typed, which is the whole point
+//   `satisfies Meta` on a meta with NO `component` — a gallery page ("Provider/Icons",
+//     "Icons/Brand") documents several components at once and has none to name; `Meta` alone is
+//     the correct type there, not a lapse.
+//
+// `some` rather than `contains` is load-bearing. `contains` descends the whole object, where
+// `parameters.docs.description.component` — a prose string every autodocs page may set — reads as a
+// `component` key and makes a gallery story look like a violation. `some` looks only at the members
+// of the object literal being checked, which is where the real `component` field lives.
+`{ $props } satisfies Meta` where {
+  $props <: some `component: $_`,
+  register_diagnostic(
+    span = $props,
+    message = "This `meta` names a `component` but is typed as a bare `Meta`, so its `args` are never checked against that component's props — a story can pass a prop the component does not have, and Storybook's generated controls drift with it. Type it `satisfies Meta<typeof TheComponent>`. A gallery meta that names no component is the one case `Meta` alone is right.",
+    severity = "error"
+  )
+}

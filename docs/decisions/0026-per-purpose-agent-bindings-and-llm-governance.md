@@ -17,7 +17,7 @@ Two problems sat on top of the LLM configuration surface (#1368):
 
 1. **The wrong abstraction for "what model runs what."** `agent_config` was a *named execution
    profile* (model + timeout + concurrency + internet). The thing that actually decided which model
-   ran practice detection versus the mentor was two scalar FK columns on `Workspace`
+   ran practice reviews versus the mentor was two scalar FK columns on `Workspace`
    (`practice_config_id`, `mentor_config_id`). So the object an admin created was not the object that
    bound a purpose, and the flow was scattered across three pages under several names. Worse,
    `AgentJobService` fanned out to *every* enabled config when a workspace had no explicit binding —
@@ -75,7 +75,7 @@ class and blur the credential blast radius. Model availability (enabled + connec
 supported protocol + visibility/grant) is decided in exactly one place, `LlmModelResolver`.
 
 **Per-purpose bindings replace named configs.** A new `workspace_agent_binding` row binds exactly one
-purpose (`PRACTICE_DETECTION` | `MENTOR`) of a workspace to exactly one catalog model plus execution
+purpose (`PRACTICE_REVIEW` | `MENTOR`) of a workspace to exactly one catalog model plus execution
 limits — `UNIQUE(workspace_id, purpose)`, a DB CHECK that exactly one of the instance/workspace model
 is set, and a tenancy-safe composite FK to workspace models. No row means the purpose is off; there
 is no implicit fan-out. The object the admin configures *is* the purpose→model binding. Detection's

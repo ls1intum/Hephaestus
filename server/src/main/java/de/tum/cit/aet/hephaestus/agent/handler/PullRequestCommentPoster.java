@@ -5,13 +5,13 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackContent;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.SummaryHandle;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackContent;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.SummaryHandle;
 import java.time.Duration;
 import java.util.EnumMap;
 import java.util.List;
@@ -134,15 +134,15 @@ class PullRequestCommentPoster {
 
     private static final Pattern EXCESSIVE_NEWLINES = Pattern.compile("\\n{3,}");
 
-    private final Map<IntegrationKind, FeedbackChannel> channels;
+    private final Map<IntegrationKind, SummaryChannel> channels;
 
-    PullRequestCommentPoster(List<FeedbackChannel> feedbackChannels) {
-        EnumMap<IntegrationKind, FeedbackChannel> map = new EnumMap<>(IntegrationKind.class);
-        for (FeedbackChannel channel : feedbackChannels) {
-            FeedbackChannel previous = map.putIfAbsent(channel.kind(), channel);
+    PullRequestCommentPoster(List<SummaryChannel> feedbackChannels) {
+        EnumMap<IntegrationKind, SummaryChannel> map = new EnumMap<>(IntegrationKind.class);
+        for (SummaryChannel channel : feedbackChannels) {
+            SummaryChannel previous = map.putIfAbsent(channel.kind(), channel);
             if (previous != null) {
                 throw new IllegalStateException(
-                    "Duplicate FeedbackChannel for kind " +
+                    "Duplicate SummaryChannel for kind " +
                         channel.kind() +
                         ": " +
                         previous.getClass().getName() +
@@ -163,7 +163,7 @@ class PullRequestCommentPoster {
                 "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
             );
         }
-        FeedbackChannel channel = requireChannel(kind);
+        SummaryChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
             SummaryHandle handle = channel.postSummary(
@@ -198,9 +198,9 @@ class PullRequestCommentPoster {
                 "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
             );
         }
-        FeedbackChannel channel = requireChannel(kind);
+        SummaryChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
-        FeedbackChannel.UpdateOutcome outcome;
+        SummaryChannel.UpdateOutcome outcome;
         try {
             outcome = channel.updateSummary(
                 target,
@@ -265,7 +265,7 @@ class PullRequestCommentPoster {
                 "AgentJob.integrationKind is null — cannot resolve a delivery channel. jobId=" + job.getId()
             );
         }
-        FeedbackChannel channel = requireChannel(kind);
+        SummaryChannel channel = requireChannel(kind);
         JsonNode metadata = job.getMetadata();
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int issueNumber = requireMetadataInt(metadata, "issue_number");
@@ -305,7 +305,7 @@ class PullRequestCommentPoster {
         if (kind == null) {
             return ExistingDeliveryLookup.unknown();
         }
-        FeedbackChannel channel = channels.get(kind);
+        SummaryChannel channel = channels.get(kind);
         if (channel == null) {
             return ExistingDeliveryLookup.unknown();
         }
@@ -326,7 +326,7 @@ class PullRequestCommentPoster {
             } else {
                 return ExistingDeliveryLookup.unknown();
             }
-            FeedbackChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, summaryMarkerFor(job));
+            SummaryChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, summaryMarkerFor(job));
             return switch (lookup.kind()) {
                 case FOUND -> ExistingDeliveryLookup.found(lookup.handle().externalId());
                 case ABSENT -> ExistingDeliveryLookup.absent();
@@ -342,11 +342,11 @@ class PullRequestCommentPoster {
         }
     }
 
-    private FeedbackChannel requireChannel(IntegrationKind kind) {
-        FeedbackChannel channel = channels.get(kind);
+    private SummaryChannel requireChannel(IntegrationKind kind) {
+        SummaryChannel channel = channels.get(kind);
         if (channel == null) {
             throw new JobDeliveryException(
-                "No FeedbackChannel wired for kind " +
+                "No SummaryChannel wired for kind " +
                     kind +
                     " — check that the vendor integration is enabled and its channel bean is registered"
             );
@@ -359,7 +359,7 @@ class PullRequestCommentPoster {
         String repoFullName = requireMetadataText(metadata, "repository_full_name");
         int prNumber = requireMetadataInt(metadata, "pr_number");
 
-        FeedbackChannel channel = requireChannel(kind);
+        SummaryChannel channel = requireChannel(kind);
         String subjectExternalId;
         try {
             subjectExternalId = channel.formatPullRequestSubjectId(repoFullName, prNumber);

@@ -72,7 +72,7 @@ jobs:
           # Other quality checks only need HEAD for faster checkout.
           # NOTE: the depths are QUOTED. Unquoted, `cond && 0 || 1` always yields 1, because the
           # number 0 is falsy in GitHub expressions; the non-empty string '0' is truthy.
-          fetch-depth: ${{ contains(fromJSON('["database-validation", "database-migrations"]'), matrix.check) && '0' || '1' }}
+          fetch-depth: ${{ contains(fromJSON('["application-server-quality", "database-validation", "database-migrations"]'), matrix.check) && '0' || '1' }}
 
       - name: Setup pnpm + Node.js
         # database-migrations is a pure git check — no Node/pnpm/JDK/Maven needed.
@@ -92,13 +92,16 @@ jobs:
           pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
-          FMT_OK=true; RUNNER_OK=true
+          FMT_OK=true; RUNNER_OK=true; CONTRACTS_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
           node --test \
             server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
-            server/src/test/resources/agent/pi-finding-normalize.spec.mjs \
-            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi runner test(s) failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs server/src/test/resources/agent/pi-finding-normalize.spec.mjs"); }
+            server/src/test/resources/agent/pi-observation-normalize.spec.mjs \
+            server/src/test/resources/agent/pi-runner-timings.spec.mjs \
+            server/src/test/resources/agent/pi-runner-usage.spec.mjs \
+            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi runner test(s) failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs server/src/test/resources/agent/pi-observation-normalize.spec.mjs server/src/test/resources/agent/pi-runner-timings.spec.mjs server/src/test/resources/agent/pi-runner-usage.spec.mjs"); }
+          pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
@@ -106,6 +109,7 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -121,9 +125,15 @@ jobs:
           ISSUES_FOUND=()
           BIOME_OK=true
           TYPES_OK=true
+          # The webapp-scoped tree gates run here as well as in the pre-push hook, because a hook is
+          # skippable and a merge is not. check:env stays out: it reads server files this leg omits.
+          COMPONENTS_OK=true
+          STORIES_OK=true
 
           pnpm run check || { BIOME_OK=false; ISSUES_FOUND+=("Biome checks failed. Run: cd webapp && pnpm run check -- --write"); }
           pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
+          node ../scripts/check-presentational-components.mjs || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
+          node ../scripts/check-story-prose.mjs || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
@@ -131,6 +141,8 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && pnpm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`pnpm run check:components\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`pnpm run check:stories\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi

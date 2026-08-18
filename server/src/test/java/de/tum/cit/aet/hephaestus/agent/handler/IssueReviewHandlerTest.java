@@ -7,6 +7,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -14,8 +15,10 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
 import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
@@ -25,14 +28,23 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestR
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.EnumSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
@@ -88,23 +100,23 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             new TaskEnvelopeWriter(objectMapper),
-            new PracticeCatalogInjector(objectMapper, practiceRepository),
+            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
             new PracticeDetectionResultParser(objectMapper),
+            new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
+            // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
+            // therefore admitted, so these tests exercise delivery rather than the tier.
+            new InContextDeliveryGate(
+                practiceRepository,
+                org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+                feedbackLedgerRecorder,
+                workspaceDefaults()
+            ),
             commentPoster,
             feedbackLedgerRecorder,
-            new PracticeFeedbackDeliveryPolicy(
-                issueRepository,
-                pullRequestRepository,
-                repositoryToMonitorRepository,
-                workspaceRepository,
-                accountPreferencesQuery,
-                new PracticeReviewProperties(false, true, false, 15, false, false),
-                () -> silentModeEngaged
-            ),
-            new PracticeFeedbackCommentFormatter(
-                new ApplicationProperties(null, new ApplicationProperties.Webapp("https://hephaestus.example"))
-            )
+            mock(PracticeFeedbackDeliveryPolicy.class),
+            mock(PracticeFeedbackCommentFormatter.class),
+            mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
         lenient()
             .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))
@@ -144,6 +156,38 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     }
 
     @Nested
+    class ComposableLanes {
+
+        @Test
+        void anIssueComposesInContextAtArtifactLevelWithoutInventingADiff() {
+            assertThat(ArtifactKinds.hasInlineLane(ArtifactKinds.ISSUE)).isFalse();
+            assertThat(IssueReviewHandler.ISSUE_REVIEW_CHANNELS).containsExactlyInAnyOrder(FeedbackChannel.values());
+        }
+
+        @Test
+        void theStagedRequestAllowsOnlyArtifactPlacement() {
+            Map<String, byte[]> files = new LinkedHashMap<>();
+            FeedbackCompositionInputs.stage(
+                files,
+                ObservationOrigin.LIVE,
+                IssueReviewHandler.ISSUE_REVIEW_CHANNELS,
+                EnumSet.of(FeedbackCompositionInputs.InContextPlacementKind.ARTIFACT)
+            );
+
+            JsonNode request = objectMapper.readTree(
+                new String(files.get(SandboxLayout.FEEDBACK_COMPOSITION_PATH), StandardCharsets.UTF_8)
+            );
+            assertThat(
+                request.get("channels").get(FeedbackChannel.IN_CONTEXT.name()).get("enabled").asBoolean()
+            ).isTrue();
+            assertThat(request.get("inContextPlacementKinds"))
+                .singleElement()
+                .extracting(JsonNode::asString)
+                .isEqualTo("ARTIFACT");
+        }
+    }
+
+    @Nested
     class CreateSubmission {
 
         @Test
@@ -151,7 +195,7 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             JobSubmission submission = handler.createSubmission(sampleRequest());
             JsonNode metadata = submission.metadata();
 
-            assertThat(metadata.get("artifact_type").asString()).isEqualTo("ISSUE");
+            assertThat(metadata.get("artifact_kind").asString()).isEqualTo("scm.issue");
             assertThat(metadata.get("repository_id").asLong()).isEqualTo(123L);
             assertThat(metadata.get("repository_full_name").asString()).isEqualTo("owner/repo");
             assertThat(metadata.get("issue_id").asLong()).isEqualTo(777L);
@@ -177,297 +221,10 @@ class IssueReviewHandlerTest extends BaseUnitTest {
 
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
 
-    @Nested
-    class DeliverIssueFeedback {
-
-        private AgentJob issueJob(String state) {
-            var job = new AgentJob();
-            var workspace = new Workspace();
-            workspace.setId(1L);
-            job.setWorkspace(workspace);
-            ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("repository_id", 123L);
-            metadata.put("repository_full_name", "owner/repo");
-            metadata.put("issue_id", 777L);
-            metadata.put("issue_number", 12);
-            metadata.put("state", state);
-            job.setMetadata(metadata);
-            return job;
-        }
-
-        private Issue stubCurrentIssue(Issue.State state) {
-            Issue issue = new Issue();
-            issue.setNumber(12);
-            issue.setState(state);
-            Repository repository = new Repository();
-            repository.setId(123L);
-            repository.setNameWithOwner("owner/repo");
-            issue.setRepository(repository);
-            User author = new User();
-            author.setId(5L);
-            issue.setAuthor(author);
-            when(issueRepository.findByIdWithAuthorAndRepository(777L)).thenReturn(Optional.of(issue));
-            return issue;
-        }
-
-        private DeliveryContent note() {
-            return new DeliveryContent("One thing to tighten: add acceptance criteria.", List.of(), List.of());
-        }
-
-        @Test
-        void disabledPracticeFeatureStopsDeliveryWithoutLedgerEgress() {
-            AgentJob job = issueJob("OPEN");
-            Workspace workspace = activePracticeWorkspace();
-            workspace.getFeatures().setPracticesEnabled(false);
-            when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
-            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
-            verify(issueRepository, never()).findByIdWithAuthorAndRepository(777L);
-            verify(accountPreferencesQuery, never()).preferencesForUserId(5L);
-        }
-
-        @Test
-        void instanceSilentMode_isSuppressedAheadOfEveryOtherRule() {
-            silentModeEngaged = true;
-            AgentJob job = issueJob("OPEN");
-            DeliveryContent delivery = note();
-
-            handler.postIssueNote(job, delivery);
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.INSTANCE_SILENCED)
-            );
-            // The brake short-circuits before the policy touches the artifact or the recipient.
-            verify(issueRepository, never()).findByIdWithAuthorAndRepository(anyLong());
-        }
-
-        @Test
-        void closedSnapshotAfterReopen_isSuppressed() {
-            AgentJob job = issueJob("CLOSED");
-            stubCurrentIssue(Issue.State.OPEN);
-            DeliveryContent delivery = note();
-
-            handler.postIssueNote(job, delivery);
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
-            );
-        }
-
-        @Test
-        void currentIssueClosedAfterSubmission_isSuppressed() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.CLOSED);
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.ARTIFACT_CLOSED)
-            );
-        }
-
-        @Test
-        void missingIssue_isSuppressedAsGone() {
-            AgentJob job = issueJob("OPEN");
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
-        }
-
-        @Test
-        void authorlessIssue_isSuppressedAsGone() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN).setAuthor(null);
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
-        }
-
-        @Test
-        void tombstonedIssue_isSuppressedAsGone() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN).setDeletedAt(Instant.now());
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
-        }
-
-        @Test
-        void mismatchedTargetMetadata_isSuppressedAsGone() {
-            AgentJob job = issueJob("OPEN");
-            ((ObjectNode) job.getMetadata()).put("repository_id", 999L);
-            stubCurrentIssue(Issue.State.OPEN);
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
-        }
-
-        @Test
-        void repositoryRemovedFromWorkspace_isSuppressedAsGone() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo")).thenReturn(false);
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.ARTIFACT_GONE)
-            );
-        }
-
-        @Test
-        void optedOutAuthor_isSuppressedWithoutConversationalEscalation() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(accountPreferencesQuery.preferencesForUserId(5L)).thenReturn(
-                Optional.of(new AccountPreferencesQuery.PreferencesView(false, false))
-            );
-
-            handler.postIssueNote(job, note());
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                any(),
-                eq(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT)
-            );
-            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
-        }
-
-        @Test
-        void preferenceLookupFailure_failsClosedWithoutConversationalEscalation() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(accountPreferencesQuery.preferencesForUserId(5L)).thenThrow(
-                new IllegalStateException("database unavailable")
-            );
-
-            assertThatThrownBy(() -> handler.postIssueNote(job, note())).isInstanceOf(IllegalStateException.class);
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
-        }
-
-        @Test
-        void blankAfterSanitize_isSuppressed_withEmptyAfterSanitizeReason() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            DeliveryContent delivery = new DeliveryContent("", List.of(), List.of());
-
-            handler.postIssueNote(job, delivery);
-
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder).recordSuppressedUnit(
-                eq(job),
-                eq(delivery),
-                eq(FeedbackSuppressionReason.EMPTY_AFTER_SANITIZE)
-            );
-        }
-
-        @Test
-        void openIssueWithoutPreferences_postsLinkedCommentAndRecordsCommentId() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenReturn("gid://gitlab/Note/9");
-
-            handler.postIssueNote(job, note());
-
-            ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
-            verify(commentPoster).postIssueFormattedBody(eq(job), body.capture());
-            assertThat(body.getValue()).contains(
-                "[Manage comments and Slack reminders](https://hephaestus.example/settings#practice-feedback)"
-            );
-            assertThat(job.getDeliveryCommentId()).isEqualTo("gid://gitlab/Note/9");
-            verify(feedbackLedgerRecorder).record(eq(job), any(), any(), any());
-            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
-        }
-
-        @Test
-        void posterFailure_isSwallowed_doesNotPropagate() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenThrow(new RuntimeException("gitlab down"));
-
-            assertThatCode(() -> handler.postIssueNote(job, note())).doesNotThrowAnyException();
-            assertThat(job.getDeliveryCommentId()).isNull();
-            verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
-            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
-        }
-
-        @Test
-        void jobDeliveryException_propagates_andDoesNotRecord() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenThrow(
-                new de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException("delivery failed")
-            );
-
-            assertThatThrownBy(() -> handler.postIssueNote(job, note())).isInstanceOf(
-                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
-            );
-            assertThat(job.getDeliveryCommentId()).isNull();
-            verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
-            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
-        }
-
-        @Test
-        void nullCommentId_doesNotRecordPhantomDelivered() {
-            AgentJob job = issueJob("OPEN");
-            stubCurrentIssue(Issue.State.OPEN);
-            when(commentPoster.postIssueFormattedBody(eq(job), any())).thenReturn(null);
-
-            handler.postIssueNote(job, note());
-
-            assertThat(job.getDeliveryCommentId()).isNull();
-            verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any());
-            verify(feedbackLedgerRecorder).recordUndelivered(eq(job), any());
-        }
-
-        @Test
-        void noDeliveryContent_isNoop() {
-            handler.postIssueNote(issueJob("OPEN"), null);
-            verify(commentPoster, never()).postIssueFormattedBody(any(), any());
-            verify(feedbackLedgerRecorder, never()).recordUndelivered(any(), any());
-        }
+    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

@@ -1,9 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.curated;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.contains;
 
 import de.tum.cit.aet.hephaestus.core.event.WorkspacesInitializedEvent;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
@@ -16,7 +20,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusReques
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
@@ -53,6 +57,9 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     @Autowired
     private ApplicationEventPublisher events;
 
+    @Autowired
+    private PracticeEvidenceDefaults evidenceDefaults;
+
     private Workspace workspace;
 
     @BeforeEach
@@ -78,7 +85,26 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
             .jsonPath("$.summary.editedHere")
             .isEqualTo(0)
             .jsonPath("$.practices[0].status.state")
-            .isEqualTo("FROM_HEPHAESTUS");
+            .isEqualTo("FROM_HEPHAESTUS")
+            .jsonPath("$.practices[0].automatedReview.mode")
+            .isEqualTo("LANGUAGE_MODEL");
+    }
+
+    @Test
+    void appAdminCanReadEvidenceAuthoringOptions() {
+        webTestClient
+            .get()
+            .uri(CATALOG + "/definition-options")
+            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            // Selected by kind rather than by position; the list is ordered by the registered domains.
+            .jsonPath("$.workTypes[?(@.artifactKind == 'chat.conversation_thread')].recommendedNeeds[0].sourceKind")
+            .value(contains("slack.conversation.thread"))
+            .jsonPath("$.workTypes[?(@.artifactKind == 'chat.conversation_thread')].allowedSources[0].displayName")
+            .value(contains("Slack thread"));
     }
 
     @Test
@@ -114,10 +140,12 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO before = getPractice();
         CuratedPracticeRequestDTO body = new CuratedPracticeRequestDTO(
             before.definition().name(),
-            before.definition().artifactType(),
-            before.definition().triggerEvents(),
+            // The shipped bindings, unchanged: they feed the review-rule fingerprint, so substituting
+            // an equivalent-looking set would make this a change to what Hephaestus reviews.
+            before.definition().bindings(),
             before.definition().criteria(),
             before.definition().precomputeScript(),
+            before.definition().automatedReviewPolicy(),
             "Our own words about why this matters.",
             before.definition().whatGoodLooksLike(),
             before.definition().areaSlug()
@@ -613,6 +641,40 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     }
 
     @Test
+    void usesArtifactEvidenceBaselineWhenCreateOmitsDeclaration() {
+        CuratedPracticeDTO template = getPractice();
+        var source = definitionOf(template, "Server baseline criteria");
+        var request = new CuratedPracticeRequestDTO(
+            source.name(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
+            source.criteria(),
+            source.precomputeScript(),
+            null,
+            source.whyItMatters(),
+            source.whatGoodLooksLike(),
+            source.areaSlug()
+        );
+
+        CuratedPracticeDTO created = webTestClient
+            .post()
+            .uri(CATALOG + "/practices")
+            .headers(headers -> headers.setBearerAuth(ADMIN_TOKEN))
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(new CreateCuratedPracticeRequestDTO("server-baseline", request))
+            .exchange()
+            .expectStatus()
+            .isCreated()
+            .expectBody(CuratedPracticeDTO.class)
+            .returnResult()
+            .getResponseBody();
+
+        assertThat(created).isNotNull();
+        assertThat(created.definition().automatedReviewPolicy()).isEqualTo(
+            evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
+        );
+    }
+
+    @Test
     void keepsRemovedDefaultsAsCustomEntries() {
         String practiceSlug = "removed-practice";
         CuratedPracticeDTO template = getPractice();
@@ -864,10 +926,10 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
         CuratedPracticeDTO edited = getPractice();
         CuratedPracticeRequestDTO guidanceEdit = new CuratedPracticeRequestDTO(
             edited.definition().name(),
-            edited.definition().artifactType(),
-            edited.definition().triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             edited.definition().criteria(),
             edited.definition().precomputeScript(),
+            edited.definition().automatedReviewPolicy(),
             "Updated guidance",
             edited.definition().whatGoodLooksLike(),
             edited.definition().areaSlug()
@@ -910,14 +972,10 @@ class CuratedCatalogAdminControllerIntegrationTest extends AbstractWorkspaceInte
     private static CuratedPracticeRequestDTO definitionOf(CuratedPracticeDTO practice, String criteria) {
         return new CuratedPracticeRequestDTO(
             practice.definition().name(),
-            practice.definition().artifactType() == null
-                ? WorkArtifact.PULL_REQUEST
-                : practice.definition().artifactType(),
-            practice.definition().triggerEvents() == null
-                ? List.of("PullRequestCreated")
-                : practice.definition().triggerEvents(),
+            PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
             criteria,
             practice.definition().precomputeScript(),
+            practice.definition().automatedReviewPolicy(),
             practice.definition().whyItMatters(),
             practice.definition().whatGoodLooksLike(),
             practice.definition().areaSlug()

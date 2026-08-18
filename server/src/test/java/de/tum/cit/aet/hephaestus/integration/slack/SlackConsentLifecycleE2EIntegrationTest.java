@@ -3,16 +3,17 @@ package de.tum.cit.aet.hephaestus.integration.slack;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.handler.ConversationReviewSubmissionRequest;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.job.ConversationReviewSubmitter;
 import de.tum.cit.aet.hephaestus.agent.job.conversation.ConversationThreadTriggerScheduler;
 import de.tum.cit.aet.hephaestus.core.auth.spi.ResearchParticipationCommand;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
@@ -66,6 +67,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.json.JsonMapper;
@@ -144,6 +146,9 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
 
     @MockitoBean
     private AgentJobService agentJobService;
+
+    @MockitoSpyBean
+    private ConversationReviewSubmitter conversationReviewSubmitter;
 
     private final JsonMapper mapper = JsonMapper.builder().build();
 
@@ -282,21 +287,12 @@ class SlackConsentLifecycleE2EIntegrationTest extends BaseIntegrationTest {
         UUID u2Obs = u2Conv.observationId();
         UUID u2Fb = u2Conv.feedbackId();
 
-        when(agentJobService.submit(eq(workspaceId), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
-            Optional.of(new AgentJob())
-        );
+        doReturn(2L).when(conversationReviewSubmitter).submitAndSettle(any(), any());
         scheduler.detectNow();
-        ArgumentCaptor<ConversationReviewSubmissionRequest> captor = ArgumentCaptor.forClass(
-            ConversationReviewSubmissionRequest.class
-        );
-        verify(agentJobService, times(2)).submit(
-            eq(workspaceId),
-            eq(AgentJobType.CONVERSATION_REVIEW),
-            captor.capture()
-        );
-        assertThat(captor.getAllValues())
-            .extracting(ConversationReviewSubmissionRequest::aboutUserId)
-            .containsExactlyInAnyOrder(u1MemberId, u2MemberId);
+        ArgumentCaptor<ConversationThreadCandidate> captor = ArgumentCaptor.forClass(ConversationThreadCandidate.class);
+        verify(conversationReviewSubmitter).submitAndSettle(captor.capture(), any());
+        assertThat(captor.getValue().workspaceId()).isEqualTo(workspaceId);
+        assertThat(captor.getValue().participantMemberIds()).containsExactlyInAnyOrder(u1MemberId, u2MemberId);
 
         // Hop 5 — U1 opts out: ingestion stops AND U1's channel data is erased, U2's survives.
         handler.handleBlockActions(optOut("U1"));

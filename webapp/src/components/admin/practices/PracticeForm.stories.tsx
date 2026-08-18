@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen } from "storybook/test";
+import { expect, fn } from "storybook/test";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
@@ -17,21 +18,20 @@ const meta = {
 	},
 	tags: ["autodocs"],
 	decorators: [withStandardPage],
-} satisfies Meta;
+	args: {
+		mode: "create",
+		workspaceSlug: "demo",
+		areas: mockAreas,
+		definitionOptions: mockPracticeDefinitionOptions,
+		onSubmit: createSubmit,
+		isPending: false,
+	},
+} satisfies Meta<typeof PracticeForm>;
 
 export default meta;
-type Story = StoryObj;
+type Story = StoryObj<typeof meta>;
 
 export const Create: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			onSubmit={createSubmit}
-			isPending={false}
-		/>
-	),
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
@@ -42,42 +42,26 @@ export const Create: Story = {
 };
 
 export const EditWithAdvanced: Story = {
-	render: () => (
-		<PracticeForm
-			mode="edit"
-			workspaceSlug="demo"
-			initialData={mockPracticeWithAllTriggers}
-			areas={mockAreas}
-			onSubmit={fn()}
-			isPending={false}
-		/>
-	),
+	args: { mode: "edit", initialData: mockPracticeWithAllTriggers, onSubmit: fn() },
 };
 
 export const Submitting: Story = {
-	render: () => (
-		<PracticeForm mode="create" workspaceSlug="demo" areas={mockAreas} onSubmit={fn()} isPending />
-	),
+	args: { isPending: true, onSubmit: fn() },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
 	},
 };
 
 export const EditClearsOptionalGuidance: Story = {
-	render: () => (
-		<PracticeForm
-			mode="edit"
-			workspaceSlug="demo"
-			initialData={{
-				...mockPracticeWithAllTriggers,
-				whyItMatters: "Small commits make review safer.",
-				whatGoodLooksLike: "Each commit explains one coherent change.",
-			}}
-			areas={mockAreas}
-			onSubmit={editSubmit}
-			isPending={false}
-		/>
-	),
+	args: {
+		mode: "edit",
+		initialData: {
+			...mockPracticeWithAllTriggers,
+			whyItMatters: "Small commits make review safer.",
+			whatGoodLooksLike: "Each commit explains one coherent change.",
+		},
+		onSubmit: editSubmit,
+	},
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
 		editSubmit.mockClear();
@@ -96,20 +80,11 @@ export const EditClearsOptionalGuidance: Story = {
 };
 
 export const ValidationErrors: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			onSubmit={createSubmit}
-			isPending={false}
-		/>
-	),
 	parameters: { chromatic: { viewports: [320, 1440] } },
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
 		await expect(canvas.getByText("Name must be at least 3 characters")).toBeVisible();
-		await expect(canvas.getByText("Select at least one trigger event")).toBeVisible();
+		await expect(canvas.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("textbox", { name: /Name/ })).toHaveAttribute(
 			"aria-invalid",
 			"true",
@@ -125,11 +100,8 @@ export const ValidationAndSubmit: Story = {
 		await ValidationErrors.play?.(context);
 		const { canvas, userEvent } = context;
 		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Clear review context");
-		await userEvent.click(
-			canvas.getByRole("checkbox", { name: "Pull or merge request is opened" }),
-		);
 		await userEvent.type(
-			canvas.getByRole("textbox", { name: /Evaluation criteria/ }),
+			canvas.getByRole("textbox", { name: /What to look for/ }),
 			"Check whether the reviewed work explains its purpose.",
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
@@ -138,8 +110,17 @@ export const ValidationAndSubmit: Story = {
 				name: "Clear review context",
 				slug: "clear-review-context",
 				criteria: "Check whether the reviewed work explains its purpose.",
-				triggerEvents: ["PullRequestCreated"],
-				artifactType: "PULL_REQUEST",
+				bindings: [
+					{
+						signals: [
+							"scm.pull_request.opened",
+							"scm.pull_request.ready",
+							"scm.pull_request.synchronized",
+						],
+						needs: mockPracticeDefinitionOptions.workTypes[0].recommendedNeeds,
+					},
+				],
+				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[0].recommendedPolicy,
 			},
 			null,
 		);
@@ -147,24 +128,16 @@ export const ValidationAndSubmit: Story = {
 };
 
 export const ConversationPractice: Story = {
-	render: () => (
-		<PracticeForm
-			mode="create"
-			workspaceSlug="demo"
-			areas={mockAreas}
-			onSubmit={createSubmit}
-			isPending={false}
-		/>
-	),
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
 		createSubmit.mockClear();
 		await userEvent.type(canvas.getByRole("textbox", { name: /Name/ }), "Helpful discussion");
-		await userEvent.click(canvas.getByRole("combobox", { name: "Evaluates" }));
-		await userEvent.click(await screen.findByRole("option", { name: "Conversation" }));
-		await expect(canvas.queryByText("Start a review when… *")).not.toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("radio", { name: /Conversation/ }));
+		// A conversation is settled or it is not, so its one occasion is chosen for the author rather
+		// than left as an empty list that cannot be saved.
+		await expect(canvas.getByRole("checkbox", { name: "Discussion settled" })).toBeChecked();
 		await userEvent.type(
-			canvas.getByRole("textbox", { name: /Evaluation criteria/ }),
+			canvas.getByRole("textbox", { name: /What to look for/ }),
 			"Check whether the conversation stays constructive.",
 		);
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
@@ -173,8 +146,13 @@ export const ConversationPractice: Story = {
 				name: "Helpful discussion",
 				slug: "helpful-discussion",
 				criteria: "Check whether the conversation stays constructive.",
-				triggerEvents: [],
-				artifactType: "CONVERSATION_THREAD",
+				bindings: [
+					{
+						signals: ["chat.conversation_thread.settled"],
+						needs: mockPracticeDefinitionOptions.workTypes[2].recommendedNeeds,
+					},
+				],
+				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
 			},
 			null,
 		);

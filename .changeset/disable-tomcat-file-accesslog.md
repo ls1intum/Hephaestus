@@ -2,9 +2,9 @@
 "hephaestus": patch
 ---
 
-Stops writing Tomcat file access logs in production. They were written to a
-`/var/log/hephaestus` volume that wasn't shipped or aggregated anywhere, and the
-requirement for a writable directory there made containers fail to start on a
-fresh volume. Per-request logging is unchanged — the reverse proxy already
-records every request at the edge. This also removes the now-unused log volumes
-from the compose stacks.
+Fixes a fresh install failing to start on its very first boot. The application server wrote a
+per-request access log into a `/var/log/hephaestus` volume, and a newly created volume is owned by
+root, so the server could not write there and aborted instead of coming up. Nothing shipped or
+collected those files anyway; the log and the volumes that held it are gone from the compose stacks,
+and the application server no longer writes a line per request at all. Startup problems, errors and
+sync activity still appear in `docker logs`.

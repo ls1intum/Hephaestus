@@ -16,7 +16,6 @@ public final class MentorContextKeys {
         WorkspaceContentSource.OUTPUT_KEY,
         PracticeCatalogContentSource.OUTPUT_KEY,
         ObservationHistoryContentSource.OUTPUT_KEY,
-        PracticeStandingContentSource.OUTPUT_KEY,
         DeliveredFeedbackContentSource.OUTPUT_KEY,
         RecentAuthoredWorkContentSource.OUTPUT_KEY,
         SlackConversationContentSource.OUTPUT_KEY,

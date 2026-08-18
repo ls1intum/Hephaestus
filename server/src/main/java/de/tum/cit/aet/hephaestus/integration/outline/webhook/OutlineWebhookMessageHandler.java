@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService.OutlineSubscription;
@@ -50,17 +51,20 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
     private final OutlineDocumentSyncScheduler syncScheduler;
     private final OutlineDocumentEventRepository documentEventRepository;
     private final ObjectMapper objectMapper;
+    private final OutlineOriginPolicy originPolicy;
 
     public OutlineWebhookMessageHandler(
         ConnectionService connectionService,
         OutlineDocumentSyncScheduler syncScheduler,
         OutlineDocumentEventRepository documentEventRepository,
-        ObjectMapper objectMapper
+        ObjectMapper objectMapper,
+        OutlineOriginPolicy originPolicy
     ) {
         this.connectionService = connectionService;
         this.syncScheduler = syncScheduler;
         this.documentEventRepository = documentEventRepository;
         this.objectMapper = objectMapper;
+        this.originPolicy = originPolicy;
     }
 
     @Override
@@ -74,7 +78,7 @@ public class OutlineWebhookMessageHandler implements IntegrationMessageHandler {
         Optional<OutlineSubscription> subscription = connectionService.findOutlineSubscription(
             delivery.subscriptionId()
         );
-        if (subscription.isEmpty()) {
+        if (subscription.isEmpty() || !originPolicy.allows(subscription.get().serverUrl())) {
             // The subscription was deleted/disconnected between publish and consume. Nothing to
             // refresh; ACK-as-no-op (returning normally) rather than NAK-looping forever.
             log.debug("outline.consumer: no ACTIVE subscription for delivery, skipping");

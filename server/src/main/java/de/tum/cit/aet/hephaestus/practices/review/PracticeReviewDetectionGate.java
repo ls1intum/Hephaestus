@@ -1,15 +1,23 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.spi.PracticeDetectionReadiness;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -17,35 +25,18 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.NonNull;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import tools.jackson.databind.JsonNode;
 
 /**
- * Detection gate that decides whether to run the practice review agent for a given PR event.
- * <p>
- * Evaluates a series of checks — ordered cheap-to-expensive — to short-circuit before
- * sandbox execution, saving compute. The gate returns a {@link GateDecision} that either
- * carries the resolved workspace and matched practices ({@link GateDecision.Detect}) or
- * a skip reason ({@link GateDecision.Skip}).
- * <p>
- * <strong>Preconditions:</strong> The {@link PullRequest} must have labels, assignees,
- * and repository eagerly loaded before calling {@link #evaluate}.
+ * Decides whether to run the practice review agent for a PR or issue event, running checks ordered
+ * cheap-to-expensive to short-circuit before sandbox execution. Preconditions: the {@link PullRequest}
+ * must have labels, assignees, and repository eagerly loaded before calling {@link #evaluate}.
  *
- * <h2>Gate checks (in order; numbers match the inline step comments in {@code evaluateReviewable})</h2>
- * <ol>
- *   <li>(1) Workspace resolution → SKIP if not found (first, so per-workspace settings drive the gates below)</li>
- *   <li>(2) Draft PR + {@code skipDrafts} setting → SKIP</li>
- *   <li>(2a) Workspace {@code practicesEnabled} flag → SKIP if disabled (complete block)</li>
- *   <li>(2b) Trigger mode: auto-trigger or manual-trigger workspace setting → SKIP if disabled</li>
- *   <li>(3) No runnable practice config for workspace → SKIP</li>
- *   <li>(4) No active practices match trigger event → SKIP</li>
- *   <li>(5) {@code runForAllUsers} setting → DETECT (bypass role check)</li>
- *   <li>(6) No assignee → SKIP</li>
- *   <li>(7) Role checker unhealthy → SKIP</li>
- *   <li>(8) Assignee has {@code run_practice_review} role → DETECT / SKIP</li>
- * </ol>
+ * <p>{@link #evaluateSignal} is the entry point for a kind with no repository, branch or assignee; it
+ * shares the workspace/signal steps below with the reviewable path via {@code evaluateWorkspaceAndSignal}.
  */
 @Service
 public class PracticeReviewDetectionGate {
@@ -56,9 +47,10 @@ public class PracticeReviewDetectionGate {
 
     private final PracticeReviewProperties properties;
     private final UserRoleChecker userRoleChecker;
-    private final PracticeDetectionReadiness practiceDetectionReadiness;
+    private final PracticeReviewReadiness practiceDetectionReadiness;
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
+    private final PracticeSignalOptions signalOptions;
 
     private final AtomicLong skippedDueToUnhealthyCount = new AtomicLong(0);
     private final AtomicReference<Instant> lastSkipWarningTime = new AtomicReference<>(Instant.EPOCH);
@@ -66,61 +58,73 @@ public class PracticeReviewDetectionGate {
     public PracticeReviewDetectionGate(
         PracticeReviewProperties properties,
         UserRoleChecker userRoleChecker,
-        PracticeDetectionReadiness practiceDetectionReadiness,
+        PracticeReviewReadiness practiceDetectionReadiness,
         PracticeRepository practiceRepository,
-        WorkspaceResolver workspaceResolver
+        WorkspaceResolver workspaceResolver,
+        PracticeSignalOptions signalOptions
     ) {
         this.properties = properties;
         this.userRoleChecker = userRoleChecker;
         this.practiceDetectionReadiness = practiceDetectionReadiness;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
+        this.signalOptions = signalOptions;
     }
 
     /**
-     * Evaluates whether the practice review agent should run for the given PR event.
-     * <p>
-     * <strong>Transaction design:</strong> This method is intentionally NOT {@code @Transactional}.
-     * Each DB read (workspace resolution, agent config check, practice query) runs in its own
-     * transaction via Spring Data defaults / explicit annotation. The role check (step 8) is a
-     * local DB lookup, so the gate holds no connection across an external call.
-     *
-     * @param pullRequest      the pull request (must have labels, assignees, repository eagerly loaded)
-     * @param triggerEventName the domain event name (e.g., "PullRequestCreated", "ReviewSubmitted")
-     * @return a {@link GateDecision} indicating whether to detect or skip (with reason)
+     * Deliberately not {@code @Transactional}: each DB read runs in its own transaction, so the gate
+     * never holds a connection across the external role-check call in {@link #checkAssigneeRoles}.
      */
     public GateDecision evaluate(
         @NonNull PullRequest pullRequest,
-        @NonNull String triggerEventName,
+        @NonNull SignalName signal,
         @NonNull TriggerMode triggerMode
     ) {
-        return evaluateReviewable(pullRequest, pullRequest.isDraft(), triggerEventName, triggerMode);
+        return evaluateReviewable(pullRequest, pullRequest.isDraft(), signal, triggerMode);
     }
 
     /**
-     * Issue-side counterpart of {@link #evaluate}: runs the same workspace / feature / trigger-mode /
-     * agent-config / practice-matching / role checks for an issue event. Practice matching filters by
-     * the stored trigger-event strings, so only ISSUE-focused practices (which alone carry issue
-     * trigger events) match — PR-only workspaces short-circuit with no extra cost. There is no draft
-     * concept for issues, so that check is skipped.
-     *
-     * @param issue the issue (must have repository + assignees eagerly loaded)
+     * Issue-side counterpart of {@link #evaluate}. A signal name carries its artifact kind, so only
+     * issue practices can match an issue signal; an issue is never a draft.
      */
     public GateDecision evaluateIssue(
         @NonNull Issue issue,
-        @NonNull String triggerEventName,
+        @NonNull SignalName signal,
         @NonNull TriggerMode triggerMode
     ) {
-        return evaluateReviewable(issue, false, triggerEventName, triggerMode);
+        return evaluateReviewable(issue, false, signal, triggerMode);
+    }
+
+    /**
+     * The kind-generic half of the gate, for an artifact that has no repository, branch or assignee.
+     *
+     * <p>Consent is <em>not</em> checked here: there is nothing kind-generic to check it on, so the
+     * caller that resolved the subject is the one that must answer for them.
+     */
+    public GateDecision evaluateSignal(
+        @NonNull Workspace workspace,
+        @NonNull SignalName signal,
+        @NonNull TriggerMode triggerMode
+    ) {
+        // Never a draft: draftness is a pull request's state, so the draft half of a binding must not
+        // filter a kind that has no such state.
+        return evaluateWorkspaceAndSignal(
+            workspace,
+            signal,
+            false,
+            triggerMode,
+            "workspace:" + workspace.getId(),
+            null
+        );
     }
 
     private GateDecision evaluateReviewable(
         @NonNull Issue reviewable,
         boolean draft,
-        @NonNull String triggerEventName,
+        @NonNull SignalName signal,
         @NonNull TriggerMode triggerMode
     ) {
-        // 1. Workspace resolution (first — per-workspace settings drive the draft gate below)
+        // Workspace resolution first: per-workspace settings drive the checks below.
         String nameWithOwner =
             reviewable.getRepository() != null ? reviewable.getRepository().getNameWithOwner() : null;
         Workspace workspace = workspaceResolver.resolveForRepository(nameWithOwner).orElse(null);
@@ -133,69 +137,42 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no workspace");
         }
 
-        // 2. Draft gate (per-workspace skipDrafts override, falls back to the fleet property)
-        if (workspace.getReviewSettings().resolveSkipDrafts(properties.skipDrafts()) && draft) {
-            log.debug("Practice review gate: SKIP, reason=draftPR, prId={}", reviewable.getId());
-            return new GateDecision.Skip("draft PR");
+        // A binding names a signal, not the trunk it targets (that varies per workspace), so scope is
+        // ANDed on here — the one place that has the artifact's repository and branch to check it against.
+        GateDecision.@Nullable Skip scopeSkip = null;
+        WorkspaceReviewScope scope = workspace.getReviewSettings().resolveReviewScope();
+        if (!scope.isUnrestricted()) {
+            // Only a pull request has a target branch; an issue passes the branch axis by construction.
+            String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
+            if (!scope.admits(nameWithOwner, targetBranch)) {
+                log.debug(
+                    "Practice review gate: SKIP, reason=outOfReviewScope, prId={}, repo={}, targetBranch={}",
+                    reviewable.getId(),
+                    nameWithOwner,
+                    targetBranch
+                );
+                scopeSkip = new GateDecision.Skip(
+                    "outside the workspace review scope",
+                    SignalStateReason.OUT_OF_REVIEW_SCOPE
+                );
+            }
         }
 
-        // 2a. Practices feature must be enabled for the workspace (complete block)
-        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())) {
-            log.debug(
-                "Practice review gate: SKIP, reason=practicesDisabled, prId={}, workspaceId={}",
-                reviewable.getId(),
-                workspace.getId()
-            );
-            return new GateDecision.Skip("practices disabled for workspace");
+        // Workspace- and signal-level checks, shared with evaluateSignal.
+        GateDecision shared = evaluateWorkspaceAndSignal(
+            workspace,
+            signal,
+            draft,
+            triggerMode,
+            String.valueOf(reviewable.getId()),
+            scopeSkip
+        );
+        if (shared instanceof GateDecision.Skip) {
+            return shared;
         }
+        List<Practice> matchedPractices = ((GateDecision.Detect) shared).matchedPractices();
 
-        // 2b. Trigger-mode-specific workspace setting
-        if (
-            triggerMode == TriggerMode.AUTO &&
-            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())
-        ) {
-            log.debug(
-                "Practice review gate: SKIP, reason=autoTriggerDisabled, prId={}, workspaceId={}",
-                reviewable.getId(),
-                workspace.getId()
-            );
-            return new GateDecision.Skip("auto-trigger disabled for workspace");
-        }
-        if (
-            triggerMode == TriggerMode.MANUAL &&
-            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())
-        ) {
-            log.debug(
-                "Practice review gate: SKIP, reason=manualTriggerDisabled, prId={}, workspaceId={}",
-                reviewable.getId(),
-                workspace.getId()
-            );
-            return new GateDecision.Skip("manual trigger disabled for workspace");
-        }
-
-        // 3. Agent gate: skip rather than incur LLM cost for a detection run that would submit no jobs.
-        if (!practiceDetectionReadiness.hasRunnableAgent(workspace.getId())) {
-            log.debug(
-                "Practice review gate: SKIP, reason=noRunnableDetectionAgent, prId={}, workspaceId={}",
-                reviewable.getId(),
-                workspace.getId()
-            );
-            return new GateDecision.Skip("no runnable practice-detection agent");
-        }
-
-        // 4. Practice matching: at least one active practice must match the trigger event
-        List<Practice> matchedPractices = findMatchingPractices(workspace.getId(), triggerEventName);
-        if (matchedPractices.isEmpty()) {
-            log.debug(
-                "Practice review gate: SKIP, reason=noMatchingPractices, prId={}, triggerEvent={}, workspaceId={}",
-                reviewable.getId(),
-                triggerEventName,
-                workspace.getId()
-            );
-            return new GateDecision.Skip("no matching practices");
-        }
-
-        // 5. Run-for-all bypass: skip role check entirely (per-workspace override, falls back to property)
+        // Run-for-all bypass skips the role check entirely; falls back to the instance property.
         if (workspace.getReviewSettings().resolveRunForAllUsers(properties.runForAllUsers())) {
             log.info(
                 "Practice review gate: DETECT, reason=runForAllUsers, prId={}, matchedPractices={}",
@@ -205,36 +182,28 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Detect(workspace, matchedPractices);
         }
 
-        // 6. Assignee gate: at least one assignee required for role checking
         var assignees = reviewable.getAssignees();
         if (assignees == null || assignees.isEmpty()) {
             log.debug("Practice review gate: SKIP, reason=noAssignee, prId={}", reviewable.getId());
             return new GateDecision.Skip("no assignee");
         }
 
-        // 7. Role-checker health gate
         if (!userRoleChecker.isHealthy()) {
             logSkippedDueToUnhealthy(reviewable);
             return new GateDecision.Skip("role checker unhealthy");
         }
 
-        // Reset skip counter on recovery
         long previousCount = skippedDueToUnhealthyCount.getAndSet(0);
         if (previousCount > 0) {
             log.info("Role checker recovered, resuming practice review gate checks");
         }
 
-        // 8. Role check: DETECT if ANY assignee has the role
         return checkAssigneeRoles(reviewable, assignees, workspace, matchedPractices);
     }
 
     /**
-     * Checks all assignees for the practice review role. Returns Detect on first match.
-     * <p>
-     * On exception: fails closed immediately (returns Skip) rather than continuing to the next
-     * assignee. This is intentional — if the role checker is misbehaving, we should not
-     * make additional calls. The {@code isHealthy()} gate (step 7) handles the common case;
-     * this catch handles unexpected failures that slip through.
+     * Fails closed on the first role-check exception rather than trying the next assignee — a
+     * misbehaving role checker should not get more calls.
      */
     private GateDecision checkAssigneeRoles(
         Issue reviewable,
@@ -244,10 +213,8 @@ public class PracticeReviewDetectionGate {
     ) {
         for (User assignee : assignees) {
             try {
-                // Identity is the stable (gitProviderId, subject) tuple, not the login: the role lives on
-                // the Hephaestus account behind THIS provider's identity. subject == the provider's numeric
-                // user id (User.nativeId as a string), matching IdentityLink.subject. A synced assignee
-                // always carries both; guard defensively so a half-synced row fails safe (no role).
+                // Role checks key on (gitProviderId, nativeId) — matching IdentityLink.subject, not the
+                // login — so a half-synced assignee fails safe (no role) rather than throwing.
                 var provider = assignee.getProvider();
                 if (provider == null || provider.getId() == null || assignee.getNativeId() == null) {
                     continue;
@@ -286,26 +253,135 @@ public class PracticeReviewDetectionGate {
         return new GateDecision.Skip("no assignee with role: " + PRACTICE_REVIEW_ROLE);
     }
 
-    private List<Practice> findMatchingPractices(Long workspaceId, String triggerEventName) {
-        return practiceRepository
-            .findByWorkspaceIdAndActiveTrue(workspaceId)
-            .stream()
-            .filter(p -> containsTriggerEvent(p.getTriggerEvents(), triggerEventName))
-            .toList();
+    /**
+     * The workspace- and signal-level gate: the checks an artifact contributes nothing to. Shared rather
+     * than duplicated for repo-less kinds, so the two paths cannot disagree about what {@code OFF} means.
+     *
+     * @param subject an identifier for the logs only; the gate makes no decision from it
+     */
+    private GateDecision evaluateWorkspaceAndSignal(
+        Workspace workspace,
+        SignalName signal,
+        boolean draft,
+        TriggerMode triggerMode,
+        String subject,
+        GateDecision.@Nullable Skip scopeSkip
+    ) {
+        if (!Boolean.TRUE.equals(workspace.getFeatures().getPracticesEnabled())) {
+            log.debug(
+                "Practice review gate: SKIP, reason=practicesDisabled, subject={}, workspaceId={}",
+                subject,
+                workspace.getId()
+            );
+            return new GateDecision.Skip("practices disabled for workspace");
+        }
+
+        // The artifact's own scope refusal: checked after the feature flag but before anything that costs
+        // a query.
+        if (scopeSkip != null) {
+            return scopeSkip;
+        }
+
+        if (
+            triggerMode == TriggerMode.AUTO &&
+            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewAutoTriggerEnabled())
+        ) {
+            log.debug(
+                "Practice review gate: SKIP, reason=autoTriggerDisabled, subject={}, workspaceId={}",
+                subject,
+                workspace.getId()
+            );
+            return new GateDecision.Skip("auto-trigger disabled for workspace");
+        }
+        if (
+            triggerMode == TriggerMode.MANUAL &&
+            !Boolean.TRUE.equals(workspace.getFeatures().getPracticeReviewManualTriggerEnabled())
+        ) {
+            log.debug(
+                "Practice review gate: SKIP, reason=manualTriggerDisabled, subject={}, workspaceId={}",
+                subject,
+                workspace.getId()
+            );
+            return new GateDecision.Skip("manual trigger disabled for workspace");
+        }
+
+        // Skip rather than incur LLM cost for a detection run that would submit no jobs.
+        if (!practiceDetectionReadiness.hasRunnableAgent(workspace.getId())) {
+            log.debug(
+                "Practice review gate: SKIP, reason=noRunnableDetectionAgent, subject={}, workspaceId={}",
+                subject,
+                workspace.getId()
+            );
+            return new GateDecision.Skip("no runnable practice-review agent");
+        }
+
+        // A binding decides its own draft policy rather than a fleet-wide veto ahead of it, otherwise no
+        // binding could ever fire on a draft.
+        SignalMatch match = findMatchingPractices(workspace, signal, draft);
+        if (match.admitted().isEmpty()) {
+            // Two reasons, not one: "bound and turned all the way down" is a deliberate act and must stay
+            // answerable apart from "nothing bound".
+            if (match.silencedByTier()) {
+                log.debug(
+                    "Practice review gate: SKIP, reason=allBoundPracticesOff, subject={}, signal={}, workspaceId={}",
+                    subject,
+                    signal,
+                    workspace.getId()
+                );
+                return new GateDecision.Skip(
+                    "every practice bound to this signal is off",
+                    SignalStateReason.PRACTICE_TIER_OFF
+                );
+            }
+            log.debug(
+                "Practice review gate: SKIP, reason=noMatchingPractices, subject={}, signal={}, draft={}, " +
+                    "workspaceId={}",
+                subject,
+                signal,
+                draft,
+                workspace.getId()
+            );
+            return new GateDecision.Skip(
+                draft ? "no practices bound to this signal on drafts" : "no matching practices"
+            );
+        }
+        return new GateDecision.Detect(workspace, match.admitted());
     }
 
-    private boolean containsTriggerEvent(JsonNode triggerEvents, String eventName) {
-        if (triggerEvents == null || !triggerEvents.isArray()) {
-            return false;
-        }
-        for (JsonNode node : triggerEvents) {
-            // Guard the type before coercion: in Jackson 3 a non-scalar element (object/array, e.g. from an
-            // out-of-band JSONB edit) makes asString() THROW. Skipping non-strings keeps the matcher total.
-            if (node.isString() && eventName.equals(node.asString())) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * @param admitted the practices to review — bound to the signal and above {@link PracticeReviewTier#OFF}
+     * @param silencedByTier at least one practice was bound to the signal and sat at {@code OFF}; this is
+     *     what lets the caller record "deliberately silenced" rather than "nothing bound"
+     */
+    private record SignalMatch(List<Practice> admitted, boolean silencedByTier) {}
+
+    /**
+     * The practices a signal occasions. A manual request is matched differently: it admits every practice
+     * bound to the artifact's kind, ignoring both the specific signal and the draft filter, since asking
+     * "review this now" has already answered the draft question. {@code OFF} still means off either way.
+     */
+    private SignalMatch findMatchingPractices(Workspace workspace, SignalName signal, boolean draft) {
+        boolean requestedByHand = signalOptions.isManualRequest(signal);
+        List<Practice> bound = practiceRepository
+            .findByWorkspaceId(workspace.getId())
+            .stream()
+            .filter(p ->
+                p
+                    .getBindings()
+                    .stream()
+                    .anyMatch(binding ->
+                        requestedByHand ? binding.appliesTo(signal.artifactKind()) : binding.occasionedBy(signal, draft)
+                    )
+            )
+            .toList();
+        // Reading the tier column raw would ask a practice that holds no opinion for one; resolve it
+        // through practice -> area -> workspace instead.
+        PracticeReviewTier workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultTier();
+        List<Practice> admitted = bound
+            .stream()
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
+            .toList();
+        return new SignalMatch(admitted, admitted.isEmpty() && !bound.isEmpty());
     }
 
     private void logSkippedDueToUnhealthy(Issue reviewable) {

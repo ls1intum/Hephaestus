@@ -21,18 +21,23 @@ import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
@@ -42,6 +47,7 @@ import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -54,18 +60,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.context.event.ApplicationEvents;
 import org.springframework.test.context.event.RecordApplicationEvents;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
-/**
- * Full pipeline integration test: handler.deliver() → result parser → finding persistence
- * → feedback delivery. Exercises real PostgreSQL for finding idempotency (ON CONFLICT DO NOTHING)
- * and event publication.
- *
- * <p><b>Mock boundary:</b> {@link PullRequestCommentPoster} and {@link DiffNotePoster} are mocked
- * because they make external API calls to GitHub/GitLab. All other components (result parser,
- * delivery service, feedback service, finding repository) are real beans against PostgreSQL.
- */
 @RecordApplicationEvents
 class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
@@ -79,6 +77,12 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
+
+    @Autowired
+    private ContentAddressedStore cas;
 
     @Autowired
     private AgentJobRepository agentJobRepository;
@@ -130,8 +134,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         workspace.getFeatures().setPracticesEnabled(true);
         workspace = workspaceRepository.save(workspace);
 
-        createPractice("pr-description-quality", "PR Description Quality");
-        createPractice("error-handling", "Error Handling");
+        Practice description = createPractice("pr-description-quality", "PR Description Quality");
+        Practice errors = createPractice("error-handling", "Error Handling");
 
         IdentityProvider provider = gitProviderRepository
             .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
@@ -192,7 +196,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         agentJob = new AgentJob();
         agentJob.setWorkspace(workspace);
-        agentJob.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        agentJob.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         agentJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         agentJob.setStatus(AgentJobStatus.COMPLETED);
         agentJob.setConfigSnapshot(
@@ -209,6 +213,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         metadata.put("source_branch", "feature/pipeline");
         metadata.put("target_branch", "main");
         agentJob.setMetadata(metadata);
+        agentJob.setEvidenceSnapshot(evidenceSnapshot(description, errors));
         agentJob = agentJobRepository.save(agentJob);
 
         handler = handlerRegistry.getHandler(AgentJobType.PULL_REQUEST_REVIEW);
@@ -219,19 +224,33 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     private Practice createPractice(String slug, String name) {
         Practice p = new Practice();
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);
-        p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        return practiceRepository.save(p);
+        p.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
+        p = practiceRepository.saveAndFlush(p);
+        PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(p, 1));
+        p.setCurrentRevision(revision);
+        return practiceRepository.saveAndFlush(p);
     }
 
     private void setJobOutput(String rawOutput) {
+        agentJob = admitAndSetOutput(agentJob, rawOutput);
+    }
+
+    private AgentJob admitAndSetOutput(AgentJob job, String rawOutput) {
+        JsonNode observations = OBJECT_MAPPER.readTree(withEvidence(rawOutput)).path("observations");
+        ((PullRequestReviewHandler) handler).admitObservations(job, observations);
+        String digest = "test-admission-digest";
+        ObjectNode metadata = (ObjectNode) job.getMetadata().deepCopy();
+        metadata.put(ObservationAdmissionService.DIGEST_METADATA_KEY, digest);
+        job.setMetadata(metadata);
         ObjectNode output = OBJECT_MAPPER.createObjectNode();
-        output.put("rawOutput", rawOutput);
-        agentJob.setOutput(output);
-        agentJob = agentJobRepository.save(agentJob);
+        output.putObject("feedback").put("admissionDigest", digest).putArray("units");
+        job.setOutput(output);
+        return agentJobRepository.save(job);
     }
 
     private void releaseSilentMode() {
@@ -251,45 +270,112 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private AgentJob newJobWithOutput(String rawOutput) {
         AgentJob next = new AgentJob();
         next.setWorkspace(workspace);
-        next.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        next.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         next.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         next.setStatus(AgentJobStatus.COMPLETED);
         next.setConfigSnapshot(agentJob.getConfigSnapshot());
         next.setMetadata(agentJob.getMetadata().deepCopy());
-        ObjectNode output = OBJECT_MAPPER.createObjectNode();
-        output.put("rawOutput", rawOutput);
-        next.setOutput(output);
-        return agentJobRepository.save(next);
+        next.setEvidenceSnapshot(agentJob.getEvidenceSnapshot().deepCopy());
+        next = agentJobRepository.save(next);
+        return admitAndSetOutput(next, rawOutput);
+    }
+
+    private ObjectNode evidenceSnapshot(Practice... practices) {
+        ObjectNode snapshot = OBJECT_MAPPER.createObjectNode();
+        var sources = snapshot.putObject("manifest").put("contractVersion", "1.0.0").putArray("sources");
+        addArtifact(
+            sources.addObject().put("kind", "scm.pull-request.core"),
+            "inputs/context/metadata.json",
+            "{\"body\":\"Test body\"}"
+        );
+        addArtifact(
+            sources.addObject().put("kind", "scm.pull-request.diff"),
+            "inputs/context/diff.patch",
+            "diff --git a/src/Main.java b/src/Main.java\n+++ b/src/Main.java\n@@ -10 +10 @@\n[L10] + insecure();\n"
+        );
+        var admitted = snapshot.putArray("practices");
+        for (Practice practice : practices) {
+            admitted
+                .addObject()
+                .put("slug", practice.getSlug())
+                .put("revisionId", practice.getCurrentRevision().getId());
+        }
+        return snapshot;
+    }
+
+    private void addArtifact(ObjectNode source, String path, String content) {
+        var facts = source
+            .putObject("state")
+            .put("availability", "AVAILABLE")
+            .put("content", "NON_EMPTY")
+            .put("completeness", "COMPLETE")
+            .putObject("facts")
+            .put("capturedAt", "2026-08-03T00:00:00Z");
+        if ("scm.pull-request.diff".equals(source.path("kind").asString())) {
+            facts.put("immutableIdentity", "pipelinesha");
+        } else {
+            facts.put("sourceEffectiveAt", "2026-08-03T00:00:00Z");
+        }
+        byte[] bytes = content.getBytes(StandardCharsets.UTF_8);
+        source
+            .putArray("artifacts")
+            .addObject()
+            .put("path", path)
+            .put("mediaType", path.endsWith(".json") ? "application/json" : "text/x-diff")
+            .put("sha256", cas.put(bytes))
+            .put("bytes", bytes.length);
+    }
+
+    private String withEvidence(String rawOutput) {
+        try {
+            var root = OBJECT_MAPPER.readTree(rawOutput);
+            for (var observation : root.path("observations")) {
+                if (!observation.has("evidence")) {
+                    var citation = ((ObjectNode) observation).putObject("evidence").putArray("citations").addObject();
+                    citation.put("sourceKind", "scm.pull-request.core");
+                    citation.put("artifactPath", "inputs/context/metadata.json");
+                    citation.put("path", "body");
+                    citation.put("startLine", 1);
+                    citation.put("endLine", 1);
+                    citation.put("quote", "Test body");
+                }
+                // An ABSENT observation asserts a universal, so delivery requires it to record the
+                // search that came up empty.
+                if ("ABSENT".equals(observation.path("presence").asString(null))) {
+                    var search = ((ObjectNode) observation.path("evidence")).putObject("search");
+                    search.putArray("consulted").add("scm.pull-request.core");
+                    search.put("lookedFor", "a null check on the changed method");
+                    search.put("boundary", "the pull request metadata only");
+                }
+            }
+            return OBJECT_MAPPER.writeValueAsString(root);
+        } catch (RuntimeException ignored) {
+            return rawOutput;
+        }
     }
 
     private String validAgentOutput() {
-        String findings = """
+        String observations = """
             {
-              "findings": [
+              "observations": [
                 {
                   "practiceSlug": "pr-description-quality",
-                  "title": "Good PR description",
+                  "summary": "Good PR description",
                   "presence": "PRESENT",
                   "assessment": "GOOD",
                   "severity": "INFO",
-                  "confidence": 0.95
+                  "evidenceRationale": "The description names what changed."
                 },
                 {
                   "practiceSlug": "error-handling",
-                  "title": "Missing null check",
+                  "summary": "Missing null check",
                   "presence": "ABSENT",
                   "assessment": "BAD",
                   "severity": "MAJOR",
-                  "confidence": 0.85,
-                  "reasoning": "The method does not check for null input.",
-                  "guidance": "Add a null check at the top of the method.",
-                  "suggestedDiffNotes": [
-                    { "filePath": "src/Main.java", "startLine": 10, "endLine": 15,
-                      "body": "Consider adding a null check here." }
-                  ]
+                  "evidenceRationale": "The method does not check for null input."
                 }
               ]""";
-        return findings + "\n}";
+        return observations + "\n}";
     }
 
     @Nested
@@ -337,9 +423,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            List<Observation> findings = observationRepository.findAll();
-            assertThat(findings).hasSize(2);
-            assertThat(findings)
+            List<Observation> observations = observationRepository.findAll();
+            assertThat(observations).hasSize(2);
+            assertThat(observations)
                 .extracting(Observation::getPresence)
                 .containsExactlyInAnyOrder(Presence.PRESENT, Presence.ABSENT);
 
@@ -347,7 +433,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
             assertThat(events).hasSize(1);
-            assertThat(events.get(0).findingsInserted()).isEqualTo(2);
+            assertThat(events.get(0).observationsInserted()).isEqualTo(2);
             assertThat(events.get(0).hasNegative()).isTrue();
 
             verify(commentPoster).postFormattedBody(eq(agentJob), any(String.class));
@@ -362,22 +448,22 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         void allPositiveFindingsPostsApproval() {
             String output = """
                 {
-                  "findings": [
+                  "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
-                      "title": "Good description",
+                      "summary": "Good description",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
+                      "evidenceRationale": "The description explains the change."
                     },
                     {
                       "practiceSlug": "error-handling",
-                      "title": "Proper error handling",
+                      "summary": "Proper error handling",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
+                      "evidenceRationale": "The implementation handles errors explicitly."
                     }
                   ]
                 }""";
@@ -388,10 +474,10 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            // A findings summary reaches this same call, so only the body text tells an approval apart.
+            // A observations summary reaches this same call, so only the body text tells an approval apart.
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(agentJob), body.capture());
-            assertThat(body.getValue()).contains("nothing to change here");
+            assertThat(body.getValue()).contains("What's working well here");
 
             verify(diffNotePoster).reconcileInlineNotes(eq(agentJob), eq(List.of()));
         }
@@ -401,62 +487,45 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     class ErrorCases {
 
         @Test
-        void invalidJsonOutputFailsGracefully() {
-            setJobOutput("this is not valid JSON at all");
-
-            assertThatThrownBy(() -> handler.deliver(agentJob))
-                .isInstanceOf(JobDeliveryException.class)
-                .hasMessageContaining("No valid findings");
-
-            assertThat(observationRepository.findAll()).isEmpty();
-            verify(commentPoster, never()).postFormattedBody(any(), any());
-        }
-
-        @Test
-        void unknownSlugDiscardedOthersKept() {
+        void unknownSlugRejectsDeliveryAtomically() {
             String output = """
                 {
-                  "findings": [
+                  "observations": [
                     {
                       "practiceSlug": "pr-description-quality",
-                      "title": "Good description",
+                      "summary": "Good description",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
+                      "evidenceRationale": "The description explains the change."
                     },
                     {
                       "practiceSlug": "nonexistent-practice",
-                      "title": "Unknown practice",
+                      "summary": "Unknown practice",
                       "presence": "PRESENT",
                       "assessment": "GOOD",
                       "severity": "INFO",
-                      "confidence": 0.9
+                      "evidenceRationale": "The submitted practice does not exist."
                     },
                     {
                       "practiceSlug": "error-handling",
-                      "title": "Good handling",
+                      "summary": "Good handling",
                       "presence": "ABSENT",
                       "assessment": "BAD",
                       "severity": "MINOR",
-                      "confidence": 0.8
+                      "evidenceRationale": "The implementation omits the required check."
                     }
                   ]
                 }""";
-            setJobOutput(output);
-            when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-456");
+            JsonNode submitted = OBJECT_MAPPER.readTree(withEvidence(output)).path("observations");
 
-            handler.deliver(agentJob);
+            assertThatThrownBy(() -> ((PullRequestReviewHandler) handler).admitObservations(agentJob, submitted))
+                .isInstanceOf(JobDeliveryException.class)
+                .hasMessageContaining("practice not admitted to the job");
 
-            List<Observation> findings = observationRepository.findAll();
-            assertThat(findings).hasSize(2);
-
-            List<PracticeDetectionCompletedEvent> events = applicationEvents
-                .stream(PracticeDetectionCompletedEvent.class)
-                .toList();
-            assertThat(events).hasSize(1);
-            assertThat(events.get(0).findingsInserted()).isEqualTo(2);
-            assertThat(events.get(0).findingsDiscarded()).isEqualTo(1);
+            assertThat(observationRepository.findAll()).isEmpty();
+            verify(commentPoster, never()).postFormattedBody(any(), any());
+            verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
         }
 
         @Test
@@ -502,7 +571,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
             handler.deliver(agentJob);
 
-            // Findings are still persisted: deliver() persists first, then posts.
+            // Observations are still persisted: deliver() persists first, then posts.
             assertThat(observationRepository.findAll()).hasSize(2);
 
             verify(commentPoster, never()).postFormattedBody(any(), any());
@@ -517,7 +586,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     class FindingIdempotency {
 
         @Test
-        @DisplayName("re-delivering same job creates no duplicate findings")
+        @DisplayName("re-delivering same job creates no duplicate observations")
         void redeliveryNoDuplicates() {
             setJobOutput(validAgentOutput());
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("comment-789");
@@ -534,10 +603,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
             List<PracticeDetectionCompletedEvent> events = applicationEvents
                 .stream(PracticeDetectionCompletedEvent.class)
                 .toList();
-            assertThat(events).hasSize(2);
-            assertThat(events.get(0).findingsInserted()).isEqualTo(2);
-            assertThat(events.get(1).findingsInserted()).isZero();
-            assertThat(events.get(1).findingsDiscarded()).isEqualTo(2);
+            assertThat(events).hasSize(1);
+            assertThat(events.get(0).observationsInserted()).isEqualTo(2);
         }
     }
 }

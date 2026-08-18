@@ -12,6 +12,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
@@ -68,8 +69,12 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
             collectionRepository,
             connectionService,
             identityResolver,
-            documentSelector
+            documentSelector,
+            new OutlineOriginPolicy(Set.of(SERVER_URL))
         );
+        lenient()
+            .when(connectionService.findActiveOutlineConfig(WORKSPACE_ID))
+            .thenReturn(Optional.of(new ConnectionConfig.OutlineConfig(SERVER_URL, null, null, Set.of())));
         lenient()
             .when(connectionService.findActive(WORKSPACE_ID, IntegrationKind.OUTLINE))
             .thenReturn(Optional.of(activeConnection()));
@@ -501,5 +506,20 @@ class OutlineDocumentProjectorTest extends BaseUnitTest {
 
         assertThat(projector.searchDocuments(WORKSPACE_ID, "nothing", 5)).isEmpty();
         verify(connectionService, never()).findActive(anyLong(), any());
+    }
+
+    @Test
+    void documentsForWorkspace_withholdsMirrorAfterOriginApprovalIsRemoved() {
+        OutlineDocumentProjector denied = new OutlineDocumentProjector(
+            documentRepository,
+            collectionRepository,
+            connectionService,
+            identityResolver,
+            documentSelector,
+            new OutlineOriginPolicy(Set.of())
+        );
+
+        assertThat(denied.documentsForWorkspace(WORKSPACE_ID)).isEmpty();
+        verify(documentRepository, never()).findForProjection(anyLong(), any());
     }
 }

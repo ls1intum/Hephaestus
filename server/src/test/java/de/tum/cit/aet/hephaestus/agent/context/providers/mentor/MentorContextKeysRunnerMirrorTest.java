@@ -54,7 +54,7 @@ class MentorContextKeysRunnerMirrorTest {
         String prompt = Files.readString(SYSTEM_PROMPT, StandardCharsets.UTF_8);
         String perTurnInputSection = prompt.substring(
             prompt.indexOf("## Per-turn input"),
-            prompt.indexOf("### Reading `inputs/context/practice_standing.json`")
+            prompt.indexOf("## When to use tools")
         );
 
         assertThat(MentorContextKeys.ALLOWED_OUTPUT_KEYS).allSatisfy(key ->
@@ -70,8 +70,8 @@ class MentorContextKeysRunnerMirrorTest {
         String source = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(source)
-            .contains("tools: [\"fetch_context\", \"link_finding\"]")
+            .contains("tools: [\"fetch_context\", \"link_observation\"]")
             .contains("\"inputs/context/recent_authored_work.json\"")
-            .doesNotContain("tools: [\"fetch_context\", \"link_finding\", \"read\", \"bash\", \"grep\"]");
+            .doesNotContain("tools: [\"fetch_context\", \"link_observation\", \"read\", \"bash\", \"grep\"]");
     }
 }

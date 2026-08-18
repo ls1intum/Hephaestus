@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectDialogFitsViewport } from "@/test/reflow";
 import { WorkspaceLlmModelFormDialog } from "./WorkspaceLlmModelFormDialog";
 
@@ -49,11 +50,7 @@ export const FreeModel: Story = {
 	args: { editing: { ...mockModel, pricingMode: "NO_CHARGE", priceNote: "self-hosted, no cost" } },
 };
 
-/**
- * WCAG 2.2 SC 1.4.10 at 320 px: this form outgrows the viewport, and `DialogBody` bounding the
- * height is all that keeps a `position: fixed` popup from hanging off both ends with its title and
- * submit out of reach.
- */
+/** WCAG 2.2 SC 1.4.10 at 320 px: `DialogBody`'s height bound is all that keeps the popup on screen. */
 export const MobileReflow: Story = {
 	args: { editing: mockModel },
 	parameters: {
@@ -69,7 +66,7 @@ export const MobileReflow: Story = {
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /add inactive model/i }));
-		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
-		await expect(await screen.findByText(/upstream model id is required/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/display name is required/i));
+		await expectSettledVisible(await screen.findByText(/upstream model id is required/i));
 	},
 };

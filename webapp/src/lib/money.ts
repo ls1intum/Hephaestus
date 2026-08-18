@@ -1,9 +1,7 @@
 /**
- * USD rendering for every surface that shows money.
- *
- * **Format these, do not do sums with them.** Totals, remaining budget and cap verdicts are exact
- * decimals computed server-side and shipped as their own fields; re-deriving one by adding up
- * binary64 rows here can only disagree with the figure printed above it.
+ * **Format only, never sum.** Totals, remaining budget and cap verdicts are exact decimals computed
+ * server-side and shipped as their own fields; re-deriving one from binary64 rows here can only
+ * disagree with the figure printed beside it.
  */
 const USD = new Intl.NumberFormat("en-US", {
 	style: "currency",
@@ -41,7 +39,7 @@ export function formatCapUsd(value: number | undefined): string {
 	return Number.isInteger(value) ? USD_WHOLE.format(value) : USD.format(value);
 }
 
-/** A published price: all four decimals, because an admin checks it against a price list. */
+/** A published price keeps its decimals, because an admin checks it against a price list. */
 export function formatRateUsd(value: number | undefined): string {
 	return value == null ? "—" : USD_RATE.format(value);
 }

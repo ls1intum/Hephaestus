@@ -14,10 +14,12 @@ import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEvent;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventData;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventLogger;
 import de.tum.cit.aet.hephaestus.core.auth.audit.AuthEventWriter;
+import de.tum.cit.aet.hephaestus.core.security.OutlineOriginPolicy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
@@ -49,7 +51,8 @@ class LoginProviderServiceTest extends BaseUnitTest {
             registrationCache,
             AuthPropertiesFixture.withLoginProviders(providers),
             authEventLogger,
-            new ObjectMapper()
+            new ObjectMapper(),
+            new OutlineOriginPolicy(Set.of("https://wiki.example.com", "https://wiki.acme.test"))
         );
     }
 
@@ -381,6 +384,14 @@ class LoginProviderServiceTest extends BaseUnitTest {
         // SSRF / HTTPS guard: the Outline base URL takes the same ServerUrlValidator posture as GitLab.
         assertThatThrownBy(() ->
             adminService().create(outlineDraft("outline-x", "http://wiki.acme.test", null))
+        ).isInstanceOf(ResponseStatusException.class);
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void createRejectsUnapprovedOutlineOrigin() {
+        assertThatThrownBy(() ->
+            adminService().create(outlineDraft("outline-x", "https://wiki.denied.test", null))
         ).isInstanceOf(ResponseStatusException.class);
         verify(repository, never()).save(any());
     }

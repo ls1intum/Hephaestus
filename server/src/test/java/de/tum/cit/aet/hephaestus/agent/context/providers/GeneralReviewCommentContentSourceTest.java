@@ -1,13 +1,15 @@
 package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueCommentRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
@@ -40,7 +42,9 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         provider = new GeneralReviewCommentContentSource(objectMapper, issueCommentRepository);
-        lenient().when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(any())).thenReturn(List.of());
+        lenient()
+            .when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any()))
+            .thenReturn(List.of());
     }
 
     private ObjectNode metadataWithPr() {
@@ -72,27 +76,36 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
     }
 
     @Test
-    void contribute_noPrId_writesNothing() {
+    void contribute_noPrId_reportsCollectionError() {
         ObjectNode metadata = objectMapper.createObjectNode();
         metadata.put("repository_id", 123L);
 
-        Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(request(metadata), files);
-
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        // Writing nothing would be misread downstream as "no review comments", a claim about the
+        // work rather than the collection — so a missing pull_request_id must throw instead.
+        assertThatThrownBy(() -> provider.contribute(request(metadata), new HashMap<>()))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasRootCauseMessage("Review-comment collection has no pull_request_id");
     }
 
+    /**
+     * A pull request nobody commented on still stages the file, holding an empty list — omitting it would leave
+     * the model unable to tell "no comments" from "comments never staged".
+     */
     @Test
-    void contribute_noComments_writesNothing() {
-        Map<String, byte[]> files = new HashMap<>();
-        provider.contribute(request(metadataWithPr()), files);
+    void contribute_noComments_stagesAnEmptyCommentList() throws Exception {
+        var captured = provider.capture(request(metadataWithPr()), provider.sourceKinds());
 
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        assertThat(captured.files()).containsKey(FILE_KEY);
+        var out = objectMapper.readTree(captured.files().get(FILE_KEY));
+        assertThat(out.get("comments")).isEmpty();
+        assertThat(out.get("count").asInt()).isZero();
+        // Present, and still EMPTY: the staged placeholder must not be read back as content.
+        assertThat(captured.contentStates()).containsValue(SourceContentState.EMPTY);
     }
 
     @Test
     void contribute_generalDiscussion_emittedWithAuthorAndBody() throws Exception {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment(
                     "reviewer-a",
@@ -117,7 +130,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_excludesHephaestusOwnComments() throws Exception {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment(
                     "bot",
@@ -136,14 +149,13 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // The Hephaestus marker comment is dropped; only the human reviewer comment survives.
         assertThat(out.get("count").asInt()).isEqualTo(1);
         assertThat(out.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-b");
     }
 
     @Test
-    void contribute_onlyHephaestusComments_writesNothing() {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+    void contribute_onlyHephaestusComments_stagesAnEmptyCommentList() {
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment("bot", "<!-- hephaestus:practice-review:abc --> summary", Instant.parse("2025-06-01T09:00:00Z"))
             )
@@ -152,34 +164,34 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
 
-        // Only the bot's own comment was present — emit nothing so reviewer-craft keeps empty-context abstention.
-        assertThat(files).doesNotContainKey(FILE_KEY);
+        // Still staged holding nothing: reviewer-craft's empty-context abstention must come from the empty
+        // list, not from the file being absent.
+        assertThat(files).containsKey(FILE_KEY);
     }
 
     @Test
-    void contribute_neverThrows_onRepositoryFailure() {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenThrow(
+    void contribute_reportsRepositoryFailure() {
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenThrow(
             new RuntimeException("db down")
         );
 
         Map<String, byte[]> files = new HashMap<>();
-        assertThatCode(() -> provider.contribute(request(metadataWithPr()), files)).doesNotThrowAnyException();
+        assertThatThrownBy(() -> provider.contribute(request(metadataWithPr()), files))
+            .isInstanceOf(EvidenceCollectionException.class)
+            .hasMessageContaining("General-review-comment collection failed");
         assertThat(files).doesNotContainKey(FILE_KEY);
     }
 
     @Test
     void contribute_overCap_keepsNewestAndFlagsTruncated() throws Exception {
-        // A6: the query is ORDER BY createdAt ASC (oldest first). On truncation the provider must keep the MOST
-        // RECENT MAX_COMMENTS — keeping the oldest head would drop the late approval/resolution and manufacture a
-        // false "rubber-stamp" verdict. Build MAX_COMMENTS + 5 comments; only the newest MAX_COMMENTS survive.
         int total = GeneralReviewCommentContentSource.MAX_COMMENTS + 5;
         List<IssueComment> comments = new ArrayList<>();
         Instant base = Instant.parse("2025-06-01T00:00:00Z");
         for (int i = 0; i < total; i++) {
-            // body encodes the sequence index so we can assert WHICH comments survived.
             comments.add(comment("reviewer-" + i, "comment-" + i, base.plusSeconds(i)));
         }
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(comments);
+        java.util.Collections.reverse(comments);
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(comments);
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(request(metadataWithPr()), files);
@@ -187,11 +199,9 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
         assertThat(out.get("count").asInt()).isEqualTo(GeneralReviewCommentContentSource.MAX_COMMENTS);
         assertThat(out.get("truncated").asBoolean()).isTrue();
-        // The oldest (comment-0) is dropped; the newest (last index) survives and leads the kept tail.
         JsonNode bodies = out.get("comments");
-        assertThat(bodies.get(0).get("body").asString()).isEqualTo("comment-5"); // first kept = total-MAX
+        assertThat(bodies.get(0).get("body").asString()).isEqualTo("comment-5");
         assertThat(bodies.get(bodies.size() - 1).get("body").asString()).isEqualTo("comment-" + (total - 1));
-        // The dropped oldest must not appear anywhere.
         for (JsonNode c : bodies) {
             assertThat(c.get("body").asString()).isNotEqualTo("comment-0");
         }
@@ -199,7 +209,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_underCap_flagsNotTruncated() throws Exception {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(comment("reviewer-a", "looks good", Instant.parse("2025-06-01T10:00:00Z")))
         );
 
@@ -212,7 +222,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_nullAuthor_omitsAuthorKey() throws Exception {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(comment(null, "anonymous note", Instant.parse("2025-06-01T10:00:00Z")))
         );
 
@@ -227,7 +237,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_nullCreatedAt_omitsCreatedAtKey() throws Exception {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(comment("reviewer-a", "no timestamp", null))
         );
 
@@ -241,7 +251,7 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
 
     @Test
     void contribute_blankBody_isSkipped() throws Exception {
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment("reviewer-a", "   ", Instant.parse("2025-06-01T09:00:00Z")),
                 comment("reviewer-b", "real feedback", Instant.parse("2025-06-01T10:00:00Z"))
@@ -252,18 +262,16 @@ class GeneralReviewCommentContentSourceTest extends BaseUnitTest {
         provider.contribute(request(metadataWithPr()), files);
 
         JsonNode out = objectMapper.readTree(files.get(FILE_KEY));
-        // The blank-body comment is dropped; only the substantive comment survives.
         assertThat(out.get("count").asInt()).isEqualTo(1);
         assertThat(out.get("comments").get(0).get("author").asString()).isEqualTo("reviewer-b");
     }
 
     @Test
     void contribute_hyphenFormDiffNoteMarker_isNotExcluded() throws Exception {
-        // HEPHAESTUS_MARKER is the colon form `<!-- hephaestus:` only. The hyphen-form diff-note marker
-        // `<!-- hephaestus-diff-note -->` is NOT matched here — and correctly so: diff notes are stored as
-        // PullRequestReviewComment, never IssueComment, so this provider (IssueComment-only) never sees them.
-        // This test pins that storage-split boundary so a marker-narrowing regression is caught.
-        when(issueCommentRepository.findByIssueIdWithAuthorOrderByCreatedAt(PR_ID)).thenReturn(
+        // The hyphen-form diff-note marker is NOT matched by HEPHAESTUS_MARKER (colon form only) — correctly
+        // so, since diff notes are stored as PullRequestReviewComment, which this IssueComment-only provider
+        // never sees.
+        when(issueCommentRepository.findRecentHumanByIssueIdWithAuthor(any(), any(), any())).thenReturn(
             List.of(
                 comment(
                     "reviewer-a",

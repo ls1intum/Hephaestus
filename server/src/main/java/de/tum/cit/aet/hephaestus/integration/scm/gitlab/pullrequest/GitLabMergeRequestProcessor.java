@@ -534,6 +534,8 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
             mrNumber
         );
         boolean isNew = existingOpt.isEmpty();
+        // Read before the upsert below overwrites the row; it's the only place the prior draft state survives.
+        Boolean wasDraft = existingOpt.map(PullRequest::isDraft).orElse(null);
 
         User author = findOrCreateUser(
             new GitLabUserLookup(
@@ -675,6 +677,17 @@ public class GitLabMergeRequestProcessor extends BaseGitLabProcessor {
         } else {
             eventPublisher.publishEvent(new ScmDomainEvent.PullRequestUpdated(prData, Set.of(), eventCtx));
             log.debug("Updated merge request from sync: nativeId={}, iid={}", nativeId, data.iid());
+        }
+
+        // Sync raises the same draft transition a missed webhook would have, so reconciliation can't skip it.
+        if (wasDraft != null) {
+            if (wasDraft && !data.draft()) {
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestReady(prData, eventCtx));
+                log.info("Merge request found ready during sync: prId={}, iid={}", pr.getId(), data.iid());
+            } else if (!wasDraft && data.draft()) {
+                eventPublisher.publishEvent(new ScmDomainEvent.PullRequestDrafted(prData, eventCtx));
+                log.info("Merge request found converted to draft during sync: prId={}, iid={}", pr.getId(), data.iid());
+            }
         }
 
         return pr;

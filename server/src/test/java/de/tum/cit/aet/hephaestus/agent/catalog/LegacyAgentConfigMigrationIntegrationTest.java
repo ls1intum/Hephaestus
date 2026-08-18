@@ -40,13 +40,21 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * so this is the only tier that can catch a regression here.
  *
  * <p>Tests are ordered because the last two mutate the database they inspect.
+ *
+ * <p>The database it inspects is this release and nothing past it, so what it asserts are the names and
+ * values <em>this</em> migration wrote — {@code PRACTICE_DETECTION}, not whatever a later release renames
+ * it to. A rename shipped after this release is that release's own migration to prove, and pulling it in
+ * here would leave a test of a past upgrade rewritten by every future one.
  */
 @Testcontainers
 @Tag("integration")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class LegacyAgentConfigMigrationIntegrationTest {
 
-    /** The consolidated changelog this release ships; everything before it is the "old" schema. */
+    /**
+     * The consolidated changelog this release ships; everything before it is the "old" schema, and
+     * everything after it belongs to a later release that this test neither applies nor rolls back.
+     */
     private static final String RELEASE_CHANGELOG = "1785015307013_changelog.xml";
 
     private static final String MASTER = "db/master.xml";
@@ -74,7 +82,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
             liquibase.tag(PRE_RELEASE_TAG);
         }
         seedLegacyConfiguration();
-        runRemainingChangeSets();
+        runTheReleaseChangeSets();
     }
 
     @Test
@@ -262,15 +270,14 @@ class LegacyAgentConfigMigrationIntegrationTest {
     }
 
     /**
-     * {@code feedback.agent_job_id} used to CASCADE, deleting append-only research data with any
-     * agent_job delete; this exercises the RESTRICT hardening rather than just asserting it from the
-     * catalog.
+     * Feedback is append-only research data, so it outlives the job that produced it. The delete is
+     * attempted rather than read off {@code pg_constraint}: what has to hold is that the row survives.
      */
     @Test
     @Order(13)
-    void deletingAnAgentJobNoLongerTakesItsFeedbackWithIt() throws SQLException {
+    void deletingAnAgentJobIsRefusedWhileItsFeedbackExists() throws SQLException {
         assertThatThrownBy(() -> execute("DELETE FROM agent_job WHERE id = '9a000000-0000-0000-0000-000000000001'"))
-            .as("the FK is RESTRICT now, so the delete is refused instead of cascading")
+            .as("the FK is RESTRICT, so the delete is refused instead of cascading")
             .hasMessageContaining("sfk_feedback_agent_job");
 
         assertThat(scalar("SELECT count(*)::text FROM feedback")).isEqualTo("1");
@@ -328,7 +335,7 @@ class LegacyAgentConfigMigrationIntegrationTest {
         String ledgerBefore = scalar("SELECT count(*)::text FROM llm_usage_event");
 
         execute("DELETE FROM databasechangelog WHERE filename LIKE '%" + RELEASE_CHANGELOG + "'");
-        assertThatCode(LegacyAgentConfigMigrationIntegrationTest::runRemainingChangeSets)
+        assertThatCode(LegacyAgentConfigMigrationIntegrationTest::runTheReleaseChangeSets)
             .as("every changeSet must guard itself; a second pass over an upgraded database must not throw")
             .doesNotThrowAnyException();
 
@@ -355,18 +362,10 @@ class LegacyAgentConfigMigrationIntegrationTest {
             .isEqualTo("7");
     }
 
-    // ── migration driver ────────────────────────────────────────────────────────────────────────
-
     /** @return how many changesets the release changelog contributes, i.e. how many were NOT applied. */
     private static int updateUpToTheReleaseChangelog() throws Exception {
         try (Liquibase liquibase = liquibase()) {
-            List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
-            List<Integer> releaseIndexes = new ArrayList<>();
-            for (int index = 0; index < pending.size(); index++) {
-                if (pending.get(index).getFilePath().endsWith(RELEASE_CHANGELOG)) {
-                    releaseIndexes.add(index);
-                }
-            }
+            List<Integer> releaseIndexes = pendingReleaseIndexes(liquibase);
             if (releaseIndexes.isEmpty()) {
                 return 0;
             }
@@ -375,10 +374,33 @@ class LegacyAgentConfigMigrationIntegrationTest {
         }
     }
 
-    private static void runRemainingChangeSets() throws Exception {
+    /**
+     * Applies what is pending through the last changeset the release contributes, and stops there.
+     *
+     * <p>Bounded rather than a plain {@code update()}, because rolling back to {@link #PRE_RELEASE_TAG}
+     * walks the databasechangelog in reverse <em>execution</em> order rather than changelog order, and
+     * {@link #reRunningTheReleaseChangelogChangesNothing} re-executes this release, which moves it behind
+     * every changelog appended after it. Applying those too would therefore roll this release back first
+     * and leave a later changelog rolling back against tables this one had already taken away.
+     */
+    private static void runTheReleaseChangeSets() throws Exception {
         try (Liquibase liquibase = liquibase()) {
-            liquibase.update(contexts(), new LabelExpression());
+            List<Integer> releaseIndexes = pendingReleaseIndexes(liquibase);
+            assertThat(releaseIndexes).as("the release changelog has nothing left to apply").isNotEmpty();
+            liquibase.update(releaseIndexes.getLast() + 1, contexts(), new LabelExpression());
         }
+    }
+
+    /** Where the release changelog's changesets sit among those still unrun, in changelog order. */
+    private static List<Integer> pendingReleaseIndexes(Liquibase liquibase) throws Exception {
+        List<ChangeSet> pending = liquibase.listUnrunChangeSets(contexts(), new LabelExpression());
+        List<Integer> indexes = new ArrayList<>();
+        for (int index = 0; index < pending.size(); index++) {
+            if (pending.get(index).getFilePath().endsWith(RELEASE_CHANGELOG)) {
+                indexes.add(index);
+            }
+        }
+        return indexes;
     }
 
     /** Each caller gets its own connection: closing a {@link Liquibase} closes the one it was given. */
@@ -394,8 +416,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
         return new Contexts("prod");
     }
 
-    // ── fixtures ────────────────────────────────────────────────────────────────────────────────
-
     private static void seedLegacyConfiguration() throws SQLException {
         execute(
             """
@@ -408,8 +428,8 @@ class LegacyAgentConfigMigrationIntegrationTest {
                    (9406, 'legacy-fanout',    'ORG', 'Fan-out',   'legacy-fanout',    'ACTIVE', false),
                    (9407, 'legacy-paused',    'ORG', 'Paused',    'legacy-paused',    'ACTIVE', false)
             """,
-            // The startup seeder's shape is 9501: enabled, BOTH pointers left NULL. Only an explicit UI
-            // action ever wrote a pointer, so this — not 9502 — is what a default install looks like.
+            // 9501 is the startup seeder's shape: enabled, both pointers left NULL — a default install,
+            // not a config an admin ever pointed at.
             """
             INSERT INTO agent_config (id, workspace_id, name, enabled, model_name, llm_api_key, llm_base_url,
                                       llm_provider, credential_mode, timeout_seconds, max_concurrent_jobs,
@@ -433,9 +453,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
                    (9509, 9407, 'Live mentor', true, 'gpt-4o', 'encrypted-mentor-key',
                     'https://mentor.example.invalid/v1', 'OPENAI', 'PROXY', 720, 9, true, now())
             """,
-            // Only two workspaces ever had a pointer written: one naming a live config for both purposes,
-            // one naming a DISABLED config for detection alone (which paused it, while the mentor fell
-            // through to the oldest enabled config).
             "UPDATE workspace SET practice_config_id = 9502, mentor_config_id = 9502 WHERE id = 9402",
             "UPDATE workspace SET practice_config_id = 9508 WHERE id = 9407",
             // A completed job with recorded spend, and a suppressed finding hanging off it so the FK
@@ -467,8 +484,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
             """
         );
     }
-
-    // ── queries ─────────────────────────────────────────────────────────────────────────────────
 
     /** Every carried-over connection: (workspace slug, connection slug, endpoint, key, model id). */
     private static List<String[]> carriedConnectionRows() throws SQLException {
@@ -533,8 +548,6 @@ class LegacyAgentConfigMigrationIntegrationTest {
         }
         return bound;
     }
-
-    // ── plumbing ────────────────────────────────────────────────────────────────────────────────
 
     private static Connection connect() throws SQLException {
         return DriverManager.getConnection(POSTGRES.getJdbcUrl(), POSTGRES.getUsername(), POSTGRES.getPassword());

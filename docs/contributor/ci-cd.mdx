@@ -13,6 +13,8 @@ Hephaestus uses trunk-based continuous deployment powered by GitHub Actions. Eve
 
 ```mermaid
 graph TD
+    accTitle: Pull request delivery pipeline
+    accDescr: An approved pull request merges to main, runs continuous integration and deployment, builds images, and deploys the application.
     PR[Pull Request] --> Review{Code Review}
     Review -->|Approved| Merge[Merge to main]
     Merge --> CI[CI/CD Pipeline]
@@ -27,13 +29,16 @@ graph TD
     T --> Pass
     D --> Pass
 
+    Pass -->|Yes| Staging[Deploy Staging]
     Pass -->|Yes| VP[changesets action updates Version PR]
     VP -->|Maintainer merges Version PR| Tag[Create Tag vX.Y.Z + GitHub Release]
 
-    Tag --> Staging[Deploy Staging]
-    Staging --> Verify{Verify OK?}
+    Tag --> Verify{Verify OK?}
     Verify -->|Approve| Prod[Deploy Production]
 ```
+
+Staging tracks `main` HEAD and production tracks the last released tag, so the two are deliberately
+not the same commit.
 
 ## ⚡ Pipeline Timeline
 
@@ -63,7 +68,8 @@ Before any release, code must pass:
 | Migration chain + drift (`Database`) | Liquibase | Full chain applies empty → head, then schema is diffed against JPA entities |
 | Changelog immutability (`Migrations`) | git diff | Released changesets + `master.xml` are append-only |
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
-| Java formatting | Spotless    | Code style           |
+| Java formatting | Prettier (`prettier-plugin-java`) | Code style |
+| Java lint       | PMD         | Static analysis      |
 | TypeScript      | Biome + tsc | Lint + typecheck     |
 
 ## 🔒 Security
@@ -91,8 +97,12 @@ This is more efficient than a custom workflow and doesn't consume CI minutes.
 | Environment       | Protection        | Deploys On     |
 | ----------------- | ----------------- | -------------- |
 | Preview (Coolify) | None              | Every PR       |
-| Staging           | None              | Every tag      |
+| Staging           | None              | Every green commit on `main` (app services only) |
 | Production        | Approval required | Tag + approval |
+
+Staging deploys the app services only. NATS/webhook (`core`) and the proxy are stateful and
+disruptive to recreate, so they are never auto-deployed; when their compose changes, CD flags it and
+an operator runs the staging deploy manually with the core/proxy switches on.
 
 ### GitHub Environment Setup
 
@@ -118,15 +128,19 @@ Coolify handles PR previews:
 | `ci-docker-build.yml`  | Called by cicd.yml    | Docker image builds per component                  |
 | `ci-security-scan.yml` | Called by cicd.yml    | Dependency scanning (Trivy), secret detection      |
 | `verify-changesets.yml`| PRs                   | Fails shipped-code PRs that carry no changeset     |
+| `ci-compose-validate.yml` | PRs, push to main  | Renders the reference and self-host compose stacks so an interpolation or merge break is a red check, not a stranger's bad first boot |
 | `version-pr.yml`       | Push to main          | Maintains the accumulating Version PR (changesets) |
-| `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, deploys staging, gates production |
-| `deploy-staging.yml`   | Called by release.yml | Deploys to staging                                 |
+| `release.yml`          | On CI/CD Success      | Cuts a release when the Version PR merged: tag + GitHub Release, gates production |
+| `cd-staging.yml`       | On CI/CD Success on `main` | Deploys that commit's immutable image to staging |
+| `deploy-staging.yml`   | Called by cd-staging.yml and manual dispatch | Deploys to staging |
 | `deploy-prod.yml`      | workflow_dispatch     | Deploys to production (manual trigger)             |
 
 ### Workflow Architecture
 
 ```mermaid
 graph LR
+    accTitle: Continuous integration job dependencies
+    accDescr: Change detection selects quality and test jobs, whose results feed the final continuous integration status gate.
     subgraph cicd.yml
         DC[Detect Changes] --> QG[Quality Gates]
         DC --> TS[Test Suite]
@@ -156,9 +170,15 @@ CI only runs jobs for components that actually changed:
 
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
-| Webapp               | `webapp/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.node-version` |
-| Application Server   | `server/**`, `scripts/db-utils.sh` (includes webhook receiver — ADR 0008) |
+| Webapp               | `webapp/**`, `docs/images/readme/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.node-version` |
+| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008) |
+| Agent images         | `docker/agents/**`                                            |
+| Docs                 | `docs/**`                                                     |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
+
+The whole of `scripts/` counts as application-server change, not just the database helper: the
+contract validator and the changelog-immutability guard live there, and a PR editing only a guard
+would otherwise skip the workflow that runs it.
 
 **Benefits:**
 
@@ -182,30 +202,20 @@ Docker builds use **registry-based caching** to store intermediate layers in `gh
 - Separate cache tags per platform: `image:cache-linux-amd64`, `image:cache-linux-arm64`
 - Native builds: amd64 on x86 runners, arm64 on ARM runners (no QEMU emulation)
 
-**Benefits over GitHub Actions Cache:**
+The registry cache is not size-capped or time-evicted the way the Actions cache is, and it is shared
+across branches, so a pull request reuses `main`'s layers.
 
-- No 10GB size limit (registry is unlimited)
-- No eviction after 7 days
-- Works across branches (PRs benefit from main's cache)
-- Persistent (survives cache clearing)
+### Registry Authentication
 
-### Docker Hub Authentication (Recommended)
-
-Without Docker Hub authentication, base image metadata resolution can be rate-limited, adding **2+ minutes** to every Docker build. To avoid this:
-
-1. Create a Docker Hub account (free tier is sufficient)
-2. Generate an access token at [hub.docker.com/settings/security](https://hub.docker.com/settings/security)
-3. Add repository variable and secret:
-   - **Variable**: `DOCKERHUB_USERNAME` = your Docker Hub username
-   - **Secret**: `DOCKERHUB_TOKEN` = your access token
-
-The Docker build workflow will automatically use these credentials if present, falling back to anonymous (slower) access if not configured.
+Image builds log in to `ghcr.io` with the workflow's own `GITHUB_TOKEN`; there is no Docker Hub
+login step and no repository secret to configure. Base image metadata is resolved anonymously and is
+therefore subject to the registry's anonymous rate limit.
 
 ### Parallel Execution
 
-- 6 test types run in parallel (3 app-server, 3 webapp). Webhook reception is part of the app-server test surface since ADR 0008.
-- 5 quality-gate legs run in parallel (App Server, Webapp, OpenAPI, Database, Migrations), plus a legacy-cleanup guard
-- 4 Docker builds × 2 architectures (amd64 + arm64)
+- Test legs run in parallel across the app server and the webapp. Webhook reception is part of the app-server test surface since ADR 0008.
+- Quality-gate legs (App Server, Webapp, OpenAPI, Database, Migrations) run in parallel, plus a legacy-cleanup guard
+- Docker images build for both architectures (amd64 + arm64)
 - `fail-fast: false` ensures all jobs complete for full feedback
 
 ### Concurrency Control
@@ -233,7 +243,7 @@ pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver
 pnpm run format:java:check     # Check formatting
-cd server && ./mvnw test -Dgroups="unit"  # Unit tests
+cd server && ./mvnw test -P'!quick'  # Unit tests — see the testing guide for why `!quick` is mandatory
 ```
 
 ### Common Issues
@@ -312,7 +322,7 @@ matrix:
     ]
 ```
 
-2. **Add case statement** in "Determine if check should run":
+1. **Add case statement** in "Determine if check should run":
 
 ```yaml
 "new-service-quality")
@@ -320,7 +330,7 @@ matrix:
   ;;
 ```
 
-3. **Add quality check step** with the appropriate linting/type checking commands.
+1. **Add quality check step** with the appropriate linting/type checking commands.
 
 ### Step 3: Tests (`ci-tests.yml`)
 
@@ -335,7 +345,7 @@ matrix:
     ]
 ```
 
-2. **Add case statement** in "Determine if test should run":
+1. **Add case statement** in "Determine if test should run":
 
 ```yaml
 "new-service-unit"|"new-service-integration")
@@ -343,9 +353,9 @@ matrix:
   ;;
 ```
 
-3. **Add test execution step** with the test commands.
+1. **Add test execution step** with the test commands.
 
-4. **Add test result upload** for JUnit reporting.
+2. **Add test result upload** for JUnit reporting.
 
 ### Step 4: Docker Build (`ci-docker-build.yml`)
 

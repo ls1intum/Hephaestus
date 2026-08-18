@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { delay, HttpResponse, http } from "msw";
 import { expect, fn, screen, within } from "storybook/test";
 import type { SlackChannelConsentEvent, SlackMonitoredChannel } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { ChannelHistorySheet } from "./ChannelHistorySheet";
 
 const CONSENT_EVENTS_URL = "*/slack/channels/:slackChannelId/consent-events";
@@ -48,7 +49,11 @@ const events: SlackChannelConsentEvent[] = [
 
 const meta = {
 	component: ChannelHistorySheet,
-	parameters: { layout: "centered" },
+	parameters: {
+		layout: "centered",
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 	args: {
 		workspaceSlug: "demo-workspace",
@@ -68,7 +73,7 @@ export const Populated: Story = {
 		const sheet = within(await screen.findByRole("dialog"));
 		await sheet.findAllByText("Monitoring");
 		sheet.getAllByText("Not started");
-		await expect(sheet.getByText("Exam week")).toBeInTheDocument();
+		sheet.getByText("Exam week");
 		await expect(sheet.queryByText("ACTIVE")).not.toBeInTheDocument();
 		await expect(sheet.queryByText("PENDING")).not.toBeInTheDocument();
 	},
@@ -80,7 +85,7 @@ export const EmptyHistory: Story = {
 	},
 	play: async () => {
 		const sheet = within(await screen.findByRole("dialog"));
-		await expect(await sheet.findByText(/no consent changes recorded yet/i)).toBeInTheDocument();
+		await expectSettledVisible(await sheet.findByText(/no consent changes recorded yet/i));
 	},
 };
 
@@ -105,8 +110,8 @@ export const LoadError: Story = {
 	},
 	play: async () => {
 		const sheet = within(await screen.findByRole("dialog"));
-		await expect(await sheet.findByText(/could not load the consent history/i)).toBeInTheDocument();
-		await expect(sheet.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+		await expectSettledVisible(await sheet.findByText(/could not load the consent history/i));
+		sheet.getByRole("button", { name: /^retry$/i });
 	},
 };
 

@@ -3,15 +3,15 @@ import { useId } from "react";
 import type {
 	CatalogEntryStatus,
 	CuratedAreaRequest,
-	CuratedPracticeRequest,
+	CuratedPracticeDefinition,
+	PracticeDefinitionOptions,
 } from "@/api/types.gen";
-import {
-	FOCUS_ARTIFACT_OPTIONS,
-	TRIGGER_EVENTS_BY_FOCUS,
-} from "@/components/admin/practice-catalog/constants";
+import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Spinner } from "@/components/ui/spinner";
+import { artifactKindLabel } from "@/lib/artifact-kinds";
+import { humanizeToken } from "@/lib/humanize";
 import { cn } from "@/lib/utils";
 import {
 	canKeepCurrentDefinition,
@@ -20,13 +20,11 @@ import {
 } from "./curated-entry-state";
 
 type ShippedDefinition = Partial<
-	Record<keyof CuratedPracticeRequest | keyof CuratedAreaRequest, unknown>
+	Record<keyof CuratedPracticeDefinition | keyof CuratedAreaRequest, unknown>
 >;
 
-export interface HephaestusVersionPanelProps {
+interface HephaestusVersionPanelBaseProps {
 	status: CatalogEntryStatus;
-	kind: "practice" | "area";
-	shipped?: ShippedDefinition;
 	areaNames?: Readonly<Record<string, string>>;
 	isResetPending: boolean;
 	isKeepPending?: boolean;
@@ -34,6 +32,16 @@ export interface HephaestusVersionPanelProps {
 	onUseHephaestusVersion?: () => void;
 	onKeepCurrentDefinition?: () => void;
 }
+
+export type HephaestusVersionPanelProps = HephaestusVersionPanelBaseProps &
+	(
+		| {
+				kind: "practice";
+				shipped?: CuratedPracticeDefinition;
+				definitionOptions: PracticeDefinitionOptions;
+		  }
+		| { kind: "area"; shipped?: CuratedAreaRequest }
+	);
 
 const AREA_FIELDS = {
 	name: "Name",
@@ -44,14 +52,18 @@ const AREA_FIELDS = {
 
 const PRACTICE_FIELDS = {
 	name: "Name",
-	artifactType: "Evaluates",
+	artifactKind: "Work reviewed",
 	areaSlug: "Area",
-	triggerEvents: "Starts a review when",
-	criteria: "Evaluation criteria",
+	criteria: "What to look for",
 	whyItMatters: "Why it matters",
 	whatGoodLooksLike: "What good looks like",
-	precomputeScript: "Precompute script",
-} satisfies Record<keyof CuratedPracticeRequest, string>;
+	precomputeScript: "Static analysis",
+	// The occasions and their evidence render under a heading of their own, which this must not repeat.
+	automatedReviewPolicy: "How it is reviewed",
+} satisfies Record<
+	Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation" | "bindings">,
+	string
+>;
 
 function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
 	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
@@ -60,55 +72,42 @@ function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefin
 function displayValue(
 	field: string,
 	value: unknown,
-	shipped: ShippedDefinition,
 	areaNames: Readonly<Record<string, string>>,
 ): string {
 	if (value === null || value === undefined || value === "") {
 		return field === "areaSlug" ? "Unassigned" : "Not set";
 	}
-	if (field === "triggerEvents" && Array.isArray(value) && value.length === 0) {
-		return "No automatic trigger";
-	}
-	const words = (token: string) =>
-		token
-			.replace(/_/g, " ")
-			.replace(/([a-z])([A-Z])/g, "$1 $2")
-			.replace(/^./, (letter) => letter.toUpperCase());
-	if (field === "artifactType") {
-		return (
-			FOCUS_ARTIFACT_OPTIONS.find((option) => option.value === value)?.label ?? words(String(value))
-		);
-	}
-	if (field === "triggerEvents" && Array.isArray(value)) {
-		const artifact = shipped.artifactType;
-		const options =
-			typeof artifact === "string" && artifact in TRIGGER_EVENTS_BY_FOCUS
-				? TRIGGER_EVENTS_BY_FOCUS[artifact as keyof typeof TRIGGER_EVENTS_BY_FOCUS]
-				: [];
-		return value
-			.map(
-				(event) => options.find((option) => option.value === event)?.label ?? words(String(event)),
-			)
-			.join("\n");
+	if (field === "artifactKind") {
+		return artifactKindLabel(String(value));
 	}
 	if (field === "areaSlug" && typeof value === "string") {
 		return areaNames[value] ?? "Area no longer exists";
 	}
-	if ((field === "icon" || field === "color") && typeof value === "string") return words(value);
+	if ((field === "icon" || field === "color") && typeof value === "string")
+		return humanizeToken(value);
 	return Array.isArray(value) ? value.join("\n") : String(value);
 }
 
-export function HephaestusVersionPanel({
-	status,
-	kind,
-	shipped,
-	areaNames = {},
-	isResetPending,
-	isKeepPending = false,
-	disabled,
-	onUseHephaestusVersion,
-	onKeepCurrentDefinition,
-}: HephaestusVersionPanelProps) {
+export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
+	const {
+		status,
+		kind,
+		shipped,
+		areaNames = {},
+		isResetPending,
+		isKeepPending = false,
+		disabled,
+		onUseHephaestusVersion,
+		onKeepCurrentDefinition,
+	} = props;
+	const shippedDefinition: ShippedDefinition | undefined = shipped;
+	const shippedPractice = props.kind === "practice" ? props.shipped : undefined;
+	const shippedDefinitionOptions =
+		props.kind === "practice" && shippedPractice
+			? props.definitionOptions.workTypes.find(
+					(option) => option.artifactKind === shippedPractice.artifactKind,
+				)
+			: undefined;
 	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
 	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion;
@@ -136,7 +135,7 @@ export function HephaestusVersionPanel({
 					</h2>
 					<p className="mt-1 text-muted-foreground">{copy.detail}</p>
 
-					{shipped && (
+					{shippedDefinition && (
 						<Collapsible className="mt-3 w-full">
 							<CollapsibleTrigger
 								render={
@@ -159,7 +158,22 @@ export function HephaestusVersionPanel({
 													field === "precomputeScript" && "font-mono",
 												)}
 											>
-												{displayValue(field, shipped[field], shipped, areaNames)}
+												{field === "automatedReviewPolicy" && shippedPractice ? (
+													shippedDefinitionOptions ? (
+														<PracticeEvidenceSummary
+															policy={shippedPractice.automatedReviewPolicy}
+															bindings={shippedPractice.bindings}
+															validation={shippedPractice.automatedReviewValidation}
+															sources={shippedDefinitionOptions.allowedSources}
+															signals={shippedDefinitionOptions.signals}
+															workTypeLabel={artifactKindLabel(shippedPractice.artifactKind)}
+														/>
+													) : (
+														"Evidence details are unavailable for this work type."
+													)
+												) : (
+													displayValue(field, shippedDefinition[field], areaNames)
+												)}
 											</dd>
 										</div>
 									),

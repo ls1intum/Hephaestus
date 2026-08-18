@@ -1,4 +1,4 @@
-# Live practice-detection E2E
+# Live practice-review E2E
 
 This setup runs the complete local path: workspace creation, SCM sync, job execution in Docker, LLM
 calls through the application proxy, observation persistence, and feedback delivery to a PR or MR.
@@ -9,7 +9,7 @@ The opt-in `e2e` profile enables these local-only capabilities:
 | --- | --- |
 | Passwordless dev sign-in | `hephaestus.auth.dev-login-enabled=true` |
 | Plain-http cookies (drops `Secure` + `__Host-`) | `hephaestus.auth.cookie-secure=false` |
-| Self-service GitLab/GitHub workspace creation | `hephaestus.workspace.creation-policy=SELF_SERVICE` + `features.flags.gitlab-workspace-creation=true` |
+| Self-service GitLab/GitHub workspace creation | `hephaestus.workspace.creation-policy=SELF_SERVICE` + `hephaestus.features.flags.gitlab-workspace-creation=true` |
 | Persistable Connection credentials (PATs) | `hephaestus.security.encryption-key` (a fixed local dev key) |
 | Dev review trigger | `hephaestus.dev.trigger-enabled=true` |
 | PostgreSQL job executor | `hephaestus.agent.enabled=true` |
@@ -69,7 +69,7 @@ requires the appropriate group role and license.
 The agent runs in a Docker sandbox (`ghcr.io/ls1intum/hephaestus/agent-pi`) and calls the LLM through
 the in-app proxy, so provider keys never enter the sandbox. Host-run E2E uses a non-internal Docker
 network (`allowInternet=true`) so the sandbox can reach that proxy through `host.docker.internal`.
-Findings are posted back to the MR and shown under the workspace's **Practices → Runs** view.
+Feedback is posted back to the MR, and the observations behind it are shown under the workspace's **Practices → Runs** view.
 
 Live runner JUnit tests call the upstream provider directly. They do not cover application proxying,
 budget admission, durable usage accounting, sandbox execution, or SCM delivery.

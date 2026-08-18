@@ -4,9 +4,9 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGateway;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppressedException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApprovalChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.common.GitLabTokenService;
 import de.tum.cit.aet.hephaestus.integration.scm.gitlab.feedback.GitlabMrResolver.MrCoordinates;
@@ -38,14 +38,14 @@ public class GitlabApprovalChannel implements ApprovalChannel {
 
     private final GitLabGraphQlClientProvider gitLabProvider;
     private final GitLabTokenService tokenService;
-    private final GitlabFeedbackChannel feedbackChannel;
+    private final GitlabSummaryChannel feedbackChannel;
     private final WebClient webClient;
     private final OutboundEgressGuard egressGuard;
 
     public GitlabApprovalChannel(
         GitLabGraphQlClientProvider gitLabProvider,
         GitLabTokenService tokenService,
-        GitlabFeedbackChannel feedbackChannel,
+        GitlabSummaryChannel feedbackChannel,
         WebClient.Builder webClientBuilder,
         OutboundEgressGuard egressGuard
     ) {
@@ -62,7 +62,7 @@ public class GitlabApprovalChannel implements ApprovalChannel {
     }
 
     @Override
-    public void approve(FeedbackChannel.FeedbackTarget target, String message) {
+    public void approve(SummaryChannel.FeedbackTarget target, String message) {
         long scopeId = target.ref().workspaceId();
         if (gitLabProvider.isRateLimitCritical(scopeId)) {
             throw new FeedbackDeliveryException("GitLab rate limit critical — skipping approval for scope " + scopeId);
@@ -99,7 +99,7 @@ public class GitlabApprovalChannel implements ApprovalChannel {
 
         // GitLab's approve endpoint accepts no body — post the message as a separate note.
         if (message != null && !message.isBlank()) {
-            feedbackChannel.postSummary(target, new FeedbackChannel.FeedbackContent(message, ""));
+            feedbackChannel.postSummary(target, new SummaryChannel.FeedbackContent(message, ""));
         }
     }
 

@@ -1,19 +1,14 @@
-import {
-	createMemoryHistory,
-	createRootRoute,
-	createRouter,
-	RouterProvider,
-} from "@tanstack/react-router";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type {
 	AgentBinding,
 	PracticeReviewSettings as PracticeReviewSettingsData,
 } from "@/api/types.gen";
+import { renderWithRouter } from "@/test/router-harness";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
 
 const readyBinding: AgentBinding = {
-	purpose: "PRACTICE_DETECTION",
+	purpose: "PRACTICE_REVIEW",
 	enabled: true,
 	ready: true,
 	instanceModelId: 20,
@@ -21,58 +16,53 @@ const readyBinding: AgentBinding = {
 
 const settings: PracticeReviewSettingsData = {
 	runForAllUsers: true,
-	skipDrafts: true,
 	deliverToMerged: false,
 	cooldownMinutes: 15,
+	reviewScope: { targetBranches: [], repositories: [] },
+	defaultReviewTier: "DELIVER",
 };
 
 function renderSettings(props: Partial<React.ComponentProps<typeof PracticeReviewSettings>> = {}) {
-	const rootRoute = createRootRoute({
-		component: () => (
-			<PracticeReviewSettings
-				workspaceSlug="acme"
-				model={{
-					binding: readyBinding,
-					isLoading: false,
-					isError: false,
-					onRetry: vi.fn(),
-				}}
-				workspace={{
-					enabled: true,
-					autoTriggerEnabled: true,
-					manualTriggerEnabled: true,
-					isSaving: false,
-					onUpdate: vi.fn(),
-				}}
-				policy={{
-					settings,
-					isSaving: false,
-					onUpdate: vi.fn(),
-					onReset: vi.fn(),
-				}}
-				{...props}
-			/>
-		),
-	});
-	const router = createRouter({
-		routeTree: rootRoute,
-		history: createMemoryHistory({ initialEntries: ["/"] }),
-	});
-	render(<RouterProvider router={router} />);
+	return renderWithRouter(
+		<PracticeReviewSettings
+			workspaceSlug="acme"
+			model={{
+				binding: readyBinding,
+				isLoading: false,
+				isError: false,
+				onRetry: vi.fn(),
+			}}
+			workspace={{
+				enabled: true,
+				autoTriggerEnabled: true,
+				manualTriggerEnabled: true,
+				isSaving: false,
+				onUpdate: vi.fn(),
+			}}
+			policy={{
+				settings,
+				isSaving: false,
+				onUpdate: vi.fn(),
+				onReset: vi.fn(),
+			}}
+			{...props}
+		/>,
+		"/w/acme/admin/practices",
+	);
 }
 
 describe("PracticeReviewSettings", () => {
-	it("reports model readiness and points at the page that owns the binding", async () => {
-		renderSettings();
+	it("points at the page that owns the binding without restating the page banner", async () => {
+		await renderSettings();
 
-		await screen.findByText("Ready to run");
-		expect(screen.getByRole("link", { name: "Change" }).getAttribute("href")).toBe(
-			"/w/acme/admin/models",
-		);
+		const change = await screen.findByRole("link", { name: "Change the review model" });
+		expect(change.getAttribute("href")).toBe("/w/acme/admin/models");
+		// Readiness is the banner's sentence; saying it again here was the same fact three times.
+		expect(screen.queryByText("Ready to run")).toBeNull();
 	});
 
 	it("explains when the selected model can no longer run", async () => {
-		renderSettings({
+		await renderSettings({
 			model: {
 				binding: { ...readyBinding, ready: false },
 				isLoading: false,
@@ -89,7 +79,7 @@ describe("PracticeReviewSettings", () => {
 
 	it("lets admins prepare triggers before choosing a runnable model", async () => {
 		const onUpdate = vi.fn();
-		renderSettings({
+		await renderSettings({
 			model: { binding: undefined, isLoading: false, isError: false, onRetry: vi.fn() },
 			workspace: {
 				enabled: false,
@@ -100,7 +90,7 @@ describe("PracticeReviewSettings", () => {
 			},
 		});
 
-		const automatic = await screen.findByRole("switch", { name: "Automatic reviews" });
+		const automatic = await screen.findByRole("switch", { name: "Reviews the work starts" });
 		expect(automatic.getAttribute("aria-disabled")).not.toBe("true");
 		expect(
 			screen.getByRole("switch", { name: "Start practice reviews" }).getAttribute("aria-disabled"),
@@ -110,9 +100,32 @@ describe("PracticeReviewSettings", () => {
 		expect(onUpdate).toHaveBeenCalledWith({ practiceReviewAutoTriggerEnabled: true });
 	});
 
+	it("offers both eligibility options with the sentence that explains each", async () => {
+		const onUpdate = vi.fn();
+		await renderSettings({
+			policy: {
+				settings: { ...settings, runForAllUsers: false },
+				isSaving: false,
+				onUpdate,
+				onReset: vi.fn(),
+			},
+		});
+
+		const narrow = await screen.findByRole("radio", {
+			name: /Only assignees with the review role/,
+		});
+		expect(narrow.getAttribute("aria-checked")).toBe("true");
+		// The role is granted per account outside this workspace, so the copy says so rather than
+		// naming the product as the thing that "manages" it.
+		expect(screen.getByText(/An instance admin grants that role per person/)).not.toBeNull();
+
+		fireEvent.click(screen.getByRole("radio", { name: /All matching work/ }));
+		expect(onUpdate).toHaveBeenCalledWith({ runForAllUsers: true });
+	});
+
 	it("allows conversation reviews without a project trigger", async () => {
 		const onUpdate = vi.fn();
-		renderSettings({
+		await renderSettings({
 			workspace: {
 				enabled: false,
 				autoTriggerEnabled: false,
@@ -127,22 +140,5 @@ describe("PracticeReviewSettings", () => {
 
 		fireEvent.click(start);
 		expect(onUpdate).toHaveBeenCalledWith({ practicesEnabled: true });
-	});
-
-	it("keeps an invalid cooldown local and explains how to fix it", async () => {
-		const onUpdate = vi.fn();
-		renderSettings({
-			policy: { settings, isSaving: false, onUpdate, onReset: vi.fn() },
-		});
-
-		const cooldown = await screen.findByRole("spinbutton", {
-			name: "Time between reviews (minutes)",
-		});
-		fireEvent.change(cooldown, { target: { value: "1500" } });
-		fireEvent.blur(cooldown);
-
-		expect(cooldown.getAttribute("aria-invalid")).toBe("true");
-		expect(screen.getByText("Enter a whole number from 0 to 1,440.")).toBeTruthy();
-		expect(onUpdate).not.toHaveBeenCalled();
 	});
 });

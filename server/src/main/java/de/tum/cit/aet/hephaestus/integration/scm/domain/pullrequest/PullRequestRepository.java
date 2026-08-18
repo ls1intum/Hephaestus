@@ -109,6 +109,13 @@ public interface PullRequestRepository extends JpaRepository<PullRequest, Long> 
     )
     Optional<PullRequest> findByIdWithAllForGate(@Param("id") Long id);
 
+    /**
+     * The head commit alone, for keying a signal without paying for the gate's fetch graph — a
+     * reconciliation pass records what it saw and never looks at the rest of the pull request.
+     */
+    @Query("SELECT p.headRefOid FROM PullRequest p WHERE p.id = :id")
+    Optional<String> findHeadRefOidById(@Param("id") Long id);
+
     List<PullRequest> findAllByRepository_Id(Long repositoryId);
 
     /**

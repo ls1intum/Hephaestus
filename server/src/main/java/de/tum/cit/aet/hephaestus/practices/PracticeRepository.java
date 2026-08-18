@@ -1,8 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -21,14 +22,50 @@ import org.springframework.transaction.annotation.Transactional;
     "Workspace-scoped via custom queries that all include workspaceId; PK-only DML allowed for delete/save"
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
+    /**
+     * Every practice of the workspace, at any tier — including {@code OFF}, so the detection gate can tell
+     * "nothing is bound to this signal" apart from "something is bound and turned off".
+     */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndActiveTrue(Long workspaceId);
+    List<Practice> findByWorkspaceId(Long workspaceId);
 
-    /** Active practices targeting one artifact kind — the per-job catalog filter (PR job vs issue job). */
+    /**
+     * Every practice of the workspace for one work type, at any tier. Deliberately unfiltered: pushing
+     * {@code review_tier <> 'OFF'} into SQL is a trap once the column can be null, since
+     * {@code NULL <> 'OFF'} is UNKNOWN and an inheriting practice would silently vanish from the query.
+     * Tier is resolved in the JVM by {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
+     */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
-    List<Practice> findByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+    List<Practice> findByWorkspaceIdAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
-    boolean existsByWorkspaceIdAndActiveTrueAndArtifactType(Long workspaceId, WorkArtifact artifactType);
+    /**
+     * The raw tier columns of every practice in a workspace, with its area's, for callers that only need to
+     * count or test tiers without hydrating the whole catalogue.
+     */
+    @Query(
+        """
+        SELECT p.reviewTier AS practiceTier, a.reviewTier AS areaTier,
+               a.id AS areaId, p.artifactKind AS artifactKind
+        FROM Practice p
+        LEFT JOIN p.area a
+        WHERE p.workspace.id = :workspaceId
+        """
+    )
+    List<PracticeTierRow> findReviewTierRows(@Param("workspaceId") Long workspaceId);
+
+    /** One practice's tier and its area's, without hydrating either entity. */
+    interface PracticeTierRow {
+        @Nullable
+        PracticeReviewTier getPracticeTier();
+
+        @Nullable
+        PracticeReviewTier getAreaTier();
+
+        @Nullable
+        Long getAreaId();
+
+        ArtifactKind getArtifactKind();
+    }
 
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
@@ -46,10 +83,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     int findMaxDisplayOrder(@Param("workspaceId") Long workspaceId, @Param("areaId") @Nullable Long areaId);
 
     /**
-     * Acquire a row-level write lock on a practice ({@code SELECT ... FOR UPDATE}). Used to serialise
-     * {@link PracticeRevision} appends per practice: holding this lock for the duration of the
-     * read-max-then-insert makes the next revision number race-free, so concurrent criteria edits append
-     * with distinct, gap-free numbers instead of colliding on {@code uk_practice_revision_practice_number}.
+     * Row-level write lock ({@code SELECT ... FOR UPDATE}) held for the read-max-then-insert that appends a
+     * {@link PracticeRevision}, so concurrent criteria edits get distinct, gap-free revision numbers instead
+     * of colliding on {@code uk_practice_revision_practice_number}.
      */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT p FROM Practice p WHERE p.id = :id")
@@ -59,9 +95,20 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
+    @Query(
+        "SELECT DISTINCT p FROM Practice p JOIN FETCH p.currentRevision current, PracticeRevision previous " +
+            "WHERE p.sourceCuratedSlug IS NOT NULL " +
+            "AND previous.practice = p " +
+            "AND previous.revisionNumber = current.revisionNumber - 1 " +
+            "AND p.sourceCuratedFingerprint = previous.reviewRuleFingerprint " +
+            "AND p.sourceCuratedFingerprint LIKE 'v1:%'"
+    )
+    List<Practice> findSourceAlignedV1Practices();
+
     /**
-     * Lists practices for a workspace with an optional active filter.
-     * Null filter values are ignored (match all).
+     * Every practice of a workspace in the order the admin catalogue shows them, areas first. No tier
+     * predicate: filtering to a tier means filtering to an <em>effective</em> tier, which is not a column
+     * on this row — the caller resolves, then filters.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     @Query(
@@ -69,11 +116,10 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
         SELECT p FROM Practice p
         LEFT JOIN FETCH p.area a
         WHERE p.workspace.id = :workspaceId
-        AND (:active IS NULL OR p.active = :active)
         ORDER BY a.displayOrder ASC NULLS LAST, p.displayOrder ASC, p.name ASC
         """
     )
-    List<Practice> findByFilters(@Param("workspaceId") Long workspaceId, @Param("active") Boolean active);
+    List<Practice> findAllForCatalog(@Param("workspaceId") Long workspaceId);
 
     /** Deletes all practices for the workspace. Cascades to observation via ON DELETE CASCADE. */
     @Modifying

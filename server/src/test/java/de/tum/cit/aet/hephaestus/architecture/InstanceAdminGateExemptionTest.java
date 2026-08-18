@@ -17,10 +17,9 @@ import org.springframework.web.bind.annotation.RestController;
  * is gated by the instance-admin authority — cross-workspace is the whole point of an instance admin.
  * That exemption is only sound while it means <em>exactly</em> that gate.
  *
- * <p>The tempting loosening is a substring test on the SpEL. It is wrong:
- * {@code hasAnyAuthority('app_admin','workspace_member')} contains "app_admin" yet is reachable by a
- * workspace member, so a substring match would silently drop tenancy scrutiny from a member-facing
- * data endpoint. These fixtures fail the build if anyone widens it back.
+ * <p>Each fixture below is a SpEL expression a looser match would wrongly exempt — most of all a
+ * substring test, under which a composite reachable by a workspace member still mentions "app_admin"
+ * and so loses its tenancy scrutiny.
  */
 @Tag("architecture")
 class InstanceAdminGateExemptionTest {

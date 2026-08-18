@@ -55,8 +55,8 @@ export const PassesItsFieldAndButtonCopyThrough: Story = {
 };
 
 /**
- * WCAG 2.2 SC 1.4.10 at 320 px: with a cap in force the footer stacks three buttons, which already
- * exceeds a phone held in landscape, so the height bound matters as much as the width.
+ * WCAG 2.2 SC 1.4.10 at 320 px: with a cap in force the footer stacks, so the height bound matters
+ * as much as the width.
  */
 export const MobileReflow: Story = {
 	parameters: {

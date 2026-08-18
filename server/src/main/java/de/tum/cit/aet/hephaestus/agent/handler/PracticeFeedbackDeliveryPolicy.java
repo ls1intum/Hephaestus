@@ -103,9 +103,6 @@ class PracticeFeedbackDeliveryPolicy {
         ) {
             return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_MERGED);
         }
-        if (pullRequest.isDraft() && settings.resolveSkipDrafts(reviewProperties.skipDrafts())) {
-            return Decision.suppressed(FeedbackSuppressionReason.ARTIFACT_DRAFT);
-        }
         if (!recipientAllowsDelivery(pullRequest)) {
             return Decision.suppressed(FeedbackSuppressionReason.RECIPIENT_OPTED_OUT);
         }

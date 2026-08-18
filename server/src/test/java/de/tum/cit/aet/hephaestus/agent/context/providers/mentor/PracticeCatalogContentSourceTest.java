@@ -56,7 +56,7 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         practice.setSlug("error-state-handling");
         practice.setName("Error State Handling");
         practice.setCriteria("Show an error view for failed network calls.");
-        when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(List.of(practice));
+        when(practiceRepository.findByWorkspaceId(eq(1L))).thenReturn(List.of(practice));
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);
@@ -86,14 +86,14 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
         when(workspaceRepository.findById(eq(1L))).thenReturn(Optional.of(ws));
-        when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(List.of());
+        when(practiceRepository.findByWorkspaceId(eq(1L))).thenReturn(List.of());
 
         var request = new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID());
         provider.contribute(request, new HashMap<>());
         provider.contribute(request, new HashMap<>());
 
         // buildPayload's query ran exactly once; the second turn served the warm cache node.
-        verify(practiceRepository, times(1)).findByWorkspaceIdAndActiveTrue(eq(1L));
+        verify(practiceRepository, times(1)).findByWorkspaceId(eq(1L));
     }
 
     @Test
@@ -112,7 +112,7 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         Workspace ws = new Workspace();
         ws.setWorkspaceSlug("acme");
         when(workspaceRepository.findById(eq(1L))).thenReturn(Optional.of(ws));
-        when(practiceRepository.findByWorkspaceIdAndActiveTrue(eq(1L))).thenReturn(List.of());
+        when(practiceRepository.findByWorkspaceId(eq(1L))).thenReturn(List.of());
 
         Map<String, byte[]> files = new HashMap<>();
         provider.contribute(new ContextRequest.MentorChatRequest(1L, 2L, UUID.randomUUID()), files);

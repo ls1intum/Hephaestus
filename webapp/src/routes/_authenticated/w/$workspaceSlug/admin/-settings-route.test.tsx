@@ -1,12 +1,16 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
 	computeUserLeagueStatsQueryKey,
 	getLeaderboardQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, testQueryClient } from "@/test/router-harness";
+
+// Mounting the real route pulls in the whole admin layout and its lazy modules; the timeout is a
+// deadlock backstop, not a budget these renders were meant to fit inside.
+vi.setConfig({ testTimeout: 15_000 });
 
 const WORKSPACE = {
 	id: 1,

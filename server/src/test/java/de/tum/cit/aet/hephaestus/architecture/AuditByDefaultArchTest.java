@@ -106,9 +106,9 @@ class AuditByDefaultArchTest extends HephaestusArchitectureTest {
     /**
      * An {@code @Audited} endpoint that reaches no recorder is a promise nothing keeps; an
      * {@code @AuditExempt} one that records anyway invites the next reader to delete a working audit
-     * call. Both of those shipped here before the build checked them.
+     * call. Neither is visible in review: the annotation and the call site sit in different files.
      *
-     * <p>Only {@code config_audit} values are checked — the other two ledgers point outside
+     * <p>Only {@code config_audit} values are checked — the other ledgers point outside
      * {@link ConfigAuditPort} and cannot be resolved from the call graph.
      */
     @Test

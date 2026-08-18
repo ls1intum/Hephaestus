@@ -11,14 +11,15 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationFingerprint;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.Reaction;
@@ -32,7 +33,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 
-/** Unit tests for reaction-aware re-nag suppression (ADR 0021, B2). */
+/** Unit tests for reaction-aware re-nag suppression (ADR 0021). */
 @org.mockito.junit.jupiter.MockitoSettings(strictness = org.mockito.quality.Strictness.LENIENT)
 class ReactionSuppressionFilterTest extends BaseUnitTest {
 
@@ -48,10 +49,10 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
     private static final String SLUG = "commit-discipline";
     private static final long CONTRIBUTOR = 7L;
     private static final long TARGET = 100L;
-    // The canonical key the filter recomputes for a SLUG finding with no location — the SAME value deliver() persists.
+    // The canonical key the filter recomputes for a SLUG observation with no location — the SAME value deliver() persists.
     private static final String CK = ObservationFingerprint.compute(
         SLUG,
-        WorkArtifact.PULL_REQUEST.name(),
+        ArtifactKinds.PULL_REQUEST.value(),
         TARGET,
         CONTRIBUTOR,
         null
@@ -62,13 +63,13 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             observationRepository,
             reactionRepository,
             feedbackLedgerRecorder,
-            new PracticeReviewProperties(false, true, false, 15, false, enabled)
+            new PracticeReviewProperties(false, false, 15, 5, false, enabled)
         );
     }
 
     @Test
     void flagOff_passesThroughUnchanged_noRepoCalls() {
-        List<ValidatedFinding> in = List.of(vf(SLUG, Presence.ABSENT));
+        List<ValidatedObservation> in = List.of(vf(SLUG, Presence.ABSENT));
 
         var d = filter(false).evaluate(TestEntities.agentJob(), in);
 
@@ -105,7 +106,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         var in = List.of(vf(SLUG, Presence.ABSENT));
 
         assertThatCode(() -> filter.evaluate(job, in)).doesNotThrowAnyException();
-        assertThat(filter.evaluate(job, in).deliverable()).isEmpty(); // still suppressed despite the failed write
+        assertThat(filter.evaluate(job, in).deliverable()).isEmpty();
     }
 
     @Test
@@ -128,12 +129,12 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
-        assertThat(d.deliverable().get(0).reasoning()).startsWith("You previously marked this as fixed");
+        assertThat(d.deliverable().get(0).evidenceRationale()).startsWith("You previously marked this as fixed");
     }
 
     @Test
     void addressedAndNowGood_isDeliveredPlainNotEscalated() {
-        // ADDRESSED only escalates a STILL-failing locus; if the practice is now PRESENT/GOOD the finding passes
+        // ADDRESSED only escalates a STILL-failing locus; if the practice is now PRESENT/GOOD the observation passes
         // through untouched (escalation is keyed on assessment == BAD, not on the reaction alone).
         stubPersistedAndReaction(ReactionAction.ADDRESSED);
 
@@ -141,16 +142,14 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
-        assertThat(d.deliverable().get(0).reasoning()).isEqualTo("because reasons"); // unchanged
+        assertThat(d.deliverable().get(0).evidenceRationale()).isEqualTo("because reasons");
     }
 
     @Test
     void secretBadFinding_isNotSuppressedDespiteDisputedReaction() {
-        // Security invariant: a still-BAD hardcoded-secrets locus is never silenceable — a single DISPUTED
-        // reaction must not permanently mute a credential leak that is still present this run.
         String secretKey = ObservationFingerprint.compute(
-            "hardcoded-secrets",
-            WorkArtifact.PULL_REQUEST.name(),
+            "avoids-insecure-defaults-and-over-broad-permissions",
+            ArtifactKinds.PULL_REQUEST.value(),
             TARGET,
             CONTRIBUTOR,
             null
@@ -164,20 +163,33 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             List.of(reaction)
         );
 
-        var d = filter(true).evaluate(
-            TestEntities.agentJob(),
-            List.of(vf("hardcoded-secrets", Presence.ABSENT, secretKey))
-        );
+        var d = filter(true).evaluate(TestEntities.agentJob(), List.of(secretScannerObservation(secretKey)));
 
         assertThat(d.deliverable()).hasSize(1);
         assertThat(d.suppressedCount()).isZero();
         verify(feedbackLedgerRecorder, never()).recordSuppressed(any(), any(), any(), anyInt());
     }
 
+    private static ValidatedObservation secretScannerObservation(String recurrenceKey) {
+        var evidence = tools.jackson.databind.node.JsonNodeFactory.instance
+            .objectNode()
+            .put("detector", "secret-diff-scanner");
+        return new ValidatedObservation(
+            "avoids-insecure-defaults-and-over-broad-permissions",
+            "Hardcoded secret on a changed line",
+            Presence.PRESENT,
+            Assessment.BAD,
+            Severity.CRITICAL,
+            evidence,
+            "A credential is committed.",
+            new ObservationKeys("occ-" + recurrenceKey, recurrenceKey)
+        );
+    }
+
     @Test
     void persistedWithNullRecurrenceKey_shortCircuits_noReactionQuery() {
         // A persisted observation may carry a null recurrence_key (a detector that emitted no locatable
-        // findings). With no keys to bind, the native IN (:recurrenceKeys) query is skipped entirely.
+        // observations). With no keys to bind, the native IN (:recurrenceKeys) query is skipped entirely.
         var pf = pf(null);
         when(observationRepository.findByAgentJobId(any())).thenReturn(List.of(pf));
 
@@ -201,10 +213,13 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     @Test
     void sameLocusSiblings_eachGetTheirOwnSuppressedRow() {
-        // Two findings of one practice on one file share a recurrence key by design, and one reaction on that
+        // Two observations of one practice on one file share a recurrence key by design, and one reaction on that
         // locus withholds BOTH. Each must be ledgered against ITS OWN observation: indexing observations by
         // locus would record the first one twice and leave the sibling withheld with no row — the recorder
         // would then bind it PRIMARY to the DELIVERED unit, and it would read as feedback the developer saw.
+        // A shared recurrence key must be ledgered against EACH observation, not just the first one found —
+        // indexing by locus would leave the sibling withheld with no row, and the recorder would then bind it
+        // PRIMARY to the delivered unit, making it read as feedback the developer saw.
         Observation first = pf(CK, "occ-first");
         Observation second = pf(CK, "occ-second");
         List<Observation> persisted = List.of(first, second);
@@ -228,35 +243,31 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
         assertThat(ledgered.getAllValues()).containsExactlyInAnyOrder(first, second);
     }
 
-    private static ValidatedFinding vf(String slug, Presence presence) {
+    private static ValidatedObservation vf(String slug, Presence presence) {
         return vf(slug, presence, CK);
     }
 
-    private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey, String occurrenceKey) {
+    private static ValidatedObservation vf(String slug, Presence presence, String recurrenceKey, String occurrenceKey) {
         return vf(slug, presence, recurrenceKey).withKeys(new ObservationKeys(occurrenceKey, recurrenceKey));
     }
 
-    private static ValidatedFinding vf(String slug, Presence presence, String recurrenceKey) {
-        // Assessment mapping: PRESENT->GOOD (strength), ABSENT->BAD (gap), NA->null.
+    private static ValidatedObservation vf(String slug, Presence presence, String recurrenceKey) {
         Assessment assessment =
             presence == Presence.NOT_APPLICABLE
                 ? null
                 : presence == Presence.PRESENT
                     ? Assessment.GOOD
                     : Assessment.BAD;
-        // The handler stamps the persisted recurrence_key onto each finding before the filter runs; the filter
+        // The handler stamps the persisted recurrence_key onto each observation before the filter runs; the filter
         // matches reactions on that stamped key (never a recompute), so the test feeds it the same way.
-        return new ValidatedFinding(
+        return new ValidatedObservation(
             slug,
             slug + " title",
             presence,
             assessment,
             Severity.MINOR,
-            0.8f,
             null,
             "because reasons",
-            "do x",
-            List.of(),
             new ObservationKeys("occ-" + recurrenceKey, recurrenceKey)
         );
     }
@@ -267,7 +278,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
 
     private Observation pf(String recurrenceKey, String occurrenceKey) {
         Observation pf = org.mockito.Mockito.mock(Observation.class);
-        // aboutUserId is always populated; for author-side findings it equals the contributor.
+        // aboutUserId is always populated; for author-side observations it equals the contributor.
         lenient().when(pf.getRecurrenceKey()).thenReturn(recurrenceKey);
         lenient().when(pf.getOccurrenceKey()).thenReturn(occurrenceKey);
         lenient().when(pf.getAboutUserId()).thenReturn(CONTRIBUTOR);

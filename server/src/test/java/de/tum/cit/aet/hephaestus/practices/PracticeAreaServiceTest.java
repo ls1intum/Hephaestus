@@ -15,11 +15,12 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -89,7 +90,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThat(created.getDescription()).isEqualTo("blurb");
         assertThat(created.getIcon()).isEqualTo("MessageSquareReply");
         assertThat(created.getColor()).isEqualTo("cyan");
-        assertThat(created.isActive()).isTrue();
+        assertThat(created.isVisibleInPracticeDashboards()).isTrue();
         verify(practiceAreaRepository).save(any(PracticeArea.class));
     }
 
@@ -109,7 +110,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         assertThat(entry.workspaceId()).isEqualTo(1L);
         assertThat(entry.before()).isNull();
         assertThat(entry.after()).isEqualTo(
-            new PracticeAreaSnapshot("review-comms", "Review communication", null, true, null, null)
+            new PracticeAreaSnapshot("review-comms", "Review communication", null, true, null, null, null)
         );
     }
 
@@ -163,7 +164,7 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         PracticeArea area = area("guidance");
         area.setId(7L);
         area.setName("Old");
-        area.setActive(true);
+        area.setVisibleInPracticeDashboards(true);
         when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "guidance")).thenReturn(Optional.of(area));
         when(practiceAreaRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -171,8 +172,8 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
         ConfigAuditEntry entry = capturedAuditEntry();
         assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
-        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("guidance", "Old", null, true, null, null));
-        assertThat(entry.after()).isEqualTo(new PracticeAreaSnapshot("guidance", "New", null, false, null, null));
+        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("guidance", "Old", null, true, null, null, null));
+        assertThat(entry.after()).isEqualTo(new PracticeAreaSnapshot("guidance", "New", null, false, null, null, null));
     }
 
     @Test
@@ -300,7 +301,9 @@ class PracticeAreaServiceTest extends BaseUnitTest {
 
         ConfigAuditEntry entry = capturedAuditEntry();
         assertThat(entry.entityType()).isEqualTo(ConfigAuditEntityType.PRACTICE_AREA);
-        assertThat(entry.before()).isEqualTo(new PracticeAreaSnapshot("deleted", "Deleted", null, true, null, null));
+        assertThat(entry.before()).isEqualTo(
+            new PracticeAreaSnapshot("deleted", "Deleted", null, true, null, null, null)
+        );
         assertThat(entry.after()).isNull();
     }
 
@@ -320,9 +323,10 @@ class PracticeAreaServiceTest extends BaseUnitTest {
         Practice practice = new Practice();
         practice.setSlug(slug);
         practice.setName(slug);
-        practice.setArtifactType(WorkArtifact.PULL_REQUEST);
-        practice.setTriggerEvents(TriggerEventsConverter.toJsonNode(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("criteria");
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         return practice;
     }
 

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { ConnectionHealthBadge } from "./ConnectionHealthBadge";
 
 /**
@@ -41,8 +41,7 @@ export const Suspended: Story = { args: { health: "SUSPENDED" } };
  */
 export const Syncing: Story = {
 	args: { health: "FAILED", isSyncing: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const badge = canvas.getByRole("status");
 		await expect(badge).toHaveTextContent("Syncing");
 		await expect(badge).toHaveAttribute("aria-label", "Connection health: Syncing");

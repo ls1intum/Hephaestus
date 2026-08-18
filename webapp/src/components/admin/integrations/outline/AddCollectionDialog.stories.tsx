@@ -2,11 +2,16 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { delay, HttpResponse, http } from "msw";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { expectSettledVisible } from "@/test/overlay";
 import { AddCollectionDialog } from "./AddCollectionDialog";
 
 const meta = {
 	component: AddCollectionDialog,
-	parameters: { layout: "centered" },
+	parameters: {
+		layout: "centered",
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
@@ -87,8 +92,8 @@ export const ProbeFailed: Story = {
 	},
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
-		await expect(await within(dialog).findByText(/outline did not respond/i)).toBeInTheDocument();
-		await expect(within(dialog).getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+		await expectSettledVisible(await within(dialog).findByText(/outline did not respond/i));
+		within(dialog).getByRole("button", { name: /^retry$/i });
 	},
 };
 
@@ -96,10 +101,10 @@ export const NoVisibleCollections: Story = {
 	parameters: { msw: { handlers: [candidatesHandler([])] } },
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
-		await expect(
+		await expectSettledVisible(
 			await within(dialog).findByText(/this token cannot see any collections/i),
-		).toBeInTheDocument();
-		await expect(within(dialog).getByText(/add the bot user/i)).toBeInTheDocument();
+		);
+		within(dialog).getByText(/add the bot user/i);
 	},
 };
 
@@ -110,10 +115,10 @@ export const PopulatedSearchable: Story = {
 
 		const mirrored = await within(dialog).findByRole("option", { name: /engineering/i });
 		await expect(mirrored).toHaveAttribute("data-disabled");
-		await expect(within(dialog).getByText(/already mirrored/i)).toBeInTheDocument();
+		within(dialog).getByText(/already mirrored/i);
 
 		await userEvent.type(within(dialog).getByRole("combobox"), "design");
-		await expect(within(dialog).getByText("Design System")).toBeInTheDocument();
+		within(dialog).getByText("Design System");
 		await expect(within(dialog).queryByText("Research Notes")).not.toBeInTheDocument();
 
 		await userEvent.click(within(dialog).getByRole("option", { name: /design system/i }));
@@ -184,9 +189,7 @@ export const EmptySearchResult: Story = {
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
 		await userEvent.type(await within(dialog).findByRole("combobox"), "nothing-matches-this");
-		await waitFor(() =>
-			expect(within(dialog).getByText(/no collections match your search/i)).toBeVisible(),
-		);
+		await waitFor(() => expect(within(dialog).getByText(/no collections match your search/i)));
 		await expect(within(dialog).queryByRole("option")).not.toBeInTheDocument();
 	},
 };
@@ -199,9 +202,9 @@ export const AllAlreadyMirrored: Story = {
 	},
 	play: async () => {
 		const dialog = await screen.findByRole("dialog");
-		await expect(
+		await expectSettledVisible(
 			await within(dialog).findByText(/every visible collection is already mirrored/i),
-		).toBeInTheDocument();
+		);
 		await expect(within(dialog).queryByRole("listbox")).not.toBeInTheDocument();
 	},
 };
@@ -219,7 +222,7 @@ export const RegisteringSequentially: Story = {
 		await userEvent.click(within(dialog).getByRole("option", { name: /design system/i }));
 		await userEvent.click(within(dialog).getByRole("button", { name: /add 2 collections/i }));
 
-		await expect(await within(dialog).findByText(/adding 1 of 2…/i)).toBeInTheDocument();
-		await expect(await within(dialog).findByText(/adding 2 of 2…/i)).toBeInTheDocument();
+		await expectSettledVisible(await within(dialog).findByText(/adding 1 of 2…/i));
+		await expectSettledVisible(await within(dialog).findByText(/adding 2 of 2…/i));
 	},
 };

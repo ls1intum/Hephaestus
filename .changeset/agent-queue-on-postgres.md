@@ -2,10 +2,11 @@
 "hephaestus": minor
 ---
 
-Practice-detection job execution no longer needs NATS — the agent job queue now runs on
+Practice-review job execution no longer needs NATS — the agent job queue now runs on
 PostgreSQL. Smallest self-host deployments that only want practice review can drop a moving part.
-The queue now also prunes its own history automatically and exposes queue-depth/age health metrics,
-so a busy instance doesn't grow `agent_job` unbounded or need to guess at queue health from logs.
+The queue now also prunes its own history automatically, so a busy instance no longer accumulates
+finished jobs without bound, and it reports its depth and the age of its oldest waiting job as
+metrics rather than leaving you to infer them from logs.
 
 **Operators:** replace `AGENT_NATS_ENABLED` with `AGENT_ENABLED` (and drop
 `HEPHAESTUS_AGENT_NATS_SERVER`, `AGENT_NATS_MAX_ACK_PENDING`, `AGENT_NATS_FETCH_BATCH_SIZE`) on

@@ -10,7 +10,7 @@
 //                  time (sourced from `chat_thread.session_jsonl` BYTEA in Postgres). The runner's
 //                  `bindThread` → `switchSession` loads byte-identical prior turns transparently
 //                  via the Pi SDK SessionManager — no explicit replay RPC is needed.
-// Custom tools: fetch_context (callback to Java, whitelisted paths), link_finding (event emit).
+// Custom tools: fetch_context (callback to Java, whitelisted paths), link_observation (event emit).
 // Error codes: -32600 invalid_request, -32601 method_not_found, -32000 thread_not_open,
 //              -32001 turn_already_in_flight, -32002 pi_error, -32003 invalid_state.
 
@@ -100,8 +100,7 @@ const FETCH_CONTEXT_ALLOWED = new Set([
     "inputs/context/workspace.json",
     "inputs/context/user.json",
     "inputs/context/practice_catalog.json",
-    "inputs/context/findings_history.json",
-    "inputs/context/practice_standing.json",
+    "inputs/context/observations_history.json",
     "inputs/context/delivered_feedback.json",
     "inputs/context/recent_authored_work.json",
     "inputs/context/slack_conversations.json",
@@ -273,7 +272,7 @@ async function ensureRuntime() {
 
         // Custom tools (defined once; same instances reused across thread switches).
         const fetchContextTool = defineFetchContextTool();
-        const linkFindingTool = defineLinkFindingTool();
+        const linkObservationTool = defineLinkObservationTool();
 
         // Same race workaround as pi-runner.mjs: register the hephaestus provider directly on
         // the ModelRegistry before createAgentSession. Reused across cwd switches; providers are
@@ -317,8 +316,8 @@ async function ensureRuntime() {
                 services,
                 sessionManager,
                 sessionStartEvent,
-                customTools: [fetchContextTool, linkFindingTool],
-                tools: ["fetch_context", "link_finding"],
+                customTools: [fetchContextTool, linkObservationTool],
+                tools: ["fetch_context", "link_observation"],
                 resourceLoader: loader,
             });
             return { ...result, services, diagnostics: services.diagnostics };
@@ -406,34 +405,34 @@ function defineFetchContextTool() {
     });
 }
 
-function defineLinkFindingTool() {
+function defineLinkObservationTool() {
     const { defineTool } = sdk;
     return defineTool({
-        name: "link_finding",
-        label: "Link Finding",
+        name: "link_observation",
+        label: "Link Observation",
         description:
-            "Surface a Hephaestus practice finding inline in the chat by linking it to its UUID. " +
-            "Use this when referring to a specific finding from a prior review.",
+            "Surface a Hephaestus practice observation inline in the chat by linking it to its UUID. " +
+            "Use this when referring to a specific observation from a prior review.",
         parameters: {
             type: "object",
             additionalProperties: false,
-            required: ["findingId"],
+            required: ["observationId"],
             properties: {
-                findingId: { type: "string", minLength: 1 },
+                observationId: { type: "string", minLength: 1 },
             },
         },
         execute: async (_toolCallId, params) => {
-            const findingId = String(params?.findingId ?? "").trim();
-            if (!findingId) {
-                throw new Error("link_finding: findingId is required");
+            const observationId = String(params?.observationId ?? "").trim();
+            if (!observationId) {
+                throw new Error("link_observation: observationId is required");
             }
-            // Emit a synthetic event the Java translator maps to a `data-finding` UI chunk.
+            // Emit a synthetic event the Java translator maps to a `data-observation` UI chunk.
             if (activeThreadId) {
-                sendEvent(activeThreadId, { type: "link_finding", findingId });
+                sendEvent(activeThreadId, { type: "link_observation", observationId });
             }
             return {
-                content: [{ type: "text", text: `Linked finding ${findingId}` }],
-                details: { findingId },
+                content: [{ type: "text", text: `Linked observation ${observationId}` }],
+                details: { observationId },
             };
         },
     });
@@ -712,7 +711,7 @@ async function handleShutdown(id) {
 }
 
 // Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
-// occasionally balloon (e.g. `findings.json` for a heavy reviewer); without a cap, a single
+// occasionally balloon (e.g. `observations.json` for a heavy reviewer); without a cap, a single
 // tool call can blow the model's context window. 200 K chars ≈ 50 K tokens at ~4 chars/token —
 // comfortably below the configured model's context window. Counted in JS string length (UTF-16 code
 // units), not bytes; context JSONs are ASCII-dominant so the variance is small.

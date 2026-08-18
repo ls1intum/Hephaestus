@@ -26,10 +26,7 @@ class CacheConfigTest extends BaseUnitTest {
         "auth_jwt_revoked",
         "contributors",
         "mentor_authored_work_context",
-        "mentor_delivered_feedback_context",
-        "mentor_findings_context",
         "mentor_practice_context",
-        "mentor_practice_standing_context",
         "mentor_user_context",
         "mentor_workspace_context",
         "pullRequestTemplates"
@@ -60,13 +57,10 @@ class CacheConfigTest extends BaseUnitTest {
             .filter(name -> name.startsWith("mentor_"))
             .toList();
         assertThat(mentorCaches)
-            .as("expected all seven mentor context caches")
+            .as("expected all four mentor context caches")
             .containsExactlyInAnyOrder(
                 "mentor_authored_work_context",
-                "mentor_delivered_feedback_context",
-                "mentor_findings_context",
                 "mentor_practice_context",
-                "mentor_practice_standing_context",
                 "mentor_user_context",
                 "mentor_workspace_context"
             );

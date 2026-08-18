@@ -131,9 +131,8 @@ const detailReport: WorkspaceLlmUsageReport = {
 };
 
 /**
- * Instance-admin table of every workspace's AI spend for one month, against both caps: the
- * shared-model budget the host grants (editable here) and the workspace's own provider cap
- * (read-only — it is the workspace's money).
+ * Every workspace's AI spend for one month, against both caps: the shared-model budget the host
+ * grants — editable here — and the workspace's own provider cap, read-only because it is their money.
  */
 const meta = {
 	component: AdminInstanceLlmUsageTable,
@@ -197,7 +196,7 @@ export const DisplayCurrencyThisMonth: Story = {
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText(FX_DISCLOSURE)).toBeVisible();
-		await expect(canvas.getByLabelText("approximately 21.99 euros")).toBeInTheDocument();
+		canvas.getByLabelText("approximately 21.99 euros");
 	},
 };
 
@@ -214,8 +213,8 @@ export const DisplayCurrencyClosedMonth: Story = {
 };
 
 /**
- * WCAG 2.2 SC 1.4.10: the eight-column rollup takes the data-table exception and scrolls sideways,
- * but the breakdown must not nest inside that scroller — two scrollers to read one number is
+ * WCAG 2.2 SC 1.4.10: the rollup takes the data-table exception and scrolls sideways, but the
+ * breakdown must not nest inside that scroller — two scrollers to read one number is
  * two-dimensional scrolling.
  */
 export const ExpandedMobileReflow: Story = {
@@ -239,8 +238,8 @@ export const ExpandedMobileReflow: Story = {
 };
 
 /**
- * WCAG 2.2 SC 2.5.8: the two column-header help buttons sit at the header's ~20 px line height, and
- * the Spacing exception would rest on column widths nothing here controls — so they carry their own.
+ * WCAG 2.2 SC 2.5.8: a header line box leaves these triggers under 24 px, and the Spacing exception
+ * would rest on column widths nothing here controls — so they carry their own target size.
  */
 export const HelpHeaderTargetSize: Story = {
 	play: async ({ canvas }) => {
@@ -339,7 +338,7 @@ export const NoProviderCapsSet: Story = {
 export const PastMonth: Story = {
 	args: { isCurrentMonth: false },
 	play: async ({ canvas }) => {
-		await expect(canvas.queryByRole("button", { name: /^Set shared-model budget/ })).toBeNull();
+		await expect(canvas.queryByRole("button", { name: /^Set budget for/ })).toBeNull();
 		await expect(canvas.getAllByRole("button", { name: /^View usage details for/ })).toHaveLength(
 			rows.length,
 		);

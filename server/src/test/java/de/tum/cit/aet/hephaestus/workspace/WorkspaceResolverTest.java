@@ -64,7 +64,7 @@ class WorkspaceResolverTest extends BaseUnitTest {
         void resolvesFromMonitor() {
             Workspace workspace = createWorkspace("test-workspace");
             RepositoryToMonitor monitor = createMonitor(workspace);
-            when(repositoryToMonitorRepository.findByNameWithOwner("ls1intum/Hephaestus")).thenReturn(
+            when(repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner("ls1intum/Hephaestus")).thenReturn(
                 Optional.of(monitor)
             );
 
@@ -79,7 +79,7 @@ class WorkspaceResolverTest extends BaseUnitTest {
         @Test
         void returnsEmptyForMonitorWithNullWorkspace() {
             RepositoryToMonitor monitor = createMonitor(null);
-            when(repositoryToMonitorRepository.findByNameWithOwner("ls1intum/Hephaestus")).thenReturn(
+            when(repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner("ls1intum/Hephaestus")).thenReturn(
                 Optional.of(monitor)
             );
 
@@ -94,7 +94,9 @@ class WorkspaceResolverTest extends BaseUnitTest {
 
         @Test
         void fallsBackToOwnerLookup() {
-            when(repositoryToMonitorRepository.findByNameWithOwner("ls1intum/Hephaestus")).thenReturn(Optional.empty());
+            when(repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner("ls1intum/Hephaestus")).thenReturn(
+                Optional.empty()
+            );
             Workspace workspace = createWorkspace("ls1intum-workspace");
             when(workspaceRepository.findByAccountLoginIgnoreCase("ls1intum")).thenReturn(Optional.of(workspace));
 
@@ -106,7 +108,9 @@ class WorkspaceResolverTest extends BaseUnitTest {
 
         @Test
         void returnsEmptyWhenNoMatch() {
-            when(repositoryToMonitorRepository.findByNameWithOwner("unknown/repo")).thenReturn(Optional.empty());
+            when(repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner("unknown/repo")).thenReturn(
+                Optional.empty()
+            );
             when(workspaceRepository.findByAccountLoginIgnoreCase("unknown")).thenReturn(Optional.empty());
 
             Optional<Workspace> result = resolver.resolveForRepository("unknown/repo");
@@ -116,7 +120,9 @@ class WorkspaceResolverTest extends BaseUnitTest {
 
         @Test
         void returnsEmptyForNoSlash() {
-            when(repositoryToMonitorRepository.findByNameWithOwner("noslash")).thenReturn(Optional.empty());
+            when(repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner("noslash")).thenReturn(
+                Optional.empty()
+            );
 
             Optional<Workspace> result = resolver.resolveForRepository("noslash");
 
@@ -126,7 +132,7 @@ class WorkspaceResolverTest extends BaseUnitTest {
 
         @Test
         void skipsHeuristicForEmptyOwner() {
-            when(repositoryToMonitorRepository.findByNameWithOwner("/repo")).thenReturn(Optional.empty());
+            when(repositoryToMonitorRepository.findWithWorkspaceByNameWithOwner("/repo")).thenReturn(Optional.empty());
 
             Optional<Workspace> result = resolver.resolveForRepository("/repo");
 

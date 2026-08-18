@@ -3,8 +3,8 @@
 import { type DefaultError, type InfiniteData, infiniteQueryOptions, queryOptions, type UseMutationOptions } from '@tanstack/react-query';
 
 import { client } from '../client.gen';
-import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, adminCreateCuratedArea, adminCreateCuratedPractice, adminCreateLlmConnection, adminCreateLlmModel, adminCreateLoginProvider, adminDeleteCuratedAreaOverride, adminDeleteCuratedPracticeOverride, adminDeleteLlmConnection, adminDeleteLlmModel, adminDeleteLoginProvider, adminExportAuthEvents, adminGetCuratedArea, adminGetCuratedCatalog, adminGetCuratedPractice, adminGetInstanceSettings, adminGetLlmConnection, adminGetLlmModel, adminGetLlmSettings, adminGetLlmUsageReport, adminKeepCuratedArea, adminKeepCuratedPractice, adminListAuthEvents, adminListConfigAuditEvents, adminListLlmConnections, adminListLlmModels, adminListLoginProviders, adminListUsers, adminListWorkspaces, adminPlaceCuratedPractice, adminProbeLlmConnection, adminProbeLlmConnectionDraft, adminReorderCuratedAreas, adminReorderCuratedPractices, adminResetCuratedCatalogOrder, adminRevokeUserSessions, adminUpdateCuratedArea, adminUpdateCuratedAreaStatus, adminUpdateCuratedPractice, adminUpdateCuratedPracticeStatus, adminUpdateLlmConnection, adminUpdateLlmModel, adminUpdateLlmModelPrice, adminUpdateLlmModelSharing, adminUpdateLlmSettings, adminUpdateLoginProvider, adminUpdateSilentMode, adminUpdateUser, adminUpdateWorkspaceLlmBudget, assignRole, audit, bindArea, callbackGet, callbackPost, cancelAgentJob, computeUserLeagueStats, configureAgent, createArea, createPractice, createWorkspace, deleteAgent, deleteArea, deleteCurrentUser, deleteOutlineCollection, deletePractice, deleteThread, downloadDataExport, exitImpersonation, getActivityMonitor, getAgentJob, getAllAchievementDefinitions, getAllTeams, getArea, getConnectionSyncStatus, getCuratedPracticeCatalogEntry, getCurrentUser, getCurrentUserMembership, getDataExportStatus, getEngagement, getIntegrationCatalog, getJwks, getLabelFilters, getLatestReaction, getLeaderboard, getLlmUsageReport, getMember, getObservation, getObservationsForPullRequest, getOutlineCollection, getOutlineTokenStatus, getPractice, getPracticeReviewFeedback, getPracticeReviewFinding, getPracticeReviewSettings, getProviders, getReflection, getRepositoriesToMonitor, getRepositorySettings, getSlackUserPreferences, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, impersonate, initiate, list, listAgentJobs, listAgents, listAreas, listConnectionSyncJobs, listConnectionSyncResources, listGitLabGroups, listGlobalContributors, listIdentityProviders, listLearnerPractices, listLinkedIdentities, listMembers, listObservations, listOutlineCollectionCandidates, listOutlineCollections, listPracticeReviewFeedback, listPracticeReviewFindings, listPracticeReviews, listPractices, listSessions, listSlackChannelCandidates, listSlackChannelConsentEvents, listSlackChannels, listThreads, listWorkspaceConfigAuditEvents, listWorkspaces, logout, type Options, placePractice, purgeWorkspace, read, recalculateUserAchievements, refresh, registerOutlineCollection, registerSlackChannel, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, reorderAreas, reorderPractices, requestDataExport, resetAndRecalculateLeagues, retryAgentJobDelivery, revokeOtherSessions, revokeSession, sendSlackTestMessage, setActive, submitReaction, triggerSyncJob, unlinkIdentity, updateArea, updateConnectionStatus, updateConnectionSyncJob, updateFeatures, updateLeaderboardDigest, updateMemberVisibility, updateNotifications, updateOutlineCollectionState, updatePractice, updatePracticeReviewSettings, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackChannelConsent, updateSlackUserPreferences, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, updateWorkspaceLlmBudget, vote, workspaceCreateLlmConnection, workspaceCreateLlmModel, workspaceDeleteLlmConnection, workspaceDeleteLlmModel, workspaceGetLlmConnection, workspaceGetLlmModel, workspaceGetLlmSettings, workspaceListAvailableLlmModels, workspaceListLlmConnections, workspaceListLlmModels, workspaceProbeLlmConnection, workspaceUpdateLlmConnection, workspaceUpdateLlmModel } from '../sdk.gen';
-import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AdminCreateCuratedAreaData, AdminCreateCuratedAreaError, AdminCreateCuratedAreaResponse, AdminCreateCuratedPracticeData, AdminCreateCuratedPracticeError, AdminCreateCuratedPracticeResponse, AdminCreateLlmConnectionData, AdminCreateLlmConnectionResponse, AdminCreateLlmModelData, AdminCreateLlmModelResponse, AdminCreateLoginProviderData, AdminCreateLoginProviderResponse, AdminDeleteCuratedAreaOverrideData, AdminDeleteCuratedAreaOverrideError, AdminDeleteCuratedAreaOverrideResponse, AdminDeleteCuratedPracticeOverrideData, AdminDeleteCuratedPracticeOverrideError, AdminDeleteCuratedPracticeOverrideResponse, AdminDeleteLlmConnectionData, AdminDeleteLlmConnectionResponse, AdminDeleteLlmModelData, AdminDeleteLlmModelResponse, AdminDeleteLoginProviderData, AdminExportAuthEventsData, AdminExportAuthEventsResponse, AdminGetCuratedAreaData, AdminGetCuratedAreaResponse, AdminGetCuratedCatalogData, AdminGetCuratedCatalogResponse, AdminGetCuratedPracticeData, AdminGetCuratedPracticeResponse, AdminGetInstanceSettingsData, AdminGetInstanceSettingsResponse, AdminGetLlmConnectionData, AdminGetLlmConnectionResponse, AdminGetLlmModelData, AdminGetLlmModelResponse, AdminGetLlmSettingsData, AdminGetLlmSettingsResponse, AdminGetLlmUsageReportData, AdminGetLlmUsageReportResponse, AdminKeepCuratedAreaData, AdminKeepCuratedAreaError, AdminKeepCuratedAreaResponse, AdminKeepCuratedPracticeData, AdminKeepCuratedPracticeError, AdminKeepCuratedPracticeResponse, AdminListAuthEventsData, AdminListAuthEventsResponse, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponse, AdminListLlmConnectionsData, AdminListLlmConnectionsResponse, AdminListLlmModelsData, AdminListLlmModelsResponse, AdminListLoginProvidersData, AdminListLoginProvidersResponse, AdminListUsersData, AdminListUsersResponse, AdminListWorkspacesData, AdminListWorkspacesResponse, AdminPlaceCuratedPracticeData, AdminPlaceCuratedPracticeResponse, AdminProbeLlmConnectionData, AdminProbeLlmConnectionDraftData, AdminProbeLlmConnectionDraftResponse, AdminProbeLlmConnectionResponse, AdminReorderCuratedAreasData, AdminReorderCuratedAreasResponse, AdminReorderCuratedPracticesData, AdminReorderCuratedPracticesResponse, AdminResetCuratedCatalogOrderData, AdminResetCuratedCatalogOrderResponse, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponse, AdminUpdateCuratedAreaData, AdminUpdateCuratedAreaError, AdminUpdateCuratedAreaResponse, AdminUpdateCuratedAreaStatusData, AdminUpdateCuratedAreaStatusError, AdminUpdateCuratedAreaStatusResponse, AdminUpdateCuratedPracticeData, AdminUpdateCuratedPracticeError, AdminUpdateCuratedPracticeResponse, AdminUpdateCuratedPracticeStatusData, AdminUpdateCuratedPracticeStatusError, AdminUpdateCuratedPracticeStatusResponse, AdminUpdateLlmConnectionData, AdminUpdateLlmConnectionResponse, AdminUpdateLlmModelData, AdminUpdateLlmModelPriceData, AdminUpdateLlmModelPriceResponse, AdminUpdateLlmModelResponse, AdminUpdateLlmModelSharingData, AdminUpdateLlmModelSharingResponse, AdminUpdateLlmSettingsData, AdminUpdateLlmSettingsResponse, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponse, AdminUpdateSilentModeData, AdminUpdateSilentModeError, AdminUpdateSilentModeResponse, AdminUpdateUserData, AdminUpdateUserResponse, AdminUpdateWorkspaceLlmBudgetData, AdminUpdateWorkspaceLlmBudgetResponse, AssignRoleData, AssignRoleResponse, AuditData, AuditResponse, BindAreaData, BindAreaError, BindAreaResponse, CallbackGetData, CallbackGetResponse, CallbackPostData, CallbackPostResponse, CancelAgentJobData, CancelAgentJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, ConfigureAgentData, ConfigureAgentResponse, CreateAreaData, CreateAreaResponse, CreatePracticeData, CreatePracticeError, CreatePracticeResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteAgentData, DeleteAgentResponse, DeleteAreaData, DeleteAreaResponse, DeleteCurrentUserData, DeleteOutlineCollectionData, DeleteOutlineCollectionResponse, DeletePracticeData, DeletePracticeError, DeletePracticeResponse, DeleteThreadData, DeleteThreadResponse, DownloadDataExportData, DownloadDataExportResponse, ExitImpersonationData, GetActivityMonitorData, GetActivityMonitorResponse, GetAgentJobData, GetAgentJobResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetAreaData, GetAreaResponse, GetConnectionSyncStatusData, GetConnectionSyncStatusResponse, GetCuratedPracticeCatalogEntryData, GetCuratedPracticeCatalogEntryResponse, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetCurrentUserResponse, GetDataExportStatusData, GetDataExportStatusResponse, GetEngagementData, GetEngagementResponse, GetIntegrationCatalogData, GetIntegrationCatalogResponse, GetJwksData, GetJwksResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestReactionData, GetLatestReactionResponse, GetLeaderboardData, GetLeaderboardResponse, GetLlmUsageReportData, GetLlmUsageReportResponse, GetMemberData, GetMemberResponse, GetObservationData, GetObservationResponse, GetObservationsForPullRequestData, GetObservationsForPullRequestResponse, GetOutlineCollectionData, GetOutlineCollectionResponse, GetOutlineTokenStatusData, GetOutlineTokenStatusResponse, GetPracticeData, GetPracticeError, GetPracticeResponse, GetPracticeReviewFeedbackData, GetPracticeReviewFeedbackError, GetPracticeReviewFeedbackResponse, GetPracticeReviewFindingData, GetPracticeReviewFindingError, GetPracticeReviewFindingResponse, GetPracticeReviewSettingsData, GetPracticeReviewSettingsResponse, GetProvidersData, GetProvidersResponse, GetReflectionData, GetReflectionResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSlackUserPreferencesData, GetSlackUserPreferencesResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ImpersonateData, InitiateData, InitiateResponse, ListAgentJobsData, ListAgentJobsResponse, ListAgentsData, ListAgentsResponse, ListAreasData, ListAreasResponse, ListConnectionSyncJobsData, ListConnectionSyncJobsResponse, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponse, ListData, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListIdentityProvidersData, ListIdentityProvidersResponse, ListLearnerPracticesData, ListLearnerPracticesResponse, ListLinkedIdentitiesData, ListLinkedIdentitiesResponse, ListMembersData, ListMembersResponse, ListObservationsData, ListObservationsResponse, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesResponse, ListOutlineCollectionsData, ListOutlineCollectionsResponse, ListPracticeReviewFeedbackData, ListPracticeReviewFeedbackError, ListPracticeReviewFeedbackResponse, ListPracticeReviewFindingsData, ListPracticeReviewFindingsError, ListPracticeReviewFindingsResponse, ListPracticeReviewsData, ListPracticeReviewsError, ListPracticeReviewsResponse, ListPracticesData, ListPracticesResponse, ListResponse, ListSessionsData, ListSessionsResponse, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponse, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponse, ListSlackChannelsData, ListSlackChannelsResponse, ListThreadsData, ListThreadsResponse, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponse, ListWorkspacesData, ListWorkspacesResponse, LogoutData, PlacePracticeData, PlacePracticeError, PlacePracticeResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, ReadData, ReadResponse, RecalculateUserAchievementsData, RefreshData, RegisterOutlineCollectionData, RegisterOutlineCollectionResponse, RegisterSlackChannelData, RegisterSlackChannelResponse, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ReorderAreasData, ReorderAreasResponse, ReorderPracticesData, ReorderPracticesError, ReorderPracticesResponse, RequestDataExportData, RequestDataExportResponse, ResetAndRecalculateLeaguesData, RetryAgentJobDeliveryData, RetryAgentJobDeliveryResponse, RevokeOtherSessionsData, RevokeSessionData, SendSlackTestMessageData, SendSlackTestMessageResponse, SetActiveData, SetActiveError, SetActiveResponse, SubmitReactionData, SubmitReactionResponse, TriggerSyncJobData, TriggerSyncJobError, TriggerSyncJobResponse, UnlinkIdentityData, UnlinkIdentityResponse, UpdateAreaData, UpdateAreaResponse, UpdateConnectionStatusData, UpdateConnectionStatusResponse, UpdateConnectionSyncJobData, UpdateConnectionSyncJobError, UpdateConnectionSyncJobResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateResponse, UpdatePracticeData, UpdatePracticeError, UpdatePracticeResponse, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponse, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, UpdateWorkspaceLlmBudgetData, UpdateWorkspaceLlmBudgetResponse, VoteData, VoteResponse, WorkspaceCreateLlmConnectionData, WorkspaceCreateLlmConnectionResponse, WorkspaceCreateLlmModelData, WorkspaceCreateLlmModelResponse, WorkspaceDeleteLlmConnectionData, WorkspaceDeleteLlmConnectionResponse, WorkspaceDeleteLlmModelData, WorkspaceDeleteLlmModelResponse, WorkspaceGetLlmConnectionData, WorkspaceGetLlmConnectionResponse, WorkspaceGetLlmModelData, WorkspaceGetLlmModelResponse, WorkspaceGetLlmSettingsData, WorkspaceGetLlmSettingsResponse, WorkspaceListAvailableLlmModelsData, WorkspaceListAvailableLlmModelsResponse, WorkspaceListLlmConnectionsData, WorkspaceListLlmConnectionsResponse, WorkspaceListLlmModelsData, WorkspaceListLlmModelsResponse, WorkspaceProbeLlmConnectionData, WorkspaceProbeLlmConnectionResponse, WorkspaceUpdateLlmConnectionData, WorkspaceUpdateLlmConnectionResponse, WorkspaceUpdateLlmModelData, WorkspaceUpdateLlmModelResponse } from '../types.gen';
+import { addLabelFilter, addLabelToTeam, addRepositoryToMonitor, adminCreateCuratedArea, adminCreateCuratedPractice, adminCreateLlmConnection, adminCreateLlmModel, adminCreateLoginProvider, adminDeleteCuratedAreaOverride, adminDeleteCuratedPracticeOverride, adminDeleteLlmConnection, adminDeleteLlmModel, adminDeleteLoginProvider, adminExportAuthEvents, adminGetCuratedArea, adminGetCuratedCatalog, adminGetCuratedPractice, adminGetInstanceSettings, adminGetLlmConnection, adminGetLlmModel, adminGetLlmSettings, adminGetLlmUsageReport, adminGetPracticeDefinitionOptions, adminKeepCuratedArea, adminKeepCuratedPractice, adminListAuthEvents, adminListConfigAuditEvents, adminListLlmConnections, adminListLlmModels, adminListLoginProviders, adminListUsers, adminListWorkspaces, adminPlaceCuratedPractice, adminProbeLlmConnection, adminProbeLlmConnectionDraft, adminReorderCuratedAreas, adminReorderCuratedPractices, adminResetCuratedCatalogOrder, adminRevokeUserSessions, adminUpdateCuratedArea, adminUpdateCuratedAreaStatus, adminUpdateCuratedPractice, adminUpdateCuratedPracticeStatus, adminUpdateLlmConnection, adminUpdateLlmModel, adminUpdateLlmModelPrice, adminUpdateLlmModelSharing, adminUpdateLlmSettings, adminUpdateLoginProvider, adminUpdateSilentMode, adminUpdateUser, adminUpdateWorkspaceLlmBudget, assignRole, audit, bindArea, callbackGet, callbackPost, cancelAgentJob, computeUserLeagueStats, configureAgent, createArea, createPractice, createSweepSchedule, createWorkspace, deleteAgent, deleteArea, deleteCurrentUser, deleteOutlineCollection, deletePractice, deleteSweepSchedule, deleteThread, downloadDataExport, exitImpersonation, getActivityMonitor, getAgentJob, getAllAchievementDefinitions, getAllTeams, getArea, getArtifactTrace, getBackfillRun, getConnectionSyncStatus, getCuratedPracticeCatalogEntry, getCurrentUser, getCurrentUserMembership, getDataExportStatus, getEngagement, getInAppFeedback, getIntegrationCatalog, getJwks, getLabelFilters, getLatestReaction, getLeaderboard, getLlmUsageReport, getMember, getObservation, getObservationsForPullRequest, getOutlineCollection, getOutlineTokenStatus, getPractice, getPracticeDefinitionOptions, getPracticeReviewFeedback, getPracticeReviewObservation, getPracticeReviewSettings, getProviders, getReflection, getRepositoriesToMonitor, getRepositorySettings, getSlackUserPreferences, getSummary, getTeamSettings, getThread, getUserAchievements, getUserFeatures, getUserProfile, getUserSettings, getUsersWithTeams, getWorkspace, gitLabPreflight, impersonate, initiate, list, listAgentJobs, listAgents, listAreas, listBackfillRuns, listConnectionSyncJobs, listConnectionSyncResources, listGitLabGroups, listGlobalContributors, listIdentityProviders, listLearnerPractices, listLinkedIdentities, listMembers, listObservations, listOutlineCollectionCandidates, listOutlineCollections, listPracticeEvidenceOutcomes, listPracticeReviewFeedback, listPracticeReviewObservations, listPracticeReviews, listPractices, listSessions, listSlackChannelCandidates, listSlackChannelConsentEvents, listSlackChannels, listSweepSchedules, listThreads, listTracedArtifacts, listWorkspaceConfigAuditEvents, listWorkspaces, logout, type Options, placePractice, preflightBackfillRun, purgeWorkspace, read, recalculateUserAchievements, refresh, registerOutlineCollection, registerSlackChannel, reloadAchievements, removeLabelFilter, removeLabelFromTeam, removeMember, removeRepositoryToMonitor, removeVote, renameSlug, reorderAreas, reorderPractices, replaceSweepSchedule, requestDataExport, requestPracticeReview, resetAndRecalculateLeagues, retryAgentJobDelivery, reviewTierRollup, revokeOtherSessions, revokeSession, sendSlackTestMessage, setAreaReviewTier, setReviewTier, submitReaction, triggerSyncJob, unlinkIdentity, updateArea, updateBackfillRunStatus, updateConnectionStatus, updateConnectionSyncJob, updateFeatures, updateLeaderboardDigest, updateMemberVisibility, updateNotifications, updateOutlineCollectionState, updatePractice, updatePracticeReviewSettings, updatePublicVisibility, updateRepositorySettings, updateRepositoryVisibility, updateSchedule, updateSlackChannelConsent, updateSlackUserPreferences, updateStatus, updateTeamSettings, updateTeamVisibility, updateToken, updateUserSettings, updateWorkspaceLlmBudget, vote, workspaceCreateLlmConnection, workspaceCreateLlmModel, workspaceDeleteLlmConnection, workspaceDeleteLlmModel, workspaceGetLlmConnection, workspaceGetLlmModel, workspaceGetLlmSettings, workspaceListAvailableLlmModels, workspaceListLlmConnections, workspaceListLlmModels, workspaceProbeLlmConnection, workspaceUpdateLlmConnection, workspaceUpdateLlmModel } from '../sdk.gen';
+import type { AddLabelFilterData, AddLabelToTeamData, AddLabelToTeamResponse, AddRepositoryToMonitorData, AdminCreateCuratedAreaData, AdminCreateCuratedAreaError, AdminCreateCuratedAreaResponse, AdminCreateCuratedPracticeData, AdminCreateCuratedPracticeError, AdminCreateCuratedPracticeResponse, AdminCreateLlmConnectionData, AdminCreateLlmConnectionResponse, AdminCreateLlmModelData, AdminCreateLlmModelResponse, AdminCreateLoginProviderData, AdminCreateLoginProviderResponse, AdminDeleteCuratedAreaOverrideData, AdminDeleteCuratedAreaOverrideError, AdminDeleteCuratedAreaOverrideResponse, AdminDeleteCuratedPracticeOverrideData, AdminDeleteCuratedPracticeOverrideError, AdminDeleteCuratedPracticeOverrideResponse, AdminDeleteLlmConnectionData, AdminDeleteLlmConnectionResponse, AdminDeleteLlmModelData, AdminDeleteLlmModelResponse, AdminDeleteLoginProviderData, AdminExportAuthEventsData, AdminExportAuthEventsResponse, AdminGetCuratedAreaData, AdminGetCuratedAreaResponse, AdminGetCuratedCatalogData, AdminGetCuratedCatalogResponse, AdminGetCuratedPracticeData, AdminGetCuratedPracticeResponse, AdminGetInstanceSettingsData, AdminGetInstanceSettingsResponse, AdminGetLlmConnectionData, AdminGetLlmConnectionResponse, AdminGetLlmModelData, AdminGetLlmModelResponse, AdminGetLlmSettingsData, AdminGetLlmSettingsResponse, AdminGetLlmUsageReportData, AdminGetLlmUsageReportResponse, AdminGetPracticeDefinitionOptionsData, AdminGetPracticeDefinitionOptionsResponse, AdminKeepCuratedAreaData, AdminKeepCuratedAreaError, AdminKeepCuratedAreaResponse, AdminKeepCuratedPracticeData, AdminKeepCuratedPracticeError, AdminKeepCuratedPracticeResponse, AdminListAuthEventsData, AdminListAuthEventsResponse, AdminListConfigAuditEventsData, AdminListConfigAuditEventsResponse, AdminListLlmConnectionsData, AdminListLlmConnectionsResponse, AdminListLlmModelsData, AdminListLlmModelsResponse, AdminListLoginProvidersData, AdminListLoginProvidersResponse, AdminListUsersData, AdminListUsersResponse, AdminListWorkspacesData, AdminListWorkspacesResponse, AdminPlaceCuratedPracticeData, AdminPlaceCuratedPracticeResponse, AdminProbeLlmConnectionData, AdminProbeLlmConnectionDraftData, AdminProbeLlmConnectionDraftResponse, AdminProbeLlmConnectionResponse, AdminReorderCuratedAreasData, AdminReorderCuratedAreasResponse, AdminReorderCuratedPracticesData, AdminReorderCuratedPracticesResponse, AdminResetCuratedCatalogOrderData, AdminResetCuratedCatalogOrderResponse, AdminRevokeUserSessionsData, AdminRevokeUserSessionsResponse, AdminUpdateCuratedAreaData, AdminUpdateCuratedAreaError, AdminUpdateCuratedAreaResponse, AdminUpdateCuratedAreaStatusData, AdminUpdateCuratedAreaStatusError, AdminUpdateCuratedAreaStatusResponse, AdminUpdateCuratedPracticeData, AdminUpdateCuratedPracticeError, AdminUpdateCuratedPracticeResponse, AdminUpdateCuratedPracticeStatusData, AdminUpdateCuratedPracticeStatusError, AdminUpdateCuratedPracticeStatusResponse, AdminUpdateLlmConnectionData, AdminUpdateLlmConnectionResponse, AdminUpdateLlmModelData, AdminUpdateLlmModelPriceData, AdminUpdateLlmModelPriceResponse, AdminUpdateLlmModelResponse, AdminUpdateLlmModelSharingData, AdminUpdateLlmModelSharingResponse, AdminUpdateLlmSettingsData, AdminUpdateLlmSettingsResponse, AdminUpdateLoginProviderData, AdminUpdateLoginProviderResponse, AdminUpdateSilentModeData, AdminUpdateSilentModeError, AdminUpdateSilentModeResponse, AdminUpdateUserData, AdminUpdateUserResponse, AdminUpdateWorkspaceLlmBudgetData, AdminUpdateWorkspaceLlmBudgetResponse, AssignRoleData, AssignRoleResponse, AuditData, AuditResponse, BindAreaData, BindAreaError, BindAreaResponse, CallbackGetData, CallbackGetResponse, CallbackPostData, CallbackPostResponse, CancelAgentJobData, CancelAgentJobResponse, ComputeUserLeagueStatsData, ComputeUserLeagueStatsResponse, ConfigureAgentData, ConfigureAgentResponse, CreateAreaData, CreateAreaResponse, CreatePracticeData, CreatePracticeError, CreatePracticeResponse, CreateSweepScheduleData, CreateSweepScheduleError, CreateSweepScheduleResponse, CreateWorkspaceData, CreateWorkspaceResponse, DeleteAgentData, DeleteAgentResponse, DeleteAreaData, DeleteAreaResponse, DeleteCurrentUserData, DeleteOutlineCollectionData, DeleteOutlineCollectionResponse, DeletePracticeData, DeletePracticeError, DeletePracticeResponse, DeleteSweepScheduleData, DeleteSweepScheduleError, DeleteSweepScheduleResponse, DeleteThreadData, DeleteThreadResponse, DownloadDataExportData, DownloadDataExportResponse, ExitImpersonationData, GetActivityMonitorData, GetActivityMonitorResponse, GetAgentJobData, GetAgentJobResponse, GetAllAchievementDefinitionsData, GetAllAchievementDefinitionsResponse, GetAllTeamsData, GetAllTeamsResponse, GetAreaData, GetAreaResponse, GetArtifactTraceData, GetArtifactTraceError, GetArtifactTraceResponse, GetBackfillRunData, GetBackfillRunError, GetBackfillRunResponse, GetConnectionSyncStatusData, GetConnectionSyncStatusResponse, GetCuratedPracticeCatalogEntryData, GetCuratedPracticeCatalogEntryResponse, GetCurrentUserData, GetCurrentUserMembershipData, GetCurrentUserMembershipResponse, GetCurrentUserResponse, GetDataExportStatusData, GetDataExportStatusResponse, GetEngagementData, GetEngagementResponse, GetInAppFeedbackData, GetInAppFeedbackResponse, GetIntegrationCatalogData, GetIntegrationCatalogResponse, GetJwksData, GetJwksResponse, GetLabelFiltersData, GetLabelFiltersResponse, GetLatestReactionData, GetLatestReactionResponse, GetLeaderboardData, GetLeaderboardResponse, GetLlmUsageReportData, GetLlmUsageReportResponse, GetMemberData, GetMemberResponse, GetObservationData, GetObservationResponse, GetObservationsForPullRequestData, GetObservationsForPullRequestResponse, GetOutlineCollectionData, GetOutlineCollectionResponse, GetOutlineTokenStatusData, GetOutlineTokenStatusResponse, GetPracticeData, GetPracticeDefinitionOptionsData, GetPracticeDefinitionOptionsResponse, GetPracticeError, GetPracticeResponse, GetPracticeReviewFeedbackData, GetPracticeReviewFeedbackError, GetPracticeReviewFeedbackResponse, GetPracticeReviewObservationData, GetPracticeReviewObservationError, GetPracticeReviewObservationResponse, GetPracticeReviewSettingsData, GetPracticeReviewSettingsResponse, GetProvidersData, GetProvidersResponse, GetReflectionData, GetReflectionResponse, GetRepositoriesToMonitorData, GetRepositoriesToMonitorResponse, GetRepositorySettingsData, GetRepositorySettingsResponse, GetSlackUserPreferencesData, GetSlackUserPreferencesResponse, GetSummaryData, GetSummaryResponse, GetTeamSettingsData, GetTeamSettingsResponse, GetThreadData, GetThreadResponse, GetUserAchievementsData, GetUserAchievementsResponse, GetUserFeaturesData, GetUserFeaturesResponse, GetUserProfileData, GetUserProfileResponse, GetUserSettingsData, GetUserSettingsResponse, GetUsersWithTeamsData, GetUsersWithTeamsResponse, GetWorkspaceData, GetWorkspaceResponse, GitLabPreflightData, GitLabPreflightResponse2, ImpersonateData, InitiateData, InitiateResponse, ListAgentJobsData, ListAgentJobsResponse, ListAgentsData, ListAgentsResponse, ListAreasData, ListAreasResponse, ListBackfillRunsData, ListBackfillRunsResponse, ListConnectionSyncJobsData, ListConnectionSyncJobsResponse, ListConnectionSyncResourcesData, ListConnectionSyncResourcesResponse, ListData, ListGitLabGroupsData, ListGitLabGroupsResponse, ListGlobalContributorsData, ListGlobalContributorsResponse, ListIdentityProvidersData, ListIdentityProvidersResponse, ListLearnerPracticesData, ListLearnerPracticesResponse, ListLinkedIdentitiesData, ListLinkedIdentitiesResponse, ListMembersData, ListMembersResponse, ListObservationsData, ListObservationsResponse, ListOutlineCollectionCandidatesData, ListOutlineCollectionCandidatesResponse, ListOutlineCollectionsData, ListOutlineCollectionsResponse, ListPracticeEvidenceOutcomesData, ListPracticeEvidenceOutcomesResponse, ListPracticeReviewFeedbackData, ListPracticeReviewFeedbackError, ListPracticeReviewFeedbackResponse, ListPracticeReviewObservationsData, ListPracticeReviewObservationsError, ListPracticeReviewObservationsResponse, ListPracticeReviewsData, ListPracticeReviewsError, ListPracticeReviewsResponse, ListPracticesData, ListPracticesResponse, ListResponse, ListSessionsData, ListSessionsResponse, ListSlackChannelCandidatesData, ListSlackChannelCandidatesResponse, ListSlackChannelConsentEventsData, ListSlackChannelConsentEventsResponse, ListSlackChannelsData, ListSlackChannelsResponse, ListSweepSchedulesData, ListSweepSchedulesResponse, ListThreadsData, ListThreadsResponse, ListTracedArtifactsData, ListTracedArtifactsError, ListTracedArtifactsResponse, ListWorkspaceConfigAuditEventsData, ListWorkspaceConfigAuditEventsResponse, ListWorkspacesData, ListWorkspacesResponse, LogoutData, PlacePracticeData, PlacePracticeError, PlacePracticeResponse, PreflightBackfillRunData, PreflightBackfillRunError, PreflightBackfillRunResponse, PurgeWorkspaceData, PurgeWorkspaceResponse, ReadData, ReadResponse, RecalculateUserAchievementsData, RefreshData, RegisterOutlineCollectionData, RegisterOutlineCollectionResponse, RegisterSlackChannelData, RegisterSlackChannelResponse, ReloadAchievementsData, RemoveLabelFilterData, RemoveLabelFilterResponse, RemoveLabelFromTeamData, RemoveLabelFromTeamResponse, RemoveMemberData, RemoveRepositoryToMonitorData, RemoveVoteData, RemoveVoteResponse, RenameSlugData, RenameSlugResponse, ReorderAreasData, ReorderAreasResponse, ReorderPracticesData, ReorderPracticesError, ReorderPracticesResponse, ReplaceSweepScheduleData, ReplaceSweepScheduleError, ReplaceSweepScheduleResponse, RequestDataExportData, RequestDataExportResponse, RequestPracticeReviewData, RequestPracticeReviewError, RequestPracticeReviewResponse, ResetAndRecalculateLeaguesData, RetryAgentJobDeliveryData, RetryAgentJobDeliveryResponse, ReviewTierRollupData, ReviewTierRollupResponse, RevokeOtherSessionsData, RevokeSessionData, SendSlackTestMessageData, SendSlackTestMessageResponse, SetAreaReviewTierData, SetAreaReviewTierResponse, SetReviewTierData, SetReviewTierError, SetReviewTierResponse, SubmitReactionData, SubmitReactionResponse, TriggerSyncJobData, TriggerSyncJobError, TriggerSyncJobResponse, UnlinkIdentityData, UnlinkIdentityResponse, UpdateAreaData, UpdateAreaResponse, UpdateBackfillRunStatusData, UpdateBackfillRunStatusError, UpdateBackfillRunStatusResponse, UpdateConnectionStatusData, UpdateConnectionStatusResponse, UpdateConnectionSyncJobData, UpdateConnectionSyncJobError, UpdateConnectionSyncJobResponse, UpdateFeaturesData, UpdateFeaturesResponse, UpdateLeaderboardDigestData, UpdateLeaderboardDigestResponse, UpdateMemberVisibilityData, UpdateMemberVisibilityResponse, UpdateNotificationsData, UpdateNotificationsResponse, UpdateOutlineCollectionStateData, UpdateOutlineCollectionStateResponse, UpdatePracticeData, UpdatePracticeError, UpdatePracticeResponse, UpdatePracticeReviewSettingsData, UpdatePracticeReviewSettingsResponse, UpdatePublicVisibilityData, UpdatePublicVisibilityResponse, UpdateRepositorySettingsData, UpdateRepositorySettingsError, UpdateRepositorySettingsResponse, UpdateRepositoryVisibilityData, UpdateScheduleData, UpdateScheduleResponse, UpdateSlackChannelConsentData, UpdateSlackChannelConsentResponse, UpdateSlackUserPreferencesData, UpdateSlackUserPreferencesResponse, UpdateStatusData, UpdateStatusResponse, UpdateTeamSettingsData, UpdateTeamSettingsError, UpdateTeamSettingsResponse, UpdateTeamVisibilityData, UpdateTokenData, UpdateTokenResponse, UpdateUserSettingsData, UpdateUserSettingsResponse, UpdateWorkspaceLlmBudgetData, UpdateWorkspaceLlmBudgetResponse, VoteData, VoteResponse, WorkspaceCreateLlmConnectionData, WorkspaceCreateLlmConnectionResponse, WorkspaceCreateLlmModelData, WorkspaceCreateLlmModelResponse, WorkspaceDeleteLlmConnectionData, WorkspaceDeleteLlmConnectionResponse, WorkspaceDeleteLlmModelData, WorkspaceDeleteLlmModelResponse, WorkspaceGetLlmConnectionData, WorkspaceGetLlmConnectionResponse, WorkspaceGetLlmModelData, WorkspaceGetLlmModelResponse, WorkspaceGetLlmSettingsData, WorkspaceGetLlmSettingsResponse, WorkspaceListAvailableLlmModelsData, WorkspaceListAvailableLlmModelsResponse, WorkspaceListLlmConnectionsData, WorkspaceListLlmConnectionsResponse, WorkspaceListLlmModelsData, WorkspaceListLlmModelsResponse, WorkspaceProbeLlmConnectionData, WorkspaceProbeLlmConnectionResponse, WorkspaceUpdateLlmConnectionData, WorkspaceUpdateLlmConnectionResponse, WorkspaceUpdateLlmModelData, WorkspaceUpdateLlmModelResponse } from '../types.gen';
 
 export type QueryKey<TOptions extends Options> = [
     Pick<TOptions, 'baseUrl' | 'body' | 'headers' | 'path' | 'query'> & {
@@ -699,6 +699,26 @@ export const adminUpdateCuratedAreaStatusMutation = (options?: Partial<Options<A
     };
     return mutationOptions;
 };
+
+export const adminGetPracticeDefinitionOptionsQueryKey = (options?: Options<AdminGetPracticeDefinitionOptionsData>) => createQueryKey('adminGetPracticeDefinitionOptions', options, false, ['Admin Practice Catalog']);
+
+/**
+ * Read practice definition options
+ *
+ * Returns available review events, recommended requirements, and allowed evidence sources by work type
+ */
+export const adminGetPracticeDefinitionOptionsOptions = (options?: Options<AdminGetPracticeDefinitionOptionsData>) => queryOptions<AdminGetPracticeDefinitionOptionsResponse, DefaultError, AdminGetPracticeDefinitionOptionsResponse, ReturnType<typeof adminGetPracticeDefinitionOptionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await adminGetPracticeDefinitionOptions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: adminGetPracticeDefinitionOptionsQueryKey(options)
+});
 
 /**
  * Use the Hephaestus default order
@@ -2859,6 +2879,25 @@ export const updateAreaMutation = (options?: Partial<Options<UpdateAreaData>>): 
     return mutationOptions;
 };
 
+/**
+ * Set how much autonomy the system has over one area
+ *
+ * Applies to every practice in the area that holds no tier of its own; practices that set their own are left alone. OFF stops their reviews entirely. PROPOSE runs them and records every observation, and sends nothing. DELIVER sends feedback without asking. Send a null tier to clear the area's own setting so it follows the workspace default.
+ */
+export const setAreaReviewTierMutation = (options?: Partial<Options<SetAreaReviewTierData>>): UseMutationOptions<SetAreaReviewTierResponse, DefaultError, Options<SetAreaReviewTierData>> => {
+    const mutationOptions: UseMutationOptions<SetAreaReviewTierResponse, DefaultError, Options<SetAreaReviewTierData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setAreaReviewTier({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getCuratedPracticeCatalogEntryQueryKey = (options: Options<GetCuratedPracticeCatalogEntryData>) => createQueryKey('getCuratedPracticeCatalogEntry', options, false, ['Practice Catalog']);
 
 /**
@@ -2884,7 +2923,7 @@ export const listPracticesQueryKey = (options: Options<ListPracticesData>) => cr
 /**
  * List practice definitions
  *
- * Returns all practice definitions for the workspace, optionally filtered by active state
+ * Returns this workspace's practices, each with the autonomy tier in force for it, whether that tier was set on the practice or inherited from its area or the workspace, and which level decided it. Optionally narrowed to one tier.
  */
 export const listPracticesOptions = (options: Options<ListPracticesData>) => queryOptions<ListPracticesResponse, DefaultError, ListPracticesResponse, ReturnType<typeof listPracticesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -2916,6 +2955,100 @@ export const createPracticeMutation = (options?: Partial<Options<CreatePracticeD
     return mutationOptions;
 };
 
+export const listBackfillRunsQueryKey = (options: Options<ListBackfillRunsData>) => createQueryKey('listBackfillRuns', options, false, ['Practice Review Backfill']);
+
+/**
+ * List this workspace's recent backfill campaigns
+ */
+export const listBackfillRunsOptions = (options: Options<ListBackfillRunsData>) => queryOptions<ListBackfillRunsResponse, DefaultError, ListBackfillRunsResponse, ReturnType<typeof listBackfillRunsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listBackfillRuns({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listBackfillRunsQueryKey(options)
+});
+
+/**
+ * Enumerate and price a backfill campaign
+ *
+ * Creates a run awaiting confirmation. Submits nothing and spends nothing.
+ */
+export const preflightBackfillRunMutation = (options?: Partial<Options<PreflightBackfillRunData>>): UseMutationOptions<PreflightBackfillRunResponse, PreflightBackfillRunError, Options<PreflightBackfillRunData>> => {
+    const mutationOptions: UseMutationOptions<PreflightBackfillRunResponse, PreflightBackfillRunError, Options<PreflightBackfillRunData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await preflightBackfillRun({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getBackfillRunQueryKey = (options: Options<GetBackfillRunData>) => createQueryKey('getBackfillRun', options, false, ['Practice Review Backfill']);
+
+/**
+ * Get one backfill campaign, including its live progress
+ */
+export const getBackfillRunOptions = (options: Options<GetBackfillRunData>) => queryOptions<GetBackfillRunResponse, GetBackfillRunError, GetBackfillRunResponse, ReturnType<typeof getBackfillRunQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getBackfillRun({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getBackfillRunQueryKey(options)
+});
+
+/**
+ * Confirm or cancel a backfill campaign
+ *
+ * RUNNING authorises the estimated spend and starts the campaign; CANCELLED stops it for good.
+ */
+export const updateBackfillRunStatusMutation = (options?: Partial<Options<UpdateBackfillRunStatusData>>): UseMutationOptions<UpdateBackfillRunStatusResponse, UpdateBackfillRunStatusError, Options<UpdateBackfillRunStatusData>> => {
+    const mutationOptions: UseMutationOptions<UpdateBackfillRunStatusResponse, UpdateBackfillRunStatusError, Options<UpdateBackfillRunStatusData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await updateBackfillRunStatus({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const getPracticeDefinitionOptionsQueryKey = (options: Options<GetPracticeDefinitionOptionsData>) => createQueryKey('getPracticeDefinitionOptions', options, false, ['Practice Catalog']);
+
+/**
+ * Read practice definition options
+ *
+ * Returns available review events, recommended requirements, and allowed evidence sources by work type
+ */
+export const getPracticeDefinitionOptionsOptions = (options: Options<GetPracticeDefinitionOptionsData>) => queryOptions<GetPracticeDefinitionOptionsResponse, DefaultError, GetPracticeDefinitionOptionsResponse, ReturnType<typeof getPracticeDefinitionOptionsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getPracticeDefinitionOptions({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getPracticeDefinitionOptionsQueryKey(options)
+});
+
 export const getEngagementQueryKey = (options: Options<GetEngagementData>) => createQueryKey('getEngagement', options, false, ['Feedback Reaction']);
 
 /**
@@ -2934,6 +3067,26 @@ export const getEngagementOptions = (options: Options<GetEngagementData>) => que
         return data;
     },
     queryKey: getEngagementQueryKey(options)
+});
+
+export const getInAppFeedbackQueryKey = (options: Options<GetInAppFeedbackData>) => createQueryKey('getInAppFeedback', options, false, ['In-App Feedback']);
+
+/**
+ * The current developer's in-app feedback
+ *
+ * Process-level messages prepared for the authenticated developer: for each habit that recurs in their work, what the pattern is, the pieces of work it was observed on, and one thing to try next. Distinct from in-context notes (which say what is wrong in one diff) and from the mentor conversation (which asks rather than tells). Reading a message is what delivers it, so this GET records the delivery.
+ */
+export const getInAppFeedbackOptions = (options: Options<GetInAppFeedbackData>) => queryOptions<GetInAppFeedbackResponse, DefaultError, GetInAppFeedbackResponse, ReturnType<typeof getInAppFeedbackQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getInAppFeedback({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getInAppFeedbackQueryKey(options)
 });
 
 export const getLatestReactionQueryKey = (options: Options<GetLatestReactionData>) => createQueryKey('getLatestReaction', options, false, ['Feedback Reaction']);
@@ -2978,9 +3131,9 @@ export const submitReactionMutation = (options?: Partial<Options<SubmitReactionD
 export const listLearnerPracticesQueryKey = (options: Options<ListLearnerPracticesData>) => createQueryKey('listLearnerPractices', options, false, ['Practice Catalog']);
 
 /**
- * List active practices, learner-facing
+ * List reviewed practices, learner-facing
  *
- * Active practices projected for a developer: name, area, why-it-matters, what-good-looks-like. The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO has no such field).
+ * Returns the learner-facing name, area, rationale, and example for every practice the workspace reviews (any autonomy tier above OFF)
  */
 export const listLearnerPracticesOptions = (options: Options<ListLearnerPracticesData>) => queryOptions<ListLearnerPracticesResponse, DefaultError, ListLearnerPracticesResponse, ReturnType<typeof listLearnerPracticesQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -3069,7 +3222,7 @@ export const getReflectionQueryKey = (options: Options<GetReflectionData>) => cr
 /**
  * Reflective dashboard feedback for the current developer
  *
- * Per-practice cards a developer can READ — why the practice matters, what good looks like, where they stand, the specific feedback to act on, and what they already do well. The third feedback channel alongside in-context SCM notes and the conversational mentor; the same findings reorganised by practice for self-paced reflection, not a scoreboard of counts.
+ * Per-practice cards a developer can READ — why the practice matters, what good looks like, where they stand, the specific feedback to act on, and what they already do well. The third feedback channel alongside in-context SCM notes and the conversational mentor; the same observations reorganised by practice for self-paced reflection, not a scoreboard of counts.
  */
 export const getReflectionOptions = (options: Options<GetReflectionData>) => queryOptions<GetReflectionResponse, DefaultError, GetReflectionResponse, ReturnType<typeof getReflectionQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -3141,6 +3294,25 @@ export const reorderPracticesMutation = (options?: Partial<Options<ReorderPracti
     return mutationOptions;
 };
 
+/**
+ * Ask for a review of a piece of work now
+ *
+ * Answers 200 both when a review starts and when one deliberately does not; the body says which, and why. 403 only when the caller has no standing on the artifact.
+ */
+export const requestPracticeReviewMutation = (options?: Partial<Options<RequestPracticeReviewData>>): UseMutationOptions<RequestPracticeReviewResponse, RequestPracticeReviewError, Options<RequestPracticeReviewData>> => {
+    const mutationOptions: UseMutationOptions<RequestPracticeReviewResponse, RequestPracticeReviewError, Options<RequestPracticeReviewData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await requestPracticeReview({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
 export const getPracticeReviewSettingsQueryKey = (options: Options<GetPracticeReviewSettingsData>) => createQueryKey('getPracticeReviewSettings', options, false, ['Practice Review Settings']);
 
 /**
@@ -3176,10 +3348,30 @@ export const updatePracticeReviewSettingsMutation = (options?: Partial<Options<U
     return mutationOptions;
 };
 
+export const reviewTierRollupQueryKey = (options: Options<ReviewTierRollupData>) => createQueryKey('reviewTierRollup', options, false, ['Practice Catalog']);
+
+/**
+ * Summarise how much autonomy this workspace grants, by area
+ *
+ * How many practices sit at each autonomy tier, for the whole workspace and for each area, plus the workspace default and where feedback may go. The summary a hundred-practice catalogue is read through — answered here so a client never has to fetch every practice to count them.
+ */
+export const reviewTierRollupOptions = (options: Options<ReviewTierRollupData>) => queryOptions<ReviewTierRollupResponse, DefaultError, ReviewTierRollupResponse, ReturnType<typeof reviewTierRollupQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await reviewTierRollup({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: reviewTierRollupQueryKey(options)
+});
+
 export const listPracticeReviewsQueryKey = (options: Options<ListPracticeReviewsData>) => createQueryKey('listPracticeReviews', options, false, ['Practice reviews']);
 
 /**
- * List practice reviews with finding and feedback outcomes
+ * List practice reviews with observation and feedback outcomes
  *
  * Results are ordered newest first.
  */
@@ -3199,7 +3391,7 @@ export const listPracticeReviewsOptions = (options: Options<ListPracticeReviewsD
 export const listPracticeReviewsInfiniteQueryKey = (options: Options<ListPracticeReviewsData>): QueryKey<Options<ListPracticeReviewsData>> => createQueryKey('listPracticeReviews', options, true);
 
 /**
- * List practice reviews with finding and feedback outcomes
+ * List practice reviews with observation and feedback outcomes
  *
  * Results are ordered newest first.
  */
@@ -3223,6 +3415,26 @@ export const listPracticeReviewsInfiniteOptions = (options: Options<ListPractice
         return data;
     },
     queryKey: listPracticeReviewsInfiniteQueryKey(options)
+});
+
+export const listPracticeEvidenceOutcomesQueryKey = (options: Options<ListPracticeEvidenceOutcomesData>) => createQueryKey('listPracticeEvidenceOutcomes', options, false, ['Practice reviews']);
+
+/**
+ * Summarize how each practice's evidence requirements turned out on recent reviews
+ *
+ * One entry per practice that recent reviews considered, with the sources that skipped it.
+ */
+export const listPracticeEvidenceOutcomesOptions = (options: Options<ListPracticeEvidenceOutcomesData>) => queryOptions<ListPracticeEvidenceOutcomesResponse, DefaultError, ListPracticeEvidenceOutcomesResponse, ReturnType<typeof listPracticeEvidenceOutcomesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listPracticeEvidenceOutcomes({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listPracticeEvidenceOutcomesQueryKey(options)
 });
 
 export const listPracticeReviewFeedbackQueryKey = (options: Options<ListPracticeReviewFeedbackData>) => createQueryKey('listPracticeReviewFeedback', options, false, ['Practice reviews']);
@@ -3277,7 +3489,7 @@ export const listPracticeReviewFeedbackInfiniteOptions = (options: Options<ListP
 export const getPracticeReviewFeedbackQueryKey = (options: Options<GetPracticeReviewFeedbackData>) => createQueryKey('getPracticeReviewFeedback', options, false, ['Practice reviews']);
 
 /**
- * Get feedback with its stored body, findings and placements
+ * Get feedback with its stored body, observations and placements
  */
 export const getPracticeReviewFeedbackOptions = (options: Options<GetPracticeReviewFeedbackData>) => queryOptions<GetPracticeReviewFeedbackResponse, GetPracticeReviewFeedbackError, GetPracticeReviewFeedbackResponse, ReturnType<typeof getPracticeReviewFeedbackQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
@@ -3292,16 +3504,16 @@ export const getPracticeReviewFeedbackOptions = (options: Options<GetPracticeRev
     queryKey: getPracticeReviewFeedbackQueryKey(options)
 });
 
-export const listPracticeReviewFindingsQueryKey = (options: Options<ListPracticeReviewFindingsData>) => createQueryKey('listPracticeReviewFindings', options, false, ['Practice reviews']);
+export const listPracticeReviewObservationsQueryKey = (options: Options<ListPracticeReviewObservationsData>) => createQueryKey('listPracticeReviewObservations', options, false, ['Practice reviews']);
 
 /**
- * List practice review findings across the workspace
+ * List practice review observations across the workspace
  *
  * Results include linked feedback outcomes and are ordered newest first by default.
  */
-export const listPracticeReviewFindingsOptions = (options: Options<ListPracticeReviewFindingsData>) => queryOptions<ListPracticeReviewFindingsResponse, ListPracticeReviewFindingsError, ListPracticeReviewFindingsResponse, ReturnType<typeof listPracticeReviewFindingsQueryKey>>({
+export const listPracticeReviewObservationsOptions = (options: Options<ListPracticeReviewObservationsData>) => queryOptions<ListPracticeReviewObservationsResponse, ListPracticeReviewObservationsError, ListPracticeReviewObservationsResponse, ReturnType<typeof listPracticeReviewObservationsQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await listPracticeReviewFindings({
+        const { data } = await listPracticeReviewObservations({
             ...options,
             ...queryKey[0],
             signal,
@@ -3309,28 +3521,28 @@ export const listPracticeReviewFindingsOptions = (options: Options<ListPracticeR
         });
         return data;
     },
-    queryKey: listPracticeReviewFindingsQueryKey(options)
+    queryKey: listPracticeReviewObservationsQueryKey(options)
 });
 
-export const listPracticeReviewFindingsInfiniteQueryKey = (options: Options<ListPracticeReviewFindingsData>): QueryKey<Options<ListPracticeReviewFindingsData>> => createQueryKey('listPracticeReviewFindings', options, true);
+export const listPracticeReviewObservationsInfiniteQueryKey = (options: Options<ListPracticeReviewObservationsData>): QueryKey<Options<ListPracticeReviewObservationsData>> => createQueryKey('listPracticeReviewObservations', options, true);
 
 /**
- * List practice review findings across the workspace
+ * List practice review observations across the workspace
  *
  * Results include linked feedback outcomes and are ordered newest first by default.
  */
-export const listPracticeReviewFindingsInfiniteOptions = (options: Options<ListPracticeReviewFindingsData>) => infiniteQueryOptions<ListPracticeReviewFindingsResponse, ListPracticeReviewFindingsError, InfiniteData<ListPracticeReviewFindingsResponse>, QueryKey<Options<ListPracticeReviewFindingsData>>, number | Pick<QueryKey<Options<ListPracticeReviewFindingsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+export const listPracticeReviewObservationsInfiniteOptions = (options: Options<ListPracticeReviewObservationsData>) => infiniteQueryOptions<ListPracticeReviewObservationsResponse, ListPracticeReviewObservationsError, InfiniteData<ListPracticeReviewObservationsResponse>, QueryKey<Options<ListPracticeReviewObservationsData>>, number | Pick<QueryKey<Options<ListPracticeReviewObservationsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
 // @ts-ignore
 {
     queryFn: async ({ pageParam, queryKey, signal }) => {
         // @ts-ignore
-        const page: Pick<QueryKey<Options<ListPracticeReviewFindingsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+        const page: Pick<QueryKey<Options<ListPracticeReviewObservationsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
             query: {
                 page: pageParam
             }
         };
         const params = createInfiniteParams(queryKey, page);
-        const { data } = await listPracticeReviewFindings({
+        const { data } = await listPracticeReviewObservations({
             ...options,
             ...params,
             signal,
@@ -3338,17 +3550,17 @@ export const listPracticeReviewFindingsInfiniteOptions = (options: Options<ListP
         });
         return data;
     },
-    queryKey: listPracticeReviewFindingsInfiniteQueryKey(options)
+    queryKey: listPracticeReviewObservationsInfiniteQueryKey(options)
 });
 
-export const getPracticeReviewFindingQueryKey = (options: Options<GetPracticeReviewFindingData>) => createQueryKey('getPracticeReviewFinding', options, false, ['Practice reviews']);
+export const getPracticeReviewObservationQueryKey = (options: Options<GetPracticeReviewObservationData>) => createQueryKey('getPracticeReviewObservation', options, false, ['Practice reviews']);
 
 /**
- * Get a finding with its evidence and linked feedback
+ * Get an observation with its evidence and linked feedback
  */
-export const getPracticeReviewFindingOptions = (options: Options<GetPracticeReviewFindingData>) => queryOptions<GetPracticeReviewFindingResponse, GetPracticeReviewFindingError, GetPracticeReviewFindingResponse, ReturnType<typeof getPracticeReviewFindingQueryKey>>({
+export const getPracticeReviewObservationOptions = (options: Options<GetPracticeReviewObservationData>) => queryOptions<GetPracticeReviewObservationResponse, GetPracticeReviewObservationError, GetPracticeReviewObservationResponse, ReturnType<typeof getPracticeReviewObservationQueryKey>>({
     queryFn: async ({ queryKey, signal }) => {
-        const { data } = await getPracticeReviewFinding({
+        const { data } = await getPracticeReviewObservation({
             ...options,
             ...queryKey[0],
             signal,
@@ -3356,7 +3568,151 @@ export const getPracticeReviewFindingOptions = (options: Options<GetPracticeRevi
         });
         return data;
     },
-    queryKey: getPracticeReviewFindingQueryKey(options)
+    queryKey: getPracticeReviewObservationQueryKey(options)
+});
+
+export const listSweepSchedulesQueryKey = (options: Options<ListSweepSchedulesData>) => createQueryKey('listSweepSchedules', options, false, ['Practice Review Sweep']);
+
+/**
+ * List this workspace's sweep schedules
+ */
+export const listSweepSchedulesOptions = (options: Options<ListSweepSchedulesData>) => queryOptions<ListSweepSchedulesResponse, DefaultError, ListSweepSchedulesResponse, ReturnType<typeof listSweepSchedulesQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listSweepSchedules({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listSweepSchedulesQueryKey(options)
+});
+
+/**
+ * Start sweeping a kind of work on a cadence
+ *
+ * Authorises the recurring spend. The first sweep runs within the hour.
+ */
+export const createSweepScheduleMutation = (options?: Partial<Options<CreateSweepScheduleData>>): UseMutationOptions<CreateSweepScheduleResponse, CreateSweepScheduleError, Options<CreateSweepScheduleData>> => {
+    const mutationOptions: UseMutationOptions<CreateSweepScheduleResponse, CreateSweepScheduleError, Options<CreateSweepScheduleData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await createSweepSchedule({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Stop sweeping
+ *
+ * Removes the instruction. Campaigns it already opened keep their records.
+ */
+export const deleteSweepScheduleMutation = (options?: Partial<Options<DeleteSweepScheduleData>>): UseMutationOptions<DeleteSweepScheduleResponse, DeleteSweepScheduleError, Options<DeleteSweepScheduleData>> => {
+    const mutationOptions: UseMutationOptions<DeleteSweepScheduleResponse, DeleteSweepScheduleError, Options<DeleteSweepScheduleData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await deleteSweepSchedule({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Replace a sweep schedule's terms
+ *
+ * Changes the cadence, the window, or whether the sweep runs at all.
+ */
+export const replaceSweepScheduleMutation = (options?: Partial<Options<ReplaceSweepScheduleData>>): UseMutationOptions<ReplaceSweepScheduleResponse, ReplaceSweepScheduleError, Options<ReplaceSweepScheduleData>> => {
+    const mutationOptions: UseMutationOptions<ReplaceSweepScheduleResponse, ReplaceSweepScheduleError, Options<ReplaceSweepScheduleData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await replaceSweepSchedule({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+export const listTracedArtifactsQueryKey = (options: Options<ListTracedArtifactsData>) => createQueryKey('listTracedArtifacts', options, false, ['Practice review trace']);
+
+/**
+ * List work this workspace recorded something about
+ *
+ * Built from the signal ledger, so it includes work that was never reviewed — which is exactly what a listing derived from review runs cannot show. Most recently signalled first.
+ */
+export const listTracedArtifactsOptions = (options: Options<ListTracedArtifactsData>) => queryOptions<ListTracedArtifactsResponse, ListTracedArtifactsError, ListTracedArtifactsResponse, ReturnType<typeof listTracedArtifactsQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await listTracedArtifacts({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listTracedArtifactsQueryKey(options)
+});
+
+export const listTracedArtifactsInfiniteQueryKey = (options: Options<ListTracedArtifactsData>): QueryKey<Options<ListTracedArtifactsData>> => createQueryKey('listTracedArtifacts', options, true);
+
+/**
+ * List work this workspace recorded something about
+ *
+ * Built from the signal ledger, so it includes work that was never reviewed — which is exactly what a listing derived from review runs cannot show. Most recently signalled first.
+ */
+export const listTracedArtifactsInfiniteOptions = (options: Options<ListTracedArtifactsData>) => infiniteQueryOptions<ListTracedArtifactsResponse, ListTracedArtifactsError, InfiniteData<ListTracedArtifactsResponse>, QueryKey<Options<ListTracedArtifactsData>>, number | Pick<QueryKey<Options<ListTracedArtifactsData>>[0], 'body' | 'headers' | 'path' | 'query'>>(
+// @ts-ignore
+{
+    queryFn: async ({ pageParam, queryKey, signal }) => {
+        // @ts-ignore
+        const page: Pick<QueryKey<Options<ListTracedArtifactsData>>[0], 'body' | 'headers' | 'path' | 'query'> = typeof pageParam === 'object' ? pageParam : {
+            query: {
+                page: pageParam
+            }
+        };
+        const params = createInfiniteParams(queryKey, page);
+        const { data } = await listTracedArtifacts({
+            ...options,
+            ...params,
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: listTracedArtifactsInfiniteQueryKey(options)
+});
+
+export const getArtifactTraceQueryKey = (options: Options<GetArtifactTraceData>) => createQueryKey('getArtifactTrace', options, false, ['Practice review trace']);
+
+/**
+ * Explain what every practice did about one piece of work
+ *
+ * Every practice the workspace runs against this kind of work appears, including the ones that did nothing, each with the recorded reason. 404 means nothing about this artifact was ever recorded here — not that the trace is unavailable.
+ */
+export const getArtifactTraceOptions = (options: Options<GetArtifactTraceData>) => queryOptions<GetArtifactTraceResponse, GetArtifactTraceError, GetArtifactTraceResponse, ReturnType<typeof getArtifactTraceQueryKey>>({
+    queryFn: async ({ queryKey, signal }) => {
+        const { data } = await getArtifactTrace({
+            ...options,
+            ...queryKey[0],
+            signal,
+            throwOnError: true
+        });
+        return data;
+    },
+    queryKey: getArtifactTraceQueryKey(options)
 });
 
 /**
@@ -3412,23 +3768,6 @@ export const updatePracticeMutation = (options?: Partial<Options<UpdatePracticeD
 };
 
 /**
- * Set practice active state
- */
-export const setActiveMutation = (options?: Partial<Options<SetActiveData>>): UseMutationOptions<SetActiveResponse, SetActiveError, Options<SetActiveData>> => {
-    const mutationOptions: UseMutationOptions<SetActiveResponse, SetActiveError, Options<SetActiveData>> = {
-        mutationFn: async (fnOptions) => {
-            const { data } = await setActive({
-                ...options,
-                ...fnOptions,
-                throwOnError: true
-            });
-            return data;
-        }
-    };
-    return mutationOptions;
-};
-
-/**
  * Move a practice
  *
  * Moves the practice to the requested area, or to Unassigned when areaSlug is null
@@ -3456,6 +3795,25 @@ export const placePracticeMutation = (options?: Partial<Options<PlacePracticeDat
     const mutationOptions: UseMutationOptions<PlacePracticeResponse, PlacePracticeError, Options<PlacePracticeData>> = {
         mutationFn: async (fnOptions) => {
             const { data } = await placePractice({
+                ...options,
+                ...fnOptions,
+                throwOnError: true
+            });
+            return data;
+        }
+    };
+    return mutationOptions;
+};
+
+/**
+ * Set how much autonomy the system has over one practice
+ *
+ * OFF stops the review entirely. PROPOSE runs it and records every observation and sends nothing. DELIVER sends feedback without asking, as far as this workspace's reach allows. Send a null tier to clear the practice's own setting so it follows its area, and through the area the workspace default.
+ */
+export const setReviewTierMutation = (options?: Partial<Options<SetReviewTierData>>): UseMutationOptions<SetReviewTierResponse, SetReviewTierError, Options<SetReviewTierData>> => {
+    const mutationOptions: UseMutationOptions<SetReviewTierResponse, SetReviewTierError, Options<SetReviewTierData>> = {
+        mutationFn: async (fnOptions) => {
+            const { data } = await setReviewTier({
                 ...options,
                 ...fnOptions,
                 throwOnError: true

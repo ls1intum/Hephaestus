@@ -10,14 +10,12 @@ import {
 describe("day bounds", () => {
 	it("sends the next midnight as the exclusive upper bound", () => {
 		const bound = dayAfterInstant(new Date(2026, 6, 15));
-		expect(bound).toBeInstanceOf(Date);
 		expect(bound.getDate()).toBe(16);
 		expect(bound.getHours()).toBe(0);
 	});
 
 	it("sends midnight of the picked day as the inclusive lower bound", () => {
 		const bound = dayStartInstant(new Date(2026, 6, 15));
-		expect(bound).toBeInstanceOf(Date);
 		expect(bound.getDate()).toBe(15);
 		expect(bound.getHours()).toBe(0);
 	});

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackPlacement;
@@ -8,30 +9,22 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.PlacementType;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import java.time.Instant;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Closes the conversational delivery loop when a mentor turn ends. The mentor surfaces a practice locus by
- * calling the {@code link_finding} custom tool with an observation id; those ids arrive here as
- * {@code linkedFindingIds}. For each, this maps the observation back to its PREPARED CONVERSATION feedback unit,
- * flips it to DELIVERED via a guarded compare-and-set, and - on a winning flip - writes exactly one
- * {@code CONVERSATION_TURN} placement bound to the assistant {@code chat_message} that delivered it.
- *
- * <p>Invoked inside the assistant finalisation transaction after the message is flushed, once the transport outcome
- * is known. The message state and feedback transition therefore commit or roll back together.
- *
- * <p><b>One flip per turn.</b> A single turn may emit several {@code link_finding} events; at most ONE PREPARED unit
- * is delivered per turn - the method returns after the first winning CAS. A rowcount of 0 (a concurrent turn already
- * delivered it, the unit aged out to {@code CONVERSATION_EXPIRED}, or the id was a display-only citation with no
- * PREPARED unit) is a no-op and the loop continues to the next linked id.
- */
 @Component
+@Transactional
 public class ConversationalDeliveryReconciler {
 
     private static final Logger log = LoggerFactory.getLogger(ConversationalDeliveryReconciler.class);
@@ -40,35 +33,26 @@ public class ConversationalDeliveryReconciler {
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final FeedbackPlacementRepository feedbackPlacementRepository;
     private final ObservationRepository observationRepository;
+    private final ObservationVisibilityPolicy visibilityPolicy;
 
     public ConversationalDeliveryReconciler(
         FeedbackRepository feedbackRepository,
         FeedbackObservationRepository feedbackObservationRepository,
         FeedbackPlacementRepository feedbackPlacementRepository,
-        ObservationRepository observationRepository
+        ObservationRepository observationRepository,
+        ObservationVisibilityPolicy visibilityPolicy
     ) {
         this.feedbackRepository = feedbackRepository;
         this.feedbackObservationRepository = feedbackObservationRepository;
         this.feedbackPlacementRepository = feedbackPlacementRepository;
         this.observationRepository = observationRepository;
+        this.visibilityPolicy = visibilityPolicy;
     }
 
-    /**
-     * Reconcile the mentor's linked findings for one turn against the PREPARED conversational queue. The caller
-     * owns the transaction and has already flushed the assistant message referenced by the placement.
-     *
-     * @param workspaceId   the chat thread's workspace
-     * @param recipientUserId the developer the mentor is talking to (the feedback recipient)
-     * @param chatMessageId the assistant {@code chat_message} id this turn produced (the placement's binding)
-     * @param linkedFindingIds observation ids the mentor linked this turn, in emission order (duplicates tolerated)
-     * @return {@code 1} if exactly one PREPARED unit was flipped + placed this turn, {@code 0} if none matched
-     */
-    public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedFindingIds) {
-        if (linkedFindingIds == null || linkedFindingIds.isEmpty()) {
-            return 0;
-        }
+    public int reconcile(long workspaceId, long recipientUserId, UUID chatMessageId, List<UUID> linkedObservationIds) {
         Instant now = Instant.now();
-        for (UUID observationId : new LinkedHashSet<>(linkedFindingIds)) {
+        for (Observation observation : admitted(workspaceId, linkedObservationIds).values()) {
+            UUID observationId = observation.getId();
             List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
                 workspaceId,
                 recipientUserId,
@@ -77,11 +61,7 @@ public class ConversationalDeliveryReconciler {
             if (feedbackIds.isEmpty()) {
                 continue;
             }
-            // Re-check FeedbackChannelRouter's admission dedup at flip time: if a later re-review has since
-            // delivered this locus in-context, skip the flip (let the stale unit age out) so it is not raised twice.
-            Observation observation = observationRepository.findById(observationId).orElse(null);
             if (
-                observation != null &&
                 observation.getRecurrenceKey() != null &&
                 feedbackRepository.existsDeliveredInContextForRecurrenceKey(
                     workspaceId,
@@ -116,15 +96,64 @@ public class ConversationalDeliveryReconciler {
     }
 
     /**
-     * Suppress the single conversational unit this turn would have delivered when the transport was blocked by
-     * instance Silent Mode. Unlike a generic transport failure, this is prospective-only: the unit must not remain
-     * queued for a later turn after the brake is released.
+     * The linked observations this turn may act on: the observations this workspace can read whose claim and
+     * evidence the visibility policy still permits for mentoring, keyed by id, in the mentor's emission
+     * order.
+     *
+     * <p>{@code linkedObservationIds} is the mentor's raw tool output — {@code link_observation} carries whatever
+     * UUID the model emitted, and nothing between the tool call and here checks it against the observations the
+     * turn's context was actually served ({@code PiEventToUiChunkTranslator} only parses it as a UUID). This
+     * gate is therefore the only thing standing between a model-chosen id and a write to the feedback
+     * ledger, and <em>both</em> endings of a turn are ledger writes — one flips a unit to DELIVERED, the
+     * other burns it to SUPPRESSED — so both are gated here rather than at one call site.
+     *
+     * <p>A refused id is left alone rather than settled. Refusal is not always terminal (an evidence
+     * authorization the source catalog withdrew can come back; a claim measured against superseded review
+     * rules cannot), and nothing ever writes a unit back to PREPARED, so settling on the first refusal would
+     * spend the developer's coaching on a condition that may lift tomorrow. The unit behind a refused id is
+     * still settled, by {@link ConversationFeedbackTtlSweeper} at the end of its window.
+     *
+     * <p>Two queries for the whole turn, not one per linked id — nothing caps how many observations a mentor
+     * turn links (TranslatorState appends a row per {@code link_observation} tool call).
      */
-    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedFindingIds) {
-        if (linkedFindingIds == null || linkedFindingIds.isEmpty()) {
-            return 0;
+    private Map<UUID, Observation> admitted(long workspaceId, List<UUID> linkedObservationIds) {
+        if (linkedObservationIds == null || linkedObservationIds.isEmpty()) {
+            return Map.of();
         }
-        for (UUID observationId : new LinkedHashSet<>(linkedFindingIds)) {
+        // Emission order, deduplicated: the first linked observation that survives every gate wins the turn, so
+        // the order the mentor linked them in is part of the answer and must survive the batching below.
+        Set<UUID> observationIds = new LinkedHashSet<>(linkedObservationIds);
+        List<Observation> rows = observationRepository.findAllByIdInAndWorkspaceId(observationIds, workspaceId);
+        Map<UUID, Observation> byId = new HashMap<>(rows.size());
+        for (Observation observation : rows) {
+            byId.put(observation.getId(), observation);
+        }
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+            workspaceId,
+            byId.values(),
+            SourceUsePurpose.CONVERSATIONAL_MENTORING
+        );
+        Map<UUID, Observation> admitted = new LinkedHashMap<>();
+        for (UUID observationId : observationIds) {
+            Observation observation = byId.get(observationId);
+            // Absent from either batch means refused.
+            if (observation != null && visible.contains(observationId)) {
+                admitted.put(observationId, observation);
+            }
+        }
+        return admitted;
+    }
+
+    /**
+     * Silent Mode permanently suppresses the unit instead of postponing it: the mentor had this to say and
+     * the instance stopped it, which is a different answer to "why was nothing said" than "it is still
+     * queued". Walks the same {@link #admitted} observations {@link #reconcile} may act on: a linked id that
+     * subsystem is not allowed to raise is not one Silent Mode gets to claim it stopped. It does not repeat
+     * that method's recurrence-key rule — "already said inline" is about what to say next, and nothing is
+     * being said.
+     */
+    public int suppressForSilentMode(long workspaceId, long recipientUserId, List<UUID> linkedObservationIds) {
+        for (UUID observationId : admitted(workspaceId, linkedObservationIds).keySet()) {
             List<UUID> feedbackIds = feedbackObservationRepository.findPreparedConversationFeedbackIdsByObservation(
                 workspaceId,
                 recipientUserId,

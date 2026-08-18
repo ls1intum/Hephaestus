@@ -67,7 +67,8 @@ class ConfigAuditImmutabilityIntegrationTest {
         registry.add("spring.liquibase.contexts", () -> "dev,prod");
         registry.add("spring.jpa.hibernate.ddl-auto", () -> "validate");
         registry.add("spring.datasource.hikari.maximum-pool-size", () -> "4");
-        // Applying the full changeset set holds one connection past the 5s test-profile threshold.
+        // Applying the full changeset set legitimately holds one connection for longer than the test
+        // profile's leak-detection threshold allows.
         registry.add("spring.datasource.hikari.leak-detection-threshold", () -> "0");
     }
 

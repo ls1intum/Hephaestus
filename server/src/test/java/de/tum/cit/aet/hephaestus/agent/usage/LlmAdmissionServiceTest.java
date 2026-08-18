@@ -64,7 +64,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     }
 
     private static WorkspaceAgentBinding byoBinding() {
-        WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_DETECTION);
+        WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_REVIEW);
         binding.setInstanceModel(null);
         WorkspaceLlmModel model = new WorkspaceLlmModel();
         model.setId(21L);
@@ -77,8 +77,8 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
 
     @Test
     void freezesAuthoritativeInstancePriceAtAdmission() {
-        WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_DETECTION);
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        WorkspaceAgentBinding binding = binding(AgentPurpose.PRACTICE_REVIEW);
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding)
         );
         when(modelRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(binding.getInstanceModel()));
@@ -118,7 +118,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     @Test
     void freezesTheWorkspacesOwnPriceAndFundingSourceForABoundByoModel() {
         WorkspaceAgentBinding binding = byoBinding();
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding)
         );
         // The row lock the instance arm takes on llm_model is taken on workspace_llm_model here, and
@@ -156,7 +156,7 @@ class LlmAdmissionServiceTest extends BaseUnitTest {
     void refusesToAdmitAModelWhosePriceIsUnknown() {
         WorkspaceAgentBinding binding = byoBinding();
         binding.getWorkspaceModel().setPricingMode(PricingMode.UNPRICED);
-        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeForUpdate(30L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding)
         );
         when(workspaceModelRepository.findByIdAndWorkspaceIdForUpdate(21L, 30L)).thenReturn(

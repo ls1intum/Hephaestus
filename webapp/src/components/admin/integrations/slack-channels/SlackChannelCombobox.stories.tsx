@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 import type { SlackChannelCandidate } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
+import { expectSettledVisible } from "@/test/overlay";
 import { SlackChannelCombobox } from "./SlackChannelCombobox";
 
 const candidates: SlackChannelCandidate[] = [
@@ -49,8 +50,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 
 		await userEvent.type(await screen.findByPlaceholderText(/search channels/i), "general");
@@ -63,27 +63,25 @@ export const Default: Story = {
 };
 
 export const Searching: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 		const search = await screen.findByPlaceholderText(/search channels/i);
 
 		await userEvent.type(search, "team");
-		await expect(await screen.findByRole("option", { name: /#team-standup/i })).toBeInTheDocument();
-		await expect(screen.getByRole("option", { name: /#team-listed/i })).toBeInTheDocument();
-		await expect(screen.getByRole("option", { name: /#team-archive/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("option", { name: /#team-standup/i }));
+		screen.getByRole("option", { name: /#team-listed/i });
+		screen.getByRole("option", { name: /#team-archive/i });
 		await expect(screen.queryByRole("option", { name: /#general/i })).not.toBeInTheDocument();
 
 		await userEvent.clear(search);
 		await userEvent.type(search, "C05GENERAL5");
-		await expect(await screen.findByRole("option", { name: /#general/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("option", { name: /#general/i }));
 		await expect(screen.queryByRole("option", { name: /#team-standup/i })).not.toBeInTheDocument();
 	},
 };
 
 export const KeyboardNavigation: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		const trigger = canvas.getByRole("combobox");
 		await userEvent.click(trigger);
 
@@ -111,13 +109,12 @@ export const KeyboardNavigation: Story = {
 
 export const AccessibleStructure: Story = {
 	args: { selectedChannelId: "C05GENERAL5" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const trigger = canvas.getByRole("combobox");
 		await expect(trigger).toHaveAttribute("aria-expanded", "false");
 
 		await userEvent.click(trigger);
-		await expect(await screen.findByRole("listbox")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("listbox"));
 		await expect(trigger).toHaveAttribute("aria-expanded", "true");
 		await expect(trigger).toHaveAttribute("aria-haspopup", "dialog");
 		await expect(screen.getByRole("option", { name: /#general/i })).toHaveAttribute(
@@ -136,16 +133,14 @@ export const AccessibleStructure: Story = {
 
 export const Selected: Story = {
 	args: { selectedChannelId: "C05GENERAL5" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("combobox")).toHaveTextContent("#general");
 	},
 };
 
 export const PastedIdNoName: Story = {
 	args: { selectedChannelId: "C0974LJBPBK" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("combobox")).toHaveTextContent("C0974LJBPBK");
 	},
 };
@@ -156,8 +151,7 @@ export const WithDisabledReasons: Story = {
 		renderBadges: (candidate) =>
 			candidate.consentState === "ACTIVE" ? <Badge variant="success">Monitoring</Badge> : null,
 	},
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 		const search = await screen.findByPlaceholderText(/search channels/i);
 		await waitFor(() => expect(search).toHaveFocus());
@@ -177,31 +171,28 @@ export const WithDisabledReasons: Story = {
 
 export const PrivateChannel: Story = {
 	args: { selectedChannelId: "C06STANDUP6" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
-		await expect(await screen.findByRole("img", { name: /private/i })).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByRole("img", { name: /private/i }));
 	},
 };
 
 export const Empty: Story = {
 	args: { candidates: [] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
-		await expect(await screen.findByText(/no channels found/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/no channels found/i));
 	},
 };
 
 export const EmptySearchResult: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("combobox"));
 		await userEvent.type(
 			await screen.findByPlaceholderText(/search channels/i),
 			"nothing-matches-this",
 		);
-		await expect(await screen.findByText(/no channels found/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/no channels found/i));
 		await expect(screen.queryByRole("option")).not.toBeInTheDocument();
 	},
 };

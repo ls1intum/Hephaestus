@@ -118,7 +118,7 @@ describe("AdminLlmConnectionsTable", () => {
 
 		const toggle = screen.getByRole("switch", { name: "OpenAI production" });
 		await expectUnavailable(toggle);
-		expect(screen.getByRole("cell", { name: "—" })).toBeTruthy();
+		screen.getByRole("cell", { name: "—" });
 
 		fireEvent.click(toggle);
 		expect(screen.queryByRole("alertdialog")).toBeNull();

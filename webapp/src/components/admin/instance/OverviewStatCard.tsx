@@ -6,7 +6,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface OverviewStatCardProps {
 	label: string;
 	value: string | number;
-	/** Secondary line under the value, e.g. "3 active". */
 	hint?: string;
 	icon: LucideIcon;
 	to: LinkProps["to"];

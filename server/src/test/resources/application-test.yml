@@ -105,9 +105,10 @@ hephaestus:
             server: nats://localhost:4222
             replay-timeframe-days: 1
             durable-consumer-name: test-consumer
+    fabric:
+        root: /tmp/hephaestus-test-git-repos
     git:
         enabled: false
-        storage-path: /tmp/hephaestus-test-git-repos
     practice-review:
         cooldown-minutes: 0
 

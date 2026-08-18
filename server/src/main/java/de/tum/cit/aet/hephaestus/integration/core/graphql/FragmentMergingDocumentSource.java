@@ -177,8 +177,8 @@ public class FragmentMergingDocumentSource extends ResourceDocumentSource {
      * Parses each resource on its own, deliberately: the last fragment in a file runs "to end of
      * string", so concatenating first would staple the next file's header comment onto it — and a
      * {@code ...Name} written inside such a comment then reads as a real spread, dragging an unrelated
-     * fragment into every request that uses the neighbour. GitHub rejects the whole query for the
-     * unused fragment that results (§5.5.1.4).
+     * fragment into every request that uses the neighbour. A conformant server rejects the whole query
+     * for the unused fragment that results (GraphQL spec §5.5.1.4, "Fragments Must Be Used").
      */
     private static Map<String, String> parseFragmentsPerResource(List<Resource> resources) {
         Map<String, String> merged = new LinkedHashMap<>();

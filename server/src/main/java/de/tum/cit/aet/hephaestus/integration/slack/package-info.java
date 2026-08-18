@@ -25,7 +25,7 @@
         "workspace::authorization",
         "workspace::context",
         // SlackWorkspacePurgeAdapter implements the WorkspacePurgeContributor SPI so a workspace
-        // PURGE cascades into a bulk delete of the four Slack-owned tables.
+        // PURGE cascades into a bulk delete of every Slack-owned table.
         "workspace::spi",
         // SlackLeaderboardDigestPublisher subscribes to LeaderboardDigestReadyEvent; the leaderboard task owns
         // schedule + data assembly, this adapter owns the Slack publish. The payload's LeaderboardEntryDTO
@@ -58,7 +58,7 @@
         // agent's read path carries no raw SQL against the Slack schema. One-way integration.slack -> agent edge,
         // so no bounded-context cycle forms.
         "agent::conversation-source",
-        // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the CONVERSATION_THREAD-derived
+        // SlackIngestService.eraseChannel completes the GDPR Art. 17 erasure of the chat.conversation_thread-derived
         // observations/feedback via the practices-owned ConversationFeedbackErasure port (one-way edge, no cycle).
         "practices::spi",
     }

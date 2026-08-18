@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.model;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -21,6 +23,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
+import org.jspecify.annotations.Nullable;
 
 @Entity
 @Table(
@@ -29,7 +32,10 @@ import lombok.ToString;
         name = "uk_practice_area_workspace_slug",
         columnNames = { "workspace_id", "slug" }
     ),
-    indexes = @Index(name = "idx_practice_area_workspace_active", columnList = "workspace_id, is_active")
+    indexes = @Index(
+        name = "idx_practice_area_workspace_dashboard_visibility",
+        columnList = "workspace_id, visible_in_practice_dashboards"
+    )
 )
 @Getter
 @Setter
@@ -80,9 +86,22 @@ public class PracticeArea {
     @Column(name = "color", length = 32)
     private String color;
 
-    /** Cohort-level toggle: which areas the dashboards surface. Independent of {@link Practice#isActive()}. */
-    @Column(name = "is_active", nullable = false)
-    private boolean active = true;
+    @Column(name = "visible_in_practice_dashboards", nullable = false)
+    private boolean visibleInPracticeDashboards = true;
+
+    /**
+     * How much autonomy the system has over every practice in this area that holds no opinion of its own, or
+     * {@code null} to inherit the workspace's default.
+     *
+     * <p>The middle level of the chain, and the one that makes the whole thing worth having: an area is the
+     * grain a team actually reasons in ("we are not ready for the system to comment on our test practices
+     * yet"), so one decision here covers the practices under it without touching any of them. Resolve with
+     * {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
+     */
+    @Column(name = "review_tier", length = PracticeReviewTier.MAX_LENGTH)
+    @Enumerated(EnumType.STRING)
+    @Nullable
+    private PracticeReviewTier reviewTier;
 
     /** Admin dashboard ordering. */
     @Column(name = "display_order", nullable = false)

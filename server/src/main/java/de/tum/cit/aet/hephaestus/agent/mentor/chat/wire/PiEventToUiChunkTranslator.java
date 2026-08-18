@@ -41,7 +41,7 @@ public class PiEventToUiChunkTranslator {
             case "tool_execution_end" -> handleToolEnd(piEvent, state);
             case "turn_end" -> handleTurnEnd(state);
             case "agent_end" -> handleAgentEnd(piEvent, state);
-            case "link_finding" -> handleLinkFinding(piEvent, state);
+            case "link_observation" -> handleLinkObservation(piEvent, state);
             case "pi_error" -> handleError(piEvent, state);
             case "turn_watchdog_fired" -> handleWatchdogFired(state);
             case "session_persisted" -> handleSessionPersisted(piEvent, state);
@@ -338,21 +338,21 @@ public class PiEventToUiChunkTranslator {
         };
     }
 
-    // link_finding → DataFinding
+    // link_observation → DataObservation
 
-    private List<UIMessageChunk> handleLinkFinding(JsonNode event, TranslatorState state) {
-        // Runner emits camelCase `findingId` (pi-mentor-runner.mjs defineLinkFindingTool).
-        String findingIdStr = optionalString(event, "findingId");
-        if (findingIdStr == null) {
-            log.debug("link_finding missing findingId — skipping: {}", event);
+    private List<UIMessageChunk> handleLinkObservation(JsonNode event, TranslatorState state) {
+        // Runner emits camelCase `observationId` (pi-mentor-runner.mjs defineLinkObservationTool).
+        String observationIdStr = optionalString(event, "observationId");
+        if (observationIdStr == null) {
+            log.debug("link_observation missing observationId — skipping: {}", event);
             return List.of();
         }
         try {
-            UUID findingId = UUID.fromString(findingIdStr);
-            state.recordDataFinding(findingId);
-            return List.of(UIMessageChunk.DataFinding.of(findingId));
+            UUID observationId = UUID.fromString(observationIdStr);
+            state.recordDataObservation(observationId);
+            return List.of(UIMessageChunk.DataObservation.of(observationId));
         } catch (IllegalArgumentException e) {
-            log.warn("link_finding has invalid UUID '{}' — dropping", findingIdStr);
+            log.warn("link_observation has invalid UUID '{}' — dropping", observationIdStr);
             return List.of();
         }
     }

@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
 
@@ -12,13 +14,26 @@ import org.jspecify.annotations.NonNull;
 @Schema(description = "A workspace's practice-review policy: effective values plus raw overrides")
 public record PracticeReviewSettingsDTO(
     @NonNull @Schema(description = "Effective: run practice review for all developers") Boolean runForAllUsers,
-    @NonNull @Schema(description = "Effective: skip draft PRs/MRs") Boolean skipDrafts,
     @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs") Boolean deliverToMerged,
     @NonNull
     @Schema(description = "Effective: minimum minutes between reviews for the same PR")
     Integer cooldownMinutes,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean runForAllUsersOverride,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Boolean skipDraftsOverride,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean deliverToMergedOverride,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride
+    @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride,
+    @NonNull
+    @Schema(
+        description = "Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean " +
+            "no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths " +
+            "are not known where the decision is made)."
+    )
+    WorkspaceReviewScope reviewScope,
+    @NonNull
+    @Schema(
+        description = "Effective: how much autonomy the system has over practices and areas that hold no " +
+            "tier of their own — the bottom of the practice → area → workspace chain"
+    )
+    PracticeReviewTier defaultReviewTier,
+    @Schema(description = "Raw override; null = this workspace has never chosen, so DELIVER applies")
+    PracticeReviewTier defaultReviewTierOverride
 ) {}

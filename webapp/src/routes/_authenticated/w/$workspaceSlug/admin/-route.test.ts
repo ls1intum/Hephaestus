@@ -32,7 +32,7 @@ function mockMembership(role: WorkspaceRole | null) {
 		http.get("*/workspaces/:workspaceSlug/members/me", () =>
 			role
 				? HttpResponse.json({ role, userId: 1, userLogin: "ada", userName: "Ada" })
-				: // A non-member gets 400, not 403: the membership lookup throws IllegalArgumentException.
+				: // The server answers a non-member with 400, not 403.
 					HttpResponse.json({ status: 400, title: "Bad Request" }, { status: 400 }),
 		),
 	);

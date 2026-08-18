@@ -8,13 +8,16 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationFeedbackBody;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -35,6 +38,7 @@ import tools.jackson.databind.ObjectMapper;
 class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final List<String> IN_CONTEXT_ONLY = List.of(FeedbackChannel.IN_CONTEXT.name());
 
     @Autowired
     private FeedbackObservationRepository feedbackObservationRepository;
@@ -72,11 +76,12 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("feedback-observation-test"));
 
         practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
         agentJob = new AgentJob();
@@ -122,7 +127,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
     @Test
     @DisplayName(
-        "findLatestAdviceBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, " +
+        "findLatestFeedbackBodiesByObservationIds returns DELIVERED and FAILED bodies and excludes PREPARED, " +
             "SUPPRESSED, and null-body units"
     )
     void findAdviceBodiesIncludesFailedExcludesPreparedSuppressed() {
@@ -138,14 +143,16 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(2, FeedbackDeliveryState.SUPPRESSED, "Withheld"), suppressed);
         bind(saveFeedback(3, FeedbackDeliveryState.DELIVERED, null), nullBody);
 
-        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
-            List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId())
+        List<ObservationFeedbackBody> bodies = feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
+            workspace.getId(),
+            List.of(delivered.getId(), failed.getId(), prepared.getId(), suppressed.getId(), nullBody.getId()),
+            IN_CONTEXT_ONLY
         );
 
         assertThat(bodies).hasSize(2);
         Map<UUID, String> byObservation = bodies
             .stream()
-            .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
+            .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
         assertThat(byObservation)
             .containsEntry(delivered.getId(), "The advice the student saw")
             .containsEntry(failed.getId(), "The advice the direct post could not place")
@@ -153,7 +160,7 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Test
-    void findLatestAdviceBodiesUsesIdAsDeterministicTieBreak() {
+    void findLatestFeedbackBodiesUsesIdAsDeterministicTieBreak() {
         Observation observation = saveObservation("obs-repeated");
         Instant createdAt = Instant.parse("2026-01-01T00:00:00Z");
         UUID lowerId = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -161,11 +168,68 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         bind(saveFeedback(lowerId, 10, FeedbackDeliveryState.DELIVERED, "Earlier identity", createdAt), observation);
         bind(saveFeedback(higherId, 11, FeedbackDeliveryState.DELIVERED, "Latest identity", createdAt), observation);
 
-        List<ObservationAdviceBody> bodies = feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(
-            List.of(observation.getId())
+        List<ObservationFeedbackBody> bodies = feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
+            workspace.getId(),
+            List.of(observation.getId()),
+            IN_CONTEXT_ONLY
         );
 
-        assertThat(bodies).singleElement().extracting(ObservationAdviceBody::getBody).isEqualTo("Latest identity");
+        assertThat(bodies).singleElement().extracting(ObservationFeedbackBody::getBody).isEqualTo("Latest identity");
+    }
+
+    @Test
+    @DisplayName(
+        "a newer IN_APP unit bound to the same observation does not become its advice: the per-finding " +
+            "surfaces keep showing what was said about that finding"
+    )
+    void findLatestFeedbackBodiesAnswersOnlyForTheChannelsTheCallerNames() {
+        Observation observation = saveObservation("obs-both-lanes");
+        bind(
+            saveFeedback(
+                null,
+                20,
+                FeedbackDeliveryState.DELIVERED,
+                "The note posted on the pull request",
+                Instant.parse("2026-01-01T00:00:00Z")
+            ),
+            observation
+        );
+        // The in-app unit is newer, DELIVERED and non-null-bodied, so it wins every other clause of
+        // the query — the channel predicate is the only thing keeping it off a per-finding surface.
+        bind(
+            saveFeedback(
+                null,
+                7000,
+                FeedbackDeliveryState.DELIVERED,
+                "### You keep shipping untested changes\n\nAcross three pull requests…\n\n**Try next:** …",
+                Instant.parse("2026-02-01T00:00:00Z"),
+                FeedbackChannel.IN_APP
+            ),
+            observation
+        );
+
+        assertThat(
+            feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
+                workspace.getId(),
+                List.of(observation.getId()),
+                IN_CONTEXT_ONLY
+            )
+        )
+            .singleElement()
+            .extracting(ObservationFeedbackBody::getBody)
+            .isEqualTo("The note posted on the pull request");
+
+        assertThat(
+            feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(
+                workspace.getId(),
+                List.of(observation.getId()),
+                List.of(FeedbackChannel.IN_APP.name())
+            )
+        )
+            .singleElement()
+            .extracting(ObservationFeedbackBody::getBody)
+            .asString()
+            .startsWith("### You keep shipping untested changes");
     }
 
     @Test
@@ -192,16 +256,28 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     private Feedback saveFeedback(UUID id, int position, FeedbackDeliveryState state, String body, Instant createdAt) {
+        return saveFeedback(id, position, state, body, createdAt, FeedbackChannel.IN_CONTEXT);
+    }
+
+    private Feedback saveFeedback(
+        UUID id,
+        int position,
+        FeedbackDeliveryState state,
+        String body,
+        Instant createdAt,
+        FeedbackChannel channel
+    ) {
+        boolean anchored = channel == FeedbackChannel.IN_CONTEXT;
         return feedbackRepository.save(
             Feedback.builder()
                 .id(id)
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
-                .artifactId(42L)
+                .artifactKind(anchored ? ArtifactKinds.PULL_REQUEST : null)
+                .artifactId(anchored ? 42L : null)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())
-                .channel(FeedbackChannel.IN_CONTEXT)
+                .channel(channel)
                 .position(position)
                 .deliveryState(state)
                 .body(body)
@@ -220,18 +296,18 @@ class FeedbackObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             agentJob.getId(),
             practice.getId(),
             null,
-            "PULL_REQUEST",
+            "scm.pull_request",
             42L,
             recipient.getId(),
             "Observation title",
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             null,
             null,
             null,
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
         return observationRepository.findById(id).orElseThrow();
     }

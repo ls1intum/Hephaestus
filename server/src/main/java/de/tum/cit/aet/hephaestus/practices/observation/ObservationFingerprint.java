@@ -9,7 +9,7 @@ import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Deterministic cross-run identity for a {@code Observation} (ADR 0021, C2).
+ * Deterministic cross-run identity for a {@code Observation} (ADR 0021).
  *
  * <p>The recurrence key answers "is this the <em>same</em> observation we surfaced on an earlier agent
  * run?" so feedback can supersede rather than re-post, and a developer's reaction history can follow
@@ -19,7 +19,7 @@ import org.jspecify.annotations.Nullable;
  * <ul>
  *   <li>{@code practiceSlug} — the practice's stable per-workspace slug (NOT its surrogate id, which is
  *       workspace-local and survives reseeds poorly); identity is per-practice.</li>
- *   <li>{@code artifactType} + {@code artifactId} — the artifact under review (PR / ISSUE).</li>
+ *   <li>{@code artifactKind} + {@code artifactId} — the artifact under review (PR / ISSUE).</li>
  *   <li>{@code aboutUserId} — the person the observation is <em>about</em> (always populated). For
  *       author-side practices this equals the developer; for reviewer-side practices the subject differs,
  *       and two reviewers on one PR must not collapse to one key.</li>
@@ -29,9 +29,9 @@ import org.jspecify.annotations.Nullable;
  *
  * <p><strong>Deliberately excluded</strong> from the digest, because they are not stable across runs:
  * the agent job id (a new id every run); any line number / column / range (edits shift lines); and —
- * critically — the observation <em>title</em>. The title makes identity inert: the LLM re-words the same underlying concern every
+ * critically — the observation <em>summary</em>. The summary makes identity inert: the LLM re-words the same underlying concern every
  * run ("DoD ticks 'All tests pass' with zero tests" vs "'All tests pass' ticked but no tests
- * exist"), so a title-anchored key does not correlate across re-detections. Identity is therefore at the <em>(practice, artifact, subject, file)</em> locus grain —
+ * exist"), so a summary-anchored key does not correlate across re-detections. Identity is therefore at the <em>(practice, artifact, subject, file)</em> locus grain —
  * the right grain for the research question "did the practice-concern at this locus persist or resolve?",
  * not "did this exact prose recur". Two distinct observations of one practice in one file collapse to one
  * locus; that is intentional (they are the same practice concern there). Only the evidence <em>path</em>
@@ -51,7 +51,7 @@ public final class ObservationFingerprint {
      * Compute the stable 64-char recurrence key for an observation.
      *
      * @param practiceSlug the practice's stable slug (required)
-     * @param artifactType the artifact-type discriminator, e.g. {@code PULL_REQUEST} / {@code ISSUE} (required)
+     * @param artifactKind the artifact-type discriminator, e.g. {@code scm.pull_request} / {@code scm.issue} (required)
      * @param artifactId the artifact id under review (required)
      * @param aboutUserId the user the observation is ABOUT — the always-populated {@code about_user_id} (the
      *     subject for reviewer-side practices; equals the developer for author-side), so the same underlying
@@ -64,18 +64,18 @@ public final class ObservationFingerprint {
      */
     public static String compute(
         String practiceSlug,
-        String artifactType,
+        String artifactKind,
         long artifactId,
         long aboutUserId,
         @Nullable String firstLocationPath
     ) {
         Objects.requireNonNull(practiceSlug, "practiceSlug");
-        Objects.requireNonNull(artifactType, "artifactType");
+        Objects.requireNonNull(artifactKind, "artifactKind");
 
         String canonical = new StringBuilder()
             .append(practiceSlug)
             .append(SEP)
-            .append(artifactType)
+            .append(artifactKind)
             .append(SEP)
             .append(artifactId)
             .append(SEP)

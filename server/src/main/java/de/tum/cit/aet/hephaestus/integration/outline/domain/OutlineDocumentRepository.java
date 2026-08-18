@@ -213,4 +213,17 @@ public interface OutlineDocumentRepository extends JpaRepository<OutlineDocument
         nativeQuery = true
     )
     int evictBodies(@Param("workspaceId") long workspaceId, @Param("ids") List<Long> ids);
+
+    /** The few columns it takes to name a mirrored document on a read surface that has only its id. */
+    @Query(
+        "SELECT d.id AS id, d.title AS title, d.collectionSlug AS collectionSlug FROM OutlineDocument d " +
+            "WHERE d.workspaceId = :workspaceId AND d.id IN (:ids)"
+    )
+    List<DocumentLabel> findLabels(@Param("workspaceId") long workspaceId, @Param("ids") Collection<Long> ids);
+
+    interface DocumentLabel {
+        Long getId();
+        String getTitle();
+        String getCollectionSlug();
+    }
 }

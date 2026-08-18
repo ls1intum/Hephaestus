@@ -84,7 +84,7 @@ erDiagram
         VARCHAR(32) cancellation_reason
         VARCHAR(255) worker_id
         VARCHAR(48) integration_kind
-        VARCHAR(48) subject_class
+        VARCHAR(64) artifact_kind
         VARCHAR(64) prompt_digest
         VARCHAR(64) inputs_digest
         TIMESTAMPTZ available_at "NOT NULL"
@@ -92,6 +92,27 @@ erDiagram
         TIMESTAMPTZ execution_started_at
         VARCHAR(32) purpose
         VARCHAR(32) hold_reason
+        JSONB evidence_snapshot
+        JSONB review_readiness
+        TIMESTAMPTZ in_chat_prepared_at
+        TIMESTAMPTZ in_app_prepared_at
+    }
+
+    ArtifactSignal {
+        UUID id PK
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) artifact_kind UK "NOT NULL"
+        BIGINT artifact_id UK "NOT NULL"
+        VARCHAR(128) signal_name UK "NOT NULL"
+        VARCHAR(128) revision UK "NOT NULL"
+        TIMESTAMPTZ occurred_at "NOT NULL"
+        VARCHAR(16) discovered_via "NOT NULL"
+        VARCHAR(16) state "NOT NULL"
+        VARCHAR(48) state_reason
+        UUID job_id
+        TIMESTAMPTZ state_changed_at "NOT NULL"
+        TIMESTAMPTZ last_attempted_at
+        BIGINT requested_by_user_id FK
     }
 
     AuthEvent {
@@ -244,8 +265,8 @@ erDiagram
     CuratedPracticeOverride {
         VARCHAR(64) slug PK
         VARCHAR(128) name
-        VARCHAR(32) applies_to
-        JSONB trigger_events
+        VARCHAR(64) applies_to
+        JSONB bindings
         TEXT criteria
         TEXT precompute_script
         TEXT why_it_matters
@@ -257,6 +278,7 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at "NOT NULL"
         BIGINT version "NOT NULL"
+        JSONB automated_review_policy
     }
 
     Discussion {
@@ -324,7 +346,7 @@ erDiagram
         UUID id PK
         UUID agent_job_id FK,UK "NOT NULL"
         BIGINT workspace_id FK "NOT NULL"
-        VARCHAR(32) artifact_type
+        VARCHAR(64) artifact_kind
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
         BIGINT about_user_id FK "NOT NULL"
@@ -632,6 +654,7 @@ erDiagram
         NUMERIC(18,8) applied_per_1m_cache_read_usd
         NUMERIC(18,8) applied_per_1m_cache_write_usd
         TIMESTAMPTZ occurred_at "NOT NULL"
+        VARCHAR(16) usage_provenance
     }
 
     LoginProvider {
@@ -693,19 +716,19 @@ erDiagram
         VARCHAR(255) occurrence_key UK "NOT NULL"
         UUID agent_job_id FK "NOT NULL"
         BIGINT practice_id FK "NOT NULL"
-        VARCHAR(32) artifact_type "NOT NULL"
+        VARCHAR(64) artifact_kind "NOT NULL"
         BIGINT artifact_id "NOT NULL"
         BIGINT about_user_id FK "NOT NULL"
-        VARCHAR(255) title "NOT NULL"
+        VARCHAR(255) summary "NOT NULL"
         VARCHAR(16) presence "NOT NULL"
         VARCHAR(16) severity
-        REAL confidence "NOT NULL"
         JSONB evidence
-        TEXT reasoning
+        TEXT evidence_rationale
         TIMESTAMPTZ observed_at "NOT NULL"
         VARCHAR(64) recurrence_key
         BIGINT practice_revision_id FK
         VARCHAR(8) assessment
+        VARCHAR(16) origin "NOT NULL"
     }
 
     Organization {
@@ -792,20 +815,21 @@ erDiagram
         BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
-        JSONB trigger_events "NOT NULL"
+        JSONB bindings "NOT NULL"
         TEXT criteria "NOT NULL"
-        BOOLEAN is_active "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
         TEXT precompute_script
         BIGINT practice_area_id FK
-        VARCHAR(32) applies_to "NOT NULL"
+        VARCHAR(64) applies_to "NOT NULL"
         TEXT why_it_matters
         TEXT what_good_looks_like
         INTEGER display_order "NOT NULL"
         BIGINT current_revision_id FK,UK
         VARCHAR(64) source_curated_slug
-        VARCHAR(64) source_curated_fingerprint
+        VARCHAR(96) source_curated_fingerprint
+        JSONB automated_review_policy "NOT NULL"
+        VARCHAR(16) review_tier
     }
 
     PracticeArea {
@@ -814,7 +838,7 @@ erDiagram
         VARCHAR(64) slug UK "NOT NULL"
         VARCHAR(128) name "NOT NULL"
         TEXT description
-        BOOLEAN is_active "NOT NULL"
+        BOOLEAN visible_in_practice_dashboards "NOT NULL"
         INTEGER display_order "NOT NULL"
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ updated_at
@@ -822,6 +846,7 @@ erDiagram
         VARCHAR(32) color
         VARCHAR(64) source_curated_slug
         VARCHAR(64) source_curated_fingerprint
+        VARCHAR(16) review_tier
     }
 
     PracticeCatalogInstallation {
@@ -838,8 +863,8 @@ erDiagram
         TIMESTAMPTZ created_at "NOT NULL"
         VARCHAR(64) slug
         VARCHAR(128) name
-        VARCHAR(32) applies_to
-        JSONB trigger_events
+        VARCHAR(64) applies_to
+        JSONB bindings
         TEXT precompute_script
         TEXT why_it_matters
         TEXT what_good_looks_like
@@ -848,7 +873,8 @@ erDiagram
         TEXT area_description
         VARCHAR(64) area_icon
         VARCHAR(32) area_color
-        VARCHAR(64) detection_fingerprint
+        VARCHAR(96) review_rule_fingerprint
+        JSONB automated_review_policy
     }
 
     Project {
@@ -1064,6 +1090,46 @@ erDiagram
         BIGINT native_id
     }
 
+    ReviewBackfillRun {
+        UUID id PK
+        BIGINT workspace_id FK "NOT NULL"
+        VARCHAR(64) artifact_kind "NOT NULL"
+        TIMESTAMPTZ from_at "NOT NULL"
+        TIMESTAMPTZ to_at "NOT NULL"
+        VARCHAR(24) status "NOT NULL"
+        VARCHAR(32) pause_reason
+        INTEGER estimated_artifacts "NOT NULL"
+        NUMERIC(12,4) estimated_cost_usd
+        BIGINT cursor_artifact_id
+        INTEGER submitted_count "NOT NULL"
+        INTEGER passed_count "NOT NULL"
+        BIGINT requested_by_account_id "NOT NULL"
+        BIGINT confirmed_by_account_id
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ started_at
+        TIMESTAMPTZ finished_at
+        TIMESTAMPTZ updated_at "NOT NULL"
+        BIGINT version "NOT NULL"
+        INTEGER failed_count "NOT NULL"
+        VARCHAR(16) discovered_via "NOT NULL"
+        UUID sweep_schedule_id
+    }
+
+    ReviewSweepSchedule {
+        UUID id PK
+        BIGINT version "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
+        VARCHAR(64) artifact_kind UK "NOT NULL"
+        VARCHAR(16) cadence "NOT NULL"
+        INTEGER lookback_days "NOT NULL"
+        BOOLEAN enabled "NOT NULL"
+        TIMESTAMPTZ next_run_at "NOT NULL"
+        TIMESTAMPTZ last_run_at
+        BIGINT created_by_account_id "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
     Shedlock {
         VARCHAR(64) name PK
         TIMESTAMP lock_until "NOT NULL"
@@ -1258,6 +1324,8 @@ erDiagram
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
+        JSONB practice_review_scope
+        VARCHAR(16) practice_default_review_tier
     }
 
     WorkspaceAgentBinding {
@@ -1364,6 +1432,8 @@ erDiagram
     Repository ||--o{ ActivityEvent : has
     Workspace ||--o{ ActivityEvent : has
     Workspace ||--o{ AgentJob : has
+    Workspace ||--o{ ArtifactSignal : has
+    User ||--o{ ArtifactSignal : has
     Account ||--o{ AuthEvent : account_id
     Account ||--o{ AuthEvent : acting_account_id
     IdentityProvider ||--o{ AuthEvent : references
@@ -1469,6 +1539,8 @@ erDiagram
     Organization ||--o{ Repository : has
     IdentityProvider ||--o{ Repository : references
     Workspace ||--o{ RepositoryToMonitor : monitors
+    Workspace ||--o{ ReviewBackfillRun : reviewed
+    Workspace ||--o{ ReviewSweepSchedule : reviewed
     User ||--o{ SlackChannelConsentEvent : has
     Workspace ||--o{ SlackChannelConsentEvent : has
     User ||--o{ SlackMessage : authored_by

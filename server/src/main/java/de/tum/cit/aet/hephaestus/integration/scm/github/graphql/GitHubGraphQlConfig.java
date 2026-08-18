@@ -183,11 +183,9 @@ public class GitHubGraphQlConfig {
         SilentModeGraphQlClientFactory clientFactory
     ) {
         // Operations are loaded from graphql/github/operations/ by name.
-        // Shared fragments (GitHubGraphQlFragments) are
-        // selectively appended by FragmentMergingDocumentSource: only fragments that are
-        // actually referenced (transitively via ...FragmentName spreads) are included.
-        // This satisfies GraphQL spec §5.5.1.4 (fragments must be used) while keeping
-        // fragment definitions in documents the two GraphQL validators can see.
+        // Shared fragments are appended selectively: only those actually referenced (transitively via
+        // ...FragmentName spreads) are included, which is what satisfies GraphQL spec §5.5.1.4
+        // (fragments must be used) while keeping the definitions in documents the validators can see.
         List<Resource> fragmentFiles = List.of(
             new ClassPathResource(GitHubGraphQlFragments.PROJECT_FRAGMENTS_RESOURCE),
             new ClassPathResource(GitHubGraphQlFragments.COMMIT_ENRICHMENT_FIELDS_RESOURCE)

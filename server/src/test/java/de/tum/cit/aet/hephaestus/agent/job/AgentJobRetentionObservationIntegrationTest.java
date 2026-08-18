@@ -4,9 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -47,12 +51,13 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             owner
         );
         Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("review-quality");
         practice.setName("Review quality");
         practice.setCriteria("Review the change");
-        practice.setTriggerEvents(objectMapper.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
+        practice.setReviewTier(PracticeReviewTier.DELIVER);
         practice = practiceRepository.save(practice);
 
         AgentJob referenced = oldTerminalJob(workspace);
@@ -65,18 +70,18 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
             referenced.getId(),
             practice.getId(),
             null,
-            WorkArtifact.PULL_REQUEST.name(),
+            ArtifactKinds.PULL_REQUEST.value(),
             7L,
             owner.getId(),
             "Stored finding",
             "ABSENT",
             "BAD",
             "MAJOR",
-            0.8f,
             "{}",
             "Reasoning",
             "retention-locus",
-            Instant.now()
+            Instant.now(),
+            "LIVE"
         );
 
         int deleted = jobRepository.deleteUnreferencedTerminalRowsOlderThan(
@@ -92,7 +97,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
     private AgentJob oldTerminalJob(Workspace workspace) {
         AgentJob job = new AgentJob();
         job.setWorkspace(workspace);
-        job.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setStatus(AgentJobStatus.COMPLETED);
         job.setDeliveryStatus(DeliveryStatus.DELIVERED);

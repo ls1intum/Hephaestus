@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { HttpResponse, http } from "msw";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { withStandardPage } from "@/stories/decorators";
 import type { FeatureValues } from "./AdminFeaturesSettings";
 import { AdminSettingsPage } from "./AdminSettingsPage";
@@ -22,6 +22,8 @@ const membershipRead = [
 const meta = {
 	component: AdminSettingsPage,
 	parameters: {
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
 		layout: "fullscreen",
 		msw: { handlers: membershipRead },
 		chromatic: { viewports: [320, 1440] },
@@ -42,11 +44,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(
-			canvas.getByRole("heading", { name: "Workspace capabilities" }),
-		).toBeInTheDocument();
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText(/reset and recalculate leagues/i)).not.toBeInTheDocument();
 		await canvas.findByRole("button", { name: /^delete workspace$/i });
 	},

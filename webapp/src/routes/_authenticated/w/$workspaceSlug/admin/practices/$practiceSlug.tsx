@@ -2,9 +2,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+	getPracticeDefinitionOptionsOptions,
 	getPracticeOptions,
 	getPracticeQueryKey,
 	listAreasOptions,
+	listPracticeEvidenceOutcomesOptions,
 	listPracticesQueryKey,
 	updatePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -51,8 +53,16 @@ function EditPracticeContainer() {
 	const areasQuery = useQuery({
 		...listAreasOptions({
 			path: { workspaceSlug },
-			query: { activeOnly: true },
+			query: { visibleInPracticeDashboardsOnly: true },
 		}),
+	});
+	const definitionOptionsQuery = useQuery({
+		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
+	});
+	// Deliberately outside the pending/error gates below: how past reviews turned out is context, not
+	// something the author needs in order to edit the requirements.
+	const evidenceOutcomesQuery = useQuery({
+		...listPracticeEvidenceOutcomesOptions({ path: { workspaceSlug } }),
 	});
 
 	const updatePractice = useMutation({
@@ -64,35 +74,34 @@ function EditPracticeContainer() {
 				queryClient.cancelQueries({ queryKey: listQueryKey }),
 			]);
 		},
+		onError: () => toast.error("Couldn't save the practice"),
 	});
 
+	// Rejects rather than swallowing the failure: the form holds its unsaved-changes guard down from
+	// submit until it hears one way or the other, so resolving on failure would lose the draft.
 	const handleSubmit = async (
 		slug: string,
 		data: UpdatePracticeRequest,
 		areaSlug: string | null,
 	) => {
-		try {
-			const request = { ...data, area: { areaSlug } };
-			const updated = await updatePractice.mutateAsync({
-				path: { workspaceSlug, practiceSlug: slug },
-				body: request,
-			});
-			queryClient.setQueryData(detailQueryKey, updated);
-			queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
-				practices
-					? patchPractice(practices, updated.slug, selectPracticePatch(updated, request))
-					: practices,
-			);
-			void queryClient.invalidateQueries({ queryKey: detailQueryKey });
-			void queryClient.invalidateQueries({ queryKey: listQueryKey });
-			toast.success("Practice saved");
-			navigate({ to: ".." });
-		} catch {
-			toast.error("Couldn't save the practice");
-		}
+		const request = { ...data, area: { areaSlug } };
+		const updated = await updatePractice.mutateAsync({
+			path: { workspaceSlug, practiceSlug: slug },
+			body: request,
+		});
+		queryClient.setQueryData(detailQueryKey, updated);
+		queryClient.setQueryData<Practice[]>(listQueryKey, (practices) =>
+			practices
+				? patchPractice(practices, updated.slug, selectPracticePatch(updated, request))
+				: practices,
+		);
+		void queryClient.invalidateQueries({ queryKey: detailQueryKey });
+		void queryClient.invalidateQueries({ queryKey: listQueryKey });
+		toast.success("Practice saved");
+		navigate({ to: ".." });
 	};
 
-	if (practiceQuery.isPending || areasQuery.isPending) {
+	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
 				<div className="flex h-64 max-w-3xl items-center justify-center">
@@ -101,16 +110,17 @@ function EditPracticeContainer() {
 			</PracticeFormShell>
 		);
 	}
-	if (practiceQuery.isError || areasQuery.isError) {
+	if (practiceQuery.isError || areasQuery.isError || definitionOptionsQuery.isError) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
 				<div className="max-w-3xl">
 					<QueryErrorAlert
-						error={practiceQuery.error ?? areasQuery.error}
+						error={practiceQuery.error ?? areasQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice"
 						onRetry={() => {
 							practiceQuery.refetch();
 							areasQuery.refetch();
+							definitionOptionsQuery.refetch();
 						}}
 					/>
 				</div>
@@ -124,8 +134,12 @@ function EditPracticeContainer() {
 			workspaceSlug={workspaceSlug}
 			initialData={practiceQuery.data}
 			areas={areasQuery.data}
+			definitionOptions={definitionOptionsQuery.data}
 			onSubmit={handleSubmit}
 			isPending={updatePractice.isPending}
+			evidenceOutcome={evidenceOutcomesQuery.data?.find(
+				(entry) => entry.practiceSlug === practiceSlug,
+			)}
 		/>
 	);
 }

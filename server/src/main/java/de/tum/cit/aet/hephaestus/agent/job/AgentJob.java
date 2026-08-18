@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectClass;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -77,7 +77,7 @@ public class AgentJob {
     @ToString.Exclude
     private Workspace workspace;
 
-    /** The workspace agent binding this job runs on; the executor re-admits it at claim time. */
+    /** Selects the workspace agent binding this job runs on; the executor re-admits it at claim time. */
     @Enumerated(EnumType.STRING)
     @Column(name = "purpose", length = 32)
     private AgentPurpose purpose;
@@ -101,12 +101,11 @@ public class AgentJob {
 
     /**
      * Discriminator for the work subject this job analyses; drives polymorphic delivery dispatch.
-     * Nullable for legacy rows, which are backfilled as {@link SubjectClass#PULL_REQUEST}.
+     * Nullable for legacy rows, which are backfilled as {@code scm.pull_request}.
      */
-    @Enumerated(EnumType.STRING)
-    @Column(name = "subject_class", length = 48)
+    @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH)
     @Nullable
-    private SubjectClass subjectClass;
+    private ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")
@@ -191,6 +190,24 @@ public class AgentJob {
     private short deliveryAttempts = 0;
 
     /**
+     * When the conversational-feedback lane finished running for this job, whether or not it prepared
+     * anything.
+     *
+     * <p>The lane is driven by an {@code @Async @TransactionalEventListener}, and a submission to a
+     * saturated pool is rejected and gone: the event has no second chance and the work is lost with no
+     * trace. This column is that trace. It is the only durable difference between "the lane ran and
+     * decided nothing was worth preparing" and "the lane never ran", which are otherwise identical from
+     * the outside — both are simply an absence of {@code feedback} rows.
+     * {@code FeedbackLanePreparationSweeper} picks up whatever is still null.
+     */
+    @Column(name = "in_chat_prepared_at")
+    private Instant inChatPreparedAt;
+
+    /** The in-app lane's half of {@link #inChatPreparedAt}; the two lanes fail independently. */
+    @Column(name = "in_app_prepared_at")
+    private Instant inAppPreparedAt;
+
+    /**
      * Worker that owns this job while RUNNING. Soft reference to {@code worker_registry.worker_id} (no
      * FK: a finished job must survive its worker row being reaped). Fences terminal writes, so a
      * requeued job's original worker cannot clobber the new owner's.
@@ -200,7 +217,7 @@ public class AgentJob {
 
     /**
      * Digest of the prompt scaffolding this run consumed. Equal digests ran byte-identical prompt
-     * assembly, which is how an evaluation groups runs. Null for rows written before provenance existed.
+     * assembly, which is how an evaluation groups runs.
      */
     @Column(name = "prompt_digest", length = 64)
     private String promptDigest;
@@ -208,10 +225,23 @@ public class AgentJob {
     /**
      * Digest over every file materialised into the sandbox workspace, with the job's own id elided so two
      * runs over identical work agree. The read-only repo mount is NOT hashed — its state is pinned by
-     * {@code metadata.commit_sha}. Null for rows written before provenance existed.
+     * {@code metadata.commit_sha}.
      */
     @Column(name = "inputs_digest", length = 64)
     private String inputsDigest;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "evidence_snapshot", columnDefinition = "jsonb")
+    private JsonNode evidenceSnapshot;
+
+    /**
+     * The readiness decisions, kept out of {@link #evidenceSnapshot} because they are read in bulk. A
+     * snapshot carries one entry per staged file and can reach megabytes; Postgres has no partial read
+     * for a TOASTed jsonb, so reading one key out of a page of snapshots would detoast every one in full.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "review_readiness", columnDefinition = "jsonb")
+    private JsonNode reviewReadiness;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -255,9 +285,6 @@ public class AgentJob {
 
     @Column(name = "llm_cache_write_tokens")
     private Integer llmCacheWriteTokens;
-
-    // No cost field here: money lives in llm_usage_event as NUMERIC(18,6) with the rates it was charged
-    // at, never as a binary float on the job row.
 
     @PrePersist
     public void prePersist() {

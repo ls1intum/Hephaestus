@@ -3,7 +3,7 @@ import { loginAsDevAdmin, test } from "./fixtures";
 /**
  * Captures PR screenshots of the domain-framed "Practices" admin: the Catalog tree (areas → practices
  * in one accordion, drag-reorderable, area icons in their seeded colours), the icon/colour picker, the
- * Review settings and Runs pages, and a practice's detail page (standard + the reserved
+ * Review and Practice reviews pages, and a practice's detail page (standard + the reserved
  * observations/feedback section). Run against the seeded `e2e` workspace. Output → /tmp/shots/*.png.
  */
 const OUT = "/tmp/shots";
@@ -57,8 +57,8 @@ test("capture practices admin", async ({ page }) => {
 	await page.waitForTimeout(400);
 	await page.screenshot({ path: `${OUT}/practice-detail.png`, fullPage: true });
 
-	// 5) Review settings.
-	await page.goto("/w/e2e/admin/practices/settings");
+	// 5) Review: When and where.
+	await page.goto("/w/e2e/admin/practices/review?section=when-and-where");
 	await page.waitForLoadState("networkidle");
 	await page.waitForTimeout(500);
 	await page.screenshot({ path: `${OUT}/review-settings.png`, fullPage: true });

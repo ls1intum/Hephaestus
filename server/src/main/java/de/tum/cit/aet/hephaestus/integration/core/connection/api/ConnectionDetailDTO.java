@@ -21,11 +21,10 @@ import tools.jackson.databind.ObjectMapper;
  * {@code type: object, additionalProperties: true} in the spec, so it round-trips through
  * client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
  * entity, and every secret-bearing key of the config itself is stripped by
- * {@link #redactSensitive} before serialization.
+ * {@code redactSensitive} before serialization.
  *
  * <p><b>Why redact here and not with {@code @JsonIgnore} on the record component?</b> The very
- * same {@link ObjectMapper} bean serializes {@link
- * de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+ * same {@code ObjectMapper} bean serializes {@code ConnectionConfig} into the JSONB
  * {@code connection.config} column (Hibernate's {@code json_format_mapper} is wired to it in
  * {@code HibernateJacksonFormatMapperConfig}). Annotating the component would therefore drop the
  * secret on write and destroy the stored value — the API-boundary filter below is the only place
@@ -58,8 +57,7 @@ public record ConnectionDetailDTO(
      * forge signed deliveries.
      *
      * <p>{@code ConnectionDetailDTOTest#everySecretShapedConfigComponentIsRegisteredAsSensitive}
-     * reflects over every {@link
-     * de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} subtype and fails if a
+     * reflects over every {@code ConnectionConfig} subtype and fails if a
      * new secret-shaped component is added without being listed here.
      */
     public static final Set<String> SENSITIVE_CONFIG_KEYS = Set.of("webhooksecret");
@@ -84,7 +82,7 @@ public record ConnectionDetailDTO(
     }
 
     /**
-     * Drops every {@link #SENSITIVE_CONFIG_KEYS} entry. The key is removed outright rather than
+     * Drops every {@code SENSITIVE_CONFIG_KEYS} entry. The key is removed outright rather than
      * masked with a placeholder: a {@code "***"} value would round-trip back through an admin
      * "edit config" client as a literal secret. Keys are compared lowercased with {@link
      * Locale#ROOT} (the {@code LocaleSafetyArchTest} contract).

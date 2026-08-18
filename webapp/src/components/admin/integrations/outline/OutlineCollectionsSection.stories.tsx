@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { OutlineCollection } from "@/api/types.gen";
 import { OutlineCollectionsSection } from "./OutlineCollectionsSection";
 
@@ -67,9 +67,8 @@ const decisions: OutlineCollection = {
 /** First run — no collections yet; the empty state offers an Add affordance. */
 export const Empty: Story = {
 	args: { collections: [] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/no collections mirrored yet/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/no collections mirrored yet/i);
 		await expect(canvas.getAllByRole("button", { name: /add collection/i }).length).toBeGreaterThan(
 			1,
 		);
@@ -84,11 +83,10 @@ export const Empty: Story = {
  */
 export const Populated: Story = {
 	args: { collections: [engineering, decisions] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Engineering")).toBeInTheDocument();
-		await expect(canvas.getByText(/up to date/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/syncing…/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Engineering");
+		canvas.getByText(/up to date/i);
+		canvas.getByText(/syncing…/i);
 
 		await expect(
 			canvas.queryByRole("columnheader", { name: /documents/i }),
@@ -112,11 +110,10 @@ export const LoadError: Story = {
 		error: { status: 503, title: "Service Unavailable", detail: "Outline sync is unavailable." },
 		onRetry: fn(),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByText(/no collections mirrored yet/i)).not.toBeInTheDocument();
-		await expect(canvas.getByText(/couldn't load the mirrored collections/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/outline sync is unavailable/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /^retry$/i })).toBeInTheDocument();
+		canvas.getByText(/couldn't load the mirrored collections/i);
+		canvas.getByText(/outline sync is unavailable/i);
+		canvas.getByRole("button", { name: /^retry$/i });
 	},
 };

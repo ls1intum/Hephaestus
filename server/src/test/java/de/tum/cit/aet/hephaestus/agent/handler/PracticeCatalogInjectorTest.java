@@ -2,14 +2,27 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
@@ -17,22 +30,17 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.test.util.ReflectionTestUtils;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 
-/**
- * Locks the lifecycle phase-correctness gate in {@link PracticeCatalogInjector#inject}: a job carrying a
- * {@code trigger_event} materialises ONLY the practices whose {@code triggerEvents} include that event, so
- * an authoring practice is not re-litigated on a fixup push and a retrospective practice runs only at
- * close. The two safety behaviours — no-trigger keeps the full set, and a mis-seeded no-match falls THROUGH
- * to the full set rather than failing the job — are the load-bearing cases and are pinned here.
- */
 @ExtendWith(MockitoExtension.class)
 class PracticeCatalogInjectorTest extends BaseUnitTest {
 
@@ -45,30 +53,38 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        injector = new PracticeCatalogInjector(objectMapper, practiceRepository);
+        injector = new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults());
     }
 
-    private Practice practice(String slug, String... triggerEvents) {
+    private Practice practice(String slug, SignalName... signals) {
         Practice p = new Practice();
         p.setSlug(slug);
         p.setName(slug);
         p.setCriteria("criteria for " + slug);
-        ArrayNode arr = objectMapper.createArrayNode();
-        for (String e : triggerEvents) {
-            arr.add(e);
-        }
-        p.setTriggerEvents(arr);
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
+        var revision = new PracticeRevision();
+        ReflectionTestUtils.setField(revision, "id", Math.abs((long) slug.hashCode()) + 1);
+        p.setCurrentRevision(revision);
+        p.setBindings(PracticeTestEvidence.bindings(signals));
         return p;
     }
 
-    private AgentJob job(String triggerEvent) {
+    /**
+     * A workspace that has expressed no review opinion of its own, so every practice below it resolves to
+     * {@link PracticeReviewTier#DEFAULT}.
+     */
+    private Workspace workspace() {
         Workspace ws = new Workspace();
         ws.setId(1L);
+        return ws;
+    }
+
+    private AgentJob job(@Nullable SignalName signal) {
         AgentJob j = new AgentJob();
-        j.setWorkspace(ws);
-        if (triggerEvent != null) {
+        j.setWorkspace(workspace());
+        if (signal != null) {
             var meta = objectMapper.createObjectNode();
-            meta.put("trigger_event", triggerEvent);
+            meta.put("signal", signal.value());
             j.setMetadata(meta);
         }
         return j;
@@ -81,18 +97,16 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("a trigger event materialises only the practices that declare it")
     void filtersToTriggerMatchingPractices() {
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
             List.of(
-                practice("authoring", "PullRequestCreated"),
-                practice("retrospective", "PullRequestMerged"),
-                practice("reviewer", "ReviewSubmitted")
+                practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
+                practice("retrospective", ScmSignals.PULL_REQUEST_MERGED),
+                practice("reviewer", ScmSignals.PULL_REQUEST_REVIEWED)
             )
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job("PullRequestMerged"), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job(ScmSignals.PULL_REQUEST_MERGED), ArtifactKinds.PULL_REQUEST);
 
         assertThat(files).containsKey(md("retrospective"));
         assertThat(files).doesNotContainKey(md("authoring"));
@@ -102,33 +116,37 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("a job with no trigger event keeps the full focus set (legacy / bot-command path)")
     void noTriggerEventKeepsFullSet() {
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(
-            List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(
+                practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
+                practice("retrospective", ScmSignals.PULL_REQUEST_MERGED)
+            )
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
 
         assertThat(files).containsKey(md("authoring"));
         assertThat(files).containsKey(md("retrospective"));
     }
 
     @Test
-    @DisplayName("a trigger event that matches nothing falls THROUGH to the full set rather than failing the job")
-    void noMatchFallsThroughToFullSet() {
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(
-            List.of(practice("authoring", "PullRequestCreated"), practice("retrospective", "PullRequestMerged"))
+    @DisplayName("a trigger event that matches nothing fails closed")
+    void noMatchFailsClosed() {
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(
+                practice("authoring", ScmSignals.PULL_REQUEST_OPENED),
+                practice("retrospective", ScmSignals.PULL_REQUEST_MERGED)
+            )
         );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job("SomeEventNobodyDeclares"), WorkArtifact.PULL_REQUEST);
-
-        assertThat(files).containsKey(md("authoring"));
-        assertThat(files).containsKey(md("retrospective"));
+        assertThatThrownBy(() ->
+            injector.inject(files, job(SignalName.of("scm.pull_request.rebased")), ArtifactKinds.PULL_REQUEST)
+        )
+            .isInstanceOf(JobPreparationException.class)
+            .hasMessageContaining("No active scm.pull_request practices");
+        assertThat(files).isEmpty();
     }
 
     @Test
@@ -136,11 +154,11 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     void abiSlugViolationThrows() {
         // Defense-in-depth: slugs are interpolated into filesystem paths, so a mis-seeded slug with a path
         // traversal must be rejected, not written to disk.
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(List.of(practice("../escape", "PullRequestCreated")));
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(practice("../escape", ScmSignals.PULL_REQUEST_OPENED))
+        );
 
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("ABI pattern");
     }
@@ -150,7 +168,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     void noWorkspaceThrows() {
         AgentJob job = new AgentJob();
 
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job, WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job, ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("no workspace");
     }
@@ -158,32 +176,54 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     @Test
     @DisplayName("an empty active-practice set throws JobPreparationException")
     void emptyFocusSetThrows() {
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(List.of());
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), WorkArtifact.PULL_REQUEST))
+        assertThatThrownBy(() -> injector.inject(new HashMap<>(), job(null), ArtifactKinds.PULL_REQUEST))
             .isInstanceOf(JobPreparationException.class)
             .hasMessageContaining("No active");
     }
 
     @Test
-    @DisplayName("inject writes index.json, the per-slug + bundled criteria, and skips blank precompute scripts")
-    void injectWritesCatalogArtifactsAndSkipsBlankPrecompute() {
-        Practice withScript = practice("authoring", "PullRequestCreated");
-        withScript.setPrecomputeScript("export default () => ({});");
-        Practice blankScript = practice("retrospective", "PullRequestMerged");
-        blankScript.setPrecomputeScript("   "); // blank → no .ts written
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(List.of(withScript, blankScript));
+    @DisplayName("a practice whose effective tier is OFF is not staged, and one that inherits its tier is")
+    void offPracticesAreFilteredOutAfterTheTierIsResolved() {
+        // The repository does not filter by tier: a `review_tier <> 'OFF'` predicate would answer UNKNOWN
+        // for the null column that means "inherit", making the inheritance chain vanish from the
+        // catalogue. The injector resolves the chain and filters here instead.
+        Practice off = practice("silenced", ScmSignals.PULL_REQUEST_OPENED);
+        off.setReviewTier(PracticeReviewTier.OFF);
+        Practice inherits = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(off, inherits)
+        );
         Map<String, byte[]> files = new HashMap<>();
 
-        injector.inject(files, job(null), WorkArtifact.PULL_REQUEST);
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
+
+        assertThat(files).containsKey(md("authoring"));
+        assertThat(files).doesNotContainKey(md("silenced"));
+    }
+
+    @Test
+    @DisplayName("inject writes index.json, the per-slug + bundled criteria, and skips blank precompute scripts")
+    void injectWritesCatalogArtifactsAndSkipsBlankPrecompute() {
+        Practice withScript = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
+        withScript.setPrecomputeScript("export default () => ({});");
+        Practice blankScript = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
+        blankScript.setPrecomputeScript("   "); // blank → no .ts written
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(withScript, blankScript)
+        );
+        Map<String, byte[]> files = new HashMap<>();
+
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
 
         // index.json lists both practices (area falls back to the slug when ungrouped).
         String index = new String(files.get(SandboxLayout.PRACTICES_PREFIX + "index.json"), StandardCharsets.UTF_8);
         assertThat(index).contains("authoring").contains("retrospective");
+        // A pointer to where this practice's author expects the answer — not a fence. What may be cited
+        // is what the run staged, and inputs/manifest.json is where that is stated, once.
+        assertThat(index).contains("readsSources").contains("scm.pull-request.diff");
+        assertThat(index).doesNotContain("allowedSources");
         // Per-slug criteria + the all-criteria bundle are present.
         assertThat(files).containsKey(md("authoring")).containsKey(md("retrospective"));
         String bundle = new String(
@@ -197,17 +237,54 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     @Test
+    @DisplayName("staged criteria tell the model which claims the evidence cannot support")
+    void injectAppendsKnownLimitationsToCriteria() {
+        Practice limited = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
+        PracticeAutomatedReviewPolicy policy = limited.getAutomatedReviewPolicy();
+        limited.setAutomatedReviewPolicy(
+            new PracticeAutomatedReviewPolicy(
+                policy.sourceContractVersion(),
+                policy.automatedReview(),
+                policy.whenEvidenceIsInsufficient(),
+                List.of(
+                    new PracticeEvidenceLimitation(
+                        "RUNTIME_BEHAVIOR_NOT_OBSERVED",
+                        "Repository evidence does not establish behavior in a deployed runtime."
+                    )
+                ),
+                null
+            )
+        );
+        Practice unlimited = practice("retrospective", ScmSignals.PULL_REQUEST_OPENED);
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(limited, unlimited)
+        );
+        Map<String, byte[]> files = new HashMap<>();
+
+        injector.inject(files, job(null), ArtifactKinds.PULL_REQUEST);
+
+        String staged = new String(files.get(md("authoring")), StandardCharsets.UTF_8);
+        assertThat(staged)
+            .contains("criteria for authoring")
+            .contains("## What this evidence cannot show")
+            .contains("Repository evidence does not establish behavior in a deployed runtime.");
+        assertThat(new String(files.get(md("retrospective")), StandardCharsets.UTF_8)).doesNotContain(
+            "## What this evidence cannot show"
+        );
+    }
+
+    @Test
     @DisplayName("whyBySlug keeps populated principles and omits blank ones")
     void whyBySlugOmitsBlankPrinciples() {
-        Practice withWhy = practice("authoring", "PullRequestCreated");
+        Practice withWhy = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
         withWhy.setWhyItMatters("Clear descriptions help reviewers.");
-        Practice blankWhy = practice("retrospective", "PullRequestMerged");
+        Practice blankWhy = practice("retrospective", ScmSignals.PULL_REQUEST_MERGED);
         blankWhy.setWhyItMatters("   ");
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(List.of(withWhy, blankWhy));
+        when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
+            List.of(withWhy, blankWhy)
+        );
 
-        Map<String, String> why = injector.whyBySlug(1L, WorkArtifact.PULL_REQUEST);
+        Map<String, String> why = injector.whyBySlug(workspace(), ArtifactKinds.PULL_REQUEST);
 
         assertThat(why)
             .containsEntry("authoring", "Clear descriptions help reviewers.")
@@ -215,17 +292,24 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("defectDetectorSlugs returns only practices whose criteria declare DEFECT-DETECTOR DISCIPLINE")
-    void defectDetectorSlugsFiltersByMarker() {
-        Practice detector = practice("authoring", "PullRequestCreated");
-        detector.setCriteria("Some rule. DEFECT-DETECTOR DISCIPLINE applies here.");
-        Practice ordinary = practice("retrospective", "PullRequestMerged"); // plain criteria, no marker
-        when(
-            practiceRepository.findByWorkspaceIdAndActiveTrueAndArtifactType(1L, WorkArtifact.PULL_REQUEST)
-        ).thenReturn(List.of(detector, ordinary));
+    @DisplayName("defectDetectorSlugs uses the exact admitted practice snapshot")
+    void defectDetectorSlugsUsesSnapshot() {
+        AgentJob job = job(ScmSignals.PULL_REQUEST_OPENED);
+        var snapshot = objectMapper.createObjectNode();
+        var practices = snapshot.putArray("practices");
+        practices.addObject().put("slug", "authoring").put("defectDetector", true);
+        practices.addObject().put("slug", "retrospective").put("defectDetector", false);
+        job.setEvidenceSnapshot(snapshot);
 
-        Set<String> slugs = injector.defectDetectorSlugs(1L, WorkArtifact.PULL_REQUEST);
+        Set<String> slugs = injector.defectDetectorSlugs(job);
 
         assertThat(slugs).containsExactly("authoring");
+    }
+
+    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
+    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
+        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
+        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
+        return provider;
     }
 }

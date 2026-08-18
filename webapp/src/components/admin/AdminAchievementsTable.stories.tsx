@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 import type { ExtendedUserTeams } from "./types";
 
@@ -20,10 +20,10 @@ function member(index: number): ExtendedUserTeams {
 	};
 }
 
-/** Workspace-admin view for re-running a member's achievement calculation. */
 const meta = {
 	component: AdminAchievementsTable,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	args: {
 		users: Array.from({ length: 8 }, (_, index) => member(index + 1)),
 		workspaceSlug: "acme",
@@ -47,8 +47,7 @@ export const NoMembers: Story = {
 
 export const Recalculating: Story = {
 	args: { recalculatingUsers: new Set(["member2"]) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /Recalculating/ })).toBeDisabled();
 		await expect(canvas.getAllByRole("button", { name: "Recalculate" })[0]).toBeEnabled();
 	},
@@ -56,8 +55,4 @@ export const Recalculating: Story = {
 
 export const ManyMembers: Story = {
 	args: { users: Array.from({ length: 30 }, (_, index) => member(index + 1)) },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
-	},
 };

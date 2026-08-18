@@ -4,14 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 
-class PracticeDetectionReadinessAdapterTest extends BaseUnitTest {
+class PracticeReviewReadinessAdapterTest extends BaseUnitTest {
 
     @Mock
     private WorkspaceAgentBindingRepository bindingRepository;
@@ -19,23 +18,23 @@ class PracticeDetectionReadinessAdapterTest extends BaseUnitTest {
     @Mock
     private LlmModelResolver resolver;
 
-    private PracticeDetectionReadinessAdapter checker;
+    private PracticeReviewReadinessAdapter checker;
 
     @BeforeEach
     void setUp() {
-        checker = new PracticeDetectionReadinessAdapter(bindingRepository, resolver);
+        checker = new PracticeReviewReadinessAdapter(bindingRepository, resolver);
     }
 
     private WorkspaceAgentBinding binding(boolean enabled) {
         WorkspaceAgentBinding b = new WorkspaceAgentBinding();
-        b.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        b.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         b.setEnabled(enabled);
         return b;
     }
 
     @Test
     void unboundPracticeIsNotRunnable() {
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.empty()
         );
         assertThat(checker.hasRunnableAgent(1L)).isFalse();
@@ -43,7 +42,7 @@ class PracticeDetectionReadinessAdapterTest extends BaseUnitTest {
 
     @Test
     void disabledBindingIsNotRunnable() {
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(binding(false))
         );
         assertThat(checker.hasRunnableAgent(1L)).isFalse();
@@ -52,20 +51,20 @@ class PracticeDetectionReadinessAdapterTest extends BaseUnitTest {
     @Test
     void enabledBindingWithRevokedModelIsNotRunnable() {
         WorkspaceAgentBinding b = binding(true);
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(b)
         );
-        when(resolver.resolve(b)).thenThrow(new IllegalStateException("unavailable"));
+        when(resolver.isAvailable(b)).thenReturn(false);
         assertThat(checker.hasRunnableAgent(1L)).isFalse();
     }
 
     @Test
     void enabledBindingWithAvailableModelIsRunnable() {
         WorkspaceAgentBinding b = binding(true);
-        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_DETECTION)).thenReturn(
+        when(bindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.PRACTICE_REVIEW)).thenReturn(
             Optional.of(b)
         );
-        when(resolver.resolve(b)).thenReturn(org.mockito.Mockito.mock(ResolvedLlmModel.class));
+        when(resolver.isAvailable(b)).thenReturn(true);
         assertThat(checker.hasRunnableAgent(1L)).isTrue();
     }
 }

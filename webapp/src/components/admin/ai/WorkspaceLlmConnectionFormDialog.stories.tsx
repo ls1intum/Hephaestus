@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { fn, screen, userEvent } from "storybook/test";
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectDialogFitsViewport } from "@/test/reflow";
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 
@@ -44,10 +45,7 @@ export const Submitting: Story = {
 	args: { isSubmitting: true },
 };
 
-/**
- * WCAG 2.2 SC 1.4.10 at 320 px on the taller create variant: a `position: fixed` popup that outgrows
- * the viewport hangs off both ends at once with no way to scroll it back.
- */
+/** WCAG 2.2 SC 1.4.10 at 320 px: a `fixed` popup that outgrows the viewport hangs off both ends. */
 export const MobileReflow: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
@@ -62,6 +60,6 @@ export const MobileReflow: Story = {
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /^connect provider$/i }));
-		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/display name is required/i));
 	},
 };

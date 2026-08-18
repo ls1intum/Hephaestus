@@ -25,8 +25,10 @@ public class LlmModelResolver {
     public ResolvedLlmModel resolve(ModelBindingSource config) {
         LlmModel instance = config.getInstanceModel();
         if (instance != null) {
+            if (!isUsable(instance, config.getWorkspace().getId())) {
+                throw unavailable();
+            }
             LlmConnection c = instance.getConnection();
-            requireUsableInstanceModel(instance, config.getWorkspace().getId());
             return new ResolvedLlmModel(
                 c.getBaseUrl(),
                 c.getApiProtocol(),
@@ -38,15 +40,10 @@ public class LlmModelResolver {
         }
         WorkspaceLlmModel byo = config.getWorkspaceModel();
         if (byo != null) {
-            WorkspaceLlmConnection c = byo.getConnection();
-            if (
-                !byo.isEnabled() ||
-                !c.isEnabled() ||
-                !isSupportedProtocol(c.getApiProtocol()) ||
-                !byo.getWorkspace().getId().equals(config.getWorkspace().getId())
-            ) {
+            if (!isUsable(byo, config.getWorkspace().getId())) {
                 throw unavailable();
             }
+            WorkspaceLlmConnection c = byo.getConnection();
             return new ResolvedLlmModel(
                 c.getBaseUrl(),
                 c.getApiProtocol(),
@@ -59,18 +56,39 @@ public class LlmModelResolver {
         throw new IllegalStateException("The agent config must bind an available OpenAI-compatible model");
     }
 
-    private void requireUsableInstanceModel(LlmModel model, Long workspaceId) {
+    /**
+     * The same availability predicate {@link #resolve} enforces, as an answer instead of a throw, for
+     * callers that only need to know whether a binding is usable.
+     */
+    @Transactional(readOnly = true)
+    public boolean isAvailable(ModelBindingSource config) {
+        LlmModel instance = config.getInstanceModel();
+        if (instance != null) {
+            return isUsable(instance, config.getWorkspace().getId());
+        }
+        WorkspaceLlmModel byo = config.getWorkspaceModel();
+        return byo != null && isUsable(byo, config.getWorkspace().getId());
+    }
+
+    private boolean isUsable(LlmModel model, Long workspaceId) {
         boolean visible =
             model.getVisibility() == ModelVisibility.PUBLIC ||
             grantRepository.existsByIdModelIdAndIdWorkspaceId(model.getId(), workspaceId);
-        if (
-            !model.isEnabled() ||
-            !model.getConnection().isEnabled() ||
-            !isSupportedProtocol(model.getConnection().getApiProtocol()) ||
-            !visible
-        ) {
-            throw unavailable();
-        }
+        return (
+            model.isEnabled() &&
+            model.getConnection().isEnabled() &&
+            isSupportedProtocol(model.getConnection().getApiProtocol()) &&
+            visible
+        );
+    }
+
+    private boolean isUsable(WorkspaceLlmModel model, Long workspaceId) {
+        return (
+            model.isEnabled() &&
+            model.getConnection().isEnabled() &&
+            isSupportedProtocol(model.getConnection().getApiProtocol()) &&
+            model.getWorkspace().getId().equals(workspaceId)
+        );
     }
 
     private static IllegalStateException unavailable() {

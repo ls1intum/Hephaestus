@@ -51,8 +51,7 @@ declare module "@tanstack/react-router" {
 }
 
 export const Route = createRootRouteWithContext<MyRouterContext>()({
-	// Fallback tab title; the deepest match that sets its own `head` wins. The static <title> in
-	// index.html stays as the pre-hydration placeholder.
+	// Fallback tab title; the deepest match that sets its own `head` wins.
 	head: () => ({ meta: [{ title: "Hephaestus" }] }),
 	component: () => {
 		const { pathname } = useLocation();

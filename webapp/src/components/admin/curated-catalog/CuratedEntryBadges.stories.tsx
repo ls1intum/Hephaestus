@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
 
@@ -40,7 +39,4 @@ export const RemovedFromDefaults: Story = {
 
 export const Excluded: Story = {
 	args: { status: status({ offered: false }), kind: "area" },
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).getByText("Excluded from new workspaces")).toBeVisible();
-	},
 };

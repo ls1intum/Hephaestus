@@ -2,41 +2,44 @@ package de.tum.cit.aet.hephaestus.integration.slack.detection;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.handler.ConversationReviewSubmissionRequest;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
-import de.tum.cit.aet.hephaestus.agent.job.AgentJobService;
+import de.tum.cit.aet.hephaestus.agent.conversation.ConversationThreadCandidate;
+import de.tum.cit.aet.hephaestus.agent.job.ConversationReviewSubmitter;
 import de.tum.cit.aet.hephaestus.agent.job.conversation.ConversationThreadTriggerScheduler;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.slack.SlackConversationTestSupport;
 import de.tum.cit.aet.hephaestus.integration.slack.conversation.SlackConversationProjector;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
+import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
+import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
-import java.util.Optional;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.ArgumentMatcher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Conversation-detection integration tests (Testcontainers — the candidate scan rides a real Postgres
  * {@code bigint[]} column, the growth count rides lexicographic Slack-{@code ts} comparison, and the watermark
- * advance is a real UPDATE). {@link AgentJobService} is mocked so the enqueue is observable without seeding a
- * workspace/agent-config graph; the raw SQL the scheduler owns is exercised for real.
+ * advance is a real UPDATE). The fan-out is mocked so the sweep's decision is observable without seeding an
+ * agent-config graph; the raw SQL the scheduler owns, and the signal-ledger row it writes before deciding
+ * anything, are exercised for real.
  *
- * <p>Channel ingestion is off by default (a deliberate, privacy-sensitive parked capability), so this test — which
- * exercises subsystem B directly — enables it via {@code hephaestus.integration.slack.conversation-ingest.enabled}.
+ * <p>Channel ingestion is off by default (a deliberate, privacy-sensitive parked capability), so this test
+ * enables it via {@code hephaestus.integration.slack.conversation-ingest.enabled}.
  */
 @TestPropertySource(properties = "hephaestus.integration.slack.conversation-ingest.enabled=true")
 class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
@@ -50,19 +53,27 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
     @Autowired
     private JdbcTemplate jdbc;
 
-    @MockitoBean
-    private AgentJobService agentJobService;
+    /** Mocked here; its own unit test covers what it does with the participants it is handed. */
+    @MockitoSpyBean
+    private ConversationReviewSubmitter conversationReviewSubmitter;
 
-    // Distinct workspace ids per test → isolation in the shared container (no FK to a workspace row).
-    private static final AtomicLong WS_SEQ = new AtomicLong(9_500_000L);
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
 
+    private static final AtomicLong WS_SEQ = new AtomicLong();
+
+    /**
+     * A real {@code workspace} row per test. The Slack tables carry no foreign key to one, but the signal
+     * ledger the sweep writes to does, which is what lets an occurrence be joined to the workspace whose
+     * budget paid for it.
+     */
     private long newWorkspace() {
-        return WS_SEQ.incrementAndGet();
+        Workspace workspace = WorkspaceTestFixtures.activeWorkspace("conv-detect-" + WS_SEQ.incrementAndGet());
+        return workspaceRepository.save(workspace).getId();
     }
 
     private SlackConversationTestSupport support;
 
-    /** Add the raw-JDBC-only {@code slack_thread} columns to the entity-derived test schema — see {@link SlackConversationTestSupport}. */
     @BeforeEach
     void ensureUnmappedSlackThreadColumns() {
         support = new SlackConversationTestSupport(jdbc);
@@ -107,27 +118,32 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         seedMessage(ws, "C1", t2, rootTs);
         seedMessage(ws, "C1", lastTs, rootTs);
 
-        when(agentJobService.submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
-            Optional.of(new AgentJob())
-        );
+        doReturn(2L).when(conversationReviewSubmitter).submitAndSettle(any(), any());
 
         scheduler.detectNow();
 
-        ArgumentCaptor<ConversationReviewSubmissionRequest> captor = ArgumentCaptor.forClass(
-            ConversationReviewSubmissionRequest.class
-        );
-        verify(agentJobService, times(2)).submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), captor.capture());
-        assertThat(captor.getAllValues())
-            .extracting(ConversationReviewSubmissionRequest::aboutUserId)
-            .containsExactlyInAnyOrder(100L, 101L);
-        assertThat(captor.getAllValues()).allSatisfy(r -> {
-            assertThat(r.slackChannelId()).isEqualTo("C1");
-            assertThat(r.slackChannelName()).isEqualTo("engineering");
-            assertThat(r.slackThreadTs()).isEqualTo(rootTs);
-            assertThat(r.lastTs()).isEqualTo(lastTs);
-        });
+        ArgumentCaptor<ConversationThreadCandidate> captor = ArgumentCaptor.forClass(ConversationThreadCandidate.class);
+        verify(conversationReviewSubmitter).submitAndSettle(captor.capture(), argThat(keyIn(ws)));
+        ConversationThreadCandidate candidate = captor.getValue();
+        assertThat(candidate.participantMemberIds()).containsExactlyInAnyOrder(100L, 101L);
+        assertThat(candidate.channelId()).isEqualTo("C1");
+        assertThat(candidate.channelName()).isEqualTo("engineering");
+        assertThat(candidate.threadTs()).isEqualTo(rootTs);
+        assertThat(candidate.lastTs()).isEqualTo(lastTs);
 
-        // Watermark advanced to the thread's newest ts after enqueue → a no-growth re-sweep now enqueues nothing.
+        // The occurrence is in the ledger, which is what lets the artifact trace explain a conversation
+        // that nothing happened to.
+        Long recorded = jdbc.queryForObject(
+            "SELECT count(*) FROM artifact_signal WHERE workspace_id = ? AND artifact_kind = ?" +
+                " AND artifact_id > 0 AND signal_name = ?",
+            Long.class,
+            ws,
+            "chat.conversation_thread",
+            "chat.conversation_thread.settled"
+        );
+        assertThat(recorded).isEqualTo(1L);
+
+        // Watermark advanced to the thread's newest ts after enqueue → a no-growth re-sweep enqueues nothing.
         String watermark = jdbc.queryForObject(
             "SELECT last_reviewed_ts FROM slack_thread WHERE workspace_id = ? AND slack_channel_id = ? AND slack_thread_ts = ?",
             String.class,
@@ -155,7 +171,7 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
 
         scheduler.detectNow();
 
-        verify(agentJobService, times(0)).submit(eq(ws), eq(AgentJobType.CONVERSATION_REVIEW), any());
+        verify(conversationReviewSubmitter, times(0)).submitAndSettle(any(), argThat(keyIn(ws)));
     }
 
     @Test
@@ -176,6 +192,31 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
         assertThat(payload.get("messageCount").asInt()).isEqualTo(2);
         assertThat(payload.get("_meta").get("trustLevel").asString()).isEqualTo("UNTRUSTED_EXTERNAL");
         assertThat(payload.get("messages")).hasSize(2);
+    }
+
+    @Test
+    @DisplayName("thread truncation is reported only when messages exist beyond the projection limit")
+    void reportsExactTruncation() {
+        assertProjectedTruncation(100, false);
+        assertProjectedTruncation(101, true);
+    }
+
+    private void assertProjectedTruncation(int messageCount, boolean expected) {
+        long ws = newWorkspace();
+        long baseSecond = Instant.now().getEpochSecond() - 1200;
+        String rootTs = baseSecond + ".000000";
+        String lastTs = baseSecond + "." + String.format("%06d", messageCount - 1);
+        seedChannel(ws, "C1", "ACTIVE");
+        seedThread(ws, "C1", rootTs, lastTs, messageCount, "{100}");
+        for (int i = 0; i < messageCount; i++) {
+            String ts = baseSecond + "." + String.format("%06d", i);
+            seedMessage(ws, "C1", ts, i == 0 ? null : rootTs);
+        }
+
+        ObjectNode payload = projector.buildThreadPayload(ws, "C1", rootTs);
+
+        assertThat(payload.get("messages")).hasSize(100);
+        assertThat(payload.get("truncated").asBoolean()).isEqualTo(expected);
     }
 
     @Test
@@ -233,13 +274,19 @@ class ConversationThreadDetectionIntegrationTest extends BaseIntegrationTest {
             seedMessage(wsB, "C1", s + ".000000", s == baseSecond ? null : rootTs);
         }
 
-        when(agentJobService.submit(eq(wsB), eq(AgentJobType.CONVERSATION_REVIEW), any())).thenReturn(
-            Optional.of(new AgentJob())
-        );
+        doReturn(1L).when(conversationReviewSubmitter).submitAndSettle(any(), any());
 
         scheduler.detectNow();
 
-        verify(agentJobService, times(0)).submit(eq(wsA), any(), any());
-        verify(agentJobService, times(1)).submit(eq(wsB), eq(AgentJobType.CONVERSATION_REVIEW), any());
+        verify(conversationReviewSubmitter, times(0)).submitAndSettle(any(), argThat(keyIn(wsA)));
+        verify(conversationReviewSubmitter, times(1)).submitAndSettle(any(), argThat(keyIn(wsB)));
+    }
+
+    /**
+     * The sweep is cross-workspace by design and this class shares one database, so every assertion about
+     * it has to name the workspace it is about — otherwise a thread another test seeded satisfies it.
+     */
+    private static ArgumentMatcher<SignalKey> keyIn(long workspaceId) {
+        return key -> key != null && key.workspaceId() == workspaceId;
     }
 }

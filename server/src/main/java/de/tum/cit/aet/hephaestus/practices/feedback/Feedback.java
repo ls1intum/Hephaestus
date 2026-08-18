@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
@@ -29,7 +29,7 @@ import org.hibernate.annotations.Immutable;
         @Index(name = "idx_feedback_workspace", columnList = "workspace_id"),
         @Index(name = "idx_feedback_workspace_created", columnList = "workspace_id, created_at DESC, id DESC"),
         @Index(name = "idx_feedback_recipient_created", columnList = "recipient_user_id, created_at DESC"),
-        @Index(name = "idx_feedback_target", columnList = "artifact_type, artifact_id"),
+        @Index(name = "idx_feedback_target", columnList = "artifact_kind, artifact_id"),
         @Index(name = "idx_feedback_continuity", columnList = "thread_key"),
         @Index(name = "idx_feedback_replaces", columnList = "replaces_id"),
     }
@@ -52,9 +52,8 @@ public class Feedback {
     @Column(name = "workspace_id", nullable = false)
     private Long workspaceId;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "artifact_type", length = 32)
-    private WorkArtifact artifactType;
+    @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH)
+    private ArtifactKind artifactKind;
 
     @Column(name = "artifact_id")
     private Long artifactId;

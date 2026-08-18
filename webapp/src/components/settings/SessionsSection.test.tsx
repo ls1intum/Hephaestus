@@ -33,7 +33,7 @@ describe("SessionsSection", () => {
 
 		// The current session is badged and offers a disabled "Current" control, not a Revoke one.
 		const currentRow = rowByDevice("Chrome 124 on macOS");
-		expect(within(currentRow).getByText("This device")).toBeTruthy();
+		within(currentRow).getByText("This device");
 		const currentButton = within(currentRow).getByRole("button", { name: "Current session" });
 		expect((currentButton as HTMLButtonElement).disabled).toBe(true);
 	});
@@ -62,8 +62,8 @@ describe("SessionsSection", () => {
 			expect(screen.queryByText("Firefox 126 on Ubuntu")).toBeNull();
 		});
 		// Other non-current row survived; current device untouched.
-		expect(screen.getByText("Mobile Safari on iOS 18")).toBeTruthy();
-		expect(screen.getByText("Chrome 124 on macOS")).toBeTruthy();
+		screen.getByText("Mobile Safari on iOS 18");
+		screen.getByText("Chrome 124 on macOS");
 	});
 
 	it("only the clicked row shows a pending spinner (guards the per-row pending scope)", async () => {

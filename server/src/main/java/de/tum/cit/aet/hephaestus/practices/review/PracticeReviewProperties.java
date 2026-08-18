@@ -12,21 +12,25 @@ import org.springframework.validation.annotation.Validated;
  *
  * @param runForAllUsers      whether to run practice review for all PRs (true) or only for users
  *                            with the {@code run_practice_review} feature flag (false)
- * @param skipDrafts          whether to skip practice review for draft PRs
  * @param deliverToMerged     whether to deliver feedback to already-merged PRs
  * @param cooldownMinutes     minimum minutes between reviews for the same PR. 0 disables cooldown.
+ * @param maxRequestsPerRequesterPerHour
+ *                            how many reviews one person may ask for by hand, per workspace, per hour.
+ *                            The only limit here keyed on a person rather than on a piece of work, and
+ *                            therefore the only one that catches somebody asking for one review each of
+ *                            twenty colleagues' merge requests. 0 disables it.
  * @param progressFooter      append the cross-run progress-delta footer (B1/B3) and post the re-review
  *                            notifying reply (A4). Off by default; needs ≥2 runs on a target to render.
  * @param reactionSuppression drop re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE
- *                            (B2). Off by default; inert until a reaction exists for a recurring locus.
+ *                            . Off by default; inert until a reaction exists for a recurring locus.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
 public record PracticeReviewProperties(
     @DefaultValue("false") boolean runForAllUsers,
-    @DefaultValue("true") boolean skipDrafts,
     @DefaultValue("false") boolean deliverToMerged,
     @Min(0) @DefaultValue("15") int cooldownMinutes,
+    @Min(0) @DefaultValue("5") int maxRequestsPerRequesterPerHour,
     @DefaultValue("false") boolean progressFooter,
     @DefaultValue("false") boolean reactionSuppression
 ) {}

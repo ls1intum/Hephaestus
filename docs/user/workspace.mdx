@@ -25,7 +25,7 @@ If **Create workspace** is not available to you, ask an instance admin.
 How repository access is managed depends on the connection:
 
 - For a **GitHub App** workspace, change repository access in the app installation on GitHub. Hephaestus mirrors the repositories granted to the app.
-- For a **token-managed** workspace, a workspace admin can open **Admin → Integrations**, enter a repository as `owner/name`, and select **Add**. Removing a monitored repository permanently deletes the data Hephaestus mirrored from it; the upstream repository is not changed.
+- For a **token-managed** workspace, a workspace admin can open **Administration → Integrations**, enter a repository as `owner/name`, and select **Add**. Removing a monitored repository permanently deletes the data Hephaestus mirrored from it; the upstream repository is not changed.
 
 Initial sync time depends on the size and history of the connected repositories. Later changes are picked up by webhooks and scheduled reconciliation.
 

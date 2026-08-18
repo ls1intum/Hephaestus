@@ -20,9 +20,11 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
@@ -89,11 +91,12 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(workspace);
 
         Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("submit-test");
         practice.setName("Submit test");
         practice.setCriteria("Review the pull request");
-        practice.setTriggerEvents(OBJECT_MAPPER.createArrayNode().add("PullRequestCreated"));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practiceRepository.save(practice);
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("submit-test"));
@@ -103,7 +106,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
 
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         binding.setEnabled(true);
         binding.setInstanceModel(model);
         binding.setTimeoutSeconds(300);
@@ -202,7 +205,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isPresent();
@@ -210,7 +214,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             assertThat(job.getStatus()).isEqualTo(AgentJobStatus.QUEUED);
             assertThat(job.getJobType()).isEqualTo(AgentJobType.PULL_REQUEST_REVIEW);
             assertThat(job.getIdempotencyKey()).isEqualTo("pr_review:org/submit-repo:10:manual:abc123:detection");
-            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_DETECTION);
+            assertThat(job.getPurpose()).isEqualTo(AgentPurpose.PRACTICE_REVIEW);
             assertThat(job.getConfigSnapshot()).isNotNull();
             assertThat(job.getMetadata().get("pull_request_id").asLong()).isEqualTo(prId);
             assertThat(job.getMetadata().get("pr_number").asInt()).isEqualTo(10);
@@ -231,12 +235,14 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> first = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
             Optional<AgentJob> second = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(first).isPresent();
@@ -254,12 +260,14 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> first = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request1
+                request1,
+                null
             );
             Optional<AgentJob> second = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request2
+                request2,
+                null
             );
 
             assertThat(first).isPresent();
@@ -275,7 +283,7 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             // simulating a job created by a concurrent request before this one.
             AgentJob existing = new AgentJob();
             existing.setWorkspace(workspace);
-            existing.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+            existing.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             existing.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
             existing.setIdempotencyKey(
                 // per-phase key: must carry the "manual" phase to dedup against a manual submission
@@ -289,7 +297,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isPresent();
@@ -308,7 +317,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isEmpty();
@@ -323,7 +333,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isEmpty();
@@ -340,7 +351,8 @@ class AgentJobSubmissionIntegrationTest extends BaseIntegrationTest {
             Optional<AgentJob> result = agentJobService.submit(
                 workspace.getId(),
                 AgentJobType.PULL_REQUEST_REVIEW,
-                request
+                request,
+                null
             );
 
             assertThat(result).isPresent();

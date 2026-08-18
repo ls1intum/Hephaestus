@@ -4,12 +4,16 @@ import type {
 	CreatePracticeRequest,
 	Practice,
 	PracticeArea,
+	PracticeDefinitionOptions,
+	PracticeEvidenceOutcome,
 	UpdatePracticeRequest,
 } from "@/api/types.gen";
+import { soleBinding } from "@/components/admin/practice-catalog/bindings";
 import {
 	PracticeDefinitionForm,
 	type PracticeDefinitionValue,
 } from "@/components/admin/practice-catalog/PracticeDefinitionForm";
+import { PracticeAutomatedReviewValidationSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { buttonVariants } from "@/components/ui/button";
@@ -20,8 +24,10 @@ interface PracticeFormCreateProps {
 	mode: "create";
 	workspaceSlug: string;
 	areas: PracticeArea[];
-	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void;
+	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
+	onSubmit: (data: CreatePracticeRequest, areaSlug: string | null) => void | Promise<void>;
 	isPending: boolean;
+	definitionOptions: PracticeDefinitionOptions;
 	initialData?: never;
 }
 
@@ -30,8 +36,16 @@ interface PracticeFormEditProps {
 	workspaceSlug: string;
 	initialData: Practice;
 	areas: PracticeArea[];
-	onSubmit: (slug: string, data: UpdatePracticeRequest, areaSlug: string | null) => void;
+	/** Rejects when the save failed, which is what keeps the unsaved-changes guard honest. */
+	onSubmit: (
+		slug: string,
+		data: UpdatePracticeRequest,
+		areaSlug: string | null,
+	) => void | Promise<void>;
 	isPending: boolean;
+	definitionOptions: PracticeDefinitionOptions;
+	/** Absent until the practice has been reviewed at least once. */
+	evidenceOutcome?: PracticeEvidenceOutcome;
 }
 
 export type PracticeFormProps = PracticeFormCreateProps | PracticeFormEditProps;
@@ -47,18 +61,18 @@ function asDefinitionValue(practice: Practice): PracticeDefinitionValue {
 	return {
 		slug: practice.slug,
 		name: practice.name,
-		artifactType: practice.artifactType,
-		triggerEvents: practice.triggerEvents,
+		bindings: [soleBinding(practice.bindings)],
 		criteria: practice.criteria,
 		...(practice.areaSlug ? { areaSlug: practice.areaSlug } : {}),
 		...(practice.whyItMatters ? { whyItMatters: practice.whyItMatters } : {}),
 		...(practice.whatGoodLooksLike ? { whatGoodLooksLike: practice.whatGoodLooksLike } : {}),
 		...(practice.precomputeScript ? { precomputeScript: practice.precomputeScript } : {}),
+		automatedReviewPolicy: practice.automatedReviewPolicy,
 	};
 }
 
 export function PracticeForm(props: PracticeFormProps) {
-	const { mode, workspaceSlug, areas, isPending, initialData } = props;
+	const { mode, workspaceSlug, areas, isPending, initialData, definitionOptions } = props;
 	const cancelAction = (
 		<Link
 			to="/w/$workspaceSlug/admin/practices"
@@ -72,24 +86,23 @@ export function PracticeForm(props: PracticeFormProps) {
 	const submit = (value: PracticeDefinitionValue) => {
 		const { areaSlug, ...definition } = value;
 		if (props.mode === "create") {
-			props.onSubmit(definition, areaSlug ?? null);
-			return;
+			return props.onSubmit(definition, areaSlug ?? null);
 		}
 
 		const clear: NonNullable<UpdatePracticeRequest["clear"]> = [];
 		if (!definition.precomputeScript) clear.push("PRECOMPUTE_SCRIPT");
 		if (!definition.whyItMatters) clear.push("WHY_IT_MATTERS");
 		if (!definition.whatGoodLooksLike) clear.push("WHAT_GOOD_LOOKS_LIKE");
-		props.onSubmit(
+		return props.onSubmit(
 			props.initialData.slug,
 			{
 				name: definition.name,
 				criteria: definition.criteria,
-				triggerEvents: definition.triggerEvents,
-				artifactType: definition.artifactType,
+				bindings: definition.bindings,
 				whyItMatters: definition.whyItMatters,
 				whatGoodLooksLike: definition.whatGoodLooksLike,
 				precomputeScript: definition.precomputeScript,
+				automatedReviewPolicy: definition.automatedReviewPolicy,
 				clear: clear.length > 0 ? clear : undefined,
 			},
 			areaSlug ?? null,
@@ -101,18 +114,33 @@ export function PracticeForm(props: PracticeFormProps) {
 				<Separator />
 				<section className="space-y-4">
 					<div>
-						<h2 className="text-lg font-semibold">Review results</h2>
+						<h2 className="text-lg font-semibold">What the author declared</h2>
 						<p className="text-sm text-muted-foreground">
-							View every finding this practice produced across the workspace.
+							The requirements above are the author's own claim about this practice. Nobody has
+							checked them independently, and nothing here says the observations recorded under it
+							are correct. The digests record the exact rules that were declared, so a later change
+							to them is visible rather than silent.
+						</p>
+					</div>
+					<PracticeAutomatedReviewValidationSummary
+						validation={initialData.automatedReviewValidation}
+					/>
+				</section>
+				<Separator />
+				<section className="space-y-4">
+					<div>
+						<h2 className="text-lg font-semibold">What the reviews observed</h2>
+						<p className="text-sm text-muted-foreground">
+							Every observation recorded for this practice across the workspace.
 						</p>
 					</div>
 					<Link
-						to="/w/$workspaceSlug/admin/practices/reviews/findings"
+						to="/w/$workspaceSlug/admin/practices/reviews/observations"
 						params={{ workspaceSlug }}
 						search={{ practiceSlug: [initialData.slug] }}
 						className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
 					>
-						View findings
+						View observations
 					</Link>
 				</section>
 			</>
@@ -125,6 +153,7 @@ export function PracticeForm(props: PracticeFormProps) {
 					mode="create"
 					areas={areas}
 					isPending={isPending}
+					definitionOptions={definitionOptions}
 					cancelAction={cancelAction}
 					onSubmit={submit}
 				/>
@@ -134,8 +163,10 @@ export function PracticeForm(props: PracticeFormProps) {
 					initialData={asDefinitionValue(initialData)}
 					areas={areas}
 					isPending={isPending}
+					definitionOptions={definitionOptions}
 					cancelAction={cancelAction}
 					afterFields={reviewResults}
+					evidenceOutcome={props.mode === "edit" ? props.evidenceOutcome : undefined}
 					onSubmit={submit}
 				/>
 			)}
@@ -165,8 +196,8 @@ export function PracticeFormShell({
 				title={mode === "create" ? "Create practice" : `Edit: ${practiceName ?? "practice"}`}
 				description={
 					mode === "create"
-						? "Define what Hephaestus should look for in reviewed work."
-						: "Update how this practice evaluates reviewed work."
+						? "Define a way of working and choose how it is reviewed."
+						: "Update this practice's review rules and developer guidance."
 				}
 			/>
 			{children}

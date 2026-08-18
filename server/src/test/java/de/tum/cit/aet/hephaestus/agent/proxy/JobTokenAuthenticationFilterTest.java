@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.proxy;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
@@ -351,11 +352,9 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
             request.addHeader("Authorization", "Bearer " + VALID_TOKEN);
             var response = new MockHttpServletResponse();
 
-            try {
-                filter.doFilterInternal(request, response, filterChain);
-            } catch (jakarta.servlet.ServletException expected) {
-                // no-op
-            }
+            assertThatThrownBy(() -> filter.doFilterInternal(request, response, filterChain)).isInstanceOf(
+                jakarta.servlet.ServletException.class
+            );
 
             assertThat(SecurityContextHolder.getContext().getAuthentication()).isNull();
         }
@@ -382,7 +381,6 @@ class JobTokenAuthenticationFilterTest extends BaseUnitTest {
 
             filter.doFilterInternal(request, response, filterChain);
 
-            // Uses getRemoteAddr(), not X-Forwarded-For
             assertThat(response.getStatus()).isEqualTo(HttpServletResponse.SC_FORBIDDEN);
             verify(filterChain, never()).doFilter(any(), any());
         }

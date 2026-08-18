@@ -13,9 +13,9 @@ un-priced review shows as "2 runs aren't counted in these totals", and the break
 
 Other copy is clearer about what to do next:
 
-- When a shared-model budget is reached, the banner now says practice detection and Mentor can keep
+- When a shared-model budget is reached, the banner now says practice reviews and Mentor can keep
   running on your own models, and links straight to AI models.
-- "Bound model cannot run" is now "Practice detection's model is unavailable", with a plain reason.
+- "Bound model cannot run" is now "The review model is unavailable", with a plain reason.
 - A workspace's status in the instance table names the money stream that stopped it ("Paused ·
   shared models" / "Paused · own provider") instead of an internal cap name.
 

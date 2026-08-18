@@ -5,10 +5,11 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.LocusObservation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.RunRef;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
@@ -37,7 +38,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
     private static final Long TARGET = 100L;
 
     private void stubTwoTargetRuns() {
-        when(repo.findRecentRunRefsForTarget(eq(WorkArtifact.PULL_REQUEST), eq(TARGET), eq(WS), any())).thenReturn(
+        when(repo.findRecentRunRefsForTarget(eq(ArtifactKinds.PULL_REQUEST), eq(TARGET), eq(WS), any())).thenReturn(
             List.of(
                 runRef(JOB_CURR, Instant.parse("2026-06-15T10:00:00Z")),
                 runRef(JOB_PREV, Instant.parse("2026-06-14T10:00:00Z"))
@@ -58,7 +59,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.countNew()).isEqualTo(1);
         assertThat(d.countResolved()).isEqualTo(1);
@@ -70,7 +71,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         assertThat(status(d, "keyZ")).isEqualTo(TransitionStatus.NEW);
         // a RESOLVED locus carries the PRIOR run's prose (it is absent now; that is what the student last saw)
         LocusTransition resolved = transition(d, "keyY");
-        assertThat(resolved.title()).isEqualTo("Y title");
+        assertThat(resolved.summary()).isEqualTo("Y title");
         assertThat(resolved.priorAssessment()).isEqualTo(Assessment.BAD);
         assertThat(resolved.currentAssessment()).isNull();
     }
@@ -89,7 +90,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.countResolved()).isEqualTo(1);
         assertThat(d.resolved().get(0).recurrenceKey()).isEqualTo("keyB");
@@ -109,7 +110,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         // Only the BAD-new counts as a "new problem"; the new strength does not.
         assertThat(d.countNew()).isEqualTo(1);
@@ -127,7 +128,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(status(d, "keyS")).isEqualTo(TransitionStatus.PERSISTED);
         assertThat(d.countPersisted()).isZero(); // now satisfied → not "still open"
@@ -145,7 +146,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.countPersisted()).isEqualTo(1);
         assertThat(d.countNew() + d.countResolved() + d.countRegressed()).isZero();
@@ -166,7 +167,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.transitions().stream().map(LocusTransition::status).toList()).containsExactly(
             TransitionStatus.REGRESSED,
@@ -195,7 +196,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.countRegressed()).isEqualTo(1);
         LocusTransition t = d.transitions().get(0);
@@ -214,7 +215,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.countRegressed()).isZero();
         assertThat(d.countResolved()).isZero();
@@ -235,7 +236,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.transitions()).hasSize(1);
         assertThat(d.transitions().get(0).currentSeverity()).isEqualTo(Severity.CRITICAL);
@@ -257,7 +258,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             )
         );
 
-        TrendDelta d = service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS).orElseThrow();
+        TrendDelta d = service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS).orElseThrow();
 
         assertThat(d.transitions()).hasSize(1);
         LocusTransition t = d.transitions().get(0);
@@ -268,11 +269,11 @@ class ObservationTrendServiceTest extends BaseUnitTest {
 
     @Test
     void computeForTarget_singleRun_returnsEmpty() {
-        when(repo.findRecentRunRefsForTarget(eq(WorkArtifact.PULL_REQUEST), eq(TARGET), eq(WS), any())).thenReturn(
+        when(repo.findRecentRunRefsForTarget(eq(ArtifactKinds.PULL_REQUEST), eq(TARGET), eq(WS), any())).thenReturn(
             List.of(runRef(JOB_CURR, Instant.parse("2026-06-15T10:00:00Z")))
         );
 
-        assertThat(service.computeForTarget(WorkArtifact.PULL_REQUEST, TARGET, WS)).isEmpty();
+        assertThat(service.computeForTarget(ArtifactKinds.PULL_REQUEST, TARGET, WS)).isEmpty();
     }
 
     private static TransitionStatus status(TrendDelta d, String key) {
@@ -318,7 +319,7 @@ class ObservationTrendServiceTest extends BaseUnitTest {
         Assessment assessment = switch (v) {
             case PRESENT -> Assessment.GOOD;
             case ABSENT -> Assessment.BAD;
-            case NOT_APPLICABLE -> null;
+            case NOT_APPLICABLE, INCONCLUSIVE -> null;
         };
         return locusFull(job, key, v, assessment, sev, conf, slug, title);
     }
@@ -364,17 +365,12 @@ class ObservationTrendServiceTest extends BaseUnitTest {
             }
 
             @Override
-            public Float getConfidence() {
-                return conf;
-            }
-
-            @Override
             public String getPracticeSlug() {
                 return slug;
             }
 
             @Override
-            public String getTitle() {
+            public String getSummary() {
                 return title;
             }
 

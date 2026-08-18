@@ -8,8 +8,11 @@ import de.tum.cit.aet.hephaestus.agent.catalog.LlmAuthMode;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditAction;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditActorKind;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -61,7 +64,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // Untouched fields must survive into the snapshot, or the "from what to what" is a lie.
         // Present AND null, not absent: null is "inherit the fleet default", so a serializer that
         // dropped null keys would make clearing an override indistinguishable from never setting one.
-        assertThat(row.getNewValue()).contains("\"skipDrafts\":null").contains("\"cooldownMinutes\":45");
+        assertThat(row.getNewValue()).contains("\"runForAllUsers\":null").contains("\"cooldownMinutes\":45");
         // Through the real filter chain (JWT -> CurrentAccount -> actor): USER, not SYSTEM, because a
         // signed-in admin did this. The id stays null because the test harness mints a non-numeric
         // subject; production subjects are always the account id.
@@ -110,8 +113,8 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
                     "focused-reviews",
                     "name",
                     "Focused reviews",
-                    "triggerEvents",
-                    List.of("PullRequestCreated"),
+                    "bindings",
+                    PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST),
                     "criteria",
                     "Initial private criteria",
                     "precomputeScript",
@@ -239,14 +242,14 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
     void filteringByChangedKeyNarrowsToOneControl() {
         Workspace workspace = setupWorkspace("audit-filter");
         patchPracticeReview(workspace, Map.of("cooldownMinutes", 45));
-        patchPracticeReview(workspace, Map.of("skipDrafts", true));
+        patchPracticeReview(workspace, Map.of("deliverToMerged", true));
 
         webTestClient
             .get()
             .uri(uri ->
                 uri
                     .path("/workspaces/{slug}/config-audit")
-                    .queryParam("changedKey", "skipDrafts")
+                    .queryParam("changedKey", "deliverToMerged")
                     .build(workspace.getWorkspaceSlug())
             )
             .headers(TestAuthUtils.withCurrentUser())
@@ -257,7 +260,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
             .jsonPath("$.content.length()")
             .isEqualTo(1)
             .jsonPath("$.content[0].changedKeys[0]")
-            .isEqualTo("skipDrafts");
+            .isEqualTo("deliverToMerged");
     }
 
     @Test

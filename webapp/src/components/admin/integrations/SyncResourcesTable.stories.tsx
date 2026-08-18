@@ -1,7 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { useState } from "react";
+import { type ComponentProps, useState } from "react";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { SyncResourceState } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { SCM_CLASS_KEYS, SyncResourcesTable } from "./SyncResourcesTable";
 
 const minutesAgo = (minutes: number) => new Date(Date.now() - minutes * 60_000);
@@ -253,7 +254,11 @@ const facetMix: SyncResourceState[] = [
 	},
 ];
 
-function FacetFallbackHarness() {
+/**
+ * Swaps the row set on click, so `resources` is the one prop the story owns rather than passes.
+ * Everything else still arrives as args, so the Controls panel keeps working.
+ */
+function FacetFallbackHarness(props: Omit<ComponentProps<typeof SyncResourcesTable>, "resources">) {
 	const [healed, setHealed] = useState(false);
 	const withAttention: SyncResourceState[] = [
 		{
@@ -287,13 +292,7 @@ function FacetFallbackHarness() {
 			<button type="button" onClick={() => setHealed(true)}>
 				Heal the stale row
 			</button>
-			<SyncResourcesTable
-				resources={healed ? allFresh : withAttention}
-				resourceNoun="repository"
-				resourceNounPlural="repositories"
-				syncIntervalSeconds={SYNC_INTERVAL_SECONDS}
-				expectedClassKeys={SCM_CLASS_KEYS}
-			/>
+			<SyncResourcesTable {...props} resources={healed ? allFresh : withAttention} />
 		</div>
 	);
 }
@@ -315,48 +314,43 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		for (const name of ["Issues", "PRs", "Reviews", "Comments", "Commits"]) {
-			await expect(canvas.getByRole("columnheader", { name })).toBeInTheDocument();
+			canvas.getByRole("columnheader", { name });
 		}
-		await expect(canvas.getByRole("columnheader", { name: "Last synced" })).toBeInTheDocument();
+		canvas.getByRole("columnheader", { name: "Last synced" });
 		await expect(canvas.queryByRole("columnheader", { name: "Items" })).toBeNull();
 		await expect(canvas.queryByRole("columnheader", { name: "State" })).toBeNull();
 		await expect(canvas.queryByRole("columnheader", { name: /synced through/i })).toBeNull();
 
-		await expect(canvas.getByText("ls1intum/Artemis")).toBeInTheDocument();
+		canvas.getByText("ls1intum/Artemis");
 
-		await expect(canvas.getByRole("row", { name: /legacy-mirror/ })).toBeInTheDocument();
+		canvas.getByRole("row", { name: /legacy-mirror/ });
 	},
 };
 
 export const WatermarkDivergence: Story = {
 	args: { resources: divergent },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByLabelText(/further behind/)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByLabelText(/further behind/);
 
 		await userEvent.hover(canvas.getByText(/ago$/));
-		await expect(await screen.findByText("Pull requests")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Pull requests"));
 	},
 };
 
 export const ZeroCommentsAgainstManyIssues: Story = {
 	args: { resources: zeroCommentsFleet },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const totals = canvas.getByRole("row", { name: /All repositories/ });
 		await userEvent.hover(within(totals).getByText("0"));
-		await expect(await screen.findByText(/pipeline may not be running/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/pipeline may not be running/i));
 	},
 };
 
 export const SeventyOneRepositories: Story = {
 	args: { resources: manyRepos },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	play: async ({ canvas, canvasElement }) => {
 		const container = canvasElement.querySelector<HTMLElement>('[data-slot="table-container"]');
 		await expect(container).not.toBeNull();
 		if (container) {
@@ -366,11 +360,11 @@ export const SeventyOneRepositories: Story = {
 			await expect(container.scrollHeight).toBeGreaterThan(container.clientHeight);
 		}
 
-		await expect(canvas.getByRole("row", { name: /legacy-mirror/ })).toBeInTheDocument();
+		canvas.getByRole("row", { name: /legacy-mirror/ });
 
 		const search = canvas.getByRole("searchbox");
 		await userEvent.type(search, "legacy");
-		await expect(canvas.getByText(/1 of 71 repositories/i)).toBeInTheDocument();
+		canvas.getByText(/1 of 71 repositories/i);
 	},
 };
 
@@ -387,35 +381,29 @@ export const NeverSynced: Story = {
 			},
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Issues" })).toBeInTheDocument();
-		await expect(canvas.getByText("0 Issues")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("0 Issues");
 
-		await expect(canvas.getByText("Never")).toBeInTheDocument();
+		canvas.getByText("Never");
 		await userEvent.hover(canvas.getByText("Never"));
-		await expect(await screen.findByText(/has not synced yet/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/has not synced yet/i));
 	},
 };
 
 export const Backfilling: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/backfilling · 62%/i)).toBeInTheDocument();
-		await expect(
-			canvas.getByRole("progressbar", { name: /backfill progress for ls1intum\/aeolus/i }),
-		).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/backfilling · 62%/i);
+		canvas.getByRole("progressbar", { name: /backfill progress for ls1intum\/aeolus/i });
 	},
 };
 
 export const RowHover: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.hover(canvas.getByText("ls1intum/Artemis"));
-		await expect(await screen.findByText("Items")).toBeInTheDocument();
-		await expect(await screen.findByText(/no backfill has run/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("Items"));
+		await expectSettledVisible(await screen.findByText(/no backfill has run/i));
 	},
 };
 
@@ -426,16 +414,15 @@ export const SlackChannels: Story = {
 		resourceNounPlural: "channels",
 		expectedClassKeys: ["messages"],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Messages" })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("columnheader", { name: "Messages" });
 		await expect(canvas.queryByRole("columnheader", { name: "Issues" })).toBeNull();
-		await expect(canvas.getByText("#engineering")).toBeInTheDocument();
-		await expect(canvas.getByText("C0123ABCD")).toBeInTheDocument();
-		await expect(canvas.getByText("All channels")).toBeInTheDocument();
+		canvas.getByText("#engineering");
+		canvas.getByText("C0123ABCD");
+		canvas.getByText("All channels");
 
 		const firstRow = canvas.getByRole("row", { name: /#design/ });
-		await expect(within(firstRow).getByRole("button", { name: /very stale/i })).toBeInTheDocument();
+		within(firstRow).getByRole("button", { name: /very stale/i });
 	},
 };
 
@@ -446,20 +433,19 @@ export const OutlineCollections: Story = {
 		resourceNounPlural: "collections",
 		expectedClassKeys: ["documents"],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("columnheader", { name: "Documents" })).toBeInTheDocument();
-		await expect(canvas.getByText("Engineering Handbook")).toBeInTheDocument();
-		await expect(canvas.getByText("col_handbook")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("columnheader", { name: "Documents" });
+		canvas.getByText("Engineering Handbook");
+		canvas.getByText("col_handbook");
 
 		const firstRow = canvas.getByRole("row", { name: /Archived Notes/ });
-		await expect(within(firstRow).getByRole("button", { name: /very stale/i })).toBeInTheDocument();
+		within(firstRow).getByRole("button", { name: /very stale/i });
 
 		await userEvent.hover(canvas.getByText("Engineering Handbook"));
-		await expect(await screen.findByText("350 items")).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText("350 items"));
 
 		await userEvent.hover(canvas.getByRole("button", { name: /error for archived notes/i }));
-		await expect(await screen.findByText(/api token was revoked/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/api token was revoked/i));
 	},
 };
 
@@ -473,41 +459,37 @@ export const NoCadence: Story = {
 
 export const FilteredEmpty: Story = {
 	args: { resources },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.type(canvas.getByRole("searchbox"), "zzz-no-such-repo");
-		await expect(canvas.getByText(/no repositories match/i)).toBeInTheDocument();
+		canvas.getByText(/no repositories match/i);
 
 		await userEvent.click(canvas.getByRole("button", { name: /clear filter/i }));
-		await expect(canvas.getByText("ls1intum/Artemis")).toBeInTheDocument();
+		canvas.getByText("ls1intum/Artemis");
 	},
 };
 
 export const AttentionFilter: Story = {
 	args: { resources: facetMix },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
-		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("acme/fresh-service");
+		canvas.getByText("acme/stale-service");
 
 		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
-		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		canvas.getByText("acme/stale-service");
 		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /fresh \(1\)/i }));
-		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
+		canvas.getByText("acme/fresh-service");
 		await expect(canvas.queryByText("acme/stale-service")).not.toBeInTheDocument();
 	},
 };
 
 export const AttentionFacetFallsBackWhenCleared: Story = {
 	args: { resources: [] },
-	render: () => <FacetFallbackHarness />,
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-
+	render: ({ resources: _ownedByTheHarness, ...args }) => <FacetFallbackHarness {...args} />,
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /attention \(1\)/i }));
-		await expect(canvas.getByText("acme/stale-service")).toBeInTheDocument();
+		canvas.getByText("acme/stale-service");
 		await expect(canvas.queryByText("acme/fresh-service")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: /heal the stale row/i }));
@@ -516,7 +498,7 @@ export const AttentionFacetFallsBackWhenCleared: Story = {
 		await expect(
 			canvas.queryByText(/no repositories match the current filter/i),
 		).not.toBeInTheDocument();
-		await expect(canvas.getByText("acme/fresh-service")).toBeInTheDocument();
+		canvas.getByText("acme/fresh-service");
 	},
 };
 

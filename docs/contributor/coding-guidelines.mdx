@@ -20,13 +20,13 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ### Platform overview
 
-- React 19.1 with Vite 6 and `@vitejs/plugin-react`.
+- React 19 on Vite. Read the pinned versions from `webapp/package.json`; they move faster than this page.
 - `babel-plugin-react-compiler` runs first in `vite.config.js`. Leave it there so the compiler stays active.
 - Routing uses TanStack Router file routes in `src/routes/**` with the generated `routeTree.gen.ts`.
 - TanStack Query v5 is initialised in `src/integrations/tanstack-query/root-provider.tsx`. OpenAPI helpers live in `src/api/@tanstack/react-query.gen.ts`.
 - Global state lives in Zustand stores under `src/stores/**`.
 - Tailwind CSS 4 powers styling. Tokens sit in `src/styles.css`. shadcn/ui primitives live in `src/components/ui/**`.
-- Storybook 8, Chromatic, Vitest, and Biome cover tooling.
+- Storybook, Chromatic, Vitest, and Biome cover tooling.
 
 ### Building features
 
@@ -52,10 +52,10 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 
 ### Structure
 
-- Feature packages live under `integration/scm/`, `leaderboard/`, `mentor/`, `notification/`, `syncing/`, and `workspace/`. Shared wiring sits in `config/` and `core/`. Cross-cutting integration traits (webhook ingress, oauth ingress, SPI, registry) live under `integration/` directly.
+- Feature packages sit directly under `de.tum.cit.aet.hephaestus` — `practices/`, `evidence/`, `agent/`, `integration/`, `mentor/`, `workspace/`, `leaderboard/` and the rest. Shared wiring sits in `config/` and `core/`. Cross-cutting integration traits (webhook ingress, oauth ingress, SPI, registry) live under `integration/` directly. `ls` the package root rather than trusting a list here.
 - Controllers return DTOs located near the controller. `LeaderboardEntryDTO` is the reference example.
 - Repositories return `Optional<T>` instead of `null`.
-- Services use field injection with `@Autowired`, as in `LeaderboardService`. If a service depends on many collaborators, split the responsibility.
+- Services take their collaborators through the constructor, over `private final` fields; field injection with `@Autowired` is not used. If a service depends on many collaborators, split the responsibility.
 - Set up loggers with `LoggerFactory.getLogger`. Use structured log messages.
 - Annotate the smallest unit of write work with `@Transactional`.
 
@@ -72,13 +72,15 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
 - Share long-lived infrastructure in tests. Lean on Testcontainers and GitHub fixtures where possible.
 - After updating Liquibase migrations, regenerate the REST client with `pnpm run generate:api` and rerun `pnpm run db:generate-erd-docs`.
 - Run the modular test suites with `./mvnw verify`. The build uses ArchUnit checks to enforce package boundaries.
-- Prefer integration tests that extend `AbstractSpringIntegrationTest` when you touch persistence logic.
+- Prefer integration tests that extend `BaseIntegrationTest`, or `AbstractWorkspaceIntegrationTest` for anything workspace-scoped, when you touch persistence logic. See [Testing](./testing.mdx).
 
 ## Webhook receiver (`server/.../integration/core/webhook/`)
 
-- Pure verifier/builder classes (`HmacVerifier`, `GitLabTokenVerifier`, `GitLabSubjectBuilder`,
-  `GitHubSubjectBuilder`, `DedupIdResolver`) — Spring-free; exercised by JUnit unit tests plus
-  parameterised tests over the captured fixtures in `server/src/test/resources/{github,gitlab}/`.
+- The provider-specific verifiers and subject parsers are Spring-free and live with their provider,
+  under `integration/scm/github/webhook/` and `integration/scm/gitlab/webhook/`; `integration/core/webhook/`
+  holds the shared ingress — the controller, the ingest pipeline, the JetStream publisher and its
+  bootstrap. All are exercised by JUnit unit tests plus parameterised tests over the captured fixtures in
+  `server/src/test/resources/{github,gitlab}/`.
 - HMAC verification: `MessageDigest.isEqual` (constant-time, length-tolerant); hex via
   `java.util.HexFormat.of()` only — enforced by ArchUnit (`HexEncodingArchTest`). Case-folding
   uses `Locale.ROOT` everywhere — enforced by `LocaleSafetyArchTest`.
@@ -86,7 +88,8 @@ These guidelines keep every service aligned. Keep changes focused. Mention any d
   `RuntimeRole.WEBHOOK_PROPERTY`. Production runs them in the dedicated `webhook-server`
   container (`SPRING_PROFILES_ACTIVE=prod,webhook`) for restart independence — see ADR 0008.
 - Configuration is shared with auto-registration: `core.webhook.WebhookProperties` bound to
-  `hephaestus.webhook.*`. JaCoCo package coverage gate ≥ 0.95 branch on `integration.core.webhook`.
+  `hephaestus.webhook.*`. The webhook packages carry per-package JaCoCo branch floors, declared in
+  `server/pom.xml`; read them there rather than from a copy.
 
 ## Docs site (`/docs`)
 

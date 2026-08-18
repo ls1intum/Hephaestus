@@ -1,24 +1,31 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeDefinitionOptions,
+	mockPullRequestBinding,
+	mockPullRequestPolicy,
+} from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { CuratedPracticeForm } from "./CuratedPracticeForm";
+import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
 
 const areas = [
 	{ slug: "communication", name: "Communication" },
 	{ slug: "version-control", name: "Version control" },
 ];
 
-const initialData = {
+const initialData: CuratedPracticeFormInitialValue = {
 	slug: "clear-pr-description",
 	name: "Write a clear pull request description",
-	artifactType: "PULL_REQUEST" as const,
 	areaSlug: "communication",
-	triggerEvents: ["PullRequestCreated", "PullRequestReady"],
-	criteria: "Assess whether the description explains the purpose, approach, and testing.",
+	bindings: [mockPullRequestBinding],
+	criteria: "Review whether the description explains the purpose, approach, and testing.",
 	whyItMatters: "Reviewers should not need to reconstruct the author's intent.",
 	whatGoodLooksLike: "The description states why, what changed, and how it was verified.",
 	precomputeScript: "export default function precompute() { return {}; }",
+	automatedReviewPolicy: mockPullRequestPolicy,
+	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	status: {
 		etag: "tag",
 		state: "FROM_HEPHAESTUS" as const,
@@ -36,6 +43,7 @@ const meta = {
 	},
 	decorators: [withStandardPage],
 	tags: ["autodocs"],
+	args: { definitionOptions: mockPracticeDefinitionOptions },
 } satisfies Meta<typeof CuratedPracticeForm>;
 
 export default meta;
@@ -95,9 +103,11 @@ export const HephaestusUpdateAvailable: Story = {
 			},
 			shipped: {
 				name: "Say what changed and why",
-				artifactType: "PULL_REQUEST",
-				triggerEvents: ["PullRequestCreated"],
+				artifactKind: "scm.pull_request",
+				bindings: [mockPullRequestBinding],
 				criteria: "The updated default criteria",
+				automatedReviewPolicy: mockPullRequestPolicy,
+				automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 				whyItMatters: "So a reviewer can start from intent rather than diff archaeology.",
 			},
 		},
@@ -108,7 +118,8 @@ export const HephaestusUpdateAvailable: Story = {
 		onSubmit: fn(),
 	},
 	play: async ({ canvas, userEvent }) => {
-		await expect(canvas.getByText("Hephaestus update available")).toBeVisible();
+		// The full label, since colour alone cannot carry which kind of update it is.
+		await expect(canvas.getByText("Hephaestus update available: review behavior")).toBeVisible();
 		await expect(canvas.getByText(/would change review behavior/)).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Review Hephaestus update" })).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Apply Hephaestus update" })).toBeVisible();
@@ -130,7 +141,7 @@ export const ValidationErrors: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Create practice" }));
 		await expect(canvas.getByText("Name must be at least 3 characters")).toBeVisible();
-		await expect(canvas.getByText("Select at least one trigger event")).toBeVisible();
+		await expect(canvas.queryByText("Select at least one trigger event")).not.toBeInTheDocument();
 		await expect(canvas.getByRole("textbox", { name: /Name/ })).toHaveAttribute(
 			"aria-describedby",
 			"practice-name-error",

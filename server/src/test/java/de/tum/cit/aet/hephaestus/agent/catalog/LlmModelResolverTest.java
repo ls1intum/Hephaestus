@@ -63,7 +63,7 @@ class LlmModelResolverTest extends BaseUnitTest {
         workspace.setId(30L);
         WorkspaceAgentBinding binding = new WorkspaceAgentBinding();
         binding.setWorkspace(workspace);
-        binding.setPurpose(AgentPurpose.PRACTICE_DETECTION);
+        binding.setPurpose(AgentPurpose.PRACTICE_REVIEW);
         return binding;
     }
 

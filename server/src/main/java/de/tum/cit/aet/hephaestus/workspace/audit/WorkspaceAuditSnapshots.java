@@ -6,13 +6,14 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
 import java.time.Instant;
 import org.jspecify.annotations.Nullable;
 
-/** Audit snapshots for workspace-administration changes. Records carry no secrets — a token rotation
- *  snapshots only that a token is set, never its value. */
+/**
+ * Audit snapshots for workspace-administration changes. Records carry no secrets — a token rotation
+ * snapshots only that a token is set, never its value.
+ */
 public final class WorkspaceAuditSnapshots {
 
     private WorkspaceAuditSnapshots() {}
 
-    /** The eight workspace feature flags. */
     public record FeaturesSnapshot(
         @Nullable Boolean practicesEnabled,
         @Nullable Boolean mentorEnabled,
@@ -37,7 +38,6 @@ public final class WorkspaceAuditSnapshots {
         }
     }
 
-    /** Whether the workspace is publicly viewable. */
     public record VisibilitySnapshot(@Nullable Boolean publiclyViewable) implements ConfigAuditSnapshot {}
 
     /** Presence of a stored SCM token — never the token itself. */
@@ -47,10 +47,8 @@ public final class WorkspaceAuditSnapshots {
         @Nullable Instant rotatedAt
     ) implements ConfigAuditSnapshot {}
 
-    /** A member's role in the workspace. */
     public record RoleSnapshot(@Nullable String role, boolean hidden) implements ConfigAuditSnapshot {}
 
-    /** The workspace lifecycle status. */
     public record StatusSnapshot(@Nullable String status) implements ConfigAuditSnapshot {
         public static StatusSnapshot of(Workspace w) {
             return new StatusSnapshot(w.getStatus() == null ? null : w.getStatus().name());

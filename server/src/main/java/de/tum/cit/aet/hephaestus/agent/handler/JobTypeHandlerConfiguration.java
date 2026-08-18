@@ -1,15 +1,17 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import java.util.List;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
@@ -29,7 +31,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class JobTypeHandlerConfiguration {
 
     private final JsonMapper objectMapper;
-    private final GitRepositoryManager gitRepositoryManager;
+    private final ContentAddressedStore contentAddressedStore;
     private final PracticeReviewProperties reviewProperties;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
@@ -37,14 +39,14 @@ public class JobTypeHandlerConfiguration {
 
     JobTypeHandlerConfiguration(
         JsonMapper objectMapper,
-        GitRepositoryManager gitRepositoryManager,
+        ContentAddressedStore contentAddressedStore,
         PracticeReviewProperties reviewProperties,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
         ReactionSuppressionFilter reactionSuppressionFilter
     ) {
         this.objectMapper = objectMapper;
-        this.gitRepositoryManager = gitRepositoryManager;
+        this.contentAddressedStore = contentAddressedStore;
         this.reviewProperties = reviewProperties;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
@@ -57,7 +59,7 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    PullRequestCommentPoster pullRequestCommentPoster(List<FeedbackChannel> feedbackChannels) {
+    PullRequestCommentPoster pullRequestCommentPoster(List<SummaryChannel> feedbackChannels) {
         return new PullRequestCommentPoster(feedbackChannels);
     }
 
@@ -65,9 +67,9 @@ public class JobTypeHandlerConfiguration {
     DiffNotePoster diffNotePoster(
         PullRequestCommentPoster commentPoster,
         PracticeFeedbackCommentFormatter commentFormatter,
-        List<InlineFindingChannel> inlineFindingChannels
+        List<InlineFeedbackChannel> inlineFeedbackChannels
     ) {
-        return new DiffNotePoster(commentPoster, commentFormatter, inlineFindingChannels);
+        return new DiffNotePoster(commentPoster, commentFormatter, inlineFeedbackChannels);
     }
 
     @Bean
@@ -91,8 +93,11 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    PracticeCatalogInjector practiceCatalogInjector(PracticeRepository practiceRepository) {
-        return new PracticeCatalogInjector(objectMapper, practiceRepository);
+    PracticeCatalogInjector practiceCatalogInjector(
+        PracticeRepository practiceRepository,
+        WorkspaceReviewDefaultsProvider workspaceDefaults
+    ) {
+        return new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults);
     }
 
     @Bean
@@ -101,38 +106,47 @@ public class JobTypeHandlerConfiguration {
     }
 
     @Bean
-    JobTypeHandler pullRequestReviewHandler(
+    PullRequestReviewHandler pullRequestReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
-        GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
+        FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
-        SecretDiffScanner secretDiffScanner
+        SecretDiffScanner secretDiffScanner,
+        InContextDeliveryGate inContextDeliveryGate,
+        ApplicationEventPublisher eventPublisher,
+        ObservationRepository observationRepository
     ) {
         return new PullRequestReviewHandler(
             objectMapper,
-            gitRepositoryManager,
+            contentAddressedStore,
             practiceCatalogInjector,
             workspaceContextBuilder,
             taskEnvelopeWriter,
-            gitDiffOperations,
             resultParser,
+            compositionResultParser,
             deliveryService,
             feedbackService,
             secretDiffScanner,
-            reactionSuppressionFilter
+            reactionSuppressionFilter,
+            inContextDeliveryGate,
+            eventPublisher,
+            observationRepository
         );
     }
 
     @Bean
-    JobTypeHandler issueReviewHandler(
+    IssueReviewHandler issueReviewHandler(
         PracticeCatalogInjector practiceCatalogInjector,
         PracticeDetectionResultParser resultParser,
+        FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
+        InContextDeliveryGate inContextDeliveryGate,
         PullRequestCommentPoster commentPoster,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
-        PracticeFeedbackCommentFormatter commentFormatter
+        PracticeFeedbackCommentFormatter commentFormatter,
+        ObservationRepository observationRepository
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -140,11 +154,14 @@ public class JobTypeHandlerConfiguration {
             taskEnvelopeWriter,
             practiceCatalogInjector,
             resultParser,
+            compositionResultParser,
             deliveryService,
+            inContextDeliveryGate,
             commentPoster,
             feedbackLedgerRecorder,
             deliveryPolicy,
-            commentFormatter
+            commentFormatter,
+            observationRepository
         );
     }
 
@@ -165,6 +182,22 @@ public class JobTypeHandlerConfiguration {
             deliveryService,
             eventPublisher,
             transactionTemplate
+        );
+    }
+
+    @Bean
+    JobTypeHandler documentReviewHandler(
+        PracticeCatalogInjector practiceCatalogInjector,
+        PracticeDetectionResultParser resultParser,
+        PracticeDetectionDeliveryService deliveryService
+    ) {
+        return new DocumentReviewHandler(
+            objectMapper,
+            workspaceContextBuilder,
+            taskEnvelopeWriter,
+            practiceCatalogInjector,
+            resultParser,
+            deliveryService
         );
     }
 

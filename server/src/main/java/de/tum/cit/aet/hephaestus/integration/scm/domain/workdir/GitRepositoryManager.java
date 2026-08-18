@@ -1,19 +1,24 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.workdir;
 
 import de.tum.cit.aet.hephaestus.integration.core.fabric.FabricLayout;
+import java.io.BufferedOutputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
+import java.util.stream.Stream;
 import lombok.extern.slf4j.Slf4j;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.errors.GitAPIException;
@@ -22,6 +27,7 @@ import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.diff.Edit;
 import org.eclipse.jgit.diff.RawTextComparator;
 import org.eclipse.jgit.lib.Constants;
+import org.eclipse.jgit.lib.FileMode;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.ObjectReader;
 import org.eclipse.jgit.lib.PersonIdent;
@@ -40,24 +46,37 @@ import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.stereotype.Service;
 
-/**
- * Manages local git repository clones for file-level commit analysis.
- * <p>
- * Repositories are stored as full clones at {storagePath}/{repositoryId}
- * This approach:
- * <ul>
- *   <li>Supports worktree-based operations for coding agents</li>
- *   <li>Allows sandboxed agents to read files directly from the working tree</li>
- *   <li>Maintains all branches via {@code setCloneAllBranches(true)}</li>
- * </ul>
- */
 @Slf4j
 @Service
 @EnableConfigurationProperties(GitRepositoryProperties.class)
 public class GitRepositoryManager {
 
-    /** Connector namespace for SCM checkouts in the fabric {@code sources/} tree (one among future slack/, outline/). */
     private static final String SCM_CONNECTOR = "scm";
+
+    /**
+     * What a tree snapshot could not stage. Every one of these makes the capture {@code PARTIAL}, and
+     * each names the omission rather than the count, because the reader's question is "what could this
+     * evidence not have shown me", not "how much of it is there".
+     */
+    public static final String TREE_LIMITATION_SYMLINK = "SYMLINK_EXCLUDED";
+
+    /** A submodule's gitlink; its contents live in another repository this snapshot does not read. */
+    public static final String TREE_LIMITATION_SUBMODULE = "SUBMODULE_EXCLUDED";
+
+    /** A tree entry whose git mode is neither a regular nor an executable file. */
+    public static final String TREE_LIMITATION_UNSUPPORTED_MODE = "UNSUPPORTED_GIT_MODE_EXCLUDED";
+
+    /** A path that would escape the staging root; excluded rather than resolved. */
+    public static final String TREE_LIMITATION_UNSAFE_PATH = "UNSAFE_PATH_EXCLUDED";
+
+    /** One blob over {@code hephaestus.git.tree-max-file-size} was skipped; the walk continued. */
+    public static final String TREE_LIMITATION_FILE_TOO_LARGE = "FILE_TOO_LARGE_EXCLUDED";
+
+    /** The walk stopped at {@code hephaestus.git.tree-max-files}; the rest of the tree was never read. */
+    public static final String TREE_LIMITATION_FILE_COUNT = "FILE_COUNT_LIMIT_REACHED";
+
+    /** The walk stopped at {@code hephaestus.git.tree-max-total-size}; the rest was never read. */
+    public static final String TREE_LIMITATION_TOTAL_SIZE = "TOTAL_SIZE_LIMIT_REACHED";
 
     private final GitRepositoryProperties properties;
     private final GitRepositoryLockManager lockManager;
@@ -83,31 +102,17 @@ public class GitRepositoryManager {
         }
     }
 
-    /**
-     * Check if local git checkout is enabled.
-     */
     public boolean isEnabled() {
         return properties.enabled();
     }
 
-    /**
-     * Get the local path for a repository clone — the SCM connector's bulk artifact in the Context
-     * Fabric (ADR 0020). Path format: {@code {fabric.root}/sources/scm/{repositoryId}}. A clone is a
-     * rebuildable cache, so the move from the legacy {@code {root}/{repositoryId}} layout needs no
-     * data migration: a stale-or-absent clone is simply re-fetched at this path on first use.
-     */
     public Path getRepositoryPath(Long repositoryId) {
         return fabricLayout.source(SCM_CONNECTOR, repositoryId.toString());
     }
 
-    /**
-     * Check if a repository is already cloned locally.
-     * Supports both full clones (.git subdirectory) and bare clones (HEAD at root).
-     */
     public boolean isRepositoryCloned(Long repositoryId) {
         Path repoPath = getRepositoryPath(repositoryId);
-        // Full clone: .git/HEAD; bare clone (legacy): HEAD at root
-        return Files.exists(repoPath.resolve(".git").resolve("HEAD")) || Files.exists(repoPath.resolve("HEAD"));
+        return Files.exists(repoPath.resolve(".git").resolve("HEAD"));
     }
 
     /**
@@ -165,15 +170,6 @@ public class GitRepositoryManager {
         lockManager.removeLock(repositoryId);
     }
 
-    /**
-     * Ensure repository is cloned/fetched. Returns path to bare repo.
-     * Called by push webhook handler.
-     *
-     * @param repositoryId the repository database ID
-     * @param cloneUrl the git clone URL (https://github.com/owner/repo.git)
-     * @param token the authentication token (for private repos)
-     * @return path to the local repository
-     */
     public Path ensureRepository(Long repositoryId, String cloneUrl, @Nullable String token) {
         if (!properties.enabled()) {
             throw new IllegalStateException("Git local checkout is not enabled");
@@ -297,18 +293,6 @@ public class GitRepositoryManager {
         });
     }
 
-    /**
-     * Resolves the HEAD SHA of the default branch from a local clone.
-     * <p>
-     * In clones created with {@code --clone-all-branches}, remote refs are
-     * stored at {@code refs/remotes/origin/<branch>}. This method resolves
-     * the ObjectId for that ref and returns its SHA-1 hex string.
-     * Also checks {@code refs/heads/<branch>} and {@code HEAD} as fallbacks.
-     *
-     * @param repositoryId  the repository database ID
-     * @param defaultBranch the default branch name (e.g. "main")
-     * @return the HEAD SHA hex string, or null if the ref cannot be resolved
-     */
     @Nullable
     public String resolveDefaultBranchHead(Long repositoryId, String defaultBranch) {
         if (!properties.enabled()) {
@@ -320,22 +304,8 @@ public class GitRepositoryManager {
             try (Git git = Git.open(repoPath.toFile())) {
                 Repository repo = git.getRepository();
 
-                // Try refs/remotes/origin/<branch> first (bare clone with remotes)
                 String ref = "refs/remotes/origin/" + defaultBranch;
                 ObjectId objectId = repo.resolve(ref);
-                if (objectId != null) {
-                    return objectId.getName();
-                }
-
-                // Fallback: try refs/heads/<branch> (some bare clones store heads directly)
-                ref = "refs/heads/" + defaultBranch;
-                objectId = repo.resolve(ref);
-                if (objectId != null) {
-                    return objectId.getName();
-                }
-
-                // Last resort: try HEAD
-                objectId = repo.resolve("HEAD");
                 if (objectId != null) {
                     return objectId.getName();
                 }
@@ -457,6 +427,13 @@ public class GitRepositoryManager {
      * @return list of commit info with file changes
      */
     public List<CommitInfo> walkCommits(Long repositoryId, @Nullable String fromSha, String toSha) {
+        return walkCommits(repositoryId, fromSha, toSha, Integer.MAX_VALUE);
+    }
+
+    public List<CommitInfo> walkCommits(Long repositoryId, @Nullable String fromSha, String toSha, int limit) {
+        if (limit < 1) {
+            throw new IllegalArgumentException("limit must be positive");
+        }
         if (!properties.enabled()) {
             return List.of();
         }
@@ -485,6 +462,7 @@ public class GitRepositoryManager {
                     for (RevCommit revCommit : revWalk) {
                         CommitInfo commitInfo = extractCommitInfo(repo, revCommit);
                         commits.add(commitInfo);
+                        if (commits.size() >= limit) break;
                     }
                 }
             } catch (IOException e) {
@@ -744,30 +722,50 @@ public class GitRepositoryManager {
     }
 
     /**
-     * Read all files from a commit's tree via JGit {@link TreeWalk}.
+     * Materialises a commit tree into a temporary directory.
      *
-     * <p>Walks the commit tree recursively, collecting file contents into a map suitable for
-     * {@code SandboxWorkspaceManager.injectFiles()}. Individual files larger than 10 MB are
-     * skipped. Collection stops when {@code maxTotalBytes} is reached.
+     * <p>Symlinks, submodules and paths that escape the staging root are excluded rather than followed,
+     * so nothing outside the commit's own tree can be written or read through the snapshot. Each
+     * exclusion is named in {@link GitTreeSnapshot#limitations()} so a consumer can say what it did not
+     * see instead of treating a partial tree as the whole repository.
      *
-     * <p>Reads from the git object store, not the working directory — guarantees an exact
-     * snapshot at the given commit regardless of working tree state.
+     * <p>Blobs are streamed one at a time from the object database straight to disk, so peak memory is
+     * one buffer regardless of repository size. The caller owns the result and must
+     * {@link GitTreeSnapshot#close() close} it to delete the directory.
      *
-     * @param repositoryId  the repository database ID
-     * @param commitSha     the commit SHA to read from
-     * @param maxTotalBytes maximum total bytes to collect (files beyond this limit are skipped)
-     * @return map of relative file paths to contents
-     * @throws GitOperationException if the commit cannot be resolved or an I/O error occurs
+     * <p>Peak memory being bounded is not the same as the capture being bounded: a repository can be
+     * arbitrarily large, and a review that reads all of it costs an unbounded number of tokens. The walk
+     * also stops at {@code hephaestus.git.tree-max-files} and {@code tree-max-total-size}, and skips any
+     * blob over {@code tree-max-file-size} — each of which makes {@link GitTreeSnapshot#complete()} false,
+     * so nothing downstream can claim something is absent from a repository it only partly saw.
+     *
+     * <p>A blob's size is read from the object database before it is written, so an oversized file is
+     * never staged and then deleted; the bound protects the disk as well as the context window.
+     *
+     * <p>Git handles are opened and closed entirely within this call rather than returned as lazy readers,
+     * which would leave an {@code ObjectReader} and the repository read lock open across the staging
+     * boundary.
      */
-    public Map<String, byte[]> readFilesAtCommit(Long repositoryId, String commitSha, long maxTotalBytes) {
+    public GitTreeSnapshot readTreeSnapshot(Long repositoryId, String commitSha) {
         if (!properties.enabled()) {
-            return Map.of();
+            throw new IllegalStateException("Repository checkout is disabled; callers must check isEnabled()");
         }
 
         return lockManager.withReadLock(repositoryId, () -> {
             Path repoPath = getRepositoryPath(repositoryId);
-            Map<String, byte[]> result = new HashMap<>();
+            Path stagingDir;
+            try {
+                stagingDir = Files.createTempDirectory("tree-snapshot-");
+            } catch (IOException e) {
+                throw new GitOperationException("Could not create staging directory for repoId=" + repositoryId, e);
+            }
+
+            Map<String, Path> result = new LinkedHashMap<>();
+            Set<String> limitations = new java.util.TreeSet<>();
             long totalBytes = 0;
+            int visitedFiles = 0;
+            String resolvedCommitSha;
+            String treeSha;
 
             try (Git git = Git.open(repoPath.toFile())) {
                 Repository repo = git.getRepository();
@@ -779,61 +777,155 @@ public class GitRepositoryManager {
 
                 try (RevWalk revWalk = new RevWalk(repo); ObjectReader reader = repo.newObjectReader()) {
                     RevCommit commit = revWalk.parseCommit(commitId);
+                    resolvedCommitSha = commit.getId().getName();
+                    treeSha = commit.getTree().getId().getName();
+
+                    long maxTotalBytes = properties.treeMaxTotalSize().toBytes();
+                    long maxFileBytes = properties.treeMaxFileSize().toBytes();
+                    int maxFiles = properties.treeMaxFiles();
 
                     try (TreeWalk treeWalk = new TreeWalk(reader)) {
                         treeWalk.addTree(commit.getTree());
                         treeWalk.setRecursive(true);
 
                         while (treeWalk.next()) {
-                            ObjectId blobId = treeWalk.getObjectId(0);
-                            long size = reader.getObjectSize(blobId, Constants.OBJ_BLOB);
-
-                            // Skip individual files larger than 10 MB
-                            if (size > 10L * 1024 * 1024) {
-                                log.debug("Skipping oversized file: path={}, size={}", treeWalk.getPathString(), size);
+                            visitedFiles++;
+                            String sourcePath = treeWalk.getPathString();
+                            FileMode mode = treeWalk.getFileMode(0);
+                            if (FileMode.SYMLINK.equals(mode)) {
+                                limitations.add(TREE_LIMITATION_SYMLINK);
                                 continue;
                             }
-
-                            if (totalBytes + size > maxTotalBytes) {
+                            if (FileMode.GITLINK.equals(mode)) {
+                                limitations.add(TREE_LIMITATION_SUBMODULE);
+                                continue;
+                            }
+                            if (!FileMode.REGULAR_FILE.equals(mode) && !FileMode.EXECUTABLE_FILE.equals(mode)) {
+                                limitations.add(TREE_LIMITATION_UNSUPPORTED_MODE);
+                                continue;
+                            }
+                            if (unsafeWorkspacePath(sourcePath)) {
+                                limitations.add(TREE_LIMITATION_UNSAFE_PATH);
+                                continue;
+                            }
+                            // The count bound stops the walk rather than skipping a file: past it we no
+                            // longer know what we are not reading, so "we read the tree in order up to the
+                            // limit" stays a claim we can state, where "we read some of it" is not.
+                            if (result.size() >= maxFiles) {
+                                limitations.add(TREE_LIMITATION_FILE_COUNT);
                                 log.warn(
-                                    "File collection exceeded size limit ({} bytes), stopping: repoId={}, commit={}",
-                                    maxTotalBytes,
+                                    "Repository tree hit the file-count bound; snapshot is partial: repoId={}, commit={}, maxFiles={}",
                                     repositoryId,
-                                    commitSha
+                                    commitSha,
+                                    maxFiles
                                 );
                                 break;
                             }
-
-                            byte[] content = reader.open(blobId).getBytes();
-                            result.put(treeWalk.getPathString(), content);
-                            totalBytes += content.length;
+                            ObjectId blobId = treeWalk.getObjectId(0);
+                            long blobSize = reader.getObjectSize(blobId, Constants.OBJ_BLOB);
+                            if (blobSize > maxFileBytes) {
+                                // One outsized blob does not end the walk: it is almost always a binary
+                                // asset, and dropping the rest of the tree with it would cost the review
+                                // the source files it came for.
+                                limitations.add(TREE_LIMITATION_FILE_TOO_LARGE);
+                                log.debug("Skipping oversized file: path={}, size={}", sourcePath, blobSize);
+                                continue;
+                            }
+                            if (totalBytes + blobSize > maxTotalBytes) {
+                                limitations.add(TREE_LIMITATION_TOTAL_SIZE);
+                                log.warn(
+                                    "Repository tree hit the total-size bound; snapshot is partial: repoId={}, commit={}, maxTotalBytes={}",
+                                    repositoryId,
+                                    commitSha,
+                                    maxTotalBytes
+                                );
+                                break;
+                            }
+                            Path target = stagingDir.resolve(sourcePath);
+                            Files.createDirectories(target.getParent());
+                            try (OutputStream out = new BufferedOutputStream(Files.newOutputStream(target))) {
+                                reader.open(blobId, Constants.OBJ_BLOB).copyTo(out);
+                            }
+                            totalBytes += Files.size(target);
+                            result.put(sourcePath, target);
                         }
                     }
                 }
             } catch (IOException e) {
+                deleteTreeQuietly(stagingDir);
                 throw new GitOperationException(
                     "Failed to read files at commit: repoId=" + repositoryId + ", commit=" + commitSha,
                     e
                 );
             }
 
-            return result;
+            return new GitTreeSnapshot(
+                stagingDir,
+                resolvedCommitSha,
+                treeSha,
+                result,
+                totalBytes,
+                visitedFiles,
+                limitations.isEmpty(),
+                limitations
+            );
         });
     }
 
+    static void deleteTreeQuietly(Path root) {
+        try (Stream<Path> paths = Files.walk(root)) {
+            paths
+                .sorted(Comparator.reverseOrder())
+                .forEach(path -> {
+                    try {
+                        Files.deleteIfExists(path);
+                    } catch (IOException e) {
+                        log.warn("Could not delete staged file {}", path, e);
+                    }
+                });
+        } catch (IOException e) {
+            log.warn("Could not delete staging directory {}", root, e);
+        }
+    }
+
+    private static boolean unsafeWorkspacePath(String path) {
+        if (path == null || path.isBlank() || path.startsWith("/") || path.contains("\\") || path.indexOf('\0') >= 0) {
+            return true;
+        }
+        for (String segment : path.split("/")) {
+            if (segment.equals(".") || segment.equals("..")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /**
-     * Generate a unified diff between two refs (branches or commits).
-     *
-     * <p>Produces standard unified diff output suitable for code review. Resolves refs
-     * using the same fallback chain as {@link #resolveDefaultBranchHead}:
-     * {@code refs/remotes/origin/<ref>} → {@code refs/heads/<ref>} → raw SHA.
-     *
-     * @param repositoryId the repository database ID
-     * @param baseRef      the base ref (target branch or commit SHA)
-     * @param headRef      the head ref (source branch or commit SHA)
-     * @return unified diff text, or empty string if refs cannot be resolved
-     * @throws GitOperationException if an I/O error occurs computing the diff
+     * A commit tree materialised on disk. {@code files} maps repository-relative paths to host files
+     * under {@code stagingDir}; closing deletes the whole directory.
      */
+    public record GitTreeSnapshot(
+        Path stagingDir,
+        String commitSha,
+        String treeSha,
+        Map<String, Path> files,
+        long totalBytes,
+        int visitedFiles,
+        boolean complete,
+        Set<String> limitations
+    ) implements AutoCloseable {
+        public GitTreeSnapshot {
+            Objects.requireNonNull(treeSha, "treeSha");
+            files = Collections.unmodifiableMap(new LinkedHashMap<>(files));
+            limitations = Set.copyOf(limitations);
+        }
+
+        @Override
+        public void close() {
+            deleteTreeQuietly(stagingDir);
+        }
+    }
+
     public String generateUnifiedDiff(Long repositoryId, String baseRef, String headRef) {
         if (!properties.enabled()) {
             return "";

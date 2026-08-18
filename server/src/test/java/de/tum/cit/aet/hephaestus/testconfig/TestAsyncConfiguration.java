@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.testconfig;
 
+import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
@@ -77,6 +78,18 @@ public class TestAsyncConfiguration implements AsyncConfigurer {
 
     @Bean(name = "syncJobExecutor")
     public AsyncTaskExecutor syncJobExecutor() {
+        return syncExecutor;
+    }
+
+    /**
+     * The feedback lanes' pool, synchronous here like every other.
+     *
+     * <p>Must exist by name even though {@link #getAsyncExecutor()} already covers unqualified dispatch:
+     * {@code @Async("feedbackLaneExecutor")} resolves its qualifier against the bean factory and fails
+     * the invocation outright if no bean carries the name.
+     */
+    @Bean(name = FeedbackLaneExecutor.BEAN_NAME)
+    public AsyncTaskExecutor feedbackLaneExecutor() {
         return syncExecutor;
     }
 

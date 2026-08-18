@@ -65,12 +65,151 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🟡 Reviewer-side practices keep the old wording until you update them
+
+**Affected**: workspaces created before this release that use the shipped practices
+*leaves useful, specific review comments*, *asks rather than demands*, and *reviews substantively*.
+
+Those three judge how somebody **reviews** a teammate's change. Until this release an occasion did not
+record whose conduct it judged, so their observations were filed against the author of the change
+rather than the reviewer who wrote the comments. An occasion now records it, and a review that cannot
+name the reviewer does not run.
+
+A workspace installs the shipped catalogue once, so an existing workspace still holds the old wording.
+Open **Practice catalogue** and apply the update to those three practices to pick it up. Until you do,
+they behave exactly as they did before — nothing new is recorded against the wrong person, because the
+new guard reads the occasion and the old wording still says *author*.
+
+#### 🔴 `GIT_STORAGE_PATH` is now `HEPHAESTUS_FABRIC_ROOT`
+
+**Affected**: deployments that set `GIT_STORAGE_PATH` to anything other than `/data/git-repos`. Check
+with `grep GIT_STORAGE_PATH` over your deployment configuration before you upgrade. Deployments that
+use the shipped Compose files unchanged are **not** affected: those files already pinned this path to
+`/data/git-repos` and now pass the new name for the same directory, mounted from the same volume.
+
+**Before**: `GIT_STORAGE_PATH` (`hephaestus.git.storage-path`) named the directory holding repository
+working copies, and the rest of the on-disk cache — content-addressed evidence blobs and per-job
+manifests — fell back to it whenever `HEPHAESTUS_FABRIC_ROOT` was unset.
+
+**After**: `HEPHAESTUS_FABRIC_ROOT` is the only name for that directory. `GIT_STORAGE_PATH` is read
+nowhere and has no alias.
+
+**Nothing warns you.** Everything under this root is a rebuildable cache, so an instance that keeps
+only the old variable starts, passes its health check and reviews normally — it simply writes to
+`/data/git-repos` instead of the path you chose. If that path is not a mounted volume on your
+deployment, it is the container's own writable layer: it grows with every clone, is discarded on
+every restart, and presents as repeated full re-clones and a container disk filling up. The tree at
+your old path is left where it is, no longer read and no longer swept.
+
+**Migration**: before starting the new version, set `HEPHAESTUS_FABRIC_ROOT` to the value
+`GIT_STORAGE_PATH` had, then remove `GIT_STORAGE_PATH`. The directory layout beneath the root is
+unchanged, so the existing contents are picked up as they are and nothing has to be re-fetched.
+
+Set it where the container will actually read it. The shipped Compose files pin
+`HEPHAESTUS_FABRIC_ROOT: /data/git-repos` literally on the server and worker services, so a value in
+`docker/.env` is ignored — edit those `environment:` blocks, or set it wherever your own orchestration
+passes environment to those two roles.
+
+#### 🔴 The evidence-cache retention window must be at least one day
+
+**Affected**: deployments that set `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS`
+(`hephaestus.fabric.gc-retention-days`). The shipped default is `30` and is valid; if you have not
+set this, there is nothing to do.
+
+This is the number of days a review's cached evidence and job manifest are kept before the daily
+sweep removes them. `0` was previously accepted, and did the opposite of what it looks like: instead
+of switching the sweep off it made every cached job directory eligible for deletion on the next run.
+A value below `1` is now rejected.
+
+**Migration**: if you set it to `0` or a negative number, set a real window before upgrading.
+Otherwise the server role does not start and reports:
+
+```
+hephaestus.fabric.gc-retention-days must be positive
+```
+
+No value switches the sweep off; set a long window instead.
+
+#### 🔴 Practice-review API uses one vocabulary
+
+**Affected**: API clients that configure practices, read findings (now observations), or manage AI bindings.
+
+Update clients in the same deployment as the server and webapp. The old names have no aliases:
+
+| Was | Now |
+| --- | --- |
+| AI purpose `PRACTICE_DETECTION` | `PRACTICE_REVIEW` |
+| `evidenceRequirements` | `automatedReviewPolicy` |
+| `evidenceSupport` | `evidenceSufficiency` |
+| practice `active` and `/active` | `reviewTier` and `/review-tier` (see below) |
+| practice-area `active` | `visibleInPracticeDashboards` |
+| observation `artifactType` | `artifactKind` |
+| observation `title` | `summary` |
+| observation `reasoning` | `evidenceRationale` |
+| observation `guidance` | `deliveredFeedback` |
+| observation `claimStatus` | `claimCurrentness` |
+| observation `confidence` | removed; it was not a calibrated measurement |
+
+Database values and columns migrate automatically. This change removes ambiguous uses of “active,” “support,” and
+“detection”; it preserves historical observation outcomes. The uncalibrated confidence values are removed.
+
+#### 🔴 A practice has a review-autonomy setting, not an on/off switch
+
+**Affected**: API clients that turn practices on or off.
+
+`PATCH /workspaces/{slug}/practices/{practiceSlug}/used-in-new-reviews` with
+`{"usedInNewReviews": true|false}` is now
+`PATCH /workspaces/{slug}/practices/{practiceSlug}/review-tier` with `{"reviewTier": "..."}`. The
+practice payload carries `reviewTier` instead of `usedInNewReviews`, and the catalogue list filter is
+`?reviewTier=<TIER>` instead of `?usedInNewReviews=<bool>`. There are no aliases.
+
+The settings are `OFF`, `PROPOSE` and `DELIVER`, in increasing order of what the system does on its
+own. Existing data maps exactly and needs no decision from you: a practice that was used in new
+reviews becomes `DELIVER`, one that was not becomes `OFF`, and the migration runs automatically.
+`PROPOSE` is new ground, and it is the middle the boolean could not express — the review still runs
+and every observation is still recorded, and nothing is sent to anyone. All three values are settable
+at every level; a practice only lands on `PROPOSE` because somebody put it there.
+
+Omitting `reviewTier`, or sending it as `null`, clears the setting so the practice follows its area,
+and the area follows the workspace default.
+
+#### 🟢 A workspace can restrict review to some branches and repositories
+
+**Affected**: nobody, unless you want it. Workspaces that do not configure a scope are unchanged.
+
+The practice-review settings resource carries a `reviewScope` of two exact-match lists,
+`targetBranches` and `repositories`. An empty list means no restriction on that axis. Exact names
+only — there are no glob patterns, and there is no path scope, because the changed files of a pull
+request are not known at the point where the decision to review is made.
+
+#### 🔴 The "Skip drafts" workspace setting is gone
+
+**Affected**: deployments that set `PRACTICE_REVIEW_SKIP_DRAFTS`, and workspaces that had "Skip
+drafts" switched on.
+
+Remove `PRACTICE_REVIEW_SKIP_DRAFTS` from your environment; it is no longer read, and the workspace
+toggle no longer appears. Whether a draft occasions a review is now stated by each practice's own
+occasions rather than by a switch that silenced all of them at once. One shipped practice ("Ready and
+traceable handoff") asks for drafts, so a workspace that previously skipped them will start seeing
+that practice's feedback on draft pull requests; no other practice reviews a draft. The stored
+per-workspace override is retained unread for one release and removed after that.
+
+#### 🔴 Outline connections require approved origins
+
+**Affected**: deployments that enable the Outline integration.
+
+Set `HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS` to the comma-separated HTTPS origins whose operator role,
+region, transfer basis, retention, and AVV status have been reviewed. An empty list blocks Outline connections,
+sync, webhook collection, evidence projection, and identity linking. Set the same value on server, worker, and
+webhook roles and restart all three. Disconnect connections for removed origins; remove all grants for
+`outline.documents` until residual mirrored data has been erased.
+
 #### 🔴 Untouched instances start with Silent Mode engaged
 
 **Affected**: deployments where the instance Silent Mode setting has never been explicitly changed.
 
 The upgrade engages the instance-wide outbound brake before any new GitHub, GitLab, or Slack delivery
-can leave the application. Detection, persistence, synchronization, webhooks, OAuth, and administration
+can leave the application. Practice review, persistence, synchronization, webhooks, OAuth, and administration
 continue normally; suppressed feedback is recorded and is never replayed.
 
 On production, verify each workspace's practice delivery settings and provider targets, then open
@@ -115,28 +254,22 @@ version first and keep its startup log to hand.
 
 1. Remove `HEPHAESTUS_WORKER_LLM_BASE_URL`, `HEPHAESTUS_WORKER_LLM_API_KEY`,
    `HEPHAESTUS_SANDBOX_LLM_PROXY_ENABLED`, and every `AGENT_DEFAULT_CONFIG_*` variable from your
-   deployment. None of them is read any more and none of them is an error, so nothing breaks if you
-   leave one behind — but nothing reliably reminds you either. Do this by grepping your own
-   configuration; do not wait for the startup log to tell you. The boot-time "`… is set but no longer
-   read`" warning only fires for a variable that reaches the JVM's own environment under its
-   `HEPHAESTUS_`-prefixed name, and the shipped Compose files no longer pass any of these into the
-   container — a stale line in `docker/.env` is therefore invisible to the application and draws no
-   warning. On a deployment that sets container environment directly (Kubernetes, systemd), the first
-   three do warn; `AGENT_DEFAULT_CONFIG_*` never does.
+   deployment. They are no longer read. Remove them by grepping your deployment configuration rather
+   than relying on startup diagnostics.
 2. Register your OpenAI-compatible endpoint(s) under Instance admin → AI models (or have a workspace admin connect their own under the workspace's Administration → AI models). Each page tests the connection before you save it, so you learn the endpoint answers without waiting for a review to fail.
 3. **Review and re-enable each workspace's carried-over AI configuration.** The upgrade copies every
    agent configuration that was in use — endpoint, model name, encrypted API key, timeout,
    concurrent-run limit and internet setting — into that workspace's AI models page, named after the
    old configuration. "In use" means one a workspace explicitly pointed at **or** any configuration
    that was simply switched on: an unset pointer never meant unused, it meant *fall back*, and the
-   mentor fell back to the workspace's oldest enabled configuration while practice detection ran on
+   mentor fell back to the workspace's oldest enabled configuration while practice review ran on
    every enabled one. Configurations created from `AGENT_DEFAULT_CONFIG_*` are exactly that shape.
-   No key you were using has to be re-issued. Everything arrives **disabled**, so practice detection
+   No key you were using has to be re-issued. Everything arrives **disabled**, so practice review
    and the mentor stay stopped until an administrator opens the page and switches them on. That is
    deliberate: in the default PROXY credential mode the endpoint a configuration actually called came
    from an instance-wide environment variable rather than from the configuration row, so re-enabling
    automatically could silently re-point a workspace's traffic — and its key — at a different host.
-   Until someone does, that workspace's practice detection and mentor are simply idle: nothing errors,
+   Until someone does, that workspace's practice review and mentor are simply idle: nothing errors,
    so there is nothing to notice. A workspace is done when its AI models page shows an enabled
    connection and a model bound to each purpose it uses.
 4. **Fix what the upgrade could not determine.** These cases need a value typed in before they will
@@ -152,10 +285,12 @@ version first and keep its startup log to hand.
      `model-not-migrated`, which keeps the configuration's timeout, concurrency and internet limits
      attached to a real binding. Replace it with the model id you want. Such a configuration could
      not run before the upgrade either.
-5. **Check any workspace where detection ran on several configurations at once.** A workspace with no
-   explicit practice-detection pointer ran detection on *every* enabled configuration. The new model
-   binds one model per purpose, so detection is bound to the oldest of them and the deploy log names
-   the workspace (`practice detection ran on SEVERAL configurations at once in these workspaces: …`).
+5. **Check any workspace where review ran on several configurations at once.** A workspace with no
+   explicit practice-review pointer ran reviews on *every* enabled configuration. The new model binds
+   one model per purpose, so practice review is bound to the oldest of them and the deploy log names
+   the workspace. That log line is written by the migration itself and still uses this release's old
+   word for the purpose: `practice detection ran on SEVERAL configurations at once in these
+   workspaces: …`.
    Nothing is lost — the other configurations are all there as connections and models — but pick the
    one you want, or delete the rest.
 6. **Revoke the keys of configurations that are dropped.** A configuration that was both switched off
@@ -175,7 +310,7 @@ version first and keep its startup log to hand.
 
 1. Set `AGENT_ENABLED=true` (replacing `AGENT_NATS_ENABLED=true`) on **every** role that needs to submit, execute, or recover jobs — not just the role that claims and runs them. In a split-pod deployment that means **both** `application-server` (submits jobs from PR/issue events and runs the orphan-recovery sweep — both gate on this same flag, independent of the worker role) **and** `application-worker` (claims and executes them, additionally gated on the worker role); `docker/compose.app.yaml` already sets the same `AGENT_ENABLED` value on both services. In the monolith, set it once. No profile turns it on for you: a pod you do not set it on claims nothing — including a `worker`-profile pod you start outside the shipped Compose files, which in earlier releases turned itself on.
 2. Confirm the flag actually took, on each side. Once the upgraded server is up, the `agent.queue.depth`, `agent.queue.oldest_age_seconds` and `agent.queue.running` metrics exist; if `AGENT_ENABLED` never reached that pod they are absent altogether rather than reading zero — which is the difference between "the queue is idle" and "the queue was never switched on". For the worker side, open a pull request and watch `agent.queue.oldest_age_seconds`: it should rise and fall. An age that only ever climbs means the server is submitting and no worker is claiming.
-3. Remove `AGENT_NATS_ENABLED`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. None is read any more and none is an error — any of them still set names itself at boot with a "`… is set but no longer read`" warning. Leave `NATS_SERVER` alone: it is still live for webhook and sync ingest.
+3. Remove `AGENT_NATS_ENABLED`, `AGENT_NATS_MAX_ACK_PENDING`, and `AGENT_NATS_FETCH_BATCH_SIZE` from your deployment. They are no longer read. Leave `NATS_SERVER` alone: it is still live for webhook and sync ingest.
 4. Optional cleanup, after the upgraded instance has run long enough that you are not rolling back: the `AGENT` JetStream stream is no longer read from or written to. Delete it with `nats stream rm AGENT` if you want to reclaim its storage; leaving it in place is harmless.
 5. Do not remove NATS itself or `NATS_ENABLED` — webhook ingest and SCM/Slack sync still require it.
 
@@ -230,6 +365,134 @@ site points at it:
 
 No database action is required. The config-audit trail keeps its historical entity-type values as
 written — the table is append-only by database trigger, so past rows are never rewritten.
+
+#### 🔴 The default GitLab server follows your GitLab login instead of the maintainers' instance
+
+**Affected**: deployments that use the shipped Compose files, talk to a GitLab other than
+`gitlab.com`, and have never set `GITLAB_DEFAULT_SERVER_URL` themselves. Check with
+`grep GITLAB_ .env` before you upgrade.
+
+**Before**: `docker/compose.app.yaml` passed `GITLAB_DEFAULT_SERVER_URL:-https://gitlab.lrz.de` — the
+maintainers' own university instance. Because Compose always supplied a concrete value, the fallback
+the shipped configuration documents never ran, and an operator who had configured only their GitLab
+login silently got an instance they had never named.
+
+**After**: the same line is `${GITLAB_DEFAULT_SERVER_URL:-${GITLAB_OAUTH_BASE_URL:-https://gitlab.com}}`.
+Unset, it follows your GitLab login URL; with neither set it is `https://gitlab.com`.
+
+This setting names the GitLab that workspace creation and repository, group and member sync talk to.
+Sync resolves its provider by that URL, so changing it does not re-point existing data — it stops
+matching the rows written under the old URL and begins writing new ones stamped with the new one.
+
+**Migration**:
+
+1. If `GITLAB_DEFAULT_SERVER_URL` is set in your `.env`, nothing changes for you.
+2. If it is unset but `GITLAB_OAUTH_BASE_URL` already names your GitLab, that is now the value —
+   which is the intended behaviour, and for most self-hosted installs is the correct one. Confirm it
+   is the instance you sync from.
+3. If both are unset and you are not on `gitlab.com`, set `GITLAB_DEFAULT_SERVER_URL` to your
+   instance **before** starting the new version.
+
+A deployment that runs the application without the shipped Compose files was already defaulting to
+`https://gitlab.com` and is unaffected.
+
+#### 🔴 An agent heartbeat slower than 30 seconds now refuses to start
+
+**Affected**: deployments that override `hephaestus.agent.heartbeat-interval`. There is no environment
+variable for it, so that means an `application-local.yaml` or another `spring.config.import` source,
+or the relaxed-binding form `HEPHAESTUS_AGENT_HEARTBEATINTERVAL`. The shipped default is `25s` and is
+valid; if you have not set this, there is nothing to do.
+
+A worker renews a 60-second lease on the jobs it is running. A heartbeat slower than half that lease
+let a worker be declared dead while it was still working: its in-flight reviews were requeued onto a
+sibling and the same work ran twice, at double the model spend. The value is now rejected instead of
+accepted.
+
+**Migration**: if you set it above `30s`, lower it before upgrading. Otherwise the application does
+not start — on every role, not only the worker, because the value is rejected when configuration is
+bound — and reports:
+
+```
+hephaestus.agent.heartbeat-interval must be <= PT30S (half the PT1M worker lease), or every worker
+is orphaned while its jobs are still running; got: ...
+```
+
+#### 🔴 The containers now have their own memory limits
+
+**Affected**: hosts with less RAM than the limits add up to — in particular any host sized from
+guidance that named 4 GB as the floor.
+
+`application-server` (`APPLICATION_SERVER_MEM_LIMIT`, default `5g`), `application-worker`
+(`APPLICATION_WORKER_MEM_LIMIT`, default `3g`) and `webhook-server` (`WEBHOOK_SERVER_MEM_LIMIT`,
+default `2g`) each carry a container memory limit, and each JVM now sizes its heap from its own limit
+rather than from the whole host. On the single-host install the worker runs inside the application
+server, so the limits that apply there are `5g` and `2g`.
+
+Nothing compares these against the host. Docker starts the stack either way and the kernel kills
+whichever container exceeds its own limit; all three restart automatically, so an undersized host
+presents as a restart loop rather than as a refusal to start. Review sandboxes are separate
+containers and their memory sits outside these limits (`SANDBOX_MEMORY_BYTES`, default 4 GiB per
+concurrent sandbox).
+
+**Migration**: on a host below 8 GB RAM, set lower values in `.env` before the first start of the new
+version. The [install guide](https://ls1intum.github.io/Hephaestus/admin/install) states the floor
+and how the limits relate to it.
+
+#### 🔴 A workspace's per-run AI timeout is capped at one hour
+
+**Affected**: workspaces whose per-run timeout under Administration → AI models is above 3600 seconds.
+
+The ceiling is enforced when the value is saved, and existing stored values are left as they are.
+That combination is what needs your attention: such a workspace cannot save **any** change on its AI
+models page until the timeout is brought to 3600 or below, because the whole form is rejected. Its
+mentor turns are clamped to the ceiling, but its practice-review runs still run to the stored value,
+so the setting and the behaviour disagree until you change it.
+
+**Migration**: open each workspace's Administration → AI models page and lower any timeout above one
+hour. There is no automatic clamp of stored values.
+
+#### 🔴 AI proxy metrics are labelled by API contract, not by provider
+
+**Affected**: deployments with dashboards or alerts on the LLM proxy metrics, and anything searching
+logs by the `proxy.provider` field.
+
+`llm.proxy.duration` and `llm.proxy.errors` keep their names. Their label changes from `provider`
+(values `OPENAI`, `ANTHROPIC`, `AZURE_OPENAI`) to `apiProtocol` (values `openai-completions`,
+`openai-responses`), because a provider name stopped identifying anything once any OpenAI-compatible
+endpoint can be registered. The MDC log fields change from `proxy.jobId` and `proxy.provider` to
+`proxy.principal` and `proxy.apiProtocol`.
+
+A query filtering on the old label does not error — it matches no series and renders empty. An alert
+built on one stops firing, which is indistinguishable from the condition being healthy.
+
+**Migration**: update those queries before upgrading. New counters you may want to add while you are
+there: `llm.proxy.budget.blocked` (calls refused by a spending cap), `llm.proxy.unbillable.refused`,
+`llm.proxy.usage.unparseable` and `llm.proxy.stream.usage.unsupported` (responses whose token counts
+could not be read, which is what makes a monthly total understated).
+
+#### 🔴 Reviewed work is renamed in place, and the rename is one way
+
+**Affected**: every deployment, and any API client that reads or writes the kind of work a practice
+applies to or that a review or observation records.
+
+A practice, a review run and a recorded observation all now identify what was reviewed as
+`scm.pull_request`, `scm.issue` or `chat.conversation_thread`, replacing two internal vocabularies
+that had drifted apart. The upgrade rewrites the stored values.
+
+**Rolling the release back requires rolling this database change back with it.** Redeploying the
+previous image on its own leaves a database the old version cannot read.
+
+Two effects are worth expecting while the first reviews run after the upgrade, neither of which needs
+action:
+
+- A piece of feedback already posted on an open pull request or thread may be posted once more rather
+  than updated in place. What ties a re-review to an earlier one is derived from the old name, so the
+  first review after the upgrade does not recognise its own earlier comment.
+- Practice review rules are re-fingerprinted on the first start after the upgrade, so a practice can
+  briefly show as differing from its Hephaestus default until that finishes. If a workspace still
+  shows as locally edited long afterwards, check the startup log: the pass records a failure per
+  workspace and moves on rather than stopping, so a workspace it could not complete stays that way
+  until the next start.
 
 ### v0.69.0
 

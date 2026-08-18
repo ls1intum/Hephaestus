@@ -1,39 +1,32 @@
 import { Link } from "@tanstack/react-router";
-import { ChevronRightIcon, MessageSquareTextIcon } from "lucide-react";
+import { MessageSquareTextIcon } from "lucide-react";
 import type { ReviewFeedback } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { deliveryOutcome } from "@/components/practice-vocabulary/delivery-outcome-defs";
+import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { withholdingReasonSentence } from "@/components/practice-vocabulary/withholding-defs";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
+	EmptyContent,
 	EmptyDescription,
 	EmptyHeader,
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import {
-	Item,
-	ItemActions,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemTitle,
-} from "@/components/ui/item";
-import {
-	Table,
-	TableBody,
-	TableCaption,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
-import { ReviewArtifact, ReviewArtifactLink } from "./ReviewArtifact";
-import { FeedbackStateBadge } from "./ReviewBadges";
+import { feedbackPreviewText } from "./feedback-preview";
+import { ReviewArtifactLabel } from "./ReviewArtifact";
+import { ReviewPerson } from "./ReviewPerson";
 import { ReviewResultsSkeleton } from "./ReviewResultsSkeleton";
-import { CHANNEL_LABELS, SUPPRESSION_REASON_LABELS, subjectLabel } from "./review-format";
+import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
+import { REVIEW_PAGE_SIZE, type ReviewScopeSearch } from "./review-search";
 
+/** See `ObservationResultsState`: a filtered empty state has to carry the way out of itself. */
 export type FeedbackResultsState =
 	| { status: "loading" }
-	| { status: "empty"; filtered: boolean }
+	| { status: "empty"; filtered: false }
+	| { status: "empty"; filtered: true; onClearFilters: () => void }
 	| { status: "ready"; feedback: ReviewFeedback[] };
 
 export interface FeedbackResultsProps {
@@ -42,7 +35,8 @@ export interface FeedbackResultsProps {
 }
 
 export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) {
-	if (state.status === "loading") return <ReviewResultsSkeleton label="Loading messages" />;
+	if (state.status === "loading")
+		return <ReviewResultsSkeleton label="Loading feedback" rows={REVIEW_PAGE_SIZE} />;
 	if (state.status === "empty") {
 		return (
 			<Empty className="border">
@@ -51,118 +45,93 @@ export function FeedbackResults({ workspaceSlug, state }: FeedbackResultsProps) 
 						<MessageSquareTextIcon />
 					</EmptyMedia>
 					<EmptyTitle>
-						{state.filtered ? "No messages match these filters" : "No messages yet"}
+						{state.filtered ? "No feedback matches these filters" : "No feedback yet"}
 					</EmptyTitle>
 					<EmptyDescription>
 						{state.filtered
-							? "Try removing a filter to broaden the results."
-							: "Delivered and withheld messages appear here after reviews run."}
+							? "Every filter still applies. Clear them to see the whole list, or narrow one at a time."
+							: "Delivered and withheld feedback appears here after reviews run."}
 					</EmptyDescription>
 				</EmptyHeader>
+				{state.filtered && (
+					<EmptyContent>
+						<Button variant="outline" size="sm" onClick={state.onClearFilters}>
+							Clear all filters
+						</Button>
+					</EmptyContent>
+				)}
 			</Empty>
 		);
 	}
-	const { feedback } = state;
 
 	return (
-		<>
-			<div className="hidden xl:block">
-				<Table containerClassName="rounded-lg border">
-					<TableCaption className="sr-only">Feedback messages, newest first</TableCaption>
-					<TableHeader>
-						<TableRow>
-							<TableHead scope="col">Message</TableHead>
-							<TableHead scope="col">Outcome</TableHead>
-							<TableHead scope="col">Reviewed work</TableHead>
-							<TableHead scope="col" className="w-32">
-								Composed
-							</TableHead>
-						</TableRow>
-					</TableHeader>
-					<TableBody>
-						{feedback.map((item) => (
-							<TableRow key={item.id}>
-								<TableCell className="max-w-md whitespace-normal align-top">
-									<Link
-										to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
-										params={{ workspaceSlug, feedbackId: item.id }}
-										search={(previous) => previous}
-										className="line-clamp-2 font-medium hover:underline"
-									>
-										Message for {subjectLabel(item.recipient)}
-									</Link>
-									{item.bodyPreview && (
-										<p className="mt-1 line-clamp-2 text-sm">{item.bodyPreview}</p>
-									)}
-									<div className="mt-2 text-xs text-muted-foreground">
-										<span>
-											{item.findingCount} {item.findingCount === 1 ? "finding" : "findings"}
-										</span>
-									</div>
-								</TableCell>
-								<TableCell className="whitespace-normal align-top">
-									<FeedbackStateBadge state={item.deliveryState} />
-									<p className="mt-1 max-w-52 text-xs text-muted-foreground">
-										{item.suppressionReason
-											? SUPPRESSION_REASON_LABELS[item.suppressionReason]
-											: CHANNEL_LABELS[item.channel]}
-									</p>
-								</TableCell>
-								<TableCell className="max-w-xs whitespace-normal align-top">
-									<ReviewArtifactLink artifact={item.artifact} />
-								</TableCell>
-								<TableCell className="align-top text-muted-foreground">
-									<RelativeTime value={item.createdAt} />
-								</TableCell>
-							</TableRow>
-						))}
-					</TableBody>
-				</Table>
-			</div>
-			<ItemGroup className="xl:hidden">
-				{feedback.map((item) => (
-					<div key={item.id} role="listitem">
-						<Item
-							variant="outline"
-							className="items-start"
-							render={
-								<Link
-									to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
-									params={{ workspaceSlug, feedbackId: item.id }}
-									search={(previous) => previous}
-								/>
-							}
-						>
-							<ItemContent className="min-w-0">
-								<ItemTitle className="w-full min-w-0 line-clamp-none break-words">
-									Message for {subjectLabel(item.recipient)}
-								</ItemTitle>
-								{item.bodyPreview && (
-									<ItemDescription className="line-clamp-2 text-sm text-foreground">
-										{item.bodyPreview}
-									</ItemDescription>
-								)}
-								<p className="text-xs text-muted-foreground">
-									{item.findingCount} {item.findingCount === 1 ? "finding" : "findings"}
-								</p>
-								<div className="mt-1 flex flex-wrap items-center gap-2">
-									<FeedbackStateBadge state={item.deliveryState} />
-									<RelativeTime value={item.createdAt} />
-								</div>
-								<p className="text-xs text-muted-foreground">
-									{item.suppressionReason
-										? SUPPRESSION_REASON_LABELS[item.suppressionReason]
-										: CHANNEL_LABELS[item.channel]}
-								</p>
-								<ReviewArtifact artifact={item.artifact} display="full" />
-							</ItemContent>
-							<ItemActions>
-								<ChevronRightIcon className="size-4 text-muted-foreground" aria-hidden />
-							</ItemActions>
-						</Item>
-					</div>
-				))}
-			</ItemGroup>
-		</>
+		<ReviewRowList label="Feedback, newest first">
+			{state.feedback.map((item) => (
+				<FeedbackRow key={item.id} workspaceSlug={workspaceSlug} feedback={item} />
+			))}
+		</ReviewRowList>
+	);
+}
+
+export interface FeedbackRowProps {
+	workspaceSlug: string;
+	feedback: ReviewFeedback;
+	/** See `ObservationRow`: the list carries its filters forward, a scoped section carries its scope. */
+	scope?: ReviewScopeSearch;
+}
+
+/**
+ * The row's name is the feedback's own opening words, because that is the only text that tells two
+ * rows apart — a title built from the recipient repeats down the page. The person goes in a chip,
+ * where it is scanned rather than read.
+ *
+ * <p>Place and outcome stay separate: the badge says what happened, the meta line says where it was
+ * going. A withheld row also carries its own precise reason, because the outcome badge only says
+ * that something stopped it.
+ */
+export function FeedbackRow({ workspaceSlug, feedback, scope }: FeedbackRowProps) {
+	const place = DELIVERY_PLACE_DEFS[feedback.channel];
+	return (
+		<ReviewRow
+			status={deliveryOutcome(feedback)}
+			title={
+				<Link
+					to="/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId"
+					params={{ workspaceSlug, feedbackId: feedback.id }}
+					search={scope ?? ((previous) => previous)}
+					className="line-clamp-2"
+				>
+					{/* Feedback whose preview is nothing but a code quote has a body and no prose to show
+					    for it, which is not the same state as feedback nobody has composed yet. */}
+					{feedbackPreviewText(feedback) ??
+						(feedback.bodyPreview
+							? "Opens with a quote from the work…"
+							: "No feedback text was composed")}
+				</Link>
+			}
+			meta={
+				<>
+					<ReviewRowMeta
+						items={[
+							place.label,
+							<ReviewArtifactLabel key="work" artifact={feedback.artifact} />,
+							`${feedback.observationCount} ${feedback.observationCount === 1 ? "observation" : "observations"}`,
+							// See `ObservationRow`: no hover target under a stretched row link.
+							<RelativeTime key="composed" value={feedback.createdAt} tooltip={false} />,
+						]}
+					/>
+					{feedback.suppressionReason && (
+						<p>{withholdingReasonSentence(feedback.suppressionReason)}</p>
+					)}
+				</>
+			}
+			chips={[
+				// Both facts are on every row, which is what earns them reserved slots: the outcome badge
+				// then sits at one x down the list however long the recipient's name is. A badge that only
+				// some rows carry belongs in a free chip instead — see `ReviewRowChip`.
+				{ key: "person", width: "lg:w-40", node: <ReviewPerson person={feedback.recipient} /> },
+				{ key: "outcome", width: "lg:w-48", node: <StatusBadge def={deliveryOutcome(feedback)} /> },
+			]}
+		/>
 	);
 }

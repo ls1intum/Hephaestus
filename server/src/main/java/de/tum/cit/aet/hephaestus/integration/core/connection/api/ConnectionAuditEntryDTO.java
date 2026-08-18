@@ -8,9 +8,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Audit-log entry returned by {@code GET /workspaces/{workspaceSlug}/connections/{id}/audit}.
  *
- * <p>Lean projection of {@link ConnectionAudit} — the entity carries a back-reference
- * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
- * want to serialize on every response.
+ * <p>Lean projection of {@link ConnectionAudit} — the entity carries a back-reference to
+ * {@code Connection} that this DTO omits.
  */
 public record ConnectionAuditEntryDTO(
     String eventType,

@@ -1,29 +1,13 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "@tanstack/react-router";
 import { WorkflowIcon } from "lucide-react";
-import { toast } from "sonner";
-import {
-	cancelAgentJobMutation,
-	getAgentJobOptions,
-	getAgentJobQueryKey,
-	listPracticeReviewFeedbackOptions,
-	listPracticeReviewFindingsOptions,
-	listPracticeReviewsQueryKey,
-	retryAgentJobDeliveryMutation,
-} from "@/api/@tanstack/react-query.gen";
-import type { AgentJob } from "@/api/types.gen";
-import {
-	DELIVERY_STATUS_LABELS,
-	deliveryBadgeVariant,
-	holdReasonCopy,
-	jobWait,
-	STATUS_LABELS,
-	statusBadgeVariant,
-} from "@/components/admin/ai/job-utils";
+import type { AgentJob, Practice, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { RelativeTime } from "@/components/common/RelativeTime";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
+import {
+	REVIEW_STATUS_DEFS,
+	SUMMARY_POST_DEFS,
+} from "@/components/practice-vocabulary/review-status-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import {
 	Empty,
 	EmptyDescription,
@@ -32,92 +16,83 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
-import { problemDetailOf } from "@/lib/problem-detail";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
-import { ReviewOutputSections } from "./ReviewOutputSections";
+import { ReviewDetailHeader } from "./ReviewDetailHeader";
+import { ReviewOutputSections, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewRunActions } from "./ReviewRunActions";
-import { ReviewRunTechnicalDetails } from "./ReviewRunTechnicalDetails";
+import { ReviewRunCard } from "./ReviewRunCard";
+import { ReviewRunNotices } from "./ReviewRunNotices";
 import type { RunsSearch } from "./review-search";
-
-const ACTIVE_REVIEW_POLL_MS = 5_000;
 
 export interface ReviewRunDetailPageProps {
 	workspaceSlug: string;
 	jobId: string;
+	/** The list's search, carried back into the breadcrumb so "Reviews" returns the reader to the
+	 * filtered page they came from. */
 	search: RunsSearch;
+	job: AgentJob | undefined;
+	isLoading: boolean;
+	error: unknown;
+	onRetry: () => void;
+	/**
+	 * Already-resolved output. A `pending` section is a review still in flight — this screen is told
+	 * that as a state, not as a fact about how often anything is re-asked for.
+	 */
+	observations: ReviewSectionState<ReviewObservation>;
+	feedback: ReviewSectionState<ReviewFeedback>;
+	/**
+	 * The workspace's practices, which each observation row's practice link shows as a hover card.
+	 * Optional: the card is the only thing that needs them, and nothing it holds is load-bearing.
+	 */
+	practices?: Practice[];
+	onCancel: () => void;
+	cancelPending: boolean;
+	onRetryDelivery: () => void;
+	retryDeliveryPending: boolean;
 }
 
-export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunDetailPageProps) {
-	const queryClient = useQueryClient();
-	const jobQuery = useQuery({
-		...getAgentJobOptions({ path: { workspaceSlug, jobId } }),
-		refetchInterval: (result) =>
-			result.state.data?.status === "QUEUED" || result.state.data?.status === "RUNNING"
-				? ACTIVE_REVIEW_POLL_MS
-				: false,
-	});
-	const runIsActive = jobQuery.data?.status === "QUEUED" || jobQuery.data?.status === "RUNNING";
-	const findingsQuery = useQuery({
-		...listPracticeReviewFindingsOptions({
-			path: { workspaceSlug },
-			query: { agentJobId: jobId, sort: "ACTIONABILITY", size: 5 },
-		}),
-		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
-	});
-	const feedbackQuery = useQuery({
-		...listPracticeReviewFeedbackOptions({
-			path: { workspaceSlug },
-			query: { agentJobId: jobId, size: 5 },
-		}),
-		refetchInterval: runIsActive ? ACTIVE_REVIEW_POLL_MS : false,
-	});
-	const updateJob = (job: AgentJob) => {
-		queryClient.setQueryData(getAgentJobQueryKey({ path: { workspaceSlug, jobId } }), job);
-		queryClient.invalidateQueries({
-			queryKey: listPracticeReviewsQueryKey({ path: { workspaceSlug } }),
-		});
-	};
-	const cancelJob = useMutation({
-		...cancelAgentJobMutation(),
-		onSuccess: (job) => {
-			updateJob(job);
-			toast.success("Review cancelled");
-		},
-		onError: (error) =>
-			toast.error("Couldn't cancel the review", {
-				description: problemDetailOf(error, "Try again in a moment."),
-			}),
-	});
-	const retryDelivery = useMutation({
-		...retryAgentJobDeliveryMutation(),
-		onSuccess: (job) => {
-			updateJob(job);
-			toast.success("Summary comment queued for retry");
-		},
-		onError: (error) =>
-			toast.error("Couldn't retry the summary comment", {
-				description: problemDetailOf(error, "Try again in a moment."),
-			}),
-	});
+/** A section that has finished loading and holds nothing, as opposed to one still waiting. */
+function isEmptyResult(state: ReviewSectionState<unknown>): boolean {
+	return state.status === "ready" && state.items.length === 0;
+}
+
+export function ReviewRunDetailPage({
+	workspaceSlug,
+	jobId,
+	search,
+	job,
+	isLoading,
+	error,
+	onRetry,
+	observations,
+	feedback,
+	practices,
+	onCancel,
+	cancelPending,
+	onRetryDelivery,
+	retryDeliveryPending,
+}: ReviewRunDetailPageProps) {
 	const breadcrumbs = (
 		<ReviewBreadcrumbs
 			workspaceSlug={workspaceSlug}
 			section={{
 				label: "Reviews",
+				// The whole search goes back, not a hand-listed subset: "Reviews" has to return the
+				// reader to the filtered page they came from, and a filter added to the list would
+				// otherwise be dropped here without anything failing.
 				link: (
 					<Link
 						to="/w/$workspaceSlug/admin/practices/reviews"
 						params={{ workspaceSlug }}
-						search={{ page: search.page, status: search.status }}
+						search={search}
 					/>
 				),
 			}}
-			current="Review"
 		/>
 	);
 
-	if (jobQuery.isLoading)
+	if (isLoading)
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
@@ -126,78 +101,55 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				</div>
 			</article>
 		);
-	if (jobQuery.isError || !jobQuery.data) {
+	if (error != null || !job) {
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
-				<QueryErrorAlert
-					error={jobQuery.error}
-					title="Couldn't load this review"
-					onRetry={() => jobQuery.refetch()}
-				/>
+				<QueryErrorAlert error={error} title="Couldn't load this review" onRetry={onRetry} />
 			</article>
 		);
 	}
-	const job = jobQuery.data;
-	const wait = jobWait(job);
-	const hold = wait?.kind === "hold" ? holdReasonCopy(wait.reason) : undefined;
-	const findings = findingsQuery.data?.content ?? [];
-	const feedback = feedbackQuery.data?.content ?? [];
 	const reviewEndedEarly =
 		job.status === "FAILED" || job.status === "TIMED_OUT" || job.status === "CANCELLED";
 	const endedWithoutOutput =
-		reviewEndedEarly &&
-		!findingsQuery.isLoading &&
-		!feedbackQuery.isLoading &&
-		!findingsQuery.isError &&
-		!feedbackQuery.isError &&
-		findings.length === 0 &&
-		feedback.length === 0;
+		reviewEndedEarly && isEmptyResult(observations) && isEmptyResult(feedback);
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">
 			{breadcrumbs}
-			<header className="space-y-4">
-				<div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-					<div className="min-w-0 space-y-2">
-						<div className="flex flex-wrap items-center gap-2">
-							<Badge variant={statusBadgeVariant(job.status)}>{STATUS_LABELS[job.status]}</Badge>
-							{job.deliveryStatus && (
-								<Badge variant={deliveryBadgeVariant(job.deliveryStatus)}>
-									Summary comment: {DELIVERY_STATUS_LABELS[job.deliveryStatus]}
-								</Badge>
-							)}
-						</div>
-						<ReviewArtifactLink artifact={job.target} variant="label" display="full" />
-						<h2 className="break-words text-2xl font-semibold tracking-tight">
-							{job.target.title}
-						</h2>
+			<ReviewDetailHeader
+				chips={
+					<>
+						<StatusBadge def={REVIEW_STATUS_DEFS[job.status]} />
+						{job.deliveryStatus && <StatusBadge def={SUMMARY_POST_DEFS[job.deliveryStatus]} />}
+					</>
+				}
+				title={job.target.title}
+				provenance={
+					<div className="space-y-1">
+						<ReviewArtifactLink artifact={job.target} className="text-sm" />
 						<p className="text-sm text-muted-foreground">
 							{job.startedAt ? "Started " : "Created "}
 							<RelativeTime value={job.startedAt ?? job.createdAt} />
 						</p>
 					</div>
+				}
+				actions={
 					<ReviewRunActions
 						job={job}
-						isCancelling={cancelJob.isPending}
-						isRetrying={retryDelivery.isPending}
-						onCancel={() => cancelJob.mutate({ path: { workspaceSlug, jobId } })}
-						onRetry={() => retryDelivery.mutate({ path: { workspaceSlug, jobId } })}
+						isCancelling={cancelPending}
+						isRetrying={retryDeliveryPending}
+						onCancel={onCancel}
+						onRetry={onRetryDelivery}
 					/>
-				</div>
-				{reviewEndedEarly && !endedWithoutOutput && (
-					<Alert variant={job.status === "FAILED" ? "destructive" : "default"}>
-						<AlertTitle>Review output may be incomplete</AlertTitle>
-						<AlertDescription>The review ended before it completed.</AlertDescription>
-					</Alert>
-				)}
-				{hold && (
-					<Alert variant="warning">
-						<AlertTitle>{hold.label}</AlertTitle>
-						<AlertDescription>{hold.detail}</AlertDescription>
-					</Alert>
-				)}
-			</header>
+				}
+			/>
+			<div className="space-y-4">
+				<ReviewRunNotices
+					job={job}
+					outputMayBeIncomplete={reviewEndedEarly && !endedWithoutOutput}
+				/>
+			</div>
 
 			{endedWithoutOutput ? (
 				<Empty className="border">
@@ -207,7 +159,7 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 						</EmptyMedia>
 						<EmptyTitle>Review couldn't be completed</EmptyTitle>
 						<EmptyDescription>
-							This review ended before it produced findings or feedback.
+							This review ended before it produced observations or feedback.
 						</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
@@ -215,45 +167,14 @@ export function ReviewRunDetailPage({ workspaceSlug, jobId, search }: ReviewRunD
 				<ReviewOutputSections
 					workspaceSlug={workspaceSlug}
 					scope={{ agentJobId: jobId }}
-					context="review"
-					feedback={
-						feedbackQuery.isLoading
-							? { status: "loading" }
-							: feedbackQuery.isError
-								? {
-										status: "error",
-										error: feedbackQuery.error,
-										onRetry: () => void feedbackQuery.refetch(),
-									}
-								: runIsActive && feedback.length === 0
-									? { status: "pending" }
-									: {
-											status: "ready",
-											items: feedback,
-											total: feedbackQuery.data?.page?.totalElements ?? 0,
-										}
-					}
-					findings={
-						findingsQuery.isLoading
-							? { status: "loading" }
-							: findingsQuery.isError
-								? {
-										status: "error",
-										error: findingsQuery.error,
-										onRetry: () => void findingsQuery.refetch(),
-									}
-								: runIsActive && findings.length === 0
-									? { status: "pending" }
-									: {
-											status: "ready",
-											items: findings,
-											total: findingsQuery.data?.page?.totalElements ?? 0,
-										}
-					}
+					outcome={job.reviewOutcome}
+					feedback={feedback}
+					observations={observations}
+					practices={practices}
 				/>
 			)}
 
-			<ReviewRunTechnicalDetails job={job} />
+			<ReviewRunCard job={job} />
 		</article>
 	);
 }

@@ -14,7 +14,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.netty.resources.ConnectionProvider;
 import reactor.netty.resources.LoopResources;
 
-@Timeout(15) // safety net: the unguarded control's connect must not hang the suite
+@Timeout(15)
 class LlmProxyWebClientConfigTest extends BaseUnitTest {
 
     private static final String LOOPBACK_URL = "http://localhost:9/";

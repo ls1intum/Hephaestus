@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -18,10 +18,10 @@ import org.jspecify.annotations.Nullable;
  * <p>Carries NO rendered prose — rendering belongs to {@code DeliveryComposer}. A locus is identified by
  * its {@code recurrence_key} (the (practice, target, subject, file) locus), which is
  * stable across the non-deterministic detector, so "the same concern recurring" is observable even when the
- * LLM re-words its title every run.
+ * LLM re-words its summary every run.
  */
 public record TrendDelta(
-    WorkArtifact artifactType,
+    ArtifactKind artifactKind,
     @Nullable Long artifactId,
     UUID currentRunJobId,
     UUID priorRunJobId,
@@ -46,7 +46,7 @@ public record TrendDelta(
     }
 
     /**
-     * One locus's movement. {@code title}/{@code currentSeverity}/{@code currentConfidence} come from the
+     * One locus's movement. {@code summary}/{@code currentSeverity} come from the
      * CURRENT run for {@link TransitionStatus#NEW}/{@link TransitionStatus#PERSISTED}/{@link TransitionStatus#REGRESSED},
      * and from the PRIOR run for {@link TransitionStatus#RESOLVED} (the locus is absent now, so the prior
      * prose is what the student last saw). {@code currentAssessment} is null for RESOLVED; {@code priorAssessment}
@@ -56,11 +56,10 @@ public record TrendDelta(
         String recurrenceKey,
         TransitionStatus status,
         String practiceSlug,
-        @Nullable String title,
+        @Nullable String summary,
         @Nullable Assessment priorAssessment,
         @Nullable Assessment currentAssessment,
-        @Nullable Severity currentSeverity,
-        @Nullable Float currentConfidence
+        @Nullable Severity currentSeverity
     ) {}
 
     /**
@@ -122,7 +121,7 @@ public record TrendDelta(
     }
 
     /**
-     * Whether the finding set actually moved (something appeared, was fixed, or backslid). A re-review that
+     * Whether the observation set actually moved (something appeared, was fixed, or backslid). A re-review that
      * only re-flags the exact same loci is NOT meaningful — A4 stays silent so an edit-in-place re-review
      * does not ping the author about nothing.
      */

@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationState;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJob;
@@ -20,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.sync.SyncJobType;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.Organization;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.organization.OrganizationRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThread;
 import de.tum.cit.aet.hephaestus.integration.slack.domain.MentorSlackThreadRepository;
@@ -34,6 +36,7 @@ import de.tum.cit.aet.hephaestus.integration.slack.retention.SlackWorkspacePurge
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -41,8 +44,8 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -730,7 +733,6 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             Workspace a = createBareWorkspace("slack-conv-a");
             Workspace b = createBareWorkspace("slack-conv-b");
 
-            // Seed a slack_thread + its derived CONVERSATION_THREAD observation/feedback for each workspace.
             SlackThread threadA = new SlackThread();
             threadA.setWorkspaceId(a.getId());
             threadA.setSlackChannelId("CA");
@@ -760,15 +762,17 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
             assertThat(observationRepository.findById(convObsB)).isPresent();
         }
 
-        /** Seed a CONVERSATION_THREAD observation + feedback + join anchored to {@code threadId} for {@code workspace}. */
+        /** Seed a chat.conversation_thread observation + feedback + join anchored to {@code threadId} for {@code workspace}. */
         private UUID seedDerivedConversation(Workspace workspace, long threadId) {
             User owner = persistUser("conv-" + workspace.getId() + "-subject");
             Practice practice = new Practice();
+            practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.conversationThread());
             practice.setWorkspace(workspace);
             practice.setSlug("conv-practice-" + workspace.getId());
             practice.setName("Conversation Practice");
             practice.setCriteria("Test description");
-            practice.setTriggerEvents(OM.valueToTree(List.of("PullRequestCreated")));
+            practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practice = practiceRepository.save(practice);
 
             AgentJob job = new AgentJob();
@@ -784,28 +788,28 @@ class WorkspacePurgeIntegrationTest extends AbstractWorkspaceIntegrationTest {
                 job.getId(),
                 practice.getId(),
                 null,
-                WorkArtifact.CONVERSATION_THREAD.name(),
+                ArtifactKinds.CONVERSATION_THREAD.value(),
                 threadId,
                 owner.getId(),
                 "Observation title",
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.8f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             Feedback feedback = feedbackRepository.save(
                 Feedback.builder()
                     .agentJobId(job.getId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.CONVERSATION_THREAD)
+                    .artifactKind(ArtifactKinds.CONVERSATION_THREAD)
                     .artifactId(threadId)
                     .recipientUserId(owner.getId())
                     .aboutUserId(owner.getId())
-                    .channel(FeedbackChannel.CONVERSATION)
+                    .channel(FeedbackChannel.IN_CHAT)
                     .position(0)
                     .deliveryState(FeedbackDeliveryState.PREPARED)
                     .source(FeedbackSource.AGENT)

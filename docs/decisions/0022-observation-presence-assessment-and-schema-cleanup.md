@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-06-24
 **Authors:** Felix T.J. Dietrich
-**Supersedes (in part):** [ADR 0021](0021-findings-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
+**Supersedes (in part):** [ADR 0021](0021-observations-feedback-synthesis-seam.md) F-6 (the sign-neutral `Observation` × `Practice.kind` split) and F-13/F-24 (the `FeedbackReaction` reshape with a nullable `finding_id` and an open `verb` event log)
 
 ## Context
 
@@ -80,7 +80,9 @@ derivation and the on-read `baseline_state`.
 `PracticeFinding` → `Observation` (table `observation`); `FeedbackFinding` → `FeedbackObservation`;
 `FindingReaction` → `reaction`. Column renames for clarity: `observation`→`presence`+`assessment`,
 `finding_fingerprint`→`recurrence_key`, `idempotency_key`→`occurrence_key`, `subject_user_id`→
-`about_user_id`, `rendered_body`→`body`, `surface`→`channel` (and `REFLECTION_DASHBOARD`→`PROFILE`),
+`about_user_id`, `rendered_body`→`body`, `surface`→`channel` (and `REFLECTION_DASHBOARD`→`PROFILE`; that
+channel value was later renamed again to `REFLECTION`, because `PROFILE` collided with the public user
+profile and named a storage location rather than how the developer engages — see `FeedbackChannel`),
 `provenance`→`source`, `unit_ordinal`→`position`, `supersedes_id`→`replaces_id`,
 `feedback_thread_key`→`thread_key`, `slot`→`placement_type`, `external_ref`→`posted_comment_ref`,
 `evidence_role`→`role`, `detected_at`→`observed_at`.

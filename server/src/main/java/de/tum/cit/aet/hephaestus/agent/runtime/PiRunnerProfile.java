@@ -13,10 +13,20 @@ public interface PiRunnerProfile {
     String runnerScript();
 
     /**
-     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-finding-normalize.mjs}).
+     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-observation-normalize.mjs}).
      * Each is staged at the workspace root next to the runner so the import resolves. Empty by default.
      */
     default List<String> sidecarScripts() {
+        return List.of();
+    }
+
+    /**
+     * Prompt files this runner reads from the workspace root by name (e.g. the composition stage's
+     * instructions). Staged like the sidecars, and digested with the rest of the prompt scaffolding —
+     * they ARE prompt content, so a run's recorded prompt version must move when they do. Empty by
+     * default.
+     */
+    default List<String> promptResources() {
         return List.of();
     }
 

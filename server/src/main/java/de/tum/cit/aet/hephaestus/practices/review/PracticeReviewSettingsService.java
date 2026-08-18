@@ -4,11 +4,13 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,7 +41,9 @@ public class PracticeReviewSettingsService {
         PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings);
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
-        settings.applyPatch(req.runForAllUsers(), req.skipDrafts(), req.deliverToMerged(), req.cooldownMinutes());
+        settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
+        settings.applyScope(req.reviewScope());
+        settings.applyDefaultReviewTier(req.defaultReviewTier() == null ? null : req.defaultReviewTier().name());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
@@ -70,15 +74,17 @@ public class PracticeReviewSettingsService {
 
     private PracticeReviewSettingsDTO toView(Workspace workspace) {
         PracticeReviewSettings s = workspace.getReviewSettings();
+        WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(s);
         return new PracticeReviewSettingsDTO(
             s.resolveRunForAllUsers(reviewProperties.runForAllUsers()),
-            s.resolveSkipDrafts(reviewProperties.skipDrafts()),
             s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
             s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
             s.getRunForAllUsers(),
-            s.getSkipDrafts(),
             s.getDeliverToMerged(),
-            s.getCooldownMinutes()
+            s.getCooldownMinutes(),
+            s.resolveReviewScope(),
+            defaults.defaultTier(),
+            s.getDefaultReviewTier() == null ? null : PracticeReviewTier.valueOf(s.getDefaultReviewTier())
         );
     }
 }

@@ -26,10 +26,12 @@ function DropdownMenuContent({
 	Pick<MenuPrimitive.Positioner.Props, "align" | "alignOffset" | "side" | "sideOffset">) {
 	return (
 		<MenuPrimitive.Portal>
+			{/* Viewport-relative, not `absolute` — see `overlay-reflow.stories.tsx`. */}
 			<MenuPrimitive.Positioner
 				className="isolate z-50 outline-none"
 				align={align}
 				alignOffset={alignOffset}
+				positionMethod="fixed"
 				side={side}
 				sideOffset={sideOffset}
 			>

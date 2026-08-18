@@ -8,9 +8,10 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
@@ -105,7 +106,7 @@ class FeedbackPlacementRepositoryIntegrationTest extends BaseIntegrationTest {
             Feedback.builder()
                 .agentJobId(job.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)
                 .recipientUserId(recipient.getId())
                 .aboutUserId(recipient.getId())

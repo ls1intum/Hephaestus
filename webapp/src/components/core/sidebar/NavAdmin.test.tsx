@@ -5,7 +5,7 @@ import {
 	createRouter,
 	RouterProvider,
 } from "@tanstack/react-router";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SidebarProvider } from "@/components/ui/sidebar";
 import { NavAdmin } from "./NavAdmin";
@@ -15,7 +15,7 @@ const PATHS = [
 	"w/$workspaceSlug/admin/practices",
 	"w/$workspaceSlug/admin/practices/new",
 	"w/$workspaceSlug/admin/practices/$practiceSlug",
-	"w/$workspaceSlug/admin/practices/settings",
+	"w/$workspaceSlug/admin/practices/review",
 	"w/$workspaceSlug/admin/practices/reviews",
 	"w/$workspaceSlug/admin/integrations",
 	"w/$workspaceSlug/admin/integrations/scm",
@@ -60,7 +60,10 @@ describe("NavAdmin", () => {
 		["/w/acme/admin/practices", "Practice setup"],
 		["/w/acme/admin/practices/new", "Practice setup"],
 		["/w/acme/admin/practices/clean-code", "Practice setup"],
-		["/w/acme/admin/practices/settings", "Review settings"],
+		["/w/acme/admin/practices/review", "Review"],
+		// Both directions, because the two paths differ by one trailing character and a matcher that
+		// compared strings rather than whole segments would light both entries up on either.
+		["/w/acme/admin/practices/reviews", "Practice reviews"],
 		["/w/acme/admin/integrations/scm", "GitHub"],
 	])("marks only the destination for %s as current", async (path, currentLabel) => {
 		renderNavigation(path);
@@ -71,14 +74,28 @@ describe("NavAdmin", () => {
 	});
 
 	it("keeps the active section visible when its children are collapsed", async () => {
-		renderNavigation("/w/acme/admin/practices/settings");
+		renderNavigation("/w/acme/admin/practices/review");
 
-		await screen.findByRole("link", { name: "Review settings" });
+		await screen.findByRole("link", { name: "Review" });
 		const practices = screen.getByRole("button", { name: "Practices" });
 		fireEvent.click(practices);
 
-		await waitFor(() => expect(screen.queryByRole("link", { name: "Review settings" })).toBeNull());
+		await waitFor(() => expect(screen.queryByRole("link", { name: "Review" })).toBeNull());
 		expect(practices.hasAttribute("data-active")).toBe(true);
+	});
+
+	it("offers three destinations under Practices, not five", async () => {
+		renderNavigation("/w/acme/admin/practices");
+		await screen.findByRole("link", { name: "Practice setup" });
+		const submenu = within(screen.getByRole("list", { name: "Practices" }));
+
+		// By accessible name, not by `textContent`: an `sr-only` suffix is part of the name and not
+		// part of the text, so reading the text is how an entry that announces itself wrongly passes
+		// a test about what it announces. `getByRole(name)` runs that computation.
+		submenu.getByRole("link", { name: "Practice setup" });
+		submenu.getByRole("link", { name: "Review" });
+		submenu.getByRole("link", { name: "Practice reviews" });
+		expect(submenu.getAllByRole("link")).toHaveLength(3);
 	});
 
 	it("keeps sections expandable on mobile when the desktop sidebar is collapsed", async () => {

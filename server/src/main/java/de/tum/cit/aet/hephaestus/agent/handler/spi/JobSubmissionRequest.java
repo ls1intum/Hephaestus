@@ -1,14 +1,21 @@
 package de.tum.cit.aet.hephaestus.agent.handler.spi;
 
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+
 /**
- * Marker interface for type-safe handler dispatch.
+ * Marker interface for type-safe handler dispatch: each {@link JobTypeHandler} accepts a specific
+ * implementation in {@link JobTypeHandler#createSubmission} and validates it via {@code instanceof}.
  *
- * <p>Each {@link JobTypeHandler} accepts a specific implementation of this interface in
- * {@link JobTypeHandler#createSubmission}. Handlers validate the concrete type at runtime
- * via {@code instanceof} and throw {@link IllegalArgumentException} on mismatch.
- *
- * <p>Not sealed because sealing would require this SPI type to reference implementation
- * classes via {@code permits}, creating a compile-time dependency from the SPI package
- * to handler implementations — violating the SPI isolation enforced by ArchUnit tests.
+ * <p>Not sealed: that would require this SPI package to reference implementation classes via
+ * {@code permits}, which the SPI-isolation ArchUnit rule forbids.
  */
-public interface JobSubmissionRequest {}
+public interface JobSubmissionRequest {
+    /**
+     * What occasioned this run, and therefore which population its observations belong to. Declared on the
+     * submission rather than inferred downstream, where a live sweep and a backfill sweep look identical and
+     * conflating them would silently merge two incomparable samples into one trend.
+     */
+    default ObservationOrigin observationOrigin() {
+        return ObservationOrigin.LIVE;
+    }
+}

@@ -2,9 +2,10 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.LocusTransition;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta.TransitionStatus;
@@ -14,7 +15,7 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
-/** Unit tests for the cross-run progress-delta footer (ADR 0021, B1/B3). */
+/** Unit tests for the cross-run progress-delta footer (ADR 0021). */
 class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test
@@ -52,10 +53,8 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     @Test
     void render_newPlusBadToGoodPersisted_doesNotCountSatisfiedLocusAsStillOpen() {
-        // A BAD→GOOD improvement is carried as PERSISTED with currentAssessment=GOOD (the locus recurs
-        // but is now satisfied). With a co-occurring NEW problem the footer renders, but the now-satisfied
-        // locus must NOT be folded into the "still open" count (C10) — only genuinely-open (BAD) persisted
-        // loci are still open.
+        // A BAD→GOOD improvement is PERSISTED with currentAssessment=GOOD (satisfied, not open); only
+        // genuinely-open (BAD) persisted loci count as "still open".
         LocusTransition newProblem = new LocusTransition(
             "k-new",
             TransitionStatus.NEW,
@@ -63,8 +62,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
             "New dead branch",
             null,
             Assessment.BAD,
-            Severity.MAJOR,
-            0.8f
+            Severity.MAJOR
         );
         LocusTransition nowSatisfied = new LocusTransition(
             "k-fixed",
@@ -73,8 +71,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
             "Name now clear",
             Assessment.BAD,
             Assessment.GOOD,
-            Severity.MINOR,
-            0.8f
+            Severity.MINOR
         );
         TrendDelta d = delta(List.of(newProblem, nowSatisfied));
 
@@ -117,7 +114,7 @@ class ProgressFooterRendererTest extends BaseUnitTest {
 
     private static TrendDelta delta(List<LocusTransition> transitions) {
         return new TrendDelta(
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             100L,
             UUID.randomUUID(),
             UUID.randomUUID(),
@@ -132,6 +129,6 @@ class ProgressFooterRendererTest extends BaseUnitTest {
         // locus is a gap → Assessment.BAD. NEW has no prior; RESOLVED has no current.
         Assessment prior = status == TransitionStatus.NEW ? null : Assessment.BAD;
         Assessment curr = status == TransitionStatus.RESOLVED ? null : Assessment.BAD;
-        return new LocusTransition(key, status, slug, title, prior, curr, Severity.MAJOR, 0.8f);
+        return new LocusTransition(key, status, slug, title, prior, curr, Severity.MAJOR);
     }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.testconfig.TestAsyncConfiguration;
 import de.tum.cit.aet.hephaestus.testconfig.TestSecurityConfig;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -216,9 +217,9 @@ class ObservationAssessmentBackfillIntegrationTest {
         overrides.put("id", id);
         overrides.put("practice_id", practiceId);
         overrides.put("presence", presence);
-        // artifact_type carries a value-restricting CHECK (IN ('PULL_REQUEST','ISSUE')); the generic
+        // artifact_kind carries a value-restricting CHECK (IN ('scm.pull_request','scm.issue')); the generic
         // dummy filler can't know that, so pin a valid value explicitly.
-        overrides.put("artifact_type", "PULL_REQUEST");
+        overrides.put("artifact_kind", "scm.pull_request");
         // assessment intentionally omitted -> NULL (the pre-backfill state).
         insertRow("observation", overrides);
         return id;
@@ -239,8 +240,11 @@ class ObservationAssessmentBackfillIntegrationTest {
         );
 
         Map<String, Object> values = new LinkedHashMap<>(overrides);
+        Map<String, String> dataTypes = new HashMap<>();
         for (Map<String, Object> col : columns) {
             String name = (String) col.get("column_name");
+            String dataType = (String) col.get("data_type");
+            dataTypes.put(name, dataType);
             if (values.containsKey(name)) {
                 continue;
             }
@@ -249,7 +253,7 @@ class ObservationAssessmentBackfillIntegrationTest {
             if (nullable || hasDefault) {
                 continue; // leave to NULL / DB default
             }
-            values.put(name, dummyFor((String) col.get("data_type"), name));
+            values.put(name, dummyFor(dataType, name));
         }
 
         String cols = String.join(", ", values.keySet());
@@ -258,7 +262,13 @@ class ObservationAssessmentBackfillIntegrationTest {
             values
                 .keySet()
                 .stream()
-                .map(k -> "?")
+                .map(name ->
+                    switch (dataTypes.get(name)) {
+                        case "json" -> "?::json";
+                        case "jsonb" -> "?::jsonb";
+                        default -> "?";
+                    }
+                )
                 .toList()
         );
         jdbcTemplate.update(

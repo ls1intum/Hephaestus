@@ -18,6 +18,7 @@ const target: AdminAccountView = {
 const meta = {
 	component: ImpersonateDialog,
 	parameters: { layout: "centered" },
+	tags: ["autodocs"],
 	args: { user: target, onOpenChange: fn(), onConfirm: fn(), isPending: false },
 } satisfies Meta<typeof ImpersonateDialog>;
 

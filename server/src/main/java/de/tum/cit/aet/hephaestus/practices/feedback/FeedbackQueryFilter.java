@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -11,7 +11,7 @@ public record FeedbackQueryFilter(
     @Nullable List<FeedbackSuppressionReason> suppressionReasons,
     @Nullable List<FeedbackChannel> channels,
     @Nullable UUID agentJobId,
-    @Nullable WorkArtifact artifactType,
+    @Nullable ArtifactKind artifactKind,
     @Nullable Long artifactId,
     @Nullable Long recipientUserId,
     @Nullable Instant from,
@@ -29,8 +29,8 @@ public record FeedbackQueryFilter(
         return names(channels);
     }
 
-    public @Nullable String artifactTypeName() {
-        return artifactType == null ? null : artifactType.name();
+    public @Nullable String artifactKindValue() {
+        return artifactKind == null ? null : artifactKind.value();
     }
 
     private static String@Nullable [] names(@Nullable List<? extends Enum<?>> values) {

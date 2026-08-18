@@ -5,7 +5,6 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
-import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -13,6 +12,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.SortedSet;
@@ -21,6 +21,7 @@ import java.util.stream.Stream;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveInputStream;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -40,9 +41,6 @@ public class SandboxWorkspaceManager {
     /** Maximum size of a single output file (10 MB). */
     static final long MAX_SINGLE_FILE_BYTES = 10L * 1024 * 1024;
 
-    /** Maximum total size of injected input files (50 MB). */
-    static final long MAX_INPUT_BYTES = 50L * 1024 * 1024;
-
     /** Maximum total size of a directory injected via tar (1 GB). */
     static final long MAX_DIRECTORY_BYTES = 1024L * 1024 * 1024;
 
@@ -55,7 +53,6 @@ public class SandboxWorkspaceManager {
     private final DockerFileOperations fileOps;
     private final long maxOutputBytes;
     private final long maxSingleFileBytes;
-    private final long maxInputBytes;
     private final long maxDirectoryBytes;
     private final int maxDirectoryEntries;
 
@@ -63,30 +60,17 @@ public class SandboxWorkspaceManager {
         this(fileOps, MAX_OUTPUT_BYTES, MAX_SINGLE_FILE_BYTES, MAX_DIRECTORY_BYTES, MAX_DIRECTORY_ENTRIES);
     }
 
-    /** Package-private constructor for testing with custom limits (input limit defaults to {@link #MAX_INPUT_BYTES}). */
+    /** Package-private constructor for testing with custom limits. */
     SandboxWorkspaceManager(
         DockerFileOperations fileOps,
         long maxOutputBytes,
         long maxSingleFileBytes,
-        long maxDirectoryBytes,
-        int maxDirectoryEntries
-    ) {
-        this(fileOps, maxOutputBytes, maxSingleFileBytes, MAX_INPUT_BYTES, maxDirectoryBytes, maxDirectoryEntries);
-    }
-
-    /** Package-private constructor for testing with custom limits, including the injected-input total. */
-    SandboxWorkspaceManager(
-        DockerFileOperations fileOps,
-        long maxOutputBytes,
-        long maxSingleFileBytes,
-        long maxInputBytes,
         long maxDirectoryBytes,
         int maxDirectoryEntries
     ) {
         this.fileOps = fileOps;
         this.maxOutputBytes = maxOutputBytes;
         this.maxSingleFileBytes = maxSingleFileBytes;
-        this.maxInputBytes = maxInputBytes;
         this.maxDirectoryBytes = maxDirectoryBytes;
         this.maxDirectoryEntries = maxDirectoryEntries;
     }
@@ -98,16 +82,52 @@ public class SandboxWorkspaceManager {
      * @param files map of relative paths to file contents
      */
     public void injectFiles(String containerId, Map<String, byte[]> files) {
-        if (files == null || files.isEmpty()) {
+        injectFiles(containerId, files, Map.of());
+    }
+
+    /**
+     * Inject files into a container via {@code docker cp}, from memory and from disk.
+     *
+     * <p>The archive is written to a temporary file rather than held in memory, so heap use is
+     * independent of how much content is staged — on-disk entries travel disk-to-socket without this
+     * process ever holding their bytes.
+     *
+     * @param containerId the target container (must be created but can be stopped)
+     * @param files map of relative paths to file contents held in memory
+     * @param filesOnDisk map of relative paths to host files, streamed rather than read
+     * @implNote The archive stream is valid only for the duration of the {@code copyArchiveToContainer}
+     *     call; callers and test doubles must consume it eagerly rather than retain it.
+     */
+    public void injectFiles(String containerId, Map<String, byte[]> files, Map<String, Path> filesOnDisk) {
+        Map<String, byte[]> inMemory = files == null ? Map.of() : files;
+        Map<String, Path> onDisk = filesOnDisk == null ? Map.of() : filesOnDisk;
+        if (inMemory.isEmpty() && onDisk.isEmpty()) {
             return;
         }
 
-        byte[] tarBytes = createTarArchive(files);
-        try (InputStream tarStream = new ByteArrayInputStream(tarBytes)) {
-            fileOps.copyArchiveToContainer(containerId, "/workspace", tarStream);
-            log.debug("Injected {} files into container {}", files.size(), containerId);
+        Path tarFile = null;
+        try {
+            tarFile = Files.createTempFile("sandbox-inputs-", ".tar");
+            writeInputTar(tarFile, inMemory, onDisk);
+            try (InputStream tarStream = Files.newInputStream(tarFile)) {
+                fileOps.copyArchiveToContainer(containerId, "/workspace", tarStream);
+            }
+            log.debug("Injected {} files into container {}", inMemory.size() + onDisk.size(), containerId);
         } catch (IOException e) {
             throw new SandboxInfrastructureException("Failed to inject files into container: " + containerId, e);
+        } finally {
+            deleteQuietly(tarFile);
+        }
+    }
+
+    private static void deleteQuietly(@Nullable Path path) {
+        if (path == null) {
+            return;
+        }
+        try {
+            Files.deleteIfExists(path);
+        } catch (IOException e) {
+            log.warn("Could not delete temporary archive {}", path, e);
         }
     }
 
@@ -367,10 +387,11 @@ public class SandboxWorkspaceManager {
 
     // Internal helpers
 
-    private byte[] createTarArchive(Map<String, byte[]> files) {
+    private void writeInputTar(Path tarFile, Map<String, byte[]> files, Map<String, Path> filesOnDisk)
+        throws IOException {
         try (
-            ByteArrayOutputStream baos = new ByteArrayOutputStream();
-            TarArchiveOutputStream tar = new TarArchiveOutputStream(baos)
+            OutputStream fileOut = new BufferedOutputStream(Files.newOutputStream(tarFile), COPY_BUFFER_SIZE);
+            TarArchiveOutputStream tar = new TarArchiveOutputStream(fileOut)
         ) {
             tar.setLongFileMode(TarArchiveOutputStream.LONGFILE_POSIX);
             tar.setBigNumberMode(TarArchiveOutputStream.BIGNUMBER_POSIX);
@@ -380,7 +401,9 @@ public class SandboxWorkspaceManager {
             // inputs/ subtree but breaks work/ (ADR 0020): the precompute step does `mkdir -p work/
             // precompute-out` and the agent uses work/ as scratch, both as uid 1000 — a root-owned work/
             // would deny those writes. We therefore pre-create every work/* ancestor owned by 1000.
-            for (String dir : writableAncestorDirs(files.keySet())) {
+            Set<String> allPaths = new LinkedHashSet<>(files.keySet());
+            allPaths.addAll(filesOnDisk.keySet());
+            for (String dir : writableAncestorDirs(allPaths)) {
                 TarArchiveEntry dirEntry = new TarArchiveEntry(dir + "/");
                 dirEntry.setModTime(System.currentTimeMillis());
                 dirEntry.setUserId(1000);
@@ -389,29 +412,43 @@ public class SandboxWorkspaceManager {
                 tar.closeArchiveEntry();
             }
 
-            long totalBytes = 0;
             for (Map.Entry<String, byte[]> entry : files.entrySet()) {
-                totalBytes += entry.getValue().length;
-                if (totalBytes > maxInputBytes) {
-                    throw new SandboxException("Input files exceed maximum size limit (" + maxInputBytes + " bytes)");
-                }
-                String safePath = validatePath(entry.getKey());
-                TarArchiveEntry tarEntry = new TarArchiveEntry(safePath);
-                tarEntry.setSize(entry.getValue().length);
-                tarEntry.setModTime(System.currentTimeMillis());
-                // Set agent user ownership so container (uid 1000) can read/write injected files
-                tarEntry.setUserId(1000);
-                tarEntry.setGroupId(1000);
+                TarArchiveEntry tarEntry = newInputEntry(validatePath(entry.getKey()), entry.getValue().length);
                 tar.putArchiveEntry(tarEntry);
                 tar.write(entry.getValue());
                 tar.closeArchiveEntry();
             }
 
+            for (Map.Entry<String, Path> entry : filesOnDisk.entrySet()) {
+                Path source = entry.getValue();
+                long fileSize = Files.size(source);
+                TarArchiveEntry tarEntry = newInputEntry(validatePath(entry.getKey()), fileSize);
+                tar.putArchiveEntry(tarEntry);
+                long written = copyExactly(source, tar, fileSize);
+                if (written != fileSize) {
+                    throw new SandboxException(
+                        "Source file changed during injection (declared " +
+                            fileSize +
+                            " bytes, read " +
+                            written +
+                            "): " +
+                            source
+                    );
+                }
+                tar.closeArchiveEntry();
+            }
+
             tar.finish();
-            return baos.toByteArray();
-        } catch (IOException e) {
-            throw new SandboxInfrastructureException("Failed to create tar archive", e);
         }
+    }
+
+    private static TarArchiveEntry newInputEntry(String safePath, long size) {
+        TarArchiveEntry entry = new TarArchiveEntry(safePath);
+        entry.setSize(size);
+        entry.setModTime(System.currentTimeMillis());
+        entry.setUserId(1000);
+        entry.setGroupId(1000);
+        return entry;
     }
 
     /**

@@ -5,9 +5,10 @@ import { expectControlOnScreen, expectNoPageOverflow } from "@/test/reflow";
 import { AchievementDesignerHeader } from "./AchievementDesignerHeader";
 
 const meta = {
-	title: "Admin/Achievements/Designer header",
+	title: "Workspace admin/Achievements/Designer header",
 	component: AchievementDesignerHeader,
 	parameters: { layout: "fullscreen" },
+	tags: ["autodocs"],
 	decorators: [
 		(Story) => (
 			<ReactFlowProvider>

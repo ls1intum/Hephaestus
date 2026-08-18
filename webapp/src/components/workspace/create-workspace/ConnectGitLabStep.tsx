@@ -94,6 +94,10 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 				<FieldLabel htmlFor="gitlab-server-url">GitLab Instance</FieldLabel>
 				{multipleInstances ? (
 					<Select
+						items={selectableInstances.map((instance) => ({
+							value: instance.baseUrl,
+							label: `${instance.displayName} (${instance.baseUrl})`,
+						}))}
 						value={state.serverUrl || selectableInstances[0]?.baseUrl || ""}
 						onValueChange={(value) => dispatch({ type: "SET_SERVER_URL", value: value ?? "" })}
 					>

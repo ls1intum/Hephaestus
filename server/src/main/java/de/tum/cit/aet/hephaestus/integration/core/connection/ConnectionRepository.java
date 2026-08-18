@@ -105,6 +105,7 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
     @Query(
         value = """
         SELECT c.workspace_id AS "workspaceId",
+               c.config ->> 'serverUrl' AS "serverUrl",
                c.config ->> 'webhookSecret' AS "signingSecret"
         FROM connection c
         WHERE c.kind = 'OUTLINE'
@@ -124,6 +125,9 @@ public interface ConnectionRepository extends JpaRepository<Connection, Long> {
      */
     interface OutlineSubscriptionProjection {
         Long getWorkspaceId();
+
+        @Nullable
+        String getServerUrl();
 
         @Nullable
         String getSigningSecret();

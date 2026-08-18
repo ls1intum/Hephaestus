@@ -5,9 +5,14 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.IssueReviewRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.PracticeReviewRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceCollectionException;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
+import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection;
 import de.tum.cit.aet.hephaestus.agent.documentation.DocumentProjection.ProjectedDocument;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.evidence.SourceContentState;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
@@ -40,7 +45,7 @@ import tools.jackson.databind.node.ObjectNode;
 /**
  * Materialises a workspace's mirrored Outline documents into the sandbox context — a pure extract+load of raw doc
  * rows through the agent-owned {@link DocumentProjection} SPI, so this source never reads {@code outline_document}
- * itself and the coupling runs one way. Best-effort; {@code originId="outline"}.
+ * itself and the coupling runs one way.
  *
  * <p>Mentor chat emits one {@code outline_docs.json}; review emits a {@code .md} tree under
  * {@code inputs/context/outline/}. Both are telescoped, never the whole corpus.
@@ -50,7 +55,19 @@ import tools.jackson.databind.node.ObjectNode;
  */
 @Component
 @ConditionalOnProperty(name = "hephaestus.integration.outline.enabled", havingValue = "true", matchIfMissing = false)
-public class OutlineDocumentContentSource implements ContentSource {
+public class OutlineDocumentContentSource implements EvidenceSource {
+
+    private static final SourceKind KIND = new SourceKind("outline.documents");
+
+    @Override
+    public Set<SourceKind> sourceKinds() {
+        return Set.of(KIND);
+    }
+
+    @Override
+    public SourceKind sourceKindFor(String path) {
+        return KIND;
+    }
 
     private static final Logger log = LoggerFactory.getLogger(OutlineDocumentContentSource.class);
 
@@ -59,6 +76,17 @@ public class OutlineDocumentContentSource implements ContentSource {
 
     /** Review-path sub-tree root for the per-document {@code .md} files. */
     static final String REVIEW_PREFIX = OUTPUT_PREFIX + "outline/";
+
+    /**
+     * Review-path index of the documents staged below {@link #REVIEW_PREFIX}, written on every review.
+     *
+     * <p>The per-document files are the evidence; this says which of them there are. It is written even
+     * when there are none, because a directory that is not there and a directory that is there and empty
+     * are different findings: the first says nothing was staged, the second says the documentation was
+     * searched and none of it turned out to bear on this work. Only the second is something a review may
+     * reason from.
+     */
+    static final String REVIEW_INDEX_KEY = REVIEW_PREFIX + "index.json";
 
     /** Cap on documents surfaced to the mentor per turn — the corpus-breadth envelope (telescope, not dump). */
     static final int MAX_MENTOR_DOCUMENTS = 15;
@@ -114,11 +142,6 @@ public class OutlineDocumentContentSource implements ContentSource {
     }
 
     @Override
-    public String originId() {
-        return "outline";
-    }
-
-    @Override
     public boolean supports(ContextRequest request) {
         return (
             request instanceof MentorChatRequest ||
@@ -145,7 +168,7 @@ public class OutlineDocumentContentSource implements ContentSource {
                 contributeReview(issueReview.job(), "issue_id", files, false);
             }
         } catch (RuntimeException e) {
-            log.warn("OutlineDocumentContentSource failed, continuing without documentation: {}", e.getMessage());
+            throw new EvidenceCollectionException("Outline-document collection failed", e);
         }
     }
 
@@ -368,6 +391,51 @@ public class OutlineDocumentContentSource implements ContentSource {
                 renderReviewDocument(entry.getValue()).getBytes(StandardCharsets.UTF_8)
             );
         }
+        writeReviewIndex(files, byPath);
+    }
+
+    /** The staged document paths, in staging order. Written even when there are none. */
+    private void writeReviewIndex(Map<String, byte[]> files, Map<String, ProjectedDocument> byPath) {
+        ObjectNode root = objectMapper.createObjectNode();
+        root.put(
+            "note",
+            "Documentation staged for this review, by path. Retrieval cannot establish that it found every " +
+                "relevant document, so an empty list means none was matched, not that none exists."
+        );
+        root.put("count", byPath.size());
+        ArrayNode documents = root.putArray("documents");
+        for (Map.Entry<String, ProjectedDocument> entry : byPath.entrySet()) {
+            ObjectNode node = documents.addObject();
+            node.put("path", entry.getKey());
+            node.put("collection", entry.getValue().collectionSlug());
+            node.put("slug", entry.getValue().slug());
+            node.put("title", entry.getValue().title());
+        }
+        files.put(REVIEW_INDEX_KEY, objectMapper.writeValueAsBytes(root));
+    }
+
+    /**
+     * Reads emptiness out of the index rather than out of the staged file list.
+     *
+     * <p>The index is always staged, so "there is a file" is no longer the same question as "a document was
+     * found". Left to the default, every review would report documentation as present.
+     */
+    @Override
+    public EvidenceContribution capture(ContextRequest request, Set<SourceKind> selectedKinds) {
+        EvidenceContribution captured = EvidenceSource.super.capture(request, selectedKinds);
+        byte[] index = captured.files().get(REVIEW_INDEX_KEY);
+        if (!selectedKinds.contains(KIND) || index == null) {
+            return captured;
+        }
+        JsonNode documents = objectMapper.readTree(index).path("documents");
+        return new EvidenceContribution(
+            captured.files(),
+            captured.completeness(),
+            captured.immutableIdentities(),
+            captured.observedAt(),
+            captured.sourceEffectiveAt(),
+            Map.of(KIND, documents.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
+        );
     }
 
     private static String reviewPath(ProjectedDocument doc) {
@@ -383,16 +451,11 @@ public class OutlineDocumentContentSource implements ContentSource {
     /**
      * The extracted references that did NOT resolve to a mirrored document, in extraction order.
      *
-     * <p>{@link DocumentProjection#documentsByReference} takes the whole reference set in one batch and hands
-     * back a flat list of matches — it does not report which individual reference produced which document, and
-     * this source deliberately stays vendor-blind to the link grammar (that parsing is the projection impl's
-     * knowledge, not ours). So resolution is checked with a generic, conservative containment test: a reference
-     * counts as resolved the moment ANY returned document's {@code slug}/{@code collectionSlug} appears
-     * (case-insensitively) inside it — true for the common {@code .../<slug>-<shortId>} link shape without this
-     * source having to know that shape. The bias is deliberately one-sided: worst case this under-reports (a
-     * reference that happens to textually contain another resolved doc's slug is missed), never over-reports —
-     * this file exists to stop a false "negligence" read, so a false negative here is harmless while a false
-     * positive would itself be a nag.
+     * <p>{@link DocumentProjection#documentsByReference} does not report which reference produced which
+     * document, and this source stays vendor-blind to the link grammar, so resolution is checked with a
+     * generic, conservative containment test: a reference counts as resolved the moment ANY returned
+     * document's {@code slug}/{@code collectionSlug} appears inside it. The bias is deliberately
+     * one-sided — a false negative here is harmless, a false positive would itself be a nag.
      */
     private static Set<String> unresolvedReferences(Set<String> references, List<ProjectedDocument> documents) {
         if (documents.isEmpty()) {
@@ -484,14 +547,9 @@ public class OutlineDocumentContentSource implements ContentSource {
     }
 
     /**
-     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. Opens with the
-     * collection's human-facing name (when captured — the model needs a way to label the doc group, not
-     * just see an opaque directory slug); a resolved member id (linked account) is appended so the
-     * reviewer can attribute the doc to a workspace developer; the last-editor line only appears when it
-     * differs from the creator; contributors show resolved display info only ("+N more" for the rest) —
-     * raw subject UUIDs are machine noise and never render in the human-facing byline. "Last updated"
-     * carries the upstream clock so the reviewer can weigh the doc's freshness; a trailing archived-status
-     * line marks a document that is still live-linkable but archived (soft, recoverable) in the wiki.
+     * The document byline, or {@code null} when the mirror captured nothing byline-worthy. Contributors
+     * show resolved display info only — raw subject UUIDs are machine noise and never render in the
+     * human-facing byline.
      */
     private static String renderByline(ProjectedDocument doc) {
         StringBuilder byline = new StringBuilder();

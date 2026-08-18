@@ -1,8 +1,11 @@
 package de.tum.cit.aet.hephaestus.integration.outline.sync;
 
+import de.tum.cit.aet.hephaestus.agent.documentation.DocumentReviewTrigger;
 import de.tum.cit.aet.hephaestus.integration.core.connection.Connection;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
+import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalKey;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncExecutionHandle;
@@ -21,6 +24,7 @@ import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollection.Sy
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineCollectionRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentRepository;
 import de.tum.cit.aet.hephaestus.integration.outline.domain.OutlineDocumentSnapshot;
+import de.tum.cit.aet.hephaestus.integration.outline.domain.signal.OutlineDocumentSignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.outline.lifecycle.OutlineWebhookRegistrar;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -37,6 +41,7 @@ import java.util.function.Consumer;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 
@@ -93,6 +98,10 @@ public class OutlineDocumentSyncService {
     private final OutlineProperties properties;
     private final OutlineMirrorWriter mirrorWriter;
     private final OutlineMirrorRetentionService retention;
+    private final OutlineDocumentSignalRecorder signalRecorder;
+
+    /** Optional because the agent subsystem is absent in the worker and webhook roles. */
+    private final ObjectProvider<DocumentReviewTrigger> reviewTrigger;
 
     public OutlineDocumentSyncService(
         ConnectionService connectionService,
@@ -102,7 +111,9 @@ public class OutlineDocumentSyncService {
         OutlineWebhookRegistrar webhookRegistrar,
         OutlineProperties properties,
         OutlineMirrorWriter mirrorWriter,
-        OutlineMirrorRetentionService retention
+        OutlineMirrorRetentionService retention,
+        OutlineDocumentSignalRecorder signalRecorder,
+        ObjectProvider<DocumentReviewTrigger> reviewTrigger
     ) {
         this.connectionService = connectionService;
         this.outlineApiClient = outlineApiClient;
@@ -112,6 +123,47 @@ public class OutlineDocumentSyncService {
         this.properties = properties;
         this.mirrorWriter = mirrorWriter;
         this.retention = retention;
+        this.signalRecorder = signalRecorder;
+        this.reviewTrigger = reviewTrigger;
+    }
+
+    /**
+     * Must run outside any transaction of ours: submission opens one of its own and locks the workspace
+     * inside it. A failed offer never fails the sync — the ledger row already written is what a later
+     * pass re-offers.
+     */
+    private void recordAndOffer(
+        long workspaceId,
+        @Nullable OutlineDocumentSnapshot document,
+        String eventName,
+        Instant occurredAt,
+        DiscoveredVia discoveredVia
+    ) {
+        Optional<SignalKey> recorded = signalRecorder.record(
+            workspaceId,
+            document,
+            eventName,
+            occurredAt,
+            discoveredVia
+        );
+        if (recorded.isEmpty()) {
+            return;
+        }
+        DocumentReviewTrigger trigger = reviewTrigger.getIfAvailable();
+        if (trigger == null) {
+            log.debug("No document review trigger on this node; signal recorded only: workspaceId={}", workspaceId);
+            return;
+        }
+        try {
+            trigger.onDocumentSignal(recorded.get(), discoveredVia);
+        } catch (RuntimeException e) {
+            log.warn(
+                "Offering a document signal for review failed (signal recorded): workspaceId={}, signal={}",
+                workspaceId,
+                recorded.get().signalName(),
+                e
+            );
+        }
     }
 
     /**
@@ -374,11 +426,12 @@ public class OutlineDocumentSyncService {
             Instant archivedAt = Instant.now();
             mirrored
                 .filter(d -> !d.isDeleted())
-                .ifPresent(d ->
+                .ifPresent(d -> {
                     mirrorWriter.updateDocument(workspaceId, ctx.connectionId(), documentId, doc ->
                         doc.setArchivedAt(archivedAt)
-                    )
-                );
+                    );
+                    recordAndOffer(workspaceId, d, eventName, archivedAt, DiscoveredVia.EVENT);
+                });
             return;
         }
         try {
@@ -415,7 +468,13 @@ public class OutlineDocumentSyncService {
             }
             Map<String, OutlineDocumentSnapshot> existing = new HashMap<>();
             mirrored.ifPresent(d -> existing.put(documentId, d));
-            upsert(ctx, collection.get(), null, meta, existing, /* budget: single doc */ null, Instant.now());
+            Instant now = Instant.now();
+            upsert(ctx, collection.get(), null, meta, existing, /* budget: single doc */ null, now);
+            // Read the row back rather than recording from `mirrored`: a content-shaped signal is keyed on
+            // the document's hash, and the whole point of this signal is that the content just changed.
+            documentRepository
+                .findSnapshotByDocumentId(workspaceId, ctx.connectionId(), documentId)
+                .ifPresent(refreshed -> recordAndOffer(workspaceId, refreshed, eventName, now, DiscoveredVia.EVENT));
         } catch (OutlineRateLimitedException e) {
             logRateLimited(workspaceId, e);
         }

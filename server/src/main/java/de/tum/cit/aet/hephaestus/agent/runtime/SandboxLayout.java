@@ -25,25 +25,14 @@ public final class SandboxLayout {
     /** Workspace-relative prefix for the read-only input subtree (the only region the path-guard whitelists). */
     public static final String INPUTS_PREFIX = "inputs/";
 
-    /**
-     * Workspace-relative prefix for per-connector source materialisations (ADR 0020): the SCM checkout
-     * mounts at {@code inputs/sources/scm/repo}, a future Slack/Outline export at
-     * {@code inputs/sources/slack/...} — each connector owns one namespace, none is privileged.
-     */
     public static final String SOURCES_PREFIX = INPUTS_PREFIX + "sources/";
 
-    /**
-     * Generic primitive: the workspace-relative mount prefix for a connector's source ({@code inputs/sources/<id>/}).
-     * The SCM-specific repo paths below are the one concrete instance; a future connector composes its own from this.
-     */
     public static String sourceMount(String originId) {
         return SOURCES_PREFIX + originId + "/";
     }
 
-    /** Workspace-relative {@code .keep} that pre-creates {@code inputs/sources/scm/} so the repo can mount under it. */
     public static final String SCM_SOURCE_KEEP = sourceMount("scm") + ".keep";
 
-    /** Bind-mount point for the read-only git checkout — the SCM connector's source materialisation. */
     public static final String REPO_MOUNT = WORKSPACE_ROOT + "/" + sourceMount("scm") + "repo";
 
     /** Workspace-relative prefix the agent cites for repo files ({@code inputs/sources/scm/repo/<path>}). */
@@ -58,13 +47,34 @@ public final class SandboxLayout {
     /** Workspace-relative prefix every {@link de.tum.cit.aet.hephaestus.agent.context.ContentSource} must write under. */
     public static final String CONTEXT_PREFIX = INPUTS_PREFIX + "context/";
 
-    /**
-     * Workspace-relative path of the integration-agnostic context manifest (the "telescope"): a small
-     * index of every projected context file with its connector + provenance, so the agent — and a future
-     * connector — sees one uniform entry point regardless of which integration produced the bytes. Sits
-     * directly under {@code inputs/}, above the per-connector context it indexes.
-     */
     public static final String MANIFEST_PATH = INPUTS_PREFIX + "manifest.json";
+
+    /**
+     * Workspace-relative path of the feedback-composition request: whether this run should compose
+     * feedback once its measurements are final, which lanes it may write for, and the bounds each must
+     * respect.
+     *
+     * <p>Absence is the off switch, and it is data rather than an env flag on purpose — the handler that
+     * knows whether a run is a live measurement of somebody's current work is the same handler that
+     * writes this file, so the decision and its parameters travel together.
+     */
+    public static final String FEEDBACK_COMPOSITION_PATH = INPUTS_PREFIX + "feedback-composition.json";
+
+    /** Workspace-relative filename of the composition stage's output, collected from {@link #OUTPUT_PATH}. */
+    public static final String FEEDBACK_FILENAME = "feedback.json";
+
+    /** Workspace-relative filename of the composition stage's instructions, staged beside the runner. */
+    public static final String FEEDBACK_COMPOSER_PROMPT_FILENAME = "feedback-composer.md";
+
+    /**
+     * Workspace-relative prefix for what earlier reviews recorded and already said.
+     *
+     * <p>Separate from {@link #CONTEXT_PREFIX} because it is the one part of the sandbox that is not
+     * about the artifact under review: {@code inputs/context/} is this event, {@code inputs/history/} is
+     * every event before it. Both files below it are always present — an empty one is the review saying
+     * it looked and there was nothing, which is a different fact from never having looked.
+     */
+    public static final String HISTORY_PREFIX = INPUTS_PREFIX + "history/";
 
     /** Workspace-relative prefix for per-practice catalog files (index, criteria). */
     public static final String PRACTICES_PREFIX = INPUTS_PREFIX + "practices/";

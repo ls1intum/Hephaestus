@@ -5,12 +5,15 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraints;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.ClearablePracticeField;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -41,11 +44,46 @@ public class PracticeService {
     private final ConfigAuditPort configAudit;
     private final PracticeRevisionService practiceRevisionService;
     private final WorkspaceRepository workspaceRepository;
+    private final PracticeDefinitionValidator definitionValidator;
+    private final PracticeEvidenceDefaults evidenceDefaults;
+    private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
+    /**
+     * The workspace catalogue, optionally narrowed to one tier.
+     *
+     * <p>The filter is on the <em>effective</em> tier, which is the only tier an administrator can see on
+     * the screen they are filtering. Filtering the stored column instead would answer "which practices
+     * happen to hold this value", and would return nothing at all for the tier most practices are actually
+     * at — the inherited one.
+     */
     @Transactional(readOnly = true)
-    public List<Practice> listPractices(WorkspaceContext ctx, Boolean active) {
-        log.debug("Listing practices for workspace {} (active={})", ctx.slug(), active);
-        return practiceRepository.findByFilters(ctx.id(), active);
+    public List<Practice> listPractices(WorkspaceContext ctx, @Nullable PracticeReviewTier reviewTier) {
+        log.debug("Listing practices for workspace {} (reviewTier={})", ctx.slug(), reviewTier);
+        List<Practice> all = practiceRepository.findAllForCatalog(ctx.id());
+        if (reviewTier == null) {
+            return all;
+        }
+        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultTier();
+        return all
+            .stream()
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault) == reviewTier)
+            .toList();
+    }
+
+    /**
+     * Every practice this workspace actually reviews, at any effective tier above {@code OFF}.
+     *
+     * <p>Includes {@code PROPOSE}: that tier promises the developer no <em>feedback</em>, not concealment,
+     * so the learner-facing catalogue lists what is observed while the tier governs what is said.
+     */
+    @Transactional(readOnly = true)
+    public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
+        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultTier();
+        return practiceRepository
+            .findAllForCatalog(ctx.id())
+            .stream()
+            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
+            .toList();
     }
 
     @Transactional
@@ -55,7 +93,7 @@ public class PracticeService {
         }
         lockWorkspace(ctx);
         List<Practice> bucket = practiceRepository
-            .findByFilters(ctx.id(), null)
+            .findAllForCatalog(ctx.id())
             .stream()
             .filter(p -> Objects.equals(areaSlug, p.getArea() == null ? null : p.getArea().getSlug()))
             .toList();
@@ -99,7 +137,7 @@ public class PracticeService {
 
         Long sourceAreaId = practice.getArea() == null ? null : practice.getArea().getId();
         Long destinationAreaId = destination == null ? null : destination.getId();
-        List<Practice> allPractices = practiceRepository.findByFilters(ctx.id(), null);
+        List<Practice> allPractices = practiceRepository.findAllForCatalog(ctx.id());
         List<Practice> source = practicesInArea(allPractices, sourceAreaId, practice);
         List<Practice> target = Objects.equals(sourceAreaId, destinationAreaId)
             ? source
@@ -190,7 +228,16 @@ public class PracticeService {
         );
         practice.setSlug(slug);
         applyDefinition(practice, definition);
-        validateDefinition(definition);
+        // A new practice holds no opinion of its own and inherits its area's (and through it the
+        // workspace's) — stamping the resolved default here would give every practice an opinion nobody
+        // expressed. Exception: a practice whose policy cannot attempt automated review is written OFF
+        // explicitly, since that's a fact about the practice, not a preference to inherit over.
+        practice.setReviewTier(
+            definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
+                ? null
+                : PracticeReviewTier.OFF
+        );
+        definitionValidator.validate(definition);
 
         try {
             practice = practiceRepository.save(practice);
@@ -223,15 +270,6 @@ public class PracticeService {
             .orElseThrow(() -> new EntityNotFoundException("Workspace", ctx.slug()));
     }
 
-    private static void validateDefinition(PracticeDefinition definition) {
-        PracticeDefinitionValidator.validate(
-            definition.artifactType(),
-            definition.triggerEvents(),
-            definition.whyItMatters(),
-            definition.whatGoodLooksLike()
-        );
-    }
-
     @Transactional
     public Practice updatePractice(WorkspaceContext ctx, String slug, UpdatePracticeRequestDTO request) {
         lockWorkspace(ctx);
@@ -243,16 +281,36 @@ public class PracticeService {
         PracticeDefinition beforeDefinition = PracticeDefinition.from(practice);
 
         Set<ClearablePracticeField> fieldsToClear = request.clear() == null ? Set.of() : request.clear();
+        List<PracticeBinding> bindings = request.bindings() == null ? beforeDefinition.bindings() : request.bindings();
+        // The kind is read off the bindings, so "the author moved this practice to another kind of
+        // work" is a question about the new bindings rather than a separate field to compare.
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(bindings);
+        PracticeAutomatedReviewPolicy automatedReviewPolicy =
+            request.automatedReviewPolicy() != null
+                ? request.automatedReviewPolicy()
+                : artifactKind.equals(beforeDefinition.artifactKind())
+                    ? beforeDefinition.automatedReviewPolicy()
+                    : evidenceDefaults.policyFor(artifactKind);
+        boolean removesAutomatedReview =
+            request.automatedReviewPolicy() != null &&
+            !automatedReviewPolicy.automatedReview().canAttemptAutomatedReview();
+        if (removesAutomatedReview) {
+            // A practice nobody automates still says what occasions it — that is where its kind comes
+            // from — but it reads nothing, so the evidence goes with the automation that read it.
+            bindings = bindings.stream().map(PracticeService::withoutEvidence).toList();
+        }
         PracticeDefinition afterDefinition = new PracticeDefinition(
             request.name() == null ? beforeDefinition.name() : request.name(),
-            request.artifactType() == null ? beforeDefinition.artifactType() : request.artifactType(),
-            request.triggerEvents() == null ? beforeDefinition.triggerEvents() : request.triggerEvents(),
+            bindings,
             request.criteria() == null ? beforeDefinition.criteria() : request.criteria(),
-            patch(
-                beforeDefinition.precomputeScript(),
-                request.precomputeScript(),
-                fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
-            ),
+            removesAutomatedReview && request.precomputeScript() == null
+                ? null
+                : patch(
+                      beforeDefinition.precomputeScript(),
+                      request.precomputeScript(),
+                      fieldsToClear.contains(ClearablePracticeField.PRECOMPUTE_SCRIPT)
+                  ),
+            automatedReviewPolicy,
             patch(
                 beforeDefinition.whyItMatters(),
                 request.whyItMatters(),
@@ -273,8 +331,12 @@ public class PracticeService {
         if (request.area() != null) {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
+        PracticeReviewTier tierBefore = practice.getReviewTier();
         applyDefinition(practice, afterDefinition);
-        validateDefinition(afterDefinition);
+        if (!afterDefinition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
+            practice.setReviewTier(PracticeReviewTier.OFF);
+        }
+        validateUpdate(afterDefinition, request.bindings() != null);
         practice = practiceRepository.save(practice);
         revisionNumber = practiceRevisionService.append(practice).getRevisionNumber();
         configAudit.record(
@@ -286,33 +348,74 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
+        if (tierBefore != practice.getReviewTier()) {
+            configAudit.record(
+                ConfigAuditEntry.updated(
+                    ConfigAuditEntityType.PRACTICE_USAGE,
+                    practice.getId(),
+                    ctx.id(),
+                    new PracticeUsageSnapshot(tierBefore),
+                    new PracticeUsageSnapshot(practice.getReviewTier())
+                )
+            );
+        }
         log.info("Updated practice '{}' (slug={}) in workspace {}", practice.getName(), slug, ctx.slug());
         return practice;
     }
 
+    /**
+     * Sets one practice's own tier, or clears it back to inherit.
+     *
+     * @param reviewTier the tier to hold, or {@code null} to hold none and inherit the area's — and through
+     *     it the workspace's. Clearing has to be expressible or the chain is write-once: an administrator
+     *     who set one practice explicitly could never put it back under the area's decision.
+     */
     @Transactional
-    public Practice setActive(WorkspaceContext ctx, String slug, boolean active) {
+    public Practice setReviewTier(WorkspaceContext ctx, String slug, @Nullable PracticeReviewTier reviewTier) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
-        if (practice.isActive() == active) {
+        PracticeReviewTier before = practice.getReviewTier();
+        if (before == reviewTier) {
             return practice;
         }
+        // Every tier above OFF starts a review, so every tier above OFF needs a policy that can run one.
+        // Asked of the tier that would be IN FORCE, not of the one being written: "inherit" is a request
+        // for whatever the area says, and if that admits a review the practice still cannot run it.
+        PracticeReviewTier effective = ReviewTierResolver.resolvePractice(
+            reviewTier,
+            practice.getArea() == null ? null : practice.getArea().getReviewTier(),
+            workspaceDefaults.forWorkspace(ctx.id()).defaultTier()
+        ).tier();
+        if (
+            effective.admitsReview() &&
+            !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
+        ) {
+            throw new IllegalArgumentException(
+                "This practice cannot be used in automated reviews with its current review settings"
+            );
+        }
 
-        practice.setActive(active);
+        practice.setReviewTier(reviewTier);
         practice = practiceRepository.save(practice);
         configAudit.record(
             ConfigAuditEntry.updated(
-                ConfigAuditEntityType.PRACTICE_ACTIVE,
+                ConfigAuditEntityType.PRACTICE_USAGE,
                 practice.getId(),
                 ctx.id(),
-                new PracticeActiveSnapshot(!active),
-                new PracticeActiveSnapshot(active)
+                new PracticeUsageSnapshot(before),
+                new PracticeUsageSnapshot(reviewTier)
             )
         );
-        log.info("Set practice '{}' (slug={}) active={} in workspace {}", practice.getName(), slug, active, ctx.slug());
+        log.info(
+            "Set practice '{}' (slug={}) reviewTier={} in workspace {}",
+            practice.getName(),
+            slug,
+            reviewTier,
+            ctx.slug()
+        );
         return practice;
     }
 
@@ -336,25 +439,71 @@ public class PracticeService {
         return practiceRevisionService.currentRevisionNumber(practice);
     }
 
-    private static PracticeDefinition definition(CreatePracticeRequestDTO request) {
+    private PracticeDefinition definition(CreatePracticeRequestDTO request) {
+        ArtifactKind artifactKind = PracticeBinding.artifactKindOf(request.bindings());
         return new PracticeDefinition(
             request.name(),
-            request.artifactType() == null ? WorkArtifact.PULL_REQUEST : request.artifactType(),
-            request.triggerEvents(),
+            request.bindings(),
             request.criteria(),
             request.precomputeScript(),
+            request.automatedReviewPolicy() == null
+                ? evidenceDefaults.policyFor(artifactKind)
+                : request.automatedReviewPolicy(),
             request.whyItMatters(),
             request.whatGoodLooksLike(),
             request.areaSlug()
         );
     }
 
+    /**
+     * Validates an edit, holding the single-occasion rule to what the caller actually said.
+     *
+     * <p>A practice reviewed on one occasion is a rule about the occasion somebody <em>submits</em>. An
+     * update that omits {@code bindings} makes no statement about occasions at all — a rename is the
+     * plainest example — so carrying the stored occasion forward and then refusing it would leave a
+     * practice written while two were still legal impossible to edit ever again, by anyone, in any
+     * field. Refusing the caller's own second occasion still happens, in the same words, both here and
+     * in bean validation on the request.
+     *
+     * <p>Carried-over occasions are not waved through: they are validated one at a time, because this
+     * same request can move the review policy they hang off — a different source-contract version can
+     * retire a source an untouched occasion reads. Only the count is a property of the list; every
+     * other rule the validator applies is a property of a single occasion, so checking each alone is
+     * the same coverage minus exactly the rule that does not apply.
+     */
+    private void validateUpdate(PracticeDefinition afterDefinition, boolean occasionSubmitted) {
+        if (occasionSubmitted || afterDefinition.bindings().size() <= 1) {
+            definitionValidator.validate(afterDefinition);
+            return;
+        }
+        for (PracticeBinding carried : afterDefinition.bindings()) {
+            definitionValidator.validate(withBindings(afterDefinition, List.of(carried)));
+        }
+    }
+
+    private static PracticeDefinition withBindings(PracticeDefinition definition, List<PracticeBinding> bindings) {
+        return new PracticeDefinition(
+            definition.name(),
+            bindings,
+            definition.criteria(),
+            definition.precomputeScript(),
+            definition.automatedReviewPolicy(),
+            definition.whyItMatters(),
+            definition.whatGoodLooksLike(),
+            definition.areaSlug()
+        );
+    }
+
+    private static PracticeBinding withoutEvidence(PracticeBinding binding) {
+        return new PracticeBinding(binding.signals(), List.of(), binding.onDrafts(), binding.subject());
+    }
+
     private static void applyDefinition(Practice practice, PracticeDefinition definition) {
         practice.setName(definition.name());
-        practice.setArtifactType(definition.artifactType());
-        practice.setTriggerEvents(definition.triggerEventsJson());
+        practice.setBindings(definition.bindings());
         practice.setCriteria(definition.criteria());
         practice.setPrecomputeScript(definition.precomputeScript());
+        practice.setAutomatedReviewPolicy(definition.automatedReviewPolicy());
         practice.setWhyItMatters(definition.whyItMatters());
         practice.setWhatGoodLooksLike(definition.whatGoodLooksLike());
     }

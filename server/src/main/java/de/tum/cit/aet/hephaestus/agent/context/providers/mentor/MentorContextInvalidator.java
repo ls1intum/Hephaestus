@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.integration.core.events.EventContext;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmDomainEvent;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.PracticeDetectionCompletedEvent;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -40,23 +39,9 @@ public class MentorContextInvalidator {
     private static final List<String> PER_USER_CACHES = List.of(
         "mentor_user_context",
         "mentor_workspace_context",
-        "mentor_findings_context",
-        "mentor_practice_standing_context",
         // The authored-work context (RecentAuthoredWorkContentSource) is keyed per
         // workspaceId:developerId and goes stale on the same PR/issue/review events.
         "mentor_authored_work_context"
-    );
-
-    /**
-     * Caches that depend on the developer's PERSISTED practice observations (findings + standing). They go
-     * stale the moment a detection run writes new observations, independent of any SCM event — so they are
-     * evicted on {@link PracticeDetectionCompletedEvent}, not on PR/issue/review updates. Delivered-feedback
-     * eviction is deliberately NOT wired: there is no delivery event, and the delivered body is immutable
-     * once posted (ADR 0021), so its cache cannot drift.
-     */
-    private static final List<String> DETECTION_DEPENDENT_CACHES = List.of(
-        "mentor_findings_context",
-        "mentor_practice_standing_context"
     );
 
     private final CacheManager cacheManager;
@@ -126,20 +111,6 @@ public class MentorContextInvalidator {
     @Transactional(propagation = Propagation.REQUIRES_NEW, readOnly = true)
     public void onReviewDismissed(ScmDomainEvent.ReviewDismissed event) {
         evictForReview(event.context(), event.review());
-    }
-
-    /**
-     * A completed detection run persists new observations for this developer, staling the findings-history and
-     * practice-standing contexts (they would otherwise lie until their TTL). Evict the two detection-dependent
-     * per-user caches for the evaluated developer. The event carries only scalars, so no transaction is needed.
-     */
-    @Async
-    @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    public void onPracticeDetectionCompleted(PracticeDetectionCompletedEvent event) {
-        if (event == null || event.workspaceId() == null || event.developerId() == null) {
-            return;
-        }
-        evictPerUser(event.workspaceId(), event.developerId(), DETECTION_DEPENDENT_CACHES);
     }
 
     private void evictForReview(EventContext context, ScmEventPayload.ReviewData review) {

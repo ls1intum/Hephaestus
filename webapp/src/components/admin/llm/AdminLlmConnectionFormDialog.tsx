@@ -71,7 +71,7 @@ export function AdminLlmConnectionFormDialog({
 	);
 }
 
-/** The display name is deliberately not among them: naming a connection after testing it must not
+/** The display name is deliberately not compared: naming a connection after testing it must not
  * discard the result. */
 function probeInputsDiffer(a: LlmConnectionFieldsValue, b: LlmConnectionFieldsValue): boolean {
 	return (
@@ -194,8 +194,7 @@ function AdminLlmConnectionFormDialogContent({
 					</DialogDescription>
 				</DialogHeader>
 
-				{/* Preset, endpoint, auth mode, credential and the probe result run to ~900 px, which
-				    overflows every phone in both directions; only the body scrolls. */}
+				{/* This form outgrows a 320 px viewport in both directions, so only the body scrolls. */}
 				<DialogBody className="space-y-4 py-1">
 					<LlmConnectionFields
 						value={fields}

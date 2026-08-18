@@ -1,0 +1,112 @@
+import { ArchiveIcon, BrushCleaningIcon, UserRoundXIcon, VolumeOffIcon } from "lucide-react";
+import type { ReviewFeedback } from "@/api/types.gen";
+import type { StatusDefs } from "./status-def";
+
+export type WithholdingReason = NonNullable<ReviewFeedback["suppressionReason"]>;
+export type WithholdingFamily = "WORK_MOVED_ON" | "POLICY" | "DEVELOPER_CHOICE" | "HOUSEKEEPING";
+
+/**
+ * The filter grain over the withholding reasons. Each family answers "who decided", which is the cut
+ * an operator acts on differently — so that, and not the shape of the pipeline, is what a new reason
+ * is filed under.
+ */
+export const WITHHOLDING_FAMILY_DEFS: StatusDefs<WithholdingFamily> = {
+	WORK_MOVED_ON: {
+		label: "The work moved on",
+		icon: ArchiveIcon,
+		badgeVariant: "outline",
+		description: "The pull request, issue or document had moved past the point of being told.",
+	},
+	POLICY: {
+		label: "Policy kept it quiet",
+		icon: VolumeOffIcon,
+		badgeVariant: "outline",
+		description: "A setting somebody chose — a volume limit, a practice's tier, or silent mode.",
+	},
+	DEVELOPER_CHOICE: {
+		label: "The developer's choice",
+		icon: UserRoundXIcon,
+		badgeVariant: "outline",
+		description: "The developer opted out, or already told us this kind of feedback was wrong.",
+	},
+	HOUSEKEEPING: {
+		label: "Housekeeping",
+		icon: BrushCleaningIcon,
+		badgeVariant: "outline",
+		description: "The pipeline dropped it: a duplicate, an empty body, or a chat that never came.",
+	},
+};
+
+/**
+ * Every reason, and the family it filters under.
+ *
+ * <p>`ARTIFACT_DRAFT` is filed but dead: the server marks the constant `@Deprecated` and nothing
+ * writes it. It keeps its words because the wire union still carries the value.
+ */
+const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
+	ARTIFACT_GONE: "WORK_MOVED_ON",
+	ARTIFACT_CLOSED: "WORK_MOVED_ON",
+	ARTIFACT_MERGED: "WORK_MOVED_ON",
+	ARTIFACT_DRAFT: "WORK_MOVED_ON",
+	VOLUME_CAPPED: "POLICY",
+	PRACTICE_TIER_QUIET: "POLICY",
+	BACKFILL_QUIET: "POLICY",
+	INSTANCE_SILENCED: "POLICY",
+	RECIPIENT_OPTED_OUT: "DEVELOPER_CHOICE",
+	REACTED_DISPUTED: "DEVELOPER_CHOICE",
+	REACTED_NOT_APPLICABLE: "DEVELOPER_CHOICE",
+	COMPOSER_DEDUPED: "HOUSEKEEPING",
+	EMPTY_AFTER_SANITIZE: "HOUSEKEEPING",
+	CONVERSATION_EXPIRED: "HOUSEKEEPING",
+};
+
+/**
+ * The precise sentence for one reason, shown on the row that has it. Third person throughout:
+ * anyone with access can open these screens and the work is usually somebody else's.
+ */
+export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
+	ARTIFACT_GONE: "The work no longer exists.",
+	ARTIFACT_CLOSED: "The work was closed before the feedback could be posted.",
+	ARTIFACT_MERGED: "The work was already merged, so a note on it would arrive too late.",
+	ARTIFACT_DRAFT: "The work was still a draft.",
+	VOLUME_CAPPED: "Over the limit on how much feedback one person gets from a single review.",
+	// The server records this reason for *any* in-context feedback the admission gate turns away,
+	// including a workspace whose reach is set to conversation only — so naming the practice's tier
+	// as the cause would be wrong about a good share of the rows.
+	PRACTICE_TIER_QUIET: "This practice is set to measure quietly rather than to speak up.",
+	BACKFILL_QUIET: "Found while reviewing past work, which is measured but never sent.",
+	INSTANCE_SILENCED: "Silent mode was switched on for the whole instance.",
+	RECIPIENT_OPTED_OUT: "The developer has opted out of AI feedback.",
+	REACTED_DISPUTED: "The developer disputed feedback like this before.",
+	REACTED_NOT_APPLICABLE: "The developer marked feedback like this not applicable before.",
+	COMPOSER_DEDUPED: "Nearly the same as other feedback from the same review.",
+	EMPTY_AFTER_SANITIZE: "Nothing was left to send once the text had been cleaned up.",
+	CONVERSATION_EXPIRED: "It waited for a conversation that never happened, then aged out.",
+};
+
+export function withholdingFamily(reason: WithholdingReason): WithholdingFamily {
+	return REASON_FAMILY[reason];
+}
+
+export function withholdingReasonSentence(reason: WithholdingReason): string {
+	return WITHHOLDING_REASON_DEFS[reason];
+}
+
+const WITHHOLDING_FAMILY_REASONS: Record<WithholdingFamily, WithholdingReason[]> = Object.entries(
+	REASON_FAMILY,
+).reduce(
+	(families, [reason, family]) => {
+		families[family].push(reason as WithholdingReason);
+		return families;
+	},
+	{
+		WORK_MOVED_ON: [],
+		POLICY: [],
+		DEVELOPER_CHOICE: [],
+		HOUSEKEEPING: [],
+	} as Record<WithholdingFamily, WithholdingReason[]>,
+);
+
+export function reasonsInFamilies(families: readonly WithholdingFamily[]): WithholdingReason[] {
+	return families.flatMap((family) => WITHHOLDING_FAMILY_REASONS[family]);
+}

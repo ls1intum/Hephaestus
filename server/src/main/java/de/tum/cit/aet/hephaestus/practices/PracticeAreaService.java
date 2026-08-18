@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraint
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -37,9 +38,11 @@ public class PracticeAreaService {
     private final WorkspaceRepository workspaceRepository;
 
     @Transactional(readOnly = true)
-    public List<PracticeArea> listAreas(WorkspaceContext ctx, @Nullable Boolean activeOnly) {
-        return Boolean.TRUE.equals(activeOnly)
-            ? practiceAreaRepository.findByWorkspaceIdAndActiveTrueOrderByDisplayOrderAscNameAsc(ctx.id())
+    public List<PracticeArea> listAreas(WorkspaceContext ctx, @Nullable Boolean visibleInPracticeDashboardsOnly) {
+        return Boolean.TRUE.equals(visibleInPracticeDashboardsOnly)
+            ? practiceAreaRepository.findByWorkspaceIdAndVisibleInPracticeDashboardsTrueOrderByDisplayOrderAscNameAsc(
+                  ctx.id()
+              )
             : practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(ctx.id());
     }
 
@@ -156,6 +159,38 @@ public class PracticeAreaService {
         return practiceAreaRepository.save(area);
     }
 
+    /**
+     * Sets — or clears — the tier this area imposes on the practices under it that hold no tier of their own.
+     *
+     * <p>The level that makes the chain worth having. An area is the grain a team reasons in, so one write
+     * here settles what would otherwise be one write per practice under it. Practices that set their own
+     * tier are untouched: they disagreed on purpose, and an area-wide setting is not a reason to overrule
+     * them.
+     *
+     * @param reviewTier the tier to impose, or {@code null} to hold none and follow the workspace default
+     */
+    @Transactional
+    public PracticeArea setReviewTier(WorkspaceContext ctx, String slug, @Nullable PracticeReviewTier reviewTier) {
+        lockWorkspace(ctx);
+        PracticeArea area = getArea(ctx, slug);
+        if (area.getReviewTier() == reviewTier) {
+            return area;
+        }
+        PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
+        area.setReviewTier(reviewTier);
+        area = practiceAreaRepository.save(area);
+        configAudit.record(
+            ConfigAuditEntry.updated(
+                ConfigAuditEntityType.PRACTICE_AREA,
+                area.getId(),
+                ctx.id(),
+                before,
+                PracticeAreaSnapshot.of(area)
+            )
+        );
+        return area;
+    }
+
     @Transactional
     public PracticeArea updateArea(WorkspaceContext ctx, String slug, AreaAttributes attributes) {
         return updateArea(ctx, slug, attributes, null);
@@ -166,7 +201,7 @@ public class PracticeAreaService {
         WorkspaceContext ctx,
         String slug,
         AreaAttributes attributes,
-        @Nullable Boolean active
+        @Nullable Boolean visibleInPracticeDashboards
     ) {
         lockWorkspace(ctx);
         PracticeArea area = getArea(ctx, slug);
@@ -191,8 +226,8 @@ public class PracticeAreaService {
         if (attributes.color() != null) {
             area.setColor(attributes.color());
         }
-        if (active != null) {
-            area.setActive(active);
+        if (visibleInPracticeDashboards != null) {
+            area.setVisibleInPracticeDashboards(visibleInPracticeDashboards);
         }
         area = practiceAreaRepository.save(area);
         if (snapshotChanged) {

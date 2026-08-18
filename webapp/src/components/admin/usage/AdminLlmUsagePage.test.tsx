@@ -1,12 +1,7 @@
-import {
-	createMemoryHistory,
-	createRootRoute,
-	createRouter,
-	RouterProvider,
-} from "@tanstack/react-router";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { fireEvent, screen, within } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { renderWithRouter } from "@/test/router-harness";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
 
 const baseReport: WorkspaceLlmUsageReport = {
@@ -49,28 +44,21 @@ async function renderPage(
 	report: WorkspaceLlmUsageReport = baseReport,
 	props: Partial<React.ComponentProps<typeof AdminLlmUsagePage>> = {},
 ) {
-	const rootRoute = createRootRoute({
-		component: () => (
-			<AdminLlmUsagePage
-				month="2026-07"
-				isCurrentMonth
-				canGoNext={false}
-				workspaceSlug="acme"
-				report={report}
-				isLoading={false}
-				error={null}
-				onEditOwnProviderCap={() => {}}
-				now={new Date("2026-07-10T12:00:00.000Z")}
-				{...props}
-			/>
-		),
-	});
-	const router = createRouter({
-		routeTree: rootRoute,
-		history: createMemoryHistory({ initialEntries: ["/"] }),
-	});
-	// biome-ignore lint/suspicious/noExplicitAny: the ad-hoc root-only tree isn't the app's route tree.
-	render(<RouterProvider router={router as any} />);
+	await renderWithRouter(
+		<AdminLlmUsagePage
+			month="2026-07"
+			isCurrentMonth
+			canGoNext={false}
+			workspaceSlug="acme"
+			report={report}
+			isLoading={false}
+			error={null}
+			onEditOwnProviderCap={() => {}}
+			now={new Date("2026-07-10T12:00:00.000Z")}
+			{...props}
+		/>,
+		"/w/acme/admin/usage",
+	);
 	await screen.findByRole("heading", { name: "AI usage" });
 }
 
@@ -147,7 +135,7 @@ describe("AdminLlmUsagePage", () => {
 				"an exhausted shared budget",
 				{ instancePaused: true, instanceBudgetVerdict: "EXHAUSTED", instanceTotalCostUsd: 25 },
 				"Shared-model budget reached",
-				"Paused until August 1 (UTC), or until your host raises the budget. Practice detection and Mentor can keep running on your own models.",
+				"Paused until August 1 (UTC), or until your host raises the budget. Practice reviews and Mentor can keep running on your own models.",
 				"/w/acme/admin/models",
 			],
 			[

@@ -9,16 +9,18 @@ import org.jspecify.annotations.Nullable;
 public record CuratedPracticeDTO(
     @NonNull String slug,
     @NonNull Integer position,
-    @NonNull CuratedPracticeRequestDTO definition,
-    @Nullable CuratedPracticeRequestDTO shipped,
+    @NonNull CuratedPracticeDefinitionDTO definition,
+    @Nullable CuratedPracticeDefinitionDTO shipped,
     @NonNull CatalogEntryStatusDTO status
 ) {
     public static CuratedPracticeDTO from(CatalogEntry<PracticeDefinition> entry) {
         return new CuratedPracticeDTO(
             entry.slug(),
             entry.position(),
-            CuratedPracticeRequestDTO.of(entry.effective()),
-            entry.changeKind() == CatalogChangeKind.NONE ? null : CuratedPracticeRequestDTO.of(entry.shipped()),
+            CuratedPracticeDefinitionDTO.from(entry.slug(), entry.effective()),
+            entry.changeKind() == CatalogChangeKind.NONE
+                ? null
+                : CuratedPracticeDefinitionDTO.from(entry.slug(), entry.shipped()),
             CatalogEntryStatusDTO.from(entry)
         );
     }

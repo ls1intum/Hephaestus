@@ -144,8 +144,8 @@ export function SilentModeCard({
 							Nothing will be posted to GitHub, GitLab or Slack from any workspace — no feedback on
 							pull requests, merge requests or issues, no Slack messages, not even the
 							acknowledgement reaction. Reviews keep running and keep costing AI budget; their
-							findings are saved and marked withheld, and anything withheld while silent mode is on
-							is never posted, not even after you release it.
+							observations are saved and marked withheld, and anything withheld while silent mode is
+							on is never posted, not even after you release it.
 						</DialogDescription>
 					</DialogHeader>
 					<Field>

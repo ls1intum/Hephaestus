@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository.ReviewRunSummaryRo
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ReviewFeedbackCounts;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewFindingCounts;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ReviewObservationCounts;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Function;
@@ -25,46 +25,46 @@ class ReviewRunSummaryQueryService {
     private final FeedbackRepository feedbackRepository;
 
     @Transactional(readOnly = true)
-    Page<ReviewRunSummaryDTO> list(Long workspaceId, AgentJobStatus status, Pageable pageable) {
-        Page<ReviewRunSummaryRow> reviews =
-            status == null
-                ? agentJobRepository.findReviewRunSummaries(workspaceId, AgentPurpose.PRACTICE_DETECTION, pageable)
-                : agentJobRepository.findReviewRunSummaries(
-                      workspaceId,
-                      AgentPurpose.PRACTICE_DETECTION,
-                      status,
-                      pageable
-                  );
+    Page<ReviewRunSummaryDTO> list(Long workspaceId, ReviewRunFilterParams filter, Pageable pageable) {
+        Page<ReviewRunSummaryRow> reviews = agentJobRepository.findReviewRunSummaries(
+            workspaceId,
+            AgentPurpose.PRACTICE_REVIEW,
+            filter.status(),
+            filter.from(),
+            filter.to(),
+            pageable
+        );
         if (reviews.isEmpty()) {
             return reviews.map(this::withoutCounts);
         }
         var jobIds = reviews.stream().map(ReviewRunSummaryRow::getId).toList();
-        Map<UUID, ReviewFindingCounts> findingCounts = observationRepository
-            .summarizeReviewFindings(workspaceId, jobIds)
+        Map<UUID, ReviewObservationCounts> observationCounts = observationRepository
+            .summarizeReviewObservations(workspaceId, jobIds)
             .stream()
-            .collect(Collectors.toMap(ReviewFindingCounts::getJobId, Function.identity()));
+            .collect(Collectors.toMap(ReviewObservationCounts::getJobId, Function.identity()));
         Map<UUID, ReviewFeedbackCounts> feedbackCounts = feedbackRepository
             .summarizeReviewFeedback(workspaceId, jobIds)
             .stream()
             .collect(Collectors.toMap(ReviewFeedbackCounts::getJobId, Function.identity()));
         return reviews.map(review ->
-            from(review, findingCounts.get(review.getId()), feedbackCounts.get(review.getId()))
+            from(review, observationCounts.get(review.getId()), feedbackCounts.get(review.getId()))
         );
     }
 
     private ReviewRunSummaryDTO from(
         ReviewRunSummaryRow review,
-        ReviewFindingCounts findingCounts,
+        ReviewObservationCounts observationCounts,
         ReviewFeedbackCounts feedbackCounts
     ) {
         return ReviewRunSummaryDTO.from(
             review,
-            findingCounts == null
-                ? ReviewFindingCountsDTO.empty()
-                : new ReviewFindingCountsDTO(
-                      findingCounts.getStrengths(),
-                      findingCounts.getProblems(),
-                      findingCounts.getNotApplicable()
+            observationCounts == null
+                ? ReviewObservationCountsDTO.empty()
+                : new ReviewObservationCountsDTO(
+                      observationCounts.getStrengths(),
+                      observationCounts.getProblems(),
+                      observationCounts.getNotApplicable(),
+                      observationCounts.getInconclusive()
                   ),
             feedbackCounts == null
                 ? ReviewFeedbackCountsDTO.empty()
@@ -79,6 +79,6 @@ class ReviewRunSummaryQueryService {
     }
 
     private ReviewRunSummaryDTO withoutCounts(ReviewRunSummaryRow review) {
-        return ReviewRunSummaryDTO.from(review, ReviewFindingCountsDTO.empty(), ReviewFeedbackCountsDTO.empty());
+        return ReviewRunSummaryDTO.from(review, ReviewObservationCountsDTO.empty(), ReviewFeedbackCountsDTO.empty());
     }
 }

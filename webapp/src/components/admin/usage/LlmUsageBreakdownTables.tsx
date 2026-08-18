@@ -43,10 +43,9 @@ export interface LlmUsageByJobTypeTableProps {
 	fx?: Fx;
 }
 
-/** Per-job-type usage with spend split by who pays for the model. */
 export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTableProps) {
 	const rows = report?.byJobType;
-	// Money comes off the report; only counts are added up here. One row earns no footer.
+	// One row earns no footer.
 	const totals =
 		report == null || rows == null || rows.length < 2
 			? null
@@ -163,10 +162,9 @@ export function LlmUsageByJobTypeTable({ report, fx }: LlmUsageByJobTypeTablePro
 }
 
 /**
- * What one unit of this work costs on average, per money stream — the two are never blended.
- *
  * An average is a rate, not an amount spent, so it renders through `formatRateUsd`: rounding to cents
  * destroys the number this column exists to give. And no `≈` — on this page that means "converted".
+ * The two money streams are never blended into one figure.
  */
 function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 	const parts = [
@@ -195,13 +193,12 @@ function AvgPerRun({ row }: { row: LlmUsageByJobType }) {
 }
 
 export interface LlmUsageByDayTableProps {
-	/** The whole report, for the same reason as {@link LlmUsageByJobTypeTableProps.report}. */
+	/** The whole report: the footer reads the server's exact total rather than re-adding floats. */
 	report?: WorkspaceLlmUsageReport;
 	/** Display-only conversion for the totals row; per-day cells stay USD-only. */
 	fx?: Fx;
 }
 
-/** Daily usage with the same two money streams as the job-type rollup. */
 export function LlmUsageByDayTable({ report, fx }: LlmUsageByDayTableProps) {
 	const rows = report?.byDay;
 	const totals =

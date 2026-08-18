@@ -6,18 +6,18 @@ import java.time.Instant;
 import java.util.UUID;
 import org.jspecify.annotations.NonNull;
 
-@Schema(description = "A review run with finding and feedback outcome counts")
+@Schema(description = "A review run with observation and feedback outcome counts")
 public record ReviewRunSummaryDTO(
     @NonNull UUID id,
     @NonNull AgentJobStatus status,
     @NonNull ReviewRunTargetDTO target,
     @NonNull Instant createdAt,
-    @NonNull ReviewFindingCountsDTO findings,
+    @NonNull ReviewObservationCountsDTO observations,
     @NonNull ReviewFeedbackCountsDTO feedback
 ) {
     static ReviewRunSummaryDTO from(
         ReviewRunSummaryRow review,
-        ReviewFindingCountsDTO findings,
+        ReviewObservationCountsDTO observations,
         ReviewFeedbackCountsDTO feedback
     ) {
         return new ReviewRunSummaryDTO(
@@ -25,7 +25,7 @@ public record ReviewRunSummaryDTO(
             review.getStatus(),
             ReviewRunTargetDTO.from(review),
             review.getCreatedAt(),
-            findings,
+            observations,
             feedback
         );
     }

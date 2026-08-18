@@ -3,10 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiscardedEntry;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ParseResult;
-import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedFinding;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -40,23 +39,24 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         return jobOutput;
     }
 
-    /** Creates a minimal valid finding JSON object. */
+    /** Creates a minimal valid observation JSON object. */
     private ObjectNode validFindingNode() {
-        ObjectNode finding = objectMapper.createObjectNode();
-        finding.put("practiceSlug", "pr-description-quality");
-        finding.put("title", "Good PR description");
-        finding.put("presence", "PRESENT");
-        finding.put("assessment", "GOOD");
-        finding.put("severity", "INFO");
-        finding.put("confidence", 0.95);
-        return finding;
+        ObjectNode observation = objectMapper.createObjectNode();
+        observation.put("practiceSlug", "pr-description-quality");
+        observation.put("summary", "Good PR description");
+        observation.put("presence", "PRESENT");
+        observation.put("assessment", "GOOD");
+        observation.put("severity", "INFO");
+        observation.putObject("evidence");
+        observation.put("evidenceRationale", "The cited evidence supports the observation.");
+        return observation;
     }
 
-    /** Wraps findings into a complete raw output JSON string. */
-    private String wrapFindings(ObjectNode... findings) {
+    /** Wraps observations into a complete raw output JSON string. */
+    private String wrapObservations(ObjectNode... observations) {
         ObjectNode root = objectMapper.createObjectNode();
-        ArrayNode arr = root.putArray("findings");
-        for (ObjectNode f : findings) {
+        ArrayNode arr = root.putArray("observations");
+        for (ObjectNode f : observations) {
             arr.add(f);
         }
         return root.toString();
@@ -69,7 +69,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void nullJobOutput() {
             ParseResult result = parser.parse(null);
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("null");
         }
@@ -81,7 +81,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             ParseResult result = parser.parse(jobOutput);
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("missing rawOutput");
         }
@@ -90,7 +90,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void blankRawOutput() {
             ParseResult result = parser.parse(wrapRawOutput("  "));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("blank");
         }
@@ -99,11 +99,11 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void oversizedRawOutputIsRejectedBeforeSanitizing() {
             // A runaway/oversized sandbox output must be rejected up front — before readTree or
             // sanitizeJsonEscapes walk the whole string — not just in the fallback extractor.
-            String huge = "{\"findings\":[" + "\\".repeat(1_000_001) + "]}";
+            String huge = "{\"observations\":[" + "\\".repeat(1_000_001) + "]}";
 
             ParseResult result = parser.parse(wrapRawOutput(huge));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("too large");
         }
@@ -112,33 +112,33 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void invalidJson() {
             ParseResult result = parser.parse(wrapRawOutput("not json {{{"));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("invalid JSON");
         }
 
         @Test
-        void missingFindings() {
+        void missingObservations() {
             ParseResult result = parser.parse(wrapRawOutput("{\"summary\":\"hello\"}"));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("missing");
         }
 
         @Test
-        void emptyFindings() {
-            ParseResult result = parser.parse(wrapRawOutput("{\"findings\":[]}"));
+        void emptyObservations() {
+            ParseResult result = parser.parse(wrapRawOutput("{\"observations\":[]}"));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("empty");
         }
 
         @Test
-        void keepsAllFindings() {
+        void keepsAllObservations() {
             ObjectNode root = objectMapper.createObjectNode();
-            ArrayNode arr = root.putArray("findings");
+            ArrayNode arr = root.putArray("observations");
             for (int i = 0; i < 5; i++) {
                 ObjectNode f = validFindingNode();
                 f.put("practiceSlug", "practice-" + i);
@@ -147,22 +147,22 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             ParseResult result = parser.parse(wrapRawOutput(root.toString()));
 
-            assertThat(result.validFindings()).hasSize(5);
-            assertThat(result.validFindings().get(0).practiceSlug()).isEqualTo("practice-0");
-            assertThat(result.validFindings().get(4).practiceSlug()).isEqualTo("practice-4");
+            assertThat(result.validObservations()).hasSize(5);
+            assertThat(result.validObservations().get(0).practiceSlug()).isEqualTo("practice-0");
+            assertThat(result.validObservations().get(4).practiceSlug()).isEqualTo("practice-4");
         }
 
         @Test
-        @DisplayName("skips non-object entries in findings array")
+        @DisplayName("skips non-object entries in observations array")
         void nonObjectEntry() {
             ObjectNode root = objectMapper.createObjectNode();
-            ArrayNode arr = root.putArray("findings");
+            ArrayNode arr = root.putArray("observations");
             arr.add("not an object");
             arr.add(validFindingNode());
 
             ParseResult result = parser.parse(wrapRawOutput(root.toString()));
 
-            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validObservations()).hasSize(1);
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("not a JSON object");
         }
@@ -172,140 +172,160 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     class FieldValidation {
 
         @Test
-        void validFinding() {
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
+        void validObservation() {
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(validFindingNode())));
 
-            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validObservations()).hasSize(1);
             assertThat(result.discarded()).isEmpty();
 
-            ValidatedFinding f = result.validFindings().get(0);
+            ValidatedObservation f = result.validObservations().get(0);
             assertThat(f.practiceSlug()).isEqualTo("pr-description-quality");
-            assertThat(f.title()).isEqualTo("Good PR description");
+            assertThat(f.summary()).isEqualTo("Good PR description");
             assertThat(f.presence()).isEqualTo(Presence.PRESENT);
             assertThat(f.severity()).isEqualTo(Severity.INFO);
-            assertThat(f.confidence()).isEqualTo(0.95f);
         }
 
         @Test
         void missingPracticeSlug() {
-            ObjectNode finding = validFindingNode();
-            finding.remove("practiceSlug");
+            ObjectNode observation = validFindingNode();
+            observation.remove("practiceSlug");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("practiceSlug");
         }
 
         @Test
         void blankTitle() {
-            ObjectNode finding = validFindingNode();
-            finding.put("title", "  ");
+            ObjectNode observation = validFindingNode();
+            observation.put("summary", "  ");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
-            assertThat(result.discarded().get(0).reason()).contains("title is blank");
+            assertThat(result.discarded().get(0).reason()).contains("summary is blank");
         }
 
         @Test
         void notApplicableObservation() {
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "NOT_APPLICABLE");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "NOT_APPLICABLE");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
         }
 
         @Test
         void presentWithMissingAssessmentIsDiscarded() {
             // A present/absent observation MUST carry a GOOD/BAD valence; a missing assessment is malformed.
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "PRESENT");
-            finding.remove("assessment");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "PRESENT");
+            observation.remove("assessment");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
         }
 
         @Test
         void absentWithMissingAssessmentIsDiscarded() {
             // The valence requirement holds for ABSENT too, not only PRESENT — a gap with no GOOD/BAD is malformed.
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "ABSENT");
-            finding.remove("assessment");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "ABSENT");
+            observation.remove("assessment");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
         }
 
         @Test
         void absentWithAssessmentKeepsValence() {
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "ABSENT");
-            finding.put("assessment", "BAD");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "ABSENT");
+            observation.put("assessment", "BAD");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.ABSENT);
-            assertThat(result.validFindings().get(0).assessment()).isEqualTo(Assessment.BAD);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).presence()).isEqualTo(Presence.ABSENT);
+            assertThat(result.validObservations().get(0).assessment()).isEqualTo(Assessment.BAD);
         }
 
         @Test
         void presentWithAssessmentKeepsValence() {
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "PRESENT");
-            finding.put("assessment", "GOOD");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "PRESENT");
+            observation.put("assessment", "GOOD");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.PRESENT);
-            assertThat(result.validFindings().get(0).assessment()).isEqualTo(Assessment.GOOD);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).presence()).isEqualTo(Presence.PRESENT);
+            assertThat(result.validObservations().get(0).assessment()).isEqualTo(Assessment.GOOD);
         }
 
         @Test
         void notApplicableForcesNullAssessmentEvenWhenSupplied() {
             // NOT_APPLICABLE has no valence: any assessment supplied alongside it is ignored (forced null).
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "NOT_APPLICABLE");
-            finding.put("assessment", "GOOD");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "NOT_APPLICABLE");
+            observation.put("assessment", "GOOD");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
-            assertThat(result.validFindings().get(0).assessment()).isNull();
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
+            assertThat(result.validObservations().get(0).assessment()).isNull();
+        }
+
+        @Test
+        void inconclusiveIsAcceptedAndKeepsNoDirection() {
+            // "We read the evidence and it does not settle this" is a measurement the series must be able
+            // to hold. Any assessment the model attaches to it is dropped rather than honoured, so a model
+            // that could not decide cannot back-door a strength or a defect into a developer's history.
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "INCONCLUSIVE");
+            observation.put("assessment", "GOOD");
+            observation.put("severity", "MAJOR");
+
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
+
+            assertThat(result.validObservations()).hasSize(1);
+            ValidatedObservation parsed = result.validObservations().get(0);
+            assertThat(parsed.presence()).isEqualTo(Presence.INCONCLUSIVE);
+            assertThat(parsed.assessment()).isNull();
+            assertThat(parsed.coerceCoherence(false, false).severity())
+                .as("severity is an impact band for a defect; an undecided observation has none")
+                .isNull();
         }
 
         @Test
         void lowercaseObservation() {
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "present");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "present");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).presence()).isEqualTo(Presence.PRESENT);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).presence()).isEqualTo(Presence.PRESENT);
         }
 
         @Test
         void invalidObservation() {
-            ObjectNode finding = validFindingNode();
-            finding.put("presence", "UNKNOWN_PRESENCE");
+            ObjectNode observation = validFindingNode();
+            observation.put("presence", "UNKNOWN_PRESENCE");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).reason()).contains("invalid presence");
         }
@@ -313,15 +333,15 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         void forwardVocabularyObservations() {
             for (Presence v : new Presence[] { Presence.PRESENT, Presence.ABSENT }) {
-                ObjectNode finding = validFindingNode();
-                finding.put("presence", v.name());
-                // Non-NA presence requires a valence; pair PRESENT->GOOD, ABSENT->BAD for a coherent finding.
-                finding.put("assessment", v == Presence.PRESENT ? "GOOD" : "BAD");
+                ObjectNode observation = validFindingNode();
+                observation.put("presence", v.name());
+                // Non-NA presence requires a valence; pair PRESENT->GOOD, ABSENT->BAD for a coherent observation.
+                observation.put("assessment", v == Presence.PRESENT ? "GOOD" : "BAD");
 
-                ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+                ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-                assertThat(result.validFindings()).hasSize(1);
-                assertThat(result.validFindings().get(0).presence()).isEqualTo(v);
+                assertThat(result.validObservations()).hasSize(1);
+                assertThat(result.validObservations().get(0).presence()).isEqualTo(v);
             }
         }
 
@@ -330,12 +350,12 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // ADR 0022: the OBSERVED/NOT_OBSERVED vocabulary is not a valid presence — it is discarded
             // exactly like any other unknown presence.
             for (String legacy : new String[] { "OBSERVED", "NOT_OBSERVED" }) {
-                ObjectNode finding = validFindingNode();
-                finding.put("presence", legacy);
+                ObjectNode observation = validFindingNode();
+                observation.put("presence", legacy);
 
-                ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+                ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-                assertThat(result.validFindings()).isEmpty();
+                assertThat(result.validObservations()).isEmpty();
                 assertThat(result.discarded()).hasSize(1);
                 assertThat(result.discarded().get(0).reason()).contains("invalid presence");
             }
@@ -343,203 +363,162 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
         @Test
         void lowercaseSeverity() {
-            ObjectNode finding = validFindingNode();
-            finding.put("severity", "major");
+            ObjectNode observation = validFindingNode();
+            observation.put("severity", "major");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).severity()).isEqualTo(Severity.MAJOR);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).severity()).isEqualTo(Severity.MAJOR);
         }
 
         @Test
         void invalidSeverity() {
-            ObjectNode finding = validFindingNode();
-            finding.put("severity", "EXTREME");
+            ObjectNode observation = validFindingNode();
+            observation.put("severity", "EXTREME");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
         }
 
         @Test
         void missingSeverityDefaultsToInfoNotDiscarded() {
-            // Regression: the model routinely omits severity on GOOD/NOT_APPLICABLE findings (severity is a
-            // coaching band only for a BAD finding). Such a finding must be KEPT with severity INFO, never
+            // Regression: the model routinely omits severity on GOOD/NOT_APPLICABLE observations (severity is a
+            // coaching band only for a BAD observation). Such an observation must be KEPT with severity INFO, never
             // discarded — coerceCoherence re-derives the band anyway, so dropping it silently loses coaching.
-            ObjectNode finding = validFindingNode();
-            finding.remove("severity");
+            ObjectNode observation = validFindingNode();
+            observation.remove("severity");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).severity()).isEqualTo(Severity.INFO);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).severity()).isEqualTo(Severity.INFO);
             assertThat(result.discarded()).isEmpty();
         }
 
         @Test
         void nullSeverityDefaultsToInfo() {
-            ObjectNode finding = validFindingNode();
-            finding.putNull("severity");
+            ObjectNode observation = validFindingNode();
+            observation.putNull("severity");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).severity()).isEqualTo(Severity.INFO);
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).severity()).isEqualTo(Severity.INFO);
         }
 
         @Test
-        void confidenceBelowZero() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", -0.5);
+        void removedConfidenceFieldRejectsTheObservation() {
+            ObjectNode observation = validFindingNode();
+            observation.put("confidence", 0.9);
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).isEmpty();
-            assertThat(result.discarded()).hasSize(1);
-            assertThat(result.discarded().get(0).reason()).contains("out of range");
+            assertThat(result.validObservations()).isEmpty();
+            assertThat(result.discarded())
+                .singleElement()
+                .satisfies(discarded ->
+                    assertThat(discarded.reason()).contains("unknown observation fields").contains("confidence")
+                );
         }
 
         @Test
-        void percentageConfidence() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 85);
+        void oversizedSummaryIsRejected() {
+            ObjectNode observation = validFindingNode();
+            observation.put("summary", "x".repeat(300));
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).confidence()).isEqualTo(0.85f);
-        }
-
-        @Test
-        void confidenceAbove100() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 150);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).isEmpty();
-            assertThat(result.discarded()).hasSize(1);
-            assertThat(result.discarded().get(0).reason()).contains("out of range");
-        }
-
-        @Test
-        void oversizedTitle() {
-            ObjectNode finding = validFindingNode();
-            finding.put("title", "x".repeat(300));
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            String title = result.validFindings().get(0).title();
-            assertThat(title).hasSize(255);
-            assertThat(title).endsWith("...");
+            assertThat(result.validObservations()).isEmpty();
+            assertThat(result.discarded())
+                .singleElement()
+                .extracting(DiscardedEntry::reason)
+                .asString()
+                .contains("summary");
         }
 
         @Test
         @DisplayName("normalizes practice slug with underscores")
         void slugNormalization() {
-            ObjectNode finding = validFindingNode();
-            finding.put("practiceSlug", "PR_Description_Quality");
+            ObjectNode observation = validFindingNode();
+            observation.put("practiceSlug", "PR_Description_Quality");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).practiceSlug()).isEqualTo("pr-description-quality");
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).practiceSlug()).isEqualTo("pr-description-quality");
         }
 
         @Test
         void optionalFieldsPresent() {
-            ObjectNode finding = validFindingNode();
-            finding.put("reasoning", "Some reasoning");
-            finding.put("guidance", "Some guidance");
+            ObjectNode observation = validFindingNode();
+            observation.put("evidenceRationale", "Some evidenceRationale");
             ObjectNode evidence = objectMapper.createObjectNode();
             evidence.put("key", "value");
-            finding.set("evidence", evidence);
+            observation.set("evidence", evidence);
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            ValidatedFinding f = result.validFindings().get(0);
-            assertThat(f.reasoning()).isEqualTo("Some reasoning");
-            assertThat(f.guidance()).isEqualTo("Some guidance");
+            ValidatedObservation f = result.validObservations().get(0);
+            assertThat(f.evidenceRationale()).isEqualTo("Some evidenceRationale");
             assertThat(f.evidence()).isNotNull();
             assertThat(f.evidence().get("key").asString()).isEqualTo("value");
         }
 
         @Test
-        void nullOptionalFields() {
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
+        @DisplayName("a removed measurement field rejects the observation")
+        void removedFieldsAreContractErrors() {
+            ObjectNode observation = validFindingNode();
+            observation.put("evidenceRationale", "Some evidenceRationale");
+            observation.put("guidance", "Rotate the credential and re-run the pipeline.");
 
-            ValidatedFinding f = result.validFindings().get(0);
-            assertThat(f.reasoning()).isNull();
-            assertThat(f.guidance()).isNull();
-            assertThat(f.evidence()).isNull();
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
+
+            assertThat(result.validObservations()).isEmpty();
+            assertThat(result.discarded())
+                .singleElement()
+                .satisfies(discarded ->
+                    assertThat(discarded.reason()).contains("unknown observation fields").contains("guidance")
+                );
         }
 
         @Test
-        void confidenceExactlyZero() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 0.0);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).confidence()).isEqualTo(0.0f);
-        }
-
-        @Test
-        void confidenceExactlyOne() {
-            ObjectNode finding = validFindingNode();
-            finding.put("confidence", 1.0);
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).confidence()).isEqualTo(1.0f);
-        }
-
-        @Test
-        void oversizedEvidenceDropped() {
-            ObjectNode finding = validFindingNode();
+        void oversizedEvidenceIsRejected() {
+            ObjectNode observation = validFindingNode();
             ObjectNode evidence = objectMapper.createObjectNode();
-            // Create evidence exceeding 64KB
             evidence.put("data", "x".repeat(70_000));
-            finding.set("evidence", evidence);
+            observation.set("evidence", evidence);
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).evidence()).isNull();
-            assertThat(result.discarded()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
+            assertThat(result.discarded())
+                .singleElement()
+                .extracting(DiscardedEntry::reason)
+                .asString()
+                .contains("evidence");
         }
 
         @Test
-        @DisplayName("truncates reasoning exceeding 10000 chars")
-        void reasoningTruncated() {
-            ObjectNode finding = validFindingNode();
-            finding.put("reasoning", "r".repeat(15_000));
+        @DisplayName("rejects evidenceRationale exceeding 10000 chars")
+        void oversizedEvidenceRationaleIsRejected() {
+            ObjectNode observation = validFindingNode();
+            observation.put("evidenceRationale", "r".repeat(15_000));
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(observation)));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).reasoning()).hasSize(10_000);
-        }
-
-        @Test
-        @DisplayName("truncates guidance exceeding 5000 chars")
-        void guidanceTruncated() {
-            ObjectNode finding = validFindingNode();
-            finding.put("guidance", "g".repeat(8_000));
-
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(finding)));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).guidance()).hasSize(5_000);
+            assertThat(result.validObservations()).isEmpty();
+            assertThat(result.discarded())
+                .singleElement()
+                .extracting(DiscardedEntry::reason)
+                .asString()
+                .contains("evidenceRationale");
         }
     }
 
     @Nested
-    class MixedFindings {
+    class MixedObservations {
 
         @Test
         void mixedValidAndInvalid() {
@@ -547,9 +526,9 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ObjectNode invalid = validFindingNode();
             invalid.put("presence", "BOGUS");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(valid, invalid)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(valid, invalid)));
 
-            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validObservations()).hasSize(1);
             assertThat(result.discarded()).hasSize(1);
             assertThat(result.discarded().get(0).index()).isEqualTo(1);
         }
@@ -559,135 +538,12 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             ObjectNode bad1 = validFindingNode();
             bad1.remove("practiceSlug");
             ObjectNode bad2 = validFindingNode();
-            bad2.put("confidence", -1);
+            bad2.remove("summary");
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(bad1, bad2)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(bad1, bad2)));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
             assertThat(result.discarded()).hasSize(2);
-        }
-    }
-
-    @Nested
-    class PerFindingSuggestedDiffNotes {
-
-        private ObjectNode findingWithSuggestedNotes(
-            String slug,
-            String presence,
-            String severity,
-            ObjectNode... notes
-        ) {
-            ObjectNode finding = objectMapper.createObjectNode();
-            finding.put("practiceSlug", slug);
-            finding.put("title", "Issue found");
-            finding.put("presence", presence);
-            // An ABSENT gap is a BAD assessment; any other presence here pairs with GOOD.
-            finding.put("assessment", "ABSENT".equalsIgnoreCase(presence) ? "BAD" : "GOOD");
-            finding.put("severity", severity);
-            finding.put("confidence", 0.90);
-            ArrayNode arr = finding.putArray("suggestedDiffNotes");
-            for (ObjectNode note : notes) {
-                arr.add(note);
-            }
-            return finding;
-        }
-
-        private ObjectNode suggestedNote(String filePath, int startLine, String body) {
-            ObjectNode note = objectMapper.createObjectNode();
-            note.put("filePath", filePath);
-            note.put("startLine", startLine);
-            note.put("body", body);
-            return note;
-        }
-
-        @Test
-        void attachesNotesToFinding() {
-            ObjectNode finding = findingWithSuggestedNotes(
-                "error-handling",
-                "ABSENT",
-                "MAJOR",
-                suggestedNote("src/Main.java", 42, "Add error handling here.")
-            );
-            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
-            DiffNote note = result.validFindings().get(0).suggestedDiffNotes().get(0);
-            assertThat(note.filePath()).isEqualTo("src/Main.java");
-            assertThat(note.startLine()).isEqualTo(42);
-            assertThat(note.body()).isEqualTo("Add error handling here.");
-        }
-
-        @Test
-        void absentNotesYieldsEmptyList() {
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(validFindingNode())));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).suggestedDiffNotes()).isEmpty();
-        }
-
-        @Test
-        void skipsInvalidEntries() {
-            ObjectNode finding = objectMapper.createObjectNode();
-            finding.put("practiceSlug", "error-handling");
-            finding.put("title", "Issue");
-            finding.put("presence", "ABSENT");
-            finding.put("assessment", "BAD");
-            finding.put("severity", "MAJOR");
-            finding.put("confidence", 0.90);
-            ArrayNode arr = finding.putArray("suggestedDiffNotes");
-            ObjectNode bad1 = objectMapper.createObjectNode();
-            bad1.put("startLine", 1);
-            bad1.put("body", "missing file path");
-            arr.add(bad1);
-            ObjectNode bad2 = objectMapper.createObjectNode();
-            bad2.put("filePath", "src/A.java");
-            bad2.put("startLine", 1);
-            arr.add(bad2);
-            arr.add(suggestedNote("src/Valid.java", 5, "Valid note"));
-
-            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
-            assertThat(result.validFindings().get(0).suggestedDiffNotes().get(0).filePath()).isEqualTo(
-                "src/Valid.java"
-            );
-        }
-
-        @Test
-        void rejectsInternalPaths() {
-            ObjectNode finding = findingWithSuggestedNotes(
-                "error-handling",
-                "ABSENT",
-                "MAJOR",
-                suggestedNote("inputs/context/foo.json", 1, "should be rejected"),
-                suggestedNote("src/Real.java", 5, "should be kept")
-            );
-            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
-            assertThat(result.validFindings().get(0).suggestedDiffNotes().get(0).filePath()).isEqualTo("src/Real.java");
-        }
-
-        @Test
-        void preservesEndLine() {
-            ObjectNode note = suggestedNote("src/Range.java", 10, "Multi-line issue");
-            note.put("endLine", 20);
-            ObjectNode finding = findingWithSuggestedNotes("error-handling", "ABSENT", "MAJOR", note);
-            String raw = "{\"findings\": [%s]}".formatted(finding.toString());
-
-            ParseResult result = parser.parse(wrapRawOutput(raw));
-
-            assertThat(result.validFindings().get(0).suggestedDiffNotes()).hasSize(1);
-            DiffNote diffNote = result.validFindings().get(0).suggestedDiffNotes().get(0);
-            assertThat(diffNote.startLine()).isEqualTo(10);
-            assertThat(diffNote.endLine()).isEqualTo(20);
         }
     }
 
@@ -698,32 +554,29 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void keepsAllFindingsPerPractice() {
             ObjectNode f1 = validFindingNode();
             f1.put("practiceSlug", "error-handling");
-            f1.put("confidence", 0.85);
-            f1.put("title", "First violation");
+            f1.put("summary", "First violation");
 
             ObjectNode f2 = validFindingNode();
             f2.put("practiceSlug", "error-handling");
-            f2.put("confidence", 0.95);
-            f2.put("title", "Second violation");
+            f2.put("summary", "Second violation");
 
             ObjectNode f3 = validFindingNode();
             f3.put("practiceSlug", "code-hygiene");
-            f3.put("confidence", 0.90);
 
-            ParseResult result = parser.parse(wrapRawOutput(wrapFindings(f1, f2, f3)));
+            ParseResult result = parser.parse(wrapRawOutput(wrapObservations(f1, f2, f3)));
 
-            // All three findings kept — no dedup
-            assertThat(result.validFindings()).hasSize(3);
+            // All three observations kept — no dedup
+            assertThat(result.validObservations()).hasSize(3);
             assertThat(
                 result
-                    .validFindings()
+                    .validObservations()
                     .stream()
                     .filter(f -> f.practiceSlug().equals("error-handling"))
                     .count()
             ).isEqualTo(2);
             assertThat(
                 result
-                    .validFindings()
+                    .validObservations()
                     .stream()
                     .anyMatch(f -> f.practiceSlug().equals("code-hygiene"))
             ).isTrue();
@@ -737,14 +590,14 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void extractsJsonFromPhaseMarkers() {
             String mixed = """
                 [PHASE0] Context loaded: 1 files changed
-                [PHASE1] RELEVANT: hardcoded-secrets
+                [PHASE1] RELEVANT: avoids-insecure-defaults-and-over-broad-permissions
                 [PHASE4] Output ready
-                {"findings": [%s]}
+                {"observations": [%s]}
                 """.formatted(validFindingNode().toString());
 
             ParseResult result = parser.parse(wrapRawOutput(mixed));
 
-            assertThat(result.validFindings()).hasSize(1);
+            assertThat(result.validObservations()).hasSize(1);
         }
 
         @Test
@@ -753,7 +606,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             ParseResult result = parser.parse(wrapRawOutput(text));
 
-            assertThat(result.validFindings()).isEmpty();
+            assertThat(result.validObservations()).isEmpty();
         }
     }
 
@@ -765,14 +618,13 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
             // Simulate agent output with Swift \(error) in code snippets
             // Jackson would fail on \( because it's not a valid JSON escape
             String rawWithSwiftEscapes = """
-                {"findings":[{"practiceSlug":"silent-failure","title":"Empty catch","presence":"ABSENT","assessment":"BAD","severity":"MAJOR","confidence":0.95,"guidance":"```swift\\nprint(\\"Error: \\(error)\\")\\n```"}]}
+                {"observations":[{"practiceSlug":"silent-failure","summary":"Empty catch","presence":"ABSENT","assessment":"BAD","severity":"MAJOR","evidence":{},"evidenceRationale":"```swift\\nprint(\\"Error: \\(error)\\")\\n```"}]}
                 """;
 
             ParseResult result = parser.parse(wrapRawOutput(rawWithSwiftEscapes));
 
-            assertThat(result.validFindings()).hasSize(1);
-            assertThat(result.validFindings().get(0).practiceSlug()).isEqualTo("silent-failure");
-            assertThat(result.validFindings().get(0).guidance()).contains("Error:");
+            assertThat(result.validObservations()).hasSize(1);
+            assertThat(result.validObservations().get(0).practiceSlug()).isEqualTo("silent-failure");
         }
 
         @Test
@@ -806,22 +658,22 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
 
             ParseResult result = parser.parse(jobOutput);
 
-            assertThat(result.validFindings()).hasSize(5);
+            assertThat(result.validObservations()).hasSize(5);
             assertThat(result.discarded()).isEmpty();
 
-            // Verify first finding
-            ValidatedFinding first = result.validFindings().get(0);
+            // Verify first observation
+            ValidatedObservation first = result.validObservations().get(0);
             assertThat(first.practiceSlug()).isEqualTo("pr-description-quality");
             assertThat(first.presence()).isEqualTo(Presence.PRESENT);
 
-            // Verify negative finding
-            ValidatedFinding negative = result.validFindings().get(1);
+            // Verify negative observation
+            ValidatedObservation negative = result.validObservations().get(1);
             assertThat(negative.presence()).isEqualTo(Presence.ABSENT);
             assertThat(negative.severity()).isEqualTo(Severity.MAJOR);
 
             // Verify remaining presences
-            assertThat(result.validFindings().get(3).presence()).isEqualTo(Presence.PRESENT);
-            assertThat(result.validFindings().get(4).presence()).isEqualTo(Presence.ABSENT);
+            assertThat(result.validObservations().get(3).presence()).isEqualTo(Presence.PRESENT);
+            assertThat(result.validObservations().get(4).presence()).isEqualTo(Presence.ABSENT);
         }
     }
 
@@ -829,7 +681,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
     @DisplayName("coerceCoherence — structural (observation, severity) invariants")
     class CoerceCoherence {
 
-        private ValidatedFinding finding(Presence presence, Severity severity) {
+        private ValidatedObservation observation(Presence presence, Severity severity) {
             // Derive the valence from presence for these structural cases: PRESENT->GOOD (a strength a
             // defect-detector must not emit), ABSENT->BAD (a gap that carries a band), NA->null.
             Assessment assessment =
@@ -838,43 +690,32 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                     : presence == Presence.PRESENT
                         ? Assessment.GOOD
                         : Assessment.BAD;
-            return new ValidatedFinding(
-                "p",
-                "t",
-                presence,
-                assessment,
-                severity,
-                0.9f,
-                null,
-                "reasoning",
-                "guidance",
-                List.of()
-            );
+            return new ValidatedObservation("p", "t", presence, assessment, severity, null, "evidenceRationale");
         }
 
         @Test
         @DisplayName("defect-detector PRESENT/GOOD is coerced to NOT_APPLICABLE (severity null) with an audit note")
         void defectDetectorObservedToNa() {
-            var out = finding(Presence.PRESENT, Severity.MAJOR).coerceCoherence(true, false);
+            var out = observation(Presence.PRESENT, Severity.MAJOR).coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
-            // Severity is a band only for a BAD finding (ADR 0022); a coerced NA finding has none.
+            // Severity is a band only for a BAD observation (ADR 0022); a coerced NA observation has none.
             assertThat(out.severity()).isNull();
-            assertThat(out.reasoning()).startsWith("[auto-downgraded");
+            assertThat(out.evidenceRationale()).startsWith("[auto-downgraded");
         }
 
         @Test
         @DisplayName("non-defect-detector PRESENT/GOOD keeps presence but nulls severity (no band for a strength)")
         void nonDefectObservedSeverityInfo() {
-            var out = finding(Presence.PRESENT, Severity.MAJOR).coerceCoherence(false, false);
+            var out = observation(Presence.PRESENT, Severity.MAJOR).coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.PRESENT);
-            // A GOOD (strength) finding carries no severity band under ADR 0022.
+            // A GOOD (strength) observation carries no severity band under ADR 0022.
             assertThat(out.severity()).isNull();
         }
 
         @Test
         @DisplayName("ABSENT with INFO severity is raised to MINOR (a gap must carry a band)")
         void notObservedInfoToMinor() {
-            var out = finding(Presence.ABSENT, Severity.INFO).coerceCoherence(false, false);
+            var out = observation(Presence.ABSENT, Severity.INFO).coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.severity()).isEqualTo(Severity.MINOR);
         }
@@ -882,14 +723,14 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("ABSENT with a real band is unchanged (identity)")
         void notObservedMajorUnchanged() {
-            var in = finding(Presence.ABSENT, Severity.MAJOR);
+            var in = observation(Presence.ABSENT, Severity.MAJOR);
             assertThat(in.coerceCoherence(false, false)).isSameAs(in);
         }
 
         @Test
         @DisplayName("NOT_APPLICABLE severity is nulled (no band for an inapplicable practice)")
         void naSeverityInfo() {
-            var out = finding(Presence.NOT_APPLICABLE, Severity.MAJOR).coerceCoherence(false, false);
+            var out = observation(Presence.NOT_APPLICABLE, Severity.MAJOR).coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.severity()).isNull();
         }
@@ -897,7 +738,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("defect-detector ABSENT defect is preserved with its band")
         void defectDetectorNotObservedPreserved() {
-            var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(true, false);
+            var out = observation(Presence.ABSENT, Severity.MAJOR).coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.severity()).isEqualTo(Severity.MAJOR);
         }
@@ -907,18 +748,15 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         void absentGoodIsPreservedAsStrength() {
             // ADR 0022 §1: (ABSENT, GOOD) is "bad behaviour avoided → clean" — a real strength, distinct from a
             // practice that simply does not apply. It MUST persist as (ABSENT, GOOD); only its severity is
-            // nulled (a coaching band is reserved for a BAD finding).
-            var strength = new ValidatedFinding(
+            // nulled (a coaching band is reserved for a BAD observation).
+            var strength = new ValidatedObservation(
                 "p",
                 "t",
                 Presence.ABSENT,
                 Assessment.GOOD,
                 Severity.INFO,
-                0.9f,
                 null,
-                "reasoning",
-                "guidance",
-                List.of()
+                "evidenceRationale"
             );
             var out = strength.coerceCoherence(false, false);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
@@ -927,60 +765,69 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         }
 
         @Test
-        @DisplayName("defect-detector (ABSENT, GOOD) is off-contract → coerced to NOT_APPLICABLE")
-        void defectDetectorAbsentGoodCoercedToNa() {
-            // A defect-detector only ever emits PRESENT/BAD or NOT_APPLICABLE; an ABSENT/GOOD it produces is
-            // off-contract model noise and must NOT ship as a false strength (it is a real strength only for a
-            // normal practice — see absentGoodIsPreservedAsStrength).
-            var offContract = new ValidatedFinding(
+        @DisplayName("defect-detector (ABSENT, GOOD) survives — it is the shape its strength has")
+        void defectDetectorAbsentGoodSurvives() {
+            // A defect-detector's target signal is the undesirable behaviour, so what would be PRESENT for it
+            // is the defect and a (PRESENT, GOOD) is off-contract. (ABSENT, GOOD) is the OTHER claim: the
+            // harmful behaviour could have appeared in the corpus the practice bounds and did not. Coercing it
+            // away is what used to tell a developer who wrote clean error handling that their work had no
+            // subject for the practice — a NOT_APPLICABLE that is simply false, and indistinguishable from
+            // "you touched nothing relevant". Whether the corpus really was bounded and covered is settled
+            // against the practice's EXHAUSTIVE stances in PracticeDetectionDeliveryService, not guessed here.
+            var strength = new ValidatedObservation(
                 "p",
                 "t",
                 Presence.ABSENT,
                 Assessment.GOOD,
                 Severity.INFO,
-                0.9f,
                 null,
-                "reasoning",
-                "guidance",
-                List.of()
+                "evidenceRationale"
+            );
+            var out = strength.coerceCoherence(true, false);
+            assertThat(out.presence()).isEqualTo(Presence.ABSENT);
+            assertThat(out.assessment()).isEqualTo(Assessment.GOOD);
+            // Severity is a coaching band for a problem only, so a strength carries none whatever was emitted.
+            assertThat(out.severity()).isNull();
+            assertThat(out.evidenceRationale()).isEqualTo("evidenceRationale");
+        }
+
+        @Test
+        @DisplayName("defect-detector (PRESENT, GOOD) is still off-contract → coerced to NOT_APPLICABLE")
+        void defectDetectorPresentGoodCoercedToNa() {
+            // The refusal that survives, and the one that was always the real one: a PRESENT here would be
+            // the defect, so endorsing it praises a good act nobody observed.
+            var offContract = new ValidatedObservation(
+                "p",
+                "t",
+                Presence.PRESENT,
+                Assessment.GOOD,
+                Severity.INFO,
+                null,
+                "evidenceRationale"
             );
             var out = offContract.coerceCoherence(true, false);
             assertThat(out.presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.assessment()).isNull();
-            assertThat(out.reasoning()).startsWith("[auto-downgraded");
+            assertThat(out.evidenceRationale()).startsWith("[auto-downgraded");
         }
 
         @Test
         @DisplayName("list helper applies the per-slug defect-detector flag")
         void listHelperPerSlug() {
-            var dd = new ValidatedFinding(
-                "sec",
-                "t",
-                Presence.PRESENT,
-                Assessment.GOOD,
-                Severity.INFO,
-                0.9f,
-                null,
-                "r",
-                "g",
-                List.of()
-            );
-            var ok = new ValidatedFinding(
+            var dd = new ValidatedObservation("sec", "t", Presence.PRESENT, Assessment.GOOD, Severity.INFO, null, "r");
+            var ok = new ValidatedObservation(
                 "style",
                 "t",
                 Presence.PRESENT,
                 Assessment.GOOD,
                 Severity.MAJOR,
-                0.9f,
                 null,
-                "r",
-                "g",
-                List.of()
+                "r"
             );
             var out = PracticeDetectionResultParser.coerceCoherence(List.of(dd, ok), Set.of("sec"));
             assertThat(out.get(0).presence()).isEqualTo(Presence.NOT_APPLICABLE);
             assertThat(out.get(1).presence()).isEqualTo(Presence.PRESENT);
-            // A PRESENT/GOOD (strength) finding carries no severity band under ADR 0022.
+            // A PRESENT/GOOD (strength) observation carries no severity band under ADR 0022.
             assertThat(out.get(1).severity()).isNull();
         }
 
@@ -989,7 +836,7 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("advisory practice: ABSENT MAJOR is capped to MINOR (no merge-block)")
         void advisoryMajorCappedToMinor() {
-            var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(false, true);
+            var out = observation(Presence.ABSENT, Severity.MAJOR).coerceCoherence(false, true);
             assertThat(out.presence()).isEqualTo(Presence.ABSENT);
             assertThat(out.severity()).isEqualTo(Severity.MINOR);
         }
@@ -997,43 +844,37 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @Test
         @DisplayName("advisory practice: ABSENT CRITICAL is also capped to MINOR")
         void advisoryCriticalCappedToMinor() {
-            var out = finding(Presence.ABSENT, Severity.CRITICAL).coerceCoherence(false, true);
+            var out = observation(Presence.ABSENT, Severity.CRITICAL).coerceCoherence(false, true);
             assertThat(out.severity()).isEqualTo(Severity.MINOR);
         }
 
         @Test
         @DisplayName("blocking-eligible practice: ABSENT MAJOR keeps its band")
         void blockingEligibleMajorPreserved() {
-            var out = finding(Presence.ABSENT, Severity.MAJOR).coerceCoherence(false, false);
+            var out = observation(Presence.ABSENT, Severity.MAJOR).coerceCoherence(false, false);
             assertThat(out.severity()).isEqualTo(Severity.MAJOR);
         }
 
         @Test
         @DisplayName("list helper: a craft slug's MAJOR is capped, a correctness slug's MAJOR survives")
         void listHelperAppliesAdvisoryCeilingBySlug() {
-            var craft = new ValidatedFinding(
+            var craft = new ValidatedObservation(
                 "describe-what-and-why",
                 "t",
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MAJOR,
-                0.98f,
                 null,
-                "r",
-                "g",
-                List.of()
+                "r"
             );
-            var correctness = new ValidatedFinding(
+            var correctness = new ValidatedObservation(
                 "handles-errors-instead-of-swallowing-them",
                 "t",
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MAJOR,
-                0.95f,
                 null,
-                "r",
-                "g",
-                List.of()
+                "r"
             );
             var out = PracticeDetectionResultParser.coerceCoherence(List.of(craft, correctness), Set.of());
             assertThat(out.get(0).severity()).as("craft MAJOR -> MINOR").isEqualTo(Severity.MINOR);
@@ -1044,19 +885,16 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
         @DisplayName("a defect-detector slug that is NOT blocking-eligible still caps its BAD MAJOR to MINOR")
         void defectDetectorButAdvisoryCapsBadToMinor() {
             // A slug can be BOTH a defect-detector (in the set) AND advisory-only (not in BLOCKING_ELIGIBLE).
-            // The defect-detector GOOD->NA coercion does not touch a BAD finding, so the advisory ceiling must
+            // The defect-detector GOOD->NA coercion does not touch a BAD observation, so the advisory ceiling must
             // apply independently: (ABSENT, BAD, MAJOR) -> MINOR.
-            var ddAdvisory = new ValidatedFinding(
+            var ddAdvisory = new ValidatedObservation(
                 "describe-what-and-why",
                 "t",
                 Presence.ABSENT,
                 Assessment.BAD,
                 Severity.MAJOR,
-                0.98f,
                 null,
-                "r",
-                "g",
-                List.of()
+                "r"
             );
             var out = PracticeDetectionResultParser.coerceCoherence(
                 List.of(ddAdvisory),
@@ -1078,7 +916,6 @@ class PracticeDetectionResultParserTest extends BaseUnitTest {
                 "avoids-unsafe-panics-and-chosen-crashes",
                 "validates-and-escapes-untrusted-input",
                 "avoids-insecure-defaults-and-over-broad-permissions",
-                "hardcoded-secrets",
                 "keeps-the-test-suite-honest"
             );
         }

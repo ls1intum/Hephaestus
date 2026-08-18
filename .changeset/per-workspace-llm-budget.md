@@ -3,7 +3,7 @@
 ---
 
 Instance administrators can now see what each workspace spent on AI in a given month, and set a
-monthly spending cap per workspace. Once a workspace reaches its cap, practice detection and mentor
+monthly spending cap per workspace. Once a workspace reaches its cap, practice reviews and the mentor
 replies pause for the rest of the month — so one runaway workspace can no longer quietly consume the
 whole instance's AI budget — and they resume on their own when the next month begins or when an
 administrator raises the cap. Changes to a cap are recorded in the audit log alongside other

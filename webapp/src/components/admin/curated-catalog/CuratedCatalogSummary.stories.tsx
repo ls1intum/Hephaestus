@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, within } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 
 const meta = {
@@ -40,8 +40,7 @@ export const UpdatesWaiting: Story = {
 			noLongerShipped: 0,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText("2 updates would change review behavior")).toBeVisible();
 		await expect(canvas.getByText("5 updates would change wording or guidance")).toBeVisible();
 		await expect(canvas.getByText("1 update would change area appearance")).toBeVisible();
@@ -64,8 +63,7 @@ export const RemovedDefault: Story = {
 			noLongerShipped: 1,
 		},
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByText("1 Hephaestus change needs review")).toBeVisible();
 		await expect(canvas.getByText("1 entry is no longer in Hephaestus defaults")).toBeVisible();
 	},
@@ -73,9 +71,7 @@ export const RemovedDefault: Story = {
 
 export const ReviewingChanges: Story = {
 	args: { ...UpdatesWaiting.args, reviewing: true },
-	play: async ({ canvasElement }) => {
-		await expect(
-			within(canvasElement).queryByRole("button", { name: "Review changes" }),
-		).not.toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button", { name: "Review changes" })).not.toBeInTheDocument();
 	},
 };

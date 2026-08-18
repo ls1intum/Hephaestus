@@ -6,24 +6,31 @@ import { subjectLabel } from "./review-format";
 
 export interface ReviewPersonProps {
 	person: ReviewSubject | undefined;
+	/**
+	 * Says which person this is when a surface shows two — "To" and "About" on a piece of feedback
+	 * whose recipient is not its subject. Omitted everywhere only one person is in play, where a
+	 * prefix would be reading out the column header.
+	 */
 	prefix?: string;
 	className?: string;
-	display?: "compact" | "full";
 }
 
-export function ReviewPerson({
-	person,
-	prefix,
-	className,
-	display = "compact",
-}: ReviewPersonProps) {
+/** One person, as a chip: avatar and name, sized to sit in a row of badges. */
+export function ReviewPerson({ person, prefix, className }: ReviewPersonProps) {
 	return (
-		<span className={cn("flex min-w-0 items-center gap-2 text-sm", className)}>
-			<Avatar size="sm">
+		<span
+			className={cn(
+				"inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-md border px-1.5 py-0.5 text-xs",
+				className,
+			)}
+		>
+			<Avatar className="size-4 shrink-0">
 				<AvatarImage src={person?.avatarUrl} alt="" />
-				<AvatarFallback>{getInitials(person?.name, person?.login)}</AvatarFallback>
+				<AvatarFallback className="text-[0.625rem]">
+					{getInitials(person?.name, person?.login)}
+				</AvatarFallback>
 			</Avatar>
-			<span className={cn(display === "compact" ? "truncate" : "break-words")}>
+			<span className="min-w-0 break-words">
 				{prefix && <span className="text-muted-foreground">{prefix} </span>}
 				{subjectLabel(person)}
 			</span>

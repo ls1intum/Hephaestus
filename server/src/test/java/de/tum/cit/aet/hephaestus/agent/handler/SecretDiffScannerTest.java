@@ -47,7 +47,6 @@ class SecretDiffScannerTest extends BaseUnitTest {
             SecretHit hit = hits.get(0);
             assertThat(hit.path()).isEqualTo("FocusBoard/WeatherView.swift");
             assertThat(hit.newLine()).isEqualTo(1);
-            assertThat(hit.isCritical()).isTrue();
             assertThat(hit.addedLine()).contains(OPENAI_KEY);
         }
 
@@ -66,19 +65,19 @@ class SecretDiffScannerTest extends BaseUnitTest {
         @Test
         void privateKeyBlock() {
             List<SecretHit> hits = scanner.scan(diff("id_rsa", "-----BEGIN RSA PRIVATE KEY-----"));
-            assertThat(hits).anyMatch(h -> h.ruleId().equals("private-key") && h.isCritical());
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("private-key"));
         }
 
         @Test
         void connectionStringWithCredentials() {
             List<SecretHit> hits = scanner.scan(diff("app/db.ts", "const url = \"" + PG_URL + "\";"));
-            assertThat(hits).anyMatch(h -> h.ruleId().equals("connection-string") && h.isCritical());
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("connection-string"));
         }
 
         @Test
         void genericHighEntropyAssignment() {
             List<SecretHit> hits = scanner.scan(diff("server.js", "const secret = \"" + HIGH_ENTROPY + "\";"));
-            assertThat(hits).anyMatch(h -> h.ruleId().equals("generic-entropy") && !h.isCritical());
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("generic-entropy"));
         }
 
         @Test
@@ -96,7 +95,7 @@ class SecretDiffScannerTest extends BaseUnitTest {
         @DisplayName("C8: a connection-string literal in an env-ref fallback is also not vetoed")
         void hybridEnvFallbackWithConnectionString() {
             List<SecretHit> hits = scanner.scan(diff("db.ts", "const url = process.env.DB_URL || \"" + PG_URL + "\";"));
-            assertThat(hits).anyMatch(h -> h.ruleId().equals("connection-string") && h.isCritical());
+            assertThat(hits).anyMatch(h -> h.ruleId().equals("connection-string"));
         }
     }
 

@@ -143,7 +143,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 						<AlertDialogDescription>
 							This replaces the customization and discards unsaved changes. It does not change
 							whether the area is included in new workspaces. Existing workspaces remain unchanged.
-							Future Hephaestus updates apply automatically until the area is customized again.
+							Future updates apply automatically until the area is customized again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>

@@ -5,64 +5,82 @@ title: Pi Agent Workspace ABI
 description: Reserved paths, task envelope, and exit codes for the Pi sandbox workspace.
 ---
 
-The container workspace (`/workspace/`) is shared across all Pi-based agent variants — the
-one-shot practice runner today, the long-lived mentor runner soon. Reserving the directory
-names below is a no-cost commitment that prevents a second rename when the mentor runtime
-lands (#1071) and beyond.
+This ABI covers the one-shot practice runner's container workspace at `/workspace/`. The interactive mentor uses
+a separate workspace contract.
 
 ## Layout
 
 The workspace is partitioned by **lifecycle, expressed as location** (ADR 0020): read-only
 vs writable is decided by *where* a file lives, not by convention. Three top-level regions —
-`inputs/` (read-only; the path-guard whitelists exactly this subtree), `work/` (agent +
-precompute scratch; never collected), and `out/` (the only directory collected back into SQL).
+`inputs/` (read-only), `work/` (agent + precompute scratch; never collected), and `out/`
+(the only directory collected back into SQL).
 
-```
+```text
 /workspace/
-├── inputs/                          # READ-ONLY. The path-guard whitelists exactly this subtree.
-│   ├── manifest.json                #   Telescope: the integration-agnostic index (path/connector/
-│   │                                #   sha256 per file). Sits above the per-connector context it indexes.
-│   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020). One namespace
-│   │   └── scm/repo/                #   per connector — the SCM git working tree (READ-ONLY mount) lives
-│   │                                #   here; a future export would be sources/slack/…, sources/outline/…
+├── inputs/                          # READ-ONLY (enforced by directory ownership, not a path guard).
+│   ├── manifest.json                #   Versioned source, capture-state, and artifact index.
+│   ├── sources/                     #   Integration-namespaced source materialisations (ADR 0020).
+│   │   └── scm/repo/                #   Pinned, read-only SCM tree without Git metadata or history.
 │   ├── context/                     #   System-written, AI-readable. Populated by the ContentSource SPI.
 │   │                                #   Files: metadata.json, comments.json, diff.patch, diff_summary.md,
-│   │                                #   contributor_history.json, linked_work_items.json, …
+│   │                                #   diff_stat.txt, linked_work_items.json, review_threads.json,
+│   │                                #   general_comments.json, project_inventory.json, context-map.md,
+│   │                                #   issue_summary.md, conversation_thread.json, document.md,
+│   │                                #   outline/index.json + outline/{collection}/{doc}.md — whichever
+│   │                                #   of them apply to the artifact kind under review.
+│   ├── history/                     #   What earlier reviews recorded and already said, about the
+│   │                                #   person whose work this is: observations.json, feedback.json.
+│   │                                #   ALWAYS present, empty on a first-ever review.
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
 │   ├── precompute/                  #   Per-practice precompute scripts injected by the server.
 │   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
-│   └── analysis/                    #   Per-practice analysis output (.gitkeep markers).
+│   └── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
 │                                    #   usage.json, runner-debug.json, watchdog-killed.json
 ├── task.json                        # TaskEnvelope<…> — runtime contract between handler and runner.
 ├── .pi/                             # Pi SDK agent dir — $PI_CODING_AGENT_DIR resolves here.
 │   ├── AGENTS.md                    #   Orchestrator instructions
-│   ├── settings.json                #   Pi SDK config (provider, model, compaction)
-│   └── extensions/                  #   Custom provider extensions (auto-discovered)
+│   └── settings.json                #   Pi SDK config (provider, model, compaction)
+├── pi-provider.json                 # Provider/model routing for the runner.
+├── pi-provider.mjs                  # Provider helper module loaded by the runner.
+├── pi-observation-normalize.mjs         # Normalises sandbox observations before out/ is written.
+├── node_modules -> /opt/pi-sdk/…    # Symlink created at container start, not staged.
 └── .run-pi.mjs                      # Runner script entry point.
 ```
 
-The long-lived **mentor interactive sandbox** (#1071) is a *separate* runtime with its own
-layout (`context/target/`, `context/user/`, `scratch/`) driven by
-`DockerInteractiveSandboxAdapter`, not by this ABI. It is documented there, not here.
+The mentor interactive sandbox has its own `context/target/`, `context/user/`, and `scratch/` layout and is not
+covered by this ABI.
 
 ## Path conventions
 
-* **`inputs/`** — the entire read-only region. The sandbox path-guard whitelists exactly this
-  subtree; an agent write attempt anywhere under `inputs/` is rejected.
-* **`inputs/context/`** — written by `ContentSource` implementations under
-  `agent.context.providers.*`. Path prefix is enforced by `WorkspaceContextBuilder`.
-* **`inputs/manifest.json`** — the telescope index, written by `ContextManifestBuilder` *above*
-  `inputs/context/` (it indexes the context files but is not itself one of them).
-* **`inputs/sources/scm/repo/`** — the read-only SCM checkout, bind-mounted from the host
-  Context Fabric (`{fabric.root}/sources/scm/{repositoryId}`).
-* **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
+- **`inputs/`** — the entire read-only region. Read-only-ness is a **filesystem** property, not a path
+  guard: the server pre-creates only the `work/` ancestors as the sandbox uid and lets the container
+  runtime auto-create the `inputs/` directories as root, so the unprivileged agent cannot write there.
+  There is no runtime allowlist of `inputs/`. The one allowlist that does exist is server-side and narrower
+  — it validates the paths an *adapter* may inject before the container exists, and covers
+  `inputs/context/` and the mentor's `.sessions/` only.
+- **`inputs/context/`** — system-written, AI-readable source materializations of the artifact under
+  review. A source with nothing to report still writes its file, holding an empty list: "the record was
+  read and held nothing" is a fact a review may reason from, and "the file is not there" is not.
+- **`inputs/history/`** — the same, for what came before this event rather than for this event. Present on
+  every review, because a review of one event is only a partial practice review and cannot be made whole by
+  reading that event harder. Never reported COMPLETE: it is a bounded window over a growing record.
+- **`inputs/manifest.json`** — the source and artifact index, and the authoritative statement of what a run
+  staged. **Every source the source contract says applies to the artifact kind is captured and staged, on
+  every review** — practice bindings decide which practices may run, never which files the agent can see. A
+  source listed as anything other than `AVAILABLE` says why in a typed reason code (`NO_PROVIDER`,
+  `GOVERNANCE_NOT_EFFECTIVE`, `COLLECTION_ERROR`, …); none of those reasons is "no practice asked for it".
+  It indexes context files but is not itself a source artifact.
+- **`inputs/sources/scm/repo/`** — a read-only repository tree materialised at the manifest's
+  immutable commit identity. It intentionally excludes `.git`, history, submodules, and symlink
+  targets; `inputs/manifest.json` records whether the resulting source is complete or partial.
+- **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
   collects it.
-* **`out/`** — the *only* directory the sandbox collects after the run.
-* **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
+- **`out/`** — the *only* directory the sandbox collects after the run.
+- **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
   `schemaVersion` and `task.kind`, exiting `42` on mismatch (envelope/image drift signal).
-* **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`
+- **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`
   — internal control surfaces. AI-readable as configured by the orchestrator, but
   *not* part of the public agent ABI; subject to change without a `schemaVersion` bump.
 
@@ -70,10 +88,14 @@ layout (`context/target/`, `context/user/`, `scratch/`) driven by
 
 | Code | Meaning |
 |------|---------|
-| 0    | Success |
-| 1    | Agent runtime failure (Pi SDK or runner error) |
-| 3    | Watchdog hard-kill (budget + grace exceeded) |
+| 0    | Success — `out/result.json` is complete, whether from the first attempt, the recovery retry, or reconstruction from persisted tool state |
+| 1    | No complete review output after the initial attempt *and* the recovery retry |
+| 2    | Fatal runner error — an unhandled rejection or uncaught exception. Debug and usage files are persisted first |
+| 3    | Watchdog hard-kill (budget + grace exceeded); writes `out/watchdog-killed.json` first |
 | 42   | Envelope mismatch (unsupported `schemaVersion` or unknown `kind`) — image/server drift |
+
+`137` is a container SIGKILL from the runtime, not a runner code. The server treats `0` as success and
+`42` as drift; every other non-zero code is a generic failure.
 
 ## Versioning policy
 

@@ -91,7 +91,7 @@ export const NothingChosen: Story = {
 		await userEvent.click(submit);
 
 		await expect(args.onSubmit).not.toHaveBeenCalled();
-		await expect(dialog.getByText(/choose a channel from the list/i)).toBeInTheDocument();
+		dialog.getByText(/choose a channel from the list/i);
 	},
 };
 
@@ -119,7 +119,7 @@ export const InvalidPaste: Story = {
 	play: async () => {
 		const dialog = within(await screen.findByRole("dialog"));
 		await userEvent.type(dialog.getByLabelText(/paste a channel link or id/i), "not-a-channel");
-		await expect(dialog.getByText(/paste a slack channel url, mention, or/i)).toBeInTheDocument();
+		dialog.getByText(/paste a slack channel url, mention, or/i);
 	},
 };
 
@@ -136,6 +136,6 @@ export const SubmitRejected: Story = {
 		await userEvent.type(dialog.getByLabelText(/paste a channel link or id/i), "C0974LJBPBK");
 		await userEvent.click(dialog.getByRole("button", { name: /^add channel$/i }));
 
-		await expect(await screen.findByRole("dialog")).toBeInTheDocument();
+		await expect(await screen.findByRole("dialog")).toBeVisible();
 	},
 };

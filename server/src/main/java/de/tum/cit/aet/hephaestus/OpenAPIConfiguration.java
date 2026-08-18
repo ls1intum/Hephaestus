@@ -71,7 +71,11 @@ import org.springframework.data.web.PagedModel;
     tags = {
         @Tag(
             name = "Practice reviews",
-            description = "Workspace-admin access to review runs, findings, and message delivery history"
+            description = "Workspace-admin access to review runs, observations, and feedback delivery history"
+        ),
+        @Tag(
+            name = "Practice review trace",
+            description = "Why each practice did or did not run on one piece of work; readable by any workspace member"
         ),
     },
     servers = { @Server(url = "/", description = "Default Server URL") },
@@ -96,7 +100,32 @@ public class OpenAPIConfiguration {
         "PageableObject",
         "SortObject",
         "ProblemDetail",
-        "PageMetadata"
+        "PageMetadata",
+        "PracticeAutomatedReviewPolicy",
+        // The binding is the shape a practice is authored in, so a client that cannot see it cannot
+        // create one. It has no DTO suffix because it is the domain type the API deliberately exposes.
+        "PracticeBinding",
+        "PracticeSubject",
+        "PracticeSubjectClause",
+        "SubjectEvidenceCollection",
+        "PracticeEvidenceRequirement",
+        "PracticeOptionalContextSource",
+        "PracticeInsufficientEvidenceAction",
+        "PracticeEvidenceLimitation",
+        "PracticeAutomatedReviewValidation",
+        "PracticeAutomatedReviewValidationStatus",
+        "PracticeAutomatedReview",
+        "PracticeAutomatedReviewMode",
+        "PracticeEvidenceSufficiency",
+        "EvidenceCompletenessRequirement",
+        "EvidenceFreshnessRequirement",
+        "ReviewClaimCurrentness",
+        "SourceContractVersion",
+        "SourceKind",
+        // The workspace review scope is the shape an admin edits directly on the settings resource; a
+        // client that cannot see it cannot render, let alone change, the scope. Domain type by choice,
+        // like PracticeBinding: it is the same value the gate reads, not a transport copy of it.
+        "WorkspaceReviewScope"
     );
     /**
      * Domain objects to include by specific suffix (like AchievementProgress records)

@@ -21,23 +21,20 @@ The platform is intentionally layered. Internally we distinguish between:
 - **Webhook Server** - same image as Application Server, activated with `SPRING_PROFILES_ACTIVE=prod,webhook` so only the inbound webhook receiver beans load. Restart-independent from Application Server; publishes to the same NATS JetStream streams that the sync consumer reads. See ADR 0008.
 - **User Management** - Hephaestus-native auth: Spring Security `oauth2Login` federates to GitHub / gitlab.lrz.de, then issues a cookie-session JWT (ADR 0017). Accounts + federated identity links live in the application database.
 
-Externally we integrate with code hosting (GitHub today, GitLab planned), Slack/email notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.
+Externally we integrate with code hosting (GitHub and GitLab), Slack/email notifications, and the analytics stack used for anonymised usage metrics. Data enters through webhooks, gets enriched via API calls, and surfaces in the React client.
 
 ## Gamification model
 
 ![Gamification analysis object model](./img/system-design/gamification_analysis_object_model.svg)
 
-The analysis object model maps GitHub webhook payloads to Hephaestus entities. Core classes (`Review`, `PullRequest`, `Developer`) mirror GitHub data, while `Leaderboard`, `Reward`, and `GamificationDashboard` extend the model for competitions.
+The analysis object model maps GitHub webhook payloads to Hephaestus entities. Its core classes — review, pull request, developer — mirror GitHub data, while leaderboard, reward and dashboard classes extend the model for competitions. These are names on the diagram, not a guide to the Java packages.
 
 The original webhook events contain redundant fields, so we normalise them into dedicated entities. Around that core we layer abstractions for leaderboards, rewards, and dashboards that keep gamification state cohesive and queryable.
 
 ## AI mentor architecture
 
-![LangGraph structure for AI mentor](./img/system-design/langgraph.png)
-
-The mentor relies on LangGraph nodes that update storage, generate responses, and maintain state. Conditional edges decide which node executes next based on the conversation context.
-
-Each call to the mentor executes the graph: storage update nodes persist longitudinal context, response nodes craft user-facing replies, state nodes mutate the TypedDict that represents the conversation, and conditional edges steer the flow. The result is a predictable yet adaptive mentoring experience.
+The mentor runs on the Pi runtime, in-process on the application server, streaming to clients over SSE.
+[Unified Pi runtime](./unified-pi-runtime.mdx) is the source of truth for its structure.
 
 ## User interaction flows
 
@@ -67,4 +64,4 @@ The login flow uses GitHub (and optionally gitlab.lrz.de) OAuth directly. On suc
 
 Webhook events arrive at the `webhook-server` container (the application-server image running under `SPRING_PROFILES_ACTIVE=prod,webhook`), which verifies the signature/token and publishes to NATS JetStream. The application-server's sync consumer reads the stream, enriches the data, and recalculates leaderboard standings in real time. The two containers are restart-independent — see ADR 0008.
 
-These workflows highlight the two critical loops: authenticating via GitHub (producing application + mentor tokens) and streaming review events through ingest → enrichment → leaderboard updates. Keeping these diagrams current avoids surprises when we extend integrations.
+These workflows highlight the two critical loops: authenticating via GitHub (producing application + mentor tokens) and streaming review events through ingest → enrichment → leaderboard updates.

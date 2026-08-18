@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import type { LlmConnection } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectDialogFitsViewport } from "@/test/reflow";
 import { AdminLlmConnectionFormDialog } from "./AdminLlmConnectionFormDialog";
 
@@ -56,7 +57,7 @@ export const DiscoveryUnsupported: Story = {
 	play: async () => {
 		await userEvent.type(await screen.findByLabelText("Base URL"), "https://example.com");
 		await userEvent.click(screen.getByRole("button", { name: /test & fetch models/i }));
-		await expect(await screen.findByText(/discovery unsupported/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/discovery unsupported/i));
 		await expect(screen.getByRole("button", { name: /save inactive connection/i })).toBeEnabled();
 	},
 };
@@ -64,7 +65,7 @@ export const DiscoveryUnsupported: Story = {
 export const ValidationError: Story = {
 	play: async () => {
 		await userEvent.click(await screen.findByRole("button", { name: /save inactive connection/i }));
-		await expect(await screen.findByText(/display name is required/i)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/display name is required/i));
 	},
 };
 

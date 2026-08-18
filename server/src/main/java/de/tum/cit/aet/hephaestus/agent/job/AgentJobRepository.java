@@ -40,30 +40,116 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("ids") Collection<UUID> ids
     );
 
+    /**
+     * What these runs decided, for the trace view. {@code reviewReadiness} is the per-practice record
+     * and is deliberately fetched with them: a run that ends without measuring a practice looks the
+     * same from {@code status} and {@code output} whatever the cause, and only readiness says which.
+     */
     @Query(
-        "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
-            "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
-            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose"
+        "SELECT j.id AS id, j.status AS status, j.output AS output, j.reviewReadiness AS reviewReadiness, " +
+            "j.completedAt AS completedAt FROM AgentJob j WHERE j.workspace.id = :workspaceId AND j.id IN :ids"
     )
-    Page<ReviewRunSummaryRow> findReviewRunSummaries(
+    List<ReviewOutcomeRow> findReviewOutcomes(
         @Param("workspaceId") Long workspaceId,
-        @Param("purpose") AgentPurpose purpose,
-        Pageable pageable
+        @Param("ids") Collection<UUID> ids
     );
 
+    interface ReviewOutcomeRow {
+        UUID getId();
+        AgentJobStatus getStatus();
+
+        @Nullable
+        JsonNode getOutput();
+
+        @Nullable
+        JsonNode getReviewReadiness();
+
+        @Nullable
+        Instant getCompletedAt();
+    }
+
+    /**
+     * One page of review runs, narrowed by any combination of status and a {@code createdAt} window.
+     *
+     * <p>Every filter is independently optional; a null one drops out of the predicate. The window is
+     * inclusive at {@code from} and exclusive at {@code to}, the same half-open convention the
+     * observation and feedback listings use, so a day picked in both surfaces means the same day.
+     *
+     * <p>The one query replaced a pair of overloads that differed only in the status clause — a third
+     * and fourth filter would have needed four. {@code CAST(:from AS Instant)} is what lets Hibernate
+     * type a null bound; see {@code AuthEventRepository#findForAdmin}, which is allowlisted out of the
+     * parameter-count arch rule for exactly this reason.
+     */
     @Query(
         "SELECT j.id AS id, j.status AS status, j.jobType AS jobType, j.integrationKind AS integrationKind, " +
             "j.metadata AS metadata, j.createdAt AS createdAt FROM AgentJob j " +
-            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose AND j.status = :status"
+            "WHERE j.workspace.id = :workspaceId AND j.purpose = :purpose " +
+            "AND (:status IS NULL OR j.status = :status) " +
+            "AND (CAST(:from AS Instant) IS NULL OR j.createdAt >= :from) " +
+            "AND (CAST(:to AS Instant) IS NULL OR j.createdAt < :to)"
     )
     Page<ReviewRunSummaryRow> findReviewRunSummaries(
         @Param("workspaceId") Long workspaceId,
         @Param("purpose") AgentPurpose purpose,
-        @Param("status") AgentJobStatus status,
+        @Param("status") @Nullable AgentJobStatus status,
+        @Param("from") @Nullable Instant from,
+        @Param("to") @Nullable Instant to,
         Pageable pageable
     );
 
     Optional<AgentJob> findByIdAndWorkspaceId(UUID id, Long workspaceId);
+
+    /**
+     * Which evidence contract governed a run, without reading the snapshot it is recorded in.
+     *
+     * <p>A snapshot carries one entry per staged file, so a repository-tree capture makes it megabytes,
+     * and Postgres has no partial read for a TOASTed jsonb. Loading the job to take one string out of it
+     * therefore detoasts, ships and parses the whole document — and evidence authorization asks this
+     * question once per observation, on surfaces that list hundreds. Extracting the key in SQL keeps the
+     * detoast on the server and the answer to a few bytes.
+     *
+     * @return the contract version, or empty when this workspace has no such run or the run recorded no
+     *     evidence — both of which mean nothing may be cited from it
+     */
+    @Query(
+        value = "SELECT jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') " +
+            "FROM agent_job j WHERE j.id = :id AND j.workspace_id = :workspaceId",
+        nativeQuery = true
+    )
+    Optional<String> findEvidenceContractVersion(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
+
+    /**
+     * The same answer as {@link #findEvidenceContractVersion} for a whole set of runs, in one round trip.
+     *
+     * <p>Evidence authorization asks the question once per observation, and the surfaces that ask it list
+     * hundreds — a developer with forty pull requests across ten practices costs four hundred sequential
+     * round trips on one dashboard read. The per-row query is cheap; the latency is the count.
+     *
+     * <p>A run this workspace does not own yields no row, and a run that recorded no evidence yields a row
+     * whose value is {@code null}. Both mean nothing may be cited from it, exactly as the empty
+     * {@link Optional} does on the single-row query.
+     */
+    @Query(
+        value = """
+        SELECT j.id AS "id",
+               jsonb_extract_path_text(j.evidence_snapshot, 'manifest', 'contractVersion') AS "contractVersion"
+        FROM agent_job j
+        WHERE j.id IN :ids
+          AND j.workspace_id = :workspaceId
+        """,
+        nativeQuery = true
+    )
+    List<EvidenceContractVersionRow> findEvidenceContractVersions(
+        @Param("workspaceId") Long workspaceId,
+        @Param("ids") Collection<UUID> ids
+    );
+
+    interface EvidenceContractVersionRow {
+        UUID getId();
+
+        @Nullable
+        String getContractVersion();
+    }
 
     @Query(
         "SELECT CASE WHEN COUNT(j) > 0 THEN true ELSE false END FROM AgentJob j " +
@@ -89,8 +175,8 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     Optional<AgentJob> findByJobTokenHashAndStatus(String jobTokenHash, AgentJobStatus status);
 
     /**
-     * Clears the hour-long hold a budget block placed on this workspace's queued jobs, so raising the
-     * cap takes effect immediately. Scoped to {@code hold_reason = 'BUDGET'} rather than "any future
+     * Clears the hold a budget block placed on this workspace's queued jobs, so raising the cap takes
+     * effect immediately. Scoped to {@code hold_reason = 'BUDGET'} rather than "any future
      * {@code available_at}" so it cannot fast-forward a crash-retry backoff.
      *
      * @return how many held jobs were released
@@ -109,7 +195,12 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         Collection<AgentJobStatus> statuses
     );
 
-    /** The key prefix is PR- and config-scoped but SHA-agnostic, so this matches re-reviews of the same PR. */
+    Optional<AgentJob> findByWorkspaceIdAndIdempotencyKey(Long workspaceId, String idempotencyKey);
+
+    /**
+     * Matches on an idempotency-key prefix, so a caller can look across the varying tail of the key
+     * (head SHA, revision, timestamp) for an earlier review of the same subject.
+     */
     @Query(
         "SELECT j FROM AgentJob j WHERE j.workspace.id = :workspaceId" +
             " AND j.idempotencyKey LIKE :keyPrefix ESCAPE '\\'" +
@@ -260,6 +351,58 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     Optional<AgentJobLlmUsage> findLlmUsageById(@Param("id") UUID id);
 
     /**
+     * Finished jobs at least one feedback lane has no record of having run — the work
+     * {@code FeedbackLanePreparationSweeper} recovers after a rejected async submission dropped the
+     * event.
+     *
+     * <p>Bounded on both sides of the window on purpose. The upper bound leaves the listener its own
+     * chance first, so the sweeper is a backstop rather than a competitor; the lower bound stops the
+     * sweep from walking all of history, which also means a lane left unprepared for longer than the
+     * window is never recovered — it is a recovery path, not a reconciliation of the whole ledger.
+     *
+     * <p>Both marks are set even when a lane prepares nothing, so a job the sweeper handles is
+     * off this list on the next pass whatever the lanes decided. That is what keeps an hourly sweep
+     * from re-routing every recent job forever.
+     */
+    @WorkspaceAgnostic("Cross-tenant recovery sweep over jobs whose feedback lanes have no completion mark")
+    @Query(
+        "SELECT new de.tum.cit.aet.hephaestus.agent.job.UnpreparedFeedbackLanes(" +
+            "j.id, j.workspace.id, j.inChatPreparedAt, j.inAppPreparedAt) FROM AgentJob j " +
+            "WHERE j.status = de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus.COMPLETED " +
+            "AND j.jobType IN (de.tum.cit.aet.hephaestus.agent.AgentJobType.PULL_REQUEST_REVIEW, " +
+            "de.tum.cit.aet.hephaestus.agent.AgentJobType.ISSUE_REVIEW) " +
+            "AND j.completedAt >= :from AND j.completedAt < :until " +
+            "AND (j.inChatPreparedAt IS NULL OR j.inAppPreparedAt IS NULL) " +
+            "ORDER BY j.completedAt"
+    )
+    List<UnpreparedFeedbackLanes> findUnpreparedFeedbackLanes(
+        @Param("from") Instant from,
+        @Param("until") Instant until,
+        Pageable pageable
+    );
+
+    /**
+     * Records that the conversational lane ran for this job. Written by the lane itself and by the
+     * sweeper that recovered it, so they cannot disagree about which one it was: the mark says the lane
+     * ran, not who drove it.
+     *
+     * <p>{@code IS NULL}-fenced so a sweeper racing a slow listener leaves the first completion's
+     * instant standing rather than backdating or advancing it.
+     *
+     * @return 1 when this call is the one that recorded the lane, 0 when it was already recorded
+     */
+    @WorkspaceAgnostic("ID-based lane completion mark; job ID from the lane's own event or the recovery sweep")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AgentJob j SET j.inChatPreparedAt = :at WHERE j.id = :id AND j.inChatPreparedAt IS NULL")
+    int markInChatPrepared(@Param("id") UUID id, @Param("at") Instant at);
+
+    /** The in-app lane's half of {@link #markInChatPrepared}. */
+    @WorkspaceAgnostic("ID-based lane completion mark; job ID from the lane's own event or the recovery sweep")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE AgentJob j SET j.inAppPreparedAt = :at WHERE j.id = :id AND j.inAppPreparedAt IS NULL")
+    int markInAppPrepared(@Param("id") UUID id, @Param("at") Instant at);
+
+    /**
      * Like {@link #transitionToCancelled}, fenced to the owning worker: a draining worker must not
      * cancel a sibling's run if the job was orphan-requeued out from under it.
      *
@@ -292,13 +435,46 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
     int markExecutionStarted(@Param("id") UUID id, @Param("workerId") String workerId, @Param("now") Instant now);
 
     /** Written before the sandbox starts, so a failed or cancelled run still records what it consumed. */
-    @WorkspaceAgnostic("ID-based provenance stamp; job ID from worker-local execution context")
+    @WorkspaceAgnostic("ID-based provenance stamp; job ID + owner from worker-local execution context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
-    @Query("UPDATE AgentJob j SET j.promptDigest = :promptDigest, j.inputsDigest = :inputsDigest WHERE j.id = :id")
+    @Query(
+        "UPDATE AgentJob j SET j.promptDigest = :#{#stamp.promptDigest}, " +
+            "j.inputsDigest = :#{#stamp.inputsDigest}, " +
+            "j.evidenceSnapshot = :#{#stamp.evidenceSnapshot}, " +
+            "j.reviewReadiness = :#{#stamp.reviewReadiness} " +
+            "WHERE j.id = :id AND j.status = 'RUNNING' " +
+            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
+            "AND j.retryCount = :retryCount"
+    )
     int updateProvenanceDigests(
         @Param("id") UUID id,
-        @Param("promptDigest") String promptDigest,
-        @Param("inputsDigest") String inputsDigest
+        @Param("workerId") String workerId,
+        @Param("retryCount") int retryCount,
+        @Param("stamp") ProvenanceStamp stamp
+    );
+
+    /** Written as a unit so the evidence snapshot and the readiness decisions over it cannot diverge. */
+    record ProvenanceStamp(
+        @Nullable String promptDigest,
+        @Nullable String inputsDigest,
+        @Nullable JsonNode evidenceSnapshot,
+        @Nullable JsonNode reviewReadiness
+    ) {}
+
+    @WorkspaceAgnostic("ID-based evidence-refusal transition; job ID + owner from worker-local execution context")
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        "UPDATE AgentJob j SET j.status = 'COMPLETED', j.completedAt = :now, j.output = :output, " +
+            "j.errorMessage = NULL WHERE j.id = :id AND j.status = 'RUNNING' " +
+            "AND ((:workerId IS NULL AND j.workerId IS NULL) OR j.workerId = :workerId) " +
+            "AND j.retryCount = :retryCount"
+    )
+    int transitionToEvidenceRefused(
+        @Param("id") UUID id,
+        @Param("workerId") String workerId,
+        @Param("retryCount") int retryCount,
+        @Param("now") Instant now,
+        @Param("output") JsonNode output
     );
 
     /**
@@ -420,7 +596,7 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Param("commentId") String commentId
     );
 
-    /** @return 1 if transitioned, 0 if the current status matched none of {@code fromStatuses}. */
+    /** @return 1 if transitioned, 0 if the row no longer matches the expected job/delivery statuses. */
     @WorkspaceAgnostic("ID-based delivery transition; job ID from workspace-scoped context")
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
@@ -548,10 +724,82 @@ public interface AgentJobRepository extends JpaRepository<AgentJob, UUID> {
         @Nullable
         Instant getOldestAvailableAt();
 
-        /** QUEUED jobs parked on an admin-undoable hold (currently only a monthly LLM cap). */
+        /** QUEUED jobs parked on a hold an admin can lift, as opposed to a retry backoff. */
         long getHeld();
 
         long getRunning();
+    }
+
+    /**
+     * Per-practice readiness outcomes over the most recent reviews of a workspace.
+     *
+     * <p>One statement, because two would take two snapshots under {@code READ COMMITTED} and a review
+     * completing between them shifts the window: counts and blocking reasons would then describe
+     * different sets of jobs. The {@code id} tiebreaker keeps the window stable when a sync enqueues
+     * several jobs in the same microsecond.
+     *
+     * <p>Native because the decisions live in a JSONB column and the useful shape is one row per
+     * decision, which needs {@code jsonb_array_elements}.
+     */
+    @Query(
+        value = "WITH recent AS (" +
+            "  SELECT j.id, j.review_readiness FROM agent_job j" +
+            "   WHERE j.workspace_id = :workspaceId AND j.review_readiness IS NOT NULL" +
+            "   ORDER BY j.created_at DESC, j.id DESC LIMIT :window" +
+            "), decision AS (" +
+            "  SELECT d FROM recent," +
+            "   jsonb_array_elements(recent.review_readiness -> 'decisions') d" +
+            "), counted AS (" +
+            "  SELECT d ->> 'practiceSlug' AS practice_slug," +
+            "         count(*) AS considered," +
+            "         count(*) FILTER (WHERE (d ->> 'ready')::boolean) AS reviewed" +
+            "    FROM decision GROUP BY 1" +
+            "), blocked AS (" +
+            // A decision can be skipped without any source failing: the author set the practice to a
+            // mode that runs no model. Those carry a decision-level reason and no failing check, so
+            // reporting only source failures would leave the skip with no stated cause at all.
+            "  SELECT d ->> 'practiceSlug' AS practice_slug," +
+            "         c ->> 'sourceKind' AS source_kind," +
+            "         reason AS reason_code," +
+            "         count(*) AS reviews" +
+            "    FROM decision," +
+            "         jsonb_array_elements(d -> 'sourceChecks') c," +
+            "         jsonb_array_elements_text(c -> 'reasonCodes') reason" +
+            "   WHERE NOT (d ->> 'ready')::boolean AND NOT (c ->> 'meetsRequirements')::boolean" +
+            "   GROUP BY 1, 2, 3" +
+            "   UNION ALL" +
+            "  SELECT d ->> 'practiceSlug', NULL, reason, count(*)" +
+            "    FROM decision, jsonb_array_elements_text(d -> 'reasonCodes') reason" +
+            "   WHERE NOT (d ->> 'ready')::boolean" +
+            "   GROUP BY 1, 2, 3" +
+            "), aggregated AS (" +
+            "  SELECT practice_slug, jsonb_agg(jsonb_build_object(" +
+            "           'sourceKind', source_kind, 'reasonCode', reason_code, 'reviewsAffected', reviews" +
+            "         ) ORDER BY reviews DESC, source_kind NULLS FIRST, reason_code) AS blockers" +
+            "    FROM blocked GROUP BY 1" +
+            ")" +
+            " SELECT counted.practice_slug AS practiceSlug," +
+            "        counted.considered AS consideredReviews," +
+            "        counted.reviewed AS reviewedCount," +
+            "        coalesce(aggregated.blockers, '[]'::jsonb)::text AS blockersObserved" +
+            "   FROM counted LEFT JOIN aggregated USING (practice_slug)" +
+            "  ORDER BY counted.practice_slug",
+        nativeQuery = true
+    )
+    List<PracticeReadinessRow> findReadinessOutcomes(
+        @Param("workspaceId") Long workspaceId,
+        @Param("window") int window
+    );
+
+    interface PracticeReadinessRow {
+        String getPracticeSlug();
+
+        int getConsideredReviews();
+
+        int getReviewedCount();
+
+        /** A JSON array of blockers, aggregated by the query so one row is one practice. */
+        String getBlockersObserved();
     }
 
     interface ReviewRunTargetRow {

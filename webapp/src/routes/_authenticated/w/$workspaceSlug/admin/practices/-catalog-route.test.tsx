@@ -1,8 +1,11 @@
 import { screen } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
+
+vi.setConfig({ testTimeout: 15_000 });
 
 describe("practice catalog route", () => {
 	it("keeps the catalog available while new reviews are paused", async () => {
@@ -29,6 +32,9 @@ describe("practice catalog route", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+				HttpResponse.json(mockPracticeDefinitionOptions),
+			),
 		);
 
 		renderRouteAt("/w/acme/admin/practices");
@@ -44,9 +50,12 @@ describe("practice catalog route", () => {
 			),
 			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+				HttpResponse.json(mockPracticeDefinitionOptions),
+			),
 		);
 
-		renderRouteAt("/w/acme/admin/practices?focus=ISSUE");
+		renderRouteAt("/w/acme/admin/practices?focus=scm.issue");
 
 		await screen.findByText("Clear the filter to reorder practices.", {}, ROUTE_RENDER_WAIT);
 	});

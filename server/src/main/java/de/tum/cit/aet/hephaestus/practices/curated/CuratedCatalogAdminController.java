@@ -6,6 +6,10 @@ import de.tum.cit.aet.hephaestus.core.Audited;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import de.tum.cit.aet.hephaestus.practices.CatalogDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionOptionsService;
+import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceDefaults;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CreateCuratedPracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaDTO;
@@ -17,6 +21,7 @@ import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeRequestDTO
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.UpdateCuratedStatusRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.PracticeDefinitionOptionsDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticesRequestDTO;
 import io.swagger.v3.oas.annotations.Operation;
@@ -57,6 +62,18 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 public class CuratedCatalogAdminController {
 
     private final CuratedCatalogService service;
+    private final PracticeEvidenceDefaults evidenceDefaults;
+    private final PracticeDefinitionOptionsService definitionOptionsService;
+
+    @GetMapping("/definition-options")
+    @Operation(
+        summary = "Read practice definition options",
+        description = "Returns available review events, recommended requirements, and allowed evidence sources by work type",
+        operationId = "adminGetPracticeDefinitionOptions"
+    )
+    public ResponseEntity<PracticeDefinitionOptionsDTO> definitionOptions() {
+        return ResponseEntity.ok(definitionOptionsService.options());
+    }
 
     @GetMapping
     @Operation(
@@ -96,7 +113,7 @@ public class CuratedCatalogAdminController {
     public ResponseEntity<CuratedPracticeDTO> createPractice(
         @Valid @RequestBody CreateCuratedPracticeRequestDTO request
     ) {
-        var entry = service.createPractice(request.slug(), request.definition().definition());
+        var entry = service.createPractice(request.slug(), definition(request.definition()));
         return created(entry.slug(), entry.etag(), CuratedPracticeDTO.from(entry));
     }
 
@@ -126,7 +143,7 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch,
         @Valid @RequestBody CuratedPracticeRequestDTO request
     ) {
-        return ok(service.writePractice(slug, precondition(ifMatch), request.definition()), CuratedPracticeDTO::from);
+        return ok(service.writePractice(slug, precondition(ifMatch), definition(request)), CuratedPracticeDTO::from);
     }
 
     @PatchMapping("/practices/{slug}/status")
@@ -436,6 +453,14 @@ public class CuratedCatalogAdminController {
         ) @Nullable String ifMatch
     ) {
         return catalogResponse(service.resetOrder(precondition(ifMatch)));
+    }
+
+    private PracticeDefinition definition(CuratedPracticeRequestDTO request) {
+        var evidence =
+            request.automatedReviewPolicy() == null
+                ? evidenceDefaults.policyFor(PracticeBinding.artifactKindOf(request.bindings()))
+                : request.automatedReviewPolicy();
+        return request.definition(evidence);
     }
 
     private static ResponseEntity<CuratedCatalogDTO> catalogResponse(EffectiveCatalog catalog) {

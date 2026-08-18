@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Configures a running local stack for a live practice-detection review against an SCM repository and
+# Configures a running local stack for a live practice-review review against an SCM repository and
 # an OpenAI-compatible model. Idempotent; credentials are accepted only through environment variables.
 #
 # Prereq: the app booted with the `local,e2e` profiles (dev-login + cookie-secure=false +
@@ -198,7 +198,7 @@ api PATCH "/workspaces/$WS_SLUG/features" -H 'content-type: application/json' \
   -d '{"practicesEnabled":true,"mentorEnabled":true,"practiceReviewAutoTriggerEnabled":true,"practiceReviewManualTriggerEnabled":true}' >/dev/null
 api PATCH "/workspaces/$WS_SLUG/practices/review-settings" -H 'content-type: application/json' \
   -d '{"cooldownMinutes":0}' >/dev/null
-say "practice detection and mentor enabled on the workspace"
+say "practice reviews and mentor enabled on the workspace"
 
 # ---- 5. OpenAI-compatible catalog + runtime bindings ----------------------
 # The provider key stays in the connection catalog and never enters the sandbox.
@@ -253,18 +253,25 @@ api PATCH "/workspaces/$WS_SLUG/llm/models/$MODEL_ID" -H 'content-type: applicat
 # PUT is an upsert, so re-running the script refreshes both purpose bindings.
 BINDING_BODY="$(jq -nc --argjson m "$MODEL_ID" \
   '{workspaceModelId:$m,enabled:true,timeoutSeconds:1200,maxConcurrentJobs:1,allowInternet:true}')"
-for PURPOSE in PRACTICE_DETECTION MENTOR; do
+for PURPOSE in PRACTICE_REVIEW MENTOR; do
   api PUT "/workspaces/$WS_SLUG/agents/$PURPOSE" \
     -H 'content-type: application/json' -d "$BINDING_BODY" >/dev/null
 done
 READY="$(api GET "/workspaces/$WS_SLUG/agents" | jq -r '[.[] | select(.ready)] | length')"
 [ "$READY" = "2" ] || die "expected both purposes bound and ready, got $READY"
-say "catalog model bound to practice detection and mentor (both ready)"
+say "catalog model bound to practice reviews and mentor (both ready)"
 
 # ---- 6. the practices ------------------------------------------------------
-practice() { local slug="$1" name="$2" trig="$3" crit="$4" body
-  body="$(jq -nc --arg s "$slug" --arg n "$name" --argjson t "$trig" --arg cr "$crit" \
-    '{slug:$s,name:$n,artifactType:"PULL_REQUEST",triggerEvents:$t,criteria:$cr}')"
+# A practice declares BINDINGS: the signals that occasion a review, and the evidence that review reads.
+# The kind of work is derived from the signal prefix, so it is never stated. The API does not fill in
+# default evidence (only the bundled-catalog loader does), so each binding spells its `needs` out; this
+# is the pull-request default from PracticeEvidenceDefaults.
+PR_NEEDS='[{"sourceKind":"scm.pull-request.core","stance":"REQUIRED"},
+           {"sourceKind":"scm.pull-request.diff","stance":"REQUIRED"},
+           {"sourceKind":"scm.pull-request.comments","stance":"REQUIRED"}]'
+practice() { local slug="$1" name="$2" signals="$3" crit="$4" body
+  body="$(jq -nc --arg s "$slug" --arg n "$name" --argjson sig "$signals" --argjson needs "$PR_NEEDS" \
+    --arg cr "$crit" '{slug:$s,name:$n,bindings:[{signals:$sig,needs:$needs}],criteria:$cr}')"
   if echo "$PRACTICES" | jq -e --arg s "$slug" 'any(.[]; .slug==$s)' >/dev/null; then
     echo "$body" | jq 'del(.slug)' | api PATCH "/workspaces/$WS_SLUG/practices/$slug" \
       -H 'content-type: application/json' --data-binary @- >/dev/null
@@ -272,19 +279,24 @@ practice() { local slug="$1" name="$2" trig="$3" crit="$4" body
     echo "$body" | api POST "/workspaces/$WS_SLUG/practices" \
       -H 'content-type: application/json' --data-binary @- >/dev/null
   fi
-  api PATCH "/workspaces/$WS_SLUG/practices/$slug/active" \
-    -H 'content-type: application/json' -d '{"active":true}' >/dev/null
+  # ENGAGE is the loudest tier: reviewed, and delivered both on the merge request and in the mentor
+  # conversation. The E2E loop exists to watch feedback land, so anything quieter would hide the thing
+  # under test. OFF below is the tier that stops the review outright.
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/review-tier" \
+    -H 'content-type: application/json' -d '{"reviewTier":"ENGAGE"}' >/dev/null
 }
 PRACTICES="$(api GET "/workspaces/$WS_SLUG/practices")"
 while IFS= read -r slug; do
-  api PATCH "/workspaces/$WS_SLUG/practices/$slug/active" \
-    -H 'content-type: application/json' -d '{"active":false}' >/dev/null
-done < <(echo "$PRACTICES" | jq -r '.[] | select(.active) | .slug')
-practice submit-reviewable-work "Submit reviewable work" '["PullRequestCreated","PullRequestReady","PullRequestSynchronized"]' \
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/review-tier" \
+    -H 'content-type: application/json' -d '{"reviewTier":"OFF"}' >/dev/null
+done < <(echo "$PRACTICES" | jq -r '.[] | select(.reviewTier != "OFF") | .slug')
+practice submit-reviewable-work "Submit reviewable work" \
+  '["scm.pull_request.opened","scm.pull_request.ready","scm.pull_request.synchronized"]' \
   "The MR is appropriately scoped, has a clear description, passes CI, and is not a draft dump. Flag oversized/unfocused MRs and missing descriptions."
-practice act-on-feedback "Act on feedback" '["ReviewSubmitted","PullRequestSynchronized"]' \
+practice act-on-feedback "Act on feedback" \
+  '["scm.pull_request.reviewed","scm.pull_request.synchronized"]' \
   "After reviewers leave comments, the author addresses them with follow-up commits or replies rather than ignoring or force-resolving them."
-practice plan-and-scope-issues "Plan & scope issues" '["PullRequestCreated"]' \
+practice plan-and-scope-issues "Plan & scope issues" '["scm.pull_request.opened"]' \
   "The MR references a well-defined, properly scoped issue and stays within that scope. Flag MRs with no linked issue or scope creep."
 say "practices created: Submit reviewable work · Act on feedback · Plan & scope issues"
 

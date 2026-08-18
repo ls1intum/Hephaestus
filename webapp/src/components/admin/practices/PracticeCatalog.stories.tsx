@@ -1,8 +1,14 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { StatefulPatch } from "@/stories/stateful";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
+	areaTier,
+	chosenTier,
+	inheritedTier,
 	mockAreas,
 	mockPracticeLongText,
 	mockPractices,
@@ -13,7 +19,7 @@ const areas = [
 	{
 		...mockAreas[0],
 		name: "Packaging work so reviewers can understand its purpose without reconstructing context",
-		active: false,
+		visibleInPracticeDashboards: false,
 	},
 	mockAreas[1],
 ];
@@ -31,9 +37,43 @@ const practices = [
 	},
 	{
 		...mockUnassignedPractice,
-		artifactType: "ISSUE" as const,
+		artifactKind: "scm.issue" as const,
 	},
 ];
+
+/** The size a workspace installs the shipped catalogue at. */
+const scaleAreas = [
+	"Submitting review-ready work",
+	"Writing issues a maintainer can act on",
+	"Reviewing other people's work",
+	"Testing what changed",
+	"Documentation",
+	"Keeping the build green",
+	"Talking about work in the open",
+	"Dependencies and supply chain",
+].map((name, index) => ({
+	...mockAreas[0],
+	id: 100 + index,
+	slug: `scale-area-${index}`,
+	name,
+	displayOrder: index,
+}));
+
+const scalePractices = scaleAreas.flatMap((area, areaIndex) =>
+	[
+		"states the motivation",
+		"links the issue it closes",
+		"lists the steps a reviewer ran",
+		"keeps the change reviewable in one sitting",
+	].map((suffix, practiceIndex) => ({
+		...mockPractices[0],
+		id: 1000 + areaIndex * 10 + practiceIndex,
+		slug: `${area.slug}-${practiceIndex}`,
+		name: `${area.name}: ${suffix}`,
+		areaSlug: area.slug,
+		displayOrder: practiceIndex,
+	})),
+);
 
 const idlePending = {
 	areaSlugs: new Set<string>(),
@@ -56,16 +96,16 @@ const meta = {
 		workspaceSlug: "demo",
 		areas,
 		practices,
+		definitionOptions: mockPracticeDefinitionOptions,
 		pending: idlePending,
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),
 		onCreateArea: fn(async () => true),
 		onRenameArea: fn(async () => true),
-		onToggleAreaActive: fn(),
+		onSetAreaDashboardVisibility: fn(),
 		onDeleteArea: fn(),
 		onReorderAreas: fn(),
 		onSetAreaVisual: fn(),
-		onSetPracticeActive: fn(),
 		onDeletePractice: fn(),
 		onPlacePractice: fn(),
 	},
@@ -77,6 +117,35 @@ const meta = {
 		),
 	],
 	tags: ["autodocs"],
+	render: (args) => (
+		<StatefulPatch initial={{ focusFilter: args.focusFilter, areas: args.areas }}>
+			{(view, patch) => (
+				<PracticeCatalog
+					{...args}
+					focusFilter={view.focusFilter}
+					areas={view.areas}
+					onFocusFilterChange={(focusFilter) => {
+						args.onFocusFilterChange(focusFilter);
+						patch({ focusFilter });
+					}}
+					onSetAreaVisual={(slug, visual) => {
+						args.onSetAreaVisual(slug, visual);
+						patch({
+							areas: view.areas.map((area) => (area.slug === slug ? { ...area, ...visual } : area)),
+						});
+					}}
+					onSetAreaDashboardVisibility={(slug, visibleInPracticeDashboards) => {
+						args.onSetAreaDashboardVisibility(slug, visibleInPracticeDashboards);
+						patch({
+							areas: view.areas.map((area) =>
+								area.slug === slug ? { ...area, visibleInPracticeDashboards } : area,
+							),
+						});
+					}}
+				/>
+			)}
+		</StatefulPatch>
+	),
 } satisfies Meta<typeof PracticeCatalog>;
 
 export default meta;
@@ -88,8 +157,51 @@ export const Populated: Story = {
 	},
 };
 
+/**
+ * The move menu lists every area in the workspace, so it is the one control whose height grows with
+ * the catalogue rather than with the row it belongs to — which is what the narrow viewport here is
+ * watching.
+ */
+export const AtScale: Story = {
+	args: { areas: scaleAreas, practices: scalePractices },
+	parameters: { chromatic: { viewports: [320, 1440] } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getAllByRole("button", { name: /^Reorder / })).toHaveLength(40);
+		await expectNoPageOverflow();
+	},
+};
+
+/**
+ * A locally written practice usually carries no prose, and a popup that appears empty under the
+ * pointer is worse than no popup.
+ */
+export const PracticeDetailOnHover: Story = {
+	args: {
+		practices: [
+			{ ...mockPractices[0], areaSlug: areas[0].slug, displayOrder: 0 },
+			{ ...mockUnassignedPractice, areaSlug: areas[0].slug, displayOrder: 1 },
+		],
+	},
+	parameters: { chromatic: { disableSnapshot: true } },
+	play: async ({ canvas, userEvent }) => {
+		await expect(screen.queryByText(/reverse-engineering the diff/)).not.toBeInTheDocument();
+
+		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
+		// as well if the card were merely slow.
+		await expect(
+			canvas.getByRole("link", { name: mockUnassignedPractice.name }),
+		).not.toHaveAttribute("data-slot", "hover-card-trigger");
+
+		const trigger = canvas.getByRole("link", { name: mockPractices[0].name });
+		await expect(trigger).toHaveAttribute("data-slot", "hover-card-trigger");
+		await userEvent.hover(trigger);
+		await expectSettledVisible(await screen.findByText(/reverse-engineering the diff/));
+		await expect(screen.getByText(/lists the exact steps a reviewer ran/)).toBeVisible();
+	},
+};
+
 export const Filtered: Story = {
-	args: { focusFilter: "ISSUE" },
+	args: { focusFilter: "scm.issue" },
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();
@@ -354,5 +466,78 @@ export const BlockedDestinationDrag: Story = {
 		]);
 
 		await expect(args.onPlacePractice).not.toHaveBeenCalled();
+	},
+};
+
+export const AutonomyTiers: Story = {
+	args: {
+		areas: mockAreas,
+		practices: [
+			{
+				...mockPractices[0],
+				slug: "from-workspace",
+				name: "Nobody has touched this one",
+				reviewTier: inheritedTier("DELIVER"),
+			},
+			{
+				...mockPractices[0],
+				slug: "from-area",
+				name: "Its area decided",
+				reviewTier: areaTier("PROPOSE"),
+			},
+			{
+				...mockPractices[0],
+				slug: "held",
+				name: "Singled out",
+				reviewTier: chosenTier("OFF"),
+			},
+		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+	},
+	play: async ({ canvas }) => {
+		// Scoped row by row: asserting that all three sentences exist somewhere on the page would pass
+		// just as well if every row carried the same one, which is the mix-up this story is about.
+		const expected = [
+			["Nobody has touched this one", "Deliver", "Follows the workspace default"],
+			["Its area decided", "Propose", `Follows ${mockAreas[0].name}`],
+			["Singled out", "Off", "Set for this practice"],
+		];
+
+		for (const [name, tier, decidedBy] of expected) {
+			const listitem = canvas.getByText(name).closest('[role="listitem"]');
+			if (!(listitem instanceof HTMLElement)) throw new Error(`No row for ${name}`);
+			const row = within(listitem);
+			await expect(row.getByText(tier, { selector: '[data-slot="badge"]' })).toBeVisible();
+			await expect(row.getByText(decidedBy)).toBeVisible();
+		}
+		await expectNoPageOverflow();
+	},
+};
+
+export const TierIsReadOnlyHere: Story = {
+	args: {
+		areas: mockAreas,
+		practices: [
+			{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("PROPOSE") },
+		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
+	},
+	parameters: {
+		chromatic: { disableSnapshot: true },
+		// The actions menu holds every area in the workspace, so on a short viewport Base UI caps it at
+		// the available height and the a11y check rejects the scrollable region that makes — a property
+		// of the menu, not of the link this story is about.
+		viewport: { defaultViewport: "desktop" },
+	},
+	play: async ({ canvas, userEvent }) => {
+		// Name-independent on purpose: the point is that no tier *control* exists here, and pinning the
+		// radiogroup's label would make this pass vacuously the next time that label is reworded.
+		await expect(canvas.queryByRole("radiogroup")).not.toBeInTheDocument();
+
+		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
+		const menu = within(await screen.findByRole("menu"));
+		await expect(menu.getByRole("menuitem", { name: "Change on Review" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/practices/review",
+		);
+		await expect(menu.queryByRole("menuitem", { name: "Use the default" })).not.toBeInTheDocument();
 	},
 };

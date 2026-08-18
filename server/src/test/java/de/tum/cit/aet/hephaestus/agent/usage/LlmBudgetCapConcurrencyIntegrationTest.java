@@ -21,6 +21,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
@@ -32,9 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * Nothing in the write path fails, so the first admin only finds out when the cap they set stops
  * having any effect.
  *
- * <p>The fix is a pessimistic read that serialises the snapshot with the write, and this is the only
- * place it can be shown working: the interleaving needs two real connections against real Postgres
- * row locks.
+ * <p>A pessimistic read serialises the snapshot with the write, and this is the only place that can be
+ * shown working: the interleaving needs two real connections against real Postgres row locks.
  */
 @Tag("integration")
 class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -42,8 +42,7 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
     /** Comfortably above the 5s lock timeout the locking reads declare, so a hang fails as a hang. */
     private static final int JOIN_TIMEOUT_SECONDS = 30;
 
-    /** Long enough for the follower to reach its statement and block on the row, short enough to stay quick. */
-    private static final long FOLLOWER_BLOCK_MILLIS = 500;
+    private static final long POLL_INTERVAL_MILLIS = 10;
 
     @Autowired
     private LlmUsageAdminService adminService;
@@ -56,6 +55,9 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
 
     @Autowired
     private TransactionTemplate transactionTemplate;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     private static final BigDecimal INSTANCE_CAP = new BigDecimal("250.00");
     private static final BigDecimal OWN_PROVIDER_CAP = new BigDecimal("40.00");
@@ -103,9 +105,9 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
     }
 
     /**
-     * Runs {@code holder} in a transaction that stays open until {@code follower} has been dispatched
-     * against the same row, so the follower is genuinely contending for it rather than arriving after
-     * the fact.
+     * Runs {@code holder} in a transaction that stays open until Postgres reports {@code follower}
+     * blocked behind it, so the follower is genuinely contending for the row rather than arriving
+     * after the fact.
      */
     private void race(Workspace workspace, Consumer<Workspace> holder, Consumer<Workspace> follower) throws Exception {
         CountDownLatch holderHasTheRow = new CountDownLatch(1);
@@ -117,7 +119,7 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
                     holder.accept(workspace);
                     holderHasTheRow.countDown();
                     await(followerDispatched);
-                    sleep(FOLLOWER_BLOCK_MILLIS);
+                    awaitFollowerBlockedOnThisRow();
                 })
             );
             Future<?> following = pool.submit(() -> {
@@ -130,6 +132,30 @@ class LlmBudgetCapConcurrencyIntegrationTest extends AbstractWorkspaceIntegratio
         } finally {
             pool.shutdownNow();
         }
+    }
+
+    /**
+     * Runs on the holder's own connection, so {@code pg_backend_pid()} names the blocked backend and the
+     * wait cannot be satisfied by a sibling test blocking elsewhere in the shared container.
+     */
+    private void awaitFollowerBlockedOnThisRow() {
+        Integer holderPid = jdbcTemplate.queryForObject("SELECT pg_backend_pid()", Integer.class);
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(JOIN_TIMEOUT_SECONDS);
+        while (System.nanoTime() < deadline) {
+            // pg_stat_activity snapshots on first read and holds for the whole (long-lived) transaction;
+            // the clear lets a backend that connects after that first poll still be seen.
+            jdbcTemplate.execute("SELECT pg_stat_clear_snapshot()");
+            Integer blocked = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM pg_stat_activity WHERE CAST(? AS integer) = ANY(pg_blocking_pids(pid))",
+                Integer.class,
+                holderPid
+            );
+            if (blocked != null && blocked > 0) {
+                return;
+            }
+            sleep(POLL_INTERVAL_MILLIS);
+        }
+        throw new IllegalStateException("the follower never contended for the row");
     }
 
     private static void await(CountDownLatch latch) {

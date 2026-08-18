@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -8,24 +9,27 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderRepository;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.RepositoryRepository;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.Team;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.team.TeamRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.AreaStandingRow;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PresenceCount;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.SeverityCount;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
@@ -45,6 +49,7 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import tools.jackson.databind.ObjectMapper;
 
@@ -97,11 +102,12 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
         workspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-test"));
 
         practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
         agentJob = new AgentJob();
@@ -131,30 +137,29 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 42L,
                 aboutUser.getId(),
                 "Good PR description",
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.95f,
                 null,
                 "Good quality",
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             assertThat(result).isEqualTo(1);
 
             Observation found = observationRepository.findById(id).orElseThrow();
             assertThat(found.getOccurrenceKey()).isEqualTo("key-1");
-            assertThat(found.getTitle()).isEqualTo("Good PR description");
+            assertThat(found.getSummary()).isEqualTo("Good PR description");
             assertThat(found.getPresence().name()).isEqualTo("PRESENT");
             assertThat(found.getAssessment()).isEqualTo(Assessment.GOOD);
             assertThat(found.getSeverity().name()).isEqualTo("INFO");
-            assertThat(found.getConfidence()).isEqualTo(0.95f);
-            assertThat(found.getReasoning()).isEqualTo("Good quality");
+            assertThat(found.getEvidenceRationale()).isEqualTo("Good quality");
         }
 
         @Test
@@ -170,18 +175,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Duplicate test",
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.8f,
                 null,
                 null,
                 null,
-                now
+                now,
+                "LIVE"
             );
 
             int second = observationRepository.insertIfAbsent(
@@ -190,18 +195,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 aboutUser.getId(),
                 "Should not insert",
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.5f,
                 null,
                 null,
                 null,
-                now
+                now,
+                "LIVE"
             );
 
             assertThat(first).isEqualTo(1);
@@ -220,18 +225,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 99L,
                 aboutUser.getId(),
                 "Missing error handling in Main.java",
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.7f,
                 evidence,
                 "Missing error handling",
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             assertThat(result).isEqualTo(1);
@@ -257,18 +262,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Purge test finding",
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             assertThat(observationRepository.findAll()).hasSize(1);
 
@@ -286,11 +291,12 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             // Create workspace B with its own practice and finding
             Workspace workspaceB = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("ws-b"));
             Practice practiceB = new Practice();
+            practiceB.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             practiceB.setWorkspace(workspaceB);
             practiceB.setSlug("practice-b");
             practiceB.setName("Practice B");
             practiceB.setCriteria("Workspace B practice");
-            practiceB.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            practiceB.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             practiceB = practiceRepository.save(practiceB);
 
             AgentJob agentJobB = new AgentJob();
@@ -306,18 +312,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "WS-A finding",
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             // Finding in workspace B
             observationRepository.insertIfAbsent(
@@ -326,18 +332,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJobB.getId(),
                 practiceB.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 aboutUser.getId(),
                 "WS-B finding",
                 "ABSENT",
                 "BAD",
                 "MINOR",
-                0.5f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             assertThat(observationRepository.findAll()).hasSize(2);
 
@@ -352,17 +358,25 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class CascadeDeleteTests {
+    class PracticeRemovalTests {
 
+        /**
+         * Removing a practice from the catalog is refused while anything was ever measured against it.
+         *
+         * <p>A cascading foreign key here would let pruning the catalog silently erase the recorded
+         * history of everyone measured against that practice — the substrate the whole product exists to
+         * build. Practices retire; measurements persist, and the database is what enforces it.
+         */
         @Test
-        void cascadesFromPracticeSelectively() {
+        void refusesToRemoveAPracticeThatHasBeenMeasuredAgainst() {
             // Create a second practice with its own finding
             Practice otherPractice = new Practice();
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(workspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Other description");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice = practiceRepository.save(otherPractice);
 
             // Finding on the practice to be deleted
@@ -372,18 +386,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Cascade test 1",
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.6f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             // Finding on the other practice (should survive)
             observationRepository.insertIfAbsent(
@@ -392,289 +406,30 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 otherPractice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 aboutUser.getId(),
                 "Cascade test 2",
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
             assertThat(observationRepository.findAll()).hasSize(2);
 
-            practiceRepository.deleteById(practice.getId());
-            practiceRepository.flush();
+            Long measuredPracticeId = practice.getId();
+            assertThatThrownBy(() -> {
+                practiceRepository.deleteById(measuredPracticeId);
+                practiceRepository.flush();
+            }).isInstanceOf(DataIntegrityViolationException.class);
 
-            // Only the finding for the deleted practice should be gone
-            List<Observation> remaining = observationRepository.findAll();
-            assertThat(remaining).hasSize(1);
-            assertThat(remaining.get(0).getOccurrenceKey()).isEqualTo("cascade-key-2");
-        }
-    }
-
-    @Nested
-    class FindDeveloperPracticeSummaryTests {
-
-        @Test
-        void returnsEmptyForNoFindings() {
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).isEmpty();
-        }
-
-        @Test
-        void aggregatesSinglePractice() {
-            // Insert 3 ABSENT and 1 PRESENT for the same practice
-            insertFinding("sum-1", practice, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
-            insertFinding("sum-2", practice, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
-            insertFinding("sum-3", practice, "ABSENT", Instant.parse("2026-03-20T14:30:00Z"));
-            insertFinding("sum-4", practice, "PRESENT", Instant.parse("2026-03-17T08:00:00Z"));
-
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(2); // One row per (slug, observation) combination
-
-            DeveloperPracticeSummary negative = result
-                .stream()
-                .filter(s -> s.getPresence() == Presence.ABSENT)
-                .findFirst()
-                .orElseThrow();
-            assertThat(negative.getPracticeSlug()).isEqualTo("test-practice");
-            assertThat(negative.getCount()).isEqualTo(3);
-            assertThat(negative.getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T14:30:00Z"));
-
-            DeveloperPracticeSummary positive = result
-                .stream()
-                .filter(s -> s.getPresence() == Presence.PRESENT)
-                .findFirst()
-                .orElseThrow();
-            assertThat(positive.getCount()).isEqualTo(1);
-        }
-
-        @Test
-        @DisplayName("M6: a twice-reviewed target is not double-counted (latest-run dedup)")
-        void countsOnlyLatestRunPerTarget() {
-            // The SAME target (PR 7) reviewed in two runs: an earlier run said ABSENT/BAD, a later run said
-            // PRESENT/GOOD. A naive COUNT/GROUP BY would surface 2 rows (1 ABSENT, 1 PRESENT); the dedup must
-            // keep only the target's CURRENT state — a single PRESENT finding, count 1.
-            AgentJob laterJob = new AgentJob();
-            laterJob.setWorkspace(workspace);
-            laterJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            laterJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
-            laterJob = agentJobRepository.save(laterJob);
-
-            insertFindingForJob("m6-old", agentJob.getId(), 7L, "ABSENT", Instant.parse("2026-03-18T10:00:00Z"));
-            insertFindingForJob("m6-new", laterJob.getId(), 7L, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
-
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(1);
-            DeveloperPracticeSummary row = result.get(0);
-            assertThat(row.getPresence()).isEqualTo(Presence.PRESENT);
-            assertThat(row.getCount()).isEqualTo(1);
-            assertThat(row.getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
-        }
-
-        private void insertFindingForJob(String key, UUID jobId, long artifactId, String presence, Instant at) {
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                key,
-                jobId,
-                practice.getId(),
-                null,
-                "PULL_REQUEST",
-                artifactId,
-                aboutUser.getId(),
-                "Test observation",
-                presence,
-                "PRESENT".equals(presence) ? "GOOD" : "BAD",
-                "INFO",
-                0.9f,
-                null,
-                null,
-                null,
-                at
-            );
-        }
-
-        @Test
-        void groupsByPracticeSlug() {
-            Practice secondPractice = new Practice();
-            secondPractice.setWorkspace(workspace);
-            secondPractice.setSlug("error-handling");
-            secondPractice.setName("Error Handling");
-            secondPractice.setCriteria("Handle errors");
-            secondPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-            secondPractice = practiceRepository.save(secondPractice);
-
-            insertFinding("multi-1", practice, "PRESENT", Instant.parse("2026-03-20T10:00:00Z"));
-            insertFinding("multi-2", secondPractice, "ABSENT", Instant.parse("2026-03-19T10:00:00Z"));
-
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(2);
-            assertThat(result)
-                .extracting(DeveloperPracticeSummary::getPracticeSlug)
-                .containsExactlyInAnyOrder("test-practice", "error-handling");
-        }
-
-        @Test
-        void workspaceIsolation() {
-            Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("other-ws"));
-            Practice otherPractice = new Practice();
-            otherPractice.setWorkspace(otherWorkspace);
-            otherPractice.setSlug("test-practice"); // Same slug, different workspace
-            otherPractice.setName("Test Practice");
-            otherPractice.setCriteria("Other workspace practice");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-            otherPractice = practiceRepository.save(otherPractice);
-
-            AgentJob otherJob = new AgentJob();
-            otherJob.setWorkspace(otherWorkspace);
-            otherJob.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
-            otherJob.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
-            otherJob = agentJobRepository.save(otherJob);
-
-            // Finding in target workspace
-            insertFinding("iso-1", practice, "ABSENT", Instant.parse("2026-03-20T10:00:00Z"));
-            // Finding in other workspace (same about-user)
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                "iso-2",
-                otherJob.getId(),
-                otherPractice.getId(),
-                null, // practiceRevisionId
-                "PULL_REQUEST",
-                2L,
-                aboutUser.getId(),
-                "Other WS finding",
-                "ABSENT",
-                "BAD",
-                "MAJOR",
-                0.8f,
-                null,
-                null,
-                null,
-                Instant.parse("2026-03-20T10:00:00Z")
-            );
-
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getPracticeSlug()).isEqualTo("test-practice");
-            assertThat(result.get(0).getCount()).isEqualTo(1);
-        }
-
-        @Test
-        void correctLastDetectedAt() {
-            Instant earliest = Instant.parse("2026-03-15T08:00:00Z");
-            Instant latest = Instant.parse("2026-03-20T14:30:00Z");
-            Instant middle = Instant.parse("2026-03-18T12:00:00Z");
-
-            insertFinding("time-1", practice, "ABSENT", earliest);
-            insertFinding("time-2", practice, "ABSENT", latest);
-            insertFinding("time-3", practice, "ABSENT", middle);
-
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getLastObservedAt()).isEqualTo(latest);
-        }
-
-        @Test
-        void aboutUserIsolation() {
-            IdentityProvider provider = gitProviderRepository
-                .findByTypeAndServerUrl(IdentityProviderType.GITHUB, "https://github.com")
-                .orElseThrow();
-            User otherAboutUser = TestUserFactory.createUser(200L, "other-about-user", provider);
-            otherAboutUser = userRepository.save(otherAboutUser);
-
-            // Observation for target about-user
-            insertFinding("contrib-iso-1", practice, "ABSENT", Instant.parse("2026-03-20T10:00:00Z"));
-            // Observation for other about-user (same practice, same workspace)
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                "contrib-iso-2",
-                agentJob.getId(),
-                practice.getId(),
-                null, // practiceRevisionId
-                "PULL_REQUEST",
-                2L,
-                otherAboutUser.getId(),
-                "Other about-user observation",
-                "ABSENT",
-                "BAD",
-                "MAJOR",
-                0.8f,
-                null,
-                null,
-                null,
-                Instant.parse("2026-03-20T10:00:00Z")
-            );
-
-            List<DeveloperPracticeSummary> result = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-
-            assertThat(result).hasSize(1);
-            assertThat(result.get(0).getCount()).isEqualTo(1);
-        }
-
-        /** Helper to insert an observation with minimal boilerplate. */
-        private void insertFinding(
-            String idempotencyKey,
-            Practice targetPractice,
-            String presence,
-            Instant observedAt
-        ) {
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                idempotencyKey,
-                agentJob.getId(),
-                targetPractice.getId(),
-                null, // practiceRevisionId
-                "PULL_REQUEST",
-                1L,
-                aboutUser.getId(),
-                "Test observation",
-                presence,
-                assessmentFor(presence),
-                "INFO",
-                0.9f,
-                null,
-                null,
-                null,
-                observedAt
-            );
-        }
-
-        /** Former-GOOD practice valence: PRESENT is a strength (GOOD), ABSENT is a problem (BAD). */
-        private static String assessmentFor(String presence) {
-            return "PRESENT".equals(presence) ? "GOOD" : "BAD";
+            assertThat(observationRepository.findAll())
+                .extracting(Observation::getOccurrenceKey)
+                .containsExactlyInAnyOrder("cascade-key-1", "cascade-key-2");
         }
     }
 
@@ -701,18 +456,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 jobId,
                 practice.getId(),
                 null,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 artifactId,
                 aboutUser.getId(),
                 "finding",
                 presence,
                 assessment,
                 severity,
-                0.9f,
                 null,
                 null,
                 null,
-                observedAt
+                observedAt,
+                "LIVE"
             );
         }
 
@@ -797,10 +552,10 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
     }
 
     @Nested
-    class ArtifactTypeTests {
+    class ArtifactKindTests {
 
         @Test
-        @DisplayName("persisted 'PULL_REQUEST' maps to WorkArtifact.PULL_REQUEST on read")
+        @DisplayName("persisted 'PULL_REQUEST' maps to ArtifactKinds.PULL_REQUEST on read")
         void enumRoundTrip() {
             UUID id = UUID.randomUUID();
             observationRepository.insertIfAbsent(
@@ -809,138 +564,22 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null, // practiceRevisionId
-                "PULL_REQUEST",
+                "scm.pull_request",
                 1L,
                 aboutUser.getId(),
                 "Enum mapping test",
                 "PRESENT",
                 "GOOD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
-                Instant.now()
+                Instant.now(),
+                "LIVE"
             );
 
             Observation found = observationRepository.findById(id).orElseThrow();
-            assertThat(found.getArtifactType()).isEqualTo(WorkArtifact.PULL_REQUEST);
-        }
-    }
-
-    @Nested
-    class AreaStandingCorroborationTests {
-
-        /**
-         * The native COUNT(DISTINCT artifact_id) / MAX(confidence) the standing floor (P4) keys on must be
-         * computed correctly against real Postgres — a unit test mocks the row, so the SQL itself is only
-         * exercised here. Two distinct PRs flagged BAD on the same area → distinctTargets=2; the max
-         * confidence across the group is surfaced for the quarantine floor.
-         */
-        @Test
-        @DisplayName("area-standing row carries COUNT(DISTINCT target) and MAX(confidence) for the P4 floor")
-        void areaStandingExposesDistinctTargetsAndMaxConfidence() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("robust-error-handling");
-            area.setName("Handling failure robustly");
-            area = practiceAreaRepository.save(area);
-            practice.setArea(area);
-            practice = practiceRepository.save(practice);
-
-            Instant since = Instant.parse("2026-01-01T00:00:00Z");
-            // Same BAD/MAJOR gap on two distinct PRs (artifact 10 and 11), differing confidence.
-            insertAreaFinding("as-1", 10L, "ABSENT", "BAD", "MAJOR", 0.4f, Instant.parse("2026-03-20T10:00:00Z"));
-            insertAreaFinding("as-2", 11L, "ABSENT", "BAD", "MAJOR", 0.7f, Instant.parse("2026-03-21T10:00:00Z"));
-
-            List<AreaStandingRow> rows = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                since,
-                since
-            );
-
-            AreaStandingRow bad = rows
-                .stream()
-                .filter(r -> r.getAssessment() == Assessment.BAD)
-                .findFirst()
-                .orElseThrow();
-            assertThat(bad.getCount()).isEqualTo(2L);
-            assertThat(bad.getDistinctTargets()).isEqualTo(2L);
-            assertThat(bad.getMaxConfidence()).isEqualTo(0.7f);
-        }
-
-        /**
-         * Pins the recent-window arithmetic: {@code recentCount} comes from a separate {@code :recentSince}
-         * bind, so it must count only findings at-or-after that cutoff while {@code count} spans the whole
-         * {@code :since} look-back. With {@code recentSince} strictly later than {@code since} and one of two
-         * findings falling before it, recentCount must be 1 while count is 2 — a regression that reused
-         * {@code :since} for the SUM (or dropped the :recentSince bind) would make recentCount == count and be
-         * caught here. The mentor standing floor (P4) keys on this distinction.
-         */
-        @Test
-        @DisplayName("area-standing recentCount counts only the recent window, not the full look-back")
-        void areaStandingRecentCountHonoursSeparateRecentSince() {
-            PracticeArea area = new PracticeArea();
-            area.setWorkspace(workspace);
-            area.setSlug("robust-error-handling");
-            area.setName("Handling failure robustly");
-            area = practiceAreaRepository.save(area);
-            practice.setArea(area);
-            practice = practiceRepository.save(practice);
-
-            Instant since = Instant.parse("2026-01-01T00:00:00Z");
-            Instant recentSince = Instant.parse("2026-03-15T00:00:00Z");
-            // One BAD before the recent window (still inside the full look-back) and one inside it, on two
-            // distinct targets.
-            insertAreaFinding("rc-old", 20L, "ABSENT", "BAD", "MAJOR", 0.5f, Instant.parse("2026-02-01T10:00:00Z"));
-            insertAreaFinding("rc-new", 21L, "ABSENT", "BAD", "MAJOR", 0.6f, Instant.parse("2026-03-20T10:00:00Z"));
-
-            List<AreaStandingRow> rows = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                since,
-                recentSince
-            );
-
-            AreaStandingRow bad = rows
-                .stream()
-                .filter(r -> r.getAssessment() == Assessment.BAD)
-                .findFirst()
-                .orElseThrow();
-            assertThat(bad.getCount()).isEqualTo(2L);
-            assertThat(bad.getRecentCount()).isEqualTo(1L); // only rc-new is at/after recentSince
-            assertThat(bad.getDistinctTargets()).isEqualTo(2L);
-        }
-
-        private void insertAreaFinding(
-            String key,
-            long artifactId,
-            String presence,
-            String assessment,
-            String severity,
-            float confidence,
-            Instant at
-        ) {
-            observationRepository.insertIfAbsent(
-                UUID.randomUUID(),
-                key,
-                agentJob.getId(),
-                practice.getId(),
-                null,
-                "PULL_REQUEST",
-                artifactId,
-                aboutUser.getId(),
-                "Area standing finding",
-                presence,
-                assessment,
-                severity,
-                confidence,
-                null,
-                null,
-                null,
-                at
-            );
+            assertThat(found.getArtifactKind()).isEqualTo(ArtifactKinds.PULL_REQUEST);
         }
     }
 
@@ -973,18 +612,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 jobId,
                 targetPractice.getId(),
                 null,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 artifactId,
                 aboutUser.getId(),
                 "Tiebreak observation",
                 presence,
                 "PRESENT".equals(presence) ? "GOOD" : "BAD",
                 "INFO",
-                0.9f,
                 null,
                 null,
                 null,
-                at
+                at,
+                "LIVE"
             );
         }
 
@@ -1016,13 +655,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(summary.get(0).getGoodCount()).isEqualTo(1L);
             assertThat(summary.get(0).getBadCount()).isEqualTo(0L);
 
-            List<DeveloperPracticeSummary> practiceSummary = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-            assertThat(practiceSummary).hasSize(1);
-            assertThat(practiceSummary.get(0).getCount()).isEqualTo(1L);
-
             List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
                 aboutUser.getId(),
                 workspace.getId(),
@@ -1047,15 +679,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(presences).hasSize(1);
             assertThat(presences.get(0).getPresence()).isEqualTo(Presence.PRESENT);
             assertThat(presences.get(0).getCount()).isEqualTo(1L);
-
-            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                Instant.parse("2026-01-01T00:00:00Z"),
-                Instant.parse("2026-01-01T00:00:00Z")
-            );
-            assertThat(standing).hasSize(1);
-            assertThat(standing.get(0).getCount()).isEqualTo(1L);
         }
 
         @Test
@@ -1066,11 +689,12 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
 
             Workspace otherWorkspace = workspaceRepository.save(WorkspaceTestFixtures.activeWorkspace("finding-other"));
             Practice otherPractice = new Practice();
+            otherPractice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
             otherPractice.setWorkspace(otherWorkspace);
             otherPractice.setSlug("other-practice");
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Other criteria");
-            otherPractice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+            otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();
@@ -1127,13 +751,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(summary.get(0).getTotalObservations()).isEqualTo(1L);
             assertThat(summary.get(0).getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
 
-            List<DeveloperPracticeSummary> practiceSummary = observationRepository.findDeveloperPracticeSummary(
-                aboutUser.getId(),
-                workspace.getId()
-            );
-            assertThat(practiceSummary).hasSize(1);
-            assertThat(practiceSummary.get(0).getCount()).isEqualTo(1L);
-
             List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
                 aboutUser.getId(),
                 workspace.getId(),
@@ -1158,16 +775,6 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             );
             assertThat(presences).hasSize(1);
             assertThat(presences.get(0).getCount()).isEqualTo(1L);
-
-            List<AreaStandingRow> standing = observationRepository.findAreaStandingByDeveloperAndWorkspace(
-                aboutUser.getId(),
-                workspace.getId(),
-                since,
-                since
-            );
-            assertThat(standing).hasSize(1);
-            assertThat(standing.get(0).getCount()).isEqualTo(1L);
-            assertThat(standing.get(0).getDistinctTargets()).isEqualTo(1L);
         }
 
         private void insertBad(String key, long artifactId, Instant at) {
@@ -1177,18 +784,18 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
                 agentJob.getId(),
                 practice.getId(),
                 null,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 artifactId,
                 aboutUser.getId(),
                 "Hidden-repo exclusion observation",
                 "ABSENT",
                 "BAD",
                 "MAJOR",
-                0.9f,
                 null,
                 null,
                 null,
-                at
+                at,
+                "LIVE"
             );
         }
 
@@ -1233,6 +840,118 @@ class ObservationRepositoryIntegrationTest extends BaseIntegrationTest {
             pr.setCreatedAt(Instant.now());
             pr.setUpdatedAt(Instant.now());
             return pullRequestRepository.save(pr);
+        }
+    }
+
+    /**
+     * A confirmed campaign spends real money and must produce something visible. The reflective surface
+     * admits its observations; the per-practice summary, which is read as a trend, still does not.
+     */
+    @Nested
+    class BackfillVisibilityTests {
+
+        private AgentJob campaignJob() {
+            AgentJob job = new AgentJob();
+            job.setWorkspace(workspace);
+            job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
+            job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+            return agentJobRepository.save(job);
+        }
+
+        private void insert(String key, UUID jobId, long artifactId, Instant at, String origin) {
+            observationRepository.insertIfAbsent(
+                UUID.randomUUID(),
+                key,
+                jobId,
+                practice.getId(),
+                null,
+                "scm.pull_request",
+                artifactId,
+                aboutUser.getId(),
+                "Backfill visibility observation",
+                "ABSENT",
+                "BAD",
+                "MAJOR",
+                null,
+                null,
+                null,
+                at,
+                origin
+            );
+        }
+
+        @Test
+        @DisplayName("a campaign's finding on the developer's own work reaches the reflective surface")
+        void backfilledObservationsAreVisibleToTheDeveloper() {
+            insert("bf-only", campaignJob().getId(), 900L, Instant.parse("2026-03-20T10:00:00Z"), "BACKFILL");
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 50)
+            );
+
+            assertThat(recent)
+                .as(
+                    "a backfilled BAD on the developer's own pull request is exactly what 'what should I work on' asks for"
+                )
+                .extracting(Observation::getArtifactId)
+                .containsExactly(900L);
+        }
+
+        @Test
+        @DisplayName("a later campaign does not erase already-delivered live feedback")
+        void aCampaignDoesNotDisplaceTheLiveReading() {
+            // Same artifact, campaign strictly newer. An origin-blind latest-run correlation would make the
+            // campaign's job "the latest run" and drop the live row the developer was actually sent.
+            insert("live-reading", agentJob.getId(), 901L, Instant.parse("2026-03-20T10:00:00Z"), "LIVE");
+            insert("campaign-reading", campaignJob().getId(), 901L, Instant.parse("2026-03-21T10:00:00Z"), "BACKFILL");
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 50)
+            );
+
+            assertThat(recent)
+                .as("the latest run is selected within each origin class, so both readings survive")
+                .extracting(Observation::getOrigin)
+                .containsExactlyInAnyOrder(ObservationOrigin.BACKFILL, ObservationOrigin.LIVE);
+        }
+
+        @Test
+        @DisplayName("the re-review multiplier is still deduped within the campaign's own origin class")
+        void latestRunStillDedupesWithinTheBackfillClass() {
+            insert("bf-older", campaignJob().getId(), 902L, Instant.parse("2026-03-20T10:00:00Z"), "BACKFILL");
+            insert("bf-newer", campaignJob().getId(), 902L, Instant.parse("2026-03-21T10:00:00Z"), "BACKFILL");
+
+            List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId(),
+                Instant.parse("2026-01-01T00:00:00Z"),
+                PageRequest.of(0, 50)
+            );
+
+            assertThat(recent).hasSize(1);
+            assertThat(recent.get(0).getObservedAt()).isEqualTo(Instant.parse("2026-03-21T10:00:00Z"));
+        }
+
+        @Test
+        @DisplayName("the per-practice summary still excludes the campaign: a hindsight sweep is not a trend point")
+        void theSummaryTrendStaysLiveOnly() {
+            insert("summary-live", agentJob.getId(), 903L, Instant.parse("2026-03-20T10:00:00Z"), "LIVE");
+            insert("summary-backfill", campaignJob().getId(), 904L, Instant.parse("2026-03-21T10:00:00Z"), "BACKFILL");
+
+            List<DeveloperPracticeSummaryProjection> summary = observationRepository.findSummaryByDeveloperAndWorkspace(
+                aboutUser.getId(),
+                workspace.getId()
+            );
+
+            assertThat(summary).hasSize(1);
+            assertThat(summary.get(0).getTotalObservations()).isEqualTo(1L);
+            assertThat(summary.get(0).getLastObservedAt()).isEqualTo(Instant.parse("2026-03-20T10:00:00Z"));
         }
     }
 }

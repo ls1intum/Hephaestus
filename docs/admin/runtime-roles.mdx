@@ -14,13 +14,13 @@ All three default-on means a vanilla `mvn spring-boot:run` is a working monolith
 
 On startup the JVM logs which roles wired:
 
-```
+```text
 INFO  RuntimeRoleStartupLogger : Runtime roles enabled: [server, worker, webhook]
 ```
 
 If you accidentally disable all three, the WARN spells out the recovery:
 
-```
+```text
 WARN  RuntimeRoleStartupLogger : All runtime roles disabled — this JVM will
       accept no work. Set at least one of hephaestus.runtime.server.enabled=true,
       hephaestus.runtime.worker.enabled=true, or hephaestus.runtime.webhook.enabled=true.
@@ -50,7 +50,7 @@ Each role ships with a Spring profile YAML that flips the other two flags off an
 
 - `application-worker.yml` — `runtime.server=false`, `runtime.webhook=false`, OAuth2 autoconfigure excluded, JPA still enabled. The servlet container stays on (`web-application-type=servlet`) with a real `server.port`: the internal LLM proxy (`/internal/llm/**`, the only credential path a sandbox has) is served with the worker/sandbox capability, and no `ports:`/Traefik mapping exposes it externally.
 - `application-webhook.yml` — `runtime.server=false`, `runtime.worker=false`, sync NATS enabled, agent job queue disabled (webhook pods never claim jobs).
-- No `application-server.yml` — the monolith default _is_ the server profile.
+- No `application-server.yml` — the monolith default *is* the server profile.
 
 To deploy a worker pod set `SPRING_PROFILES_ACTIVE=prod,worker` and point `HEPHAESTUS_HUB_URL` at the app pod's WSS endpoint. See `docker/compose.app.yaml` for a working compose template.
 
@@ -68,6 +68,7 @@ overlay's value where the overlay pins one, otherwise the base default.
 | `hephaestus.git.enabled` | false | false | false | env default |
 | `hephaestus.sync.nats.enabled` | false | **false** | **true** | env default / profile overlay |
 | `hephaestus.agent.enabled` | false | false | false | env default |
+| `hephaestus.integration.outline.allowed-origins` | empty | empty | empty | env default |
 | Needs user-auth wiring | yes | no | no | role gating |
 
 Bolded cells are pinned by that role's profile overlay and are not the base default. Reading the
@@ -75,14 +76,25 @@ three `runtime.*` rows down a column gives that pod's role set: the `worker` ove
 and webhook roles off, the `webhook` overlay turns server and worker off, and the monolith (no
 overlay) runs all three.
 
-Four rows are **not** role-differentiated — they are instance-wide defaults, shown per role only
-because operators ask per role: `init-default` is `false` in the `prod` profile for every role, and
-`git.enabled` (`GIT_CHECKOUT_ENABLED`), `agent.enabled` (`AGENT_ENABLED`) and `Needs user-auth wiring`
-are unaffected by which overlay is active. The two env-var flags in particular default `false` on
-**every** role until the operator sets the variable — no profile turns work on for you. There is no
-`hephaestus.sandbox.enabled`: that flag was
-retired (an arch test now forbids reintroducing it) because the Docker sandbox IS the worker
-capability — it follows `hephaestus.runtime.worker.enabled`.
+Outline origin approval is enforced independently by all three roles: the server controls connections and sync,
+the worker projects evidence, and the webhook role accepts change events. Supply the same allowlist to every role
+and restart all three after a change; the reference Compose files wire this automatically.
+
+The rows that read identically across all three columns are **not** role-differentiated — they are
+instance-wide defaults, shown per role only because operators ask per role: `init-default` is `false`
+in the `prod` profile for every role, and `git.enabled` (`GIT_CHECKOUT_ENABLED`), `agent.enabled`
+(`AGENT_ENABLED`) and `integration.outline.allowed-origins` are unaffected by which overlay is
+active. The two env-var flags in particular default `false` on **every** role until the operator sets
+the variable — no profile turns work on for you.
+
+`Needs user-auth wiring` is **not** in that group — its cells read `yes | no | no` because it really
+does differ by role. The whole `core.auth` module carries `@ConditionalOnServerRole`, so setting
+`hephaestus.runtime.server.enabled=false` drops it; the `worker` overlay additionally excludes
+`OAuth2ResourceServerAutoConfiguration` outright, so a worker-only pod never depends on user-auth
+wiring at boot. The `webhook` overlay does not carry that exclusion and relies on the role gate alone.
+
+There is no `hephaestus.sandbox.enabled`, and an arch test forbids introducing one: the Docker
+sandbox *is* the worker capability, so it follows `hephaestus.runtime.worker.enabled`.
 
 One row reads differently from what a bare `docker compose up` produces, because the shipped compose
 file sets the env var the base default leaves off:

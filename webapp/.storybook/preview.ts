@@ -9,6 +9,7 @@ import {
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
+import { Toaster } from "../src/components/ui/sonner";
 import { ThemeProvider } from "../src/integrations/theme";
 import { handlers } from "../src/mocks/handlers";
 import "../src/styles.css";
@@ -56,6 +57,20 @@ const RouterDecorator: Decorator = (Story) => {
 	const router = createRouter({ routeTree });
 	return React.createElement(RouterProvider, { router });
 };
+
+/**
+ * `__root.tsx` mounts one of these for the whole app, so a story without it has no error channel at
+ * all: `toast.error` resolves, renders nowhere, and a play function asserting the failure path has
+ * nothing to find. Mounted here rather than per story, because the surfaces that raise a toast are
+ * spread across the app and the ones that forget to mount it are exactly the ones that need it.
+ */
+const ToastDecorator: Decorator = (Story) =>
+	React.createElement(
+		React.Fragment,
+		null,
+		React.createElement(Story),
+		React.createElement(Toaster),
+	);
 
 const injectDocsThemeCSS = () => {
 	if (typeof document === "undefined") return;
@@ -119,7 +134,27 @@ const preview: Preview = {
 		},
 		options: {
 			storySort: {
-				order: ["Admin", "Core", "Shared"],
+				// Product surfaces first, roughly outside-in by who opens them, then the shared kit, then
+				// the auto-titled path trees, then cross-cutting regression suites. Every top-level
+				// segment any story declares has to appear here — an unnamed one sorts alphabetically
+				// after all of these, which is how `Workspace admin` ended up below `Shared`. That
+				// applies to derived titles too: `integrations` is the auto-title of the two
+				// feature-flag stories, and was missing.
+				order: [
+					"Workspace admin",
+					"Instance admin",
+					"Practice trace",
+					"My feedback",
+					"Workspace",
+					"Surveys",
+					"Common",
+					"Shared",
+					"Provider",
+					"Icons",
+					"components",
+					"integrations",
+					"Tests",
+				],
 			},
 		},
 		docs: {
@@ -160,6 +195,7 @@ const preview: Preview = {
 	decorators: [
 		QueryDecorator,
 		RouterDecorator,
+		ToastDecorator,
 		ThemeDecorator,
 		withThemeByClassName({
 			themes: {

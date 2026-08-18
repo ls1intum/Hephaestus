@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import type { SyncJob } from "@/api/types.gen";
 import { SyncNowButton } from "./SyncNowButton";
 
@@ -44,8 +44,7 @@ type Story = StoryObj<typeof meta>;
 
 /** Idle — clickable, and the live region is silent until a run actually starts. */
 export const Idle: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await expect(canvas.queryByText(/starting/i)).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/in progress/i)).not.toBeInTheDocument();
 		await userEvent.click(canvas.getByRole("button", { name: /sync now/i }));
@@ -56,10 +55,9 @@ export const Idle: Story = {
 /** Trigger in flight — the button is disabled and the live region announces the start. */
 export const Triggering: Story = {
 	args: { triggeringType: "RECONCILIATION" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /starting/i })).toBeDisabled();
-		await expect(canvas.getByText("Starting reconciliation")).toBeInTheDocument();
+		canvas.getByText("Starting reconciliation");
 	},
 };
 
@@ -69,19 +67,17 @@ export const Triggering: Story = {
  */
 export const TriggeringBackfill: Story = {
 	args: { triggeringType: "BACKFILL" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Starting backfill")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Starting backfill");
 	},
 };
 
 /** A job is already running — disabled and labelled "Syncing…", with the job named to assistive tech. */
 export const ActiveJob: Story = {
 	args: { activeJob: runningJob },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /syncing/i })).toBeDisabled();
-		await expect(canvas.getByText("Reconciliation in progress")).toBeInTheDocument();
+		canvas.getByText("Reconciliation in progress");
 	},
 };
 
@@ -91,9 +87,8 @@ export const ActiveJob: Story = {
  */
 export const ActiveBackfill: Story = {
 	args: { activeJob: runningBackfill, triggeringType: "RECONCILIATION" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Backfill in progress")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("Backfill in progress");
 		await expect(canvas.queryByText(/starting/i)).not.toBeInTheDocument();
 	},
 };

@@ -12,13 +12,13 @@ import static org.mockito.Mockito.when;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.config.ApplicationProperties;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackChannel.FeedbackTarget;
-import de.tum.cit.aet.hephaestus.integration.core.spi.FindingAnchor;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineFinding;
-import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFindingChannel.InlineResult;
+import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineFeedback;
+import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel.InlineResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
+import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.FeedbackTarget;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.testconfig.TestEntities;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 /**
- * Unit tests for the inline diff-note poster (DiffNote → InlineFinding mapping + channel dispatch). Couples to
+ * Unit tests for the inline diff-note poster (DiffNote → InlineFeedback mapping + channel dispatch). Couples to
  * A1: a repo-relative anchor path flows through unchanged, and the (startLine, endLine) → (newLineNumber,
  * startLine) anchor swap is verified.
  */
@@ -51,10 +51,10 @@ class DiffNotePosterTest extends BaseUnitTest {
         return new FeedbackTarget(new IntegrationRef(IntegrationKind.GITLAB, 1L, null), "group/project!42", null);
     }
 
-    /** A recording channel that captures the findings it was asked to post (and whether clear was invoked). */
-    private static final class RecordingChannel implements InlineFindingChannel {
+    /** A recording channel that captures the observations it was asked to post (and whether clear was invoked). */
+    private static final class RecordingChannel implements InlineFeedbackChannel {
 
-        List<InlineFinding> posted;
+        List<InlineFeedback> posted;
         boolean cleared;
         RuntimeException clearThrows;
 
@@ -64,13 +64,13 @@ class DiffNotePosterTest extends BaseUnitTest {
         }
 
         @Override
-        public InlineResult postInlineFindings(FeedbackTarget target, List<InlineFinding> findings) {
-            this.posted = findings;
-            return new InlineResult(findings.size(), 0, List.of());
+        public InlineResult postInlineFeedback(FeedbackTarget target, List<InlineFeedback> observations) {
+            this.posted = observations;
+            return new InlineResult(observations.size(), 0, List.of());
         }
 
         @Override
-        public void clearStaleFindings(FeedbackTarget target, String marker) {
+        public void clearStaleFeedback(FeedbackTarget target, String marker) {
             this.cleared = true;
             if (clearThrows != null) {
                 throw clearThrows;
@@ -93,8 +93,8 @@ class DiffNotePosterTest extends BaseUnitTest {
         poster.reconcileInlineNotes(gitlabJob(), List.of(multi));
 
         assertThat(channel.posted).hasSize(1);
-        InlineFinding f = channel.posted.get(0);
-        FindingAnchor.DiffAnchor anchor = (FindingAnchor.DiffAnchor) f.anchor();
+        InlineFeedback f = channel.posted.get(0);
+        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) f.anchor();
         assertThat(anchor.filePath()).isEqualTo("src/A.java");
         assertThat(anchor.newLineNumber()).isEqualTo(14); // end line
         assertThat(f.body()).contains(
@@ -112,7 +112,7 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(single));
 
-        FindingAnchor.DiffAnchor anchor = (FindingAnchor.DiffAnchor) channel.posted.get(0).anchor();
+        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) channel.posted.get(0).anchor();
         assertThat(anchor.newLineNumber()).isEqualTo(10);
         assertThat(anchor.startLine()).isNull();
     }
@@ -121,13 +121,13 @@ class DiffNotePosterTest extends BaseUnitTest {
     void blankBodyNote_isSkipped_andClearsStaleWhenAllBlank() {
         RecordingChannel channel = new RecordingChannel();
         DiffNotePoster poster = poster(channel);
-        // A body that sanitizes to blank yields no finding → the all-empty path clears stale notes instead.
+        // A body that sanitizes to blank yields no observation → the all-empty path clears stale notes instead.
         DiffNote blank = new DiffNote("src/A.java", 10, null, "   ", "ck-blank");
 
         DiffNotePoster.DiffNoteResult result = poster.reconcileInlineNotes(gitlabJob(), List.of(blank));
 
         assertThat(result.posted()).isZero();
-        assertThat(channel.posted).isNull(); // postInlineFindings never invoked
+        assertThat(channel.posted).isNull(); // postInlineFeedback never invoked
         assertThat(channel.cleared).isTrue(); // stale-clear path taken
     }
 
@@ -143,14 +143,14 @@ class DiffNotePosterTest extends BaseUnitTest {
 
     @Test
     void duplicateChannelKind_inConstructor_throws() {
-        InlineFindingChannel a = mock(InlineFindingChannel.class);
-        InlineFindingChannel b = mock(InlineFindingChannel.class);
+        InlineFeedbackChannel a = mock(InlineFeedbackChannel.class);
+        InlineFeedbackChannel b = mock(InlineFeedbackChannel.class);
         when(a.kind()).thenReturn(IntegrationKind.GITLAB);
         when(b.kind()).thenReturn(IntegrationKind.GITLAB);
 
         assertThatThrownBy(() -> new DiffNotePoster(commentPoster, commentFormatter, List.of(a, b)))
             .isInstanceOf(IllegalStateException.class)
-            .hasMessageContaining("Duplicate InlineFindingChannel for kind");
+            .hasMessageContaining("Duplicate InlineFeedbackChannel for kind");
     }
 
     @Test
@@ -163,7 +163,7 @@ class DiffNotePosterTest extends BaseUnitTest {
 
         poster.reconcileInlineNotes(gitlabJob(), List.of(note));
 
-        FindingAnchor.DiffAnchor anchor = (FindingAnchor.DiffAnchor) channel.posted.get(0).anchor();
+        FeedbackAnchor.DiffAnchor anchor = (FeedbackAnchor.DiffAnchor) channel.posted.get(0).anchor();
         assertThat(anchor.filePath()).isEqualTo("src/components/Button.tsx");
     }
 

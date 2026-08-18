@@ -85,6 +85,7 @@ abstract class AbstractSlackConsentGateIntegrationTest extends BaseIntegrationTe
         job.setWorkspace(workspace);
         job.setJobType(AgentJobType.CONVERSATION_REVIEW);
         job.setConfigSnapshot(OM.valueToTree(Map.of("model", "test")));
+        job.setEvidenceSnapshot(OM.readTree("{\"manifest\":{\"contractVersion\":\"1.0.0\"}}"));
         return agentJobRepository.save(job);
     }
 }

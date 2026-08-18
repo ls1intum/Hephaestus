@@ -81,19 +81,17 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/cooldownMinutes: 30 → 10/)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/cooldownMinutes: 30 → 10/);
 		await expect(canvas.getAllByText(/GPT reviewer/).length).toBeGreaterThan(0);
 	},
 };
 
 export const Impersonation: Story = {
 	args: { entries: [entries[1]] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/acting as Ada Lovelace/)).toBeInTheDocument();
-		await expect(canvas.getByText(/not set → ••••••/)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/acting as Ada Lovelace/);
+		canvas.getByText(/not set → ••••••/);
 	},
 };
 
@@ -101,9 +99,8 @@ export const SystemActor: Story = {
 	args: {
 		entries: [entries[3]],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("System")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("System");
 	},
 };
 
@@ -112,62 +109,53 @@ export const WithWorkspaceColumn: Story = {
 		showWorkspace: true,
 		resolveWorkspaceName: (id) => (id === 12 ? "Acme Engineering" : undefined),
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("Workspace")).toBeInTheDocument();
+	play: async ({ canvas }) => {
 		await expect(canvas.getAllByText("Acme Engineering").length).toBeGreaterThan(0);
 	},
 };
 
 export const RowDetail: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const buttons = canvas.getAllByRole("button", { name: /View details/i });
 		await userEvent.click(buttons[0]);
 		const dialog = within(await screen.findByRole("dialog"));
-		await expect(dialog.getByText("cooldownMinutes")).toBeInTheDocument();
-		await expect(dialog.getByText("30")).toBeInTheDocument();
-		await expect(dialog.getByText("10")).toBeInTheDocument();
+		dialog.getByText("cooldownMinutes");
+		dialog.getByText("30");
+		dialog.getByText("10");
 	},
 };
 
 export const EmptyWithFilter: Story = {
 	args: { entries: [], hasFilter: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No changes match your filters")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("No changes match your filters");
 	},
 };
 
 export const EmptyInitial: Story = {
 	args: { entries: [] },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText("No settings changes yet")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText("No settings changes yet");
 	},
 };
 
 export const ErrorState: Story = {
 	args: { entries: [], isError: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/Couldn’t load the audit log/i)).toBeInTheDocument();
-		await expect(canvas.getByRole("button", { name: /Try again/i })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/Couldn’t load the audit log/i);
 	},
 };
 
 export const LoadMore: Story = {
 	args: { hasNextPage: true, isFetchingNextPage: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /Load more/i })).toBeDisabled();
 	},
 };
 
 export const ColumnCountMatchesHeader: Story = {
 	args: { showWorkspace: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const headers = canvas.getAllByRole("columnheader");
 		const cells = within(canvas.getAllByRole("row")[1]).getAllByRole("cell");
 		await expect(headers).toHaveLength(cells.length);

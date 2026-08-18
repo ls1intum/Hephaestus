@@ -10,6 +10,7 @@ const ICONS = [
 
 const meta = {
 	title: "Icons/Brand",
+	tags: ["autodocs"],
 } satisfies Meta;
 
 export default meta;

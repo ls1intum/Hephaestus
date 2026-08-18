@@ -1,4 +1,4 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
 	createAreaMutation,
@@ -6,10 +6,11 @@ import {
 	deletePracticeMutation,
 	getPracticeQueryKey,
 	listAreasQueryKey,
+	listPracticesOptions,
 	listPracticesQueryKey,
 	placePracticeMutation,
 	reorderAreasMutation,
-	setActiveMutation,
+	reviewTierRollupQueryKey,
 	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
@@ -17,7 +18,6 @@ import {
 	applyDisplayOrder,
 	applyPracticePlacements,
 	patchArea,
-	patchPractice,
 	placePractice,
 	practiceCatalogStructureScope,
 	practicePlacementSnapshot,
@@ -27,6 +27,7 @@ import {
 	upsertArea,
 } from "@/hooks/practice-catalog-cache";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { problemStatusOf } from "@/lib/problem-detail";
 
 const UNASSIGNED = "__unassigned__";
 
@@ -60,14 +61,25 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		}
 	};
 
+	// The per-tier rollup is a server-resolved projection of this catalogue: every tier written here,
+	// and every practice created, deleted or moved between areas, changes a count in it. Nothing on
+	// this screen renders it, which is exactly why it has to be invalidated from here — the autonomy
+	// screen shares the cache and would otherwise open on the numbers from before the last edit.
+	const invalidateReviewTierRollup = () => {
+		void queryClient.invalidateQueries({
+			queryKey: reviewTierRollupQueryKey({ path: { workspaceSlug } }),
+		});
+	};
 	const invalidateAreasAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: areaMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: areasQueryKey });
+			invalidateReviewTierRollup();
 		}
 	};
 	const invalidatePracticesAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: practiceMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: practicesQueryKey });
+			invalidateReviewTierRollup();
 		}
 	};
 
@@ -84,10 +96,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			toast.success("Area created");
 		},
 		onError: (error) => {
-			const status =
-				typeof error === "object" && error !== null && "status" in error
-					? (error as { status: number }).status
-					: undefined;
+			const status = problemStatusOf(error);
 			toast.error(
 				status === 409 ? "An area with that name already exists" : "Couldn't create the area",
 			);
@@ -274,44 +283,20 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
-	const setActive = useMutation({
-		...filedUnder(practiceMutationKey, setActiveMutation()),
-		onMutate: async (variables) => {
-			await queryClient.cancelQueries({ queryKey: practicesQueryKey });
-			const previousActive = queryClient
-				.getQueryData<Practice[]>(practicesQueryKey)
-				?.find((practice) => practice.slug === variables.path.practiceSlug)?.active;
-			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-				patchPractice(practices, variables.path.practiceSlug, {
-					active: variables.body.active,
-				}),
-			);
-			return { previousActive };
-		},
-		onError: (_error, variables, context) => {
-			if (context?.previousActive !== undefined) {
-				queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-					patchPractice(practices, variables.path.practiceSlug, {
-						active: context.previousActive,
-					}),
-				);
-			}
-			toast.error("Couldn't update the practice");
-		},
-		onSuccess: (updated) => {
-			queryClient.setQueryData<Practice[]>(practicesQueryKey, (practices = []) =>
-				patchPractice(practices, updated.slug, { active: updated.active }),
-			);
-			queryClient.setQueryData<Practice>(
-				getPracticeQueryKey({
-					path: { workspaceSlug, practiceSlug: updated.slug },
-				}),
-				(practice) => (practice ? { ...practice, active: updated.active } : practice),
-			);
-		},
-		onSettled: invalidatePracticesAfterLastWrite,
-	});
+	// No tier mutation here. The catalogue reads the tier out and links to Review → How much, which is
+	// the one writer of the field — two editors over one endpoint is how an admin undid the workspace
+	// answer they had just set. This hook also held the only client-side construction of a
+	// `ReviewTierAssignment` anywhere in the app, which could only ever guess at a chain the server
+	// resolves.
 
+	// Subscribed rather than read with `getQueryData`, which is a snapshot with no subscription behind
+	// it: a catalogue that changes while a move or a delete is in flight would leave these buckets —
+	// and every reorder control they disable — describing a stale list. The one caller renders this
+	// same query, so this shares its subscription rather than adding a fetch.
+	const { data: practices = [] } = useQuery({
+		...listPracticesOptions({ path: { workspaceSlug } }),
+		select: (all) => all.map(({ slug, areaSlug }) => ({ slug, areaSlug })),
+	});
 	const pendingAreaSlugs = usePendingMutationIds<{ path: { areaSlug?: string } }, string>(
 		areaMutationKey,
 		(variables) => variables.path.areaSlug,
@@ -325,7 +310,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 	if (place.isPending) {
 		blockedPracticeOrderBuckets.add(UNASSIGNED);
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
-		for (const practice of queryClient.getQueryData<Practice[]>(practicesQueryKey) ?? []) {
+		for (const practice of practices) {
 			if (practice.areaSlug) {
 				blockedPracticeOrderBuckets.add(practice.areaSlug);
 				blockedMoveDestinationSlugs.add(practice.areaSlug);
@@ -340,9 +325,9 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
 	}
 	if (deletePractice.isPending && deletePractice.variables) {
-		const practice = queryClient
-			.getQueryData<Practice[]>(practicesQueryKey)
-			?.find(({ slug }) => slug === deletePractice.variables.path.practiceSlug);
+		const practice = practices.find(
+			({ slug }) => slug === deletePractice.variables.path.practiceSlug,
+		);
 		const bucket = practice?.areaSlug ?? UNASSIGNED;
 		blockedPracticeOrderBuckets.add(bucket);
 		blockedMoveDestinationSlugs.add(bucket);
@@ -359,7 +344,6 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		blockedMoveDestinationSlugs,
 		blockedPracticeOrderBuckets,
 		reorderAreas,
-		setActive,
 		updateArea,
 	};
 }

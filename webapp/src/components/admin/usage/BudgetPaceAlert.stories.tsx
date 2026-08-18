@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import type { FxRateInfo } from "@/api/types.gen";
 import { BudgetPaceAlert } from "./BudgetPaceAlert";
 
@@ -10,10 +10,7 @@ const eur: FxRateInfo = {
 	source: "ECB",
 };
 
-/**
- * Warn before the wall: how much of a cap is gone, and when this month's pace would reach it. Both
- * consoles render it, so only the subject of the sentence changes — never the figures or their order.
- */
+/** Both consoles render it, so only the subject of the sentence changes — never the figures. */
 const meta = {
 	component: BudgetPaceAlert,
 	parameters: { layout: "padded" },
@@ -35,24 +32,21 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const OwnProviderCap: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText(/You've used 84% of your provider cap/)).toBeVisible();
 	},
 };
 
 export const NamedSubject: Story = {
 	args: { subjectName: "Acme" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText(/Acme has used 84% of its provider cap/)).toBeVisible();
 	},
 };
 
 export const SharedModelBudget: Story = {
 	args: { scope: "shared", subjectName: "Acme" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText(/shared-model budget/)).toBeVisible();
 	},
 };

@@ -8,34 +8,47 @@ import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/compone
 import { Separator } from "@/components/ui/separator";
 
 export interface DateRangeFacetProps {
+	/**
+	 * Which date this filters, in the words the rows use: "Observed", "Composed", "Changed".
+	 *
+	 * Required, and deliberately not defaulted to "Date": several screens filter different timestamps
+	 * through this control, and "Date" names the category rather than the value. A filter's name has to
+	 * be "concrete and predictable" (NN/g, "Filter Categories and Values"), and a default would let the
+	 * next screen ship unlabelled.
+	 */
+	title: string;
 	value: DateRange | undefined;
 	onChange: (range: DateRange | undefined) => void;
 }
 
-function rangeLabel(range: DateRange): string {
-	if (!range.from) return "Date";
-	if (!range.to) {
-		return `From ${format(range.from, "MMM d, yyyy")}`;
-	}
+function rangeLabel(range: DateRange): string | undefined {
+	if (!range.from) return undefined;
+	if (!range.to) return `From ${format(range.from, "MMM d, yyyy")}`;
 	return `${format(range.from, "MMM d")} – ${format(range.to, "MMM d, yyyy")}`;
 }
 
-export function DateRangeFacet({ value, onChange }: DateRangeFacetProps) {
+export function DateRangeFacet({ title, value, onChange }: DateRangeFacetProps) {
+	const applied = value?.from ? rangeLabel(value) : undefined;
 	return (
 		<Popover>
 			<PopoverTrigger
 				render={
-					<Button variant="outline" size="sm" className="h-8 border-dashed font-normal">
+					<Button
+						variant="outline"
+						size="sm"
+						className="h-8 border-dashed font-normal"
+						aria-label={applied ? `${title}: ${applied}` : title}
+					>
 						<CalendarIcon aria-hidden />
-						Date
-						{value?.from && (
+						{title}
+						{applied && (
 							<>
 								<Separator
 									orientation="vertical"
 									className="mx-0.5 data-[orientation=vertical]:h-4"
 								/>
 								<Badge variant="secondary" className="rounded-sm px-1 font-normal">
-									{rangeLabel(value)}
+									{applied}
 								</Badge>
 							</>
 						)}
@@ -43,7 +56,7 @@ export function DateRangeFacet({ value, onChange }: DateRangeFacetProps) {
 				}
 			/>
 			<PopoverContent className="w-auto p-0" align="start">
-				<PopoverTitle className="sr-only">Choose a date range</PopoverTitle>
+				<PopoverTitle className="sr-only">Choose a {title.toLowerCase()} date range</PopoverTitle>
 				<Calendar
 					autoFocus
 					mode="range"
@@ -52,6 +65,21 @@ export function DateRangeFacet({ value, onChange }: DateRangeFacetProps) {
 					onSelect={onChange}
 					numberOfMonths={1}
 				/>
+				{/* The way out every other facet in the toolbar has: without it a picked range can only be
+				    replaced by picking another, never removed. */}
+				{applied && (
+					<>
+						<Separator />
+						<Button
+							variant="ghost"
+							size="sm"
+							className="h-8 w-full rounded-t-none font-normal"
+							onClick={() => onChange(undefined)}
+						>
+							Clear selection
+						</Button>
+					</>
+				)}
 			</PopoverContent>
 		</Popover>
 	);

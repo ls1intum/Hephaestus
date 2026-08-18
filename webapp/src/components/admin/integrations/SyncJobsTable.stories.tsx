@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { SyncJob } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { SyncJobsTable } from "./SyncJobsTable";
 
 const jobs: SyncJob[] = [
@@ -139,8 +140,7 @@ export const AllStatuses: Story = { args: { jobs: allStatuses } };
 /** Type and trigger are one phrase, not two columns — the second repeated one word down every row. */
 export const TypeCarriesTrigger: Story = {
 	args: { jobs },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("columnheader", { name: "Trigger" })).toBeNull();
 		await expect(canvas.getAllByText("Reconciliation", { exact: false }).length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText(/· scheduled/i).length).toBeGreaterThan(0);
@@ -150,22 +150,18 @@ export const TypeCarriesTrigger: Story = {
 /** The start time is relative for scanning and absolute for grepping a log — hover gets the instant. */
 export const StartedRevealsAbsoluteTime: Story = {
 	args: { jobs },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.hover(canvas.getAllByText(/ago$/)[0]);
-		await expect(await screen.findByText(/\d{4}, \d{2}:\d{2}:\d{2}$/)).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/\d{4}, \d{2}:\d{2}:\d{2}$/));
 	},
 };
 
 /** The error hover surfaces the summary on demand, keyed to the failing row. No click, no focus trap. */
 export const ErrorHover: Story = {
 	args: { jobs: allStatuses },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.hover(canvas.getByRole("button", { name: /error for job 10/i }));
-		await expect(
-			await screen.findByText(/rate limit exceeded after 3 retries/i),
-		).toBeInTheDocument();
+		await expectSettledVisible(await screen.findByText(/rate limit exceeded after 3 retries/i));
 	},
 };
 
@@ -186,13 +182,12 @@ export const ExpandProgressDetail: Story = {
 			jobs[2],
 		],
 	},
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		// Only the job with a progress report is expandable.
 		await expect(canvas.getAllByRole("button", { name: /show details for job/i })).toHaveLength(1);
 		await userEvent.click(canvas.getByRole("button", { name: /show details for job 3/i }));
-		await expect(await canvas.findByText(/backfilling ls1intum\/artemis/i)).toBeInTheDocument();
-		await expect(canvas.getByText("Pull requests")).toBeInTheDocument();
+		await expectSettledVisible(await canvas.findByText(/backfilling ls1intum\/artemis/i));
+		canvas.getByText("Pull requests");
 	},
 };
 
@@ -207,9 +202,8 @@ export const Paged: Story = {
 
 export const FirstPage: Story = {
 	args: { jobs, page: 0, totalPages: 4, onPageChange: fn() },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByRole("navigation", { name: "pagination" })).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByRole("navigation", { name: "pagination" });
 		await expect(canvas.queryByText(/Page \d+ of \d+/)).toBeNull();
 	},
 };

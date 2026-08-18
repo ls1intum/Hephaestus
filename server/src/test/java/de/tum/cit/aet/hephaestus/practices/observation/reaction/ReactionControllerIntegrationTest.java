@@ -5,8 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.feedback.EvidenceRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
@@ -14,12 +17,12 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.CreateReactionDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.reaction.dto.ReactionDTO;
@@ -86,11 +89,12 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         adminUser = ensureAdminMembership(workspace).getUser();
 
         Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setSlug("test-practice");
         practice.setName("Test Practice");
         practice.setCriteria("Test description");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
+        practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice = practiceRepository.save(practice);
 
         // Agent job is a required FK for the observation.
@@ -104,14 +108,13 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             .occurrenceKey("test-key-" + UUID.randomUUID())
             .agentJobId(agentJob.getId())
             .practice(practice)
-            .artifactType(WorkArtifact.PULL_REQUEST)
+            .artifactKind(ArtifactKinds.PULL_REQUEST)
             .artifactId(42L)
             .aboutUserId(adminUser.getId())
-            .title("Missing error handling")
+            .summary("Missing error handling")
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(Severity.MAJOR)
-            .confidence(0.85f)
             .recurrenceKey(HEADLINE_RECURRENCE_KEY)
             .observedAt(Instant.now())
             .build();
@@ -122,7 +125,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             Feedback.builder()
                 .agentJobId(agentJob.getId())
                 .workspaceId(workspace.getId())
-                .artifactType(WorkArtifact.PULL_REQUEST)
+                .artifactKind(ArtifactKinds.PULL_REQUEST)
                 .artifactId(42L)
                 .recipientUserId(adminUser.getId())
                 .aboutUserId(adminUser.getId())
@@ -136,7 +139,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
         );
 
         // Bind the observation as the feedback's PRIMARY evidence so findHeadlineRecurrenceKey resolves the
-        // headline locus the reaction must denormalize (B2).
+        // headline locus the reaction must denormalize.
         feedbackObservationRepository.insertIfAbsent(
             feedbackUnit.getId(),
             finding.getId(),
@@ -175,7 +178,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
             assertThat(response.id()).isNotNull();
             assertThat(response.createdAt()).isNotNull();
 
-            // B2 denormalization: the persisted reaction carries the feedback's headline recurrence key.
+            // The persisted reaction carries the feedback's headline recurrence key.
             Reaction saved = reactionRepository.findById(response.id()).orElseThrow();
             assertThat(saved.getRecurrenceKey()).isEqualTo(HEADLINE_RECURRENCE_KEY);
         }
@@ -299,7 +302,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 Feedback.builder()
                     .agentJobId(feedbackUnit.getAgentJobId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.PULL_REQUEST)
+                    .artifactKind(ArtifactKinds.PULL_REQUEST)
                     .artifactId(43L)
                     .recipientUserId(adminUser.getId())
                     .aboutUserId(mentorUser.getId())
@@ -538,7 +541,7 @@ class ReactionControllerIntegrationTest extends AbstractWorkspaceIntegrationTest
                 Feedback.builder()
                     .agentJobId(feedbackUnit.getAgentJobId())
                     .workspaceId(workspace.getId())
-                    .artifactType(WorkArtifact.PULL_REQUEST)
+                    .artifactKind(ArtifactKinds.PULL_REQUEST)
                     .artifactId(42L)
                     .recipientUserId(feedbackUnit.getRecipientUserId())
                     .aboutUserId(feedbackUnit.getAboutUserId())

@@ -42,8 +42,8 @@ export interface CapMeterProps {
 }
 
 /**
- * One cap's consumption, everywhere a cap is shown. The bar is all this owns — layout and the caption
- * belong to the surface — but the tone, the clamping and the announcement must not diverge between them.
+ * The bar is all this owns — layout and the caption belong to the surface — but the tone, the
+ * clamping and the announcement must not diverge between the surfaces that show a cap.
  */
 export function CapMeter({ spendUsd, capUsd, percent, paused, label }: CapMeterProps): ReactNode {
 	const value = Math.min(Math.max(percent, 0), 100);

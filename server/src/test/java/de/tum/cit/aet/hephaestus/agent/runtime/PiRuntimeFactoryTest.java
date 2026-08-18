@@ -85,23 +85,25 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             var inputs = factory.build(spec("azure-openai-responses", "gpt-5.4-mini", false)).inputFiles();
             assertThat(inputs.get(SandboxLayout.ORCHESTRATOR_PATH)).isNotNull();
             assertThat(new String(inputs.get(SandboxLayout.ORCHESTRATOR_PATH), StandardCharsets.UTF_8)).contains(
-                "findings"
+                "observations"
             );
             assertThat(inputs.get(SandboxLayout.RUNNER_SCRIPT_FILENAME)).isNotEmpty();
         }
 
         @Test
-        @DisplayName(
-            "stages the runner's relative-import sidecars beside the runner (pi-finding-normalize.mjs, pi-provider.mjs)"
-        )
+        @DisplayName("stages the runner's relative-import sidecars beside the runner")
         void stagesRunnerSidecars() {
             var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
-            // pi-runner.mjs imports both relatively; unstaged, the sandbox exits 1 with ERR_MODULE_NOT_FOUND.
+            // pi-runner.mjs imports each relatively; unstaged, the sandbox exits 1 with ERR_MODULE_NOT_FOUND.
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 assertThat(inputs).containsKey(sidecar);
                 assertThat(inputs.get(sidecar)).isNotEmpty();
             }
-            assertThat(PRACTICE.sidecarScripts()).contains("pi-finding-normalize.mjs", "pi-provider.mjs");
+            assertThat(PRACTICE.sidecarScripts()).contains(
+                "pi-observation-normalize.mjs",
+                "pi-runner-usage.mjs",
+                "pi-provider.mjs"
+            );
         }
 
         @Test
@@ -115,8 +117,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
 
         @Test
         void promptDigest_matchesScaffoldingBytes() {
-            // The digest is exactly the root digest over orchestrator + runner + sidecars — recomputable
-            // from the plan's own input files, so a replay can verify it.
+            // The digest is exactly the root digest over orchestrator + runner + sidecars + prompt
+            // resources — recomputable from the plan's own input files, so a replay can verify it.
+            // Insertion order mirrors PiRuntimeFactory: sidecars, then prompts.
             var plan = factory.build(spec("openai-completions", "m", false));
             var scaffolding = new java.util.LinkedHashMap<String, byte[]>();
             scaffolding.put(SandboxLayout.ORCHESTRATOR_PATH, plan.inputFiles().get(SandboxLayout.ORCHESTRATOR_PATH));
@@ -126,6 +129,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             );
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 scaffolding.put(sidecar, plan.inputFiles().get(sidecar));
+            }
+            for (String prompt : PRACTICE.promptResources()) {
+                scaffolding.put(prompt, plan.inputFiles().get(prompt));
             }
 
             assertThat(plan.promptDigest()).isEqualTo(ProvenanceDigest.rootDigestHex(scaffolding));

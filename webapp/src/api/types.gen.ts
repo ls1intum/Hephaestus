@@ -45,6 +45,42 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
+ * The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
+ * It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
+ * what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
+ * about one workspace that a centrally curated catalogue cannot carry.
+ *
+ * <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
+ * axis".
+ *
+ * <h2>What this cannot express, and why</h2>
+ *
+ * <ul>
+ * <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
+ * <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
+ * by which point the review has been admitted and paid for. A path axis here would be a predicate
+ * that quietly never narrows anything.
+ * <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
+ * compatible, taking them away would not.
+ * <li><strong>Any third key.</strong> The vocabulary is closed at the column
+ * (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
+ * fields would drop the key in silence, leaving a workspace believing a restriction was in force.
+ * </ul>
+ */
+export type WorkspaceReviewScope = {
+    /**
+     * exact <code>owner/name</code> repository identifiers. Empty = every monitored
+     * repository. This narrows <em>review</em> within the set the workspace already syncs; it never
+     * adds one.
+     */
+    repositories?: Array<string>;
+    /**
+     * exact target-branch names (a PR's base ref). Empty = every branch.
+     */
+    targetBranches?: Array<string>;
+};
+
+/**
  * Available workspace creation providers and their configuration
  */
 export type WorkspaceProviders = {
@@ -205,7 +241,7 @@ export type LlmUsageByJobType = {
      * Confirmed spend on shared (instance) models for this job type, in USD.
      */
     instanceTotalCostUsd: number;
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'MENTOR_TURN';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'DOCUMENT_REVIEW' | 'MENTOR_TURN';
     outputTokens: number;
     /**
      * Spend on this workspace's own connected provider(s) for this job type, in USD.
@@ -891,6 +927,44 @@ export type UpdateSilentModeRequest = {
 };
 
 /**
+ * Replace a sweep schedule's terms.
+ *
+ * <p>Every field is required: a schedule is three numbers that only mean anything together — a cadence
+ * changed without its lookback can silently make a window illegal, or leave days nothing ever sweeps.
+ * The artifact kind is not among them; a schedule for a different kind of work is a different schedule.
+ */
+export type UpdateReviewSweepScheduleRequest = {
+    /**
+     * How often the sweep runs
+     */
+    cadence: 'DAILY' | 'WEEKLY';
+    /**
+     * Whether the scheduler acts on this row; a disabled schedule keeps its terms
+     */
+    enabled: boolean;
+    /**
+     * How far back each sweep looks, in days
+     */
+    lookbackDays: number;
+};
+
+/**
+ * The lifecycle transitions an admin can ask for.
+ *
+ * <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
+ * were shown and authorises the spend. <code>CANCELLED</code> stops a campaign for good. Every other
+ * transition — pausing on an exhausted budget, resuming when it clears, completing at the end of the
+ * scope — belongs to the driver, and is refused here so the state on screen always reflects something
+ * the system decided or something a person did, never a mixture.
+ */
+export type UpdateReviewBackfillRunStatusRequest = {
+    /**
+     * RUNNING confirms the estimate and starts the campaign; CANCELLED stops it for good
+     */
+    status: 'RUNNING' | 'CANCELLED';
+};
+
+/**
  * Request to update repository contribution visibility settings in a workspace
  */
 export type UpdateRepositorySettingsRequest = {
@@ -898,6 +972,16 @@ export type UpdateRepositorySettingsRequest = {
      * Whether contributions from this repository should be hidden from leaderboard calculations
      */
     hiddenFromContributions: boolean;
+};
+
+/**
+ * Set how much autonomy the system has here, or clear it back to inherit
+ */
+export type UpdatePracticeReviewTierRequest = {
+    /**
+     * OFF = not reviewed at all · PROPOSE = the review runs and every observation is recorded, and nothing is sent · DELIVER = feedback is delivered without asking. Send null (or omit the field) to hold no tier here and inherit — a practice inherits its area's, an area inherits the workspace default.
+     */
+    reviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
 };
 
 /**
@@ -909,21 +993,25 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     cooldownMinutes?: number;
     /**
+     * How much autonomy the system has over practices and areas that hold no tier of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet.
+     */
+    defaultReviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
+    /**
      * Deliver feedback to already-merged PRs/MRs
      */
     deliverToMerged?: boolean;
     /**
-     * Fields to reset to the inherited fleet default
+     * Fields to reset back to inherit
      */
-    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES'>;
+    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_REVIEW_TIER'>;
+    /**
+     * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
+     */
+    reviewScope?: WorkspaceReviewScope;
     /**
      * Run practice review for all developers (vs only the run_practice_review role)
      */
     runForAllUsers?: boolean;
-    /**
-     * Skip practice review for draft PRs/MRs
-     */
-    skipDrafts?: boolean;
 };
 
 /**
@@ -935,15 +1023,21 @@ export type UpdatePracticeRequest = {
      */
     area?: BindPracticeAreaRequest;
     /**
-     * Artifact this practice evaluates
+     * Replacement review settings; omit to preserve them, or to take the recommended ones when the bindings move the practice to a different kind of work
      */
-    artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
+    /**
+     * Replacement occasion and its evidence; omit to leave it unchanged
+     */
+    bindings?: [
+        PracticeBinding
+    ];
     /**
      * Optional fields to clear before applying supplied values
      */
     clear?: Array<'PRECOMPUTE_SCRIPT' | 'WHY_IT_MATTERS' | 'WHAT_GOOD_LOOKS_LIKE'>;
     /**
-     * Practice evaluation criteria
+     * Practice review criteria
      */
     criteria?: string;
     /**
@@ -951,21 +1045,143 @@ export type UpdatePracticeRequest = {
      */
     name?: string;
     /**
-     * TypeScript/Bun precompute script for static analysis before AI review
+     * TypeScript/Bun static analysis run before automated review
      */
     precomputeScript?: string;
     /**
-     * Domain events that trigger detection; empty for scheduled conversation reviews
-     */
-    triggerEvents?: Array<string>;
-    /**
-     * Developer-facing exemplar (learner layer); a concrete instance, not the rubric
+     * Concrete example shown to the developer; not review criteria
      */
     whatGoodLooksLike?: string;
     /**
-     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     * Plain-language rationale shown to the developer
      */
     whyItMatters?: string;
+};
+
+/**
+ * A source a practice reads and the stance it takes towards it
+ */
+export type PracticeEvidenceRequirement = {
+    /**
+     * Stable source identifier from the selected source contract
+     */
+    sourceKind: string;
+    /**
+     * Whether an absent or degraded capture refuses the review
+     */
+    stance: 'REQUIRED' | 'EXHAUSTIVE' | 'CONTEXTUAL';
+};
+
+/**
+ * One shape the subject a practice judges can take in a piece of work
+ */
+export type PracticeSubjectClause = {
+    /**
+     * Globs; holds when the change touches a matching path
+     */
+    changedPathMatches?: Array<string>;
+    /**
+     * Literal strings; holds when the diff contains one of them
+     */
+    diffContains?: Array<string>;
+    /**
+     * Named evidence collection; holds when it has at least one entry
+     */
+    evidenceHasItems?: 'scm.review-threads' | 'scm.inline-review-comments' | 'scm.general-review-comments';
+};
+
+/**
+ * What must be in a piece of work for this practice to have anything to judge
+ */
+export type PracticeSubject = {
+    /**
+     * Sentence shown when the subject was proven absent, in the author's voice
+     */
+    absentSays: string;
+    /**
+     * Shapes the subject may take; the subject is present when any one is found
+     */
+    anyOf?: Array<PracticeSubjectClause>;
+};
+
+/**
+ * An occasion that starts a review, and the evidence that review reads
+ */
+export type PracticeBinding = {
+    /**
+     * What must be in the work for this practice to apply; omit to always apply
+     */
+    appliesWhen?: PracticeSubject;
+    /**
+     * Sources a review occasioned this way reads, each with the stance it takes
+     */
+    needs: Array<PracticeEvidenceRequirement>;
+    /**
+     * Whether an artifact still marked draft occasions this review; omit for false
+     */
+    onDrafts?: boolean;
+    /**
+     * Signals that occasion this review, e.g. scm.pull_request.merged
+     */
+    signals: Array<string>;
+    /**
+     * Whose conduct this review judges; omit for AUTHOR
+     */
+    subject?: 'AUTHOR' | 'ASSIGNEE' | 'REVIEWER';
+};
+
+/**
+ * Known claim that the selected evidence cannot support even when every requirement passes
+ */
+export type PracticeEvidenceLimitation = {
+    /**
+     * Stable machine-readable identifier
+     */
+    code: string;
+    /**
+     * Plain-language explanation of the claim the evidence cannot support
+     */
+    description: string;
+};
+
+/**
+ * Author-declared automated review and evidence sufficiency for one practice
+ */
+export type PracticeAutomatedReview = {
+    /**
+     * Whether meeting every evidence requirement provides enough context to review the work
+     */
+    evidenceSufficiency: 'SUFFICIENT_WHEN_REQUIREMENTS_MET' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'NONE';
+    /**
+     * Implementation Hephaestus uses for automated review
+     */
+    mode: 'LANGUAGE_MODEL' | 'NONE';
+};
+
+/**
+ * Author-defined automated review settings for one practice revision
+ */
+export type PracticeAutomatedReviewPolicy = {
+    /**
+     * Automated review configuration; human review is a separate process
+     */
+    automatedReview: PracticeAutomatedReview;
+    /**
+     * Why this practice needs a human rather than automated review; present only when evidenceSufficiency is DECLARED_EVIDENCE_INSUFFICIENT
+     */
+    insufficiencyReason?: PracticeEvidenceLimitation;
+    /**
+     * Claims the selected evidence cannot support even when every requirement passes
+     */
+    knownLimitations: Array<PracticeEvidenceLimitation>;
+    /**
+     * Exact contract version that defines source kinds and source-state semantics
+     */
+    sourceContractVersion: string;
+    /**
+     * Conservative action when required evidence does not pass
+     */
+    whenEvidenceIsInsufficient: 'SKIP_AUTOMATED_REVIEW';
 };
 
 /**
@@ -982,10 +1198,6 @@ export type BindPracticeAreaRequest = {
  * Request to update an existing practice area (PATCH — only non-null fields applied)
  */
 export type UpdatePracticeAreaRequest = {
-    /**
-     * Whether this area is active
-     */
-    active?: boolean;
     /**
      * Optional palette colour key for the area's chip
      */
@@ -1006,16 +1218,10 @@ export type UpdatePracticeAreaRequest = {
      * Human-readable name
      */
     name?: string;
-};
-
-/**
- * Request to set a practice's active state
- */
-export type UpdatePracticeActiveRequest = {
     /**
-     * Whether the practice should be active
+     * Whether this area is shown in practice dashboards
      */
-    active: boolean;
+    visibleInPracticeDashboards?: boolean;
 };
 
 /**
@@ -1215,6 +1421,75 @@ export type TriggerSyncJobRequest = {
      * RECONCILIATION for a full re-sync, BACKFILL for historical data
      */
     type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
+};
+
+/**
+ * One thing that happened to this artifact, and what the system did about it
+ */
+export type TracedSignal = {
+    /**
+     * How we came to know: by event, by sync, by hand, or by backfill
+     */
+    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL' | 'SWEEP';
+    /**
+     * Human label for the signal, from the artifact kind's descriptor
+     */
+    displayName: string;
+    /**
+     * This occurrence's own identity; what a practice's occasionedById points at
+     */
+    id: string;
+    /**
+     * When it happened upstream; for a sync discovery, only as precise as the sync
+     */
+    occurredAt: Date;
+    /**
+     * The review this occurrence started, when it started one
+     */
+    reviewId?: string;
+    /**
+     * Which version of the artifact this occurrence is about; the reason editing a description can be re-measured while the commits stay put
+     */
+    revision: string;
+    /**
+     * Signal name, e.g. scm.pull_request.ready
+     */
+    signal: string;
+    state: 'RECORDED' | 'TRIGGERED' | 'SUPPRESSED' | 'PENDING' | 'LAPSED';
+    /**
+     * Why it ended in that state; null once it triggered a review
+     */
+    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+};
+
+/**
+ * An artifact this workspace recorded something about, and how much of it turned into review
+ */
+export type TracedArtifact = {
+    artifactId: number;
+    artifactKind: string;
+    /**
+     * Repository, collection or channel it sits in
+     */
+    container?: string;
+    lastSignalAt: Date;
+    /**
+     * The number the provider shows, for kinds that have one
+     */
+    number?: number;
+    /**
+     * How many of them started a review
+     */
+    reviewedSignalCount: number;
+    /**
+     * Occurrences recorded on this artifact
+     */
+    signalCount: number;
+    title: string;
+    /**
+     * Where to open it upstream; absent for a deleted or unlinkable artifact
+     */
+    url?: string;
 };
 
 /**
@@ -1621,6 +1896,103 @@ export type RevokeSessionsResult = {
     revoked?: number;
 };
 
+/**
+ * Practice counts per autonomy tier, for the workspace and for each of its areas
+ */
+export type ReviewTierRollup = {
+    /**
+     * The same counts per area, in catalogue order
+     */
+    areas: Array<AreaReviewTierRollup>;
+    /**
+     * Practice count per effective tier across the whole workspace; every tier is a key
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * The workspace-level decision every area and practice falls back to
+     */
+    workspaceDefault: ReviewTierAssignment;
+};
+
+/**
+ * The autonomy tier in force here, whether it was set here or inherited, and the level that decided it
+ */
+export type ReviewTierAssignment = {
+    /**
+     * The tier actually in force. OFF = not reviewed · PROPOSE = reviewed and recorded, feedback held back and nothing sent · DELIVER = feedback delivered without asking
+     */
+    effective: 'OFF' | 'PROPOSE' | 'DELIVER';
+    /**
+     * True when this practice or area holds no tier of its own and follows a level above
+     */
+    inherited: boolean;
+    /**
+     * The tier set on this practice or area itself, or null when it holds none and inherits. Send null to the tier endpoint to clear it back to this state.
+     */
+    override?: 'OFF' | 'PROPOSE' | 'DELIVER';
+    /**
+     * Which level decided the effective tier: PRACTICE, AREA or WORKSPACE
+     */
+    source: 'PRACTICE' | 'AREA' | 'WORKSPACE';
+};
+
+/**
+ * One area's practice counts per effective tier, and the area's own tier
+ */
+export type AreaReviewTierRollup = {
+    /**
+     * Area name; null for the no-area group
+     */
+    areaName?: string;
+    /**
+     * Area slug; null groups the practices that belong to no area
+     */
+    areaSlug?: string;
+    /**
+     * Practice count per effective tier in this area; every tier is a key
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * How many of this area's practices set their own tier rather than inheriting
+     */
+    overriddenCount: number;
+    /**
+     * The tier in force for this area, and where it came from
+     */
+    reviewTier: ReviewTierAssignment;
+};
+
+/**
+ * A standing instruction to review recent work on a cadence, as an admin sees it.
+ */
+export type ReviewSweepSchedule = {
+    artifactKind: string;
+    cadence: 'DAILY' | 'WEEKLY';
+    createdAt: Date;
+    createdByAccountId: number;
+    enabled: boolean;
+    id: string;
+    /**
+     * When a campaign was last opened from this schedule; absent until the first one
+     */
+    lastRunAt?: Date;
+    /**
+     * how far back each sweep looks. Bounded at write time to twice the cadence and
+     * never more than a week, which is what keeps a sweep's observations admissible in the same trend line
+     * as reviews that events triggered.
+     */
+    lookbackDays: number;
+    /**
+     * when the next sweep is due. Shown because it is the only way to tell a schedule that
+     * is working from one whose workspace has been skipping it.
+     */
+    nextRunAt: Date;
+};
+
 export type ReviewSubject = {
     avatarUrl?: string;
     id: number;
@@ -1650,26 +2022,33 @@ export type ReviewRunTarget = {
     provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     repositoryName?: string;
     title: string;
-    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    type: string;
     url?: string;
 };
 
 /**
- * A review run with finding and feedback outcome counts
+ * A review run with observation and feedback outcome counts
  */
 export type ReviewRunSummary = {
     createdAt: Date;
     feedback: ReviewFeedbackCounts;
-    findings: ReviewFindingCounts;
     id: string;
+    observations: ReviewObservationCounts;
     status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
     target: ReviewRunTarget;
 };
 
 /**
- * Counts of findings by assessment
+ * Counts of observations by assessment
  */
-export type ReviewFindingCounts = {
+export type ReviewObservationCounts = {
+    /**
+     * Practices that looked at the evidence and could not settle the question either way; reported apart from notApplicable because one says there was nothing here to judge and the other says we could not tell
+     */
+    inconclusive: number;
+    /**
+     * Practices whose subject did not occur in this work
+     */
     notApplicable: number;
     problems: number;
     strengths: number;
@@ -1684,6 +2063,28 @@ export type ReviewFeedbackCounts = {
     prepared: number;
     superseded: number;
     suppressed: number;
+};
+
+/**
+ * What came of asking for a review
+ */
+export type ReviewRequestOutcome = {
+    /**
+     * The review that is now running; absent when none was started
+     */
+    jobId?: string;
+    /**
+     * The controlled-vocabulary reason nothing was started; absent when a review was started
+     */
+    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    /**
+     * The reason as one sentence for the person who asked. Render it verbatim: it is written next to the reason it explains so that every surface says the same thing, and a re-worded copy is how a screen and a support answer come to disagree.
+     */
+    reasonDescription?: string;
+    /**
+     * Whether a review is now running, or nothing was started
+     */
+    status: 'SUBMITTED' | 'REFUSED';
 };
 
 export type ReviewPracticeArea = {
@@ -1736,9 +2137,9 @@ export type ReviewPlacement = {
 };
 
 /**
- * A finding with evidence and linked feedback
+ * An observation with evidence and linked feedback
  */
-export type ReviewFindingDetail = {
+export type ReviewObservationDetail = {
     agentJobId: string;
     /**
      * Practice area; null when the practice is Unassigned
@@ -1750,10 +2151,11 @@ export type ReviewFindingDetail = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Detector confidence
+     * Whether an observation was produced using the current review rules
      */
-    confidence: number;
-    evidence?: unknown;
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    evidence?: ObservationEvidence;
+    evidenceRationale?: string;
     /**
      * Linked feedback, newest first
      */
@@ -1766,8 +2168,7 @@ export type ReviewFindingDetail = {
      */
     practiceRevisionId?: number;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
-    reasoning?: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Cross-run locus key; null when continuity is unavailable
      */
@@ -1777,18 +2178,18 @@ export type ReviewFindingDetail = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Whose work the finding is about; null when the identity is no longer resolvable
+     * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    title: string;
+    summary: string;
 };
 
 /**
- * A message composed from a finding
+ * Feedback composed from an observation
  */
 export type ReviewBoundFeedback = {
     agentJobId: string;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
     createdAt: Date;
     /**
      * When the message was placed; null if it was not delivered
@@ -1797,13 +2198,35 @@ export type ReviewBoundFeedback = {
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
     feedbackId: string;
     /**
-     * Whether the finding led the message or reinforced it
+     * Whether the observation led the feedback or reinforced it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
+};
+
+/**
+ * A verified quote and its exact source location
+ */
+export type EvidenceCitation = {
+    artifactPath: string;
+    endLine: number;
+    path: string;
+    quote?: string;
+    quoteRedacted: boolean;
+    side?: 'OLD' | 'NEW';
+    sourceKind: string;
+    startLine: number;
+};
+
+/**
+ * Verified, source-bound evidence for an observation
+ */
+export type ObservationEvidence = {
+    citations: Array<EvidenceCitation>;
+    detector?: string;
 };
 
 export type ReviewArtifact = {
@@ -1828,7 +2251,7 @@ export type ReviewArtifact = {
      */
     repositoryName?: string;
     title: string;
-    type: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    type: string;
     /**
      * Provider URL, when one is available
      */
@@ -1836,9 +2259,9 @@ export type ReviewArtifact = {
 };
 
 /**
- * A practice review finding with its linked feedback outcomes
+ * A practice review observation with its linked feedback outcomes
  */
-export type ReviewFinding = {
+export type ReviewObservation = {
     agentJobId: string;
     /**
      * Practice area; null when the practice is Unassigned
@@ -1850,18 +2273,22 @@ export type ReviewFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Detector confidence
+     * Whether an observation was produced using the current review rules
      */
-    confidence: number;
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
-     * Counts of linked messages by delivery state
+     * Counts of linked feedback by delivery state
      */
     feedbackDisposition: ReviewFeedbackDisposition;
     id: string;
     observedAt: Date;
+    /**
+     * What occasioned the measurement. BACKFILL came from a confirmed campaign over work that already existed, so it is not a point on the live trend line.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
     practiceName: string;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Cross-run locus key; null when continuity is unavailable
      */
@@ -1871,10 +2298,10 @@ export type ReviewFinding = {
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Whose work the finding is about; null when the identity is no longer resolvable
+     * Whose work the observation is about; null when the identity is no longer resolvable
      */
     subject?: ReviewSubject;
-    title: string;
+    summary: string;
 };
 
 /**
@@ -1882,23 +2309,23 @@ export type ReviewFinding = {
  */
 export type ReviewFeedbackDisposition = {
     /**
-     * Linked messages delivered
+     * Linked feedback delivered
      */
     delivered: number;
     /**
-     * Linked messages whose delivery failed
+     * Linked feedback whose delivery failed
      */
     failed: number;
     /**
-     * Linked messages awaiting delivery
+     * Linked feedback awaiting delivery
      */
     prepared: number;
     /**
-     * Linked messages delivered and later replaced
+     * Linked feedback delivered and later replaced
      */
     superseded: number;
     /**
-     * Linked messages withheld by policy
+     * Linked feedback withheld by policy
      */
     suppressed: number;
 };
@@ -1909,45 +2336,45 @@ export type ReviewFeedbackDisposition = {
 export type ReviewFeedbackDetail = {
     agentJobId: string;
     /**
-     * Work item the message targets; null for an unanchored message
+     * Work item the feedback targets; null when it is unanchored
      */
     artifact?: ReviewArtifact;
     /**
-     * Stored composed body; null when none was produced
+     * Stored composed body; null when none was produced, and always null on the IN_APP and IN_CHAT channels — neither the developer's practice pages nor the mentor's queued move is readable by an operator
      */
     body?: string;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
     createdAt: Date;
     /**
-     * When the message was placed; null if it was not delivered
+     * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
-    /**
-     * Source findings in render order
-     */
-    findings: Array<ReviewBoundFinding>;
     id: string;
+    /**
+     * Source observations in render order
+     */
+    observations: Array<ReviewBoundObservation>;
     /**
      * Recorded placements; empty when none
      */
     placements: Array<ReviewPlacement>;
     /**
-     * Who the message is addressed to; null when the identity is no longer resolvable
+     * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
     /**
-     * The message this one replaced; null on a first delivery
+     * The feedback this one replaced; null on a first delivery
      */
     replacesId?: string;
     /**
-     * Whose work the message addresses; may equal the recipient
+     * Whose work the feedback addresses; may equal the recipient
      */
     subject?: ReviewSubject;
     /**
-     * Why the message was withheld; null unless the state is SUPPRESSED
+     * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -1955,9 +2382,9 @@ export type ReviewFeedbackDetail = {
 };
 
 /**
- * A finding that contributed to a message
+ * An observation that contributed to a piece of feedback
  */
-export type ReviewBoundFinding = {
+export type ReviewBoundObservation = {
     /**
      * Practice area; null when the practice is Unassigned
      */
@@ -1967,68 +2394,118 @@ export type ReviewBoundFinding = {
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * Detector confidence
+     * Whether an observation was produced using the current review rules
      */
-    confidence: number;
-    findingId: string;
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
+    observationId: string;
     observedAt: Date;
     /**
-     * Render order within the message (lower renders earlier)
+     * Render order within the feedback (lower renders earlier)
      */
     ordinal: number;
     practiceName: string;
     practiceSlug: string;
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
-     * Whether the finding leads the message or reinforces it
+     * Whether the observation leads the feedback or reinforces it
      */
     role: 'PRIMARY' | 'SUPPORTING';
     /**
      * Severity band (null unless assessment is BAD)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
-    title: string;
+    summary: string;
 };
 
 export type ReviewFeedback = {
     agentJobId: string;
     /**
-     * Work item the message targets; null for an unanchored message
+     * Work item the feedback targets; null when it is unanchored
      */
     artifact?: ReviewArtifact;
     /**
-     * Leading characters of the composed body; null when the message carries no body
+     * Leading characters of the composed body; null when the feedback carries no body
      */
     bodyPreview?: string;
     bodyTruncated: boolean;
-    channel: 'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE';
+    channel: 'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP';
     createdAt: Date;
     /**
-     * When the message was placed; null if it was not delivered
+     * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
     deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
-    /**
-     * Number of findings used to compose the message
-     */
-    findingCount: number;
     id: string;
     /**
-     * Who the message is addressed to; null when the identity is no longer resolvable
+     * Number of observations used to compose the feedback
+     */
+    observationCount: number;
+    /**
+     * Who the feedback is addressed to; null when the identity is no longer resolvable
      */
     recipient?: ReviewSubject;
     /**
-     * The message this one replaced; null on a first delivery
+     * The feedback this one replaced; null on a first delivery
      */
     replacesId?: string;
     /**
-     * Whose work the message addresses; may equal the recipient
+     * Whose work the feedback addresses; may equal the recipient
      */
     subject?: ReviewSubject;
     /**
-     * Why the message was withheld; null unless the state is SUPPRESSED
+     * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
+};
+
+/**
+ * A campaign as an admin sees it — before confirming, while it runs, and after it ends.
+ */
+export type ReviewBackfillRun = {
+    artifactKind: string;
+    /**
+     * Who authorised the spend; absent until the run is confirmed
+     */
+    confirmedByAccountId?: number;
+    createdAt: Date;
+    /**
+     * BACKFILL for a campaign an admin scoped by hand, SWEEP for one a recurring schedule opened
+     */
+    discoveredVia: 'EVENT' | 'SYNC' | 'MANUAL' | 'BACKFILL' | 'SWEEP';
+    estimatedArtifacts: number;
+    /**
+     * Forecast total spend in USD; absent when the workspace has no priced review history
+     */
+    estimatedCostUsd?: number;
+    /**
+     * artifacts whose submission threw, leaving no job and no recorded decision. Non-zero
+     * means this campaign's baseline has holes in it, which is why it is reported apart from a pass.
+     */
+    failedCount: number;
+    finishedAt?: Date;
+    fromAt: Date;
+    id: string;
+    /**
+     * artifacts walked past without one: already measured at their current state, or
+     * refused by the review gate. The campaign looked at each of these and decided.
+     */
+    passedCount: number;
+    /**
+     * Set only while the run is PAUSED
+     */
+    pauseReason?: 'BUDGET_EXHAUSTED' | 'REVIEW_MODEL_UNBOUND' | 'WORKSPACE_UNAVAILABLE';
+    requestedByAccountId: number;
+    startedAt?: Date;
+    status: 'AWAITING_CONFIRMATION' | 'RUNNING' | 'PAUSED' | 'COMPLETED' | 'CANCELLED';
+    /**
+     * artifacts for which a review job was created
+     */
+    submittedCount: number;
+    /**
+     * The schedule that opened this run; absent for a campaign an admin scoped by hand
+     */
+    sweepScheduleId?: string;
+    toAt: Date;
 };
 
 /**
@@ -2164,11 +2641,11 @@ export type ReflectionItem = {
     /**
      * The kind of work this is about (PR / issue)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
-    guidance?: string;
+    deliveredFeedback?: string;
     /**
      * Where in the work, e.g. "FrameRecorder.swift:212", when known
      */
@@ -2177,6 +2654,10 @@ export type ReflectionItem = {
      * Observation id — handle to open the full detail
      */
     observationId: string;
+    /**
+     * What occasioned the measurement. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
     /**
      * Impact level (null unless assessed BAD)
      */
@@ -2192,15 +2673,15 @@ export type ReflectionItem = {
  */
 export type ReactionEngagement = {
     /**
-     * RESPONSE: findings the developer acted on (the recipience act, not the outcome)
+     * RESPONSE: observations the developer acted on (the recipience act, not the outcome)
      */
     addressed: number;
     /**
-     * RESPONSE: findings the developer rejected with a reasoned explanation
+     * RESPONSE: observations the developer rejected with a reasoned explanation
      */
     disputed: number;
     /**
-     * VALIDITY: findings marked out-of-scope — a detector-scope signal, NOT an uptake count
+     * VALIDITY: observations marked out-of-scope — a detector-scope signal, NOT an uptake count
      */
     notApplicable: number;
 };
@@ -2581,6 +3062,116 @@ export type ProbeLlmConnectionRequest = {
 };
 
 /**
+ * Review timing, evidence choices, and recommended settings for one type of reviewed work
+ */
+export type PracticeWorkTypeDefinitionOptions = {
+    allowedSources: Array<PracticeEvidenceSourceOption>;
+    artifactKind: string;
+    /**
+     * How a person asks for a review of this work type by hand, or absent where the work type admits no such request. Not an occasion to bind to: such a request reviews every practice on the work type whatever state the work is in.
+     */
+    manualReviewSignal?: PracticeManualReviewSignal;
+    /**
+     * Evidence a new binding on this work type starts with when the author says nothing
+     */
+    recommendedNeeds: Array<PracticeEvidenceRequirement>;
+    recommendedPolicy: PracticeAutomatedReviewPolicy;
+    /**
+     * The occasions a practice on this work type can be bound to. A review somebody asks for by hand is not among them — see manualReviewSignal.
+     */
+    signals: Array<PracticeSignalOption>;
+    supportedAutomatedReviewModes: Array<'LANGUAGE_MODEL' | 'NONE'>;
+};
+
+/**
+ * A signal a practice can start an automated review on
+ */
+export type PracticeSignalOption = {
+    displayName: string;
+    recommended: boolean;
+    signal: string;
+};
+
+/**
+ * The signal a person raises by asking for a review of this work type by hand
+ */
+export type PracticeManualReviewSignal = {
+    displayName: string;
+    signal: string;
+};
+
+/**
+ * An evidence source a practice on this kind of work may read
+ */
+export type PracticeEvidenceSourceOption = {
+    description: string;
+    displayName: string;
+    privacyClass: 'INTERNAL' | 'PERSONAL' | 'SENSITIVE_PERSONAL';
+    /**
+     * What requiring this source demands of its capture; fixed by the source contract
+     */
+    requiredQuality: 'ANY_CAPTURE' | 'COMPLETE' | 'COMPLETE_AND_NON_EMPTY';
+    /**
+     * How much of the source one capture takes, and the bound past which it is no longer whole
+     */
+    selectionScope: string;
+    sourceKind: string;
+    /**
+     * Whether this source can be captured whole, and so whether a practice may rest a claim about what is absent from it on the capture
+     */
+    supportsExhaustiveEvidence: boolean;
+};
+
+/**
+ * What became of one practice on this artifact, and whether anyone heard about it
+ */
+export type PracticeTraceEntry = {
+    /**
+     * When the answer was settled
+     */
+    decidedAt?: Date;
+    /**
+     * Interventions actually delivered to a person
+     */
+    deliveredCount: number;
+    /**
+     * The outcome in a sentence, phrased as what would change it
+     */
+    explanation: string;
+    /**
+     * Measurements this practice produced on this artifact
+     */
+    observationCount: number;
+    /**
+     * The occurrence this answer is about; null when nothing it watches happened
+     */
+    occasionedBy?: string;
+    /**
+     * That occurrence's id in this trace's signals list. The name alone cannot identify it — the same signal recurs on every revision — so this is what a link should follow.
+     */
+    occasionedById?: string;
+    outcome: 'REVIEWED' | 'RUNNING' | 'PENDING' | 'SKIPPED' | 'NOT_ASSESSABLE' | 'TURNED_OFF' | 'NOT_OCCASIONED' | 'DORMANT' | 'LAPSED' | 'FAILED';
+    practiceName: string;
+    practiceSlug: string;
+    /**
+     * The review this answer came from, when one ran
+     */
+    reviewId?: string;
+    /**
+     * How much autonomy the workspace currently gives this practice, after inheritance
+     */
+    reviewTier: 'OFF' | 'PROPOSE' | 'DELIVER';
+    /**
+     * The signals this practice watches
+     */
+    watches: Array<string>;
+    /**
+     * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
+     */
+    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
+};
+
+/**
  * A workspace's practice-review policy: effective values plus raw overrides
  */
 export type PracticeReviewSettings = {
@@ -2593,6 +3184,14 @@ export type PracticeReviewSettings = {
      */
     cooldownMinutesOverride?: number;
     /**
+     * Effective: how much autonomy the system has over practices and areas that hold no tier of their own — the bottom of the practice → area → workspace chain
+     */
+    defaultReviewTier: 'OFF' | 'PROPOSE' | 'DELIVER';
+    /**
+     * Raw override; null = this workspace has never chosen, so DELIVER applies
+     */
+    defaultReviewTierOverride?: 'OFF' | 'PROPOSE' | 'DELIVER';
+    /**
      * Effective: deliver feedback to merged PRs/MRs
      */
     deliverToMerged: boolean;
@@ -2601,6 +3200,10 @@ export type PracticeReviewSettings = {
      */
     deliverToMergedOverride?: boolean;
     /**
+     * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
+     */
+    reviewScope: WorkspaceReviewScope;
+    /**
      * Effective: run practice review for all developers
      */
     runForAllUsers: boolean;
@@ -2608,24 +3211,85 @@ export type PracticeReviewSettings = {
      * Raw override; null = inheriting the fleet default
      */
     runForAllUsersOverride?: boolean;
+};
+
+/**
+ * Recent review readiness for one practice's evidence requirements
+ */
+export type PracticeEvidenceOutcome = {
     /**
-     * Effective: skip draft PRs/MRs
+     * Blockers seen on the skipped reviews, most frequent first
      */
-    skipDrafts: boolean;
+    blockersObserved: Array<PracticeEvidenceBlocker>;
     /**
-     * Raw override; null = inheriting the fleet default
+     * Reviews that considered this practice
      */
-    skipDraftsOverride?: boolean;
+    consideredReviews: number;
+    /**
+     * Practice this outcome describes
+     */
+    practiceSlug: string;
+    /**
+     * Reviews where the evidence met every requirement
+     */
+    reviewedCount: number;
+};
+
+/**
+ * One thing that blocked automated review, and how many reviews it affected
+ */
+export type PracticeEvidenceBlocker = {
+    /**
+     * Readiness reason recorded for that source or practice
+     */
+    reasonCode: 'SOURCE_NOT_AVAILABLE' | 'SOURCE_INCOMPLETE' | 'SOURCE_EMPTY' | 'NO_AUTOMATED_REVIEW' | 'DECLARED_EVIDENCE_INSUFFICIENT' | 'SUBJECT_NOT_IN_THE_WORK';
+    /**
+     * Reviews this blocker affected
+     */
+    reviewsAffected: number;
+    /**
+     * Source that did not meet its requirement; absent when the practice itself runs no review
+     */
+    sourceKind?: string;
+};
+
+/**
+ * What a practice author may choose, per type of reviewed work
+ */
+export type PracticeDefinitionOptions = {
+    /**
+     * Source contract these options describe
+     */
+    sourceContractVersion: string;
+    workTypes: Array<PracticeWorkTypeDefinitionOptions>;
+};
+
+/**
+ * Who stands behind a practice's automated-review policy, and which exact policy
+ */
+export type PracticeAutomatedReviewValidation = {
+    /**
+     * SHA-256 digest of the exact automated-review policy
+     */
+    policyDigest: string;
+    /**
+     * Versioned fingerprint of the exact review rules
+     */
+    reviewRuleFingerprint: string;
+    /**
+     * Source contract the declared practice definition is written against
+     */
+    sourceContractVersion: string;
+    /**
+     * Validation lifecycle; authors cannot mark their own review policy as independently validated
+     */
+    status: 'AUTHOR_DECLARED';
 };
 
 /**
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
-    /**
-     * Whether this area is active
-     */
-    active: boolean;
     catalogOrigin?: CatalogOrigin;
     /**
      * Optional palette colour key for the area's chip
@@ -2656,6 +3320,10 @@ export type PracticeArea = {
      */
     name: string;
     /**
+     * How much autonomy the system has over every practice in this area that holds no tier of its own, whether that was set here or inherited from the workspace, and which level decided it
+     */
+    reviewTier: ReviewTierAssignment;
+    /**
      * URL-safe identifier unique within the workspace
      */
     slug: string;
@@ -2663,6 +3331,10 @@ export type PracticeArea = {
      * Timestamp when the area was last updated
      */
     updatedAt?: Date;
+    /**
+     * Whether this area is shown in practice dashboards
+     */
+    visibleInPracticeDashboards: boolean;
 };
 
 /**
@@ -2685,24 +3357,26 @@ export type CatalogOrigin = {
  */
 export type Practice = {
     /**
-     * Whether this practice is actively being detected
-     */
-    active: boolean;
-    /**
      * Slug of the practice area this practice is bound to, if any
      */
     areaSlug?: string;
     /**
-     * Artifact this practice evaluates
+     * Kind of work this practice reviews, read off its bindings
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
+    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
+    automatedReviewValidation: PracticeAutomatedReviewValidation;
+    /**
+     * The one occasion this practice is reviewed on, with the evidence that review reads
+     */
+    bindings: Array<PracticeBinding>;
     catalogOrigin?: CatalogOrigin;
     /**
      * Timestamp when the practice was created
      */
     createdAt: Date;
     /**
-     * Practice evaluation criteria
+     * Practice review criteria
      */
     criteria: string;
     /**
@@ -2722,13 +3396,13 @@ export type Practice = {
      */
     precomputeScript?: string;
     /**
+     * How much autonomy the system has over this practice, whether that was set here or inherited from its area or workspace, and which level decided it
+     */
+    reviewTier: ReviewTierAssignment;
+    /**
      * URL-safe identifier unique within workspace
      */
     slug: string;
-    /**
-     * Domain events that trigger detection
-     */
-    triggerEvents: Array<string>;
     /**
      * Timestamp when the practice was last updated
      */
@@ -2757,8 +3431,8 @@ export type PlacePracticeRequest = {
     position: number;
 };
 
-export type PagedModelReviewRunSummary = {
-    content?: Array<ReviewRunSummary>;
+export type PagedModelTracedArtifact = {
+    content?: Array<TracedArtifact>;
     page?: PageMetadata;
 };
 
@@ -2769,8 +3443,13 @@ export type PageMetadata = {
     totalPages?: number;
 };
 
-export type PagedModelReviewFinding = {
-    content?: Array<ReviewFinding>;
+export type PagedModelReviewRunSummary = {
+    content?: Array<ReviewRunSummary>;
+    page?: PageMetadata;
+};
+
+export type PagedModelReviewObservation = {
+    content?: Array<ReviewObservation>;
     page?: PageMetadata;
 };
 
@@ -2827,15 +3506,15 @@ export type ObservationList = {
     /**
      * Artifact type (e.g. PULL_REQUEST)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
-     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * AI confidence score (0.0–1.0)
+     * Whether an observation was produced using the current review rules
      */
-    confidence: number;
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * Observation ID
      */
@@ -2845,6 +3524,10 @@ export type ObservationList = {
      */
     observedAt: Date;
     /**
+     * What occasioned the measurement; never mix origins in one trend line
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
      * Practice name
      */
     practiceName: string;
@@ -2853,17 +3536,17 @@ export type ObservationList = {
      */
     practiceSlug: string;
     /**
-     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE
      */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Severity level (null unless assessment is BAD)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Observation title
+     * Observation summary
      */
-    title: string;
+    summary: string;
 };
 
 export type PageConfigAuditEntryView = {
@@ -2906,19 +3589,19 @@ export type ConfigAuditEntryView = {
     actingActor?: ConfigAuditActorRef;
     action?: 'CREATED' | 'UPDATED' | 'DELETED';
     /**
-     * resolved identity of {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorAccountId #actorAccountId}; null for SYSTEM rows or once the
-     * account is gone. Read together with {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorKind #actorKind} — that is what keeps
+     * resolved identity of <code>actorAccountId</code>; null for SYSTEM rows or once the
+     * account is gone. Read together with <code>actorKind</code> — that is what keeps
      * "a system did this" distinct from "we no longer know who did this".
      */
     actor?: ConfigAuditActorRef;
     actorAccountId?: number;
     actorKind?: 'USER' | 'SYSTEM' | 'IMPERSONATED';
     /**
-     * dot-paths that differ between {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#oldValue #oldValue} and {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#newValue #newValue}
+     * dot-paths that differ between <code>oldValue</code> and <code>newValue</code>
      */
     changedKeys?: Array<string>;
     entityId?: string;
-    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
+    entityType?: 'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL';
     id?: number;
     newValue?: string;
     occurredAt?: Date;
@@ -3029,7 +3712,7 @@ export type AgentJob = {
     /**
      * Job type
      */
-    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW';
+    jobType: 'PULL_REQUEST_REVIEW' | 'ISSUE_REVIEW' | 'CONVERSATION_REVIEW' | 'DOCUMENT_REVIEW';
     /**
      * Tokens read from prompt cache
      */
@@ -3078,6 +3761,10 @@ export type AgentJob = {
      * Number of retry attempts
      */
     retryCount: number;
+    /**
+     * Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE means no model ran because required evidence was missing, unreadable, stale, or unauthorized — so no observations means nothing was assessed, not that nothing was wrong. REVIEWED means the model ran against sufficient evidence.
+     */
+    reviewOutcome: 'REVIEWED' | 'INSUFFICIENT_EVIDENCE';
     /**
      * Timestamp when the job started running
      */
@@ -3219,7 +3906,7 @@ export type OutlineCollection = {
 };
 
 /**
- * Full practice observation detail including guidance and evidence
+ * Full practice observation detail including delivered feedback and evidence
  */
 export type ObservationDetail = {
     /**
@@ -3229,25 +3916,24 @@ export type ObservationDetail = {
     /**
      * Artifact type (e.g. PULL_REQUEST)
      */
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
     /**
-     * Assessment: GOOD or BAD (null when NOT_APPLICABLE)
+     * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)
      */
     assessment?: 'GOOD' | 'BAD';
     /**
-     * AI confidence score (0.0–1.0)
+     * Whether an observation was produced using the current review rules
      */
-    confidence: number;
-    /**
-     * Structured evidence: {"locations":[{"path","startLine","endLine"}], "snippets":[...], "references":[...]}
-     */
-    evidence?: {
-        [key: string]: unknown;
-    };
+    claimCurrentness: 'CURRENT' | 'STALE' | 'UNVERIFIABLE';
     /**
      * What to do — the delivered feedback for this observation (null if nothing was delivered)
      */
-    guidance?: string;
+    deliveredFeedback?: string;
+    evidence?: ObservationEvidence;
+    /**
+     * Evidence-based rationale for the observation
+     */
+    evidenceRationale?: string;
     /**
      * Observation ID
      */
@@ -3257,6 +3943,10 @@ export type ObservationDetail = {
      */
     observedAt: Date;
     /**
+     * What occasioned the measurement; never mix origins in one trend line
+     */
+    origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
      * Practice name
      */
     practiceName: string;
@@ -3265,21 +3955,17 @@ export type ObservationDetail = {
      */
     practiceSlug: string;
     /**
-     * Presence: PRESENT, ABSENT, or NOT_APPLICABLE
+     * Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE
      */
-    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
-    /**
-     * AI reasoning behind the observation
-     */
-    reasoning?: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
     /**
      * Severity level (null unless assessment is BAD)
      */
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     /**
-     * Observation title
+     * Observation summary
      */
-    title: string;
+    summary: string;
 };
 
 /**
@@ -3665,11 +4351,11 @@ export type InstanceLlmSettings = {
 /**
  * Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
  *
- * <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+ * <p>Two outcomes, distinguished by <code>type</code>:
  * <ul>
- * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+ * <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). <code>vendorUrl</code> is the
  * URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
- * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+ * <li><code>LINKED</code> — inline-credential flows (GitLab PAT). <code>connectionId</code> is the
  * newly-created Connection; no further round-trip is needed.</li>
  * </ul>
  *
@@ -3699,6 +4385,80 @@ export type InitiateConnectionRequest = {
     userInput?: {
         [key: string]: string;
     };
+};
+
+/**
+ * A process-level message on the developer's own practice pages
+ */
+export type InAppFeedback = {
+    /**
+     * Area display name; null when the practice has none
+     */
+    areaName?: string;
+    /**
+     * Area the practice sits in; null when the practice has none
+     */
+    areaSlug?: string;
+    /**
+     * The message, as Markdown; ends with the habit to try next
+     */
+    body: string;
+    /**
+     * The pieces of work the habit was observed on, newest first
+     */
+    evidence: Array<InAppEvidence>;
+    /**
+     * Short headline naming the habit, never the person
+     */
+    headline: string;
+    id: string;
+    /**
+     * How many pieces of work carry it — the length of the evidence list
+     */
+    occurrenceCount: number;
+    practiceName: string;
+    /**
+     * Practice this habit belongs to
+     */
+    practiceSlug: string;
+    /**
+     * When the message was composed
+     */
+    preparedAt: Date;
+    /**
+     * When this developer first opened it; null until they have
+     */
+    readAt?: Date;
+    /**
+     * What good looks like, in the learner's framing
+     */
+    whatGoodLooksLike?: string;
+    /**
+     * Why this practice matters, in the learner's framing
+     */
+    whyItMatters?: string;
+};
+
+/**
+ * One piece of work the pattern was observed on
+ */
+export type InAppEvidence = {
+    /**
+     * Identifier of the work within its kind
+     */
+    artifactId: number;
+    /**
+     * Kind of work, e.g. scm.pull_request
+     */
+    artifactKind: string;
+    /**
+     * When the measurement behind this occurrence was taken
+     */
+    observedAt: Date;
+    /**
+     * What the review recorded on this piece of work
+     */
+    summary?: string;
 };
 
 export type ImpersonateRequest = {
@@ -3904,7 +4664,8 @@ export type CurrentUserView = {
 
 export type CuratedPracticeSummary = {
     areaSlug?: string;
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    artifactKind: string;
+    automatedReview: PracticeAutomatedReview;
     effectivelyOffered: boolean;
     name: string;
     position: number;
@@ -3927,19 +4688,43 @@ export type CatalogEntryStatus = {
  */
 export type CuratedPracticeRequest = {
     areaSlug?: string;
-    artifactType: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    /**
+     * Evidence requirements; omit to use the recommended requirements for the selected work type
+     */
+    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
+    /**
+     * The one occasion this practice is reviewed on; the kind of work is read off the signals
+     */
+    bindings: [
+        PracticeBinding
+    ];
     criteria: string;
     name: string;
     precomputeScript?: string;
-    triggerEvents: Array<string>;
+    whatGoodLooksLike?: string;
+    whyItMatters?: string;
+};
+
+/**
+ * A resolved curated practice definition
+ */
+export type CuratedPracticeDefinition = {
+    areaSlug?: string;
+    artifactKind: string;
+    automatedReviewPolicy: PracticeAutomatedReviewPolicy;
+    automatedReviewValidation: PracticeAutomatedReviewValidation;
+    bindings: Array<PracticeBinding>;
+    criteria: string;
+    name: string;
+    precomputeScript?: string;
     whatGoodLooksLike?: string;
     whyItMatters?: string;
 };
 
 export type CuratedPractice = {
-    definition: CuratedPracticeRequest;
+    definition: CuratedPracticeDefinition;
     position: number;
-    shipped?: CuratedPracticeRequest;
+    shipped?: CuratedPracticeDefinition;
     slug: string;
     status: CatalogEntryStatus;
 };
@@ -4117,6 +4902,64 @@ export type CreateWorkspaceLlmConnectionRequest = {
 };
 
 /**
+ * Create a standing instruction to sweep this workspace's recent work.
+ *
+ * <p>Unlike a backfill campaign there is no separate confirmation step: this request <em>is</em> the
+ * authorisation to spend on the cadence it names, and it is recorded against the account that made it.
+ *
+ * <p>There is deliberately no repository or author list. Which repositories are reviewed is the
+ * workspace's review scope and whose work is reviewed is the practice-review role; both already apply to
+ * every review this workspace runs, a sweep included.
+ */
+export type CreateReviewSweepScheduleRequest = {
+    /**
+     * Kind of work to sweep
+     */
+    artifactKind: 'scm.pull_request' | 'scm.issue';
+    /**
+     * How often the sweep runs
+     */
+    cadence: 'DAILY' | 'WEEKLY';
+    /**
+     * How far back each sweep looks, in days
+     */
+    lookbackDays: number;
+};
+
+/**
+ * The piece of work a review is being asked for
+ */
+export type CreateReviewRequest = {
+    /**
+     * The artifact's internal id, as the trace and review listings report it
+     */
+    artifactId: number;
+    /**
+     * The artifact kind's wire id, e.g. scm.pull_request. A raw string rather than a closed enum because kinds are an open vocabulary: a build that has never heard of a kind should refuse it by name, not fail to parse the request.
+     */
+    artifactKind: string;
+};
+
+/**
+ * Ask for a campaign to be enumerated and costed. Creates nothing that spends money: the run comes back
+ * awaiting confirmation, and only a subsequent status change starts it.
+ */
+export type CreateReviewBackfillRunRequest = {
+    /**
+     * Kind of work to review
+     */
+    artifactKind: 'scm.pull_request' | 'scm.issue';
+    /**
+     * Window start, inclusive, over the artifact's creation time
+     */
+    fromAt: Date;
+    /**
+     * Window end, exclusive
+     */
+    toAt: Date;
+};
+
+/**
  * Submit a reaction to a delivered feedback unit
  */
 export type CreateReaction = {
@@ -4139,11 +4982,17 @@ export type CreatePracticeRequest = {
      */
     areaSlug?: string | null;
     /**
-     * Artifact this practice evaluates. Defaults to PULL_REQUEST when omitted.
+     * Versioned review settings; omit to use the recommended ones for the work type the bindings name
      */
-    artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
+    automatedReviewPolicy?: PracticeAutomatedReviewPolicy;
     /**
-     * Practice evaluation criteria
+     * The one occasion this practice is reviewed on, with the evidence that review reads. The kind of work reviewed is read off the signals.
+     */
+    bindings: [
+        PracticeBinding
+    ];
+    /**
+     * Practice review criteria
      */
     criteria: string;
     /**
@@ -4151,7 +5000,7 @@ export type CreatePracticeRequest = {
      */
     name: string;
     /**
-     * TypeScript/Bun precompute script for static analysis before AI review
+     * TypeScript/Bun static analysis run before automated review
      */
     precomputeScript?: string;
     /**
@@ -4159,15 +5008,11 @@ export type CreatePracticeRequest = {
      */
     slug: string;
     /**
-     * Domain events that trigger detection; empty for scheduled conversation reviews
-     */
-    triggerEvents: Array<string>;
-    /**
-     * Developer-facing exemplar; a concrete instance, not the assessment criteria
+     * Developer-facing exemplar; a concrete instance, not the review criteria
      */
     whatGoodLooksLike?: string;
     /**
-     * Developer-facing rationale (learner layer); plain language, never the detection rubric
+     * Plain-language rationale shown to the developer
      */
     whyItMatters?: string;
 };
@@ -4428,7 +5273,7 @@ export type BackfillSummary = {
  * response build time so adding/removing a capability needs no DB migration.
  */
 export type ConnectionSummary = {
-    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FEEDBACK' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     createdAt?: Date;
     displayName?: string;
     family?: 'SCM' | 'MESSAGING' | 'DOCUMENTATION';
@@ -4446,10 +5291,10 @@ export type ConnectionSummary = {
  * <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
  * client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
  * entity, and every secret-bearing key of the config itself is stripped by
- * {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO#redactSensitive #redactSensitive} before serialization.
+ * <code>redactSensitive</code> before serialization.
  *
  * <p><b>Why redact here and not with <code>@JsonIgnore</code> on the record component?</b> The very
- * same {@link ObjectMapper ObjectMapper} bean serializes {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO  de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+ * same <code>ObjectMapper</code> bean serializes <code>ConnectionConfig</code> into the JSONB
  * <code>connection.config</code> column (Hibernate's <code>json_format_mapper</code> is wired to it in
  * <code>HibernateJacksonFormatMapperConfig</code>). Annotating the component would therefore drop the
  * secret on write and destroy the stored value — the API-boundary filter below is the only place
@@ -4460,7 +5305,7 @@ export type ConnectionSummary = {
  * object.
  */
 export type ConnectionDetail = {
-    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FINDINGS' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
+    capabilities?: Array<'WEBHOOK_INGEST' | 'TOKEN_REFRESH' | 'FEEDBACK_DELIVERY' | 'INLINE_FEEDBACK' | 'APPROVAL_WORKFLOW' | 'SCOPE_CHANGES'>;
     config?: {
         [key: string]: unknown;
     };
@@ -4478,9 +5323,8 @@ export type ConnectionDetail = {
 /**
  * Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
  *
- * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
- * to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
- * want to serialize on every response.
+ * <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference to
+ * <code>Connection</code> that this DTO omits.
  */
 export type ConnectionAuditEntry = {
     actorKind?: string;
@@ -4616,6 +5460,38 @@ export type AssignRoleRequest = {
 };
 
 /**
+ * Every practice's answer for one artifact, and the occurrences those answers rest on
+ */
+export type ArtifactTrace = {
+    artifactId: number;
+    artifactKind: string;
+    /**
+     * Repository, collection or channel it sits in
+     */
+    container?: string;
+    /**
+     * The number the provider shows, for kinds that have one
+     */
+    number?: number;
+    /**
+     * Every practice this workspace runs against this kind of work, the ones with something to report first, then the rest; ties broken by practice name
+     */
+    practices: Array<PracticeTraceEntry>;
+    /**
+     * Everything recorded about this artifact, oldest first
+     */
+    signals: Array<TracedSignal>;
+    /**
+     * The label a person recognises; the kind's display name when the mirror cannot name it
+     */
+    title: string;
+    /**
+     * Where to open it upstream; absent for a deleted or unlinkable artifact
+     */
+    url?: string;
+};
+
+/**
  * Bind a model and execution limits to an agent purpose
  */
 export type AgentBindingRequest = {
@@ -4653,7 +5529,7 @@ export type AgentBinding = {
     enabled: boolean;
     instanceModelId?: number;
     maxConcurrentJobs?: number;
-    purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+    purpose: 'PRACTICE_REVIEW' | 'MENTOR';
     /**
      * True when the bound model is available to run right now
      */
@@ -4863,7 +5739,7 @@ export type AdminListConfigAuditEventsData = {
         workspaceId?: number;
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -5546,6 +6422,22 @@ export type AdminUpdateCuratedAreaStatusResponses = {
 };
 
 export type AdminUpdateCuratedAreaStatusResponse = AdminUpdateCuratedAreaStatusResponses[keyof AdminUpdateCuratedAreaStatusResponses];
+
+export type AdminGetPracticeDefinitionOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/admin/practice-catalog/definition-options';
+};
+
+export type AdminGetPracticeDefinitionOptionsResponses = {
+    /**
+     * OK
+     */
+    200: PracticeDefinitionOptions;
+};
+
+export type AdminGetPracticeDefinitionOptionsResponse = AdminGetPracticeDefinitionOptionsResponses[keyof AdminGetPracticeDefinitionOptionsResponses];
 
 export type AdminResetCuratedCatalogOrderData = {
     body?: never;
@@ -6584,7 +7476,7 @@ export type DeleteAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/agents/{purpose}';
@@ -6606,7 +7498,7 @@ export type ConfigureAgentData = {
          * Workspace slug
          */
         workspaceSlug: string;
-        purpose: 'PRACTICE_DETECTION' | 'MENTOR';
+        purpose: 'PRACTICE_REVIEW' | 'MENTOR';
     };
     query?: never;
     url: '/workspaces/{workspaceSlug}/agents/{purpose}';
@@ -6639,7 +7531,7 @@ export type ListWorkspaceConfigAuditEventsData = {
     query?: {
         page?: number;
         size?: number;
-        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
+        entityType?: Array<'PRACTICE_REVIEW_SETTINGS' | 'AGENT_BINDING' | 'AGENT_CONFIG' | 'AI_CONFIG_BINDING' | 'WORKSPACE_ROLE' | 'WORKSPACE_FEATURES' | 'WORKSPACE_STATUS' | 'WORKSPACE_TOKEN' | 'WORKSPACE_VISIBILITY' | 'PRACTICE_ACTIVE' | 'PRACTICE_USAGE' | 'PRACTICE_DEFINITION' | 'PRACTICE_AREA' | 'CURATED_PRACTICE' | 'CURATED_PRACTICE_AREA' | 'WORKSPACE_INSTANCE_LLM_BUDGET' | 'WORKSPACE_OWN_PROVIDER_LLM_BUDGET' | 'WORKSPACE_LLM_BUDGET' | 'WORKSPACE_BYO_LLM_BUDGET' | 'REVIEW_BACKFILL_RUN' | 'REVIEW_SWEEP_SCHEDULE' | 'WORKSPACE_LLM_CONNECTION' | 'WORKSPACE_LLM_MODEL'>;
         entityId?: string;
         changedKey?: string;
         action?: Array<'CREATED' | 'UPDATED' | 'DELETED'>;
@@ -8044,9 +8936,9 @@ export type ListAreasData = {
     };
     query?: {
         /**
-         * Return only active areas
+         * Return only areas shown in practice dashboards
          */
-        activeOnly?: boolean;
+        visibleInPracticeDashboardsOnly?: boolean;
     };
     url: '/workspaces/{workspaceSlug}/practice-areas';
 };
@@ -8207,6 +9099,39 @@ export type UpdateAreaResponses = {
 
 export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
 
+export type SetAreaReviewTierData = {
+    body: UpdatePracticeReviewTierRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        areaSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier';
+};
+
+export type SetAreaReviewTierErrors = {
+    /**
+     * PROPOSE cannot be selected yet: there is no approval queue for the feedback it would prepare
+     */
+    400: unknown;
+    /**
+     * Area not found
+     */
+    404: unknown;
+};
+
+export type SetAreaReviewTierResponses = {
+    /**
+     * Tier updated; the response carries the tier now in force and where it came from
+     */
+    200: PracticeArea;
+};
+
+export type SetAreaReviewTierResponse = SetAreaReviewTierResponses[keyof SetAreaReviewTierResponses];
+
 export type GetCuratedPracticeCatalogEntryData = {
     body?: never;
     path: {
@@ -8239,9 +9164,9 @@ export type ListPracticesData = {
     };
     query?: {
         /**
-         * Filter by active state
+         * Keep only the practices whose tier IN FORCE is exactly this one, inherited or not
          */
-        active?: boolean;
+        reviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };
@@ -8289,6 +9214,144 @@ export type CreatePracticeResponses = {
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
 
+export type ListBackfillRunsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs';
+};
+
+export type ListBackfillRunsResponses = {
+    /**
+     * Campaigns returned
+     */
+    200: Array<ReviewBackfillRun>;
+};
+
+export type ListBackfillRunsResponse = ListBackfillRunsResponses[keyof ListBackfillRunsResponses];
+
+export type PreflightBackfillRunData = {
+    body: CreateReviewBackfillRunRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs';
+};
+
+export type PreflightBackfillRunErrors = {
+    /**
+     * The window is inverted, too long, or covers too many artifacts
+     */
+    400: ProblemDetail;
+    /**
+     * A campaign is already under way for this workspace
+     */
+    409: ProblemDetail;
+};
+
+export type PreflightBackfillRunError = PreflightBackfillRunErrors[keyof PreflightBackfillRunErrors];
+
+export type PreflightBackfillRunResponses = {
+    /**
+     * Scope enumerated and priced
+     */
+    201: ReviewBackfillRun;
+};
+
+export type PreflightBackfillRunResponse = PreflightBackfillRunResponses[keyof PreflightBackfillRunResponses];
+
+export type GetBackfillRunData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}';
+};
+
+export type GetBackfillRunErrors = {
+    /**
+     * No such campaign in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetBackfillRunError = GetBackfillRunErrors[keyof GetBackfillRunErrors];
+
+export type GetBackfillRunResponses = {
+    /**
+     * Campaign returned
+     */
+    200: ReviewBackfillRun;
+};
+
+export type GetBackfillRunResponse = GetBackfillRunResponses[keyof GetBackfillRunResponses];
+
+export type UpdateBackfillRunStatusData = {
+    body: UpdateReviewBackfillRunStatusRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        runId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/backfill-runs/{runId}/status';
+};
+
+export type UpdateBackfillRunStatusErrors = {
+    /**
+     * The campaign cannot make that transition from its current state
+     */
+    409: ProblemDetail;
+};
+
+export type UpdateBackfillRunStatusError = UpdateBackfillRunStatusErrors[keyof UpdateBackfillRunStatusErrors];
+
+export type UpdateBackfillRunStatusResponses = {
+    /**
+     * Campaign updated
+     */
+    200: ReviewBackfillRun;
+};
+
+export type UpdateBackfillRunStatusResponse = UpdateBackfillRunStatusResponses[keyof UpdateBackfillRunStatusResponses];
+
+export type GetPracticeDefinitionOptionsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/definition-options';
+};
+
+export type GetPracticeDefinitionOptionsResponses = {
+    /**
+     * OK
+     */
+    200: PracticeDefinitionOptions;
+};
+
+export type GetPracticeDefinitionOptionsResponse = GetPracticeDefinitionOptionsResponses[keyof GetPracticeDefinitionOptionsResponses];
+
 export type GetEngagementData = {
     body?: never;
     path: {
@@ -8309,6 +9372,27 @@ export type GetEngagementResponses = {
 };
 
 export type GetEngagementResponse = GetEngagementResponses[keyof GetEngagementResponses];
+
+export type GetInAppFeedbackData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/in-app';
+};
+
+export type GetInAppFeedbackResponses = {
+    /**
+     * In-app messages returned, newest first
+     */
+    200: Array<InAppFeedback>;
+};
+
+export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
 export type GetLatestReactionData = {
     body?: never;
@@ -8417,7 +9501,7 @@ export type ListObservationsData = {
         /**
          * Filter by presence
          */
-        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE';
+        presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
         page?: number;
         size?: number;
     };
@@ -8556,6 +9640,44 @@ export type ReorderPracticesResponses = {
 
 export type ReorderPracticesResponse = ReorderPracticesResponses[keyof ReorderPracticesResponses];
 
+export type RequestPracticeReviewData = {
+    body: CreateReviewRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-requests';
+};
+
+export type RequestPracticeReviewErrors = {
+    /**
+     * The artifact kind is not one that can be asked for
+     */
+    400: ProblemDetail;
+    /**
+     * The caller is neither the work's author or assignee nor a workspace admin
+     */
+    403: ProblemDetail;
+    /**
+     * No such artifact in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type RequestPracticeReviewError = RequestPracticeReviewErrors[keyof RequestPracticeReviewErrors];
+
+export type RequestPracticeReviewResponses = {
+    /**
+     * The ask was understood: a review is running, or the body names what stopped it
+     */
+    200: ReviewRequestOutcome;
+};
+
+export type RequestPracticeReviewResponse = RequestPracticeReviewResponses[keyof RequestPracticeReviewResponses];
+
 export type GetPracticeReviewSettingsData = {
     body?: never;
     path: {
@@ -8598,6 +9720,27 @@ export type UpdatePracticeReviewSettingsResponses = {
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
+export type ReviewTierRollupData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-tiers';
+};
+
+export type ReviewTierRollupResponses = {
+    /**
+     * Rollup returned
+     */
+    200: ReviewTierRollup;
+};
+
+export type ReviewTierRollupResponse = ReviewTierRollupResponses[keyof ReviewTierRollupResponses];
+
 export type ListPracticeReviewsData = {
     body?: never;
     path: {
@@ -8607,9 +9750,17 @@ export type ListPracticeReviewsData = {
         workspaceSlug: string;
     };
     query?: {
-        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
         page?: number;
         size?: number;
+        status?: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED';
+        /**
+         * Inclusive lower bound on when the review was requested
+         */
+        from?: Date;
+        /**
+         * Exclusive upper bound on when the review was requested
+         */
+        to?: Date;
     };
     url: '/workspaces/{workspaceSlug}/practices/reviews';
 };
@@ -8632,6 +9783,27 @@ export type ListPracticeReviewsResponses = {
 
 export type ListPracticeReviewsResponse = ListPracticeReviewsResponses[keyof ListPracticeReviewsResponses];
 
+export type ListPracticeEvidenceOutcomesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes';
+};
+
+export type ListPracticeEvidenceOutcomesResponses = {
+    /**
+     * Evidence outcomes returned
+     */
+    200: Array<PracticeEvidenceOutcome>;
+};
+
+export type ListPracticeEvidenceOutcomesResponse = ListPracticeEvidenceOutcomesResponses[keyof ListPracticeEvidenceOutcomesResponses];
+
 export type ListPracticeReviewFeedbackData = {
     body?: never;
     path: {
@@ -8644,12 +9816,15 @@ export type ListPracticeReviewFeedbackData = {
         page?: number;
         size?: number;
         deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED'>;
-        channel?: Array<'IN_CONTEXT' | 'CONVERSATION' | 'PROFILE'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
+        channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;
-        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
         /**
-         * Artifact ID; requires artifactType
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
          */
         artifactId?: number;
         recipientUserId?: number;
@@ -8676,7 +9851,7 @@ export type ListPracticeReviewFeedbackError = ListPracticeReviewFeedbackErrors[k
 
 export type ListPracticeReviewFeedbackResponses = {
     /**
-     * Paginated messages returned
+     * Paginated feedback returned
      */
     200: PagedModelReviewFeedback;
 };
@@ -8707,14 +9882,14 @@ export type GetPracticeReviewFeedbackError = GetPracticeReviewFeedbackErrors[key
 
 export type GetPracticeReviewFeedbackResponses = {
     /**
-     * Message details returned
+     * Feedback detail returned
      */
     200: ReviewFeedbackDetail;
 };
 
 export type GetPracticeReviewFeedbackResponse = GetPracticeReviewFeedbackResponses[keyof GetPracticeReviewFeedbackResponses];
 
-export type ListPracticeReviewFindingsData = {
+export type ListPracticeReviewObservationsData = {
     body?: never;
     path: {
         /**
@@ -8726,21 +9901,28 @@ export type ListPracticeReviewFindingsData = {
         page?: number;
         size?: number;
         /**
-         * Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, then not-applicable findings; ties are newest first.
+         * Sorting strategy. ACTIONABILITY orders problems from CRITICAL to INFO, then strengths, then not-applicable observations; ties are newest first.
          */
         sort?: 'NEWEST' | 'ACTIONABILITY';
         practiceSlug?: Array<string>;
         areaSlug?: Array<string>;
-        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE'>;
+        presence?: Array<'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE'>;
         assessment?: Array<'GOOD' | 'BAD'>;
         severity?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
         agentJobId?: string;
-        artifactType?: 'PULL_REQUEST' | 'ISSUE' | 'CONVERSATION_THREAD';
         /**
-         * Artifact ID; requires artifactType
+         * Kind of reviewed work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+        /**
+         * Artifact ID; requires artifactKind
          */
         artifactId?: number;
         subjectUserId?: number;
+        /**
+         * What occasioned the measurement: LIVE, MANUAL or BACKFILL
+         */
+        origin?: Array<'LIVE' | 'MANUAL' | 'BACKFILL'>;
         /**
          * Inclusive lower bound
          */
@@ -8750,57 +9932,249 @@ export type ListPracticeReviewFindingsData = {
          */
         to?: Date;
     };
-    url: '/workspaces/{workspaceSlug}/practices/reviews/findings';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/observations';
 };
 
-export type ListPracticeReviewFindingsErrors = {
+export type ListPracticeReviewObservationsErrors = {
     /**
      * Invalid filter or pagination
      */
     400: ProblemDetail;
 };
 
-export type ListPracticeReviewFindingsError = ListPracticeReviewFindingsErrors[keyof ListPracticeReviewFindingsErrors];
+export type ListPracticeReviewObservationsError = ListPracticeReviewObservationsErrors[keyof ListPracticeReviewObservationsErrors];
 
-export type ListPracticeReviewFindingsResponses = {
+export type ListPracticeReviewObservationsResponses = {
     /**
-     * Paginated findings returned
+     * Paginated observations returned
      */
-    200: PagedModelReviewFinding;
+    200: PagedModelReviewObservation;
 };
 
-export type ListPracticeReviewFindingsResponse = ListPracticeReviewFindingsResponses[keyof ListPracticeReviewFindingsResponses];
+export type ListPracticeReviewObservationsResponse = ListPracticeReviewObservationsResponses[keyof ListPracticeReviewObservationsResponses];
 
-export type GetPracticeReviewFindingData = {
+export type GetPracticeReviewObservationData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        findingId: string;
+        observationId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}';
+    url: '/workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}';
 };
 
-export type GetPracticeReviewFindingErrors = {
+export type GetPracticeReviewObservationErrors = {
     /**
-     * Finding not found in this workspace
+     * Observation not found in this workspace
      */
     404: ProblemDetail;
 };
 
-export type GetPracticeReviewFindingError = GetPracticeReviewFindingErrors[keyof GetPracticeReviewFindingErrors];
+export type GetPracticeReviewObservationError = GetPracticeReviewObservationErrors[keyof GetPracticeReviewObservationErrors];
 
-export type GetPracticeReviewFindingResponses = {
+export type GetPracticeReviewObservationResponses = {
     /**
-     * Finding detail returned
+     * Observation detail returned
      */
-    200: ReviewFindingDetail;
+    200: ReviewObservationDetail;
 };
 
-export type GetPracticeReviewFindingResponse = GetPracticeReviewFindingResponses[keyof GetPracticeReviewFindingResponses];
+export type GetPracticeReviewObservationResponse = GetPracticeReviewObservationResponses[keyof GetPracticeReviewObservationResponses];
+
+export type ListSweepSchedulesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules';
+};
+
+export type ListSweepSchedulesResponses = {
+    /**
+     * Schedules returned
+     */
+    200: Array<ReviewSweepSchedule>;
+};
+
+export type ListSweepSchedulesResponse = ListSweepSchedulesResponses[keyof ListSweepSchedulesResponses];
+
+export type CreateSweepScheduleData = {
+    body: CreateReviewSweepScheduleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules';
+};
+
+export type CreateSweepScheduleErrors = {
+    /**
+     * The kind cannot be swept, or the lookback is longer than the cadence allows
+     */
+    400: ProblemDetail;
+    /**
+     * This workspace already sweeps that kind of work
+     */
+    409: ProblemDetail;
+};
+
+export type CreateSweepScheduleError = CreateSweepScheduleErrors[keyof CreateSweepScheduleErrors];
+
+export type CreateSweepScheduleResponses = {
+    /**
+     * Schedule created
+     */
+    201: ReviewSweepSchedule;
+};
+
+export type CreateSweepScheduleResponse = CreateSweepScheduleResponses[keyof CreateSweepScheduleResponses];
+
+export type DeleteSweepScheduleData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}';
+};
+
+export type DeleteSweepScheduleErrors = {
+    /**
+     * No such schedule in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type DeleteSweepScheduleError = DeleteSweepScheduleErrors[keyof DeleteSweepScheduleErrors];
+
+export type DeleteSweepScheduleResponses = {
+    /**
+     * Schedule removed
+     */
+    204: void;
+};
+
+export type DeleteSweepScheduleResponse = DeleteSweepScheduleResponses[keyof DeleteSweepScheduleResponses];
+
+export type ReplaceSweepScheduleData = {
+    body: UpdateReviewSweepScheduleRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        scheduleId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}';
+};
+
+export type ReplaceSweepScheduleErrors = {
+    /**
+     * No such schedule in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type ReplaceSweepScheduleError = ReplaceSweepScheduleErrors[keyof ReplaceSweepScheduleErrors];
+
+export type ReplaceSweepScheduleResponses = {
+    /**
+     * Schedule updated
+     */
+    200: ReviewSweepSchedule;
+};
+
+export type ReplaceSweepScheduleResponse = ReplaceSweepScheduleResponses[keyof ReplaceSweepScheduleResponses];
+
+export type ListTracedArtifactsData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: {
+        page?: number;
+        size?: number;
+        /**
+         * Restrict to one kind of work, e.g. scm.pull_request
+         */
+        artifactKind?: string;
+    };
+    url: '/workspaces/{workspaceSlug}/practices/trace';
+};
+
+export type ListTracedArtifactsErrors = {
+    /**
+     * Unknown artifact kind or invalid pagination
+     */
+    400: ProblemDetail;
+};
+
+export type ListTracedArtifactsError = ListTracedArtifactsErrors[keyof ListTracedArtifactsErrors];
+
+export type ListTracedArtifactsResponses = {
+    /**
+     * Paginated artifacts returned
+     */
+    200: PagedModelTracedArtifact;
+};
+
+export type ListTracedArtifactsResponse = ListTracedArtifactsResponses[keyof ListTracedArtifactsResponses];
+
+export type GetArtifactTraceData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        /**
+         * Kind of work, e.g. scm.pull_request
+         */
+        artifactKind: string;
+        /**
+         * The artifact's identifier as the ledger stores it
+         */
+        artifactId: number;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}';
+};
+
+export type GetArtifactTraceErrors = {
+    /**
+     * Nothing recorded about this artifact in this workspace
+     */
+    404: ProblemDetail;
+};
+
+export type GetArtifactTraceError = GetArtifactTraceErrors[keyof GetArtifactTraceErrors];
+
+export type GetArtifactTraceResponses = {
+    /**
+     * Trace returned
+     */
+    200: ArtifactTrace;
+};
+
+export type GetArtifactTraceResponse = GetArtifactTraceResponses[keyof GetArtifactTraceResponses];
 
 export type DeletePracticeData = {
     body?: never;
@@ -8895,37 +10269,6 @@ export type UpdatePracticeResponses = {
 
 export type UpdatePracticeResponse = UpdatePracticeResponses[keyof UpdatePracticeResponses];
 
-export type SetActiveData = {
-    body: UpdatePracticeActiveRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        practiceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/active';
-};
-
-export type SetActiveErrors = {
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type SetActiveError = SetActiveErrors[keyof SetActiveErrors];
-
-export type SetActiveResponses = {
-    /**
-     * Active state updated
-     */
-    200: Practice;
-};
-
-export type SetActiveResponse = SetActiveResponses[keyof SetActiveResponses];
-
 export type BindAreaData = {
     body: BindPracticeAreaRequest;
     path: {
@@ -8991,6 +10334,41 @@ export type PlacePracticeResponses = {
 };
 
 export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
+
+export type SetReviewTierData = {
+    body: UpdatePracticeReviewTierRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier';
+};
+
+export type SetReviewTierErrors = {
+    /**
+     * The tier cannot be selected: PROPOSE has no approval queue yet, or this practice's review settings cannot run an automated review at any tier above OFF
+     */
+    400: ProblemDetail;
+    /**
+     * Practice not found
+     */
+    404: ProblemDetail;
+};
+
+export type SetReviewTierError = SetReviewTierErrors[keyof SetReviewTierErrors];
+
+export type SetReviewTierResponses = {
+    /**
+     * Tier updated; the response carries the tier now in force and where it came from
+     */
+    200: Practice;
+};
+
+export type SetReviewTierResponse = SetReviewTierResponses[keyof SetReviewTierResponses];
 
 export type GetUserProfileData = {
     body?: never;

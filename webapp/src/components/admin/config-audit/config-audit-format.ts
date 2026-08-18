@@ -5,11 +5,12 @@ type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
 type Action = NonNullable<ConfigAuditEntryView["action"]>;
 type ActorKind = NonNullable<ConfigAuditEntryView["actorKind"]>;
 
-/** Entity types renamed since: the trail is append-only, so old rows keep the spelling they were
- * written under and must still read as the thing they describe. */
+/** The trail is append-only, so a row keeps the spelling it was written under: entity types that no
+ * longer exist under these names must still read as the thing they describe. */
 const RENAMED_ENTITY_TYPE_LABELS = {
 	AGENT_CONFIG: "Agent config",
 	AI_CONFIG_BINDING: "AI binding",
+	PRACTICE_ACTIVE: "Practice review participation",
 	WORKSPACE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_BYO_LLM_BUDGET: "Own-provider AI cap",
 } satisfies Partial<Record<EntityType, string>>;
@@ -22,13 +23,15 @@ export const ENTITY_TYPE_LABELS: Record<EntityType, string> = {
 	WORKSPACE_STATUS: "Workspace status",
 	WORKSPACE_TOKEN: "Access token",
 	WORKSPACE_VISIBILITY: "Visibility",
-	PRACTICE_ACTIVE: "Practice active",
+	PRACTICE_USAGE: "Practice review participation",
 	PRACTICE_DEFINITION: "Practice",
 	PRACTICE_AREA: "Practice area",
 	CURATED_PRACTICE: "Catalog practice",
 	CURATED_PRACTICE_AREA: "Catalog area",
 	WORKSPACE_INSTANCE_LLM_BUDGET: "Shared-model AI budget",
 	WORKSPACE_OWN_PROVIDER_LLM_BUDGET: "Own-provider AI cap",
+	REVIEW_BACKFILL_RUN: "Review of past work",
+	REVIEW_SWEEP_SCHEDULE: "Recurring check for new work",
 	WORKSPACE_LLM_CONNECTION: "Workspace AI provider",
 	WORKSPACE_LLM_MODEL: "Workspace model",
 	...RENAMED_ENTITY_TYPE_LABELS,

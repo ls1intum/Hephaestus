@@ -1,9 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Result of the practice review detection gate evaluation.
@@ -22,7 +24,7 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      * The gate passed: the practice review agent should run.
      *
      * @param workspace         the resolved workspace for this PR's repository
-     * @param matchedPractices  active practices whose trigger events match the current event
+     * @param matchedPractices practices bound to the observed signal and above {@code OFF}
      */
     record Detect(Workspace workspace, List<Practice> matchedPractices) implements GateDecision {
         public Detect {
@@ -35,6 +37,20 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      * The gate rejected: the practice review agent should NOT run.
      *
      * @param reason a short, human-readable reason for the skip (for logging/diagnostics)
+     * @param signalReason the controlled-vocabulary reason to record the refused signal under, or
+     *     {@code null} for the default {@link SignalStateReason#GATE_SKIPPED}. Name a reason only when
+     *     the <em>class</em> of answer differs — a practice silenced to {@code OFF} is a different fact
+     *     from "the gate declined", and only one of them is lifted by an admin.
      */
-    record Skip(String reason) implements GateDecision {}
+    record Skip(String reason, @Nullable SignalStateReason signalReason) implements GateDecision {
+        /** A skip that carries only diagnostic prose; the signal is recorded as {@code GATE_SKIPPED}. */
+        public Skip(String reason) {
+            this(reason, null);
+        }
+
+        /** The reason to record this refusal under, resolving the unnamed case to {@code GATE_SKIPPED}. */
+        public SignalStateReason resolvedSignalReason() {
+            return signalReason != null ? signalReason : SignalStateReason.GATE_SKIPPED;
+        }
+    }
 }

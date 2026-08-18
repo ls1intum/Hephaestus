@@ -46,10 +46,10 @@ export const ExpandedNavigation: Story = {
 		await userEvent.click(canvas.getByRole("button", { name: "Practices" }));
 		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
 
-		await expect(canvas.getByRole("link", { name: "Practice setup" })).toBeInTheDocument();
-		await expect(canvas.getByRole("link", { name: "Practice reviews" })).toBeInTheDocument();
-		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
-		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+		canvas.getByRole("link", { name: "Practice setup" });
+		canvas.getByRole("link", { name: "Practice reviews" });
+		canvas.getByRole("link", { name: "Overview" });
+		canvas.getByRole("link", { name: "GitHub" });
 	},
 };
 
@@ -60,8 +60,8 @@ export const OptionalIntegrationsUnavailable: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Integrations" }));
 
-		await expect(canvas.getByRole("link", { name: "Overview" })).toBeInTheDocument();
-		await expect(canvas.getByRole("link", { name: "GitHub" })).toBeInTheDocument();
+		canvas.getByRole("link", { name: "Overview" });
+		canvas.getByRole("link", { name: "GitHub" });
 		await expect(canvas.queryByRole("link", { name: "Slack" })).not.toBeInTheDocument();
 		await expect(canvas.queryByRole("link", { name: "Outline" })).not.toBeInTheDocument();
 	},

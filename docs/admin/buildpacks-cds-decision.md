@@ -30,7 +30,7 @@ AOT processing evaluates `@Conditional` at **build time**, baking the build-time
 `pom.xml` pins `builder-noble-java-tiny` + `ubuntu-noble-run-tiny` + the `health-checker` buildpack by
 sha256 digest. Refresh:
 
-```
+```shell
 docker buildx imagetools inspect paketobuildpacks/builder-noble-java-tiny:latest --format '{{.Manifest.Digest}}'
 docker buildx imagetools inspect paketobuildpacks/ubuntu-noble-run-tiny:latest    --format '{{.Manifest.Digest}}'
 docker buildx imagetools inspect paketobuildpacks/health-checker:latest           --format '{{.Manifest.Digest}}'

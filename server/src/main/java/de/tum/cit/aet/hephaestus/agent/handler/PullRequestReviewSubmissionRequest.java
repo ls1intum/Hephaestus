@@ -2,28 +2,27 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import java.util.Objects;
 import org.jspecify.annotations.Nullable;
 
 /**
- * Submission request for {@link de.tum.cit.aet.hephaestus.agent.AgentJobType#PULL_REQUEST_REVIEW}
- * jobs.
+ * Submission request for {@code PULL_REQUEST_REVIEW} jobs. Combines the async-safe
+ * {@link ScmEventPayload.PullRequestData} snapshot with branch information not present on that DTO.
  *
- * <p>Combines the async-safe {@link ScmEventPayload.PullRequestData} snapshot with branch
- * information not present on that DTO. The event listener constructs this from the
- * {@code PullRequest} entity before it detaches.
- *
- * @param pullRequest async-safe pull request snapshot (no JPA proxies)
- * @param headRefName source branch name (e.g. {@code "feature/my-feature"})
- * @param headRefOid  head commit SHA
- * @param baseRefName target branch name (e.g. {@code "main"})
+ * @param observationOrigin which population this run's observations belong to; {@code null} defaults to
+ *     the rule below. Explicit because the default cannot see a backfill: a campaign replays the signal
+ *     the artifact's current state would have raised, so its request carries a trigger signal and would
+ *     otherwise be filed as LIVE.
  */
 public record PullRequestReviewSubmissionRequest(
     ScmEventPayload.PullRequestData pullRequest,
     String headRefName,
     String headRefOid,
     String baseRefName,
-    @Nullable String triggerEvent
+    @Nullable SignalName triggerSignal,
+    ObservationOrigin observationOrigin
 ) implements JobSubmissionRequest {
     public PullRequestReviewSubmissionRequest {
         Objects.requireNonNull(pullRequest, "pullRequest must not be null");
@@ -40,18 +39,31 @@ public record PullRequestReviewSubmissionRequest(
         if (baseRefName.isBlank()) {
             throw new IllegalArgumentException("baseRefName must not be blank");
         }
+        if (observationOrigin == null) {
+            // A run with no lifecycle event behind it was asked for by a person, so its observations are a
+            // self-selected sample (not a random draw from the work) and are recorded as such.
+            observationOrigin = triggerSignal == null ? ObservationOrigin.MANUAL : ObservationOrigin.LIVE;
+        }
     }
 
-    /**
-     * Constructor for callers that do not carry a trigger event (the gate-bypass dev path and the
-     * bot-command path); the job then runs the full focus-active practice set.
-     */
+    /** For the event-driven and resubmission paths, which take the origin rule as it stands. */
+    public PullRequestReviewSubmissionRequest(
+        ScmEventPayload.PullRequestData pullRequest,
+        String headRefName,
+        String headRefOid,
+        String baseRefName,
+        @Nullable SignalName triggerSignal
+    ) {
+        this(pullRequest, headRefName, headRefOid, baseRefName, triggerSignal, null);
+    }
+
+    /** For callers with no signal behind the run; the job then runs the full focus-active practice set. */
     public PullRequestReviewSubmissionRequest(
         ScmEventPayload.PullRequestData pullRequest,
         String headRefName,
         String headRefOid,
         String baseRefName
     ) {
-        this(pullRequest, headRefName, headRefOid, baseRefName, null);
+        this(pullRequest, headRefName, headRefOid, baseRefName, null, null);
     }
 }

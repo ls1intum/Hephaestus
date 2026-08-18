@@ -14,11 +14,14 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     public static final String SCRIPT = "pi-runner.mjs";
 
-    /** Imported by {@link #SCRIPT} with a relative specifier, so both must be staged beside it. */
+    /** Imported by {@link #SCRIPT} with a relative specifier, so each must be staged beside it. */
     private static final List<String> SIDECARS = List.of(
-        "pi-finding-normalize.mjs",
+        "pi-observation-normalize.mjs",
+        "pi-runner-usage.mjs",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
+
+    private static final List<String> PROMPTS = List.of(SandboxLayout.FEEDBACK_COMPOSER_PROMPT_FILENAME);
 
     private static final List<String> FLAGS = List.of("--no-warnings");
 
@@ -30,6 +33,11 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     @Override
     public List<String> sidecarScripts() {
         return SIDECARS;
+    }
+
+    @Override
+    public List<String> promptResources() {
+        return PROMPTS;
     }
 
     @Override

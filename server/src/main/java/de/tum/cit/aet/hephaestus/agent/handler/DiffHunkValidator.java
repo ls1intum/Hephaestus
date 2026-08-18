@@ -105,7 +105,7 @@ class DiffHunkValidator {
     /**
      * Snap window: maximum line delta we'll silently fix before dropping. A diff note at L42 when
      * only L500 is valid is more confusing than no note at all — the student sees an unrelated
-     * comment and has to invert the agent's intent. Notes beyond the window are dropped; the finding's
+     * comment and has to invert the agent's intent. Notes beyond the window are dropped; the observation's
      * detail still appears in the server-composed MR summary because only delivered notes demote their
      * summary section.
      */
@@ -198,8 +198,8 @@ class DiffHunkValidator {
                 correctedEnd = containedEnd(fileLines, nearest, nearestEnd);
             }
 
-            // Only the position changes — preserve the finding's correlation key so the snapped note still
-            // maps back to its persisted finding (ADR 0021 C2).
+            // Only the position changes — preserve the observation's correlation key so the snapped note still
+            // maps back to its persisted observation (ADR 0021).
             corrected.add(new DiffNote(note.filePath(), nearest, correctedEnd, note.body(), note.recurrenceKey()));
         }
 

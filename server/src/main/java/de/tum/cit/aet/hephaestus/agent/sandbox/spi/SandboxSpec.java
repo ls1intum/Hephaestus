@@ -16,13 +16,8 @@ import java.util.UUID;
  * output path after completion. The transfer mechanism is an implementation detail of the
  * underlying {@link SandboxManager}.
  *
- * @param jobId unique job identifier (used for labels, network naming, logging)
- * @param image Docker image to run (e.g. {@code ghcr.io/ls1intum/hephaestus/agent-pi:latest})
- * @param command container command + arguments
- * @param environment environment variables injected into the container
  * @param networkPolicy network access and LLM proxy configuration
  * @param resourceLimits CPU, memory, PID, and timeout constraints
- * @param securityProfile container hardening flags
  * @param inputFiles files to inject into /workspace (relative path → content)
  * @param outputPath container path to collect results from after execution
  * @param volumeMounts host bind mounts (host path → container path); mounted read-only
@@ -36,9 +31,39 @@ public record SandboxSpec(
     ResourceLimits resourceLimits,
     SecurityProfile securityProfile,
     Map<String, byte[]> inputFiles,
+    /** Inputs staged by host path and streamed into the container, never read into this process. */
+    Map<String, java.nio.file.Path> inputFilesOnDisk,
     String outputPath,
     Map<String, String> volumeMounts
 ) {
+    /** For runs whose inputs are all held in memory. */
+    public SandboxSpec(
+        java.util.UUID jobId,
+        String image,
+        java.util.List<String> command,
+        Map<String, String> environment,
+        NetworkPolicy networkPolicy,
+        ResourceLimits resourceLimits,
+        SecurityProfile securityProfile,
+        Map<String, byte[]> inputFiles,
+        String outputPath,
+        Map<String, String> volumeMounts
+    ) {
+        this(
+            jobId,
+            image,
+            command,
+            environment,
+            networkPolicy,
+            resourceLimits,
+            securityProfile,
+            inputFiles,
+            Map.of(),
+            outputPath,
+            volumeMounts
+        );
+    }
+
     public SandboxSpec {
         Objects.requireNonNull(jobId, "jobId must not be null");
         Objects.requireNonNull(image, "image must not be null");
@@ -50,10 +75,10 @@ public record SandboxSpec(
         if (outputPath.isBlank()) {
             throw new IllegalArgumentException("outputPath must not be blank");
         }
-        // Default nullable collection fields to empty — avoids null-checking in consumers
         command = command != null ? command : List.of();
         environment = environment != null ? environment : Map.of();
         inputFiles = inputFiles != null ? Map.copyOf(inputFiles) : Map.of();
+        inputFilesOnDisk = inputFilesOnDisk != null ? Map.copyOf(inputFilesOnDisk) : Map.of();
         volumeMounts = volumeMounts != null ? volumeMounts : Map.of();
     }
 }

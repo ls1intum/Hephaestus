@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -140,32 +141,21 @@ public interface IssueCommentRepository extends JpaRepository<IssueComment, Long
     )
     long countByIssueIdAndAuthorIdNot(@Param("issueId") Long issueId, @Param("authorId") Long authorId);
 
-    /**
-     * All general (conversation-tab) comments on an issue or merge request, author eagerly fetched,
-     * oldest-first.
-     *
-     * <p>Used by {@code GeneralReviewCommentContentSource} to materialise the non-positioned MR
-     * review discussion that {@code GitLabDiscussionSyncService} routes to {@link IssueComment} (any
-     * note without a diff position). The inline-only {@code comments.json} cannot see these, so the
-     * reviewer-craft practices were blind to review that happened in the conversation tab.
-     *
-     * <p>This fetch is intentionally unbounded: the consumer first filters out blank and bot-authored
-     * notes, then tail-slices to {@code GeneralReviewCommentContentSource.MAX_COMMENTS}. Pushing a DB-side
-     * {@code LIMIT} here would slice the raw set (bot/blank rows included) and could drop the latest real
-     * approval, so the cap stays consumer-side. Conversation-tab comment counts are small in practice.
-     *
-     * @param issueId the issue/PR id (a {@code PullRequest} is an {@code Issue} subtype, so its
-     *     general notes are {@code IssueComment} rows keyed by the same id)
-     * @return general comments ordered by creation time ascending
-     */
     @Query(
-        """
-        SELECT ic
-        FROM IssueComment ic
-        LEFT JOIN FETCH ic.author
-        WHERE ic.issue.id = :issueId
-        ORDER BY ic.createdAt ASC
-        """
+        "SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author " +
+            "WHERE ic.issue.id = :issueId ORDER BY ic.createdAt DESC, ic.id DESC"
     )
-    List<IssueComment> findByIssueIdWithAuthorOrderByCreatedAt(@Param("issueId") Long issueId);
+    List<IssueComment> findRecentByIssueIdWithAuthor(@Param("issueId") Long issueId, Pageable pageable);
+
+    @Query(
+        "SELECT ic FROM IssueComment ic LEFT JOIN FETCH ic.author " +
+            "WHERE ic.issue.id = :issueId AND ic.body IS NOT NULL AND TRIM(ic.body) <> '' " +
+            "AND ic.body NOT LIKE CONCAT('%', :excludedMarker, '%') " +
+            "ORDER BY ic.createdAt DESC, ic.id DESC"
+    )
+    List<IssueComment> findRecentHumanByIssueIdWithAuthor(
+        @Param("issueId") Long issueId,
+        @Param("excludedMarker") String excludedMarker,
+        Pageable pageable
+    );
 }

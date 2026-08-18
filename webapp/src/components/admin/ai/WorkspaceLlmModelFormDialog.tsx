@@ -44,10 +44,8 @@ function priceValueOf(model: WorkspaceLlmModel | null): PriceModeValue {
 	};
 }
 
-/**
- * Create/edit a model on your own provider. Price is set inline — the workspace scope has no
- * separate price endpoint, unlike the instance catalog.
- */
+/** Price is set inline: the workspace scope has no separate price endpoint, unlike the instance
+ * catalog. */
 export function WorkspaceLlmModelFormDialog({
 	open,
 	onOpenChange,
@@ -122,9 +120,8 @@ function WorkspaceLlmModelFormDialogContent({
 					<DialogTitle>{isEdit ? "Edit model" : "Add model"}</DialogTitle>
 				</DialogHeader>
 
-				{/* The tallest form on this surface — six fields plus the whole price editor, around
-				    950 px. Without an internal scroll region it overflowed every phone viewport in both
-				    directions and neither the title nor the submit button could be reached. */}
+				{/* This form outgrows a 320 px viewport; without an internal scroll region the popup hangs
+				    off both edges and neither the title nor the submit button can be reached. */}
 				<DialogBody className="space-y-4 py-1">
 					<LlmModelFields
 						audience="workspace"

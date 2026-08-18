@@ -8,9 +8,12 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PagedModel;
@@ -31,10 +34,11 @@ import org.springframework.web.bind.annotation.RequestParam;
 public class PracticeReviewSummaryController {
 
     private final ReviewRunSummaryQueryService queryService;
+    private final PracticeEvidenceOutcomeService evidenceOutcomeService;
 
     @GetMapping
     @Operation(
-        summary = "List practice reviews with finding and feedback outcomes",
+        summary = "List practice reviews with observation and feedback outcomes",
         description = "Results are ordered newest first.",
         operationId = "listPracticeReviews"
     )
@@ -49,11 +53,24 @@ public class PracticeReviewSummaryController {
     )
     public ResponseEntity<PagedModel<ReviewRunSummaryDTO>> listReviews(
         WorkspaceContext workspaceContext,
-        @RequestParam(required = false) AgentJobStatus status,
         @RequestParam(defaultValue = "0") @Min(0) int page,
-        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size
+        @RequestParam(defaultValue = "20") @Min(1) @Max(100) int size,
+        @Valid @ParameterObject ReviewRunFilterParams filter
     ) {
         PageRequest pageable = PageRequest.of(page, size, Sort.by(Sort.Order.desc("createdAt"), Sort.Order.desc("id")));
-        return ResponseEntity.ok(new PagedModel<>(queryService.list(workspaceContext.id(), status, pageable)));
+        return ResponseEntity.ok(
+            new PagedModel<>(queryService.list(workspaceContext.id(), filter.validated(), pageable))
+        );
+    }
+
+    @GetMapping("/evidence-outcomes")
+    @Operation(
+        summary = "Summarize how each practice's evidence requirements turned out on recent reviews",
+        description = "One entry per practice that recent reviews considered, with the sources that skipped it.",
+        operationId = "listPracticeEvidenceOutcomes"
+    )
+    @ApiResponse(responseCode = "200", description = "Evidence outcomes returned")
+    public ResponseEntity<List<PracticeEvidenceOutcomeDTO>> listEvidenceOutcomes(WorkspaceContext workspaceContext) {
+        return ResponseEntity.ok(evidenceOutcomeService.recentOutcomes(workspaceContext.id()));
     }
 }

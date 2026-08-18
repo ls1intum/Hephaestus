@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { InstanceSettings } from "@/api/types.gen";
 import { SilentModeCard } from "./SilentModeCard";
 
@@ -34,8 +34,7 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Released: Story = {
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /engage silent mode/i }));
 		await userEvent.type(
 			await screen.findByLabelText(/why are you silencing/i),
@@ -48,14 +47,13 @@ export const Released: Story = {
 
 export const Engaged: Story = {
 	args: { settings: engaged },
-	play: async ({ args, canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /release silent mode/i }));
 		const confirm = await screen.findByRole("button", { name: /^release silent mode$/i });
 		await userEvent.type(screen.getByLabelText(/type/i), "nope");
 		await userEvent.click(confirm);
 		await expect(args.onRelease).not.toHaveBeenCalled();
-		await expect(await screen.findByText(/does not match/i)).toBeInTheDocument();
+		await expect(await screen.findByText(/does not match/i)).toBeVisible();
 
 		await userEvent.clear(screen.getByLabelText(/type/i));
 		await userEvent.type(screen.getByLabelText(/type/i), "release");
@@ -70,8 +68,7 @@ export const Pending: Story = {
 
 export const ReleaseUnavailable: Story = {
 	args: { settings: engaged, releaseDisabled: true },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: /release silent mode/i })).toBeDisabled();
 	},
 };

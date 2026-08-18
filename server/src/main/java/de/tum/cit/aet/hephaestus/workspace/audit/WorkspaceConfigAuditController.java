@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RequestParam;
  * depend on {@code workspace}; it reaches the trail through the {@code config-audit-spi} port.
  *
  * <p>{@code entityType} + {@code entityId} + {@code changedKey} are the per-resource and per-control
- * history contract that the settings pages filter on (#1357).
+ * history contract that the settings pages filter on.
  */
 @WorkspaceScopedController
 @RequestMapping("/config-audit")

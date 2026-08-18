@@ -39,10 +39,10 @@ public final class TranslatorState {
     private final ArrayNode partsAccumulator = nodes.arrayNode();
 
     /**
-     * Observation ids the mentor linked this turn via {@code link_finding}, in emission order. Read at
+     * Observation ids the mentor linked this turn via {@code link_observation}, in emission order. Read at
      * end-of-turn by the conversational-delivery reconciler to flip the matching PREPARED unit to DELIVERED.
      */
-    private final List<UUID> linkedFindingIds = new ArrayList<>();
+    private final List<UUID> linkedObservationIds = new ArrayList<>();
 
     /** Did we emit at least one {@code Start} chunk? Defensive — runner may replay an event. */
     private boolean started = false;
@@ -190,23 +190,23 @@ public final class TranslatorState {
         this.textBuffer.setLength(0);
     }
 
-    public synchronized void recordDataFinding(UUID findingId) {
+    public synchronized void recordDataObservation(UUID observationId) {
         // Match the AI SDK data-* envelope: {type, id, data:{...}}. The id at the top level
-        // lets AI SDK dedupe across re-renders; findingId stays inside data for consumers.
+        // lets AI SDK dedupe across re-renders; observationId stays inside data for consumers.
         ObjectNode part = nodes.objectNode();
-        part.put("type", "data-finding");
-        part.put("id", findingId.toString());
-        part.putObject("data").put("findingId", findingId.toString());
+        part.put("type", "data-observation");
+        part.put("id", observationId.toString());
+        part.putObject("data").put("observationId", observationId.toString());
         partsAccumulator.add(part);
-        linkedFindingIds.add(findingId);
+        linkedObservationIds.add(observationId);
     }
 
     /**
-     * The observation ids the mentor linked this turn via {@code link_finding}, in emission order (duplicates
+     * The observation ids the mentor linked this turn via {@code link_observation}, in emission order (duplicates
      * retained - the reconciler de-duplicates). Snapshot copy for cross-thread safety on the finalise path.
      */
-    public synchronized List<UUID> linkedFindingIds() {
-        return List.copyOf(linkedFindingIds);
+    public synchronized List<UUID> linkedObservationIds() {
+        return List.copyOf(linkedObservationIds);
     }
 
     /**

@@ -15,7 +15,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
  * compile-time safety.
  * <p>
  * <strong>Adding a new flag:</strong> Add the enum constant to {@link FeatureFlag},
- * then add the corresponding field here and wire it in {@link #from(FeatureFlagService)}.
+ * then add the corresponding field here and wire it in {@code from}.
  *
  * @see FeatureFlag
  * @see FeatureFlagController

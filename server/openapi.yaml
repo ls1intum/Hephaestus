@@ -46,6 +46,8 @@ tags:
     Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
      slugged routes live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
   name: workspace-registry-controller
+- description: Bounded campaigns that review work which already existed
+  name: Practice Review Backfill
 - description: |-
     Controller for managing workspace memberships and roles.
      Handles CRUD operations for workspace members and role assignments.
@@ -54,6 +56,8 @@ tags:
   name: Agents
 - description: Workspace-scoped agent job monitoring
   name: Agent Jobs
+- description: Asking for a review of a piece of work by hand
+  name: Practice review requests
 - description: "User account management (settings, deletion)"
   name: Account
 - description: Read-only access to practice evaluation observations
@@ -66,11 +70,10 @@ tags:
   name: Outline collections
 - description: Team management within workspace
   name: Teams
-- description: "Workspace-admin access to review runs, findings, and message delivery\
-    \ history"
-  name: Practice reviews
 - description: The starting catalog copied into new workspaces
   name: Admin Practice Catalog
+- description: The developer's own prepared practice feedback
+  name: In-App Feedback
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
@@ -80,6 +83,9 @@ tags:
   name: Instance Settings
 - description: Contributor rankings and league statistics
   name: Leaderboard
+- description: Why each practice did or did not run on one piece of work; readable
+    by any workspace member
+  name: Practice review trace
 - description: Current instance definitions visible to workspace administrators
   name: Practice Catalog
 - description: Session lifecycle
@@ -89,8 +95,7 @@ tags:
 - description: Active sessions
   name: Account
 - description: |-
-    GitLab-specific REST endpoints used during the workspace creation wizard: one validates a personal
-     access token, the other lists the groups that token can reach. Both require the
+    GitLab-specific REST endpoints used during the workspace creation wizard. Gated on the
      <code>GITLAB_WORKSPACE_CREATION</code> feature flag.
   name: git-lab-preflight-controller
 - description: Workspace integration connection management
@@ -99,6 +104,9 @@ tags:
   name: Admin LLM
 - description: Up/down votes on mentor assistant messages
   name: Mentor Votes
+- description: "Workspace-admin access to review runs, observations, and feedback\
+    \ delivery history"
+  name: Practice reviews
 - description: Public JWK set for verifying Hephaestus session JWTs
   name: Auth discovery
 - description: GDPR Art. 20 self-service data export
@@ -115,6 +123,8 @@ tags:
   name: Practice Catalog
 - description: Workspace-scoped team settings management
   name: Team Settings
+- description: Recurring reviews of recent work
+  name: Practice Review Sweep
 - description: Developer reactions to delivered feedback
   name: Feedback Reaction
 - description: Identity provider discovery (public)
@@ -358,6 +368,7 @@ paths:
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
+            - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_AREA
             - CURATED_PRACTICE
@@ -366,6 +377,8 @@ paths:
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
+            - REVIEW_BACKFILL_RUN
+            - REVIEW_SWEEP_SCHEDULE
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -1102,6 +1115,21 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: If-Match is required
       summary: "Exclude an area from new workspaces, or include it again"
+      tags:
+      - Admin Practice Catalog
+  /admin/practice-catalog/definition-options:
+    get:
+      description: "Returns available review events, recommended requirements, and\
+        \ allowed evidence sources by work type"
+      operationId: adminGetPracticeDefinitionOptions
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeDefinitionOptions"
+          description: OK
+      summary: Read practice definition options
       tags:
       - Admin Practice Catalog
   /admin/practice-catalog/order:
@@ -2223,7 +2251,7 @@ paths:
         schema:
           type: string
           enum:
-          - PRACTICE_DETECTION
+          - PRACTICE_REVIEW
           - MENTOR
       responses:
         "204":
@@ -2247,7 +2275,7 @@ paths:
         schema:
           type: string
           enum:
-          - PRACTICE_DETECTION
+          - PRACTICE_REVIEW
           - MENTOR
       requestBody:
         content:
@@ -2310,6 +2338,7 @@ paths:
             - WORKSPACE_TOKEN
             - WORKSPACE_VISIBILITY
             - PRACTICE_ACTIVE
+            - PRACTICE_USAGE
             - PRACTICE_DEFINITION
             - PRACTICE_AREA
             - CURATED_PRACTICE
@@ -2318,6 +2347,8 @@ paths:
             - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
             - WORKSPACE_LLM_BUDGET
             - WORKSPACE_BYO_LLM_BUDGET
+            - REVIEW_BACKFILL_RUN
+            - REVIEW_SWEEP_SCHEDULE
             - WORKSPACE_LLM_CONNECTION
             - WORKSPACE_LLM_MODEL
       - in: query
@@ -3988,9 +4019,9 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Return only active areas
+      - description: Return only areas shown in practice dashboards
         in: query
-        name: activeOnly
+        name: visibleInPracticeDashboardsOnly
         required: false
         schema:
           type: boolean
@@ -4156,6 +4187,49 @@ paths:
       summary: Update a practice area
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier:
+    patch:
+      description: "Applies to every practice in the area that holds no tier of its\
+        \ own; practices that set their own are left alone. OFF stops their reviews\
+        \ entirely. PROPOSE runs them and records every observation, and sends nothing.\
+        \ DELIVER sends feedback without asking. Send a null tier to clear the area's\
+        \ own setting so it follows the workspace default."
+      operationId: setAreaReviewTier
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: areaSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeReviewTierRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeArea"
+          description: Tier updated; the response carries the tier now in force and
+            where it came from
+        "400":
+          description: "PROPOSE cannot be selected yet: there is no approval queue\
+            \ for the feedback it would prepare"
+        "404":
+          description: Area not found
+      summary: Set how much autonomy the system has over one area
+      tags:
+      - Practice Areas
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
     get:
       description: The current instance-catalog definition for comparison with a workspace
@@ -4186,8 +4260,10 @@ paths:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices:
     get:
-      description: "Returns all practice definitions for the workspace, optionally\
-        \ filtered by active state"
+      description: "Returns this workspace's practices, each with the autonomy tier\
+        \ in force for it, whether that tier was set on the practice or inherited\
+        \ from its area or the workspace, and which level decided it. Optionally narrowed\
+        \ to one tier."
       operationId: listPractices
       parameters:
       - description: Workspace slug
@@ -4197,12 +4273,17 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - description: Filter by active state
+      - description: "Keep only the practices whose tier IN FORCE is exactly this\
+          \ one, inherited or not"
         in: query
-        name: active
+        name: reviewTier
         required: false
         schema:
-          type: boolean
+          type: string
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
       responses:
         "200":
           content:
@@ -4253,6 +4334,166 @@ paths:
       summary: Create a new practice definition
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/backfill-runs:
+    get:
+      operationId: listBackfillRuns
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Campaigns returned
+      summary: List this workspace's recent backfill campaigns
+      tags:
+      - Practice Review Backfill
+    post:
+      description: Creates a run awaiting confirmation. Submits nothing and spends
+        nothing.
+      operationId: preflightBackfillRun
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewBackfillRunRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Scope enumerated and priced
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The window is inverted, too long, or covers too many artifacts"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: A campaign is already under way for this workspace
+      summary: Enumerate and price a backfill campaign
+      tags:
+      - Practice Review Backfill
+  /workspaces/{workspaceSlug}/practices/backfill-runs/{runId}:
+    get:
+      operationId: getBackfillRun
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Campaign returned
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such campaign in this workspace
+      summary: "Get one backfill campaign, including its live progress"
+      tags:
+      - Practice Review Backfill
+  /workspaces/{workspaceSlug}/practices/backfill-runs/{runId}/status:
+    patch:
+      description: RUNNING authorises the estimated spend and starts the campaign;
+        CANCELLED stops it for good.
+      operationId: updateBackfillRunStatus
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewBackfillRunStatusRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewBackfillRun"
+          description: Campaign updated
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The campaign cannot make that transition from its current state
+      summary: Confirm or cancel a backfill campaign
+      tags:
+      - Practice Review Backfill
+  /workspaces/{workspaceSlug}/practices/definition-options:
+    get:
+      description: "Returns available review events, recommended requirements, and\
+        \ allowed evidence sources by work type"
+      operationId: getPracticeDefinitionOptions
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeDefinitionOptions"
+          description: OK
+      summary: Read practice definition options
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/feedback/engagement:
     get:
       description: Returns the current user's reaction action counts across all feedback
@@ -4276,6 +4517,36 @@ paths:
       summary: Get engagement statistics
       tags:
       - Feedback Reaction
+  /workspaces/{workspaceSlug}/practices/feedback/in-app:
+    get:
+      description: "Process-level messages prepared for the authenticated developer:\
+        \ for each habit that recurs in their work, what the pattern is, the pieces\
+        \ of work it was observed on, and one thing to try next. Distinct from in-context\
+        \ notes (which say what is wrong in one diff) and from the mentor conversation\
+        \ (which asks rather than tells). Reading a message is what delivers it, so\
+        \ this GET records the delivery."
+      operationId: getInAppFeedback
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/InAppFeedback"
+          description: "In-app messages returned, newest first"
+      security: []
+      summary: The current developer's in-app feedback
+      tags:
+      - In-App Feedback
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
     get:
       description: "Returns the current user's most recent reaction to the specified\
@@ -4352,9 +4623,8 @@ paths:
       - Feedback Reaction
   /workspaces/{workspaceSlug}/practices/learner:
     get:
-      description: "Active practices projected for a developer: name, area, why-it-matters,\
-        \ what-good-looks-like. The detection criteria is ABSENT BY CONSTRUCTION (LearnerPracticeDTO\
-        \ has no such field)."
+      description: "Returns the learner-facing name, area, rationale, and example\
+        \ for every practice the workspace reviews (any autonomy tier above OFF)"
       operationId: listLearnerPractices
       parameters:
       - description: Workspace slug
@@ -4374,7 +4644,7 @@ paths:
                   $ref: "#/components/schemas/LearnerPractice"
           description: Learner practices returned
       security: []
-      summary: "List active practices, learner-facing"
+      summary: "List reviewed practices, learner-facing"
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/practices/observations:
@@ -4406,6 +4676,7 @@ paths:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INCONCLUSIVE
       - in: query
         name: page
         required: false
@@ -4467,8 +4738,8 @@ paths:
       description: "Per-practice cards a developer can READ — why the practice matters,\
         \ what good looks like, where they stand, the specific feedback to act on,\
         \ and what they already do well. The third feedback channel alongside in-context\
-        \ SCM notes and the conversational mentor; the same findings reorganised by\
-        \ practice for self-paced reflection, not a scoreboard of counts."
+        \ SCM notes and the conversational mentor; the same observations reorganised\
+        \ by practice for self-paced reflection, not a scoreboard of counts."
       operationId: getReflection
       parameters:
       - description: Workspace slug
@@ -4584,6 +4855,56 @@ paths:
       summary: Reorder the practices within an area
       tags:
       - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/review-requests:
+    post:
+      description: "Answers 200 both when a review starts and when one deliberately\
+        \ does not; the body says which, and why. 403 only when the caller has no\
+        \ standing on the artifact."
+      operationId: requestPracticeReview
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewRequestOutcome"
+          description: "The ask was understood: a review is running, or the body names\
+            \ what stopped it"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The artifact kind is not one that can be asked for
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: The caller is neither the work's author or assignee nor a workspace
+            admin
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such artifact in this workspace
+      summary: Ask for a review of a piece of work now
+      tags:
+      - Practice review requests
   /workspaces/{workspaceSlug}/practices/review-settings:
     get:
       operationId: getPracticeReviewSettings
@@ -4631,6 +4952,31 @@ paths:
       summary: Update the workspace's practice-review policy
       tags:
       - Practice Review Settings
+  /workspaces/{workspaceSlug}/practices/review-tiers:
+    get:
+      description: "How many practices sit at each autonomy tier, for the whole workspace\
+        \ and for each area, plus the workspace default and where feedback may go.\
+        \ The summary a hundred-practice catalogue is read through — answered here\
+        \ so a client never has to fetch every practice to count them."
+      operationId: reviewTierRollup
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewTierRollup"
+          description: Rollup returned
+      summary: "Summarise how much autonomy this workspace grants, by area"
+      tags:
+      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/reviews:
     get:
       description: Results are ordered newest first.
@@ -4643,18 +4989,6 @@ paths:
         schema:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: query
-        name: status
-        required: false
-        schema:
-          type: string
-          enum:
-          - QUEUED
-          - RUNNING
-          - COMPLETED
-          - FAILED
-          - TIMED_OUT
-          - CANCELLED
       - in: query
         name: page
         required: false
@@ -4672,6 +5006,32 @@ paths:
           default: 20
           maximum: 100
           minimum: 1
+      - in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - QUEUED
+          - RUNNING
+          - COMPLETED
+          - FAILED
+          - TIMED_OUT
+          - CANCELLED
+      - description: Inclusive lower bound on when the review was requested
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: Exclusive upper bound on when the review was requested
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
       responses:
         "200":
           content:
@@ -4685,7 +5045,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Invalid filter or pagination
-      summary: List practice reviews with finding and feedback outcomes
+      summary: List practice reviews with observation and feedback outcomes
+      tags:
+      - Practice reviews
+  /workspaces/{workspaceSlug}/practices/reviews/evidence-outcomes:
+    get:
+      description: "One entry per practice that recent reviews considered, with the\
+        \ sources that skipped it."
+      operationId: listPracticeEvidenceOutcomes
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeEvidenceOutcome"
+          description: Evidence outcomes returned
+      summary: Summarize how each practice's evidence requirements turned out on recent
+        reviews
       tags:
       - Practice reviews
   /workspaces/{workspaceSlug}/practices/reviews/feedback:
@@ -4750,6 +5136,8 @@ paths:
             - RECIPIENT_OPTED_OUT
             - EMPTY_AFTER_SANITIZE
             - INSTANCE_SILENCED
+            - PRACTICE_TIER_QUIET
+            - BACKFILL_QUIET
       - in: query
         name: channel
         required: false
@@ -4759,24 +5147,21 @@ paths:
             type: string
             enum:
             - IN_CONTEXT
-            - CONVERSATION
-            - PROFILE
+            - IN_CHAT
+            - IN_APP
       - in: query
         name: agentJobId
         required: false
         schema:
           type: string
           format: uuid
-      - in: query
-        name: artifactType
+      - description: "Kind of reviewed work, e.g. scm.pull_request"
+        in: query
+        name: artifactKind
         required: false
         schema:
           type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-      - description: Artifact ID; requires artifactType
+      - description: Artifact ID; requires artifactKind
         in: query
         name: artifactId
         required: false
@@ -4811,7 +5196,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PagedModelReviewFeedback"
-          description: Paginated messages returned
+          description: Paginated feedback returned
         "400":
           content:
             application/problem+json:
@@ -4844,21 +5229,21 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ReviewFeedbackDetail"
-          description: Message details returned
+          description: Feedback detail returned
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Feedback not found in this workspace
-      summary: "Get feedback with its stored body, findings and placements"
+      summary: "Get feedback with its stored body, observations and placements"
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/findings:
+  /workspaces/{workspaceSlug}/practices/reviews/observations:
     get:
       description: Results include linked feedback outcomes and are ordered newest
         first by default.
-      operationId: listPracticeReviewFindings
+      operationId: listPracticeReviewObservations
       parameters:
       - description: Workspace slug
         in: path
@@ -4885,7 +5270,7 @@ paths:
           maximum: 100
           minimum: 1
       - description: "Sorting strategy. ACTIONABILITY orders problems from CRITICAL\
-          \ to INFO, then strengths, then not-applicable findings; ties are newest\
+          \ to INFO, then strengths, then not-applicable observations; ties are newest\
           \ first."
         in: query
         name: sort
@@ -4921,6 +5306,7 @@ paths:
             - PRESENT
             - ABSENT
             - NOT_APPLICABLE
+            - INCONCLUSIVE
       - in: query
         name: assessment
         required: false
@@ -4949,16 +5335,13 @@ paths:
         schema:
           type: string
           format: uuid
-      - in: query
-        name: artifactType
+      - description: "Kind of reviewed work, e.g. scm.pull_request"
+        in: query
+        name: artifactKind
         required: false
         schema:
           type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-      - description: Artifact ID; requires artifactType
+      - description: Artifact ID; requires artifactKind
         in: query
         name: artifactId
         required: false
@@ -4973,6 +5356,18 @@ paths:
           type: integer
           format: int64
           exclusiveMinimum: 0
+      - description: "What occasioned the measurement: LIVE, MANUAL or BACKFILL"
+        in: query
+        name: origin
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - LIVE
+            - MANUAL
+            - BACKFILL
       - description: Inclusive lower bound
         in: query
         name: from
@@ -4992,20 +5387,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/PagedModelReviewFinding"
-          description: Paginated findings returned
+                $ref: "#/components/schemas/PagedModelReviewObservation"
+          description: Paginated observations returned
         "400":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Invalid filter or pagination
-      summary: List practice review findings across the workspace
+      summary: List practice review observations across the workspace
       tags:
       - Practice reviews
-  /workspaces/{workspaceSlug}/practices/reviews/findings/{findingId}:
+  /workspaces/{workspaceSlug}/practices/reviews/observations/{observationId}:
     get:
-      operationId: getPracticeReviewFinding
+      operationId: getPracticeReviewObservation
       parameters:
       - description: Workspace slug
         in: path
@@ -5015,7 +5410,7 @@ paths:
           type: string
           pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
       - in: path
-        name: findingId
+        name: observationId
         required: true
         schema:
           type: string
@@ -5025,17 +5420,249 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ReviewFindingDetail"
-          description: Finding detail returned
+                $ref: "#/components/schemas/ReviewObservationDetail"
+          description: Observation detail returned
         "404":
           content:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
-          description: Finding not found in this workspace
-      summary: Get a finding with its evidence and linked feedback
+          description: Observation not found in this workspace
+      summary: Get an observation with its evidence and linked feedback
       tags:
       - Practice reviews
+  /workspaces/{workspaceSlug}/practices/sweep-schedules:
+    get:
+      operationId: listSweepSchedules
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ReviewSweepSchedule"
+          description: Schedules returned
+      summary: List this workspace's sweep schedules
+      tags:
+      - Practice Review Sweep
+    post:
+      description: Authorises the recurring spend. The first sweep runs within the
+        hour.
+      operationId: createSweepSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateReviewSweepScheduleRequest"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSweepSchedule"
+          description: Schedule created
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The kind cannot be swept, or the lookback is longer than the\
+            \ cadence allows"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: This workspace already sweeps that kind of work
+      summary: Start sweeping a kind of work on a cadence
+      tags:
+      - Practice Review Sweep
+  /workspaces/{workspaceSlug}/practices/sweep-schedules/{scheduleId}:
+    delete:
+      description: Removes the instruction. Campaigns it already opened keep their
+        records.
+      operationId: deleteSweepSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: scheduleId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Schedule removed
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such schedule in this workspace
+      summary: Stop sweeping
+      tags:
+      - Practice Review Sweep
+    put:
+      description: "Changes the cadence, the window, or whether the sweep runs at\
+        \ all."
+      operationId: replaceSweepSchedule
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: scheduleId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateReviewSweepScheduleRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSweepSchedule"
+          description: Schedule updated
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: No such schedule in this workspace
+      summary: Replace a sweep schedule's terms
+      tags:
+      - Practice Review Sweep
+  /workspaces/{workspaceSlug}/practices/trace:
+    get:
+      description: "Built from the signal ledger, so it includes work that was never\
+        \ reviewed — which is exactly what a listing derived from review runs cannot\
+        \ show. Most recently signalled first."
+      operationId: listTracedArtifacts
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 25
+          maximum: 100
+          minimum: 1
+      - description: "Restrict to one kind of work, e.g. scm.pull_request"
+        in: query
+        name: artifactKind
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelTracedArtifact"
+          description: Paginated artifacts returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Unknown artifact kind or invalid pagination
+      summary: List work this workspace recorded something about
+      tags:
+      - Practice review trace
+  /workspaces/{workspaceSlug}/practices/trace/{artifactKind}/{artifactId}:
+    get:
+      description: "Every practice the workspace runs against this kind of work appears,\
+        \ including the ones that did nothing, each with the recorded reason. 404\
+        \ means nothing about this artifact was ever recorded here — not that the\
+        \ trace is unavailable."
+      operationId: getArtifactTrace
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - description: "Kind of work, e.g. scm.pull_request"
+        in: path
+        name: artifactKind
+        required: true
+        schema:
+          type: string
+      - description: The artifact's identifier as the ledger stores it
+        in: path
+        name: artifactId
+        required: true
+        schema:
+          type: integer
+          format: int64
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArtifactTrace"
+          description: Trace returned
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Nothing recorded about this artifact in this workspace
+      summary: Explain what every practice did about one piece of work
+      tags:
+      - Practice review trace
   /workspaces/{workspaceSlug}/practices/{practiceSlug}:
     delete:
       operationId: deletePractice
@@ -5132,44 +5759,6 @@ paths:
       summary: Update a practice
       tags:
       - Practice Catalog
-  /workspaces/{workspaceSlug}/practices/{practiceSlug}/active:
-    patch:
-      operationId: setActive
-      parameters:
-      - description: Workspace slug
-        in: path
-        name: workspaceSlug
-        required: true
-        schema:
-          type: string
-          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
-      - in: path
-        name: practiceSlug
-        required: true
-        schema:
-          type: string
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdatePracticeActiveRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/Practice"
-          description: Active state updated
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/ProblemDetail"
-          description: Practice not found
-      summary: Set practice active state
-      tags:
-      - Practice Catalog
   /workspaces/{workspaceSlug}/practices/{practiceSlug}/area:
     put:
       description: "Moves the practice to the requested area, or to Unassigned when\
@@ -5256,6 +5845,57 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Practice or area not found
       summary: Place a practice in the catalog
+      tags:
+      - Practice Catalog
+  /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier:
+    patch:
+      description: "OFF stops the review entirely. PROPOSE runs it and records every\
+        \ observation and sends nothing. DELIVER sends feedback without asking, as\
+        \ far as this workspace's reach allows. Send a null tier to clear the practice's\
+        \ own setting so it follows its area, and through the area the workspace default."
+      operationId: setReviewTier
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: practiceSlug
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdatePracticeReviewTierRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Practice"
+          description: Tier updated; the response carries the tier now in force and
+            where it came from
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: "The tier cannot be selected: PROPOSE has no approval queue\
+            \ yet, or this practice's review settings cannot run an automated review\
+            \ at any tier above OFF"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Practice not found
+      summary: Set how much autonomy the system has over one practice
       tags:
       - Practice Catalog
   /workspaces/{workspaceSlug}/profile/{login}:
@@ -6587,7 +7227,7 @@ components:
         purpose:
           type: string
           enum:
-          - PRACTICE_DETECTION
+          - PRACTICE_REVIEW
           - MENTOR
         ready:
           type: boolean
@@ -6691,6 +7331,7 @@ components:
           - PULL_REQUEST_REVIEW
           - ISSUE_REVIEW
           - CONVERSATION_REVIEW
+          - DOCUMENT_REVIEW
         llmCacheReadTokens:
           type: integer
           format: int32
@@ -6735,6 +7376,16 @@ components:
           type: integer
           format: int32
           description: Number of retry attempts
+        reviewOutcome:
+          type: string
+          description: "Why a COMPLETED run produced the observations it did. INSUFFICIENT_EVIDENCE\
+            \ means no model ran because required evidence was missing, unreadable,\
+            \ stale, or unauthorized — so no observations means nothing was assessed,\
+            \ not that nothing was wrong. REVIEWED means the model ran against sufficient\
+            \ evidence."
+          enum:
+          - REVIEWED
+          - INSUFFICIENT_EVIDENCE
         startedAt:
           type: string
           format: date-time
@@ -6759,8 +7410,82 @@ components:
       - id
       - jobType
       - retryCount
+      - reviewOutcome
       - status
       - target
+    AreaReviewTierRollup:
+      type: object
+      description: "One area's practice counts per effective tier, and the area's\
+        \ own tier"
+      properties:
+        areaName:
+          type: string
+          description: Area name; null for the no-area group
+        areaSlug:
+          type: string
+          description: Area slug; null groups the practices that belong to no area
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Practice count per effective tier in this area; every tier
+            is a key
+        overriddenCount:
+          type: integer
+          format: int32
+          description: How many of this area's practices set their own tier rather
+            than inheriting
+        reviewTier:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: "The tier in force for this area, and where it came from"
+      required:
+      - counts
+      - overriddenCount
+      - reviewTier
+    ArtifactTrace:
+      type: object
+      description: "Every practice's answer for one artifact, and the occurrences\
+        \ those answers rest on"
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+        artifactKind:
+          type: string
+        container:
+          type: string
+          description: "Repository, collection or channel it sits in"
+        number:
+          type: integer
+          format: int32
+          description: "The number the provider shows, for kinds that have one"
+        practices:
+          type: array
+          description: "Every practice this workspace runs against this kind of work,\
+            \ the ones with something to report first, then the rest; ties broken\
+            \ by practice name"
+          items:
+            $ref: "#/components/schemas/PracticeTraceEntry"
+        signals:
+          type: array
+          description: "Everything recorded about this artifact, oldest first"
+          items:
+            $ref: "#/components/schemas/TracedSignal"
+        title:
+          type: string
+          description: The label a person recognises; the kind's display name when
+            the mirror cannot name it
+        url:
+          type: string
+          description: Where to open it upstream; absent for a deleted or unlinkable
+            artifact
+      required:
+      - artifactId
+      - artifactKind
+      - practices
+      - signals
+      - title
     AssignRoleRequest:
       type: object
       description: Request to assign or update a user's role in a workspace
@@ -6974,7 +7699,7 @@ components:
         parts:
           type: array
           items:
-            description: AI SDK UIMessage part (text / data-finding).
+            description: AI SDK UIMessage part (text / data-observation).
         role:
           type: string
     ChatMessageVote:
@@ -7065,8 +7790,8 @@ components:
         actor:
           $ref: "#/components/schemas/ConfigAuditActorRef"
           description: |-
-            resolved identity of {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorAccountId #actorAccountId}; null for SYSTEM rows or once the
-                                 account is gone. Read together with {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#actorKind #actorKind} — that is what keeps
+            resolved identity of <code>actorAccountId</code>; null for SYSTEM rows or once the
+                                 account is gone. Read together with <code>actorKind</code> — that is what keeps
                                  "a system did this" distinct from "we no longer know who did this".
         actorAccountId:
           type: integer
@@ -7079,9 +7804,7 @@ components:
           - IMPERSONATED
         changedKeys:
           type: array
-          description: "dot-paths that differ between {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#oldValue\
-            \ #oldValue} and {@link de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntryViewDTO#newValue\
-            \ #newValue}"
+          description: dot-paths that differ between <code>oldValue</code> and <code>newValue</code>
           items:
             type: string
         entityId:
@@ -7099,6 +7822,7 @@ components:
           - WORKSPACE_TOKEN
           - WORKSPACE_VISIBILITY
           - PRACTICE_ACTIVE
+          - PRACTICE_USAGE
           - PRACTICE_DEFINITION
           - PRACTICE_AREA
           - CURATED_PRACTICE
@@ -7107,6 +7831,8 @@ components:
           - WORKSPACE_OWN_PROVIDER_LLM_BUDGET
           - WORKSPACE_LLM_BUDGET
           - WORKSPACE_BYO_LLM_BUDGET
+          - REVIEW_BACKFILL_RUN
+          - REVIEW_SWEEP_SCHEDULE
           - WORKSPACE_LLM_CONNECTION
           - WORKSPACE_LLM_MODEL
         id:
@@ -7127,9 +7853,8 @@ components:
       description: |-
         Audit-log entry returned by <code>GET /workspaces/{workspaceSlug</code>/connections/{id}/audit}.
 
-         <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference
-         to {@link de.tum.cit.aet.hephaestus.integration.core.connection.Connection de.tum.cit.aet.hephaestus.integration.core.connection.Connection} that we don't
-         want to serialize on every response.
+         <p>Lean projection of {@link ConnectionAudit ConnectionAudit} — the entity carries a back-reference to
+         <code>Connection</code> that this DTO omits.
       properties:
         actorKind:
           type: string
@@ -7164,10 +7889,10 @@ components:
          <code>type: object, additionalProperties: true</code> in the spec, so it round-trips through
          client codegen). NEVER carries credentials: the encrypted credential blob stays inside the
          entity, and every secret-bearing key of the config itself is stripped by
-         {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO#redactSensitive #redactSensitive} before serialization.
+         <code>redactSensitive</code> before serialization.
 
          <p><b>Why redact here and not with <code>@JsonIgnore</code> on the record component?</b> The very
-         same {@link ObjectMapper ObjectMapper} bean serializes {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.ConnectionDetailDTO  de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig} into the JSONB
+         same <code>ObjectMapper</code> bean serializes <code>ConnectionConfig</code> into the JSONB
          <code>connection.config</code> column (Hibernate's <code>json_format_mapper</code> is wired to it in
          <code>HibernateJacksonFormatMapperConfig</code>). Annotating the component would therefore drop the
          secret on write and destroy the stored value — the API-boundary filter below is the only place
@@ -7185,7 +7910,7 @@ components:
             - WEBHOOK_INGEST
             - TOKEN_REFRESH
             - FEEDBACK_DELIVERY
-            - INLINE_FINDINGS
+            - INLINE_FEEDBACK
             - APPROVAL_WORKFLOW
             - SCOPE_CHANGES
           uniqueItems: true
@@ -7243,7 +7968,7 @@ components:
             - WEBHOOK_INGEST
             - TOKEN_REFRESH
             - FEEDBACK_DELIVERY
-            - INLINE_FINDINGS
+            - INLINE_FEEDBACK
             - APPROVAL_WORKFLOW
             - SCOPE_CHANGES
           uniqueItems: true
@@ -7593,18 +8318,21 @@ components:
           - "null"
           description: Practice area to add the practice to. Omit or set to null for
             Unassigned.
-        artifactType:
-          type: string
-          description: Artifact this practice evaluates. Defaults to PULL_REQUEST
-            when omitted.
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-          example: PULL_REQUEST
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+          description: Versioned review settings; omit to use the recommended ones
+            for the work type the bindings name
+        bindings:
+          type: array
+          description: "The one occasion this practice is reviewed on, with the evidence\
+            \ that review reads. The kind of work reviewed is read off the signals."
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+          maxItems: 1
+          minItems: 1
         criteria:
           type: string
-          description: Practice evaluation criteria
+          description: Practice review criteria
           maxLength: 50000
           minLength: 0
         name:
@@ -7615,8 +8343,7 @@ components:
           minLength: 3
         precomputeScript:
           type: string
-          description: TypeScript/Bun precompute script for static analysis before
-            AI review
+          description: TypeScript/Bun static analysis run before automated review
           maxLength: 100000
           minLength: 0
         slug:
@@ -7626,34 +8353,22 @@ components:
           maxLength: 64
           minLength: 3
           pattern: "^[a-z0-9]+(?:-[a-z0-9]+)*$"
-        triggerEvents:
-          type: array
-          description: Domain events that trigger detection; empty for scheduled conversation
-            reviews
-          example:
-          - PullRequestCreated
-          - ReviewSubmitted
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
         whatGoodLooksLike:
           type: string
-          description: "Developer-facing exemplar; a concrete instance, not the assessment\
+          description: "Developer-facing exemplar; a concrete instance, not the review\
             \ criteria"
           maxLength: 2000
           minLength: 0
         whyItMatters:
           type: string
-          description: "Developer-facing rationale (learner layer); plain language,\
-            \ never the detection rubric"
+          description: Plain-language rationale shown to the developer
           maxLength: 2000
           minLength: 0
       required:
+      - bindings
       - criteria
       - name
       - slug
-      - triggerEvents
     CreateReaction:
       type: object
       description: Submit a reaction to a delivered feedback unit
@@ -7672,6 +8387,87 @@ components:
           minLength: 0
       required:
       - action
+    CreateReviewBackfillRunRequest:
+      type: object
+      description: |-
+        Ask for a campaign to be enumerated and costed. Creates nothing that spends money: the run comes back
+         awaiting confirmation, and only a subsequent status change starts it.
+      properties:
+        artifactKind:
+          type: string
+          description: Kind of work to review
+          enum:
+          - scm.pull_request
+          - scm.issue
+          example: scm.pull_request
+        fromAt:
+          type: string
+          format: date-time
+          description: "Window start, inclusive, over the artifact's creation time"
+        toAt:
+          type: string
+          format: date-time
+          description: "Window end, exclusive"
+      required:
+      - artifactKind
+      - fromAt
+      - toAt
+    CreateReviewRequest:
+      type: object
+      description: The piece of work a review is being asked for
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: "The artifact's internal id, as the trace and review listings\
+            \ report it"
+        artifactKind:
+          type: string
+          description: "The artifact kind's wire id, e.g. scm.pull_request. A raw\
+            \ string rather than a closed enum because kinds are an open vocabulary:\
+            \ a build that has never heard of a kind should refuse it by name, not\
+            \ fail to parse the request."
+          example: scm.pull_request
+          minLength: 1
+      required:
+      - artifactId
+      - artifactKind
+    CreateReviewSweepScheduleRequest:
+      type: object
+      description: |-
+        Create a standing instruction to sweep this workspace's recent work.
+
+         <p>Unlike a backfill campaign there is no separate confirmation step: this request <em>is</em> the
+         authorisation to spend on the cadence it names, and it is recorded against the account that made it.
+
+         <p>There is deliberately no repository or author list. Which repositories are reviewed is the
+         workspace's review scope and whose work is reviewed is the practice-review role; both already apply to
+         every review this workspace runs, a sweep included.
+      properties:
+        artifactKind:
+          type: string
+          description: Kind of work to sweep
+          enum:
+          - scm.pull_request
+          - scm.issue
+          example: scm.pull_request
+        cadence:
+          type: string
+          description: How often the sweep runs
+          enum:
+          - DAILY
+          - WEEKLY
+        lookbackDays:
+          type: integer
+          format: int32
+          description: "How far back each sweep looks, in days"
+          example: 2
+          maximum: 7
+          minimum: 1
+      required:
+      - artifactKind
+      - cadence
+      - lookbackDays
     CreateWorkspaceLlmConnectionRequest:
       type: object
       description: Connect your own AI provider
@@ -7947,12 +8743,12 @@ components:
       type: object
       properties:
         definition:
-          $ref: "#/components/schemas/CuratedPracticeRequest"
+          $ref: "#/components/schemas/CuratedPracticeDefinition"
         position:
           type: integer
           format: int32
         shipped:
-          $ref: "#/components/schemas/CuratedPracticeRequest"
+          $ref: "#/components/schemas/CuratedPracticeDefinition"
         slug:
           type: string
         status:
@@ -7962,6 +8758,39 @@ components:
       - position
       - slug
       - status
+    CuratedPracticeDefinition:
+      type: object
+      description: A resolved curated practice definition
+      properties:
+        areaSlug:
+          type: string
+        artifactKind:
+          type: string
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        automatedReviewValidation:
+          $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
+        bindings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+        criteria:
+          type: string
+        name:
+          type: string
+        precomputeScript:
+          type: string
+        whatGoodLooksLike:
+          type: string
+        whyItMatters:
+          type: string
+      required:
+      - artifactKind
+      - automatedReviewPolicy
+      - automatedReviewValidation
+      - bindings
+      - criteria
+      - name
     CuratedPracticeRequest:
       type: object
       description: A complete curated practice definition
@@ -7970,12 +8799,18 @@ components:
           type: string
           maxLength: 64
           minLength: 0
-        artifactType:
-          type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+          description: Evidence requirements; omit to use the recommended requirements
+            for the selected work type
+        bindings:
+          type: array
+          description: The one occasion this practice is reviewed on; the kind of
+            work is read off the signals
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+          maxItems: 1
+          minItems: 1
         criteria:
           type: string
           maxLength: 50000
@@ -7986,14 +8821,8 @@ components:
           minLength: 3
         precomputeScript:
           type: string
-          maxLength: 50000
+          maxLength: 100000
           minLength: 0
-        triggerEvents:
-          type: array
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
         whatGoodLooksLike:
           type: string
           maxLength: 2000
@@ -8003,21 +8832,18 @@ components:
           maxLength: 2000
           minLength: 0
       required:
-      - artifactType
+      - bindings
       - criteria
       - name
-      - triggerEvents
     CuratedPracticeSummary:
       type: object
       properties:
         areaSlug:
           type: string
-        artifactType:
+        artifactKind:
           type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
+        automatedReview:
+          $ref: "#/components/schemas/PracticeAutomatedReview"
         effectivelyOffered:
           type: boolean
         name:
@@ -8030,7 +8856,8 @@ components:
         status:
           $ref: "#/components/schemas/CatalogEntryStatus"
       required:
-      - artifactType
+      - artifactKind
+      - automatedReview
       - effectivelyOffered
       - name
       - position
@@ -8110,6 +8937,38 @@ components:
       - practiceName
       - practiceSlug
       - totalObservations
+    EvidenceCitation:
+      type: object
+      description: A verified quote and its exact source location
+      properties:
+        artifactPath:
+          type: string
+        endLine:
+          type: integer
+          format: int32
+        path:
+          type: string
+        quote:
+          type: string
+        quoteRedacted:
+          type: boolean
+        side:
+          type: string
+          enum:
+          - OLD
+          - NEW
+        sourceKind:
+          type: string
+        startLine:
+          type: integer
+          format: int32
+      required:
+      - artifactPath
+      - endLine
+      - path
+      - quoteRedacted
+      - sourceKind
+      - startLine
     ExportCreated:
       type: object
       description: Acknowledgement returned when a data export is requested.
@@ -8334,6 +9193,85 @@ components:
       required:
       - reason
       - targetAccountId
+    InAppEvidence:
+      type: object
+      description: One piece of work the pattern was observed on
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+          description: Identifier of the work within its kind
+        artifactKind:
+          type: string
+          description: "Kind of work, e.g. scm.pull_request"
+        observedAt:
+          type: string
+          format: date-time
+          description: When the measurement behind this occurrence was taken
+        summary:
+          type: string
+          description: What the review recorded on this piece of work
+      required:
+      - artifactId
+      - artifactKind
+      - observedAt
+    InAppFeedback:
+      type: object
+      description: A process-level message on the developer's own practice pages
+      properties:
+        areaName:
+          type: string
+          description: Area display name; null when the practice has none
+        areaSlug:
+          type: string
+          description: Area the practice sits in; null when the practice has none
+        body:
+          type: string
+          description: "The message, as Markdown; ends with the habit to try next"
+        evidence:
+          type: array
+          description: "The pieces of work the habit was observed on, newest first"
+          items:
+            $ref: "#/components/schemas/InAppEvidence"
+        headline:
+          type: string
+          description: "Short headline naming the habit, never the person"
+        id:
+          type: string
+          format: uuid
+        occurrenceCount:
+          type: integer
+          format: int32
+          description: How many pieces of work carry it — the length of the evidence
+            list
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+          description: Practice this habit belongs to
+        preparedAt:
+          type: string
+          format: date-time
+          description: When the message was composed
+        readAt:
+          type: string
+          format: date-time
+          description: When this developer first opened it; null until they have
+        whatGoodLooksLike:
+          type: string
+          description: "What good looks like, in the learner's framing"
+        whyItMatters:
+          type: string
+          description: "Why this practice matters, in the learner's framing"
+      required:
+      - body
+      - evidence
+      - headline
+      - id
+      - occurrenceCount
+      - practiceName
+      - practiceSlug
+      - preparedAt
     InitiateConnectionRequest:
       type: object
       description: |-
@@ -8361,11 +9299,11 @@ components:
       description: |-
         Flat response for <code>POST /workspaces/{workspaceSlug</code>/connections}.
 
-         <p>Two outcomes, distinguished by {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#type #type}:
+         <p>Two outcomes, distinguished by <code>type</code>:
          <ul>
-           <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#vendorUrl #vendorUrl} is the
+           <li><code>REDIRECT</code> — OAuth / App-install flows (GitHub, Slack). <code>vendorUrl</code> is the
                URL to bounce the browser to; the signed OAuth state is already embedded in it.</li>
-           <li><code>LINKED</code> — inline-credential flows (GitLab PAT). {@link de.tum.cit.aet.hephaestus.integration.core.connection.api.InitiateConnectionResponseDTO#connectionId #connectionId} is the
+           <li><code>LINKED</code> — inline-credential flows (GitLab PAT). <code>connectionId</code> is the
                newly-created Connection; no further round-trip is needed.</li>
          </ul>
 
@@ -8896,6 +9834,7 @@ components:
           - PULL_REQUEST_REVIEW
           - ISSUE_REVIEW
           - CONVERSATION_REVIEW
+          - DOCUMENT_REVIEW
           - MENTOR_TURN
         outputTokens:
           type: integer
@@ -8965,38 +9904,40 @@ components:
       - updatedAt
     ObservationDetail:
       type: object
-      description: Full practice observation detail including guidance and evidence
+      description: Full practice observation detail including delivered feedback and
+        evidence
       properties:
         artifactId:
           type: integer
           format: int64
           description: Artifact entity ID
-        artifactType:
+        artifactKind:
           type: string
           description: Artifact type (e.g. PULL_REQUEST)
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
         assessment:
           type: string
-          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          description: "Assessment: GOOD or BAD; null when the presence carries no\
+            \ direction (NOT_APPLICABLE, INCONCLUSIVE)"
           enum:
           - GOOD
           - BAD
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
-        evidence:
-          type: object
-          additionalProperties: {}
-          description: "Structured evidence: {\"locations\":[{\"path\",\"startLine\"\
-            ,\"endLine\"}], \"snippets\":[...], \"references\":[...]}"
-        guidance:
+        claimCurrentness:
+          type: string
+          description: Whether an observation was produced using the current review
+            rules
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        deliveredFeedback:
           type: string
           description: What to do — the delivered feedback for this observation (null
             if nothing was delivered)
+        evidence:
+          $ref: "#/components/schemas/ObservationEvidence"
+        evidenceRationale:
+          type: string
+          description: Evidence-based rationale for the observation
         id:
           type: string
           format: uuid
@@ -9005,6 +9946,14 @@ components:
           type: string
           format: date-time
           description: When the observation was made
+        origin:
+          type: string
+          description: What occasioned the measurement; never mix origins in one trend
+            line
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         practiceName:
           type: string
           description: Practice name
@@ -9013,14 +9962,12 @@ components:
           description: Practice slug
         presence:
           type: string
-          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE"
           enum:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-        reasoning:
-          type: string
-          description: AI reasoning behind the observation
+          - INCONCLUSIVE
         severity:
           type: string
           description: Severity level (null unless assessment is BAD)
@@ -9029,19 +9976,32 @@ components:
           - MAJOR
           - MINOR
           - INFO
-        title:
+        summary:
           type: string
-          description: Observation title
+          description: Observation summary
       required:
       - artifactId
-      - artifactType
-      - confidence
+      - artifactKind
+      - claimCurrentness
       - id
       - observedAt
+      - origin
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
+    ObservationEvidence:
+      type: object
+      description: "Verified, source-bound evidence for an observation"
+      properties:
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/EvidenceCitation"
+        detector:
+          type: string
+      required:
+      - citations
     ObservationList:
       type: object
       description: Practice observation summary for list views
@@ -9050,23 +10010,24 @@ components:
           type: integer
           format: int64
           description: Artifact entity ID
-        artifactType:
+        artifactKind:
           type: string
           description: Artifact type (e.g. PULL_REQUEST)
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
         assessment:
           type: string
-          description: "Assessment: GOOD or BAD (null when NOT_APPLICABLE)"
+          description: "Assessment: GOOD or BAD; null when the presence carries no\
+            \ direction (NOT_APPLICABLE, INCONCLUSIVE)"
           enum:
           - GOOD
           - BAD
-        confidence:
-          type: number
-          format: float
-          description: AI confidence score (0.0–1.0)
+        claimCurrentness:
+          type: string
+          description: Whether an observation was produced using the current review
+            rules
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         id:
           type: string
           format: uuid
@@ -9075,6 +10036,14 @@ components:
           type: string
           format: date-time
           description: When the observation was made
+        origin:
+          type: string
+          description: What occasioned the measurement; never mix origins in one trend
+            line
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         practiceName:
           type: string
           description: Practice name
@@ -9083,11 +10052,12 @@ components:
           description: Practice slug
         presence:
           type: string
-          description: "Presence: PRESENT, ABSENT, or NOT_APPLICABLE"
+          description: "Presence: PRESENT, ABSENT, NOT_APPLICABLE, or INCONCLUSIVE"
           enum:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INCONCLUSIVE
         severity:
           type: string
           description: Severity level (null unless assessment is BAD)
@@ -9096,19 +10066,20 @@ components:
           - MAJOR
           - MINOR
           - INFO
-        title:
+        summary:
           type: string
-          description: Observation title
+          description: Observation summary
       required:
       - artifactId
-      - artifactType
-      - confidence
+      - artifactKind
+      - claimCurrentness
       - id
       - observedAt
+      - origin
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
     OutlineCollection:
       type: object
       description: A mirrored Outline collection with its sync state and live document
@@ -9440,13 +10411,13 @@ components:
             $ref: "#/components/schemas/ReviewFeedback"
         page:
           $ref: "#/components/schemas/PageMetadata"
-    PagedModelReviewFinding:
+    PagedModelReviewObservation:
       type: object
       properties:
         content:
           type: array
           items:
-            $ref: "#/components/schemas/ReviewFinding"
+            $ref: "#/components/schemas/ReviewObservation"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewRunSummary:
@@ -9456,6 +10427,15 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/ReviewRunSummary"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
+    PagedModelTracedArtifact:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/TracedArtifact"
         page:
           $ref: "#/components/schemas/PageMetadata"
     PlacePracticeRequest:
@@ -9478,19 +10458,23 @@ components:
       type: object
       description: Practice definition for evaluating developer contributions
       properties:
-        active:
-          type: boolean
-          description: Whether this practice is actively being detected
         areaSlug:
           type: string
           description: "Slug of the practice area this practice is bound to, if any"
-        artifactType:
+        artifactKind:
           type: string
-          description: Artifact this practice evaluates
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
+          description: "Kind of work this practice reviews, read off its bindings"
+          example: scm.pull_request
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        automatedReviewValidation:
+          $ref: "#/components/schemas/PracticeAutomatedReviewValidation"
+        bindings:
+          type: array
+          description: "The one occasion this practice is reviewed on, with the evidence\
+            \ that review reads"
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
         catalogOrigin:
           $ref: "#/components/schemas/CatalogOrigin"
         createdAt:
@@ -9499,7 +10483,7 @@ components:
           description: Timestamp when the practice was created
         criteria:
           type: string
-          description: Practice evaluation criteria
+          description: Practice review criteria
         displayOrder:
           type: integer
           format: int32
@@ -9515,14 +10499,14 @@ components:
           type: string
           description: TypeScript/Bun precompute script for static analysis before
             AI review
+        reviewTier:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: "How much autonomy the system has over this practice, whether\
+            \ that was set here or inherited from its area or workspace, and which\
+            \ level decided it"
         slug:
           type: string
           description: URL-safe identifier unique within workspace
-        triggerEvents:
-          type: array
-          description: Domain events that trigger detection
-          items:
-            type: string
         updatedAt:
           type: string
           format: date-time
@@ -9534,23 +10518,22 @@ components:
           type: string
           description: Developer-facing rationale (learner layer)
       required:
-      - active
-      - artifactType
+      - artifactKind
+      - automatedReviewPolicy
+      - automatedReviewValidation
+      - bindings
       - createdAt
       - criteria
       - displayOrder
       - id
       - name
+      - reviewTier
       - slug
-      - triggerEvents
       - updatedAt
     PracticeArea:
       type: object
       description: A practice area grouping related practices into a learning objective
       properties:
-        active:
-          type: boolean
-          description: Whether this area is active
         catalogOrigin:
           $ref: "#/components/schemas/CatalogOrigin"
         color:
@@ -9577,6 +10560,11 @@ components:
         name:
           type: string
           description: Human-readable name
+        reviewTier:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: "How much autonomy the system has over every practice in this\
+            \ area that holds no tier of its own, whether that was set here or inherited\
+            \ from the workspace, and which level decided it"
         slug:
           type: string
           description: URL-safe identifier unique within the workspace
@@ -9584,13 +10572,287 @@ components:
           type: string
           format: date-time
           description: Timestamp when the area was last updated
+        visibleInPracticeDashboards:
+          type: boolean
+          description: Whether this area is shown in practice dashboards
       required:
-      - active
       - createdAt
       - displayOrder
       - id
       - name
+      - reviewTier
       - slug
+      - visibleInPracticeDashboards
+    PracticeAutomatedReview:
+      type: object
+      description: Author-declared automated review and evidence sufficiency for one
+        practice
+      properties:
+        evidenceSufficiency:
+          type: string
+          description: Whether meeting every evidence requirement provides enough
+            context to review the work
+          enum:
+          - SUFFICIENT_WHEN_REQUIREMENTS_MET
+          - DECLARED_EVIDENCE_INSUFFICIENT
+          - NONE
+        mode:
+          type: string
+          description: Implementation Hephaestus uses for automated review
+          enum:
+          - LANGUAGE_MODEL
+          - NONE
+      required:
+      - evidenceSufficiency
+      - mode
+    PracticeAutomatedReviewPolicy:
+      type: object
+      description: Author-defined automated review settings for one practice revision
+      properties:
+        automatedReview:
+          $ref: "#/components/schemas/PracticeAutomatedReview"
+          description: Automated review configuration; human review is a separate
+            process
+        insufficiencyReason:
+          $ref: "#/components/schemas/PracticeEvidenceLimitation"
+          description: Why this practice needs a human rather than automated review;
+            present only when evidenceSufficiency is DECLARED_EVIDENCE_INSUFFICIENT
+        knownLimitations:
+          type: array
+          description: Claims the selected evidence cannot support even when every
+            requirement passes
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceLimitation"
+        sourceContractVersion:
+          type: string
+          description: Exact contract version that defines source kinds and source-state
+            semantics
+        whenEvidenceIsInsufficient:
+          type: string
+          description: Conservative action when required evidence does not pass
+          enum:
+          - SKIP_AUTOMATED_REVIEW
+      required:
+      - automatedReview
+      - knownLimitations
+      - sourceContractVersion
+      - whenEvidenceIsInsufficient
+    PracticeAutomatedReviewValidation:
+      type: object
+      description: "Who stands behind a practice's automated-review policy, and which\
+        \ exact policy"
+      properties:
+        policyDigest:
+          type: string
+          description: SHA-256 digest of the exact automated-review policy
+        reviewRuleFingerprint:
+          type: string
+          description: Versioned fingerprint of the exact review rules
+        sourceContractVersion:
+          type: string
+          description: Source contract the declared practice definition is written
+            against
+        status:
+          type: string
+          description: Validation lifecycle; authors cannot mark their own review
+            policy as independently validated
+          enum:
+          - AUTHOR_DECLARED
+      required:
+      - policyDigest
+      - reviewRuleFingerprint
+      - sourceContractVersion
+      - status
+    PracticeBinding:
+      type: object
+      description: "An occasion that starts a review, and the evidence that review\
+        \ reads"
+      properties:
+        appliesWhen:
+          $ref: "#/components/schemas/PracticeSubject"
+          description: What must be in the work for this practice to apply; omit to
+            always apply
+        needs:
+          type: array
+          description: "Sources a review occasioned this way reads, each with the\
+            \ stance it takes"
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+        onDrafts:
+          type: boolean
+          description: Whether an artifact still marked draft occasions this review;
+            omit for false
+        signals:
+          type: array
+          description: "Signals that occasion this review, e.g. scm.pull_request.merged"
+          items:
+            type: string
+          minItems: 1
+        subject:
+          type: string
+          description: Whose conduct this review judges; omit for AUTHOR
+          enum:
+          - AUTHOR
+          - ASSIGNEE
+          - REVIEWER
+      required:
+      - needs
+      - signals
+    PracticeDefinitionOptions:
+      type: object
+      description: "What a practice author may choose, per type of reviewed work"
+      properties:
+        sourceContractVersion:
+          type: string
+          description: Source contract these options describe
+          example: 1.0.0
+        workTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeWorkTypeDefinitionOptions"
+      required:
+      - sourceContractVersion
+      - workTypes
+    PracticeEvidenceBlocker:
+      type: object
+      description: "One thing that blocked automated review, and how many reviews\
+        \ it affected"
+      properties:
+        reasonCode:
+          type: string
+          description: Readiness reason recorded for that source or practice
+          enum:
+          - SOURCE_NOT_AVAILABLE
+          - SOURCE_INCOMPLETE
+          - SOURCE_EMPTY
+          - NO_AUTOMATED_REVIEW
+          - DECLARED_EVIDENCE_INSUFFICIENT
+          - SUBJECT_NOT_IN_THE_WORK
+        reviewsAffected:
+          type: integer
+          format: int32
+          description: Reviews this blocker affected
+        sourceKind:
+          type: string
+          description: Source that did not meet its requirement; absent when the practice
+            itself runs no review
+      required:
+      - reasonCode
+      - reviewsAffected
+    PracticeEvidenceLimitation:
+      type: object
+      description: Known claim that the selected evidence cannot support even when
+        every requirement passes
+      properties:
+        code:
+          type: string
+          description: Stable machine-readable identifier
+          example: RUNTIME_BEHAVIOR_NOT_OBSERVED
+          pattern: "[A-Z][A-Z0-9_]{2,63}"
+        description:
+          type: string
+          description: Plain-language explanation of the claim the evidence cannot
+            support
+          maxLength: 500
+          minLength: 1
+      required:
+      - code
+      - description
+    PracticeEvidenceOutcome:
+      type: object
+      description: Recent review readiness for one practice's evidence requirements
+      properties:
+        blockersObserved:
+          type: array
+          description: "Blockers seen on the skipped reviews, most frequent first"
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceBlocker"
+        consideredReviews:
+          type: integer
+          format: int32
+          description: Reviews that considered this practice
+        practiceSlug:
+          type: string
+          description: Practice this outcome describes
+        reviewedCount:
+          type: integer
+          format: int32
+          description: Reviews where the evidence met every requirement
+      required:
+      - blockersObserved
+      - consideredReviews
+      - practiceSlug
+      - reviewedCount
+    PracticeEvidenceRequirement:
+      type: object
+      description: A source a practice reads and the stance it takes towards it
+      properties:
+        sourceKind:
+          type: string
+          description: Stable source identifier from the selected source contract
+        stance:
+          type: string
+          description: Whether an absent or degraded capture refuses the review
+          enum:
+          - REQUIRED
+          - EXHAUSTIVE
+          - CONTEXTUAL
+      required:
+      - sourceKind
+      - stance
+    PracticeEvidenceSourceOption:
+      type: object
+      description: An evidence source a practice on this kind of work may read
+      properties:
+        description:
+          type: string
+        displayName:
+          type: string
+        privacyClass:
+          type: string
+          enum:
+          - INTERNAL
+          - PERSONAL
+          - SENSITIVE_PERSONAL
+        requiredQuality:
+          type: string
+          description: What requiring this source demands of its capture; fixed by
+            the source contract
+          enum:
+          - ANY_CAPTURE
+          - COMPLETE
+          - COMPLETE_AND_NON_EMPTY
+        selectionScope:
+          type: string
+          description: "How much of the source one capture takes, and the bound past\
+            \ which it is no longer whole"
+        sourceKind:
+          type: string
+        supportsExhaustiveEvidence:
+          type: boolean
+          description: "Whether this source can be captured whole, and so whether\
+            \ a practice may rest a claim about what is absent from it on the capture"
+      required:
+      - description
+      - displayName
+      - privacyClass
+      - requiredQuality
+      - selectionScope
+      - sourceKind
+      - supportsExhaustiveEvidence
+    PracticeManualReviewSignal:
+      type: object
+      description: The signal a person raises by asking for a review of this work
+        type by hand
+      properties:
+        displayName:
+          type: string
+        signal:
+          type: string
+          example: scm.pull_request.manual_review
+      required:
+      - displayName
+      - signal
     PracticeReviewSettings:
       type: object
       description: "A workspace's practice-review policy: effective values plus raw\
@@ -9604,29 +10866,247 @@ components:
           type: integer
           format: int32
           description: Raw override; null = inheriting the fleet default
+        defaultReviewTier:
+          type: string
+          description: "Effective: how much autonomy the system has over practices\
+            \ and areas that hold no tier of their own — the bottom of the practice\
+            \ → area → workspace chain"
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
+        defaultReviewTierOverride:
+          type: string
+          description: "Raw override; null = this workspace has never chosen, so DELIVER\
+            \ applies"
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
         deliverToMerged:
           type: boolean
           description: "Effective: deliver feedback to merged PRs/MRs"
         deliverToMergedOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
+        reviewScope:
+          $ref: "#/components/schemas/WorkspaceReviewScope"
+          description: "Which work is reviewed at all, ANDed onto every practice binding.\
+            \ Empty lists mean no restriction on that axis. Exact names only — no\
+            \ patterns, and no path scope (changed paths are not known where the decision\
+            \ is made)."
         runForAllUsers:
           type: boolean
           description: "Effective: run practice review for all developers"
         runForAllUsersOverride:
           type: boolean
           description: Raw override; null = inheriting the fleet default
-        skipDrafts:
-          type: boolean
-          description: "Effective: skip draft PRs/MRs"
-        skipDraftsOverride:
-          type: boolean
-          description: Raw override; null = inheriting the fleet default
       required:
       - cooldownMinutes
+      - defaultReviewTier
       - deliverToMerged
+      - reviewScope
       - runForAllUsers
-      - skipDrafts
+    PracticeSignalOption:
+      type: object
+      description: A signal a practice can start an automated review on
+      properties:
+        displayName:
+          type: string
+        recommended:
+          type: boolean
+        signal:
+          type: string
+          example: scm.pull_request.ready
+      required:
+      - displayName
+      - recommended
+      - signal
+    PracticeSubject:
+      type: object
+      description: What must be in a piece of work for this practice to have anything
+        to judge
+      properties:
+        absentSays:
+          type: string
+          description: "Sentence shown when the subject was proven absent, in the\
+            \ author's voice"
+          maxLength: 300
+          minLength: 0
+        anyOf:
+          type: array
+          description: Shapes the subject may take; the subject is present when any
+            one is found
+          items:
+            $ref: "#/components/schemas/PracticeSubjectClause"
+          maxItems: 10
+          minItems: 1
+      required:
+      - absentSays
+    PracticeSubjectClause:
+      type: object
+      description: One shape the subject a practice judges can take in a piece of
+        work
+      properties:
+        changedPathMatches:
+          type: array
+          description: Globs; holds when the change touches a matching path
+          items:
+            type: string
+        diffContains:
+          type: array
+          description: Literal strings; holds when the diff contains one of them
+          items:
+            type: string
+        evidenceHasItems:
+          type: string
+          description: Named evidence collection; holds when it has at least one entry
+          enum:
+          - scm.review-threads
+          - scm.inline-review-comments
+          - scm.general-review-comments
+    PracticeTraceEntry:
+      type: object
+      description: "What became of one practice on this artifact, and whether anyone\
+        \ heard about it"
+      properties:
+        decidedAt:
+          type: string
+          format: date-time
+          description: When the answer was settled
+        deliveredCount:
+          type: integer
+          format: int32
+          description: Interventions actually delivered to a person
+        explanation:
+          type: string
+          description: "The outcome in a sentence, phrased as what would change it"
+        observationCount:
+          type: integer
+          format: int32
+          description: Measurements this practice produced on this artifact
+        occasionedBy:
+          type: string
+          description: The occurrence this answer is about; null when nothing it watches
+            happened
+        occasionedById:
+          type: string
+          format: uuid
+          description: That occurrence's id in this trace's signals list. The name
+            alone cannot identify it — the same signal recurs on every revision —
+            so this is what a link should follow.
+        outcome:
+          type: string
+          enum:
+          - REVIEWED
+          - RUNNING
+          - PENDING
+          - SKIPPED
+          - NOT_ASSESSABLE
+          - TURNED_OFF
+          - NOT_OCCASIONED
+          - DORMANT
+          - LAPSED
+          - FAILED
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        reviewId:
+          type: string
+          format: uuid
+          description: "The review this answer came from, when one ran"
+        reviewTier:
+          type: string
+          description: "How much autonomy the workspace currently gives this practice,\
+            \ after inheritance"
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
+        watches:
+          type: array
+          description: The signals this practice watches
+          items:
+            type: string
+        withheldReasons:
+          type: array
+          description: Why prepared feedback was withheld. Non-empty with observations
+            present means we measured and deliberately said nothing.
+          items:
+            type: string
+            enum:
+            - VOLUME_CAPPED
+            - COMPOSER_DEDUPED
+            - REACTED_DISPUTED
+            - REACTED_NOT_APPLICABLE
+            - CONVERSATION_EXPIRED
+            - ARTIFACT_GONE
+            - ARTIFACT_CLOSED
+            - ARTIFACT_MERGED
+            - ARTIFACT_DRAFT
+            - RECIPIENT_OPTED_OUT
+            - EMPTY_AFTER_SANITIZE
+            - INSTANCE_SILENCED
+            - PRACTICE_TIER_QUIET
+            - BACKFILL_QUIET
+      required:
+      - deliveredCount
+      - explanation
+      - observationCount
+      - outcome
+      - practiceName
+      - practiceSlug
+      - reviewTier
+      - watches
+      - withheldReasons
+    PracticeWorkTypeDefinitionOptions:
+      type: object
+      description: "Review timing, evidence choices, and recommended settings for\
+        \ one type of reviewed work"
+      properties:
+        allowedSources:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceSourceOption"
+        artifactKind:
+          type: string
+        manualReviewSignal:
+          $ref: "#/components/schemas/PracticeManualReviewSignal"
+          description: "How a person asks for a review of this work type by hand,\
+            \ or absent where the work type admits no such request. Not an occasion\
+            \ to bind to: such a request reviews every practice on the work type whatever\
+            \ state the work is in."
+        recommendedNeeds:
+          type: array
+          description: Evidence a new binding on this work type starts with when the
+            author says nothing
+          items:
+            $ref: "#/components/schemas/PracticeEvidenceRequirement"
+        recommendedPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+        signals:
+          type: array
+          description: The occasions a practice on this work type can be bound to.
+            A review somebody asks for by hand is not among them — see manualReviewSignal.
+          items:
+            $ref: "#/components/schemas/PracticeSignalOption"
+        supportedAutomatedReviewModes:
+          type: array
+          items:
+            type: string
+            description: Author-declared approach for automated review; this does
+              not describe human review
+            enum:
+            - LANGUAGE_MODEL
+            - NONE
+      required:
+      - allowedSources
+      - artifactKind
+      - recommendedNeeds
+      - recommendedPolicy
+      - signals
+      - supportedAutomatedReviewModes
     ProbeLlmConnectionRequest:
       type: object
       description: Draft connection probe using a supplied (never-persisted) credential
@@ -10108,17 +11588,17 @@ components:
         addressed:
           type: integer
           format: int64
-          description: "RESPONSE: findings the developer acted on (the recipience\
+          description: "RESPONSE: observations the developer acted on (the recipience\
             \ act, not the outcome)"
         disputed:
           type: integer
           format: int64
-          description: "RESPONSE: findings the developer rejected with a reasoned\
+          description: "RESPONSE: observations the developer rejected with a reasoned\
             \ explanation"
         notApplicable:
           type: integer
           format: int64
-          description: "VALIDITY: findings marked out-of-scope — a detector-scope\
+          description: "VALIDITY: observations marked out-of-scope — a detector-scope\
             \ signal, NOT an uptake count"
       required:
       - addressed
@@ -10132,14 +11612,10 @@ components:
           type: integer
           format: int64
           description: Id of the PR / issue this is about
-        artifactType:
+        artifactKind:
           type: string
           description: The kind of work this is about (PR / issue)
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-        guidance:
+        deliveredFeedback:
           type: string
           description: What to do — the delivered feedback for this observation (null
             if nothing was delivered)
@@ -10151,6 +11627,15 @@ components:
           type: string
           format: uuid
           description: Observation id — handle to open the full detail
+        origin:
+          type: string
+          description: "What occasioned the measurement. BACKFILL means it came from\
+            \ a review of past work rather than from something that just happened,\
+            \ and nothing was posted anywhere at the time."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         severity:
           type: string
           description: Impact level (null unless assessed BAD)
@@ -10164,8 +11649,9 @@ components:
           description: The headline of the feedback
       required:
       - artifactId
-      - artifactType
+      - artifactKind
       - observationId
+      - origin
       - title
     ReflectionPractice:
       type: object
@@ -10386,10 +11872,6 @@ components:
           type: string
         type:
           type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
         url:
           type: string
           description: "Provider URL, when one is available"
@@ -10397,9 +11879,108 @@ components:
       - id
       - title
       - type
+    ReviewBackfillRun:
+      type: object
+      description: "A campaign as an admin sees it — before confirming, while it runs,\
+        \ and after it ends."
+      properties:
+        artifactKind:
+          type: string
+        confirmedByAccountId:
+          type: integer
+          format: int64
+          description: Who authorised the spend; absent until the run is confirmed
+        createdAt:
+          type: string
+          format: date-time
+        discoveredVia:
+          type: string
+          description: "BACKFILL for a campaign an admin scoped by hand, SWEEP for\
+            \ one a recurring schedule opened"
+          enum:
+          - EVENT
+          - SYNC
+          - MANUAL
+          - BACKFILL
+          - SWEEP
+        estimatedArtifacts:
+          type: integer
+          format: int32
+        estimatedCostUsd:
+          type: number
+          format: decimal
+          description: Forecast total spend in USD; absent when the workspace has
+            no priced review history
+        failedCount:
+          type: integer
+          format: int32
+          description: |-
+            artifacts whose submission threw, leaving no job and no recorded decision. Non-zero
+                 means this campaign's baseline has holes in it, which is why it is reported apart from a pass.
+        finishedAt:
+          type: string
+          format: date-time
+        fromAt:
+          type: string
+          format: date-time
+        id:
+          type: string
+          format: uuid
+        passedCount:
+          type: integer
+          format: int32
+          description: |-
+            artifacts walked past without one: already measured at their current state, or
+                 refused by the review gate. The campaign looked at each of these and decided.
+        pauseReason:
+          type: string
+          description: Set only while the run is PAUSED
+          enum:
+          - BUDGET_EXHAUSTED
+          - REVIEW_MODEL_UNBOUND
+          - WORKSPACE_UNAVAILABLE
+        requestedByAccountId:
+          type: integer
+          format: int64
+        startedAt:
+          type: string
+          format: date-time
+        status:
+          type: string
+          enum:
+          - AWAITING_CONFIRMATION
+          - RUNNING
+          - PAUSED
+          - COMPLETED
+          - CANCELLED
+        submittedCount:
+          type: integer
+          format: int32
+          description: artifacts for which a review job was created
+        sweepScheduleId:
+          type: string
+          format: uuid
+          description: The schedule that opened this run; absent for a campaign an
+            admin scoped by hand
+        toAt:
+          type: string
+          format: date-time
+      required:
+      - artifactKind
+      - createdAt
+      - discoveredVia
+      - estimatedArtifacts
+      - failedCount
+      - fromAt
+      - id
+      - passedCount
+      - requestedByAccountId
+      - status
+      - submittedCount
+      - toAt
     ReviewBoundFeedback:
       type: object
-      description: A message composed from a finding
+      description: Feedback composed from an observation
       properties:
         agentJobId:
           type: string
@@ -10408,8 +11989,8 @@ components:
           type: string
           enum:
           - IN_CONTEXT
-          - CONVERSATION
-          - PROFILE
+          - IN_CHAT
+          - IN_APP
         createdAt:
           type: string
           format: date-time
@@ -10430,7 +12011,7 @@ components:
           format: uuid
         role:
           type: string
-          description: Whether the finding led the message or reinforced it
+          description: Whether the observation led the feedback or reinforced it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -10450,6 +12031,8 @@ components:
           - RECIPIENT_OPTED_OUT
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
+          - PRACTICE_TIER_QUIET
+          - BACKFILL_QUIET
       required:
       - agentJobId
       - channel
@@ -10457,9 +12040,9 @@ components:
       - deliveryState
       - feedbackId
       - role
-    ReviewBoundFinding:
+    ReviewBoundObservation:
       type: object
-      description: A finding that contributed to a message
+      description: An observation that contributed to a piece of feedback
       properties:
         area:
           $ref: "#/components/schemas/ReviewPracticeArea"
@@ -10470,13 +12053,15 @@ components:
           enum:
           - GOOD
           - BAD
-        confidence:
-          type: number
-          format: float
-          description: Detector confidence
-          maximum: 1
-          minimum: 0
-        findingId:
+        claimCurrentness:
+          type: string
+          description: Whether an observation was produced using the current review
+            rules
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        observationId:
           type: string
           format: uuid
         observedAt:
@@ -10485,7 +12070,7 @@ components:
         ordinal:
           type: integer
           format: int32
-          description: Render order within the message (lower renders earlier)
+          description: Render order within the feedback (lower renders earlier)
         practiceName:
           type: string
         practiceSlug:
@@ -10496,9 +12081,10 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INCONCLUSIVE
         role:
           type: string
-          description: Whether the finding leads the message or reinforces it
+          description: Whether the observation leads the feedback or reinforces it
           enum:
           - PRIMARY
           - SUPPORTING
@@ -10510,18 +12096,18 @@ components:
           - MAJOR
           - MINOR
           - INFO
-        title:
+        summary:
           type: string
       required:
-      - confidence
-      - findingId
+      - claimCurrentness
+      - observationId
       - observedAt
       - ordinal
       - practiceName
       - practiceSlug
       - presence
       - role
-      - title
+      - summary
     ReviewFeedback:
       type: object
       properties:
@@ -10530,10 +12116,10 @@ components:
           format: uuid
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
-          description: Work item the message targets; null for an unanchored message
+          description: Work item the feedback targets; null when it is unanchored
         bodyPreview:
           type: string
-          description: Leading characters of the composed body; null when the message
+          description: Leading characters of the composed body; null when the feedback
             carries no body
         bodyTruncated:
           type: boolean
@@ -10541,15 +12127,15 @@ components:
           type: string
           enum:
           - IN_CONTEXT
-          - CONVERSATION
-          - PROFILE
+          - IN_CHAT
+          - IN_APP
         createdAt:
           type: string
           format: date-time
         deliveredAt:
           type: string
           format: date-time
-          description: When the message was placed; null if it was not delivered
+          description: When the feedback was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -10558,27 +12144,27 @@ components:
           - SUPERSEDED
           - SUPPRESSED
           - FAILED
-        findingCount:
-          type: integer
-          format: int64
-          description: Number of findings used to compose the message
         id:
           type: string
           format: uuid
+        observationCount:
+          type: integer
+          format: int64
+          description: Number of observations used to compose the feedback
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Who the message is addressed to; null when the identity is
+          description: Who the feedback is addressed to; null when the identity is
             no longer resolvable
         replacesId:
           type: string
           format: uuid
-          description: The message this one replaced; null on a first delivery
+          description: The feedback this one replaced; null on a first delivery
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the message addresses; may equal the recipient
+          description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why the feedback was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -10592,14 +12178,16 @@ components:
           - RECIPIENT_OPTED_OUT
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
+          - PRACTICE_TIER_QUIET
+          - BACKFILL_QUIET
       required:
       - agentJobId
       - bodyTruncated
       - channel
       - createdAt
       - deliveryState
-      - findingCount
       - id
+      - observationCount
     ReviewFeedbackCounts:
       type: object
       description: Counts of feedback by delivery state
@@ -10634,23 +12222,25 @@ components:
           format: uuid
         artifact:
           $ref: "#/components/schemas/ReviewArtifact"
-          description: Work item the message targets; null for an unanchored message
+          description: Work item the feedback targets; null when it is unanchored
         body:
           type: string
-          description: Stored composed body; null when none was produced
+          description: "Stored composed body; null when none was produced, and always\
+            \ null on the IN_APP and IN_CHAT channels — neither the developer's practice\
+            \ pages nor the mentor's queued move is readable by an operator"
         channel:
           type: string
           enum:
           - IN_CONTEXT
-          - CONVERSATION
-          - PROFILE
+          - IN_CHAT
+          - IN_APP
         createdAt:
           type: string
           format: date-time
         deliveredAt:
           type: string
           format: date-time
-          description: When the message was placed; null if it was not delivered
+          description: When the feedback was placed; null if it was not delivered
         deliveryState:
           type: string
           enum:
@@ -10659,14 +12249,14 @@ components:
           - SUPERSEDED
           - SUPPRESSED
           - FAILED
-        findings:
-          type: array
-          description: Source findings in render order
-          items:
-            $ref: "#/components/schemas/ReviewBoundFinding"
         id:
           type: string
           format: uuid
+        observations:
+          type: array
+          description: Source observations in render order
+          items:
+            $ref: "#/components/schemas/ReviewBoundObservation"
         placements:
           type: array
           description: Recorded placements; empty when none
@@ -10674,18 +12264,18 @@ components:
             $ref: "#/components/schemas/ReviewPlacement"
         recipient:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Who the message is addressed to; null when the identity is
+          description: Who the feedback is addressed to; null when the identity is
             no longer resolvable
         replacesId:
           type: string
           format: uuid
-          description: The message this one replaced; null on a first delivery
+          description: The feedback this one replaced; null on a first delivery
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the message addresses; may equal the recipient
+          description: Whose work the feedback addresses; may equal the recipient
         suppressionReason:
           type: string
-          description: Why the message was withheld; null unless the state is SUPPRESSED
+          description: Why the feedback was withheld; null unless the state is SUPPRESSED
           enum:
           - VOLUME_CAPPED
           - COMPOSER_DEDUPED
@@ -10699,6 +12289,8 @@ components:
           - RECIPIENT_OPTED_OUT
           - EMPTY_AFTER_SANITIZE
           - INSTANCE_SILENCED
+          - PRACTICE_TIER_QUIET
+          - BACKFILL_QUIET
         threadKey:
           type: string
           description: Cross-run continuity key tying successive deliveries together
@@ -10707,8 +12299,8 @@ components:
       - channel
       - createdAt
       - deliveryState
-      - findings
       - id
+      - observations
       - placements
     ReviewFeedbackDisposition:
       type: object
@@ -10717,32 +12309,32 @@ components:
         delivered:
           type: integer
           format: int64
-          description: Linked messages delivered
+          description: Linked feedback delivered
         failed:
           type: integer
           format: int64
-          description: Linked messages whose delivery failed
+          description: Linked feedback whose delivery failed
         prepared:
           type: integer
           format: int64
-          description: Linked messages awaiting delivery
+          description: Linked feedback awaiting delivery
         superseded:
           type: integer
           format: int64
-          description: Linked messages delivered and later replaced
+          description: Linked feedback delivered and later replaced
         suppressed:
           type: integer
           format: int64
-          description: Linked messages withheld by policy
+          description: Linked feedback withheld by policy
       required:
       - delivered
       - failed
       - prepared
       - superseded
       - suppressed
-    ReviewFinding:
+    ReviewObservation:
       type: object
-      description: A practice review finding with its linked feedback outcomes
+      description: A practice review observation with its linked feedback outcomes
       properties:
         agentJobId:
           type: string
@@ -10758,21 +12350,32 @@ components:
           enum:
           - GOOD
           - BAD
-        confidence:
-          type: number
-          format: float
-          description: Detector confidence
-          maximum: 1
-          minimum: 0
+        claimCurrentness:
+          type: string
+          description: Whether an observation was produced using the current review
+            rules
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
         feedbackDisposition:
           $ref: "#/components/schemas/ReviewFeedbackDisposition"
-          description: Counts of linked messages by delivery state
+          description: Counts of linked feedback by delivery state
         id:
           type: string
           format: uuid
         observedAt:
           type: string
           format: date-time
+        origin:
+          type: string
+          description: "What occasioned the measurement. BACKFILL came from a confirmed\
+            \ campaign over work that already existed, so it is not a point on the\
+            \ live trend line."
+          enum:
+          - LIVE
+          - MANUAL
+          - BACKFILL
         practiceName:
           type: string
         practiceSlug:
@@ -10783,6 +12386,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
+          - INCONCLUSIVE
         recurrenceKey:
           type: string
           description: Cross-run locus key; null when continuity is unavailable
@@ -10796,28 +12400,36 @@ components:
           - INFO
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the finding is about; null when the identity is
-            no longer resolvable
-        title:
+          description: Whose work the observation is about; null when the identity
+            is no longer resolvable
+        summary:
           type: string
       required:
       - agentJobId
       - artifact
-      - confidence
+      - claimCurrentness
       - feedbackDisposition
       - id
       - observedAt
+      - origin
       - practiceName
       - practiceSlug
       - presence
-      - title
-    ReviewFindingCounts:
+      - summary
+    ReviewObservationCounts:
       type: object
-      description: Counts of findings by assessment
+      description: Counts of observations by assessment
       properties:
+        inconclusive:
+          type: integer
+          format: int64
+          description: Practices that looked at the evidence and could not settle
+            the question either way; reported apart from notApplicable because one
+            says there was nothing here to judge and the other says we could not tell
         notApplicable:
           type: integer
           format: int64
+          description: Practices whose subject did not occur in this work
         problems:
           type: integer
           format: int64
@@ -10825,12 +12437,13 @@ components:
           type: integer
           format: int64
       required:
+      - inconclusive
       - notApplicable
       - problems
       - strengths
-    ReviewFindingDetail:
+    ReviewObservationDetail:
       type: object
-      description: A finding with evidence and linked feedback
+      description: An observation with evidence and linked feedback
       properties:
         agentJobId:
           type: string
@@ -10846,13 +12459,18 @@ components:
           enum:
           - GOOD
           - BAD
-        confidence:
-          type: number
-          format: float
-          description: Detector confidence
-          maximum: 1
-          minimum: 0
-        evidence: {}
+        claimCurrentness:
+          type: string
+          description: Whether an observation was produced using the current review
+            rules
+          enum:
+          - CURRENT
+          - STALE
+          - UNVERIFIABLE
+        evidence:
+          $ref: "#/components/schemas/ObservationEvidence"
+        evidenceRationale:
+          type: string
         feedback:
           type: array
           description: "Linked feedback, newest first"
@@ -10878,8 +12496,7 @@ components:
           - PRESENT
           - ABSENT
           - NOT_APPLICABLE
-        reasoning:
-          type: string
+          - INCONCLUSIVE
         recurrenceKey:
           type: string
           description: Cross-run locus key; null when continuity is unavailable
@@ -10893,21 +12510,21 @@ components:
           - INFO
         subject:
           $ref: "#/components/schemas/ReviewSubject"
-          description: Whose work the finding is about; null when the identity is
-            no longer resolvable
-        title:
+          description: Whose work the observation is about; null when the identity
+            is no longer resolvable
+        summary:
           type: string
       required:
       - agentJobId
       - artifact
-      - confidence
+      - claimCurrentness
       - feedback
       - id
       - observedAt
       - practiceName
       - practiceSlug
       - presence
-      - title
+      - summary
     ReviewPlacement:
       type: object
       description: A recorded message placement
@@ -10972,20 +12589,63 @@ components:
       required:
       - name
       - slug
+    ReviewRequestOutcome:
+      type: object
+      description: What came of asking for a review
+      properties:
+        jobId:
+          type: string
+          format: uuid
+          description: The review that is now running; absent when none was started
+        reason:
+          type: string
+          description: The controlled-vocabulary reason nothing was started; absent
+            when a review was started
+          enum:
+          - GATE_SKIPPED
+          - COOLDOWN_ACTIVE
+          - REQUEST_COOLDOWN_ACTIVE
+          - REQUESTER_QUOTA_EXHAUSTED
+          - CONCURRENT_DUPLICATE
+          - OUT_OF_REVIEW_SCOPE
+          - WORKSPACE_INACTIVE
+          - PRACTICES_DISABLED
+          - NO_ACTIVE_PRACTICE
+          - REVIEW_MODEL_UNBOUND
+          - PRACTICE_TIER_OFF
+          - BUDGET_EXHAUSTED
+          - SUBJECT_UNLINKED
+          - MODEL_UNAVAILABLE
+          - PENDING_DEADLINE_EXCEEDED
+          - ARTIFACT_GONE
+        reasonDescription:
+          type: string
+          description: "The reason as one sentence for the person who asked. Render\
+            \ it verbatim: it is written next to the reason it explains so that every\
+            \ surface says the same thing, and a re-worded copy is how a screen and\
+            \ a support answer come to disagree."
+        status:
+          type: string
+          description: "Whether a review is now running, or nothing was started"
+          enum:
+          - SUBMITTED
+          - REFUSED
+      required:
+      - status
     ReviewRunSummary:
       type: object
-      description: A review run with finding and feedback outcome counts
+      description: A review run with observation and feedback outcome counts
       properties:
         createdAt:
           type: string
           format: date-time
         feedback:
           $ref: "#/components/schemas/ReviewFeedbackCounts"
-        findings:
-          $ref: "#/components/schemas/ReviewFindingCounts"
         id:
           type: string
           format: uuid
+        observations:
+          $ref: "#/components/schemas/ReviewObservationCounts"
         status:
           type: string
           enum:
@@ -11000,8 +12660,8 @@ components:
       required:
       - createdAt
       - feedback
-      - findings
       - id
+      - observations
       - status
       - target
     ReviewRunTarget:
@@ -11031,10 +12691,6 @@ components:
           type: string
         type:
           type: string
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
         url:
           type: string
       required:
@@ -11057,6 +12713,120 @@ components:
       required:
       - id
       - login
+    ReviewSweepSchedule:
+      type: object
+      description: "A standing instruction to review recent work on a cadence, as\
+        \ an admin sees it."
+      properties:
+        artifactKind:
+          type: string
+        cadence:
+          type: string
+          enum:
+          - DAILY
+          - WEEKLY
+        createdAt:
+          type: string
+          format: date-time
+        createdByAccountId:
+          type: integer
+          format: int64
+        enabled:
+          type: boolean
+        id:
+          type: string
+          format: uuid
+        lastRunAt:
+          type: string
+          format: date-time
+          description: When a campaign was last opened from this schedule; absent
+            until the first one
+        lookbackDays:
+          type: integer
+          format: int32
+          description: |-
+            how far back each sweep looks. Bounded at write time to twice the cadence and
+                 never more than a week, which is what keeps a sweep's observations admissible in the same trend line
+                 as reviews that events triggered.
+        nextRunAt:
+          type: string
+          format: date-time
+          description: |-
+            when the next sweep is due. Shown because it is the only way to tell a schedule that
+                 is working from one whose workspace has been skipping it.
+      required:
+      - artifactKind
+      - cadence
+      - createdAt
+      - createdByAccountId
+      - enabled
+      - id
+      - lookbackDays
+      - nextRunAt
+    ReviewTierAssignment:
+      type: object
+      description: "The autonomy tier in force here, whether it was set here or inherited,\
+        \ and the level that decided it"
+      properties:
+        effective:
+          type: string
+          description: "The tier actually in force. OFF = not reviewed · PROPOSE =\
+            \ reviewed and recorded, feedback held back and nothing sent · DELIVER\
+            \ = feedback delivered without asking"
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
+        inherited:
+          type: boolean
+          description: True when this practice or area holds no tier of its own and
+            follows a level above
+        override:
+          type: string
+          description: "The tier set on this practice or area itself, or null when\
+            \ it holds none and inherits. Send null to the tier endpoint to clear\
+            \ it back to this state."
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
+        source:
+          type: string
+          description: "Which level decided the effective tier: PRACTICE, AREA or\
+            \ WORKSPACE"
+          enum:
+          - PRACTICE
+          - AREA
+          - WORKSPACE
+      required:
+      - effective
+      - inherited
+      - source
+    ReviewTierRollup:
+      type: object
+      description: "Practice counts per autonomy tier, for the workspace and for each\
+        \ of its areas"
+      properties:
+        areas:
+          type: array
+          description: "The same counts per area, in catalogue order"
+          items:
+            $ref: "#/components/schemas/AreaReviewTierRollup"
+        counts:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int32
+          description: Practice count per effective tier across the whole workspace;
+            every tier is a key
+        workspaceDefault:
+          $ref: "#/components/schemas/ReviewTierAssignment"
+          description: The workspace-level decision every area and practice falls
+            back to
+      required:
+      - areas
+      - counts
+      - workspaceDefault
     RevokeSessionsResult:
       type: object
       properties:
@@ -11540,6 +13310,122 @@ components:
       - hidden
       - id
       - name
+    TracedArtifact:
+      type: object
+      description: "An artifact this workspace recorded something about, and how much\
+        \ of it turned into review"
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+        artifactKind:
+          type: string
+        container:
+          type: string
+          description: "Repository, collection or channel it sits in"
+        lastSignalAt:
+          type: string
+          format: date-time
+        number:
+          type: integer
+          format: int32
+          description: "The number the provider shows, for kinds that have one"
+        reviewedSignalCount:
+          type: integer
+          format: int32
+          description: How many of them started a review
+        signalCount:
+          type: integer
+          format: int32
+          description: Occurrences recorded on this artifact
+        title:
+          type: string
+        url:
+          type: string
+          description: Where to open it upstream; absent for a deleted or unlinkable
+            artifact
+      required:
+      - artifactId
+      - artifactKind
+      - lastSignalAt
+      - reviewedSignalCount
+      - signalCount
+      - title
+    TracedSignal:
+      type: object
+      description: "One thing that happened to this artifact, and what the system\
+        \ did about it"
+      properties:
+        discoveredVia:
+          type: string
+          description: "How we came to know: by event, by sync, by hand, or by backfill"
+          enum:
+          - EVENT
+          - SYNC
+          - MANUAL
+          - BACKFILL
+          - SWEEP
+        displayName:
+          type: string
+          description: "Human label for the signal, from the artifact kind's descriptor"
+        id:
+          type: string
+          format: uuid
+          description: This occurrence's own identity; what a practice's occasionedById
+            points at
+        occurredAt:
+          type: string
+          format: date-time
+          description: "When it happened upstream; for a sync discovery, only as precise\
+            \ as the sync"
+        reviewId:
+          type: string
+          format: uuid
+          description: "The review this occurrence started, when it started one"
+        revision:
+          type: string
+          description: Which version of the artifact this occurrence is about; the
+            reason editing a description can be re-measured while the commits stay
+            put
+        signal:
+          type: string
+          description: "Signal name, e.g. scm.pull_request.ready"
+        state:
+          type: string
+          enum:
+          - RECORDED
+          - TRIGGERED
+          - SUPPRESSED
+          - PENDING
+          - LAPSED
+        stateReason:
+          type: string
+          description: Why it ended in that state; null once it triggered a review
+          enum:
+          - GATE_SKIPPED
+          - COOLDOWN_ACTIVE
+          - REQUEST_COOLDOWN_ACTIVE
+          - REQUESTER_QUOTA_EXHAUSTED
+          - CONCURRENT_DUPLICATE
+          - OUT_OF_REVIEW_SCOPE
+          - WORKSPACE_INACTIVE
+          - PRACTICES_DISABLED
+          - NO_ACTIVE_PRACTICE
+          - REVIEW_MODEL_UNBOUND
+          - PRACTICE_TIER_OFF
+          - BUDGET_EXHAUSTED
+          - SUBJECT_UNLINKED
+          - MODEL_UNAVAILABLE
+          - PENDING_DEADLINE_EXCEEDED
+          - ARTIFACT_GONE
+      required:
+      - discoveredVia
+      - displayName
+      - id
+      - occurredAt
+      - revision
+      - signal
+      - state
     TriggerSyncJobRequest:
       type: object
       description: Manual sync trigger request body
@@ -11772,23 +13658,11 @@ components:
           - PAUSED
       required:
       - state
-    UpdatePracticeActiveRequest:
-      type: object
-      description: Request to set a practice's active state
-      properties:
-        active:
-          type: boolean
-          description: Whether the practice should be active
-      required:
-      - active
     UpdatePracticeAreaRequest:
       type: object
       description: Request to update an existing practice area (PATCH — only non-null
         fields applied)
       properties:
-        active:
-          type: boolean
-          description: Whether this area is active
         color:
           type: string
           description: Optional palette colour key for the area's chip
@@ -11816,6 +13690,9 @@ components:
           maxLength: 128
           minLength: 3
           pattern: .*\S.*
+        visibleInPracticeDashboards:
+          type: boolean
+          description: Whether this area is shown in practice dashboards
     UpdatePracticeRequest:
       type: object
       description: Request to update a practice; omitted fields remain unchanged
@@ -11824,14 +13701,18 @@ components:
           $ref: "#/components/schemas/BindPracticeAreaRequest"
           description: Catalog placement to apply with the definition update; omit
             to leave unchanged
-        artifactType:
-          type: string
-          description: Artifact this practice evaluates
-          enum:
-          - PULL_REQUEST
-          - ISSUE
-          - CONVERSATION_THREAD
-          example: ISSUE
+        automatedReviewPolicy:
+          $ref: "#/components/schemas/PracticeAutomatedReviewPolicy"
+          description: "Replacement review settings; omit to preserve them, or to\
+            \ take the recommended ones when the bindings move the practice to a different\
+            \ kind of work"
+        bindings:
+          type: array
+          description: Replacement occasion and its evidence; omit to leave it unchanged
+          items:
+            $ref: "#/components/schemas/PracticeBinding"
+          maxItems: 1
+          minItems: 1
         clear:
           type: array
           description: Optional fields to clear before applying supplied values
@@ -11844,7 +13725,7 @@ components:
           uniqueItems: true
         criteria:
           type: string
-          description: Practice evaluation criteria
+          description: Practice review criteria
           maxLength: 50000
           minLength: 0
           pattern: .*\S.*
@@ -11857,29 +13738,18 @@ components:
           pattern: .*\S.*
         precomputeScript:
           type: string
-          description: TypeScript/Bun precompute script for static analysis before
-            AI review
+          description: TypeScript/Bun static analysis run before automated review
           maxLength: 100000
           minLength: 0
-        triggerEvents:
-          type: array
-          description: Domain events that trigger detection; empty for scheduled conversation
-            reviews
-          items:
-            type: string
-          maxItems: 10
-          minItems: 0
         whatGoodLooksLike:
           type: string
-          description: "Developer-facing exemplar (learner layer); a concrete instance,\
-            \ not the rubric"
+          description: Concrete example shown to the developer; not review criteria
           maxLength: 2000
           minLength: 0
           pattern: .*\S.*
         whyItMatters:
           type: string
-          description: "Developer-facing rationale (learner layer); plain language,\
-            \ never the detection rubric"
+          description: Plain-language rationale shown to the developer
           maxLength: 2000
           minLength: 0
           pattern: .*\S.*
@@ -11895,12 +13765,22 @@ components:
             the cooldown
           maximum: 1440
           minimum: 0
+        defaultReviewTier:
+          type: string
+          description: How much autonomy the system has over practices and areas that
+            hold no tier of their own. The one decision that moves a whole workspace
+            at once. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset'
+            to clear it. PROPOSE is not selectable yet.
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
         deliverToMerged:
           type: boolean
           description: Deliver feedback to already-merged PRs/MRs
         reset:
           type: array
-          description: Fields to reset to the inherited fleet default
+          description: Fields to reset back to inherit
           items:
             type: string
             enum:
@@ -11908,14 +13788,34 @@ components:
             - SKIP_DRAFTS
             - DELIVER_TO_MERGED
             - COOLDOWN_MINUTES
+            - REVIEW_SCOPE
+            - DEFAULT_REVIEW_TIER
           uniqueItems: true
+        reviewScope:
+          $ref: "#/components/schemas/WorkspaceReviewScope"
+          description: "Replaces the review scope wholesale (the lists ARE the setting,\
+            \ so a merge could only ever add). Null leaves it unchanged; two empty\
+            \ lists clear it back to unrestricted."
         runForAllUsers:
           type: boolean
           description: Run practice review for all developers (vs only the run_practice_review
             role)
-        skipDrafts:
-          type: boolean
-          description: Skip practice review for draft PRs/MRs
+    UpdatePracticeReviewTierRequest:
+      type: object
+      description: "Set how much autonomy the system has here, or clear it back to\
+        \ inherit"
+      properties:
+        reviewTier:
+          type: string
+          description: "OFF = not reviewed at all · PROPOSE = the review runs and\
+            \ every observation is recorded, and nothing is sent · DELIVER = feedback\
+            \ is delivered without asking. Send null (or omit the field) to hold no\
+            \ tier here and inherit — a practice inherits its area's, an area inherits\
+            \ the workspace default."
+          enum:
+          - "OFF"
+          - PROPOSE
+          - DELIVER
     UpdateRepositorySettingsRequest:
       type: object
       description: Request to update repository contribution visibility settings in
@@ -11927,6 +13827,56 @@ components:
             from leaderboard calculations
       required:
       - hiddenFromContributions
+    UpdateReviewBackfillRunStatusRequest:
+      type: object
+      description: |-
+        The lifecycle transitions an admin can ask for.
+
+         <p><code>RUNNING</code> is the confirmation: it is the point at which somebody accepts the estimate they
+         were shown and authorises the spend. <code>CANCELLED</code> stops a campaign for good. Every other
+         transition — pausing on an exhausted budget, resuming when it clears, completing at the end of the
+         scope — belongs to the driver, and is refused here so the state on screen always reflects something
+         the system decided or something a person did, never a mixture.
+      properties:
+        status:
+          type: string
+          description: RUNNING confirms the estimate and starts the campaign; CANCELLED
+            stops it for good
+          enum:
+          - RUNNING
+          - CANCELLED
+      required:
+      - status
+    UpdateReviewSweepScheduleRequest:
+      type: object
+      description: |-
+        Replace a sweep schedule's terms.
+
+         <p>Every field is required: a schedule is three numbers that only mean anything together — a cadence
+         changed without its lookback can silently make a window illegal, or leave days nothing ever sweeps.
+         The artifact kind is not among them; a schedule for a different kind of work is a different schedule.
+      properties:
+        cadence:
+          type: string
+          description: How often the sweep runs
+          enum:
+          - DAILY
+          - WEEKLY
+        enabled:
+          type: boolean
+          description: Whether the scheduler acts on this row; a disabled schedule
+            keeps its terms
+        lookbackDays:
+          type: integer
+          format: int32
+          description: "How far back each sweep looks, in days"
+          example: 2
+          maximum: 7
+          minimum: 1
+      required:
+      - cadence
+      - enabled
+      - lookbackDays
     UpdateSilentModeRequest:
       type: object
       properties:
@@ -12732,6 +14682,45 @@ components:
         gitlab:
           $ref: "#/components/schemas/GitLabProvider"
           description: "GitLab workspace provider config, null if not available"
+    WorkspaceReviewScope:
+      type: object
+      description: |-
+        The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
+         It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
+         what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
+         about one workspace that a centrally curated catalogue cannot carry.
+
+         <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
+         axis".
+
+         <h2>What this cannot express, and why</h2>
+
+         <ul>
+           <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
+               <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
+               by which point the review has been admitted and paid for. A path axis here would be a predicate
+               that quietly never narrows anything.
+           <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
+               compatible, taking them away would not.
+           <li><strong>Any third key.</strong> The vocabulary is closed at the column
+               (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
+               fields would drop the key in silence, leaving a workspace believing a restriction was in force.
+         </ul>
+      properties:
+        repositories:
+          type: array
+          description: |-
+            exact <code>owner/name</code> repository identifiers. Empty = every monitored
+                 repository. This narrows <em>review</em> within the set the workspace already syncs; it never
+                 adds one.
+          items:
+            type: string
+        targetBranches:
+          type: array
+          description: exact target-branch names (a PR's base ref). Empty = every
+            branch.
+          items:
+            type: string
     WorkspaceTeamRepositorySettings:
       type: object
       description: Repository contribution visibility settings for a specific team

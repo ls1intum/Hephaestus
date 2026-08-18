@@ -52,8 +52,8 @@ function priceValueOf(model: LlmModel | null): PriceModeValue {
 	};
 }
 
-/** Create/edit an instance catalog model. Creation includes initial access; a later access change
- * goes through the dedicated dialog, which states its immediate impact. */
+/** Creation includes initial access; a later access change goes through the dedicated dialog, which
+ * states its immediate impact. */
 export function AdminLlmModelFormDialog({
 	open,
 	onOpenChange,
@@ -142,9 +142,8 @@ function AdminLlmModelFormDialogContent({
 					</DialogDescription>
 				</DialogHeader>
 
-				{/* The tallest form on the instance console — seven fields, the price editor and the
-				    workspace picker, past 1000 px. Only the body scrolls, so the title and "Add model"
-				    stay reachable. */}
+				{/* This form outgrows a 320 px viewport; only the body scrolls, so the title and
+				    "Add model" stay reachable. */}
 				<DialogBody className="space-y-4 py-1">
 					<LlmModelFields
 						audience="instance"

@@ -1,11 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.model;
 
-import de.tum.cit.aet.hephaestus.practices.PracticeDetectionFingerprint;
-import de.tum.cit.aet.hephaestus.practices.dto.TriggerEventsConverter;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.ReviewRuleFingerprint;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.GeneratedValue;
@@ -18,6 +18,7 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -28,12 +29,16 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.type.SqlTypes;
-import tools.jackson.databind.JsonNode;
 
 /**
- * Complete practice definition used to reproduce historical observations.
+ * An immutable, append-only snapshot of a {@link Practice}: SCD-2 over the whole definition, not only
+ * over {@code criteria}. {@code Observation.practiceRevision} pins each observation to the revision the
+ * detector saw, and a observation written before versioning pins {@code null}.
  *
- * <p>{@code Observation.practiceRevision} pins each finding to the definition the detector saw.
+ * <p><strong>The snapshot must stay complete.</strong> Every field a review reads off a practice is
+ * copied here by the constructor; a field added to {@link Practice} and not added here reproduces a
+ * past observation against today's value of it, silently. {@code revisionNumber} is 1-based and
+ * monotonic per practice ({@code uk_practice_revision_practice_number}).
  */
 @Entity
 @Immutable
@@ -78,14 +83,13 @@ public class PracticeRevision {
     @Column(name = "name", length = 128)
     private String name;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "applies_to", length = 32)
-    private WorkArtifact artifactType;
+    @Column(name = "applies_to", length = ArtifactKind.MAX_LENGTH)
+    private ArtifactKind artifactKind;
 
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "trigger_events", columnDefinition = "jsonb")
+    @Column(name = "bindings", columnDefinition = "jsonb")
     @ToString.Exclude
-    private JsonNode triggerEvents;
+    private List<PracticeBinding> bindings;
 
     @Column(name = "criteria", columnDefinition = "TEXT", nullable = false)
     @ToString.Exclude
@@ -94,6 +98,11 @@ public class PracticeRevision {
     @Column(name = "precompute_script", columnDefinition = "TEXT")
     @ToString.Exclude
     private String precomputeScript;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "automated_review_policy", columnDefinition = "jsonb")
+    @ToString.Exclude
+    private PracticeAutomatedReviewPolicy automatedReviewPolicy;
 
     @Column(name = "why_it_matters", columnDefinition = "TEXT")
     @ToString.Exclude
@@ -118,8 +127,8 @@ public class PracticeRevision {
     @Column(name = "area_color", length = 32)
     private String areaColor;
 
-    @Column(name = "detection_fingerprint", length = 64)
-    private String detectionFingerprint;
+    @Column(name = "review_rule_fingerprint", length = 96)
+    private String reviewRuleFingerprint;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
@@ -132,10 +141,14 @@ public class PracticeRevision {
         this.revisionNumber = revisionNumber;
         this.slug = Objects.requireNonNull(practice.getSlug(), "practice.slug");
         this.name = Objects.requireNonNull(practice.getName(), "practice.name");
-        this.artifactType = Objects.requireNonNull(practice.getArtifactType(), "practice.artifactType");
-        this.triggerEvents = Objects.requireNonNull(practice.getTriggerEvents(), "practice.triggerEvents").deepCopy();
+        this.artifactKind = Objects.requireNonNull(practice.getArtifactKind(), "practice.artifactKind");
+        this.bindings = List.copyOf(Objects.requireNonNull(practice.getBindings(), "practice.bindings"));
         this.criteria = Objects.requireNonNull(practice.getCriteria(), "practice.criteria");
         this.precomputeScript = practice.getPrecomputeScript();
+        this.automatedReviewPolicy = Objects.requireNonNull(
+            practice.getAutomatedReviewPolicy(),
+            "practice.automatedReviewPolicy"
+        );
         this.whyItMatters = practice.getWhyItMatters();
         this.whatGoodLooksLike = practice.getWhatGoodLooksLike();
         PracticeArea area = practice.getArea();
@@ -146,25 +159,17 @@ public class PracticeRevision {
             this.areaIcon = area.getIcon();
             this.areaColor = area.getColor();
         }
-        this.detectionFingerprint = PracticeDetectionFingerprint.of(
-            slug,
-            name,
-            artifactType,
-            TriggerEventsConverter.toList(triggerEvents),
-            criteria,
-            precomputeScript,
-            areaSlug
-        );
+        this.reviewRuleFingerprint = computeReviewRuleFingerprint();
     }
 
-    public String computeDetectionFingerprint() {
-        return PracticeDetectionFingerprint.of(
+    public String computeReviewRuleFingerprint() {
+        return ReviewRuleFingerprint.of(
             slug,
             name,
-            artifactType,
-            TriggerEventsConverter.toList(triggerEvents),
+            bindings,
             criteria,
             precomputeScript,
+            automatedReviewPolicy,
             areaSlug
         );
     }

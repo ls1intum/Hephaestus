@@ -7,26 +7,40 @@ import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requ
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
+import de.tum.cit.aet.hephaestus.agent.context.EvidencePlan;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
-import de.tum.cit.aet.hephaestus.agent.context.providers.GitDiffOperations;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionInputs;
+import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobPreparationException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
+import de.tum.cit.aet.hephaestus.agent.runtime.ProvenanceDigest;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.Task;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.workdir.GitRepositoryManager;
+import de.tum.cit.aet.hephaestus.integration.core.fabric.ContentAddressedStore;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
-import java.nio.file.Path;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -37,6 +51,7 @@ import java.util.TreeSet;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
@@ -56,13 +71,12 @@ import tools.jackson.databind.node.ObjectNode;
  * /workspace/
  * ├── inputs/                            # read-only — the path-guard whitelists exactly this subtree
  * │   ├── manifest.json                  #   telescope: integration-agnostic index (path/connector/sha256)
- * │   ├── sources/scm/repo/            #   the SCM connector's source — git checkout (RO mount)
+ * │   ├── sources/scm/repo/              #   optional materialized repository tree
  * │   ├── context/                       #   workspace context (this handler populates via WorkspaceContextBuilder)
  * │   │   ├── metadata.json              #     PR metadata + commits
  * │   │   ├── comments.json              #     review comments
  * │   │   ├── diff.patch                 #     diff with [L&lt;n&gt;] annotations
  * │   │   ├── diff_summary.md            #     per-file diff chunks
- * │   │   └── contributor_history.json   #     prior findings (optional)
  * │   └── practices/{index.json, {slug}.md, all-criteria.md}
  * ├── work/                              # scratch the agent + precompute write; NEVER collected
  * │   ├── precompute/practices/{slug}.ts
@@ -76,91 +90,53 @@ import tools.jackson.databind.node.ObjectNode;
  */
 public class PullRequestReviewHandler implements JobTypeHandler {
 
-    /**
-     * Materialized context files a finding may legitimately cite that survive the post-agent
-     * {@code filterByDiffScope} pass. metadata.json carries the PR fields; diff.patch / diff_summary.md
-     * ARE the change under review (so a finding anchored there is in-scope by definition — the
-     * code-judging practices quote a {@code [L<n>]} span in diff.patch); comments.json is the review
-     * thread the reviewer-side practices read. These resolve as internal paths in DeliveryComposer, so
-     * such findings render as non-inlinable summary items rather than diff-anchored inline notes.
-     */
-    private static final Set<String> ALLOWED_INTERNAL_CONTEXT_PATHS = Set.of(
-        ContentSource.OUTPUT_PREFIX + "metadata.json",
-        ContentSource.OUTPUT_PREFIX + "diff.patch",
-        ContentSource.OUTPUT_PREFIX + "diff_summary.md",
-        ContentSource.OUTPUT_PREFIX + "comments.json",
-        // Raw SQL-only integration objects (the agent cannot get these from the mounted worktree): a finding
-        // grounded in one of these must survive the diff-scope filter. Only objects absent from the worktree
-        // belong here — anything derivable from the checkout is content the agent reads directly.
-        ContentSource.OUTPUT_PREFIX + "linked_work_items.json",
-        ContentSource.OUTPUT_PREFIX + "review_threads.json",
-        // General (conversation-tab) MR review discussion — position-less notes GitLab routes to
-        // IssueComment, surfaced by GeneralReviewCommentContentSource. The reviewer-craft practices
-        // ground in this alongside comments.json; a finding citing it must survive the diff-scope filter.
-        ContentSource.OUTPUT_PREFIX + "general_comments.json"
-    );
-
-    /**
-     * Process/metadata-level PR practices whose evidence is the PR metadata, the commit subjects, or the
-     * review thread — NOT a diff line. {@code filterByDiffScope} is a guard for CODE-defect findings whose
-     * location must sit inside the diff; applied to these process practices it would wrongly drop a valid
-     * finding the moment the agent attaches a stray (non-diff) location to it (e.g. a commit-subject
-     * finding citing a commit ref). These slugs therefore bypass the diff-scope filter.
-     */
-    private static final Set<String> METADATA_LEVEL_PRACTICES = Set.of(
-        "scope-one-reviewable-change",
-        "describe-what-and-why",
-        "ready-and-traceable-handoff",
-        "commit-subjects-explain-each-change",
-        "engaging-with-inline-review-comments",
-        // Reviewer-side review practices ground in the review-decision/thread-state context file
-        // (review_threads.json) or comments.json — never a diff line of the change under review.
-        "reviews-substantively-with-understanding",
-        "leaves-useful-specific-review-comments",
-        "reviews-respectfully-asks-rather-than-demands",
-        // Cross-context practices: grounded in a neighbourhood context file, not a diff line.
-        "honours-linked-issue-acceptance-criteria",
-        "branches-from-the-integration-branch"
-    );
-
     private static final Logger log = LoggerFactory.getLogger(PullRequestReviewHandler.class);
 
     private final JsonMapper objectMapper;
-    private final GitRepositoryManager gitRepositoryManager;
+    private final ContentAddressedStore cas;
     private final PracticeCatalogInjector practiceCatalogInjector;
     private final WorkspaceContextBuilder workspaceContextBuilder;
     private final TaskEnvelopeWriter taskEnvelopeWriter;
-    private final GitDiffOperations gitDiffOperations;
     private final PracticeDetectionResultParser resultParser;
+    private final FeedbackCompositionResultParser compositionResultParser;
     private final PracticeDetectionDeliveryService deliveryService;
     private final FeedbackDeliveryService feedbackService;
     private final SecretDiffScanner secretDiffScanner;
     private final ReactionSuppressionFilter reactionSuppressionFilter;
+    private final InContextDeliveryGate inContextDeliveryGate;
+    private final ApplicationEventPublisher eventPublisher;
+    private final ObservationRepository observationRepository;
 
     PullRequestReviewHandler(
         JsonMapper objectMapper,
-        GitRepositoryManager gitRepositoryManager,
+        ContentAddressedStore cas,
         PracticeCatalogInjector practiceCatalogInjector,
         WorkspaceContextBuilder workspaceContextBuilder,
         TaskEnvelopeWriter taskEnvelopeWriter,
-        GitDiffOperations gitDiffOperations,
         PracticeDetectionResultParser resultParser,
+        FeedbackCompositionResultParser compositionResultParser,
         PracticeDetectionDeliveryService deliveryService,
         FeedbackDeliveryService feedbackService,
         SecretDiffScanner secretDiffScanner,
-        ReactionSuppressionFilter reactionSuppressionFilter
+        ReactionSuppressionFilter reactionSuppressionFilter,
+        InContextDeliveryGate inContextDeliveryGate,
+        ApplicationEventPublisher eventPublisher,
+        ObservationRepository observationRepository
     ) {
         this.objectMapper = objectMapper;
-        this.gitRepositoryManager = gitRepositoryManager;
+        this.cas = cas;
         this.practiceCatalogInjector = practiceCatalogInjector;
         this.workspaceContextBuilder = workspaceContextBuilder;
         this.taskEnvelopeWriter = taskEnvelopeWriter;
-        this.gitDiffOperations = gitDiffOperations;
         this.resultParser = resultParser;
+        this.compositionResultParser = compositionResultParser;
         this.deliveryService = deliveryService;
         this.feedbackService = feedbackService;
         this.secretDiffScanner = secretDiffScanner;
         this.reactionSuppressionFilter = reactionSuppressionFilter;
+        this.inContextDeliveryGate = inContextDeliveryGate;
+        this.eventPublisher = eventPublisher;
+        this.observationRepository = observationRepository;
     }
 
     @Override
@@ -179,6 +155,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         ScmEventPayload.PullRequestData pullRequestData = submissionRequest.pullRequest();
 
         ObjectNode metadata = objectMapper.createObjectNode();
+        metadata.put(
+            PracticeDetectionDeliveryService.ORIGIN_METADATA_KEY,
+            submissionRequest.observationOrigin().name()
+        );
         metadata.put("repository_id", pullRequestData.repository().id());
         metadata.put("repository_full_name", pullRequestData.repository().nameWithOwner());
         metadata.put("pull_request_id", pullRequestData.id());
@@ -187,25 +167,21 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         metadata.put("commit_sha", submissionRequest.headRefOid());
         metadata.put("source_branch", submissionRequest.headRefName());
         metadata.put("target_branch", submissionRequest.baseRefName());
-        // The MR title + description are the sole inputs for the communication/process practices
-        // (describe-what-and-why, commit-subjects-explain-each-change) — their precompute scripts read
-        // metadata.title / metadata.body. Without these the practices silently can't evaluate.
+        // The sole inputs for the communication/process practices (describe-what-and-why,
+        // commit-subjects-explain-each-change) — their precompute scripts read metadata.title / .body.
         metadata.put("title", pullRequestData.title());
         metadata.put("body", pullRequestData.body());
-        // The lifecycle event that triggered this job. When present, the catalog injector materialises
-        // ONLY the practices whose triggerEvents include it — so an authoring practice is not re-litigated
-        // on a fixup push and a retrospective practice runs only at merge. Null = run the full focus set
-        // (the gate-bypass dev path / bot command).
-        if (submissionRequest.triggerEvent() != null) {
-            metadata.put("trigger_event", submissionRequest.triggerEvent());
+        // When present, the catalog injector materialises ONLY the practices bound to this signal, so an
+        // authoring practice is not re-litigated on a fixup push. Null = run the full focus set.
+        if (submissionRequest.triggerSignal() != null) {
+            metadata.put(PracticeCatalogInjector.SIGNAL_METADATA_KEY, submissionRequest.triggerSignal().value());
         }
 
-        // The trigger-event PHASE is part of the key: an authoring review (Created/Ready), a push
-        // re-scan (Synchronized), a reviewer pass (ReviewSubmitted) and a retrospective (Merged) of the
-        // SAME head SHA are DIFFERENT reviews over different practice sets — a retrospective must never be
-        // deduped/cooled-down against an earlier authoring job for the same commit. Phase sits BEFORE the
-        // SHA so extractCooldownKeyPrefix scopes cooldown per (pr, phase).
-        String phase = submissionRequest.triggerEvent() != null ? submissionRequest.triggerEvent() : "manual";
+        // The occasion is part of the key: an authoring review, a push re-scan, a reviewer pass and a
+        // retrospective of the SAME head SHA are DIFFERENT reviews over different practice sets, so a
+        // retrospective must never be deduped against an earlier authoring job for the same commit. It
+        // sits BEFORE the SHA so extractCooldownKeyPrefix scopes cooldown per (pr, occasion).
+        String phase = submissionRequest.triggerSignal() != null ? submissionRequest.triggerSignal().value() : "manual";
         String idempotencyKey =
             "pr_review:" +
             pullRequestData.repository().nameWithOwner() +
@@ -219,13 +195,8 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return new JobSubmission(metadata, idempotencyKey);
     }
 
-    /**
-     * Prepare context files for the agent. Workspace context is materialised by
-     * {@link WorkspaceContextBuilder}; task envelope by {@link TaskEnvelopeWriter}; practice
-     * catalog stays here (per-job, not provider-shaped).
-     */
     @Override
-    public Map<String, byte[]> prepareInputFiles(AgentJob job) {
+    public PreparedJobInputs prepareInputs(AgentJob job) {
         long startNanos = System.nanoTime();
         JsonNode metadata = job.getMetadata();
         if (metadata == null || metadata.isNull() || metadata.isMissingNode()) {
@@ -234,18 +205,63 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         long repositoryId = requireLong(metadata, "repository_id");
         long pullRequestId = requireLong(metadata, "pull_request_id");
 
-        // LinkedHashMap: deterministic iteration order for snapshot fixtures.
-        Map<String, byte[]> files = new LinkedHashMap<>(
-            workspaceContextBuilder.build(new ContextRequest.PracticeReviewRequest(job))
+        SignalName signal = PracticeCatalogInjector.signalOf(job);
+        List<Practice> practices = practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.PULL_REQUEST);
+        PreparedEvidence prepared = workspaceContextBuilder.prepare(
+            new ContextRequest.PracticeReviewRequest(job),
+            EvidencePlan.compile(practices)
         );
+        var artifactSourceManifest = prepared.manifest();
+        var readiness = workspaceContextBuilder.prepareAutomatedReviewReadiness(
+            prepared.manifest(),
+            practices,
+            job.getId().toString(),
+            job.getCreatedAt(),
+            signal,
+            prepared.files()
+        );
+        List<Practice> eligible = practices;
+        practices = readiness.readyPractices();
+        // A practice not put to the model leaves no trace in the delivered review, so a reader cannot
+        // distinguish it from one that was assessed and produced no observations; the readiness report
+        // records why — evidence we could not read, or a subject that was not in this work — and both the
+        // administration surface and the artifact trace read it back from there.
+        if (practices.size() < eligible.size()) {
+            log.info(
+                "Not asking {} of {} practice(s): jobId={}, skipped={}",
+                eligible.size() - practices.size(),
+                eligible.size(),
+                job.getId(),
+                readiness
+                    .report()
+                    .decisions()
+                    .stream()
+                    .filter(decision -> !decision.ready())
+                    .map(decision -> decision.practiceSlug() + decision.reasonCodes())
+                    .toList()
+            );
+        }
+        if (practices.isEmpty()) {
+            throw new InsufficientEvidenceException(
+                "No practice has sufficient evidence: jobId=" + job.getId(),
+                new PreparedJobInputs(
+                    prepared.files(),
+                    prepared.filesOnDisk(),
+                    prepared.cleanups(),
+                    artifactSourceManifest,
+                    readiness.report()
+                )
+            );
+        }
+        Map<String, byte[]> files = new LinkedHashMap<>(prepared.files());
 
         files.put(SandboxLayout.TASK_ENVELOPE_FILENAME, taskEnvelopeWriter.write(buildTaskEnvelope(job, metadata)));
 
-        practiceCatalogInjector.inject(files, job, WorkArtifact.PULL_REQUEST);
-
-        // Pre-create blobs/scm/ so the repo can mount under it (the directory mount needs its parent
-        // to exist before docker cp extracts into it).
-        files.put(SandboxLayout.SCM_SOURCE_KEEP, new byte[0]);
+        practiceCatalogInjector.inject(files, job, ArtifactKinds.PULL_REQUEST, practices);
+        // Asks the run for a second, separate turn once its measurements are final: the feedback to say
+        // now, on every lane this occasion can reach, composed over this person's record rather than over
+        // this diff alone. Absent for a backfill sweep — see FeedbackCompositionInputs.
+        ContextMapWriter.write(files);
 
         long elapsedMs = (System.nanoTime() - startNanos) / 1_000_000;
         log.info(
@@ -255,7 +271,13 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             repositoryId,
             pullRequestId
         );
-        return files;
+        return new PreparedJobInputs(
+            files,
+            prepared.filesOnDisk(),
+            prepared.cleanups(),
+            artifactSourceManifest,
+            readiness.report()
+        );
     }
 
     private TaskEnvelope buildTaskEnvelope(AgentJob job, JsonNode metadata) {
@@ -268,26 +290,6 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             requireText(metadata, "repository_full_name")
         );
         return TaskEnvelope.of(job.getId(), job.getWorkspace().getId(), task);
-    }
-
-    /**
-     * Mount the real locally-cloned git repository into the container read-only.
-     * The agent gets full access to git history, blame, diffs, and the complete codebase.
-     */
-    @Override
-    public Map<String, String> volumeMounts(AgentJob job) {
-        JsonNode metadata = job.getMetadata();
-        long repositoryId = requireLong(metadata, "repository_id");
-
-        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) {
-            throw new JobPreparationException(
-                "Repository not cloned: repoId=" + repositoryId + ", jobId=" + job.getId()
-            );
-        }
-
-        log.info("Mounting real repo: repoId={}, path={}", repositoryId, repoPath);
-        return Map.of(repoPath.toAbsolutePath().toString(), SandboxLayout.REPO_MOUNT);
     }
 
     private String buildPrompt(AgentJob job) {
@@ -303,7 +305,7 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             pullRequestNumber +
             " in " +
             repoName +
-            ". Read the context files, then persist every justified finding via the report_finding tool. " +
+            ". Read the context files, then persist every justified observation via the report_observation tool. " +
             "Follow " +
             SandboxLayout.ORCHESTRATOR_PATH +
             " for the schema and rules.";
@@ -315,48 +317,93 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
     @Override
     public void deliver(AgentJob job) {
-        var parsed = resultParser.parse(job.getOutput());
+        ObservationAdmissionService.requireMatchingCompositionDigest(job);
+        deliverAdmitted(job);
+    }
+
+    private void deliverAdmitted(AgentJob job) {
+        List<PracticeDetectionResultParser.ValidatedObservation> scopedObservations = observationRepository
+            .findByAgentJobId(job.getId())
+            .stream()
+            .map(this::validated)
+            .toList();
+        if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
+        String unifiedDiff = capturedDiff(job);
+        List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
+            job,
+            scopedObservations
+        );
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactionSuppressionFilter
+            .evaluate(job, loudEnough)
+            .deliverable();
+        List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
+        Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
+        var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units);
+        feedbackService.deliverFeedback(job, content, delivered ->
+            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units)
+        );
+    }
+
+    private PracticeDetectionResultParser.ValidatedObservation validated(Observation observation) {
+        return new PracticeDetectionResultParser.ValidatedObservation(
+            observation.getPractice().getSlug(),
+            observation.getSummary(),
+            observation.getPresence(),
+            observation.getAssessment(),
+            observation.getSeverity(),
+            observation.getEvidence(),
+            observation.getEvidenceRationale(),
+            new ObservationKeys(observation.getOccurrenceKey(), observation.getRecurrenceKey())
+        );
+    }
+
+    public void admitObservations(AgentJob job, JsonNode observations) {
+        ObjectNode output = objectMapper.createObjectNode();
+        ObjectNode raw = objectMapper.createObjectNode();
+        raw.set("observations", observations);
+        output.put("rawOutput", raw.toString());
+        processObservations(job, output, true);
+    }
+
+    private void processObservations(AgentJob job, JsonNode output, boolean admissionOnly) {
+        var parsed = resultParser.parse(output);
         if (!parsed.discarded().isEmpty()) {
             log.info(
-                "Discarded {} findings during parsing: jobId={}, reasons={}",
+                "Discarded {} observations during parsing: jobId={}, reasons={}",
                 parsed.discarded().size(),
                 job.getId(),
                 parsed.discarded()
             );
         }
-        if (parsed.validFindings().isEmpty()) {
+        if (parsed.validObservations().isEmpty()) {
             throw new JobDeliveryException(
-                "No valid findings in agent output: jobId=" + job.getId() + ", discarded=" + parsed.discarded().size()
+                "No valid observations in agent output: jobId=" +
+                    job.getId() +
+                    ", discarded=" +
+                    parsed.discarded().size()
             );
         }
 
-        // Raw two-ref diff for the PR range — computed ONCE here and threaded through every consumer
-        // (the secret pre-pass, the M1 grounding guard, and the line-position validator) so deliver()
-        // opens the JGit repo + resolves the diff range a single time per job instead of re-materialising
-        // the full unified diff for each use. Null when the diff is unavailable.
-        String unifiedDiff = computeUnifiedDiff(job);
-        // File set from the same range, also computed once and reused by both the stale-diff guard and
-        // the diff-scope filter below.
-        Set<String> diffFiles = computeDiffStatFiles(job);
+        String unifiedDiff = capturedDiff(job);
+        Set<String> diffFiles = Set.copyOf(DiffHunkValidator.parseValidLines(unifiedDiff).keySet());
+        Set<String> defectDetectorSlugs = practiceCatalogInjector.defectDetectorSlugs(job);
+        List<PracticeDetectionResultParser.ValidatedObservation> secretObservations =
+            practiceCatalogInjector.isAdmitted(job, "avoids-insecure-defaults-and-over-broad-permissions")
+                ? scanForSecrets(unifiedDiff)
+                : List.of();
 
-        // Deterministic, LLM-independent secret pre-pass over the raw diff. This catches a committed
-        // credential even when the model abstains, the precompute crashes, or the clone is checked
-        // out at the merge base (so a working-tree grep finds nothing). The synthetic PRESENT/BAD
-        // findings flow through the normal persist+compose+deliver path and force the green→red flip.
-        List<PracticeDetectionResultParser.ValidatedFinding> secretFindings = scanForSecrets(
-            unifiedDiff,
-            parsed.validFindings()
-        );
-
-        boolean allNotApplicable = parsed
-            .validFindings()
+        // A run that decided nothing at all over a non-empty diff is the stale-diff signature. Both
+        // valence-free presences count here: an empty diff yields NOT_APPLICABLE, a truncated one yields
+        // INCONCLUSIVE, and the harness fault is identical either way.
+        boolean nothingDecided = parsed
+            .validObservations()
             .stream()
-            .allMatch(f -> f.presence() == Presence.NOT_APPLICABLE);
-        if (allNotApplicable && secretFindings.isEmpty()) {
+            .noneMatch(f -> f.presence().carriesValence());
+        if (nothingDecided && secretObservations.isEmpty()) {
             boolean hasDiffContent = !diffFiles.isEmpty();
             if (hasDiffContent) {
                 throw new JobDeliveryException(
-                    "All findings are NOT_APPLICABLE but the diff contains " +
+                    "No observation decided anything (all NOT_APPLICABLE/INCONCLUSIVE) but the diff contains " +
                         diffFiles.size() +
                         " files — likely a stale/empty diff was provided to the agent. " +
                         "Refusing to deliver. jobId=" +
@@ -365,56 +412,70 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             }
         }
 
-        var scopedFindings = new ArrayList<>(filterByDiffScope(parsed.validFindings(), diffFiles));
-        if (scopedFindings.size() < parsed.validFindings().size()) {
+        var scopedObservations = new ArrayList<>(filterByDiffScope(parsed.validObservations(), diffFiles));
+        if (scopedObservations.size() < parsed.validObservations().size()) {
             log.info(
-                "Diff scope filter removed {} out-of-scope findings: jobId={}, before={}, after={}",
-                parsed.validFindings().size() - scopedFindings.size(),
+                "Diff scope filter removed {} out-of-scope observations: jobId={}, before={}, after={}",
+                parsed.validObservations().size() - scopedObservations.size(),
                 job.getId(),
-                parsed.validFindings().size(),
-                scopedFindings.size()
+                parsed.validObservations().size(),
+                scopedObservations.size()
             );
         }
-        // Secret findings are inherently in-diff (their location is an added line) — inject AFTER the
+        // Secret observations are inherently in-diff (their location is an added line) — inject AFTER the
         // diff-scope filter so a path-normalisation mismatch can never silently drop a credential.
-        if (!secretFindings.isEmpty()) {
-            scopedFindings.addAll(secretFindings);
+        if (!secretObservations.isEmpty()) {
+            Set<String> scannerLocations = secretObservations
+                .stream()
+                .flatMap(f -> f.evidence().path("citations").valueStream())
+                .map(citation -> citation.path("path").asString() + ":" + citation.path("startLine").asInt())
+                .collect(java.util.stream.Collectors.toSet());
+            scopedObservations.removeIf(
+                observation ->
+                    "avoids-insecure-defaults-and-over-broad-permissions".equals(observation.practiceSlug()) &&
+                    observation.evidence() != null &&
+                    observation
+                        .evidence()
+                        .path("citations")
+                        .valueStream()
+                        .anyMatch(citation ->
+                            scannerLocations.contains(
+                                citation.path("path").asString() + ":" + citation.path("startLine").asInt()
+                            )
+                        )
+            );
+            scopedObservations.addAll(secretObservations);
             log.warn(
-                "Secret pre-pass injected {} hardcoded-secrets PRESENT/BAD finding(s); blocking any all-clear comment: jobId={}",
-                secretFindings.size(),
+                "Secret pre-pass injected {} avoids-insecure-defaults-and-over-broad-permissions PRESENT/BAD observation(s); blocking any all-clear comment: jobId={}",
+                secretObservations.size(),
                 job.getId()
             );
         }
-        if (scopedFindings.isEmpty()) {
+        if (scopedObservations.isEmpty()) {
             throw new JobDeliveryException(
-                "All findings were filtered by diff scope: jobId=" +
+                "All observations were filtered by diff scope: jobId=" +
                     job.getId() +
                     ", before=" +
-                    parsed.validFindings().size() +
+                    parsed.validObservations().size() +
                     ", diffFiles=" +
                     diffFiles.size()
             );
         }
 
-        // Coherence coercion: keep (observation, severity) coherent regardless of what the
-        // weak model emitted. A defect-detector practice's GOOD assessment becomes NOT_APPLICABLE (no false strength
-        // ships to the student), and severity is pinned to the INFO sentinel except on a BAD finding.
-        // Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the posted comment.
-        Set<String> defectDetectorSlugs =
-            job.getWorkspace() == null
-                ? Set.of()
-                : practiceCatalogInjector.defectDetectorSlugs(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
-        scopedFindings = new ArrayList<>(
-            PracticeDetectionResultParser.coerceCoherence(scopedFindings, defectDetectorSlugs)
+        // Coherence coercion: a defect-detector practice's GOOD assessment becomes NOT_APPLICABLE (no false
+        // strength ships to the student), and severity is pinned to the INFO sentinel except on a BAD
+        // observation. Applied BEFORE deliver() so it reaches the DB, and before compose() so it reaches the
+        // posted comment.
+        scopedObservations = new ArrayList<>(
+            PracticeDetectionResultParser.coerceCoherence(scopedObservations, defectDetectorSlugs)
         );
 
         PracticeDetectionDeliveryService.DeliveryResult result;
         try {
-            result = deliveryService.deliver(job, scopedFindings);
+            result = deliveryService.deliver(job, scopedObservations);
             log.info(
-                "Delivery complete: inserted={}, unknownSlug={}, duplicate={}, jobId={}",
+                "Delivery complete: inserted={}, duplicate={}, jobId={}",
                 result.inserted(),
-                result.discardedUnknownSlug(),
                 result.discardedDuplicate(),
                 job.getId()
             );
@@ -424,84 +485,63 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             throw new JobDeliveryException("Delivery failed unexpectedly: jobId=" + job.getId(), e);
         }
 
-        // Stamp each finding with the EXACT keys deliver() persisted (ADR 0021 C2), by identity, so downstream
-        // stages address the stored observation without recomputing a key that could drift. Done BEFORE the
-        // reaction filter so an escalated copy inherits them. A finding absent from the map (unknown slug —
-        // never persisted) stays unstamped.
-        Map<PracticeDetectionResultParser.ValidatedFinding, ObservationKeys> keysByFinding = result.observationKeys();
-        for (int i = 0; i < scopedFindings.size(); i++) {
-            scopedFindings.set(i, scopedFindings.get(i).withKeys(keysByFinding.get(scopedFindings.get(i))));
+        // Stamp each observation with the exact keys deliver() persisted, by identity, so downstream stages
+        // address the stored observation without recomputing a key that could drift.
+        Map<PracticeDetectionResultParser.ValidatedObservation, ObservationKeys> keysByObservation =
+            result.observationKeys();
+        for (int i = 0; i < scopedObservations.size(); i++) {
+            scopedObservations.set(
+                i,
+                scopedObservations.get(i).withKeys(keysByObservation.get(scopedObservations.get(i)))
+            );
         }
 
-        // Reaction-aware re-nag suppression (ADR 0021, B2): drop a locus the student already DISPUTED /
-        // marked NOT_APPLICABLE on an earlier run, and stiffen the wording on an ADDRESSED-but-recurring
-        // locus. Flag-gated; a no-op pass-through when off or when no reaction matches. Runs AFTER
-        // deliver() because recurrence_key is persisted there; before compose() so the drop reaches both the
-        // summary and the inline notes.
-        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, scopedFindings);
-        List<PracticeDetectionResultParser.ValidatedFinding> deliverable = reactions.deliverable();
-        if (deliverable.isEmpty() && !scopedFindings.isEmpty()) {
-            // Everything this run was already reacted away — a SUCCESS (the student told us to stop nagging),
-            // not a delivery failure. The SUPPRESSED ledger rows are written; the prior edit-in-place summary
-            // stays as-is. Nothing new to post.
-            log.info("All {} findings suppressed by prior reactions: jobId={}", scopedFindings.size(), job.getId());
+        if (admissionOnly) return;
+
+        // Loudness tier BEFORE the reaction filter (ADR 0021): the workspace's standing policy on how loud
+        // a practice may be settles first, so an observation it already chose not to place on the artifact is
+        // never also charged to the developer's own per-locus reaction history. Runs AFTER deliver()
+        // because recurrence_key is persisted there; before compose() so the drop reaches both the summary
+        // and the inline notes.
+        List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
+            job,
+            scopedObservations
+        );
+        if (loudEnough.isEmpty() && !scopedObservations.isEmpty()) {
+            // The observations are persisted and the SUPPRESSED rows are written; posting an empty summary
+            // would be the noise the tier was turned down to avoid.
+            log.info("All {} observations withheld by loudness tier: jobId={}", scopedObservations.size(), job.getId());
             return;
         }
 
-        // Silent-clean-on-stale-diff signal: the NOT_APPLICABLE guard above only fires when EVERY finding
-        // is NA. A weak model that instead reads a stale/empty diff as "all clean" — emitting only
-        // ABSENT/GOOD strengths (no BAD) — slips past that guard and composes an all-clear over an artifact
-        // that was effectively never diffed. We do NOT throw (a genuinely clean PR over a non-empty diff is
-        // legitimate strengths-only), but a strengths-only delivery while diffFiles is EMPTY is the stale-diff
-        // fingerprint — surface it so the case is observable rather than silent.
+        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, loudEnough);
+        List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactions.deliverable();
+        if (deliverable.isEmpty() && !scopedObservations.isEmpty()) {
+            // A SUCCESS (the student told us to stop nagging), not a delivery failure: the SUPPRESSED
+            // ledger rows are written, and the prior edit-in-place summary stays as-is.
+            log.info(
+                "All {} observations suppressed by prior reactions: jobId={}",
+                scopedObservations.size(),
+                job.getId()
+            );
+            return;
+        }
+
+        // The NOT_APPLICABLE guard above only fires when EVERY observation is NA. A weak model that instead
+        // reads a stale/empty diff as "all clean" (only ABSENT/GOOD, no BAD) slips past it and composes an
+        // all-clear over an artifact that was effectively never diffed. Not thrown — a genuinely clean PR
+        // is legitimate strengths-only — but surfaced so the case is observable rather than silent.
         boolean hasGap = deliverable.stream().anyMatch(f -> f.assessment() == Assessment.BAD);
         if (!hasGap && diffFiles.isEmpty()) {
             log.warn(
-                "Composing a strengths-only delivery over an EMPTY diff ({} finding(s), no BAD): the diff may " +
+                "Composing a strengths-only delivery over an EMPTY diff ({} observation(s), no BAD): the diff may " +
                     "be stale/unavailable, so this all-clear is not grounded in changed code. jobId={}",
                 deliverable.size(),
                 job.getId()
             );
         }
 
-        Map<String, String> whyBySlug =
-            job.getWorkspace() == null
-                ? Map.of()
-                : practiceCatalogInjector.whyBySlug(job.getWorkspace().getId(), WorkArtifact.PULL_REQUEST);
-        // unifiedDiff (computed once at the top of deliver()) is the substrate for BOTH the M1 grounding
-        // guard (drop a hallucinated inline anchor before it lands on a student) and the downstream
-        // line-position validator below.
-        PracticeDetectionResultParser.DeliveryContent delivery = DeliveryComposer.compose(
-            deliverable,
-            WorkArtifact.PULL_REQUEST,
-            whyBySlug,
-            unifiedDiff
-        );
-        if (delivery != null) {
-            log.info("Server-side delivery composed from {} findings: jobId={}", deliverable.size(), job.getId());
-            if (!delivery.diffNotes().isEmpty()) {
-                var validLines =
-                    unifiedDiff == null
-                        ? Map.<String, TreeSet<Integer>>of()
-                        : DiffHunkValidator.parseValidLines(unifiedDiff);
-                if (!validLines.isEmpty()) {
-                    var correctedNotes = DiffHunkValidator.validateAndCorrect(
-                        delivery.diffNotes(),
-                        validLines,
-                        job.getId().toString()
-                    );
-                    delivery = delivery.withDiffNotes(correctedNotes);
-                }
-            }
-        }
-
-        // Recompose hook: after the inline notes post, the summary's inline section is demoted to a pointer
-        // for every finding whose comment actually landed (its detail then lives on the diff). Binding the
-        // findings + work artifact here keeps FeedbackDeliveryService free of the composition inputs — it only
-        // hands back the delivered keys. Re-runs the identical partition so the body cannot drift.
-        feedbackService.deliverFeedback(job, delivery, deliveredKeys ->
-            DeliveryComposer.recomposeMrNote(deliverable, WorkArtifact.PULL_REQUEST, whyBySlug, deliveredKeys)
-        );
+        return;
     }
 
     /**
@@ -510,154 +550,94 @@ public class PullRequestReviewHandler implements JobTypeHandler {
      */
     @Override
     public ExistingDeliveryLookup findExistingDelivery(AgentJob job) {
-        return feedbackService.findExistingDeliveryCommentId(job);
+        // Measurement has no provider-side delivery. Its durable effect is the persisted observation
+        // set plus the idempotent composition request, so an unrelated earlier review comment must
+        // never make recovery skip this handler.
+        return ExistingDeliveryLookup.absent();
     }
 
-    // Delivery-phase diff helpers (delegate to GitDiffOperations)
-
-    /**
-     * Run the deterministic secret pre-pass over the job's raw diff and map each hit to a synthetic
-     * {@code hardcoded-secrets} PRESENT/BAD finding. Hits already covered by an LLM-produced
-     * hardcoded-secrets finding (same matched token already quoted) are skipped to avoid double-posting.
-     */
-    private List<PracticeDetectionResultParser.ValidatedFinding> scanForSecrets(
-        @Nullable String diff,
-        List<PracticeDetectionResultParser.ValidatedFinding> existing
-    ) {
+    private List<PracticeDetectionResultParser.ValidatedObservation> scanForSecrets(@Nullable String diff) {
         List<SecretDiffScanner.SecretHit> hits = secretDiffScanner.scan(diff);
         if (hits.isEmpty()) return List.of();
 
-        // De-dup synthetic hits against credentials an LLM finding already flagged, keyed by IN-DIFF
-        // POSITION (path:line). Position is stable regardless of how the LLM worded its evidence or which
-        // canonical token the scanner emitted — e.g. the scanner's "-----BEGIN PRIVATE KEY-----" token
-        // never appears verbatim when the line is the "-----BEGIN RSA PRIVATE KEY-----" variant, so a
-        // token-substring check alone would re-post the same secret. The token check stays only as a
-        // fallback for LLM findings that carry no parseable location.
-        Set<String> llmPositions = new HashSet<>();
-        Set<String> llmQuoted = new HashSet<>();
-        for (var f : existing) {
-            if (
-                !"hardcoded-secrets".equals(f.practiceSlug()) ||
-                f.assessment() != Assessment.BAD ||
-                f.evidence() == null
-            ) {
-                continue;
-            }
-            boolean hadLocation = false;
-            JsonNode locations = f.evidence().get("locations");
-            if (locations != null && locations.isArray()) {
-                for (JsonNode loc : locations) {
-                    JsonNode pathNode = loc.get("path");
-                    JsonNode lineNode = loc.get("startLine");
-                    if (pathNode != null && !pathNode.isNull() && lineNode != null && lineNode.isNumber()) {
-                        llmPositions.add(pathNode.asString() + ":" + lineNode.asInt());
-                        hadLocation = true;
-                    }
-                }
-            }
-            if (!hadLocation) {
-                llmQuoted.add(f.evidence().toString());
-            }
-        }
-
-        List<PracticeDetectionResultParser.ValidatedFinding> out = new ArrayList<>();
+        List<PracticeDetectionResultParser.ValidatedObservation> out = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (SecretDiffScanner.SecretHit hit : hits) {
             String key = hit.path() + ":" + hit.newLine() + ":" + hit.ruleId();
             if (!seen.add(key)) continue;
-            if (llmPositions.contains(hit.path() + ":" + hit.newLine())) continue;
-            if (llmQuoted.stream().anyMatch(q -> q.contains(hit.matchedToken()))) continue;
-            out.add(toSecretFinding(hit));
+            out.add(toSecretObservation(hit));
         }
         return out;
     }
 
-    private PracticeDetectionResultParser.ValidatedFinding toSecretFinding(SecretDiffScanner.SecretHit hit) {
+    private PracticeDetectionResultParser.ValidatedObservation toSecretObservation(SecretDiffScanner.SecretHit hit) {
         ObjectNode evidence = objectMapper.createObjectNode();
-        ArrayNode locations = evidence.putArray("locations");
-        ObjectNode location = locations.addObject();
-        location.put("path", hit.path());
-        location.put("startLine", hit.newLine());
-        ArrayNode snippets = evidence.putArray("snippets");
-        snippets.add(hit.addedLine());
+        evidence.put("detector", "secret-diff-scanner");
+        ArrayNode citations = evidence.putArray("citations");
+        ObjectNode citation = citations.addObject();
+        citation.put("sourceKind", "scm.pull-request.diff");
+        citation.put("artifactPath", ContentSource.OUTPUT_PREFIX + "diff.patch");
+        citation.put("path", hit.path());
+        citation.put("side", "NEW");
+        citation.put("startLine", hit.newLine());
+        citation.put("endLine", hit.newLine());
+        citation.put("quoteSha256", ProvenanceDigest.sha256Hex(hit.addedLine().getBytes(StandardCharsets.UTF_8)));
+        citation.put("quoteRedacted", true);
 
         boolean lowSignal = secretDiffScanner.isLowSignalPath(hit.path());
-        Severity severity = (hit.isCritical() && !lowSignal) ? Severity.CRITICAL : Severity.MAJOR;
+        Severity severity = lowSignal ? Severity.MINOR : Severity.MAJOR;
 
+        // The remediation rides in `reasoning` because this observation has no model behind it to bias: the
+        // scanner is deterministic, the sentence is written here rather than generated, and a leaked
+        // credential is the one case where the cost of the developer not being told what to do dominates
+        // everything else. It must not wait on a composition stage that is entitled to withhold.
         String reasoning =
-            "A credential appears on a changed line: `" +
-            hit.addedLine() +
-            "`. Committed secrets remain in the git history permanently — even after the line is removed — so the key must be treated as compromised.";
-        String guidance =
-            "Remove the literal value, rotate the credential immediately, and load it at runtime from an environment variable or a secrets manager instead of hardcoding it.";
+            "A credential appears on the cited changed line. Committed secrets remain in git history even after removal, " +
+            "so treat the credential as compromised: remove the literal value, rotate the credential immediately, and " +
+            "load it at runtime from an environment variable or a secrets manager instead of hardcoding it.";
 
-        return new PracticeDetectionResultParser.ValidatedFinding(
-            "hardcoded-secrets",
+        return new PracticeDetectionResultParser.ValidatedObservation(
+            "avoids-insecure-defaults-and-over-broad-permissions",
             "Hardcoded secret on a changed line",
             Presence.PRESENT,
             Assessment.BAD,
             severity,
-            1.0f,
             evidence,
-            reasoning,
-            guidance,
-            List.of()
+            reasoning
         );
     }
 
-    /** Raw (un-annotated) unified diff for the job's PR range, or null when unavailable. */
-    private String computeUnifiedDiff(AgentJob job) {
-        JsonNode metadata = job.getMetadata();
-        if (metadata == null) return null;
-
-        long repositoryId;
-        String headSha, targetBranch, sourceBranch;
-        try {
-            repositoryId = requireLong(metadata, "repository_id");
-            headSha = requireText(metadata, "commit_sha");
-            targetBranch = requireText(metadata, "target_branch");
-            sourceBranch = requireText(metadata, "source_branch");
-        } catch (Exception e) {
-            log.debug("Cannot compute unified diff, missing metadata: {}", e.getMessage());
-            return null;
+    private @Nullable String capturedDiff(AgentJob job) {
+        JsonNode sources =
+            job.getEvidenceSnapshot() == null ? null : job.getEvidenceSnapshot().path("manifest").path("sources");
+        if (sources == null || !sources.isArray()) {
+            throw new JobDeliveryException("Job has no captured source manifest: jobId=" + job.getId());
         }
-
-        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return null;
-        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-
-        String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
-        if (range == null) return null;
-
-        String diff = gitDiffOperations.diff(repoPath, range[0], range[1]);
-        return (diff == null || diff.isBlank()) ? null : diff;
+        for (JsonNode source : sources) {
+            if (
+                !"scm.pull-request.diff".equals(source.path("kind").asString()) ||
+                !"AVAILABLE".equals(source.path("state").path("availability").asString())
+            ) {
+                continue;
+            }
+            for (JsonNode artifact : source.path("artifacts")) {
+                if ((ContentSource.OUTPUT_PREFIX + "diff.patch").equals(artifact.path("path").asString())) {
+                    String sha = artifact.path("sha256").asString();
+                    byte[] bytes = cas
+                        .get(sha)
+                        .orElseThrow(() ->
+                            new JobDeliveryException("Captured diff is no longer available: jobId=" + job.getId())
+                        );
+                    return new String(bytes, StandardCharsets.UTF_8);
+                }
+            }
+            throw new JobDeliveryException("Captured diff source has no diff artifact: jobId=" + job.getId());
+        }
+        return null;
     }
 
-    private Set<String> computeDiffStatFiles(AgentJob job) {
-        JsonNode metadata = job.getMetadata();
-        if (metadata == null) return Set.of();
-
-        long repositoryId;
-        String headSha, targetBranch, sourceBranch;
-        try {
-            repositoryId = requireLong(metadata, "repository_id");
-            headSha = requireText(metadata, "commit_sha");
-            targetBranch = requireText(metadata, "target_branch");
-            sourceBranch = requireText(metadata, "source_branch");
-        } catch (Exception e) {
-            log.debug("Cannot compute diff_stat_files, missing metadata fields: {}", e.getMessage());
-            return Set.of();
-        }
-
-        if (!gitRepositoryManager.isRepositoryCloned(repositoryId)) return Set.of();
-        Path repoPath = gitRepositoryManager.getRepositoryPath(repositoryId);
-
-        String[] range = gitDiffOperations.resolveDiffRange(repoPath, targetBranch, sourceBranch, headSha);
-        if (range == null) return Set.of();
-
-        String nameOnly = gitDiffOperations.diffNameOnly(repoPath, range[0], range[1]);
-        if (nameOnly == null || nameOnly.isBlank()) return Set.of();
-
-        return parseDiffNameOnlyPaths(nameOnly);
+    Map<String, TreeSet<Integer>> validDiffLines(AgentJob job) {
+        return DiffHunkValidator.parseValidLines(capturedDiff(job));
     }
 
     /**
@@ -675,34 +655,34 @@ public class PullRequestReviewHandler implements JobTypeHandler {
         return paths;
     }
 
-    /**
-     * Filter findings to only include those whose evidence locations reference files in the diff.
-     */
-    static List<PracticeDetectionResultParser.ValidatedFinding> filterByDiffScope(
-        List<PracticeDetectionResultParser.ValidatedFinding> findings,
+    static List<PracticeDetectionResultParser.ValidatedObservation> filterByDiffScope(
+        List<PracticeDetectionResultParser.ValidatedObservation> observations,
         Set<String> diffFiles
     ) {
-        if (diffFiles.isEmpty()) return findings;
-        List<PracticeDetectionResultParser.ValidatedFinding> filtered = new ArrayList<>();
-        for (var finding : findings) {
-            // Process/metadata-level practices are not diff-anchored — never drop them on a location mismatch.
-            if (METADATA_LEVEL_PRACTICES.contains(finding.practiceSlug())) {
-                filtered.add(finding);
-                continue;
-            }
-            JsonNode evidence = finding.evidence();
+        if (diffFiles.isEmpty()) return observations;
+        List<PracticeDetectionResultParser.ValidatedObservation> filtered = new ArrayList<>();
+        for (var observation : observations) {
+            JsonNode evidence = observation.evidence();
             if (evidence == null || evidence.isNull() || evidence.isMissingNode()) {
-                filtered.add(finding);
+                filtered.add(observation);
                 continue;
             }
-            JsonNode locations = evidence.get("locations");
-            if (locations == null || !locations.isArray() || locations.isEmpty()) {
-                filtered.add(finding);
+            JsonNode citations = evidence.get("citations");
+            if (citations == null || !citations.isArray() || citations.isEmpty()) {
+                filtered.add(observation);
                 continue;
             }
             boolean hasInScopeLocation = false;
-            for (JsonNode loc : locations) {
-                JsonNode pathNode = loc.get("path");
+            for (JsonNode citation : citations) {
+                String sourceKind = citation.path("sourceKind").asString();
+                if (sourceKind.isBlank()) {
+                    continue;
+                }
+                if (!"scm.pull-request.diff".equals(sourceKind)) {
+                    hasInScopeLocation = true;
+                    break;
+                }
+                JsonNode pathNode = citation.get("path");
                 if (pathNode == null || pathNode.isNull() || pathNode.isMissingNode()) {
                     continue;
                 }
@@ -710,27 +690,24 @@ public class PullRequestReviewHandler implements JobTypeHandler {
                 if (path.isBlank() || "null".equals(path)) {
                     continue;
                 }
-                // The agent cites files it read under the repo mount as "inputs/sources/scm/repo/<path>" (ADR 0020),
-                // but diff-stat paths are repo-relative ("<path>"). Strip the mount prefix so a code finding
-                // on a genuinely-changed file is not dropped on a cosmetic path mismatch.
                 String repoRelative = path.startsWith(SandboxLayout.REPO_MOUNT_RELATIVE)
                     ? path.substring(SandboxLayout.REPO_MOUNT_RELATIVE.length())
                     : path;
-                if (diffFiles.contains(path) || diffFiles.contains(repoRelative) || isInternalContextPath(path)) {
+                if (diffFiles.contains(path) || diffFiles.contains(repoRelative)) {
                     hasInScopeLocation = true;
                     break;
                 }
             }
             if (hasInScopeLocation) {
-                filtered.add(finding);
+                filtered.add(observation);
             } else {
-                log.info("Filtered out-of-scope finding: slug={}, paths={}", finding.practiceSlug(), locations);
+                log.info(
+                    "Filtered out-of-scope observation: slug={}, citations={}",
+                    observation.practiceSlug(),
+                    citations
+                );
             }
         }
         return filtered;
-    }
-
-    private static boolean isInternalContextPath(String path) {
-        return ALLOWED_INTERNAL_CONTEXT_PATHS.contains(path);
     }
 }

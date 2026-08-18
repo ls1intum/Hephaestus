@@ -10,22 +10,20 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
-import de.tum.cit.aet.hephaestus.agent.handler.PullRequestReviewSubmissionRequest;
 import de.tum.cit.aet.hephaestus.integration.core.events.BotCommandReceivedEvent;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ScmCommentReactionSink;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
-import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
-import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Tag;
@@ -41,15 +39,21 @@ class BotCommandProcessorTest extends BaseUnitTest {
     private static final long REPO_ID = 100L;
     private static final int MR_NUMBER = 42;
     private static final String AUTHOR = "student1";
+    private static final long PROVIDER_ID = 3L;
+    private static final long AUTHOR_NATIVE_ID = 77L;
+    private static final String REPO_NAME = "hephaestustest/demo-repository";
 
     @Mock
-    private AgentJobService agentJobService;
+    private ManualReviewRequests manualReviewRequests;
 
     @Mock
     private PullRequestRepository pullRequestRepository;
 
     @Mock
-    private PracticeReviewDetectionGate practiceReviewDetectionGate;
+    private UserRepository userRepository;
+
+    @Mock
+    private WorkspaceResolver workspaceResolver;
 
     private BotCommandProcessor processor;
 
@@ -59,9 +63,10 @@ class BotCommandProcessorTest extends BaseUnitTest {
     void setUp() {
         silentModeEngaged = false;
         processor = new BotCommandProcessor(
-            agentJobService,
+            manualReviewRequests,
             pullRequestRepository,
-            practiceReviewDetectionGate,
+            userRepository,
+            workspaceResolver,
             List.of(),
             () -> silentModeEngaged
         );
@@ -70,26 +75,20 @@ class BotCommandProcessorTest extends BaseUnitTest {
     @Nested
     class CommandMatching {
 
-        /**
-         * A null trigger event is what makes a manually requested review run the full focus-active
-         * practice set rather than one trigger's subset.
-         */
         @ParameterizedTest(name = "{0} triggers a review")
         @ValueSource(strings = { "/hephaestus review", "/hephaestus review please", "/Hephaestus Review" })
-        void anAcceptedReviewCommand_submitsAReviewForThatMergeRequest(String command) {
+        void anAcceptedReviewCommand_asksForAReviewOfThatMergeRequest(String command) {
             PullRequest pr = createOpenPr();
             mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
+            Workspace workspace = mockWorkspace();
+            User commenter = mockCommenter();
+            when(manualReviewRequests.requestPullRequestReview(any(), any(), any())).thenReturn(
+                ManualReviewOutcome.submitted(UUID.randomUUID())
+            );
 
             processor.onBotCommandReceived(event(command));
 
-            var captor = ArgumentCaptor.forClass(PullRequestReviewSubmissionRequest.class);
-            verify(agentJobService).submit(eq(1L), eq(AgentJobType.PULL_REQUEST_REVIEW), captor.capture());
-            PullRequestReviewSubmissionRequest request = captor.getValue();
-            assertThat(request.pullRequest().number()).isEqualTo(MR_NUMBER);
-            assertThat(request.headRefOid()).isEqualTo("abc123");
-            assertThat(request.triggerEvent()).isNull();
+            verify(manualReviewRequests).requestPullRequestReview(eq(workspace), eq(pr), eq(List.of(commenter)));
         }
 
         @ParameterizedTest(name = "{0} is ignored")
@@ -98,7 +97,60 @@ class BotCommandProcessorTest extends BaseUnitTest {
             processor.onBotCommandReceived(event(command));
 
             verify(pullRequestRepository, never()).findByRepositoryIdAndNumber(anyLong(), anyInt());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
+        }
+    }
+
+    /** These tests pin only that the right identity reaches {@link ReviewRequestAuthority}. */
+    @Nested
+    class CommenterIdentity {
+
+        @Test
+        void theCommenterIsResolvedByProviderAndNativeId_notByLogin() {
+            PullRequest pr = createOpenPr();
+            mockPrLookup(pr);
+            mockWorkspace();
+            User commenter = mockCommenter();
+            when(manualReviewRequests.requestPullRequestReview(any(), any(), any())).thenReturn(
+                ManualReviewOutcome.submitted(UUID.randomUUID())
+            );
+
+            processor.onBotCommandReceived(event("/hephaestus review"));
+
+            verify(userRepository).findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID);
+            verify(userRepository, never()).findByLogin(any());
+            @SuppressWarnings("unchecked")
+            ArgumentCaptor<java.util.Collection<User>> captor = ArgumentCaptor.forClass(java.util.Collection.class);
+            verify(manualReviewRequests).requestPullRequestReview(any(), any(), captor.capture());
+            assertThat(captor.getValue()).containsExactly(commenter);
+        }
+
+        @Test
+        void anUnknownCommenterIsHandedOnAsNobody_ratherThanSkippingTheCheck() {
+            PullRequest pr = createOpenPr();
+            mockPrLookup(pr);
+            mockWorkspace();
+            when(userRepository.findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID)).thenReturn(
+                Optional.empty()
+            );
+            when(manualReviewRequests.requestPullRequestReview(any(), any(), any())).thenReturn(
+                ManualReviewOutcome.forbidden()
+            );
+
+            processor.onBotCommandReceived(event("/hephaestus review"));
+
+            verify(manualReviewRequests).requestPullRequestReview(any(), any(), eq(List.of()));
+        }
+
+        @Test
+        void aRepositoryNoWorkspaceMonitors_asksForNothing() {
+            PullRequest pr = createOpenPr();
+            mockPrLookup(pr);
+            when(workspaceResolver.resolveForRepository(REPO_NAME)).thenReturn(Optional.empty());
+
+            processor.onBotCommandReceived(event("/hephaestus review"));
+
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
         }
     }
 
@@ -111,29 +163,25 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
         }
 
         @Test
         void closedPr_skipsProcessing() {
-            PullRequest pr = createPrWithState(PullRequest.State.CLOSED);
-            mockPrLookup(pr);
+            mockPrLookup(createPrWithState(PullRequest.State.CLOSED));
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
         }
 
         @Test
         void mergedPr_skipsProcessing() {
-            PullRequest pr = createPrWithState(PullRequest.State.MERGED);
-            mockPrLookup(pr);
+            mockPrLookup(createPrWithState(PullRequest.State.MERGED));
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
         }
 
         @Test
@@ -144,37 +192,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(practiceReviewDetectionGate, never()).evaluate(any(), any(), any());
-            verify(agentJobService, never()).submit(any(), any(), any());
-        }
-    }
-
-    @Nested
-    class GateEvaluation {
-
-        @Test
-        void gateSkip_noJobSubmitted() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(
-                new GateDecision.Skip("no practices")
-            );
-
-            processor.onBotCommandReceived(event("/hephaestus review"));
-
-            verify(agentJobService, never()).submit(any(), any(), any());
-        }
-
-        @Test
-        void gateReceivesManualTriggerMode() {
-            PullRequest pr = createOpenPr();
-            mockPrLookup(pr);
-            mockGateDetect(pr);
-            when(agentJobService.submit(any(), any(), any())).thenReturn(Optional.of(new AgentJob()));
-
-            processor.onBotCommandReceived(event("/hephaestus review"));
-
-            verify(practiceReviewDetectionGate).evaluate(eq(pr), any(), eq(TriggerMode.MANUAL));
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
         }
     }
 
@@ -189,7 +207,7 @@ class BotCommandProcessorTest extends BaseUnitTest {
 
             processor.onBotCommandReceived(event("/hephaestus review"));
 
-            verify(agentJobService, never()).submit(any(), any(), any());
+            verify(manualReviewRequests, never()).requestPullRequestReview(any(), any(), any());
         }
     }
 
@@ -201,9 +219,10 @@ class BotCommandProcessorTest extends BaseUnitTest {
         private BotCommandProcessor processorWithSink() {
             when(sink.kind()).thenReturn(IntegrationKind.GITLAB);
             return new BotCommandProcessor(
-                agentJobService,
+                manualReviewRequests,
                 pullRequestRepository,
-                practiceReviewDetectionGate,
+                userRepository,
+                workspaceResolver,
                 List.of(sink),
                 () -> silentModeEngaged
             );
@@ -223,15 +242,35 @@ class BotCommandProcessorTest extends BaseUnitTest {
         }
 
         private BotCommandReceivedEvent eventWithReactionTarget(String noteBody) {
-            // commentId = 7 (6th arg), scopeId = 9 (7th arg); react() takes (scopeId, commentNativeId, name).
-            return new BotCommandReceivedEvent(IntegrationKind.GITLAB, REPO_ID, MR_NUMBER, noteBody, AUTHOR, 7L, 9L);
+            // commentId = 7, scopeId = 9; react() takes (scopeId, commentNativeId, name).
+            return new BotCommandReceivedEvent(
+                IntegrationKind.GITLAB,
+                REPO_ID,
+                MR_NUMBER,
+                noteBody,
+                AUTHOR,
+                PROVIDER_ID,
+                AUTHOR_NATIVE_ID,
+                7L,
+                9L
+            );
         }
     }
 
     // Test helpers
 
     private BotCommandReceivedEvent event(String noteBody) {
-        return new BotCommandReceivedEvent(IntegrationKind.GITLAB, REPO_ID, MR_NUMBER, noteBody, AUTHOR, null, null);
+        return new BotCommandReceivedEvent(
+            IntegrationKind.GITLAB,
+            REPO_ID,
+            MR_NUMBER,
+            noteBody,
+            AUTHOR,
+            PROVIDER_ID,
+            AUTHOR_NATIVE_ID,
+            null,
+            null
+        );
     }
 
     private PullRequest createOpenPr() {
@@ -241,15 +280,15 @@ class BotCommandProcessorTest extends BaseUnitTest {
     private PullRequest createPrWithState(PullRequest.State state) {
         Repository repo = new Repository();
         repo.setId(REPO_ID);
-        repo.setNameWithOwner("hephaestustest/demo-repository");
-        repo.setHtmlUrl("https://gitlab.example.com/hephaestustest/demo-repository");
+        repo.setNameWithOwner(REPO_NAME);
+        repo.setHtmlUrl("https://gitlab.example.com/" + REPO_NAME);
 
         PullRequest pr = new PullRequest();
         pr.setId(500L);
         pr.setNumber(MR_NUMBER);
         pr.setState(state);
         pr.setTitle("Test MR");
-        pr.setHtmlUrl("https://gitlab.example.com/hephaestustest/demo-repository/-/merge_requests/" + MR_NUMBER);
+        pr.setHtmlUrl("https://gitlab.example.com/" + REPO_NAME + "/-/merge_requests/" + MR_NUMBER);
         pr.setHeadRefOid("abc123");
         pr.setHeadRefName("feature/branch");
         pr.setBaseRefName("main");
@@ -262,11 +301,20 @@ class BotCommandProcessorTest extends BaseUnitTest {
         when(pullRequestRepository.findByIdWithAllForGate(pr.getId())).thenReturn(Optional.of(pr));
     }
 
-    private void mockGateDetect(PullRequest pr) {
+    private Workspace mockWorkspace() {
         Workspace workspace = new Workspace();
         workspace.setId(1L);
-        when(practiceReviewDetectionGate.evaluate(eq(pr), any(), any())).thenReturn(
-            new GateDecision.Detect(workspace, List.of(new Practice()))
+        when(workspaceResolver.resolveForRepository(REPO_NAME)).thenReturn(Optional.of(workspace));
+        return workspace;
+    }
+
+    private User mockCommenter() {
+        User commenter = new User();
+        commenter.setId(4242L);
+        commenter.setLogin(AUTHOR);
+        when(userRepository.findByNativeIdAndProviderId(AUTHOR_NATIVE_ID, PROVIDER_ID)).thenReturn(
+            Optional.of(commenter)
         );
+        return commenter;
     }
 }

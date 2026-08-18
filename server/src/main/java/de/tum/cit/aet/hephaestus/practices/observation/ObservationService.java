@@ -1,17 +1,20 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
-import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationAdviceBody;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationFeedbackBody;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
@@ -19,8 +22,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -35,15 +36,15 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Service for reading practice findings scoped to the authenticated developer.
+ * Service for reading practice observations scoped to the authenticated developer.
  *
  * <p>All methods resolve the current user from the security context via
  * {@link UserRepository#getCurrentUser()}. If the user is not yet synced as a
  * developer (e.g., first login before any PR activity), list/summary endpoints
  * return empty results rather than failing.
  *
- * <p>For single-finding access, developer ownership is enforced in SQL — a
- * non-owner receives 404 (not 403) to avoid leaking finding existence.
+ * <p>For single-observation access, developer ownership is enforced in SQL — a
+ * non-owner receives 404 (not 403) to avoid leaking observation existence.
  */
 @Service
 @RequiredArgsConstructor
@@ -52,9 +53,10 @@ public class ObservationService {
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final UserRepository userRepository;
+    private final ObservationVisibilityPolicy visibilityPolicy;
 
     /**
-     * Paginated findings for the current user in a workspace, with optional filters.
+     * Paginated observations for the current user in a workspace, with optional filters.
      *
      * @return empty page if user is not a synced developer
      */
@@ -92,7 +94,7 @@ public class ObservationService {
         return observationRepository.findSummaryByDeveloperAndWorkspace(currentUser.get().getId(), workspaceId);
     }
 
-    /** Look-back for the reflection surface — mirrors the mentor's findings window. */
+    /** Look-back for the reflection read model — mirrors the mentor's observations window. */
     private static final int REFLECTION_LOOKBACK_DAYS = 90;
     /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
@@ -100,20 +102,22 @@ public class ObservationService {
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
     /**
-     * Upstream-quality floor (P4) for the reflective surface, mirroring the live mentor standing path. Below
-     * this confidence a single-target BAD is quarantined and EXCLUDED from {@code toWorkOn} entirely: a coin-flip
-     * detector hunch seen on one artifact must never reach the learner's dashboard (audit gap #1c), not merely
-     * sort last.
+     * The lanes whose text this read model's {@code guidance} means: the ones that speak about the one
+     * observation they are bound to. A {@code IN_APP} unit is excluded because it is a message about a
+     * habit across several pieces of work — it binds every problem behind it as evidence, so it would
+     * answer "what did you tell me about this observation" with a paragraph that is explicitly not about it.
+     * Named here rather than defaulted in the query so a fourth lane has to be admitted deliberately.
      */
-    private static final float QUARANTINE_CONFIDENCE = 0.5f;
-    /** Distinct targets at which a low-confidence gap is corroborated enough to rank as a normal priority. */
-    private static final int CORROBORATION_TARGETS = 2;
+    private static final List<String> FEEDBACK_CHANNELS = List.of(
+        FeedbackChannel.IN_CONTEXT.name(),
+        FeedbackChannel.IN_CHAT.name()
+    );
 
     /**
      * The reflective-dashboard read-model for the current developer: per-practice cards they can READ —
      * why the practice matters, what good looks like, where they stand, what to act on, and what they
      * already do well. This is the third feedback channel (alongside in-context SCM notes and the mentor),
-     * reorganising the SAME findings by practice for self-paced reflection — not a scoreboard.
+     * reorganising the SAME observations by practice for self-paced reflection — not a scoreboard.
      *
      * <p>Sourced from each target's LATEST review run with {@code NOT_APPLICABLE} already excluded (the
      * repository query), so the surface carries only feedback the developer can act on or be affirmed by.
@@ -130,22 +134,32 @@ public class ObservationService {
             return List.of();
         }
         Instant since = Instant.now().minus(REFLECTION_LOOKBACK_DAYS, ChronoUnit.DAYS);
-        // No pre-group LIMIT: a global recency cap would silently drop WHOLE practice cards whose findings fall
-        // past the cap row, making a missing card indistinguishable from "no findings". The query is already
+        // No pre-group LIMIT: a global recency cap would silently drop WHOLE practice cards whose observations fall
+        // past the cap row, making a missing card indistinguishable from "no observations". The query is already
         // latest-run-deduped within a 90-day window (so cardinality is bounded by a developer's distinct
-        // latest-run findings, not their full history), and the per-practice caps below do the real trimming —
-        // so every practice with at least one actionable finding gets a card regardless of overall volume.
-        List<Observation> observations = observationRepository.findRecentByDeveloperAndWorkspace(
+        // latest-run observations, not their full history), and the per-practice caps below do the real trimming —
+        // so every practice with at least one actionable observation gets a card regardless of overall volume.
+        List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             currentUser.get().getId(),
             workspaceId,
             since,
             Pageable.unpaged()
         );
+        Set<UUID> visible = visibilityPolicy.permitsAll(
+            workspaceId,
+            recent,
+            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
+        );
+        List<Observation> observations = recent
+            .stream()
+            .filter(o -> visible.contains(o.getId()))
+            .toList();
 
         // Advice lives on the delivered Feedback (ADR 0021), not on the observation. Batch-fetch the
         // observation-id → delivered-body map ONCE for every observation on this surface so each card's items can
         // show what was actually delivered (null when nothing was). One query, not N+1.
-        Map<UUID, String> deliveredGuidance = deliveredGuidanceByObservation(
+        Map<UUID, String> deliveredFeedback = deliveredFeedbackByObservation(
+            workspaceId,
             observations.stream().map(Observation::getId).collect(Collectors.toSet())
         );
 
@@ -159,53 +173,37 @@ public class ObservationService {
         for (List<Observation> group : byPractice.values()) {
             Practice practice = group.get(0).getPractice();
 
-            // A defect-detector practice has no GOOD observation, so a persisted GOOD row predating the
-            // write-time coercion must not surface here as a false "strength" — read-time guard for the dashboard.
+            // A defect-detector practice hunts an undesirable behaviour, so it has no PRESENT, GOOD: what
+            // would be present is the defect. A persisted row of that shape predating the write-time coercion
+            // must not surface here as a false "strength" — read-time guard for the dashboard.
+            //
+            // Its ABSENT, GOOD rows are the opposite case and belong on the card. The harmful behaviour could
+            // have appeared in the corpus the practice bounds and did not, proven against the search the
+            // observation carries, and this surface is the whole reason that verdict was made reachable: a
+            // developer who writes clean error handling has to be able to read that they did, and used to be
+            // told instead that their work had no subject for the practice.
             boolean isDefectDetector = practice.isDefectDetector();
 
-            // The "to work on" headline must be the highest-impact CORROBORATED item, not just the highest
-            // severity (P4): a single low-confidence BAD on one artifact must sink below a confident or
-            // multi-target gap so it never leads the card. Rank a gap that is quarantined (low confidence on a
-            // single target) last, then by (confidence × severity-weight) descending.
             List<Observation> bad = group
                 .stream()
                 .filter(f -> f.getAssessment() == Assessment.BAD)
                 .toList();
-            // Corroboration is per recurrence LOCUS, not per practice group (matching the standing content source
-            // design, where distinct-target counts are keyed per row): an uncorroborated gap on target A must
-            // not be rescued from quarantine just because an UNRELATED BAD exists on target B for the same
-            // practice. Count distinct targets within each recurrenceKey; the whole-group count is the fallback
-            // only for observations that carry no recurrenceKey.
-            Set<Long> groupTargets = bad.stream().map(Observation::getArtifactId).collect(Collectors.toSet());
-            boolean groupSingleTarget = groupTargets.size() < CORROBORATION_TARGETS;
-            Map<String, Set<Long>> targetsByLocus = new HashMap<>();
-            for (Observation f : bad) {
-                if (f.getRecurrenceKey() != null) {
-                    targetsByLocus.computeIfAbsent(f.getRecurrenceKey(), k -> new HashSet<>()).add(f.getArtifactId());
-                }
-            }
-            // P4 firewall on the read model (audit gap #1c): a quarantined BAD (low-confidence AND seen on a
-            // single target) must not just sort last — it must NOT be DISPLAYED at all. Otherwise the dashboard's
-            // bounded MAX_ITEMS list still surfaces a coin-flip detector hunch as something to work on, bypassing
-            // the same floor the mentor standing surface already enforces. Filter first, then rank what survives.
             List<ReflectionItemDTO> toWorkOn = bad
                 .stream()
-                .filter(f -> !quarantined(f, locusSingleTarget(f, targetsByLocus, groupSingleTarget)))
-                .sorted(Comparator.comparingDouble(ObservationService::priorityScore).reversed())
+                .sorted(Comparator.comparingInt(ObservationService::severityOrdinal))
                 .limit(MAX_ITEMS_PER_PRACTICE)
-                .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
+                .map(f -> ReflectionItemDTO.from(f, deliveredFeedback.get(f.getId())))
                 .toList();
-            List<ReflectionItemDTO> strengths = isDefectDetector
-                ? List.of()
-                : group
-                      .stream()
-                      .filter(f -> f.getAssessment() == Assessment.GOOD)
-                      .limit(MAX_STRENGTHS_PER_PRACTICE)
-                      .map(f -> ReflectionItemDTO.from(f, deliveredGuidance.get(f.getId())))
-                      .toList();
+            List<ReflectionItemDTO> strengths = group
+                .stream()
+                .filter(f -> f.getAssessment() == Assessment.GOOD)
+                .filter(f -> !isDefectDetector || f.getPresence() == Presence.ABSENT)
+                .limit(MAX_STRENGTHS_PER_PRACTICE)
+                .map(f -> ReflectionItemDTO.from(f, deliveredFeedback.get(f.getId())))
+                .toList();
             if (toWorkOn.isEmpty() && strengths.isEmpty()) {
-                // This fires for a defect-detector practice whose only rows are GOOD: strengths are suppressed
-                // for defect-detectors (no clean-bill-of-health) and there are no BAD rows, so the card is empty
+                // This fires for a defect-detector practice whose only rows are PRESENT, GOOD: those are
+                // suppressed above (no clean-bill-of-health) and there are no BAD rows, so the card is empty
                 // and contributes nothing to the dashboard. Skip it rather than emit a contentless card.
                 continue;
             }
@@ -259,52 +257,16 @@ public class ObservationService {
             .orElse(Severity.values().length); // strengths-only cards sort after any with problems
     }
 
-    /**
-     * A gap is quarantined when it is low-confidence AND uncorroborated (only seen on a single target). Returns
-     * {@code true} for quarantined items so they are FILTERED OUT of the displayed {@code toWorkOn} list (audit
-     * gap #1c) — a coin-flip detector hunch on one artifact must never reach the learner's dashboard. A confident
-     * gap, or one corroborated across ≥2 targets, is never quarantined.
-     */
-    private static boolean quarantined(Observation f, boolean singleTarget) {
-        float conf = f.getConfidence() == null ? 0f : f.getConfidence();
-        return singleTarget && conf < QUARANTINE_CONFIDENCE;
+    private static int severityOrdinal(Observation observation) {
+        return observation.getSeverity() == null ? Severity.values().length : observation.getSeverity().ordinal();
     }
 
     /**
-     * Whether the recurrence locus this observation belongs to is corroborated on fewer than
-     * {@link #CORROBORATION_TARGETS} distinct targets. Keyed per {@code recurrenceKey} so an unrelated BAD on
-     * another target for the same practice never lends corroboration to this gap. An observation with no
-     * recurrenceKey falls back to the whole-group single-target verdict.
-     */
-    private static boolean locusSingleTarget(
-        Observation f,
-        Map<String, Set<Long>> targetsByLocus,
-        boolean groupSingleTarget
-    ) {
-        if (f.getRecurrenceKey() == null) {
-            return groupSingleTarget;
-        }
-        Set<Long> locusTargets = targetsByLocus.get(f.getRecurrenceKey());
-        return locusTargets == null || locusTargets.size() < CORROBORATION_TARGETS;
-    }
-
-    /**
-     * Ranking weight for a BAD gap: {@code confidence × severity-weight}, so a low-confidence gap sinks below
-     * a corroborated/confident one of the same severity, and a high-severity-but-uncertain gap does not
-     * automatically outrank a confident lower-severity one. Severity weight is CRITICAL=4..INFO=1, null=0.
-     */
-    private static double priorityScore(Observation f) {
-        float conf = f.getConfidence() == null ? 0f : f.getConfidence();
-        int sevWeight = f.getSeverity() == null ? 0 : (Severity.values().length - f.getSeverity().ordinal());
-        return conf * sevWeight;
-    }
-
-    /**
-     * Single finding detail. Ownership is enforced in the SQL query itself —
-     * a finding belonging to another developer simply won't be returned.
+     * Single observation detail. Ownership is enforced in the SQL query itself —
+     * a observation belonging to another developer simply won't be returned.
      *
-     * @return the finding if it exists and belongs to the current user
-     * @throws EntityNotFoundException if no user, or finding not found/not owned
+     * @return the observation if it exists and belongs to the current user
+     * @throws EntityNotFoundException if no user, or observation not found/not owned
      */
     @Transactional(readOnly = true)
     public Observation getObservation(Long workspaceId, UUID observationId) {
@@ -321,30 +283,35 @@ public class ObservationService {
      * The delivered feedback body for a single observation — the developer's advice source for the detail view
      * (ADR 0021: advice lives on the delivered {@code Feedback}, not the immutable observation). Null when the
      * observation was never delivered. Callers pass this into {@code ObservationDetailDTO.from}.
+     *
+     * <p>Takes the workspace even though the observation id alone identifies a row: the body it returns
+     * belongs to a feedback unit, and feedback is tenant-scoped whatever the observation is.
      */
     @Transactional(readOnly = true)
-    public Optional<String> getDeliveredGuidance(UUID observationId) {
-        return Optional.ofNullable(deliveredGuidanceByObservation(Set.of(observationId)).get(observationId));
+    public Optional<String> getDeliveredGuidance(Long workspaceId, UUID observationId) {
+        return Optional.ofNullable(
+            deliveredFeedbackByObservation(workspaceId, Set.of(observationId)).get(observationId)
+        );
     }
 
-    private Map<UUID, String> deliveredGuidanceByObservation(Set<UUID> observationIds) {
+    private Map<UUID, String> deliveredFeedbackByObservation(Long workspaceId, Set<UUID> observationIds) {
         if (observationIds.isEmpty()) {
             return Map.of();
         }
         return feedbackObservationRepository
-            .findLatestAdviceBodiesByObservationIds(observationIds)
+            .findLatestFeedbackBodiesByObservationIds(workspaceId, observationIds, FEEDBACK_CHANNELS)
             .stream()
-            .collect(Collectors.toMap(ObservationAdviceBody::getObservationId, ObservationAdviceBody::getBody));
+            .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
     }
 
     /**
-     * All findings for a specific pull request within a workspace.
-     * Any workspace member can view PR findings (not restricted to the PR author).
+     * All observations for a specific pull request within a workspace.
+     * Any workspace member can view PR observations (not restricted to the PR author).
      */
     @Transactional(readOnly = true)
     public List<Observation> getObservationsForPullRequest(Long workspaceId, Long pullRequestId) {
         return observationRepository.findByPullRequestAndWorkspace(
-            WorkArtifact.PULL_REQUEST,
+            ArtifactKinds.PULL_REQUEST,
             pullRequestId,
             workspaceId
         );

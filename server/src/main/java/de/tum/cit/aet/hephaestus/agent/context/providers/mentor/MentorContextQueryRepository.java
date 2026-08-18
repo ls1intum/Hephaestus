@@ -169,7 +169,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
         Pageable pageable
     );
 
-    // Findings context — reviews received in window
+    // Observations context — reviews received in window
 
     /**
      * Earliest USER-role message per thread for a batch of thread ids, in one round trip. Native because
@@ -231,7 +231,7 @@ public interface MentorContextQueryRepository extends JpaRepository<User, Long> 
 
     /**
      * The developer's own authored PULL REQUESTS in the workspace, newest first — the work itself (not
-     * findings about it), so the mentor has a concrete, linkable inventory of what they shipped. Same
+     * observations about it), so the mentor has a concrete, linkable inventory of what they shipped. Same
      * author + RepositoryToMonitor scoping as {@link #findReviewsReceivedSince}. {@code FROM PullRequest}
      * narrows to the PR discriminator (single-table inheritance), so issues never leak in.
      */

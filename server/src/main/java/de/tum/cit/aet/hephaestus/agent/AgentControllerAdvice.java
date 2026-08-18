@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent;
 
+import de.tum.cit.aet.hephaestus.agent.backfill.ReviewBackfillConflictException;
+import de.tum.cit.aet.hephaestus.agent.backfill.ReviewSweepScheduleConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionInUseException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmConnectionSlugConflictException;
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelInUseException;
@@ -11,6 +13,7 @@ import java.net.URI;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -27,6 +30,40 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice(basePackageClasses = AgentControllerAdvice.class)
 @Order(Ordered.HIGHEST_PRECEDENCE)
 public class AgentControllerAdvice {
+
+    @ExceptionHandler(ReviewBackfillConflictException.class)
+    ProblemDetail handleReviewBackfillConflict(ReviewBackfillConflictException exception) {
+        return problem(HttpStatus.CONFLICT, "review-backfill-conflict", "Review backfill conflict", exception);
+    }
+
+    @ExceptionHandler(ReviewSweepScheduleConflictException.class)
+    ProblemDetail handleReviewSweepScheduleConflict(ReviewSweepScheduleConflictException exception) {
+        return problem(
+            HttpStatus.CONFLICT,
+            "review-sweep-schedule-conflict",
+            "Review sweep schedule conflict",
+            exception
+        );
+    }
+
+    /**
+     * An optimistic-lock failure that outlived its retries is a conflict, not a server fault.
+     *
+     * <p>Agent entities carry version columns because an admin screen and a scheduler write the same rows,
+     * so this is a contended-row outcome the caller can act on by repeating the request. Without the
+     * mapping it falls through to {@code GlobalControllerAdvice}'s
+     * {@code @ExceptionHandler(Exception.class)} and becomes a 500, which tells the admin the server is
+     * broken when what happened is that somebody else got there first.
+     */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    ProblemDetail handleOptimisticLockingFailure(OptimisticLockingFailureException exception) {
+        return problem(
+            HttpStatus.CONFLICT,
+            "concurrent-modification",
+            "Concurrent modification",
+            new IllegalStateException("The record changed while this request was being processed. Try again.")
+        );
+    }
 
     @ExceptionHandler(AgentJobStateConflictException.class)
     ProblemDetail handleAgentJobStateConflict(AgentJobStateConflictException exception) {

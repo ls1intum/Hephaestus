@@ -55,7 +55,7 @@ public class AgentJobLifecycleService {
     }
 
     /**
-     * Retries delivery for a completed job whose delivery previously FAILED. Only {@code FAILED} is
+     * Retries delivery for a completed job whose delivery status is FAILED. Only {@code FAILED} is
      * accepted as the CAS source: admitting {@code PENDING} would let two concurrent retries both
      * succeed, since a {@code PENDING → PENDING} no-op still reports one row updated. A job stuck at
      * PENDING is therefore not recoverable here — {@link #recoverStuckDelivery} is its path.
@@ -168,7 +168,8 @@ public class AgentJobLifecycleService {
                     "Cannot cancel job " + jobId + " — executor already moved it to " + raced.getStatus()
                 );
             }
-            // Still non-terminal, so the executor only claimed it (QUEUED→RUNNING); one retry suffices.
+            // Back inside the CAS window, so a concurrent claim moved it there; retry once and then
+            // report whatever state the loser observes rather than spinning against the executor.
             if (casToCancelled(jobId) == 0) {
                 AgentJob racedAgain = requireJob(workspaceId, jobId);
                 if (racedAgain.getStatus() != AgentJobStatus.CANCELLED) {

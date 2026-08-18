@@ -14,7 +14,7 @@ import org.jspecify.annotations.Nullable;
  * <p>It is the conversational/in-context substance reorganised by practice — NOT a scoreboard. Counts and
  * observation enums are deliberately absent; so is {@code criteria} (the {@code whyItMatters} /
  * {@code whatGoodLooksLike} learner framing is carried instead, preserving the "criteria never reaches a
- * learner" invariant). Items are the actual findings, deduped to each target's latest review and with the
+ * learner" invariant). Items are the actual observations, deduped to each target's latest review and with the
  * "not applicable / no change needed" noise removed.
  */
 @Schema(description = "A developer's readable feedback for one practice")

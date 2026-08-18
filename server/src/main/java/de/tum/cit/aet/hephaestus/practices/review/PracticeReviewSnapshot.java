@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.practices.review;
 
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditSnapshot;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -12,16 +13,18 @@ import org.jspecify.annotations.Nullable;
  */
 record PracticeReviewSnapshot(
     @Nullable Boolean runForAllUsers,
-    @Nullable Boolean skipDrafts,
     @Nullable Boolean deliverToMerged,
-    @Nullable Integer cooldownMinutes
+    @Nullable Integer cooldownMinutes,
+    @Nullable WorkspaceReviewScope reviewScope,
+    @Nullable String defaultReviewTier
 ) implements ConfigAuditSnapshot {
     static PracticeReviewSnapshot of(PracticeReviewSettings s) {
         return new PracticeReviewSnapshot(
             s.getRunForAllUsers(),
-            s.getSkipDrafts(),
             s.getDeliverToMerged(),
-            s.getCooldownMinutes()
+            s.getCooldownMinutes(),
+            s.getReviewScope(),
+            s.getDefaultReviewTier()
         );
     }
 }

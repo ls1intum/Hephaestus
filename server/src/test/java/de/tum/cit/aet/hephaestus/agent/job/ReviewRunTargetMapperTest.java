@@ -3,8 +3,9 @@ package de.tum.cit.aet.hephaestus.agent.job;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
-import de.tum.cit.aet.hephaestus.practices.model.WorkArtifact;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup.Target;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.util.stream.Stream;
@@ -56,6 +57,11 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
         conversation.put("slack_thread_id", 91L);
         conversation.put("slack_channel_name", "engineering");
 
+        ObjectNode document = MAPPER.createObjectNode();
+        document.put("docs_document_id", 77L);
+        document.put("title", "Deployment runbook");
+        document.put("docs_collection_name", "Engineering");
+
         ObjectNode malformed = MAPPER.createObjectNode();
         malformed.put("pull_request_id", "not-an-id");
         malformed.put("pr_number", 4.2);
@@ -68,7 +74,7 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
                 IntegrationKind.GITHUB,
                 pullRequest,
                 new Target(
-                    WorkArtifact.PULL_REQUEST,
+                    ArtifactKinds.PULL_REQUEST,
                     7L,
                     IntegrationKind.GITHUB,
                     42,
@@ -84,7 +90,7 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
                 IntegrationKind.GITLAB,
                 issue,
                 new Target(
-                    WorkArtifact.ISSUE,
+                    ArtifactKinds.ISSUE,
                     73L,
                     IntegrationKind.GITLAB,
                     19,
@@ -100,7 +106,7 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
                 IntegrationKind.SLACK,
                 conversation,
                 new Target(
-                    WorkArtifact.CONVERSATION_THREAD,
+                    ArtifactKinds.CONVERSATION_THREAD,
                     91L,
                     IntegrationKind.SLACK,
                     null,
@@ -111,18 +117,41 @@ class ReviewRunTargetMapperTest extends BaseUnitTest {
                 )
             ),
             Arguments.of(
+                "document",
+                AgentJobType.DOCUMENT_REVIEW,
+                IntegrationKind.OUTLINE,
+                document,
+                new Target(
+                    ArtifactKinds.DOCUMENT,
+                    77L,
+                    IntegrationKind.OUTLINE,
+                    null,
+                    "Deployment runbook",
+                    null,
+                    "Engineering",
+                    null
+                )
+            ),
+            Arguments.of(
+                "a document whose title the mirror lost still names its kind",
+                AgentJobType.DOCUMENT_REVIEW,
+                null,
+                null,
+                new Target(ArtifactKinds.DOCUMENT, null, null, null, "Document", null, null, null)
+            ),
+            Arguments.of(
                 "malformed metadata",
                 AgentJobType.PULL_REQUEST_REVIEW,
                 null,
                 malformed,
-                new Target(WorkArtifact.PULL_REQUEST, null, null, null, "Pull request", null, null, null)
+                new Target(ArtifactKinds.PULL_REQUEST, null, null, null, "Pull request", null, null, null)
             ),
             Arguments.of(
                 "missing metadata",
                 AgentJobType.ISSUE_REVIEW,
                 null,
                 null,
-                new Target(WorkArtifact.ISSUE, null, null, null, "Issue", null, null, null)
+                new Target(ArtifactKinds.ISSUE, null, null, null, "Issue", null, null, null)
             )
         );
     }

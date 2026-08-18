@@ -33,7 +33,7 @@ describe("SlackPreferencesSection", () => {
 		);
 
 		const row = screen.getByRole("group", { name: "Hephaestus Test Slack preferences" });
-		expect(within(row).getByText("2 active monitored channels")).toBeTruthy();
+		within(row).getByText("2 active monitored channels");
 
 		fireEvent.click(within(row).getByRole("switch", { name: /use my new channel messages/i }));
 
@@ -61,7 +61,7 @@ describe("SlackPreferencesSection", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
 
 		expect(onToggleChannelMessages).not.toHaveBeenCalled();
-		expect(screen.getByRole("switch", { name: /use my new channel messages/i })).toBeTruthy();
+		screen.getByRole("switch", { name: /use my new channel messages/i });
 	});
 
 	it("does not fake controls when Slack is linked but no workspace is available", () => {
@@ -75,7 +75,7 @@ describe("SlackPreferencesSection", () => {
 			/>,
 		);
 
-		expect(screen.getByText(/Slack is connected/i)).toBeTruthy();
+		screen.getByText(/Slack is connected/i);
 		expect(screen.queryByRole("switch")).toBeNull();
 	});
 });

@@ -1,11 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
+import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.EvidenceAuthorization;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
 import io.swagger.v3.oas.annotations.Operation;
@@ -29,7 +31,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
-import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Read-only REST API for practice observations.
@@ -46,7 +47,7 @@ import tools.jackson.databind.json.JsonMapper;
 public class ObservationController {
 
     private final ObservationService observationService;
-    private final JsonMapper objectMapper;
+    private final EvidenceAuthorization evidenceAuthorization;
 
     @GetMapping
     @Operation(
@@ -97,8 +98,8 @@ public class ObservationController {
         summary = "Reflective dashboard feedback for the current developer",
         description = "Per-practice cards a developer can READ — why the practice matters, what good looks like, " +
             "where they stand, the specific feedback to act on, and what they already do well. The third feedback " +
-            "channel alongside in-context SCM notes and the conversational mentor; the same findings reorganised by " +
-            "practice for self-paced reflection, not a scoreboard of counts."
+            "channel alongside in-context SCM notes and the conversational mentor; the same observations " +
+            "reorganised by practice for self-paced reflection, not a scoreboard of counts."
     )
     @ApiResponse(
         responseCode = "200",
@@ -128,8 +129,15 @@ public class ObservationController {
         @PathVariable UUID observationId
     ) {
         var observation = observationService.getObservation(workspaceContext.id(), observationId);
-        String deliveredGuidance = observationService.getDeliveredGuidance(observationId).orElse(null);
-        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredGuidance, objectMapper));
+        String deliveredFeedback = observationService
+            .getDeliveredGuidance(workspaceContext.id(), observationId)
+            .orElse(null);
+        boolean includeEvidence = evidenceAuthorization.permits(
+            workspaceContext.id(),
+            observation,
+            SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
+        );
+        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredFeedback, includeEvidence));
     }
 
     @GetMapping("/pull-request/{prId}")
@@ -147,7 +155,7 @@ public class ObservationController {
         WorkspaceContext workspaceContext,
         @PathVariable Long prId
     ) {
-        // Unlike the per-developer endpoints, this returns EVERY developer's BAD/ABSENT findings on the PR,
+        // Unlike the per-developer endpoints, this returns EVERY developer's BAD/ABSENT observations on the PR,
         // unscoped to the caller. On a public-read workspace an anonymous (membership-less) request would
         // otherwise expose them — require workspace membership.
         if (!workspaceContext.hasMembership()) {

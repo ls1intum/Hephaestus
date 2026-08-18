@@ -5,8 +5,10 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.ConfigSnapshot;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
+import de.tum.cit.aet.hephaestus.agent.context.InsufficientEvidenceException;
 import de.tum.cit.aet.hephaestus.agent.handler.JobTypeHandlerRegistry;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.PreparedJobInputs;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeAgentRequest;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticePiAdapter;
 import de.tum.cit.aet.hephaestus.agent.practice.PracticeSandboxSpec;
@@ -31,6 +33,8 @@ import de.tum.cit.aet.hephaestus.agent.usage.LlmPriceSnapshot;
 import de.tum.cit.aet.hephaestus.agent.usage.LlmUsageRecorder;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
@@ -39,7 +43,6 @@ import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -52,7 +55,6 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -79,7 +81,9 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.support.TransactionTemplate;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 
 /**
  * Polls the {@code agent_job} table for {@code QUEUED} work: the queue IS the table, so a QUEUED
@@ -123,8 +127,8 @@ public class AgentJobExecutor {
             CannotCreateTransactionException.class
         )
         .maxRetries(2)
-        // Growing: a lock timeout or a failover needs more than an immediate retry gives it.
         .delay(Duration.ofMillis(200))
+        // Growing rather than fixed: a lock timeout or a failover outlasts an immediate retry.
         .multiplier(2)
         .build();
 
@@ -144,6 +148,7 @@ public class AgentJobExecutor {
     private final WorkspaceAgentBindingRepository bindingRepository;
     private final JobTypeHandlerRegistry handlerRegistry;
     private final PracticePiAdapter practiceAgent;
+
     private final SandboxManager sandboxManager;
     private final AsyncTaskExecutor sandboxExecutor;
     private final TransactionTemplate transactionTemplate;
@@ -236,7 +241,6 @@ public class AgentJobExecutor {
         );
     }
 
-    /** Bound on how long {@link #stopAcceptingNewJobs()} waits for the poll thread to actually exit. */
     private static final Duration POLL_THREAD_JOIN_TIMEOUT = Duration.ofSeconds(10);
 
     /**
@@ -418,9 +422,8 @@ public class AgentJobExecutor {
     }
 
     /**
-     * {@code WorkerCapacityState.reviewMax} and the sandbox executor's pool size are independently
-     * configured and nothing enforces they agree, so the free-slot bound is what stops a reviewMax
-     * larger than the pool from claiming jobs the pool then rejects.
+     * The sandbox executor's free slots are the hard bound: worker capacity and pool size are separate
+     * knobs, so a capacity larger than the pool must not claim jobs the pool would then reject.
      */
     int computeCapacity() {
         int poolCapacity = capacityState
@@ -454,7 +457,7 @@ public class AgentJobExecutor {
 
     /**
      * @return true if the job was claimed and dispatched. Anything else leaves it QUEUED for the next
-     *     poll, except the two {@link ClaimOutcome}s {@link #claimJob} has already cancelled outright.
+     *     poll, except the {@link ClaimOutcome}s {@link #claimJob} has already cancelled outright.
      */
     boolean processJob(UUID jobId) {
         ClaimAttempt attempt;
@@ -571,8 +574,7 @@ public class AgentJobExecutor {
         };
     }
 
-    // Everything below runs on the sandbox executor, not the poll thread.
-
+    /** Runs on the sandbox executor, not the poll thread. */
     private void runClaimedJob(UUID jobId, ClaimResult claim) {
         MDC.put(MDC_JOB_ID, jobId.toString());
         AgentJob job = claim.job;
@@ -580,10 +582,13 @@ public class AgentJobExecutor {
         Instant startTime = Instant.now();
         String metricOutcome = "unknown";
         boolean sandboxExecutionStarted = false;
+        PreparedJobInputs stagedInputs = null;
         try {
             log.info("Executing agent job: jobId={}, jobType={}", jobId, job.getJobType());
 
-            SandboxSpec sandboxSpec = prepareSandboxSpec(jobId, job, claim.snapshot);
+            PreparedSandbox preparedSandbox = prepareSandboxSpec(jobId, job, claim.snapshot);
+            stagedInputs = preparedSandbox.stagedInputs();
+            SandboxSpec sandboxSpec = preparedSandbox.spec();
             // Past this boundary provider usage may exist even if execute() throws, so it is persisted
             // for recovery on another process. A lost fence means the job was cancelled or requeued
             // while preparation ran, so its sandbox must not start.
@@ -604,6 +609,32 @@ public class AgentJobExecutor {
         } catch (SandboxCancelledException e) {
             handleCancellation(jobId, job);
             metricOutcome = AgentJobStatus.CANCELLED.name();
+        } catch (InsufficientEvidenceException e) {
+            try {
+                persistRefusedEvidence(jobId, job.getJobType(), job.getRetryCount(), e.preparedInputs());
+                ObjectNode output = objectMapper.createObjectNode().put("outcome", "INSUFFICIENT_EVIDENCE");
+                Integer updated = transactionTemplate.execute(status ->
+                    jobRepository.transitionToEvidenceRefused(
+                        jobId,
+                        workerId,
+                        job.getRetryCount(),
+                        Instant.now(),
+                        output
+                    )
+                );
+                if (updated != null && updated == 1) {
+                    meterRegistry.counter("agent.job.evidence.refused").increment();
+                    metricOutcome = "INSUFFICIENT_EVIDENCE";
+                    log.info(
+                        "Completed agent job without model execution: jobId={}, outcome=INSUFFICIENT_EVIDENCE",
+                        jobId
+                    );
+                } else {
+                    metricOutcome = "OWNERSHIP_LOST";
+                }
+            } catch (Exception persistenceFailure) {
+                metricOutcome = handleExecutionFailure(jobId, job, persistenceFailure, false);
+            }
         } catch (TerminalPersistenceException e) {
             // Provider work already completed. Leave RUNNING for the zombie sweeper to terminalize
             // and account as UNPRICED; never execute the provider a second time.
@@ -612,6 +643,11 @@ public class AgentJobExecutor {
         } catch (Exception e) {
             metricOutcome = handleExecutionFailure(jobId, job, e, sandboxExecutionStarted);
         } finally {
+            // The sandbox has whatever it was going to get by now, so the staging directories behind any
+            // disk-staged evidence are no longer referenced by anything.
+            if (stagedInputs != null) {
+                stagedInputs.close();
+            }
             recordExecutionDuration(job.getJobType(), metricOutcome, Duration.between(startTime, Instant.now()));
             releaseCapacity();
             localRunningJobs.remove(jobId);
@@ -636,20 +672,23 @@ public class AgentJobExecutor {
             .record(duration);
     }
 
-    /** Prepares the spec without starting provider execution — no LLM cost accrues here. */
-    private SandboxSpec prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
+    /**
+     * The staging directories must outlive {@code injectFiles} — which runs inside the sandbox
+     * execution — so the caller closes them once the run is over, whatever its outcome.
+     */
+    private record PreparedSandbox(SandboxSpec spec, PreparedJobInputs stagedInputs) {}
+
+    /** No provider execution happens here, so no LLM cost accrues if this throws. */
+    private PreparedSandbox prepareSandboxSpec(UUID jobId, AgentJob job, ConfigSnapshot snapshot) {
         JobTypeHandler handler = handlerRegistry.getHandler(job.getJobType());
 
         // The claim transaction is long gone, so the handler needs a transaction of its own here to
         // resolve lazy JPA proxies, and a re-fetch that eagerly loads the workspace.
         TransactionTemplate readOnlyTx = new TransactionTemplate(transactionTemplate.getTransactionManager());
         readOnlyTx.setReadOnly(true);
-        record PrepareResult(Map<String, byte[]> files, Map<String, String> volumeMounts) {}
-        PrepareResult prepared = readOnlyTx.execute(status -> {
+        PreparedJobInputs preparedInputs = readOnlyTx.execute(status -> {
             AgentJob managedJob = jobRepository.findByIdWithWorkspace(jobId).orElse(job);
-            Map<String, byte[]> files = handler.prepareInputFiles(managedJob);
-            Map<String, String> volumes = handler.volumeMounts(managedJob);
-            return new PrepareResult(files, volumes);
+            return handler.prepareInputs(managedJob);
         });
 
         // Every sandbox reaches the provider through the in-app LLM proxy with the job's own token;
@@ -668,23 +707,66 @@ public class AgentJobExecutor {
         PracticeSandboxSpec agentSpec = practiceAgent.buildSandboxSpec(adapterRequest);
         SandboxSpec sandboxSpec = buildSandboxSpec(
             jobId,
-            prepared.files(),
-            prepared.volumeMounts(),
+            preparedInputs.files(),
+            preparedInputs.filesOnDisk(),
             agentSpec,
             snapshot
         );
-        persistProvenanceDigests(jobId, agentSpec.promptDigest(), sandboxSpec.inputFiles());
-        return sandboxSpec;
+        persistProvenanceDigests(
+            jobId,
+            job.getJobType(),
+            agentSpec.promptDigest(),
+            sandboxSpec.inputFiles(),
+            job.getRetryCount(),
+            preparedInputs.automatedReviewReadinessReport()
+        );
+        return new PreparedSandbox(sandboxSpec, preparedInputs);
+    }
+
+    private void persistRefusedEvidence(
+        UUID jobId,
+        AgentJobType jobType,
+        int retryCount,
+        PreparedJobInputs preparedInputs
+    ) {
+        persistProvenanceDigests(
+            jobId,
+            jobType,
+            null,
+            preparedInputs.files(),
+            retryCount,
+            preparedInputs.automatedReviewReadinessReport()
+        );
     }
 
     /**
      * Deliberately not best-effort: an observation that cannot be tied to the inputs that produced it
      * is unfixable evaluation data, so a failed write fails the run before any LLM cost accrues.
      */
-    private void persistProvenanceDigests(UUID jobId, @Nullable String promptDigest, Map<String, byte[]> inputFiles) {
+    private void persistProvenanceDigests(
+        UUID jobId,
+        AgentJobType jobType,
+        @Nullable String promptDigest,
+        Map<String, byte[]> inputFiles,
+        int retryCount,
+        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
+    ) {
         String inputsDigest = ProvenanceDigest.inputsDigestHex(inputFiles, jobId);
+        JsonNode evidenceSnapshot = evidenceSnapshot(inputFiles, automatedReviewReadinessReport);
         Integer updated = transactionTemplate.execute(status ->
-            jobRepository.updateProvenanceDigests(jobId, promptDigest, inputsDigest)
+            jobRepository.updateProvenanceDigests(
+                jobId,
+                workerId,
+                retryCount,
+                new AgentJobRepository.ProvenanceStamp(
+                    promptDigest,
+                    inputsDigest,
+                    evidenceSnapshot,
+                    automatedReviewReadinessReport == null
+                        ? null
+                        : objectMapper.valueToTree(automatedReviewReadinessReport)
+                )
+            )
         );
         if (updated == null || updated != 1) {
             throw new IllegalStateException("Provenance digest write matched no job row: jobId=" + jobId);
@@ -692,33 +774,35 @@ public class AgentJobExecutor {
         log.debug("Provenance digests: jobId={}, prompt={}, inputs={}", jobId, promptDigest, inputsDigest);
     }
 
+    private JsonNode evidenceSnapshot(
+        Map<String, byte[]> inputFiles,
+        @Nullable AutomatedReviewReadinessReport automatedReviewReadinessReport
+    ) {
+        byte[] manifest = inputFiles.get(SandboxLayout.MANIFEST_PATH);
+        byte[] practices = inputFiles.get(SandboxLayout.PRACTICES_PREFIX + "index.json");
+        // Java null, not NullNode: NullNode serializes to the JSON value null, which is a non-SQL-NULL
+        // jsonb and so passes every IS NOT NULL predicate a reader writes against this column.
+        if (manifest == null && practices == null && automatedReviewReadinessReport == null) return null;
+        if (manifest == null || automatedReviewReadinessReport == null) {
+            throw new IllegalStateException("Practice review inputs have an incomplete evidence snapshot");
+        }
+        ObjectNode snapshot = objectMapper.createObjectNode();
+        if (manifest != null) snapshot.set("manifest", objectMapper.readTree(manifest));
+        if (practices != null) {
+            snapshot.set("practices", objectMapper.readTree(practices));
+        }
+        return snapshot;
+    }
+
     private static SandboxSpec buildSandboxSpec(
         UUID jobId,
         Map<String, byte[]> handlerFiles,
-        Map<String, String> handlerVolumeMounts,
+        Map<String, java.nio.file.Path> handlerFilesOnDisk,
         PracticeSandboxSpec agentSpec,
         ConfigSnapshot snapshot
     ) {
-        // The adapter takes precedence on collision.
         Map<String, byte[]> allInputFiles = new HashMap<>(handlerFiles);
         allInputFiles.putAll(agentSpec.inputFiles());
-
-        Map<String, String> allVolumeMounts = new HashMap<>(handlerVolumeMounts);
-        for (var entry : agentSpec.volumeMounts().entrySet()) {
-            String existing = allVolumeMounts.put(entry.getKey(), entry.getValue());
-            if (existing != null && !existing.equals(entry.getValue())) {
-                log.warn(
-                    "Volume mount collision: hostPath={}, handler={}, adapter={} (using adapter)",
-                    entry.getKey(),
-                    existing,
-                    entry.getValue()
-                );
-            }
-        }
-        Set<String> containerPaths = new HashSet<>(allVolumeMounts.values());
-        if (containerPaths.size() < allVolumeMounts.size()) {
-            log.warn("Multiple host paths mapped to the same container path: {}", allVolumeMounts);
-        }
 
         ResourceLimits limits = new ResourceLimits(
             ResourceLimits.DEFAULT.memoryBytes(),
@@ -736,8 +820,9 @@ public class AgentJobExecutor {
             limits,
             agentSpec.securityProfile(),
             allInputFiles,
+            handlerFilesOnDisk,
             agentSpec.outputPath(),
-            allVolumeMounts
+            agentSpec.volumeMounts()
         );
     }
 
@@ -937,8 +1022,8 @@ public class AgentJobExecutor {
                 return refuseUnavailableModel(job);
             }
 
-            // Concurrency gate: at most maxConcurrentJobs RUNNING for this workspace + purpose. Admission
-            // above holds the binding row lock (joined into this transaction), so the count is stable.
+            // Admission above holds the binding row lock (joined into this transaction), so this count
+            // cannot race a sibling claim.
             {
                 long runningCount = jobRepository.countByWorkspaceIdAndPurposeAndStatusIn(
                     job.getWorkspace().getId(),
@@ -987,10 +1072,9 @@ public class AgentJobExecutor {
      * pre-queue jobs faster than the cap updates. It is never re-checked past this point — there is no
      * mid-execution kill on budget alone.
      *
-     * <p>Held rather than cancelled, because exhaustion is temporary (month rollover, or an admin
-     * raises the cap) and {@code retry_count} is untouched — this is not an execution failure. A job
-     * still blocked once it is older than {@link #BUDGET_HOLD_MAX_JOB_AGE} is cancelled instead, so a
-     * bound that never trips cannot hold it forever.
+     * <p>Held rather than cancelled: a month rollover or a raised cap clears the block without the job
+     * having failed, so {@code retry_count} stays untouched. The age bound is what keeps that from
+     * being unbounded when neither ever happens.
      */
     private ClaimOutcome holdOrCancelOverBudget(AgentJob job, LlmBudgetBlockReason blockReason) {
         Instant now = Instant.now();

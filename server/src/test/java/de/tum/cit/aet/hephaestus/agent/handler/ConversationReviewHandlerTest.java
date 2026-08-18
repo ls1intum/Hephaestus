@@ -3,21 +3,34 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.agent.context.ContextManifestBuilder;
+import de.tum.cit.aet.hephaestus.agent.context.PreparedEvidence;
 import de.tum.cit.aet.hephaestus.agent.context.WorkspaceContextBuilder;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmission;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
+import de.tum.cit.aet.hephaestus.evidence.ArtifactSourceManifest;
+import de.tum.cit.aet.hephaestus.evidence.AutomatedReviewReadinessReport;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
@@ -81,11 +94,12 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             JobSubmission submission = handler.createSubmission(sampleRequest());
             JsonNode metadata = submission.metadata();
 
-            assertThat(metadata.get("artifact_type").asString()).isEqualTo("CONVERSATION_THREAD");
+            assertThat(metadata.get("artifact_kind").asString()).isEqualTo("chat.conversation_thread");
             assertThat(metadata.get("slack_thread_id").asLong()).isEqualTo(555L);
             assertThat(metadata.get("slack_channel_id").asString()).isEqualTo("C0ABC");
             assertThat(metadata.get("slack_channel_name").asString()).isEqualTo("engineering");
             assertThat(metadata.get("slack_thread_ts").asString()).isEqualTo("1700000000.100000");
+            assertThat(metadata.get("slack_last_ts").asString()).isEqualTo("1700000900.500000");
             assertThat(metadata.get("about_user_id").asLong()).isEqualTo(42L);
         }
 
@@ -108,12 +122,8 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
 
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
 
-    /**
-     * A conversation-review job is REPO-LESS: it carries no SCM source mount and no volume mounts, so the
-     * orchestrator/runner run without a clone.
-     */
     @Nested
-    class RepoLessSpike {
+    class RepoLessExecution {
 
         private AgentJob conversationJob() {
             var job = new AgentJob();
@@ -122,7 +132,7 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
             workspace.setId(1L);
             job.setWorkspace(workspace);
             ObjectNode metadata = objectMapper.createObjectNode();
-            metadata.put("artifact_type", "CONVERSATION_THREAD");
+            metadata.put("artifact_kind", "chat.conversation_thread");
             metadata.put("slack_channel_id", "C0ABC");
             metadata.put("slack_thread_ts", "1700000000.100000");
             metadata.put("about_user_id", 42L);
@@ -131,21 +141,34 @@ class ConversationReviewHandlerTest extends BaseUnitTest {
         }
 
         @Test
-        void volumeMountsAreEmpty() {
-            // Inherits the default JobTypeHandler.volumeMounts() == Map.of() — what lets the runner skip the clone.
-            assertThat(handler.volumeMounts(conversationJob())).isEmpty();
-        }
-
-        @Test
-        void prepareInputFilesWritesNoScmSourceAndOnlyContextPlusTask() {
+        void prepareInputsWritesNoScmSourceAndOnlyContextPlusTask() {
             AgentJob job = conversationJob();
-            // WorkspaceContextBuilder is mocked (its provider wiring has its own tests); stub a representative
-            // context file. The practice-catalog injection is a mocked no-op; neither path writes an SCM source.
-            when(workspaceContextBuilder.build(any())).thenReturn(
-                Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes())
+            Practice practice = new Practice();
+            practice.setSlug("conversation-practice");
+            practice.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.CONVERSATION_THREAD));
+            practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.CONVERSATION_THREAD));
+            var revision = new PracticeRevision();
+            ReflectionTestUtils.setField(revision, "id", 12L);
+            practice.setCurrentRevision(revision);
+            when(practiceCatalogInjector.resolveEligiblePractices(job, ArtifactKinds.CONVERSATION_THREAD)).thenReturn(
+                List.of(practice)
+            );
+            when(workspaceContextBuilder.prepare(any(), any())).thenReturn(
+                new PreparedEvidence(
+                    Map.of(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json", "{\"messages\":[]}".getBytes()),
+                    org.mockito.Mockito.mock(ArtifactSourceManifest.class)
+                )
+            );
+            when(
+                workspaceContextBuilder.prepareAutomatedReviewReadiness(any(), any(), anyString(), any(), any(), any())
+            ).thenReturn(
+                new ContextManifestBuilder.PreparedAutomatedReviewReadiness(
+                    List.of(practice),
+                    mock(AutomatedReviewReadinessReport.class)
+                )
             );
 
-            Map<String, byte[]> files = handler.prepareInputFiles(job);
+            Map<String, byte[]> files = handler.prepareInputs(job).files();
 
             assertThat(files).containsKey(SandboxLayout.CONTEXT_PREFIX + "conversation_thread.json");
             assertThat(files).containsKey(SandboxLayout.TASK_ENVELOPE_FILENAME);

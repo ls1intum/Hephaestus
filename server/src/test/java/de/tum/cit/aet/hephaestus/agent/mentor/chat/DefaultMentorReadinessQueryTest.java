@@ -5,7 +5,6 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.catalog.LlmModelResolver;
-import de.tum.cit.aet.hephaestus.agent.catalog.ResolvedLlmModel;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBinding;
 import de.tum.cit.aet.hephaestus.agent.config.WorkspaceAgentBindingRepository;
@@ -49,9 +48,7 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
             Optional.of(binding)
         );
-        when(llmModelResolver.resolve(binding)).thenReturn(
-            new ResolvedLlmModel("https://api.openai.com", "openai-completions", "gpt-test", null, null, false)
-        );
+        when(llmModelResolver.isAvailable(binding)).thenReturn(true);
 
         assertThat(query.isReady(1L)).isTrue();
     }
@@ -78,7 +75,7 @@ class DefaultMentorReadinessQueryTest extends BaseUnitTest {
         when(agentBindingRepository.findByWorkspaceIdAndPurposeWithModels(1L, AgentPurpose.MENTOR)).thenReturn(
             Optional.of(binding)
         );
-        when(llmModelResolver.resolve(binding)).thenThrow(new IllegalStateException("unavailable"));
+        when(llmModelResolver.isAvailable(binding)).thenReturn(false);
 
         assertThat(query.isReady(1L)).isFalse();
     }

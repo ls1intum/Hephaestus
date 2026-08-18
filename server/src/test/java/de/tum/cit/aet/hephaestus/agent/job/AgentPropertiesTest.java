@@ -78,6 +78,14 @@ class AgentPropertiesTest extends BaseUnitTest {
             ),
             Arguments.of(
                 VALID_POLL_INTERVAL,
+                AgentProperties.WORKER_LEASE_TTL.plusSeconds(1),
+                VALID_PAYLOAD_RETENTION,
+                VALID_ROW_RETENTION,
+                "heartbeat-interval",
+                "slower than the worker lease, so every worker would orphan its own running jobs"
+            ),
+            Arguments.of(
+                VALID_POLL_INTERVAL,
                 VALID_HEARTBEAT_INTERVAL,
                 Duration.ZERO,
                 VALID_ROW_RETENTION,
@@ -144,6 +152,14 @@ class AgentPropertiesTest extends BaseUnitTest {
                 VALID_PAYLOAD_RETENTION,
                 VALID_ROW_RETENTION,
                 "the heartbeat-interval floor exactly"
+            ),
+            Arguments.of(
+                VALID_POLL_INTERVAL,
+                5,
+                AgentProperties.MAX_HEARTBEAT_INTERVAL,
+                VALID_PAYLOAD_RETENTION,
+                VALID_ROW_RETENTION,
+                "the heartbeat-interval ceiling exactly"
             ),
             Arguments.of(
                 VALID_POLL_INTERVAL,

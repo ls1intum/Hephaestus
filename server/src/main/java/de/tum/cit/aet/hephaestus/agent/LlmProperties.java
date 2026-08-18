@@ -28,19 +28,18 @@ public record LlmProperties(
     @Valid @DefaultValue Fx fx
 ) {
     /**
-     * Supported display currencies as a regex alternation. One entry, because {@code fx_rate} holds a
-     * single {@code usd_per_eur} scalar — widening this means widening that table first.
+     * Supported display currencies as a regex alternation. Widening it means widening {@code fx_rate}
+     * first: that table holds a single {@code usd_per_eur} scalar.
      */
     public static final String SUPPORTED_DISPLAY_CURRENCIES = "EUR";
 
     public static final String ECB_DAILY_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-daily.xml";
 
     /**
-     * @param allowLoopback whether {@code http://localhost}-style provider base URLs are accepted.
-     *                      SECURITY: enabling this lets a workspace admin aim a "provider" at
-     *                      host-local services, so it belongs in local/dev profiles only. The
-     *                      private/link-local/CGNAT check is unconditional and this flag does not
-     *                      relax it
+     * @param allowLoopback whether {@code http://localhost}-style provider base URLs are accepted; belongs
+     *                      in local/dev profiles only, since it lets a workspace admin aim a "provider" at
+     *                      host-local services. Does not relax the unconditional private/link-local/CGNAT
+     *                      check
      */
     public record Egress(@DefaultValue("false") boolean allowLoopback) {}
 

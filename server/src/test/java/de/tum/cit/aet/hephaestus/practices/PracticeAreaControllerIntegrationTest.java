@@ -2,12 +2,18 @@ package de.tum.cit.aet.hephaestus.practices;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import de.tum.cit.aet.hephaestus.core.audit.ConfigAuditEventRepository;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
+import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditFilter;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierSource;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -15,23 +21,30 @@ import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
 /**
  * Access-control coverage for {@link PracticeAreaController}.
  *
- * <p>Read operations are annotated {@code @SecurityRequirements} (any workspace member); the four
- * mutating operations (create / update / reorder / delete) are {@code @RequireAtLeastWorkspaceAdmin}.
- * These tests assert that a plain workspace MEMBER is forbidden on every mutation and permitted on
- * reads, and that anonymous callers are rejected. Functional CRUD behaviour for the bind endpoint
- * lives on {@code PracticeCatalogControllerIntegrationTest}.
+ * <p>Read operations are annotated {@code @SecurityRequirements} (any workspace member); the five
+ * mutating operations (create / update / review-tier / reorder / delete) are
+ * {@code @RequireAtLeastWorkspaceAdmin}. These tests assert that a plain workspace MEMBER is forbidden on
+ * every mutation and permitted on reads, and that anonymous callers are rejected. Functional CRUD
+ * behaviour for the bind endpoint lives on {@code PracticeCatalogControllerIntegrationTest}; the
+ * review-tier PATCH's own behaviour is pinned here, because the area is the middle level of the
+ * inheritance chain and nothing else exercises it.
  */
 class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -42,6 +55,12 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
     @Autowired
     private PracticeAreaRepository areaRepository;
+
+    @Autowired
+    private WorkspaceRepository workspaceRepository;
+
+    @Autowired
+    private ConfigAuditEventRepository configAuditEventRepository;
 
     private Workspace workspace;
 
@@ -498,6 +517,261 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .delete()
                 .uri(BASE_URI + "/{areaSlug}", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(TestAuthUtils.withCsrf(csrf))
+                .exchange()
+                .expectStatus()
+                .isUnauthorized();
+        }
+    }
+
+    // PATCH /{areaSlug}/review-tier — @RequireAtLeastWorkspaceAdmin
+
+    /**
+     * The middle level of the practice → area → workspace chain. A null clears the area's own answer back
+     * to the workspace's, and re-sending the tier already in force does nothing at all — including to the
+     * audit ledger.
+     */
+    @Nested
+    @DisplayName("PATCH /practice-areas/{areaSlug}/review-tier")
+    class SetAreaReviewTier {
+
+        private PracticeArea persistAreaAt(String slug, @Nullable PracticeReviewTier tier) {
+            PracticeArea area = persistArea(slug, "Area " + slug);
+            area.setReviewTier(tier);
+            return areaRepository.save(area);
+        }
+
+        /** Gives the workspace an opinion of its own, so "inherit" has something to resolve to. */
+        private void workspaceDefaultsTo(PracticeReviewTier tier) {
+            Workspace stored = workspaceRepository.findById(workspace.getId()).orElseThrow();
+            stored.getReviewSettings().applyDefaultReviewTier(tier.name());
+            workspaceRepository.save(stored);
+        }
+
+        private @Nullable PracticeReviewTier storedTierOf(String slug) {
+            return areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), slug).orElseThrow().getReviewTier();
+        }
+
+        /**
+         * How many config-audit rows this one area has accumulated. Read through the workspace-scoped
+         * query rather than a bare {@code count()}: {@code config_audit_event} is workspace-scoped, and
+         * {@code WorkspaceStatementInspector} rejects a statement that reaches it without a
+         * {@code workspace_id} predicate — in a test just as in production.
+         */
+        private long auditedChangesTo(PracticeArea area) {
+            return configAuditEventRepository
+                .findForWorkspace(
+                    workspace.getId(),
+                    new ConfigAuditFilter(
+                        List.of(ConfigAuditEntityType.PRACTICE_AREA),
+                        String.valueOf(area.getId()),
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    ),
+                    PageRequest.of(0, 50)
+                )
+                .getTotalElements();
+        }
+
+        /**
+         * PROPOSE is included on purpose: refusing the middle rung would leave OFF/DELIVER, the on/off
+         * switch the tier chain exists to remove.
+         */
+        @ParameterizedTest
+        @EnumSource(PracticeReviewTier.class)
+        @WithAdminUser
+        @DisplayName("sets the area's own tier and reports it as the area's decision, not an inheritance")
+        void shouldSetTheAreasOwnTier(PracticeReviewTier tier) {
+            ensureAdminMembership(workspace);
+            persistAreaAt("decides", null);
+
+            PracticeAreaDTO result = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "decides")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(tier))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeAreaDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(tier);
+            assertThat(result.reviewTier().override()).isEqualTo(tier);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
+            assertThat(result.reviewTier().inherited()).isFalse();
+            assertThat(storedTierOf("decides")).isEqualTo(tier);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("an explicit null clears the area's tier back to inheriting the workspace's")
+        void shouldClearToInheritOnExplicitNull() {
+            ensureAdminMembership(workspace);
+            workspaceDefaultsTo(PracticeReviewTier.PROPOSE);
+            persistAreaAt("clear-me", PracticeReviewTier.OFF);
+
+            PracticeAreaDTO result = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "clear-me")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{\"reviewTier\": null}")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeAreaDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
+            assertThat(result.reviewTier().inherited()).isTrue();
+            assertThat(storedTierOf("clear-me")).isNull();
+        }
+
+        /**
+         * An absent key clears too. This endpoint carries one field, so "not sent" cannot mean "leave it
+         * alone" without leaving no way at all to express a clear — unlike the settings PATCH, where absent
+         * means no change and a clear is named in a {@code reset} set.
+         */
+        @Test
+        @WithAdminUser
+        @DisplayName("an absent tier key clears just as an explicit null does")
+        void shouldClearToInheritWhenTheKeyIsAbsent() {
+            ensureAdminMembership(workspace);
+            workspaceDefaultsTo(PracticeReviewTier.OFF);
+            persistAreaAt("absent-key", PracticeReviewTier.DELIVER);
+
+            PracticeAreaDTO result = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "absent-key")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue("{}")
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeAreaDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
+            assertThat(storedTierOf("absent-key")).isNull();
+        }
+
+        /**
+         * Re-sending the tier already in force short-circuits before the write. The observable is the audit
+         * ledger: a config change that did not happen must not be recorded as one, or a reviewer reading
+         * the ledger sees a decision nobody made.
+         */
+        @Test
+        @WithAdminUser
+        @DisplayName("re-sending the tier already in force records nothing in the audit ledger")
+        void shouldBeIdempotentAndNotAudited() {
+            ensureAdminMembership(workspace);
+            PracticeArea area = persistAreaAt("unchanged", PracticeReviewTier.PROPOSE);
+            long auditedBefore = auditedChangesTo(area);
+
+            PracticeAreaDTO result = webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "unchanged")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody(PracticeAreaDTO.class)
+                .returnResult()
+                .getResponseBody();
+
+            assertThat(result).isNotNull();
+            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(storedTierOf("unchanged")).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(auditedChangesTo(area)).isEqualTo(auditedBefore);
+        }
+
+        /** A real change, by contrast, is recorded — otherwise the assertion above would pass vacuously. */
+        @Test
+        @WithAdminUser
+        @DisplayName("a real change IS recorded in the audit ledger")
+        void shouldAuditARealChange() {
+            ensureAdminMembership(workspace);
+            PracticeArea area = persistAreaAt("changes", PracticeReviewTier.PROPOSE);
+            long auditedBefore = auditedChangesTo(area);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "changes")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .exchange()
+                .expectStatus()
+                .isOk();
+
+            assertThat(auditedChangesTo(area)).isEqualTo(auditedBefore + 1);
+        }
+
+        @Test
+        @WithAdminUser
+        @DisplayName("returns 404 for an unknown area")
+        void shouldReturn404ForUnknownArea() {
+            ensureAdminMembership(workspace);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "no-such-area")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .exchange()
+                .expectStatus()
+                .isNotFound();
+        }
+
+        @Test
+        @WithMentorUser
+        @DisplayName("forbids a plain workspace member from setting an area's tier")
+        void shouldReturn403ForNonAdmin() {
+            asMember();
+            persistAreaAt("forbidden-tier", PracticeReviewTier.DELIVER);
+
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "forbidden-tier")
+                .headers(TestAuthUtils.withCurrentUser())
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .exchange()
+                .expectStatus()
+                .isForbidden();
+
+            assertThat(storedTierOf("forbidden-tier")).isEqualTo(PracticeReviewTier.DELIVER);
+        }
+
+        @Test
+        @DisplayName("returns 401 when not logged in")
+        void shouldReturnUnauthorized() {
+            String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
+            webTestClient
+                .patch()
+                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "any-slug")
+                .headers(TestAuthUtils.withCsrf(csrf))
+                .contentType(MediaType.APPLICATION_JSON)
+                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

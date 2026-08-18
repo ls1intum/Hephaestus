@@ -2,10 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { Code, MessageSquare, Sparkles, Trophy } from "lucide-react";
 import { FeatureCard } from "./FeatureCard";
 
-/**
- * FeatureCard component for displaying feature information with icons and badges.
- * Used to highlight key platform capabilities with consistent visual styling.
- */
 const meta = {
 	component: FeatureCard,
 	parameters: { layout: "padded" },
@@ -20,9 +16,6 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default feature card, as used on the about page for practice feedback.
- */
 export const Default: Story = {
 	args: {
 		feature: {
@@ -36,9 +29,6 @@ export const Default: Story = {
 	},
 };
 
-/**
- * The mentor feature, as used on the about page.
- */
 export const AIMentorship: Story = {
 	args: {
 		feature: {
@@ -52,9 +42,6 @@ export const AIMentorship: Story = {
 	},
 };
 
-/**
- * A shipped integration, showing how a non-core badge reads.
- */
 export const SlackIntegration: Story = {
 	args: {
 		feature: {
@@ -68,9 +55,6 @@ export const SlackIntegration: Story = {
 	},
 };
 
-/**
- * An optional feature, showing a longer badge and a warm icon.
- */
 export const Recognition: Story = {
 	args: {
 		feature: {

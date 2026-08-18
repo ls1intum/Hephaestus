@@ -29,11 +29,11 @@ public interface ReactionRepository extends JpaRepository<Reaction, UUID> {
 
     /**
      * Latest reaction per {@code recurrence_key} (stable locus) for the given keys, restricted to one
-     * reacting developer (the feedback's recipient — only the recipient may react). Used by B2 to suppress
+     * reacting developer (the feedback's recipient — only the recipient may react). Used by reaction suppression to suppress
      * re-nagging a locus the student already DISPUTED / marked NOT_APPLICABLE on an earlier run,
      * even though the per-run feedback row (and its {@code feedback_id}) is different this run.
      *
-     * <p>Not workspace-joined, and that is safe: the {@code recurrence_key} embeds {@code artifactType} +
+     * <p>Not workspace-joined, and that is safe: the {@code recurrence_key} embeds {@code artifactKind} +
      * {@code artifactId}, and {@code artifactId} is the GLOBAL PR/Issue primary key (one identity sequence
      * across all workspaces), so a key resolves to exactly one artifact in exactly one workspace — two
      * workspaces cannot share one. The reactor scope already pins the recipient.

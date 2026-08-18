@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 
 /**
@@ -22,9 +22,8 @@ type Story = StoryObj<typeof meta>;
 /** Setup is still finishing. Nothing is owed, so this states the fact and doesn't shout. */
 export const Pending: Story = {
 	args: { connectionState: "PENDING" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/finishing setup/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/finishing setup/i);
 		await expect(canvas.queryByText(/slack is pending/i)).not.toBeInTheDocument();
 	},
 };
@@ -32,19 +31,17 @@ export const Pending: Story = {
 /** The provider suspended the connection — a warning, because sync has stopped. */
 export const Suspended: Story = {
 	args: { connectionState: "SUSPENDED" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/syncing is paused/i)).toBeInTheDocument();
-		await expect(canvas.getByText(/reconnect to resume/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/syncing is paused/i);
+		canvas.getByText(/reconnect to resume/i);
 	},
 };
 
 /** The app was removed upstream. */
 export const Uninstalled: Story = {
 	args: { connectionState: "UNINSTALLED" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/the app was removed/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/the app was removed/i);
 		await expect(canvas.queryByText(/slack is uninstalled/i)).not.toBeInTheDocument();
 	},
 };
@@ -52,24 +49,23 @@ export const Uninstalled: Story = {
 /** The same states, worded for a different integration — one component, one vocabulary. */
 export const SuspendedOutline: Story = {
 	args: { connectionState: "SUSPENDED", displayName: "Outline" },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(canvas.getByText(/outline was suspended by the provider/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		canvas.getByText(/outline was suspended by the provider/i);
 	},
 };
 
 /** ACTIVE has nothing to explain, so the notice renders nothing at all. */
 export const Active: Story = {
 	args: { connectionState: "ACTIVE" },
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByRole("alert")).not.toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
 	},
 };
 
 /** No connection at all — also nothing to explain. */
 export const NoConnection: Story = {
 	args: { connectionState: undefined },
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByRole("alert")).not.toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
 	},
 };

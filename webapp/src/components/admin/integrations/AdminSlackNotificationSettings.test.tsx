@@ -62,7 +62,7 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 	it("requires a channel before enabling the digest", () => {
 		setup([], true);
 
-		expect(screen.getByText(/choose a channel before enabling/i)).toBeTruthy();
+		screen.getByText(/choose a channel before enabling/i);
 		expect((screen.getByRole("button", { name: /^save$/i }) as HTMLButtonElement).disabled).toBe(
 			true,
 		);
@@ -75,7 +75,7 @@ describe("AdminSlackNotificationSettings — digest channel combobox", () => {
 		expect(
 			screen.getByRole("option", { name: /#private-team/i }).getAttribute("aria-disabled"),
 		).toBe("true");
-		expect(screen.getByText(/needs invite/i)).toBeTruthy();
+		screen.getByText(/needs invite/i);
 	});
 
 	it("resolves a pasted channel link through the escape hatch into the same single value", () => {

@@ -30,9 +30,17 @@ JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) w
 
 ## Application server
 
-### Maven profiles and local configuration
+### Spring profiles and local configuration
 
-We ship three Maven profiles: `local` (default), `prod`, and `specs`. For development stick to the `local` profile.
+For development stick to the `local` profile, which is the default. The other shipped profiles each
+have their own `application-<name>.yml` under `server/src/main/resources/` — `prod` and `specs`, plus
+the per-role and per-purpose overlays (`worker`, `webhook`, `e2e`, `cds-training`) documented where
+they are used.
+
+They are **not** Maven profiles — `./mvnw -Plocal` warns that the profile does not exist and changes
+nothing. Maven passes the active Spring profile through the `app.profiles` property, so the override
+is `-Dapp.profiles=…` (this is what `pnpm dev:server:e2e` does). Maven's own profiles are a separate,
+smaller set: `live-tests`, `architecture-tests`, `quick`, `pitest`, `aot` and `local-db-timeout`.
 
 Create `server/src/main/resources/application-local.yml` to override defaults. This file is gitignored.
 
@@ -58,7 +66,15 @@ Never commit `application-local.yml`. It may contain secrets and machine-specifi
    pnpm dev:webapp   # terminal 2 — Vite dev server
    ```
 
-3. Access the API at `http://localhost:8080` (Swagger UI at `http://localhost:8080/swagger-ui/index.html`) and the webapp at `http://localhost:4200`.
+3. Access the API at `http://localhost:8080` and the webapp at `http://localhost:4200`.
+
+   The OpenAPI description and Swagger UI are **off** unless you switch them on: the endpoints answer
+   unauthenticated wherever springdoc registers them, so a deployment that left them on published its
+   complete route list, admin routes included. For a local session, set `SPRINGDOC_API_DOCS_ENABLED=true`
+   (and `SPRINGDOC_SWAGGER_UI_ENABLED=true` for the browser UI) and Swagger UI appears at
+   `http://localhost:8080/swagger-ui/index.html`. Committing a spec does not need either flag —
+   `pnpm run generate:api:application-server:specs` boots under the `specs` profile, which turns them on
+   itself.
 
 To wipe the local database (e.g. after a bad migration or sync), run `pnpm dev:reset`. The Postgres data is a bind-mounted folder (`server/postgres-data`), so `docker compose down -v` alone does not clear it — `dev:reset` removes the folder and recreates the stack.
 
@@ -72,10 +88,11 @@ Every host-side port is configurable so multiple Hephaestus instances (or other 
 | -------------------- | ------- | --------------------------- | -------------------------------- |
 | PostgreSQL           | 5432    | `POSTGRES_PORT`             | `server/.env` |
 | Application server   | 8080    | `SERVER_PORT`               | `server/.env` |
-| Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env or `webapp/.env`       |
+| Webapp (Vite dev)    | 4200    | `WEBAPP_PORT`               | Shell env only                   |
 
 :::tip Pre-flight check
-Run `pnpm run check:ports` before starting the stack to verify all ports are free.
+Run `pnpm run check:ports` before starting the stack. It checks the three ports above; a NATS
+container binds 4222 as well, and a conflict there shows up only at boot.
 :::
 
 #### How it works
@@ -84,7 +101,7 @@ The `.env` file in `server/` is read by **both** Docker Compose (for container p
 
 Ports flow through the system like this:
 
-```
+```text
 .env (POSTGRES_PORT=15432)
   ├─► Docker Compose  →  '15432:5432' host mapping
   └─► Spring Boot     →  jdbc:postgresql://localhost:15432/hephaestus
@@ -108,16 +125,28 @@ The application server automatically picks up the new port from the same `.env` 
 SERVER_PORT=18080
 ```
 
-If the webapp also needs to reach the server at the new port, set the server URL in the webapp environment:
+If the webapp also needs to reach the server at the new port, edit the runtime-environment stub the
+webapp loads before its bundle:
 
-```bash
-# webapp/.env (or shell)
-VITE_APPLICATION_SERVER_URL=http://localhost:18080
+```js
+// webapp/public/env-config.js
+window.__ENV__ = { APPLICATION_SERVER_URL: "http://localhost:18080" };
 ```
+
+:::caution Keep it local
+`env-config.js` is committed as an empty stub and overwritten by the Docker entrypoint in
+production. Treat a local override the way you treat `application-local.yml`: do not commit it.
+:::
+
+The webapp has no Vite-level environment variables — `vite.config.ts` does not call `loadEnv`, sets
+no `envPrefix`, and nothing in `src/` reads `import.meta.env` beyond `DEV`. A `webapp/.env` file has
+no effect on the application's configuration, and there is no `VITE_`-prefixed setting for the server
+URL.
 
 **Changing the webapp port:**
 
-The Vite dev server reads `WEBAPP_PORT` from the shell environment (not from `server/.env`):
+The Vite dev server reads `WEBAPP_PORT` from the shell environment (`process.env`, not a `.env` file
+and not `server/.env`):
 
 ```bash
 WEBAPP_PORT=5200 pnpm --filter webapp run dev
@@ -141,7 +170,11 @@ Changing a port in one place may require updates elsewhere. This table shows the
 | `POSTGRES_PORT`             | Nothing (automatic)                                        | Both Compose and Spring read from `.env` |
 
 :::warning Webapp defaults
-The webapp has a hardcoded dev default in `webapp/src/environment/index.ts` for `APPLICATION_SERVER_URL` (`http://localhost:8080`). In production this is injected via `window.__ENV__`. For local development with non-standard ports, set it as a Vite environment variable or update the default.
+The webapp reads its configuration from `window.__ENV__`, falling back to hardcoded dev defaults in
+`webapp/src/environment/index.ts` — `APPLICATION_SERVER_URL` defaults to `http://localhost:8080`. In
+production the Docker entrypoint writes the real values into `env-config.js`. For local development
+with non-standard ports, put the override in `webapp/public/env-config.js` as shown above. Nothing
+here reads a Vite environment variable.
 :::
 
 ### GitHub configuration
@@ -171,7 +204,7 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
            - your-github-org/repo2
    ```
 
-3. Leave `github.app.id` unset or set to `0`.
+3. Leave `hephaestus.integration.github.app.id` unset or set to `0`.
 
 #### Option B: GitHub App
 
@@ -180,15 +213,15 @@ Hephaestus supports two GitHub authentication modes. Pick the one that fits your
 2. Create `application-local.yml`:
 
    ```yaml
-   github:
-     app:
-       id: 12345
-       privateKey: |
-         -----BEGIN RSA PRIVATE KEY-----
-         ...
-         -----END RSA PRIVATE KEY-----
-
    hephaestus:
+     integration:
+       github:
+         app:
+           id: 12345
+           privateKey: |
+             -----BEGIN RSA PRIVATE KEY-----
+             ...
+             -----END RSA PRIVATE KEY-----
      workspace:
        init-default: false # Workspaces created from installations
    ```
@@ -220,13 +253,13 @@ Filters don't delete data – they just skip sync operations. Workspace and orga
 
 ### AI model (local)
 
-Practice detection and the mentor need at least one enabled model. Providers are registered at
+Practice reviews and the mentor need at least one enabled model. Providers are registered at
 runtime — either an instance-wide catalog entry (Instance admin → AI models) or a workspace's own
 "bring your own AI provider" connection. Configure it through the same admin UI/API used in
 production; there is deliberately no second env-var catalog or startup seeder that can drift from
 the stored configuration. New connections and models start inactive. Test the connection, declare
 its price (or explicitly mark it as having no metered API cost), then activate it and bind it to a
-purpose (`PRACTICE_DETECTION` or `MENTOR`) on the workspace's **AI models** page.
+purpose (`PRACTICE_REVIEW` or `MENTOR`) on the workspace's **AI models** page.
 
 For an automated local end-to-end setup, use `scripts/e2e-setup.sh`. It creates the connection,
 model, and agent binding through the application API and keeps provider credentials out of source
@@ -278,7 +311,6 @@ App-level admin is the `APP_ADMIN` role on the `account` table (authority `app_a
 - **401 after login:** ensure `GITHUB_OAUTH_CLIENT_ID/SECRET` are set and the callback URL on the GitHub app matches your `SERVER_PORT`.
 - **Logins don't survive a server restart locally:** set `HEPHAESTUS_AUTH_STATE_COOKIE_KEY` (base64 32-byte; `openssl rand -base64 32`) in `server/.env` — otherwise an ephemeral per-boot key is used.
 - **Reset everything:** run `pnpm dev:reset` (Postgres is a bind-mounted folder, so `docker compose down -v` does **not** clear it — `dev:reset` removes `server/postgres-data` and recreates the stack); on next login the account + identity link are recreated.
-
 
 ### Webhook receiver
 

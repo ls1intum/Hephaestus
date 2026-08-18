@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -66,20 +67,28 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
             files.put("work/analysis/practices/.gitkeep", new byte[0]);
             files.put("work/precompute/practices/foo.ts", "x".getBytes());
 
-            manager.injectFiles(CONTAINER_ID, files);
-
-            ArgumentCaptor<InputStream> tar = ArgumentCaptor.forClass(InputStream.class);
-            verify(fileOps).copyArchiveToContainer(eq(CONTAINER_ID), eq("/workspace"), tar.capture());
-
+            // The archive stream is closed and its temp file deleted before injectFiles returns, so it
+            // must be drained inside the call — exactly as docker-java does in production.
             Map<String, Long> dirUid = new HashMap<>();
-            try (var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(tar.getValue())) {
-                TarArchiveEntry e;
-                while ((e = tis.getNextEntry()) != null) {
-                    if (e.isDirectory()) {
-                        dirUid.put(e.getName(), e.getLongUserId());
+            doAnswer(invocation -> {
+                try (
+                    var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+                        invocation.getArgument(2, InputStream.class)
+                    )
+                ) {
+                    TarArchiveEntry e;
+                    while ((e = tis.getNextEntry()) != null) {
+                        if (e.isDirectory()) {
+                            dirUid.put(e.getName(), e.getLongUserId());
+                        }
                     }
                 }
-            }
+                return null;
+            })
+                .when(fileOps)
+                .copyArchiveToContainer(any(), any(), any());
+
+            manager.injectFiles(CONTAINER_ID, files);
 
             // Every work/ ancestor is pre-created and owned by the container uid.
             assertThat(dirUid).containsKeys(
@@ -128,22 +137,76 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldRejectOversizedInput() {
-            // Use a tiny input limit (1 KB) to avoid allocating ~50 MB in CI, mirroring the other size tests.
-            var limitedManager = new SandboxWorkspaceManager(
-                fileOps,
-                SandboxWorkspaceManager.MAX_OUTPUT_BYTES,
-                SandboxWorkspaceManager.MAX_SINGLE_FILE_BYTES,
-                1024,
-                SandboxWorkspaceManager.MAX_DIRECTORY_BYTES,
-                SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
-            );
-            byte[] largeFile = new byte[1025]; // 1 byte over the 1 KB input limit
-            Map<String, byte[]> files = Map.of("huge.bin", largeFile);
+        @DisplayName("stages an input far past the removed 50 MB ceiling")
+        void shouldStageInputsBeyondTheFormerCeiling(@TempDir Path tempDir) throws Exception {
+            // The archive is written to a temp file and on-disk entries stream through a fixed buffer,
+            // so total staged size is bounded by disk, not by heap.
+            Path large = tempDir.resolve("large.bin");
+            byte[] chunk = new byte[1024 * 1024];
+            java.util.Arrays.fill(chunk, (byte) 'x');
+            try (var out = Files.newOutputStream(large)) {
+                for (int i = 0; i < 64; i++) {
+                    out.write(chunk);
+                }
+            }
 
-            assertThatThrownBy(() -> limitedManager.injectFiles(CONTAINER_ID, files))
-                .isInstanceOf(SandboxException.class)
-                .hasMessageContaining("maximum size limit");
+            long[] staged = { 0 };
+            doAnswer(invocation -> {
+                try (
+                    var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+                        invocation.getArgument(2, InputStream.class)
+                    )
+                ) {
+                    TarArchiveEntry entry;
+                    while ((entry = tis.getNextEntry()) != null) {
+                        if (!entry.isDirectory()) {
+                            staged[0] += entry.getSize();
+                        }
+                    }
+                }
+                return null;
+            })
+                .when(fileOps)
+                .copyArchiveToContainer(any(), any(), any());
+
+            manager.injectFiles(CONTAINER_ID, Map.of(), Map.of("inputs/large.bin", large));
+
+            assertThat(staged[0]).isEqualTo(64L * 1024 * 1024);
+        }
+
+        @Test
+        @DisplayName("streams on-disk inputs without reading them into this process")
+        void shouldStreamOnDiskInputs(@TempDir Path tempDir) throws Exception {
+            Path source = tempDir.resolve("App.java");
+            Files.writeString(source, "class App {}");
+
+            Map<String, byte[]> captured = new HashMap<>();
+            doAnswer(invocation -> {
+                try (
+                    var tis = new org.apache.commons.compress.archivers.tar.TarArchiveInputStream(
+                        invocation.getArgument(2, InputStream.class)
+                    )
+                ) {
+                    TarArchiveEntry entry;
+                    while ((entry = tis.getNextEntry()) != null) {
+                        if (!entry.isDirectory()) {
+                            captured.put(entry.getName(), tis.readAllBytes());
+                        }
+                    }
+                }
+                return null;
+            })
+                .when(fileOps)
+                .copyArchiveToContainer(any(), any(), any());
+
+            manager.injectFiles(
+                CONTAINER_ID,
+                Map.of("inputs/context/diff.patch", "diff".getBytes()),
+                Map.of("inputs/sources/scm/repo/App.java", source)
+            );
+
+            assertThat(captured).containsOnlyKeys("inputs/context/diff.patch", "inputs/sources/scm/repo/App.java");
+            assertThat(new String(captured.get("inputs/sources/scm/repo/App.java"))).isEqualTo("class App {}");
         }
     }
 
@@ -186,8 +249,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
                 SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
             );
 
-            byte[] largeContent = new byte[800]; // 800 bytes
-            byte[] secondContent = new byte[500]; // 500 bytes — total 1300 > 1024
+            byte[] largeContent = new byte[800];
+            byte[] secondContent = new byte[500];
 
             byte[] tarBytes = createTestTar(Map.of("out/first.bin", largeContent, "out/second.bin", secondContent));
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
@@ -211,7 +274,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             Map<String, byte[]> output = manager.collectOutput(CONTAINER_ID, "/workspace/out");
 
-            // Only the safe file should be collected; the traversal path should be skipped
             assertThat(output).hasSize(1);
             assertThat(output).containsKey("safe.txt");
             assertThat(output).doesNotContainKey("../../../etc/passwd");
@@ -253,8 +315,8 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
                 SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES
             );
 
-            byte[] smallContent = "small".getBytes(); // 5 bytes — under limit
-            byte[] oversizedContent = "this is way too big".getBytes(); // 19 bytes — over 10-byte limit
+            byte[] smallContent = "small".getBytes();
+            byte[] oversizedContent = "this is way too big".getBytes();
 
             byte[] tarBytes = createTestTar(Map.of("out/small.txt", smallContent, "out/toobig.txt", oversizedContent));
             when(fileOps.copyArchiveFromContainer(CONTAINER_ID, "/workspace/out")).thenReturn(
@@ -263,7 +325,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
 
             Map<String, byte[]> output = limitedManager.collectOutput(CONTAINER_ID, "/workspace/out");
 
-            // Only the small file should be collected — the oversized one is skipped
             assertThat(output).containsKey("small.txt");
             assertThat(output).doesNotContainKey("toobig.txt");
         }
@@ -384,8 +445,6 @@ class SandboxWorkspaceManagerTest extends BaseUnitTest {
         void shouldHaveReasonableEntryCountLimit() {
             assertThat(SandboxWorkspaceManager.MAX_DIRECTORY_ENTRIES).isEqualTo(500_000);
         }
-
-        // Validation tests (from main)
 
         @Test
         void shouldSkipWhenDirectoryMountsNull() {

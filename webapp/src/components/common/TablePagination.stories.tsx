@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, userEvent, within } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { TablePagination } from "./TablePagination";
 
@@ -14,8 +14,8 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-	play: async ({ args, canvasElement }) => {
-		await userEvent.click(within(canvasElement).getByRole("button", { name: "Go to next page" }));
+	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Go to next page" }));
 		await expect(args.onPageChange).toHaveBeenCalledWith(1);
 	},
 };
@@ -26,14 +26,13 @@ export const Windowed: Story = {
 
 export const SinglePage: Story = {
 	args: { totalPages: 1 },
-	play: async ({ canvasElement }) => {
-		await expect(within(canvasElement).queryByRole("navigation")).toBeNull();
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("navigation")).toBeNull();
 	},
 };
 
 export const BoundaryControls: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Go to previous page" }));
 		await expect(canvas.getByRole("button", { name: "Go to next page" })).toBeEnabled();
 	},
@@ -47,8 +46,7 @@ export const LinkNavigation: Story = {
 			renderPageLink={(page, props) => <a {...props} href={`?status=FAILED&page=${page}`} />}
 		/>
 	),
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		const next = canvas.getByRole("link", { name: "Go to next page" });
 		await expect(next).toHaveAttribute("href", "?status=FAILED&page=2");
 		await expect(canvas.getByRole("link", { name: "Go to page 2" })).toHaveAttribute(

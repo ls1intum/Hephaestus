@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, within } from "storybook/test";
+import { expect } from "storybook/test";
 import { noSessions, sessionsError } from "@/mocks/handlers";
 import { SessionsSection } from "./SessionsSection";
 
@@ -11,7 +11,11 @@ import { SessionsSection } from "./SessionsSection";
  */
 const meta = {
 	component: SessionsSection,
-	parameters: { layout: "centered" },
+	parameters: {
+		layout: "centered",
+		// One MSW worker answers a whole Docs page, so each story gets its own frame until MSW goes.
+		docs: { story: { inline: false, height: "600px" } },
+	},
 	tags: ["autodocs"],
 } satisfies Meta<typeof SessionsSection>;
 
@@ -24,17 +28,15 @@ export const Default: Story = {};
 /** No active sessions — empty-state copy. */
 export const Empty: Story = {
 	parameters: { msw: { handlers: [noSessions] } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(await canvas.findByText("No active sessions found.")).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText("No active sessions found.")).toBeVisible();
 	},
 };
 
 /** Server error fetching sessions — error-state copy. */
 export const ErrorState: Story = {
 	parameters: { msw: { handlers: [sessionsError] } },
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
-		await expect(await canvas.findByText(/Failed to load sessions/i)).toBeInTheDocument();
+	play: async ({ canvas }) => {
+		await expect(await canvas.findByText(/Failed to load sessions/i)).toBeVisible();
 	},
 };

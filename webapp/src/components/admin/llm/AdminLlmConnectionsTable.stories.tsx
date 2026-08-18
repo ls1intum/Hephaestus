@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, fn, screen, userEvent, within } from "storybook/test";
+import { fn, screen, userEvent, within } from "storybook/test";
 import type { LlmConnection } from "@/api/types.gen";
 import { AdminLlmConnectionsTable } from "./AdminLlmConnectionsTable";
 
@@ -70,10 +70,9 @@ export const Empty: Story = {
 };
 
 export const DeleteConfirm: Story = {
-	play: async ({ canvasElement }) => {
-		const canvas = within(canvasElement);
+	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("button", { name: /delete openai production/i }));
 		const dialog = await screen.findByRole("alertdialog");
-		await expect(within(dialog).getByText(/still on it/i)).toBeInTheDocument();
+		within(dialog).getByText(/still on it/i);
 	},
 };

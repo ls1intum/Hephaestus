@@ -2,10 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
 import { LandingTestimonialSection } from "./LandingTestimonialSection";
 
-/**
- * Testimonial section component that displays user feedback and success stories
- * through a collection of testimonial cards.
- */
 const meta = {
 	component: LandingTestimonialSection,
 	parameters: {
@@ -36,20 +32,12 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * Default testimonial section for first-time visitors.
- * Features the testimonial cards.
- */
 export const Default: Story = {
 	args: {
 		isSignedIn: false,
 	},
 };
 
-/**
- * Testimonial section for authenticated users.
- * The section content does not change with authentication state.
- */
 export const SignedIn: Story = {
 	args: {
 		isSignedIn: true,
