@@ -15,6 +15,24 @@ switch it on, keep it from costing more than intended, and find out why it went 
 whole page: every refusal is recorded, and the screen that shows you the recording is
 **Review activity**, which every member can already see.
 
+## First successful review
+
+Use this short path before tuning campaigns, scopes, or per-practice overrides:
+
+1. Connect GitHub or GitLab and confirm a recent pull or merge request appears under **Review activity**.
+   If it does not, fix ingestion first; practice-review settings cannot make missing work appear.
+2. Open **Administration → AI models** and assign a ready model to **Practice reviews**.
+3. Open **Administration → Practices → Review**. Under **When and where**, turn on
+   **Start practice reviews** and **Automatic reviews**.
+4. Under **How much**, choose **Propose** for a delivery-free trial or **Deliver** to allow feedback to
+   reach its eligible lanes. Leave repository and target-branch scope empty for the first test.
+5. Open a small pull or merge request, then follow it in **Review activity**. The trace distinguishes
+   ingestion, admission, observation, composition, withholding, and delivery; do not use the presence of
+   a provider comment as the success test.
+
+Once that works, narrow the scope, add practice overrides, or configure past-work reviews. The rest of
+this page is reference and troubleshooting for those decisions.
+
 ## What starts a review
 
 Five doors. Reviews cost money at every one of them, so it is worth knowing who can open each.
@@ -231,10 +249,11 @@ overlap on purpose so that work missed once gets a second chance; work already r
 twice.
 :::
 
-Observations from either instrument are **measured and never delivered**. Backfill observations are entitled
-only to a delivery channel that has no producer, so they land in the read models and on Review activity and
-nowhere else. That is by construction, not a setting you can change: a campaign changes what you can read
-back about past work, and never posts anything on it.
+Observations from either instrument are **measured and never delivered**. Backfill runs do not enter the
+composition stage, and the in-app router separately refuses a pattern supported only by backfilled
+observations. They therefore land in the read models and on **Review activity**, never as comments,
+practice-page cards, or mentor briefs. That is by construction, not a setting you can change: a campaign
+changes what you can read about past work and does not contact the people whose work it measured.
 
 ## When a workspace goes quiet
 
@@ -348,5 +367,7 @@ Each of these is deliberate, and none is configurable from `docker/.env`.
   review resolves documents *linked from* the work first and only tops up a small number by search; the
   mentor searches the whole corpus and truncates each document. Neither path can report that it found
   everything, and neither is a substitute for the other when you are diagnosing missing context.
-- **Feedback wording is written by the detector, not composed at delivery.** Prompt and catalogue changes
-  change the wording; nothing on these screens does.
+- **Observation and feedback wording come from different turns in one agent session.** The first turn
+  records evidence-backed observations. After Java admits them, a second turn composes lane-specific
+  feedback from those observations and their evidence. Practice criteria affect what is observed; the
+  composition contract affects what is said. Nothing on the administration screens edits either prompt.

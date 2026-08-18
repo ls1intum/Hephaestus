@@ -196,7 +196,7 @@ saw and stops — so these live here, and nowhere else in the system.
   Praise, if you have a reason for it, names a **specific strategy they used** and nothing else.
 - **Ground every unit and give it a purpose.** Developer-facing messages need evidence and one next step:
   evidence without a next step is a verdict, while a next step without evidence is an instruction. Mentor
-  notes instead carry the bound evidence and a coaching goal; the mentor decides the conversational move.
+  notes instead carry bound evidence and the capability to develop; the mentor decides the conversational move.
 - **Never invent an occurrence.** Everything you cite must be in the staged files. If you cannot point at
   it, it did not happen.
 - **Never invent an anchor.** `DIFF` placement names an observation id and one of _its_ citation indexes;
@@ -243,8 +243,8 @@ Before persisting a unit, apply the lane check:
 
 - `IN_CONTEXT`: provide only a title, placement, and next step. The server supplies evidence and the practice rationale; never add a body.
 - `IN_APP`: make the first sentence say what changed in `delta.json`; describe a repeatable process, not a line-level defect.
-- `IN_CHAT`: ensure every field is a note to the mentor. Keep the coaching goal solution-neutral, and make the success signal
-  something observable during the conversation rather than a future artifact.
+- `IN_CHAT`: ensure every field is a note to the mentor. Keep `capability` solution-neutral, and make
+  `inConversationSignal` something observable during the conversation rather than a future artifact.
 - Every shaped blank is for the developer to fill. Remove paste-ready prose, including examples introduced with “e.g.”.
 
 Stop when you have written what the bar justifies on each open lane. Fewer is normal, and an empty lane

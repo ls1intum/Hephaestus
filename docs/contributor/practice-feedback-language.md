@@ -13,30 +13,30 @@ Within a surface already titled **Practice reviews**, shorten **practice feedbac
 Use the full term when the surrounding context does not establish which kind of feedback is meant.
 Within **Practice setup** or **Practice catalog**, shorten **practice area** to **area**.
 
-| Term                  | Meaning                                                                         | Avoid for this concept             |
-| --------------------- | ------------------------------------------------------------------------------- | ---------------------------------- |
-| **Practice**          | A defined way of working used to review work                                    | rule, detector                     |
-| **Practice area**     | A group of related practices                                                    | category, goal, learning objective |
-| **Unassigned**        | Practices that are not in a practice area                                       | ungrouped, unbound                 |
-| **Observation**       | One recorded result of reviewing one practice against one piece of reviewed work | finding, detection                 |
-| **Practice feedback** | Guidance written from observations and addressed to a developer — both the whole and the countable unit | message, AI feedback, feedback item, ledger unit |
-| **Delivery**          | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced | placement, surface            |
-| **Channel**           | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting; the destinations are the `FeedbackChannel` constants | destination, surface, reach |
-| **Practice feedback about a habit** | Practice feedback prepared for one developer about what recurs across their work, readable by nobody else — the `IN_APP` channel | my feedback, private view, profile, reflection, reflection dashboard |
-| **Reviewed work**     | A pull request, merge request, issue, or conversation being reviewed             | artifact, target                   |
-| **Developer**         | The person an observation is about                                              | learner                            |
-| **Contributor**       | A repository role relevant to review eligibility                                | user, when the role matters        |
-| **Heph**              | The conversational assistant                                                    | agent, bot                         |
-| **Mentor**            | The product area for conversations with Heph                                    |                                    |
-| **Hephaestus**        | The application, named only where the application itself is the subject — installing it, an account linked to it, a release of it | agent |
-| **Hephaestus default** | A practice or area bundled with the running Hephaestus release                  | shipped entry                      |
-| **Instance catalog**  | The starting set copied into each new workspace                                  | curated catalog                    |
-| **Workspace practices** | Independent definitions used for reviews in one workspace                     | workspace catalog                  |
-| **Review rules**      | Inputs and criteria that determine review behavior                               | detector configuration             |
-| **Developer guidance** | Explanatory text that does not change review behavior                           | learner guidance                   |
-| **Customize**         | Change a default or catalog-based definition                                     | override                           |
-| **Include / exclude** | Whether an instance entry is copied into new workspaces                          | offer, retire                      |
-| **No Hephaestus default** | An instance-maintained entry with no bundled definition                      | ours, yours                        |
+| Term                                | Meaning                                                                                                                                                    | Avoid for this concept                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| **Practice**                        | A defined way of working used to review work                                                                                                               | rule, detector                                                       |
+| **Practice area**                   | A group of related practices                                                                                                                               | category, goal, learning objective                                   |
+| **Unassigned**                      | Practices that are not in a practice area                                                                                                                  | ungrouped, unbound                                                   |
+| **Observation**                     | One recorded result of reviewing one practice against one piece of reviewed work                                                                           | finding, detection                                                   |
+| **Practice feedback**               | Guidance written from observations and addressed to a developer — both the whole and the countable unit                                                    | message, AI feedback, feedback item, ledger unit                     |
+| **Delivery**                        | Whether one piece of feedback was prepared, delivered, withheld, failed, or replaced                                                                       | placement, surface                                                   |
+| **Channel**                         | Where one piece of feedback is intended to appear — a fact about that piece, not a workspace setting; the destinations are the `FeedbackChannel` constants | destination, surface, reach                                          |
+| **Practice feedback about a habit** | Practice feedback prepared for one developer about what recurs across their work, readable by nobody else — the `IN_APP` channel                           | my feedback, private view, profile, reflection, reflection dashboard |
+| **Reviewed work**                   | A pull request, merge request, issue, or conversation being reviewed                                                                                       | artifact, target                                                     |
+| **Developer**                       | The person an observation is about                                                                                                                         | learner                                                              |
+| **Contributor**                     | A repository role relevant to review eligibility                                                                                                           | user, when the role matters                                          |
+| **Heph**                            | The conversational assistant                                                                                                                               | agent, bot                                                           |
+| **Mentor**                          | The product area for conversations with Heph                                                                                                               |                                                                      |
+| **Hephaestus**                      | The application, named only where the application itself is the subject — installing it, an account linked to it, a release of it                          | agent                                                                |
+| **Hephaestus default**              | A practice or area bundled with the running Hephaestus release                                                                                             | shipped entry                                                        |
+| **Instance catalog**                | The starting set copied into each new workspace                                                                                                            | curated catalog                                                      |
+| **Workspace practices**             | Independent definitions used for reviews in one workspace                                                                                                  | workspace catalog                                                    |
+| **Review rules**                    | Inputs and criteria that determine review behavior                                                                                                         | detector configuration                                               |
+| **Developer guidance**              | Explanatory text that does not change review behavior                                                                                                      | learner guidance                                                     |
+| **Customize**                       | Change a default or catalog-based definition                                                                                                               | override                                                             |
+| **Include / exclude**               | Whether an instance entry is copied into new workspaces                                                                                                    | offer, retire                                                        |
+| **No Hephaestus default**           | An instance-maintained entry with no bundled definition                                                                                                    | ours, yours                                                          |
 
 Use provider-specific names such as **pull request** or **merge request** when the provider is known;
 otherwise write **pull or merge request**.
@@ -45,15 +45,15 @@ otherwise write **pull or merge request**.
 *note*, or *entry* to get a noun that pluralises; *feedback* is uncountable, so the fix is to phrase the
 count so the noun is not needed rather than to invent a second word for the same thing.
 
-| Instead of           | Write                                                       |
-| -------------------- | ----------------------------------------------------------- |
-| 3 messages           | 3 pieces of feedback                                        |
-| Messages             | Feedback — a heading naming the collection needs no plural  |
-| No messages yet      | No feedback yet                                             |
-| This message         | This feedback                                               |
-| Message details      | Feedback details                                            |
-| Findings behind this message | Observations behind this feedback                   |
-| Queued for conversation | Prepared for conversation                                |
+| Instead of                   | Write                                                      |
+| ---------------------------- | ---------------------------------------------------------- |
+| 3 messages                   | 3 pieces of feedback                                       |
+| Messages                     | Feedback — a heading naming the collection needs no plural |
+| No messages yet              | No feedback yet                                            |
+| This message                 | This feedback                                              |
+| Message details              | Feedback details                                           |
+| Findings behind this message | Observations behind this feedback                          |
+| Queued for conversation      | Prepared for conversation                                  |
 
 A column that counts per row is headed **Feedback** and the cell holds the number alone. Where a sentence
 needs a singular subject, name what the feedback is *about* — "the feedback for this observation", not
@@ -82,9 +82,10 @@ the developer is supposed to do about it. The three do line up with the task, se
 levels of Hattie & Timperley's model (ADR 0029), but a level is a claim about content that a destination
 cannot enforce, so do not use the level as the name.
 
-`IN_APP` is the code noun — the enum constant, the `chk_feedback_channel` value, the endpoint
-`GET /practices/feedback/in-app`. It has been renamed three times (`REFLECTION_DASHBOARD`, `PROFILE`,
-`REFLECTION`) and this is the last one; ADR 0029 records why each earlier name failed. Do not reintroduce
+`IN_APP` is the code noun — the enum constant, the `chk_feedback_channel` value, and the endpoint
+`GET /workspaces/{workspaceSlug}/practices/feedback/in-app`. It has been renamed three times
+(`REFLECTION_DASHBOARD`, `PROFILE`, `REFLECTION`) and this is the last one; ADR 0029 records why each earlier
+name failed. Do not reintroduce
 any of them: *profile* is the public page at `/user/{username}`, *private view* describes a property
 rather than naming one, and *reflection* names what the developer is supposed to do rather than where the
 feedback lands — an outcome nothing in the system can observe. On an operator surface, where the question
@@ -104,8 +105,10 @@ it carries no data contract and new links never use it.
 
 Everything else is an observation, including the read APIs and the reviews UI — the surfaces an operator
 actually reads are exactly where the banned word does the most damage. Those names are
-`ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`, `observationId`, and
-`/practices/reviews/observations`. Apart from that redirect, a *finding* in this subsystem is a bug.
+`ReviewObservation`, `ReviewObservationDetail`, `ReviewBoundObservation`, `observationId`, and the
+workspace-admin route `/workspaces/{workspaceSlug}/practices/reviews/observations`. Developer-scoped
+reads live under `/workspaces/{workspaceSlug}/practices/observations`. Apart from the web-route redirect, a
+*finding* in this subsystem is a bug.
 
 For how much a workspace lets the system do on its own about a practice — including whether it is
 reviewed at all — use **autonomy tier** and its three values **Off**, **Propose**, **Deliver**, as

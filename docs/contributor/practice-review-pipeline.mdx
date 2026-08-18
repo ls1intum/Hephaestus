@@ -6,9 +6,7 @@ description: The four stages a practice review passes through, the refusal vocab
 ---
 
 A practice review passes through four stages, in this order: **Occasion**, **Capture**, **Observation**,
-**Delivery**. Each is a first-class noun in the code — `NOT_OCCASIONED` and `occasionedBy`,
-`SourceCaptureState` and `capturedAt`, `Observation` and `ObservationOrigin`, `DeliveryComposer` and
-`FeedbackChannel` — and each one can end the review on its own terms.
+**Delivery**. Each stage can stop independently and records a different reason.
 
 ```mermaid
 flowchart TB
@@ -20,16 +18,13 @@ flowchart TB
     Observe -->|cannot tell| Inconclusive[observation.presence INCONCLUSIVE]
     Observe -->|a claim| Deliver{Delivery: do we say it?}
     Deliver -->|no| Quiet[feedback.suppression_reason]
-    Deliver -->|yes| Said[A comment on the work, or a mentor turn]
+    Deliver -->|yes| Said[Feedback recorded and routed to an eligible surface]
 ```
 
-Read that as a funnel with four exits, not a pipe with one. Most reviews that produce nothing exited
-somewhere above the last box, and which box it was is the only thing that tells you what to fix.
+Use the stage that stopped the review to decide what to fix. Do not translate one stage's reason into
+another stage's vocabulary.
 
-The stages are named Occasion, Capture, Observation and Delivery in code, in commits and on screen. Any other
-name for one of them — an act number, a phase letter, a sprint label — is ungreppable and invites a fifth.
-
-## Refusal is the point
+## Where a review can stop
 
 **Each stage owns exactly one refusal vocabulary, and they are not interchangeable.** Answering a question
 from one stage in another stage's words is the failure this table exists to prevent.
@@ -201,10 +196,10 @@ tests it"* is either true or false, and you check it by opening the file. It say
 anybody should do, and it remains unedited for as long as it is retained, so later readings can
 be compared with it.
 
-**An intervention cannot be true or false.** *"Write the assertion that distinguishes the new branch
-before you write the branch"* is only useful or useless, and whether it is useful depends entirely on
-who is reading it, where they are reading it, what they were told last week, and whether anybody has
-said it to them already.
+**An intervention must stay grounded, but grounding alone does not make it useful.** *"Write the assertion
+that distinguishes the new branch before you write the branch"* can be supported by the observation and
+still be badly timed, repetitive, or irrelevant to the recipient. Composition therefore considers the
+audience, surface, history, and current conversation as well as the evidence.
 
 The line the code draws, stated once so it fits in a prompt: **if you can check it by reading the
 artifact, it is measurement; if you can only check it by watching what the person does next, it is
@@ -222,7 +217,7 @@ know the developer was already told, and it cannot decide to stay quiet.
 flowchart TB
     work["A piece of work"] --> measure
 
-    subgraph phase1["Phase 1 — measurement"]
+    subgraph measurementTurn["Measurement turn"]
         measure["Read the work against each practice"]
         measure --> obs["Observations: what is there,<br/>with the citation that proves it.<br/>Immutable while retained."]
     end
@@ -231,7 +226,7 @@ flowchart TB
     record["Everything measured before<br/>about this person"] --> compose
     said["Everything already delivered,<br/>and feedback prepared but unread"] --> compose
 
-    subgraph phase2["Phase 2 — intervention"]
+    subgraph compositionTurn["Composition turn"]
         compose["Decide what is worth saying now,<br/>to whom, and on which surface"]
         compose --> incontext["IN_CONTEXT: this change, one edit"]
         compose --> page["IN_APP: the habit, one thing to try"]
@@ -251,7 +246,7 @@ before composition still sits after it — `FeedbackAdmission.delivers(origin, t
 cap. Giving the model more context is not a reason to relax the gate; it is a reason the gate has more
 to refuse.
 
-### Phase 2, concretely
+### Composition inputs and outputs
 
 After Java admits the observations, `pi-runner.mjs` resumes the same in-memory session with
 `agent/feedback-composer.md`. Reusing the session avoids making the agent reconstruct the artifact context. The provider still receives the prior conversation on the resumed turn; prompt caching may reduce, but does not erase, that input cost.
@@ -263,7 +258,7 @@ It is prompted with `agent/feedback-composer.md` and reads:
 
 | Input                                                      | Where                                                       | Staged by                                          |
 | ---------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------- |
-| This run's observations, projected                         | `work/composition/observations.json`                        | the runner itself, from the review's result file   |
+| This run's admitted observations                           | `work/composition/observations.json`                        | the runner, from Java's admission response         |
 | Prior observations about this person                       | `inputs/history/observations.json`                          | `ReviewHistoryContentSource` — 90 days, at most 50 |
 | Feedback already delivered                                 | `inputs/history/feedback.json`                              | the same, at most 30                               |
 | Feedback prepared but not yet read                         | `inputs/history/prepared.json`                              | the same, at most 20                               |
@@ -274,7 +269,7 @@ It is prompted with `agent/feedback-composer.md` and reads:
 Output is `out/feedback.json`, collected into the job output and parsed by
 `FeedbackCompositionResultParser` into `ComposedFeedbackUnit`s.
 
-Three properties of that list matter more than the paths:
+Three properties matter more than the paths:
 
 - **Presence of `inputs/feedback-composition.json` is the on switch, and it carries the lane set.**
   Only `PullRequestReviewHandler` and `IssueReviewHandler` stage it, and never for a `BACKFILL` origin.
@@ -302,17 +297,16 @@ direction. All three names answer one question — *where does this land?* — a
 [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)
 records why the lane once called `REFLECTION` is not named for what the developer is meant to do with it.
 
-|                  | `IN_CONTEXT`                                                              | `IN_APP`                                 | `IN_CHAT`                                                                                        |
-| ---------------- | ------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Lands            | on the work artifact — pull request summary or inline note, issue comment | on the developer's own practice pages    | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
-| Level            | task                                                                      | process                                  | self-regulation                                                                                  |
-| Answers          | "what is worth changing or reinforcing here?"                                                     | "what pattern is visible across my work?"    | "what capability could this conversation support?"                                                           |
-| Audience         | public — the team reads it                                                | private, to the developer alone          | private, in a live mentor turn                                                                   |
-| Evidence is      | a current admitted observation; a diff placement also selects one verified citation | several pieces of work, named            | available to the mentor as the original observations and a concise summary                                                            |
-| Intervention is     | one edit, in this change                                                  | a habit, for next time                   | chosen by the mentor from the notes, evidence, and live conversation                                                                      |
-| `whyItMatters`   | appended verbatim by the server                                           | situated by the composer, never appended | not used                                                                                         |
-| Placement        | `DIFF` on a verified citation, or `ARTIFACT` at summary level              | forbidden                                | forbidden                                                                                        |
-| Units per run | at most 3                                                                 | at most 2                                | at most 3                                                                                        |
+|                 | `IN_CONTEXT`                                                                        | `IN_APP`                                  | `IN_CHAT`                                                                                        |
+| --------------- | ----------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Lands           | on the work artifact — pull request summary or inline note, issue comment           | on the developer's own practice pages     | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
+| Level           | task                                                                                | process                                   | self-regulation                                                                                  |
+| Answers         | "what is worth changing or reinforcing here?"                                       | "what pattern is visible across my work?" | "what capability could this conversation support?"                                               |
+| Audience        | public — the team reads it                                                          | private, to the developer alone           | private, in a live mentor turn                                                                   |
+| Evidence is     | a current admitted observation; a diff placement also selects one verified citation | several pieces of work, named             | available to the mentor as the original observations and a concise summary                       |
+| Intervention is | one edit, in this change                                                            | a habit, for next time                    | chosen by the mentor from the notes, evidence, and live conversation                             |
+| `whyItMatters`  | appended verbatim by the server                                                     | situated by the composer, never appended  | not used                                                                                         |
+| Placement       | `DIFF` on a verified citation, or `ARTIFACT` at summary level                       | forbidden                                 | forbidden                                                                                        |
 
 **The mentor renders in the app too, and that does not make it `IN_APP`.** `IN_CHAT` is the *dialogic*
 channel — the unit becomes a turn the developer can answer — wherever the conversation runs. `IN_APP` is
@@ -328,8 +322,8 @@ what the system did before.
 
 An issue review has no diff, so its in-context unit can use only `ARTIFACT` placement. Pull requests allow
 both `DIFF` and `ARTIFACT`. In either form, public feedback must bind to a current admitted observation of
-the same practice; history alone cannot become a public claim. The per-lane caps above restate caps the
-lanes themselves own; `FeedbackCompositionCapsTest` is what stops the two copies drifting.
+the same practice; history alone cannot become a public claim. Per-lane limits are part of the staged
+composition configuration rather than this documentation.
 
 `IN_CHAT` is composed as **notes to the mentor**, not as a turn: the `situation` (factual, artifacts
 named, never addressed to the developer as "you"), the `capability` (the useful understanding or
@@ -338,17 +332,14 @@ observation evidence), and the `inConversationSignal` (an observable sign that t
 enforce is that you write what the mentor needs to know, never a sentence for it to say — anything phrased
 as a line of dialogue gets spoken and sounds like a script.
 
-The notes are stored as JSON on `feedback.body` via `ConversationBriefBody` and handed to the mentor under
-a `notes` key by `PreparedConversationFeedbackContentSource`; the composed title is staged separately as
-`topic`. Neither is placed under `body` or
-`message`, because none of it is text to speak. The mentor re-composes the whole turn against the live
-conversation. The mentor may adapt, defer, or discard a prepared note when it no longer fits the live turn.
+The notes are stored as structured JSON and handed to the mentor as `notes`; the composed title is staged
+separately as `topic`. Neither is a message to speak. The mentor composes the turn against the live
+conversation and may adapt, defer, or discard a note when it no longer fits.
 There is no empty-notes form: an admitted `IN_CHAT` unit has all four fields, and no unit is created when
 composition has nothing useful to prepare.
 
-`ConversationBriefBody` accepts exactly this shape. There are no field aliases, version readers, or fallback
-conversation schemas: producer, parser, persistence and mentor context share the same four names, and a
-structural test fails when the Java record, runner schema and composer prompt drift.
+The producer, parser, persistence model, and mentor context use the same four required fields. There are no
+aliases or fallback conversation schemas.
 
 For example, a review may observe that a new tax-exempt branch has no distinguishing test. The conversation
 lane does **not** prepare `"Why didn't you write a test?"`. It prepares material such as:
@@ -466,7 +457,7 @@ flowchart LR
     T --> AND{"do both say yes?"}
     O["observation origin"] --> AND
     AND -->|no| Q["SUPPRESSED, with the reason"]
-    AND -->|yes| S["composed and sent"]
+    AND -->|yes| S["recorded and routed"]
 ```
 
 - **`PracticeReviewTier`** — how much autonomy the system has over this practice: `OFF`, `PROPOSE`,
@@ -482,7 +473,8 @@ flowchart LR
 `FeedbackChannel.IN_APP` is the developer's own practice feedback: the process level of the three, where
 a habit that recurs across several pieces of their work is named along with what to do differently next
 time. It is composed, admitted and stored per developer and served to that developer alone from
-`GET /practices/feedback/in-app`; the developer's practice pages are where it will surface. Its body is
+`GET /workspaces/{workspaceSlug}/practices/feedback/in-app`; the developer's practice pages are where it
+will surface. Its body is
 the only text the system composes that is read verbatim by a named person who is its sole audience —
 `IN_CONTEXT` feedback is already public on the work, and `IN_CHAT` stores structured notes for the mentor
 rather than words for the developer — so an
@@ -516,9 +508,13 @@ sequenceDiagram
     W->>DB: write evidence_snapshot and review_readiness
     W->>SB: start the container, stage inputs
     SB->>W: model calls, through the worker's own LLM proxy
+    SB->>W: submit observations for admission
+    W->>DB: validate and persist admitted observations
+    W-->>SB: return the durable observation projection and digest
+    SB->>SB: resume the same model session and compose feedback
     SB->>W: out/ files and an exit code
-    W->>W: parse observations, gate delivery, compose
-    W->>DB: write observations and the feedback ledger
+    W->>W: verify the admission digest and apply delivery gates
+    W->>DB: write the feedback ledger
     W->>SCM: post the comment
     W->>DB: record whether delivery succeeded
 ```

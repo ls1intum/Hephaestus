@@ -35,13 +35,15 @@ In this guide, **change request** means a GitHub pull request or a GitLab merge 
 1. You open an eligible change request.
 2. Hephaestus reads the change, its description, commits, and relevant discussion.
 3. It checks the work against the practices enabled for the workspace.
-4. It posts a summary comment. Feedback tied to a specific changed line can also appear as an inline comment.
+4. It records what each applicable practice observed, then decides whether feedback would help. Useful
+   feedback can become a summary or inline comment; a review can also stay private or deliberately stay
+   quiet.
 
 A review takes a few minutes, and longer on a large change. Your instance sets a hard time limit on each one.
 
-### Read the summary
+### Read a summary
 
-The summary can include:
+When the review produces a public summary, it can include:
 
 - a practice the work demonstrated well
 - a concern that applies to the whole change, such as a missing explanation or an unfocused set of commits
@@ -84,9 +86,9 @@ There is no equivalent command on GitHub pull requests. Use **Review this now** 
 
 ### See what was reviewed, and what was not
 
-**Review activity** in the workspace sidebar lists every piece of work Hephaestus recorded, and opening
-one shows what each practice made of it — including the practices that stayed quiet, and why. This is
-the place to look when you expected feedback and got none.
+**Review activity** in the workspace sidebar lists every piece of work Hephaestus recorded, not only work
+that received a comment. Opening one shows what each practice made of it — including the practices that
+stayed quiet, and why. This is the place to look when you expected feedback and got none.
 
 Two answers there surprise people:
 

@@ -91,20 +91,11 @@ source, because “the harmful behaviour is nowhere here” is sound only over a
 whole. The claim reaches no further than the recorded boundary; it is not a clean bill of health for the
 repository or runtime. Both the sandbox normalizer and server admission enforce these rules.
 
-#### There is no confidence field
+### Ordering uses observable properties
 
-Observations used to carry a detector-reported `confidence` in `[0, 1]`. Measured over 580 live observations
-it never fell below 0.90 and was exactly 1.00 in 55% of them: the model cannot use the range, so every
-consumer that ranked or floored on it was ranking on noise. It is gone from the tool schema, the normalizer
-and `ValidatedObservation`.
-
-What ranks an observation now is `ObservationOrder`: severity where it applies, then **evidence breadth** — the number
-of distinct loci the citations point at, the in-run form of recurrence — then a stable identity so the order
-is total and a re-run reproduces it. All three are properties the run can check rather than ones it reports.
-
-The field is also absent from persistence and every read API. Historical values were model-generated noise,
-not evidence worth preserving as a product contract; keeping them would leave consumers free to quietly rank
-on them again.
+Observations have no model-reported confidence score. `ObservationOrder` sorts by severity where it
+applies, then by the number of distinct cited loci, then by stable identity. This makes ordering
+deterministic and derives every input from admitted evidence instead of model self-assessment.
 
 ### Recipient and subject remain distinct
 

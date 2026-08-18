@@ -1201,7 +1201,7 @@ async function main() {
                     `Coverage check. You have NOT yet reported an observation for these practices: ${missing.join(", ")}. ` +
                     `Read inputs/practices/<slug>.md for each and evaluate it against the SAME diff/context you already read ` +
                     `(do NOT re-read the diff). Persist an observation for EVERY one with report_observation, one call per observation ` +
-                    `— choose a BEHAVIOR_* outcome when evidence settles the claim. Use NO_REVIEW_OCCASION only when a prerequisite situation explicitly named by the practice did not occur; target-behaviour absence is BEHAVIOR_ABSENT_*, never a decline. Use INSUFFICIENT_EVIDENCE when required evidence is unavailable. Fill exactly the evidence branch the tool schema requires.`;
+                    `— choose a BEHAVIOR_* outcome when evidence settles the claim. Use NO_REVIEW_OCCASION only when a prerequisite situation explicitly named by the practice did not occur; target-behaviour absence is BEHAVIOR_ABSENT_*, never a decline. Use INSUFFICIENT_EVIDENCE only when the available evidence was read but does not settle the claim. Fill exactly the evidence branch the tool schema requires.`;
                 try {
                     await session.prompt(gatePrompt);
                 } catch (err) {
