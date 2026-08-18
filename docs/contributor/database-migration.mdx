@@ -141,6 +141,8 @@ Generates:
 
 ```mermaid
 flowchart TD
+    accTitle: Database schema change workflow
+    accDescr: Entity changes produce a migration, which updates generated schema documentation and is checked in continuous integration.
     A[Entity changes] --> B[Migrations]
     B --> C[ERD docs]
 

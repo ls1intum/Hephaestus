@@ -10,6 +10,8 @@ A practice review passes through four stages, in this order: **Occasion**, **Cap
 
 ```mermaid
 flowchart TB
+    accTitle: Practice review stages and their distinct exits
+    accDescr: Work passes through occasion, evidence capture, observation, and delivery. Each stage records a different result when processing stops.
     Work[Something happened to a piece of work] --> Occasion{Occasion: do we look?}
     Occasion -->|no| Refused[artifact_signal.state_reason]
     Occasion -->|yes| Capture{Capture: can we look?}
@@ -148,6 +150,8 @@ know the developer was already told, and it cannot decide to stay quiet.
 
 ```mermaid
 flowchart TB
+    accTitle: Measurement and feedback composition are separate turns
+    accDescr: A measurement turn creates grounded observations. A composition turn combines admitted observations with bounded history and proposes feedback for three channels or withholds it.
     work["A piece of work"] --> measure
 
     subgraph measurementTurn["Measurement turn"]
@@ -202,73 +206,22 @@ Three constraints shape how that context may be used:
 Accepted tool calls update the composition output incrementally. The server parses proposed units and applies
 all delivery gates; the model never writes the feedback ledger directly.
 
-### The three channels are three levels
+### Channels are distinct interventions
 
-`FeedbackChannel` is not three renderers of one message. Each value is a different level of Hattie &
-Timperley's model, which is why the mapping from observations to feedback is not 1:1 in either
-direction. All three names answer one question — *where does this land?* — and
-[ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)
-records why the lane once called `REFLECTION` is not named for what the developer is meant to do with it.
+The channel contract is defined in the
+[practice review glossary](./practice-review-glossary.mdx#the-three-channels-are-three-levels). The
+composition turn must not render one advice string three ways:
 
-|                 | `IN_CONTEXT`                                                                        | `IN_APP`                                  | `IN_CHAT`                                                                                        |
-| --------------- | ----------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| Lands           | on the work artifact — pull request summary or inline note, issue comment           | on the developer's own practice pages     | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack |
-| Level           | task                                                                                | process                                   | self-regulation                                                                                  |
-| Answers         | "what is worth changing or reinforcing here?"                                       | "what pattern is visible across my work?" | "what capability could this conversation support?"                                               |
-| Audience        | public — the team reads it                                                          | private, to the developer alone           | private, in a live mentor turn                                                                   |
-| Evidence is     | a current admitted observation; a diff placement also selects one verified citation | several pieces of work, named             | available to the mentor as the original observations and a concise summary                       |
-| Intervention is | one edit, in this change                                                            | a habit, for next time                    | chosen by the mentor from the notes, evidence, and live conversation                             |
-| `whyItMatters`  | appended verbatim by the server                                                     | situated by the composer, never appended  | not used                                                                                         |
-| Placement       | `DIFF` on a verified citation, or `ARTIFACT` at summary level                       | forbidden                                 | forbidden                                                                                        |
+- `IN_CONTEXT` is public task-level feedback about the current work. It binds to a current admitted
+  observation and uses either server-resolved `DIFF` placement or artifact-level placement. History alone
+  cannot support a public claim.
+- `IN_APP` is private process-level feedback about a pattern across several pieces of the recipient's work.
+- `IN_CHAT` is private context for a later mentor turn. It prepares `situation`, `capability`,
+  `evidenceSummary`, and `inConversationSignal` as notes, not dialogue. The mentor receives the original
+  evidence and live conversation, then may adapt, defer, or discard the note.
 
-**The mentor renders in the app too, and that does not make it `IN_APP`.** `IN_CHAT` is the *dialogic*
-channel — the unit becomes a turn the developer can answer — wherever the conversation runs. `IN_APP` is
-the *non-dialogic* practice surface — the unit is written down, and reading it is the whole interaction.
-Ask *is it a turn?* before asking *which screen?*: a new written surface inside Hephaestus is `IN_APP`,
-and a mentor that moves to another chat product is still `IN_CHAT`.
-
-Two of the rows are the load-bearing ones. The public lane never says *"you keep doing this"* — that
-is a performance review in front of the team — even though the composer knows it. The private lanes
-never re-quote a line of code, because the line is already on the merge request where it can be read
-in context. Neither rule is achievable by templating one advice string over three surfaces, which is
-what the system did before.
-
-An issue review has no diff, so its in-context unit can use only `ARTIFACT` placement. Pull requests allow
-both `DIFF` and `ARTIFACT`. In either form, public feedback must bind to a current admitted observation of
-the same practice; history alone cannot become a public claim. Per-lane limits are part of the staged
-composition configuration rather than this documentation.
-
-`IN_CHAT` is composed as **notes to the mentor**, not as a turn: the `situation` (factual, artifacts
-named, never addressed to the developer as "you"), the `capability` (the useful understanding or
-behaviour the conversation should support), the `evidenceSummary` (checked against the separately staged
-observation evidence), and the `inConversationSignal` (an observable sign that the conversation helped). The rule the field names
-enforce is that you write what the mentor needs to know, never a sentence for it to say — anything phrased
-as a line of dialogue gets spoken and sounds like a script.
-
-The notes are stored as structured JSON and handed to the mentor as `notes`; the composed title is staged
-separately as `topic`. Neither is a message to speak. The mentor composes the turn against the live
-conversation and may adapt, defer, or discard a note when it no longer fits.
-There is no empty-notes form: an admitted `IN_CHAT` unit has all four fields, and no unit is created when
-composition has nothing useful to prepare.
-
-The producer, parser, persistence model, and mentor context use the same four required fields. There are no
-aliases or fallback conversation schemas.
-
-For example, a review may observe that a new tax-exempt branch has no distinguishing test. The conversation
-lane does **not** prepare `"Why didn't you write a test?"`. It prepares material such as:
-
-```json
-{
-  "situation": "The tax calculation change adds a tax-exempt branch without a test that exercises it.",
-  "capability": "Recognise decision branches that need a distinguishing example before implementation.",
-  "evidenceSummary": "The admitted observation binds the new branch and the exhaustive search of changed tests.",
-  "inConversationSignal": "The developer can name the input that distinguishes the new branch and where to test it."
-}
-```
-
-On a later turn, the mentor inspects the bound observation and the conversation so far. It might ask for the
-distinguishing input, explain the gap directly, connect it to the developer's current question, or leave the
-note for later. The prepared fields constrain purpose and grounding; they do not prescribe dialogue.
+An issue has no diff and therefore permits only artifact-level in-context placement. Pull requests permit
+both placements. Per-lane limits are supplied in composition configuration, not fixed in this guide.
 
 ### What the composer is not allowed to do
 
@@ -322,6 +275,8 @@ never inside it.
 
 ```mermaid
 flowchart LR
+    accTitle: Effective review tier and delivery admission
+    accDescr: The effective tier falls back from practice to area to workspace to the Deliver default, then combines with observation origin to admit or suppress feedback.
     P{"practice.review_tier set?"}
     P -->|yes| T{{"effective tier"}}
     P -->|no| A{"area.review_tier set?"}
@@ -354,87 +309,12 @@ never delivered.
 The full suppression vocabulary lives on `FeedbackSuppressionReason`, which also carries one deprecated
 constant (`ARTIFACT_DRAFT`) kept only so old rows still read back.
 
-## Who does what, and where
+## Runtime and extension points
 
-The most counter-intuitive facts about this system are all about *where* code runs, and none of them are
-visible from the class names.
-
-```mermaid
-sequenceDiagram
-    participant S as Server
-    participant DB as agent_job in Postgres
-    participant W as Worker
-    participant SB as Sandbox
-    participant SCM as GitHub or GitLab
-    S->>S: authorise, run the gate, record the occurrence
-    S->>DB: INSERT one QUEUED row
-    Note over S,DB: The row is the enqueue. The server never calls the worker.
-    W->>DB: SELECT FOR UPDATE SKIP LOCKED, re-check budget and model
-    W->>W: capture evidence, build the manifest, decide readiness
-    W->>DB: write evidence_snapshot and review_readiness
-    W->>SB: start the container, stage inputs
-    SB->>W: model calls, through the worker's own LLM proxy
-    SB->>W: submit observations for admission
-    W->>DB: validate and persist admitted observations
-    W-->>SB: return the durable observation projection and digest
-    SB->>SB: resume the same model session and compose feedback
-    SB->>W: out/ files and an exit code
-    W->>W: verify the admission digest and apply delivery gates
-    W->>DB: write the feedback ledger
-    opt admitted IN_CONTEXT feedback
-        W->>SCM: post or update provider feedback
-        W->>DB: record whether delivery succeeded
-    end
-```
-
-- **The `agent_job` table is the queue.** There is no broker between server and worker. Submission is one
-  row insert; `handler.createSubmission` is explicitly the lightweight path and extracts metadata and an
-  idempotency key only. NATS is upstream of all of this, carrying webhook ingress, and is not part of the
-  review path.
-- **Evidence capture runs on the claiming worker, not on the server.** `handler.prepareInputs` — and
-  therefore `WorkspaceContextBuilder` and `ContextManifestBuilder` — is called from `AgentJobExecutor`
-  after the claim. The beans themselves carry no runtime-role condition; it is the *call chain* that is
-  worker-exclusive. The operational consequence is easy to miss: **the worker reads the repository clone
-  from its own disk**, so a worker without checkout enabled and without the fabric volume captures a
-  degraded tree and says so in the manifest.
-- **`evidence_snapshot` and `review_readiness` are written before the container starts**, in their own
-  transaction, and a failed write fails the run before any model cost accrues. The result is a separate,
-  later transaction.
-- **The worker posts the comment.** The whole tail — parse, persist observations, compose, call the
-  provider — runs inside `handler.deliver` on the worker's sandbox-executor thread.
-- **Control never returns to the server between claim and completion.** The only server-to-worker push is
-  the hub WebSocket, and it carries cancellation and drain, not work.
-
-## Extension points
-
-Artifact-specific handlers assemble context and delivery constraints — `PullRequestReviewHandler`,
-`IssueReviewHandler`, `ConversationReviewHandler` — and all of them share one practice-agent runtime and
-one observations model. Provider adapters own provider identifiers, diff and comment APIs, and conversation
-storage; the practices module owns practice definitions, observations, and the feedback ledger.
-
-The durable boundaries, which the implementation may reschedule freely behind:
-
-- **Admission** — `PracticeReviewDetectionGate` decides whether an occurrence may enqueue work.
-- **Queue and execution** — `agent_job`, described by
-  [ADR 0025](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0025-agent-job-queue-on-postgresql.md).
-- **Workspace ABI** — the sandbox receives read-only `inputs/`, disposable `work/`, and returns only
-  `out/`. [Agent workspace ABI](agent/workspace-abi.mdx) is the source of truth for paths and exit codes.
-- **Observations** — the agent reports through `report_observation`;
-  `PracticeDetectionResultParser` validates and never throws, and persistence assigns occurrence and
-  recurrence identity.
-- **Feedback** — after admission, the same agent session reports through `report_feedback` in a closed
-  intervention phase;
-  `FeedbackCompositionResultParser` validates and never throws. Admitted feedback, server suppressions,
-  replacements, and placements enter the ledger; a model `WITHHOLD` remains only in the bounded job output. The seam itself is
-  [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md).
-
-When changing sandbox inputs or outputs: update the owning runtime type or parser first; update the ABI
-page only for a durable ABI change; add a behavioural test at the narrowest owning boundary; regenerate
-OpenAPI and the web client when the HTTP contract changes. To extend the bundled catalogue, follow
-[Practice catalogue curation](practice-catalogue.md).
-
-Avoid copying file trees, enum inventories, defaults, or database columns into this guide. Those details
-are owned by executable types, Liquibase, the generated database schema, and OpenAPI.
+The server records an occasion and enqueues an `agent_job`; a worker claims it, captures evidence, runs the
+sandbox, admits observations, resumes composition, applies delivery gates, and calls the provider. Runtime
+roles, transaction boundaries, extension ownership, and change guidance are documented in
+[Practice review runtime](./practice-review-runtime.mdx).
 
 ## Reading a real review back
 

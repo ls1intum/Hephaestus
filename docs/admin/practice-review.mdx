@@ -11,9 +11,8 @@ observations first and, where that artifact and review occasion permit delivery,
 the work, the developer's private practice pages, or a later mentor conversation. This page is how you
 switch it on, keep it from costing more than intended, and find out why it went quiet.
 
-**Nothing errors when practice review stops.** The workspace simply goes quiet. That single fact shapes the
-whole page: every refusal is recorded, and the screen that shows you the recording is
-**Review activity**, which every member can already see.
+Many review gates refuse work without raising a user-facing error, so a workspace can simply go quiet.
+Every refusal is recorded; **Review activity**, available to every member, is the first place to inspect it.
 
 ## First successful review
 
@@ -33,6 +32,35 @@ Use this short path before tuning campaigns, scopes, or per-practice overrides:
 Once that works, narrow the scope, add practice overrides, or configure past-work reviews. The rest of
 this page is reference and troubleshooting for those decisions.
 
+### Follow one review end to end
+
+Suppose a developer opens **Update dependencies** with no explanation in its description:
+
+1. The provider event creates an occurrence visible under **Review activity**.
+2. The review gate selects practices whose occasions match that pull request. Capture must satisfy each
+   selected practice's evidence requirements before that practice can run.
+3. A practice about explaining why a change is needed can record that the explanation is absent, bounded
+   to the description it searched. This is the observation; it is retained even if nobody is contacted.
+4. Composition considers that observation alongside recent observations and feedback. It may propose a
+   public summary, private process feedback, mentor context, or no feedback.
+5. Server-side policy admits or refuses each proposal. **Review activity** explains the result. Workspace
+   admins can inspect the run under **Administration → Practices → Practice reviews**; a provider comment
+   exists only when public delivery was both useful and permitted.
+
+This is the smallest useful diagnostic slice: occurrence → readiness → observation → composition →
+delivery. Stop at the first missing stage rather than changing downstream settings at random.
+
+### Use the right screen
+
+| Question | Open |
+| --- | --- |
+| Did this piece of work enter the system, and why was it quiet? | **Review activity**, then open the work |
+| Did a job run, fail, or produce observations and feedback? | **Administration → Practices → Practice reviews** |
+| Which work may start reviews, and may feedback be delivered? | **Administration → Practices → Review** |
+| What does one practice review and which evidence does it require? | **Administration → Practices → Practice setup** |
+| Is the review model ready? | **Administration → AI models** |
+| Did a budget stop new work? | **Administration → AI usage** |
+
 ## What starts a review
 
 Five doors start reviews. Provider reconciliation is shown too because it records an occurrence but stops
@@ -40,6 +68,8 @@ before a review starts.
 
 ```mermaid
 flowchart LR
+    accTitle: Events that do and do not start practice reviews
+    accDescr: Live events, manual requests, campaigns, and recurring checks start reviews. Provider reconciliation records an occurrence but does not start a pull request or issue review.
     Event[A live event from GitHub or GitLab] --> Live[Live event]
     Command[The /hephaestus review comment command] --> Hand[Requested by hand]
     Button[The Review this now button] --> Hand
@@ -81,57 +111,10 @@ quiet until both are done.
 
 ### Deployment
 
-The **In `.env`?** column says whether the shipped Compose files forward the variable from `docker/.env`.
-Where it says no, setting it in `docker/.env` does nothing — add it to the service's own `environment:`
-block instead.
-
-| Variable | Default | In `.env`? | What it does |
-| --- | --- | --- | --- |
-| `AGENT_ENABLED` | `false` | yes | Enables the PostgreSQL-backed job queue: submission on the server, claiming and execution on the worker. Must be `true` on **both** roles |
-| `GIT_CHECKOUT_ENABLED` | `false` | server only | Enables the local repository checkout that supplies the repository-tree evidence |
-| `PRACTICE_REVIEW_FOR_ALL` | `false` | yes | Enables the feature flag and the review gate for all users |
-| `PRACTICE_REVIEW_DELIVER_TO_MERGED` | `false` | yes | Instance default for posting after merge; a workspace may override it |
-| `PRACTICE_REVIEW_COOLDOWN_MINUTES` | `15` | yes | Instance default for the minimum gap between reviews of the same work; a workspace may override it |
-| `HEPHAESTUS_FABRIC_GC_RETENTION_DAYS` | `30` | yes | Age after which replay directories and unreferenced evidence blobs become collectable |
-| `PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR` | `5` | no | The per-person hourly allowance in the table above. Keyed on the person, not the work, so it is the one limit that catches somebody asking for a review on twenty colleagues' merge requests. `0` removes it |
-| `PRACTICE_REVIEW_PROGRESS_FOOTER` | `false` | no | Appends the run-to-run progress footer and the re-review reply. Renders nothing until a target has been reviewed twice |
-| `PRACTICE_REVIEW_REACTION_SUPPRESSION` | `false` | no | Stops re-raising a point the author already disputed or marked not applicable |
-
-Fleet-wide guard rails on campaigns over past work and on the occurrence ledger. None is forwarded from
-`docker/.env`; the defaults are the supported configuration and are worth changing only to make a campaign
-cheaper or an over-large instance quieter.
-
-| Variable | Default | What it does |
-| --- | --- | --- |
-| `PRACTICE_REVIEW_BACKFILL_MAX_WINDOW` | `400d` | Widest lookback any campaign may request. A campaign over this is refused at the estimate, before anything is confirmed and before anything is paid for |
-| `PRACTICE_REVIEW_BACKFILL_MAX_ARTIFACTS` | `5000` | Most pieces of work any one campaign may cover. Refused the same way |
-| `PRACTICE_REVIEW_BACKFILL_BATCH_SIZE` | `25` | How many pieces of work one driver tick offers. Bounds how far a campaign can overshoot a budget cap it crosses mid-batch |
-| `PRACTICE_REVIEW_BACKFILL_COST_HISTORY_WINDOW` | `90d` | How far back the estimate looks for completed reviews to price a campaign from |
-| `SIGNAL_LEDGER_PENDING_RETRY_AFTER` | `1h` | How often a refused-but-retryable occurrence is offered again. The blockers are operator actions, so retrying faster only multiplies the refusal |
-| `SIGNAL_LEDGER_PENDING_LAPSE_AFTER` | `7d` | How long an occurrence keeps being re-offered before it is retired |
-| `SIGNAL_LEDGER_SWEEP_BATCH_SIZE` | `200` | How many pending occurrences one sweep re-offers |
-
-:::caution Two variables do not behave the way their name suggests
-
-- **`PRACTICE_REVIEW_RUN_FOR_ALL` is inert in the shipped Compose files.** The `application-server`
-  service pins the underlying setting to `PRACTICE_REVIEW_FOR_ALL`, so setting the other name in
-  `docker/.env` changes nothing. Use `PRACTICE_REVIEW_FOR_ALL`.
-- **`GIT_CHECKOUT_ENABLED` is passed to `application-server` only.** The `application-worker` service's
-  `environment:` block does not forward it — and evidence capture runs on the *worker*, not the server. On
-  a split deployment, a worker without it captures a degraded repository tree and records that fact in the
-  manifest rather than failing. Add the variable to the `application-worker` service's own `environment:`
-  block, and mount the same fabric volume there.
-:::
-
-Repository checkouts, replay metadata, and content-addressed evidence live under the fabric root, which the
-reference Compose stack pins to `/data/git-repos`. A split or multi-host deployment must mount the same
-durable read-write filesystem on **every** server and worker, with cross-process file locks, atomic
-rename, and appropriate access controls.
-
-Which sources a review may read, and for which purpose, is not a deployment setting. It is fixed by the
-reviewed source-use decisions shipped in the artifact-source contract, and a deployment cannot widen or
-narrow them. A source a workspace has not connected is simply never captured. See
-[Artifact-Source Governance](./dsms/artifact-source-governance) for the decision record.
+Enable the agent runtime on both server and worker roles, enable repository checkout where evidence capture
+runs, and expose the practice-review feature. Variables, Compose forwarding, storage requirements, queue
+metrics, retention, and fixed limits are in
+[Practice review operations](./practice-review-operations.mdx).
 
 ### Per workspace, in screen order
 
@@ -298,77 +281,7 @@ The per-workspace review list under Administration → **Practices → Practice 
 status, the model it ran on, and its error message — the fastest way to tell "never submitted" from
 "submitted and failed".
 
-## Reference
+## Operational reference
 
-### Where each setting lives
-
-| Setting | Where |
-| --- | --- |
-| Bind a model for reviews | Administration → AI models → **Practice reviews** card |
-| Start or stop practice reviews | Administration → Practices → Review → **When and where** → *Start practice reviews* |
-| Live events, comment command, cooldown | Administration → Practices → Review → **When and where** → *Project review triggers* |
-| Post after merge, eligible work | Administration → Practices → Review → **When and where** → *Project review rules* |
-| Target branches, repositories | Administration → Practices → Review → **When and where** → *Review scope* |
-| Workspace default tier | Administration → Practices → Review → **How much** |
-| Per-area and per-practice overrides | Administration → Practices → Review → **How much** |
-| Draft handling | On the practice itself — *Also while it is still a draft* |
-| One-off campaign | Administration → Practices → Review → **Past work** |
-| Recurring check over recent work | Administration → Practices → Review → **When and where** |
-| What actually ran, and why not | Administration → Practices → **Practice reviews**, or **Review activity** for any member |
-| Workspace AI spend and cap | Administration → **AI usage** |
-| Instance-wide budget cap | Instance admin → AI usage → **Set budget** |
-| Instance-wide silent mode | Instance admin → **Instance settings** |
-
-### Queue health
-
-The job queue exposes its own signals — alert off these rather than reading application logs.
-
-- **`agent.queue.oldest_age_seconds`** — age of the oldest eligible queued job, `0` when empty. **This is
-  the one to alert on**: a briefly busy queue and a stuck one both show non-zero depth, but only a stuck
-  queue shows a climbing age.
-- **`agent.queue.depth`** — queued jobs eligible to run now.
-- **`agent.queue.held`** — jobs parked on an exhausted budget.
-- **`agent.queue.running`** — jobs running fleet-wide.
-- **`agent.queue.health.sampler.failures`** — failed samples; the gauges keep their last-good value rather
-  than reporting a false empty queue.
-- **`agent.job.claim.latency`** — time between a job becoming eligible and being claimed.
-- **`agent.job.execution.duration`** — tagged by `jobType` and outcome `status`.
-- **`agent.job.delivery.recovered`** — deliveries stuck by an executor crash and successfully re-attempted.
-- **`agent.job.retention.stripped`** / **`agent.job.retention.deleted`** — rows pruned by the retention
-  sweep.
-- **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
-
-Gauges are sampled every 30 seconds; timers and counters are recorded inline. None run on a request path.
-
-**Retention.** Terminal job rows are pruned automatically. `AGENT_PAYLOAD_RETENTION` (default `P14D`)
-strips container logs and output to `NULL`; `AGENT_ROW_RETENTION` (default `P90D`, must be at least the
-payload retention) deletes the row and its durable evidence snapshot. **Neither is forwarded by the shipped
-Compose files** — to change them, add them to the service's own `environment:` block. Tighten only against
-the deployment's approved retention policy, and treat the fabric root volume as sensitive storage.
-
-## Limits you should know about
-
-Each of these is deliberate, and none is configurable from `docker/.env`.
-
-- **Three background cadences are fixed in code.** The recurring-sweep opener runs every 5 minutes, the
-  campaign driver every 2 minutes, and the re-offer reaper every 15 minutes. Only their *thresholds* are
-  properties; the cadences are not, so you cannot slow them down under load.
-- **A refused-but-retryable occurrence is retried for seven days and then retired.** A workspace left
-  misconfigured accumulates a week of retries and then goes quiet again with nothing new to see. Both the
-  interval and the deadline are settable — `SIGNAL_LEDGER_PENDING_RETRY_AFTER` and
-  `SIGNAL_LEDGER_PENDING_LAPSE_AFTER` above — but not from `docker/.env`.
-- **Nothing is ever deleted from the occurrence ledger**, in any state, including retired rows. It is the
-  record of what was *not* done, and it only grows. Size it accordingly on a busy instance.
-- **The repository-tree capture is bounded**, by file count, total size, and per-file size
-  (`GIT_TREE_MAX_FILES`, `GIT_TREE_MAX_TOTAL_SIZE`, `GIT_TREE_MAX_FILE_SIZE`). When a bound bites, the
-  capture reports itself **partial** and names which bound it hit rather than silently truncating. The
-  values in force are the ones declared in the artifact-source catalog's selection scope for that source —
-  read them there rather than from a copy. None of the three is forwarded by the shipped Compose files.
-- **Linked Outline documents are retrieval-limited, and the mentor and review paths do not agree.** A
-  review resolves documents *linked from* the work first and only tops up a small number by search; the
-  mentor searches the whole corpus and truncates each document. Neither path can report that it found
-  everything, and neither is a substitute for the other when you are diagnosing missing context.
-- **Observation and feedback wording come from different turns in one agent session.** The first turn
-  records evidence-backed observations. After Java admits them, a second turn composes lane-specific
-  feedback from those observations and their evidence. Practice criteria affect what is observed; the
-  composition contract affects what is said. Nothing on the administration screens edits either prompt.
+For deployment variables, the workspace setting map, queue metrics, retention, and non-configurable limits,
+see [Practice review operations](./practice-review-operations.mdx).

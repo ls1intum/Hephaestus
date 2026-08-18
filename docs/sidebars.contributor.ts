@@ -48,6 +48,7 @@ const sidebars: SidebarsConfig = {
       label: 'Practices & Feedback',
       items: [
         'practice-review-pipeline',
+        'practice-review-runtime',
         'artifact-source-contract',
         'practice-catalogue',
         'practice-feedback-schema',

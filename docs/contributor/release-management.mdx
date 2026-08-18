@@ -20,6 +20,8 @@ What a released version number promises is defined in the
 
 ```mermaid
 sequenceDiagram
+    accTitle: Changesets release workflow
+    accDescr: Feature pull requests add changesets, the version pull request consumes them, and merging the version pull request publishes the release.
     participant PR as Feature PR
     participant M as main
     participant VP as Version PR
