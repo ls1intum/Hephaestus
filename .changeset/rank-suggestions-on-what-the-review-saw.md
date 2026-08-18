@@ -6,4 +6,4 @@ When a review has more to say than one comment can hold, the suggestions that su
 
 Observations are now ordered by severity first, then by how many distinct places in the change the observation is quoted at: a habit running through four files leads a one-off, and problems always precede strengths. The order is stable, so re-reviewing the same work reproduces the same list rather than shuffling it.
 
-The review detail page no longer shows a confidence percentage, because there was never a real measurement behind it. Scores already recorded against past reviews are kept as they are.
+The review detail page no longer shows a confidence percentage, because there was never a real measurement behind it. The unmeasured confidence field and previously stored values are removed rather than retained as a misleading signal.

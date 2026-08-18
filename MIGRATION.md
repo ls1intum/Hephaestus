@@ -143,10 +143,15 @@ Update clients in the same deployment as the server and webapp. The old names ha
 | `evidenceSupport` | `evidenceSufficiency` |
 | practice `active` and `/active` | `reviewTier` and `/review-tier` (see below) |
 | practice-area `active` | `visibleInPracticeDashboards` |
-| finding `claimStatus` | `claimCurrentness` |
+| observation `artifactType` | `artifactKind` |
+| observation `title` | `summary` |
+| observation `reasoning` | `evidenceRationale` |
+| observation `guidance` | `deliveredFeedback` |
+| observation `claimStatus` | `claimCurrentness` |
+| observation `confidence` | removed; it was not a calibrated measurement |
 
 Database values and columns migrate automatically. This change removes ambiguous uses of “active,” “support,” and
-“detection”; it does not change historical finding results.
+“detection”; it preserves historical observation outcomes. The uncalibrated confidence values are removed.
 
 #### 🔴 A practice has a review-autonomy setting, not an on/off switch
 

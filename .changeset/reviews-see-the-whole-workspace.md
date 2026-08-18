@@ -8,8 +8,7 @@ scope had declared, which meant most reviews never saw the rest of the project's
 requests at all, and only some saw the repository, the wiki documents, or the conversation on the
 pull request. Reviews can now read all of it and cite any of it, so judgements that depend on
 context outside the change — whether the work is already tracked elsewhere, whether a linked design
-doc says what the change claims, what the code a changed line calls into actually does — stop coming
-back as "not applicable" for want of the evidence.
+doc says what the change claims, what the code a changed line calls into actually does — no longer fail for want of context that Hephaestus already holds.
 
 This changes nothing about what is collected or kept: every one of these sources was already gathered
 and stored for every review; the cut only decided what the reviewing model was shown. Sources still

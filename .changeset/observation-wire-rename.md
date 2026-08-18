@@ -2,6 +2,6 @@
 "hephaestus": minor
 ---
 
-Practice review screens now call a recorded review result an **observation** and the guidance written from it **feedback**. The words *finding* and *message* are gone from every screen, heading, filter and empty state under Practice reviews, so one thing is no longer named two ways depending on which page you are on.
+Practice-review screens now consistently call a recorded measurement an **observation** and the intervention derived from it **feedback**. Headings, filters, empty states, deletion warnings, and user documentation use the same terms. Old bookmarked web pages under `/admin/practices/reviews/findings` redirect to their observation equivalents.
 
-The workspace-admin review API follows the same wording: `/practices/reviews/findings` is now `/practices/reviews/observations`, and the `findingId`, `findingCount` and `findings` fields are now `observationId`, `observationCount` and `observations`. No action on upgrade — the Hephaestus web app is this API's only client and ships in the same release. If you call these endpoints from your own tooling, use the new names.
+**API clients:** observation payloads now use `artifactKind`, `summary`, `evidenceRationale`, and `deliveredFeedback` in place of `artifactType`, `title`, `reasoning`, and `guidance`. They also expose the observation's origin and claim currentness. The model-reported `confidence` field is removed because it was not a calibrated measurement. The removed API fields have no aliases; the bundled web app already uses the new contract. See `MIGRATION.md`.
