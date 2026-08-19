@@ -1,28 +1,18 @@
-import {
-	ArrowUpRightIcon,
-	CheckIcon,
-	CircleXIcon,
-	Clock3Icon,
-	FileCode2Icon,
-	ShieldCheckIcon,
-} from "lucide-react";
+import { Link } from "@tanstack/react-router";
+import { CheckIcon, CircleXIcon, Clock3Icon } from "lucide-react";
 import { useState } from "react";
-import type { DecideFeedbackProposalRequest } from "@/api/types.gen";
-import {
-	DELIVERY_PLACE_DEFS,
-	type DeliveryPlace,
-} from "@/components/practice-vocabulary/delivery-place-defs";
+import type {
+	DecideFeedbackProposalRequest,
+	GetPracticeReviewFeedbackResponse,
+	Practice,
+} from "@/api/types.gen";
+import { DELIVERY_PLACE_DEFS } from "@/components/practice-vocabulary/delivery-place-defs";
+import { observationResult } from "@/components/practice-vocabulary/observation-result";
+import { placementLabel } from "@/components/practice-vocabulary/placement-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-	Item,
-	ItemContent,
-	ItemDescription,
-	ItemGroup,
-	ItemMedia,
-	ItemTitle,
-} from "@/components/ui/item";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import {
 	Popover,
 	PopoverContent,
@@ -33,36 +23,26 @@ import {
 } from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
 import { FeedbackBody } from "./FeedbackBody";
+import { ReviewArtifactLink } from "./ReviewArtifact";
+import { ClaimCurrentnessBadge, ObservationResultBadge } from "./ReviewBadges";
+import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
+import { ReviewDetailHeader, ReviewFact, ReviewFactGrid } from "./ReviewDetailHeader";
+import { ReviewPerson } from "./ReviewPerson";
+import { ReviewPracticeLink } from "./ReviewPracticeLink";
+import { ReviewRow, ReviewRowList, ReviewRowMeta } from "./ReviewRow";
+import { subjectLabel } from "./review-format";
 
 export type ProposalRejectionReason = NonNullable<DecideFeedbackProposalRequest["rejectionReason"]>;
 
-export interface FeedbackProposal {
-	id: string;
-	practiceNames: string[];
-	recipientName: string;
-	body: string;
-	deliveryPlace: DeliveryPlace;
-	placements: string[];
-	artifact?: {
-		label: string;
-		title: string;
-		repositoryName: string;
-		url?: string;
-	};
-	evidence: Array<{
-		id: string;
-		practiceName: string;
-		excerpt: string;
-		url?: string;
-	}>;
-}
-
 export interface ProposalReviewPageProps {
-	proposal: FeedbackProposal;
+	workspaceSlug: string;
+	feedback: GetPracticeReviewFeedbackResponse;
+	practices?: Practice[];
 	isDeciding?: boolean;
-	onApprove: (proposalId: string) => void;
-	onReject: (proposalId: string, reason?: ProposalRejectionReason) => void;
+	onApprove: (feedbackId: string) => void;
+	onReject: (feedbackId: string, reason?: ProposalRejectionReason, note?: string) => void;
 }
 
 const REJECTION_REASONS: Array<{ value: ProposalRejectionReason; label: string }> = [
@@ -75,131 +55,154 @@ const REJECTION_REASONS: Array<{ value: ProposalRejectionReason; label: string }
 ];
 
 export function ProposalReviewPage({
-	proposal,
+	workspaceSlug,
+	feedback,
+	practices,
 	isDeciding = false,
 	onApprove,
 	onReject,
 }: ProposalReviewPageProps) {
-	const place = DELIVERY_PLACE_DEFS[proposal.deliveryPlace];
+	const place = DELIVERY_PLACE_DEFS[feedback.channel];
+	const placements = Array.from(
+		new Set(
+			feedback.placements.map((placement) =>
+				placementLabel(feedback.channel, placement.placementType),
+			),
+		),
+	);
+	const subjectDiffers = feedback.subject && feedback.subject.id !== feedback.recipient?.id;
+
 	return (
-		<article className="mx-auto max-w-5xl space-y-6">
-			<header className="space-y-3 border-b pb-5">
-				<div className="flex flex-wrap items-center gap-2">
-					<Badge variant="warning">
-						<Clock3Icon />
-						Awaiting approval
-					</Badge>
-					<StatusBadge def={place} />
-				</div>
-				<div className="space-y-1.5">
-					<h2 className="text-2xl font-semibold tracking-tight">
-						Review feedback for {proposal.recipientName}
-					</h2>
-					<p className="max-w-3xl text-sm text-muted-foreground">
-						Approve or reject this complete {place.label.toLowerCase()} feedback unit. Approval
-						sends exactly what appears below; it does not approve other feedback from the same
-						review.
+		<article className="min-w-0 max-w-4xl space-y-8">
+			<ReviewBreadcrumbs
+				workspaceSlug={workspaceSlug}
+				section={{
+					label: "Delivery",
+					link: (
+						<Link
+							to="/w/$workspaceSlug/admin/practices/reviews/delivery"
+							params={{ workspaceSlug }}
+							search={(previous) => previous}
+						/>
+					),
+				}}
+			/>
+			<ReviewDetailHeader
+				chips={
+					<>
+						<Badge variant="warning">
+							<Clock3Icon />
+							Awaiting approval
+						</Badge>
+						<StatusBadge def={place} />
+					</>
+				}
+				title={`Feedback for ${subjectLabel(feedback.recipient)}`}
+				provenance={
+					<p className="max-w-2xl text-sm text-muted-foreground">
+						Review the exact feedback, the work it addresses, and every observation behind it.
+						Approval sends only this feedback.
+					</p>
+				}
+			/>
+
+			<ReviewFactGrid>
+				<ReviewFact label={subjectDiffers ? "Addressed to" : "Developer"}>
+					<div className="space-y-1">
+						<ReviewPerson person={feedback.recipient} />
+						{subjectDiffers && <ReviewPerson person={feedback.subject} prefix="About" />}
+					</div>
+				</ReviewFact>
+				<ReviewFact label="Reviewed work">
+					<div className="space-y-1">
+						<ReviewArtifactLink artifact={feedback.artifact} />
+						{feedback.artifact && (
+							<p className="break-words text-muted-foreground">{feedback.artifact.title}</p>
+						)}
+					</div>
+				</ReviewFact>
+				<ReviewFact label="Will appear as">
+					<div className="flex flex-wrap gap-1.5">
+						{placements.length > 0 ? (
+							placements.map((placement) => (
+								<Badge key={placement} variant="outline">
+									{placement}
+								</Badge>
+							))
+						) : (
+							<span className="text-muted-foreground">{place.label}</span>
+						)}
+					</div>
+				</ReviewFact>
+			</ReviewFactGrid>
+
+			<section aria-labelledby="proposal-feedback-heading" className="space-y-3">
+				<h3 id="proposal-feedback-heading" className="text-lg font-semibold">
+					Feedback to send
+				</h3>
+				<FeedbackBody feedback={feedback} />
+			</section>
+
+			<section aria-labelledby="proposal-observations-heading" className="space-y-3">
+				<div>
+					<h3 id="proposal-observations-heading" className="text-lg font-semibold">
+						Observations behind this feedback
+					</h3>
+					<p className="text-sm text-muted-foreground">
+						Open an observation to inspect its rationale, citations, and source passages.
 					</p>
 				</div>
-			</header>
-
-			<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-				<div className="space-y-7">
-					<section aria-labelledby="proposal-feedback-heading" className="space-y-3">
-						<div className="space-y-2">
-							<h3 id="proposal-feedback-heading" className="text-lg font-semibold">
-								Feedback to send
-							</h3>
-							<div className="flex flex-wrap gap-1.5" role="group" aria-label="Planned placements">
-								{proposal.placements.map((placement) => (
-									<Badge key={placement} variant="outline">
-										{placement}
-									</Badge>
-								))}
-							</div>
-						</div>
-						<FeedbackBody
-							feedback={{
-								body: proposal.body,
-								channel: proposal.deliveryPlace,
-								deliveryState: "AWAITING_APPROVAL",
-							}}
+				<ReviewRowList label="Observations behind this feedback">
+					{feedback.observations.map((observation) => (
+						<ReviewRow
+							key={observation.observationId}
+							status={observationResult(observation)}
+							title={
+								<Link
+									to="/w/$workspaceSlug/admin/practices/reviews/observations/$observationId"
+									params={{ workspaceSlug, observationId: observation.observationId }}
+									search={(previous) => previous}
+								>
+									{observation.summary}
+								</Link>
+							}
+							meta={
+								<ReviewRowMeta
+									items={[
+										<ReviewPracticeLink
+											key="practice"
+											workspaceSlug={workspaceSlug}
+											practiceSlug={observation.practiceSlug}
+											practiceName={observation.practiceName}
+											area={observation.area}
+											practice={practices?.find(
+												(practice) => practice.slug === observation.practiceSlug,
+											)}
+										/>,
+										observation.role === "PRIMARY"
+											? "What this feedback is about"
+											: "Supporting this feedback",
+									]}
+								/>
+							}
+							chips={[
+								{
+									key: "result",
+									node: <ObservationResultBadge observation={observation} />,
+								},
+								{
+									key: "currentness",
+									node: <ClaimCurrentnessBadge currentness={observation.claimCurrentness} />,
+								},
+							]}
 						/>
-					</section>
+					))}
+				</ReviewRowList>
+			</section>
 
-					<section aria-labelledby="proposal-evidence-heading" className="space-y-3">
-						<div className="flex items-center gap-2">
-							<ShieldCheckIcon className="size-4 text-muted-foreground" aria-hidden />
-							<h3 id="proposal-evidence-heading" className="text-lg font-semibold">
-								Evidence to verify
-							</h3>
-						</div>
-						<ItemGroup aria-label="Observations behind this feedback">
-							{proposal.evidence.map((evidence) => (
-								<Item key={evidence.id} variant="outline" role="listitem">
-									<ItemMedia variant="icon">
-										<FileCode2Icon />
-									</ItemMedia>
-									<ItemContent>
-										<ItemTitle>{evidence.practiceName}</ItemTitle>
-										<ItemDescription className="line-clamp-none">
-											{evidence.excerpt}
-										</ItemDescription>
-										{evidence.url && (
-											<a
-												className="w-fit text-sm font-medium underline underline-offset-4"
-												href={evidence.url}
-											>
-												Inspect observation and source evidence
-											</a>
-										)}
-									</ItemContent>
-								</Item>
-							))}
-						</ItemGroup>
-					</section>
-				</div>
-
-				<aside className="space-y-5 lg:sticky lg:top-5 lg:self-start">
-					{proposal.artifact && (
-						<section aria-labelledby="reviewed-work-heading" className="space-y-2">
-							<h3 id="reviewed-work-heading" className="text-sm font-semibold">
-								Reviewed work
-							</h3>
-							<div className="space-y-1 text-sm">
-								<p className="font-medium">{proposal.artifact.label}</p>
-								<p className="text-muted-foreground">{proposal.artifact.title}</p>
-								<p className="text-muted-foreground">{proposal.artifact.repositoryName}</p>
-								{proposal.artifact.url && (
-									<a
-										href={proposal.artifact.url}
-										target="_blank"
-										rel="noreferrer"
-										className="inline-flex items-center gap-1 font-medium underline underline-offset-4"
-									>
-										Open reviewed work
-										<ArrowUpRightIcon className="size-3.5" aria-hidden />
-									</a>
-								)}
-							</div>
-						</section>
-					)}
-					<section aria-labelledby="proposal-practices-heading" className="space-y-2 border-t pt-4">
-						<h3 id="proposal-practices-heading" className="text-sm font-semibold">
-							{proposal.practiceNames.length === 1 ? "Practice" : "Practices"}
-						</h3>
-						<ul className="space-y-1 text-sm text-muted-foreground">
-							{proposal.practiceNames.map((practiceName) => (
-								<li key={practiceName}>{practiceName}</li>
-							))}
-						</ul>
-					</section>
-				</aside>
-			</div>
-
-			<footer className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t bg-background/95 py-3 backdrop-blur sm:flex-row sm:justify-end">
-				<RejectProposalPopover proposal={proposal} disabled={isDeciding} onReject={onReject} />
-				<Button disabled={isDeciding} onClick={() => onApprove(proposal.id)}>
+			<footer className="sticky bottom-0 z-20 flex flex-col-reverse gap-2 border-t bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/85 sm:flex-row sm:items-center sm:justify-end">
+				<RejectFeedbackPopover feedbackId={feedback.id} disabled={isDeciding} onReject={onReject} />
+				<Button disabled={isDeciding} onClick={() => onApprove(feedback.id)}>
 					{isDeciding ? <Spinner /> : <CheckIcon />} Approve and send
 				</Button>
 			</footer>
@@ -207,35 +210,36 @@ export function ProposalReviewPage({
 	);
 }
 
-function RejectProposalPopover({
-	proposal,
+function RejectFeedbackPopover({
+	feedbackId,
 	disabled,
 	onReject,
 }: {
-	proposal: FeedbackProposal;
+	feedbackId: string;
 	disabled: boolean;
 	onReject: ProposalReviewPageProps["onReject"];
 }) {
 	const [open, setOpen] = useState(false);
 	const [reason, setReason] = useState<ProposalRejectionReason | "">("");
+	const [note, setNote] = useState("");
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger render={<Button variant="outline" disabled={disabled} />}>
 				<CircleXIcon />
 				Reject feedback
 			</PopoverTrigger>
-			<PopoverContent align="end" side="top" className="w-80 gap-3 p-3">
+			<PopoverContent align="end" side="top" className="w-[min(24rem,calc(100vw-2rem))] gap-4 p-4">
 				<PopoverHeader>
-					<PopoverTitle>Why should this not be sent?</PopoverTitle>
+					<PopoverTitle>Reject this feedback</PopoverTitle>
 					<PopoverDescription>
-						A category is optional. It helps distinguish quality problems from duplicate or
-						misplaced feedback.
+						The category supports quality review. Add a note when the category alone would not
+						explain the problem.
 					</PopoverDescription>
 				</PopoverHeader>
 				<RadioGroup
 					value={reason}
 					onValueChange={(value) => setReason(value as ProposalRejectionReason)}
-					aria-label="Rejection reason"
+					aria-label="Rejection category"
 					className="gap-1"
 				>
 					{REJECTION_REASONS.map((option) => (
@@ -249,6 +253,17 @@ function RejectProposalPopover({
 						</label>
 					))}
 				</RadioGroup>
+				<Field>
+					<FieldLabel htmlFor="rejection-note">Note</FieldLabel>
+					<Textarea
+						id="rejection-note"
+						value={note}
+						onChange={(event) => setNote(event.target.value)}
+						maxLength={500}
+						placeholder="What should be corrected or reconsidered?"
+					/>
+					<FieldDescription>Optional · {note.length}/500</FieldDescription>
+				</Field>
 				<div className="flex justify-end gap-2 border-t pt-3">
 					<Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
 						Cancel
@@ -256,7 +271,7 @@ function RejectProposalPopover({
 					<Button
 						variant="destructive"
 						size="sm"
-						onClick={() => onReject(proposal.id, reason || undefined)}
+						onClick={() => onReject(feedbackId, reason || undefined, note.trim() || undefined)}
 					>
 						Reject feedback
 					</Button>

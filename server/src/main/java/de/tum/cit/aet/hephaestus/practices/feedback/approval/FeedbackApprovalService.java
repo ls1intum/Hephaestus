@@ -42,7 +42,8 @@ public class FeedbackApprovalService {
         if (existing != null) {
             if (
                 existing.getDecision() != request.decision() ||
-                existing.getRejectionReason() != request.rejectionReason()
+                existing.getRejectionReason() != request.rejectionReason() ||
+                !java.util.Objects.equals(existing.getRejectionNote(), normalizedNote(request.rejectionNote()))
             ) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal has already been decided");
             }
@@ -67,6 +68,7 @@ public class FeedbackApprovalService {
                 .actorAccountId(actorAccountId)
                 .decision(request.decision())
                 .rejectionReason(request.rejectionReason())
+                .rejectionNote(normalizedNote(request.rejectionNote()))
                 .contentDigest(FeedbackApprovalDigest.of(feedback))
                 .build()
         );
@@ -87,5 +89,14 @@ public class FeedbackApprovalService {
         if (request.decision() == FeedbackApprovalDecision.APPROVED && request.rejectionReason() != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection reason");
         }
+        if (
+            request.decision() == FeedbackApprovalDecision.APPROVED && normalizedNote(request.rejectionNote()) != null
+        ) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection note");
+        }
+    }
+
+    private static String normalizedNote(String note) {
+        return note == null || note.isBlank() ? null : note.trim();
     }
 }

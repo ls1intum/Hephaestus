@@ -11,9 +11,6 @@ import {
 	type ProposalRejectionReason,
 	ProposalReviewPage,
 } from "@/components/admin/practice-reviews/ProposalReviewPage";
-import { reviewArtifactLabel } from "@/components/admin/practice-reviews/ReviewArtifact";
-import { subjectLabel } from "@/components/admin/practice-reviews/review-format";
-import { placementLabel } from "@/components/practice-vocabulary/placement-defs";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -50,36 +47,9 @@ function FeedbackDetailRoute() {
 	if (feedback?.deliveryState === "AWAITING_APPROVAL") {
 		return (
 			<ProposalReviewPage
-				proposal={{
-					id: feedback.id,
-					practiceNames: Array.from(
-						new Set(feedback.observations.map((observation) => observation.practiceName)),
-					),
-					recipientName: subjectLabel(feedback.recipient),
-					body: feedback.body ?? "No feedback text was composed.",
-					artifact: feedback.artifact
-						? {
-								label: reviewArtifactLabel(feedback.artifact),
-								title: feedback.artifact.title,
-								repositoryName: feedback.artifact.repositoryName ?? "Repository unavailable",
-								url: feedback.artifact.url,
-							}
-						: undefined,
-					deliveryPlace: feedback.channel,
-					placements: Array.from(
-						new Set(
-							feedback.placements.map((placement) =>
-								placementLabel(feedback.channel, placement.placementType),
-							),
-						),
-					),
-					evidence: feedback.observations.map((observation) => ({
-						id: observation.observationId,
-						practiceName: observation.practiceName,
-						excerpt: observation.summary,
-						url: `/w/${workspaceSlug}/admin/practices/reviews/observations/${observation.observationId}`,
-					})),
-				}}
+				workspaceSlug={workspaceSlug}
+				feedback={feedback}
+				practices={practicesQuery.data}
 				isDeciding={decision.isPending}
 				onApprove={(id) =>
 					decision.mutate({
@@ -87,10 +57,10 @@ function FeedbackDetailRoute() {
 						body: { decision: "APPROVED" },
 					})
 				}
-				onReject={(id, rejectionReason?: ProposalRejectionReason) =>
+				onReject={(id, rejectionReason?: ProposalRejectionReason, rejectionNote?: string) =>
 					decision.mutate({
 						path: { workspaceSlug, feedbackId: id },
-						body: { decision: "REJECTED", rejectionReason },
+						body: { decision: "REJECTED", rejectionReason, rejectionNote },
 					})
 				}
 			/>

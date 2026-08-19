@@ -45,6 +45,9 @@ public class FeedbackApproval {
     @Column(name = "rejection_reason", length = 32)
     private FeedbackRejectionReason rejectionReason;
 
+    @Column(name = "rejection_note", length = 500)
+    private String rejectionNote;
+
     @Column(name = "content_digest", nullable = false, length = 64)
     private String contentDigest;
 

@@ -9028,6 +9028,10 @@ components:
           enum:
           - APPROVED
           - REJECTED
+        rejectionNote:
+          type: string
+          maxLength: 500
+          minLength: 0
         rejectionReason:
           type: string
           enum:
@@ -9164,6 +9168,8 @@ components:
         feedbackId:
           type: string
           format: uuid
+        rejectionNote:
+          type: string
         rejectionReason:
           type: string
           enum:

@@ -1,41 +1,29 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
-import { type FeedbackProposal, ProposalReviewPage } from "./ProposalReviewPage";
+import { expectNoPageOverflow } from "@/test/reflow";
+import { ProposalReviewPage } from "./ProposalReviewPage";
+import { longFeedbackDetail, workspacePractices } from "./story-mock-data";
 
-const proposal = {
-	id: "feedback-42",
-	practiceNames: ["Make failures actionable"],
-	recipientName: "Alex Morgan",
-	body: "The retry currently catches every exception and continues without recording why the operation failed. Consider catching the expected timeout explicitly and returning an error that names the affected workspace. This preserves the original cause while giving the caller an actionable next step.",
-	artifact: {
-		label: "MR !184",
-		title: "Add resilient workspace synchronization",
-		repositoryName: "hephaestus/course-project",
-		url: "https://gitlab.example.com/hephaestus/course-project/-/merge_requests/184",
-	},
-	deliveryPlace: "IN_CONTEXT",
-	placements: ["Summary comment", "Inline comments"],
-	evidence: [
-		{
-			id: "evidence-1",
-			practiceName: "Make failures actionable",
-			excerpt: "catch (Exception ignored) { continue; }",
-		},
-		{
-			id: "evidence-2",
-			practiceName: "Preserve observable failures",
-			excerpt:
-				"The timeout test verifies that synchronization continues, but does not assert an observable failure.",
-		},
-	],
-} satisfies FeedbackProposal;
+const feedback = {
+	...longFeedbackDetail,
+	deliveryState: "AWAITING_APPROVAL" as const,
+	deliveredAt: undefined,
+	placements: [{ id: "proposal-summary", placementType: "SUMMARY" as const }],
+};
 
 const meta = {
-	title: "Workspace/Practice reviews/Proposal review page",
+	title: "Workspace admin/Practice reviews/Proposal review",
 	component: ProposalReviewPage,
+	parameters: {
+		layout: "padded",
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 768, 1440] },
+	},
 	tags: ["autodocs"],
 	args: {
-		proposal,
+		workspaceSlug: "demo",
+		feedback,
+		practices: workspacePractices,
 		onApprove: fn(),
 		onReject: fn(),
 	},
@@ -46,23 +34,34 @@ type Story = StoryObj<typeof meta>;
 
 export const Ready: Story = {
 	play: async ({ canvas, args }) => {
+		await expect(canvas.getByRole("heading", { name: /Feedback for/ })).toBeVisible();
+		await expect(canvas.getByText("As a summary comment on the work")).toBeVisible();
 		await expect(
-			canvas.getByRole("heading", { name: "Review feedback for Alex Morgan" }),
+			canvas.getByRole("link", {
+				name: "A cache miss and a permission failure come back as the same 404",
+			}),
 		).toBeVisible();
-		await expect(canvas.getByText("Summary comment")).toBeVisible();
-		await expect(canvas.getByText("Inline comments")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Approve and send" }));
-		await expect(args.onApprove).toHaveBeenCalledWith("feedback-42");
+		await expect(args.onApprove).toHaveBeenCalledWith(feedback.id);
+		await expectNoPageOverflow();
 	},
 };
 
-export const Rejecting: Story = {
+export const RejectingWithContext: Story = {
 	play: async ({ canvas, args }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "Reject feedback" }));
 		const popover = await screen.findByRole("dialog");
 		await userEvent.click(within(popover).getByText("Missing important context"));
+		await userEvent.type(
+			within(popover).getByLabelText("Note"),
+			"The fallback path is not represented in the review.",
+		);
 		await userEvent.click(within(popover).getByRole("button", { name: "Reject feedback" }));
-		await expect(args.onReject).toHaveBeenCalledWith("feedback-42", "MISSING_CONTEXT");
+		await expect(args.onReject).toHaveBeenCalledWith(
+			feedback.id,
+			"MISSING_CONTEXT",
+			"The fallback path is not represented in the review.",
+		);
 	},
 };
 
@@ -72,8 +71,4 @@ export const Deciding: Story = {
 		await expect(canvas.getByRole("button", { name: /Approve and send/ })).toBeDisabled();
 		await expect(canvas.getByRole("button", { name: "Reject feedback" })).toBeDisabled();
 	},
-};
-
-export const Reflow: Story = {
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };

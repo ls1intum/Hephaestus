@@ -48,10 +48,10 @@ describe("feedback proposal route", () => {
 
 		renderRouteAtWithRouter(`/w/acme/admin/practices/reviews/delivery/${FEEDBACK_ID}`);
 
-		await screen.findByRole("heading", { name: /Review feedback for/ }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: /Feedback for/ }, ROUTE_RENDER_WAIT);
 		expect(screen.getByText(/Please keep the cache scoped/)).not.toBeNull();
 		expect(
-			screen.getByRole("link", { name: "Inspect observation and source evidence" }),
+			screen.getByRole("link", { name: reviewFeedbackDetail.observations[0].summary }),
 		).not.toBeNull();
 
 		await userEvent.click(screen.getByRole("button", { name: "Approve and send" }));
@@ -59,7 +59,7 @@ describe("feedback proposal route", () => {
 		expect(requestBody).toEqual({ decision: "APPROVED" });
 	});
 
-	it("sends the selected structured rejection reason", async () => {
+	it("sends the selected rejection category and reviewer context", async () => {
 		let requestBody: unknown;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
@@ -79,12 +79,20 @@ describe("feedback proposal route", () => {
 		);
 
 		renderRouteAtWithRouter(`/w/acme/admin/practices/reviews/delivery/${FEEDBACK_ID}`);
-		await screen.findByRole("heading", { name: /Review feedback for/ }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: /Feedback for/ }, ROUTE_RENDER_WAIT);
 		await userEvent.click(screen.getByRole("button", { name: "Reject feedback" }));
 		const dialog = await screen.findByRole("dialog");
 		await userEvent.click(within(dialog).getByText("Missing important context"));
+		await userEvent.type(
+			within(dialog).getByLabelText("Note"),
+			"The fallback path was not considered.",
+		);
 		await userEvent.click(within(dialog).getByRole("button", { name: "Reject feedback" }));
 
-		expect(requestBody).toEqual({ decision: "REJECTED", rejectionReason: "MISSING_CONTEXT" });
+		expect(requestBody).toEqual({
+			decision: "REJECTED",
+			rejectionReason: "MISSING_CONTEXT",
+			rejectionNote: "The fallback path was not considered.",
+		});
 	});
 });

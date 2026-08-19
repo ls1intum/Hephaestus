@@ -26,7 +26,7 @@ Use the executable sources for exact details:
 | `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice; an observation may pin one revision                    |
 | `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job; may support many pieces of feedback        |
 | `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job; may draw on many observations and have many placements      |
-| `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision, content digest, and time    |
+| `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
 | `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
 | `Reaction`            | A developer response to delivered feedback                                 | Belongs to one `Feedback` and retains its recurrence key                        |

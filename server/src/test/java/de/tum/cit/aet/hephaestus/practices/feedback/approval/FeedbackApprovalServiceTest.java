@@ -71,7 +71,7 @@ class FeedbackApprovalServiceTest {
             7L,
             feedbackId,
             42L,
-            new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null)
+            new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)
         );
 
         verify(feedbackRepository).decideProposal(7L, feedbackId, "PREPARED");
@@ -89,13 +89,15 @@ class FeedbackApprovalServiceTest {
             42L,
             new DecideFeedbackProposalRequestDTO(
                 FeedbackApprovalDecision.REJECTED,
-                FeedbackRejectionReason.MISSING_CONTEXT
+                FeedbackRejectionReason.MISSING_CONTEXT,
+                "The feedback overlooks the fallback path."
             )
         );
 
         ArgumentCaptor<FeedbackApproval> captor = ArgumentCaptor.forClass(FeedbackApproval.class);
         verify(approvalRepository).save(captor.capture());
         assertThat(captor.getValue().getRejectionReason()).isEqualTo(FeedbackRejectionReason.MISSING_CONTEXT);
+        assertThat(captor.getValue().getRejectionNote()).isEqualTo("The feedback overlooks the fallback path.");
     }
 
     @Test
@@ -107,7 +109,7 @@ class FeedbackApprovalServiceTest {
                 7L,
                 feedbackId,
                 42L,
-                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null)
+                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)
             )
         ).isInstanceOf(ResponseStatusException.class);
     }
@@ -119,7 +121,7 @@ class FeedbackApprovalServiceTest {
             7L,
             feedbackId,
             42L,
-            new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.REJECTED, null)
+            new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.REJECTED, null, null)
         );
         assertThat(result.getRejectionReason()).isNull();
     }

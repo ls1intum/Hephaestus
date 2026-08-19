@@ -369,6 +369,7 @@ erDiagram
         BIGINT actor_account_id
         VARCHAR(16) decision "NOT NULL"
         VARCHAR(32) rejection_reason
+        VARCHAR(500) rejection_note
         VARCHAR(64) content_digest "NOT NULL"
         TIMESTAMPTZ decided_at "NOT NULL"
     }

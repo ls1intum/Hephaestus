@@ -4509,6 +4509,7 @@ export type FeedbackApproval = {
     decidedAt?: Date;
     decision?: 'APPROVED' | 'REJECTED';
     feedbackId?: string;
+    rejectionNote?: string;
     rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
 };
 
@@ -4585,6 +4586,7 @@ export type DeveloperPracticeSummary = {
 
 export type DecideFeedbackProposalRequest = {
     decision: 'APPROVED' | 'REJECTED';
+    rejectionNote?: string;
     rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
 };
 

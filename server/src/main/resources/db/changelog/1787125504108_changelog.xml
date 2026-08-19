@@ -93,6 +93,7 @@
             <column name="actor_account_id" type="BIGINT"/>
             <column name="decision" type="VARCHAR(16)"><constraints nullable="false"/></column>
             <column name="rejection_reason" type="VARCHAR(32)"/>
+            <column name="rejection_note" type="VARCHAR(500)"/>
             <column name="content_digest" type="VARCHAR(64)"><constraints nullable="false"/></column>
             <column name="decided_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
         </createTable>
