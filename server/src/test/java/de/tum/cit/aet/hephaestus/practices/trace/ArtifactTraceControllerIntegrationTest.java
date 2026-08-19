@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -143,10 +143,10 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         @Test
         @WithMentorUser
         void reportsEveryPracticeIncludingTheQuietOnes() {
-            Practice reviewed = persistPractice("reviewed", "Reviewed practice", PracticeReviewTier.DELIVER);
-            persistPractice("silenced", "Silenced practice", PracticeReviewTier.OFF);
-            persistPractice("not-admitted", "Not admitted practice", PracticeReviewTier.DELIVER);
-            persistPractice("dormant", "Dormant practice", PracticeReviewTier.DELIVER, ScmSignals.PULL_REQUEST_MERGED);
+            Practice reviewed = persistPractice("reviewed", "Reviewed practice", PracticeAutonomy.AUTOMATIC);
+            persistPractice("silenced", "Silenced practice", PracticeAutonomy.OFF);
+            persistPractice("not-admitted", "Not admitted practice", PracticeAutonomy.AUTOMATIC);
+            persistPractice("dormant", "Dormant practice", PracticeAutonomy.AUTOMATIC, ScmSignals.PULL_REQUEST_MERGED);
             AgentJob job = persistJob();
             recordSignal(workspace, ScmSignals.PULL_REQUEST_READY, SignalState.TRIGGERED, null, job.getId());
             insertObservation(reviewed, job);
@@ -188,7 +188,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         @Test
         @WithMentorUser
         void explainsARefusedSignalWithTheActionThatWouldLiftIt() {
-            persistPractice("waiting", "Waiting practice", PracticeReviewTier.DELIVER);
+            persistPractice("waiting", "Waiting practice", PracticeAutonomy.AUTOMATIC);
             recordSignal(
                 workspace,
                 ScmSignals.PULL_REQUEST_READY,
@@ -212,7 +212,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         @Test
         @WithMentorUser
         void answersNothingForAnArtifactNobodyRecordedAnythingAbout() {
-            persistPractice("waiting", "Waiting practice", PracticeReviewTier.DELIVER);
+            persistPractice("waiting", "Waiting practice", PracticeAutonomy.AUTOMATIC);
 
             get(TRACE, workspace.getWorkspaceSlug(), ArtifactKinds.PULL_REQUEST.value(), ARTIFACT_ID)
                 .expectStatus()
@@ -264,11 +264,11 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         return webTestClient.get().uri(uri, vars).headers(TestAuthUtils.withCurrentUser()).exchange();
     }
 
-    private Practice persistPractice(String slug, String name, PracticeReviewTier tier) {
-        return persistPractice(slug, name, tier, ScmSignals.PULL_REQUEST_READY);
+    private Practice persistPractice(String slug, String name, PracticeAutonomy autonomy) {
+        return persistPractice(slug, name, autonomy, ScmSignals.PULL_REQUEST_READY);
     }
 
-    private Practice persistPractice(String slug, String name, PracticeReviewTier tier, SignalName signal) {
+    private Practice persistPractice(String slug, String name, PracticeAutonomy autonomy, SignalName signal) {
         Practice practice = new Practice();
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
@@ -276,7 +276,7 @@ class ArtifactTraceControllerIntegrationTest extends AbstractWorkspaceIntegratio
         practice.setName(name);
         practice.setCriteria("Criteria for " + slug);
         practice.setBindings(PracticeTestEvidence.bindings(signal));
-        practice.setReviewTier(tier);
+        practice.setAutonomy(autonomy);
         return practiceRepository.save(practice);
     }
 

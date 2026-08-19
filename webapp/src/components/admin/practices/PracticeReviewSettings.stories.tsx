@@ -129,35 +129,6 @@ export const ModelReadinessUnavailable: Story = {
 };
 
 /**
- * Both options carry the sentence that explains them, so neither is hidden behind a closed menu —
- * the reason to pick the narrower one is exactly what a menu would have hidden.
- */
-export const ReviewRoleOnly: Story = {
-	args: { policy: { ...policy, settings: { ...settings, runForAllUsers: false } } },
-	parameters: {
-		viewport: { defaultViewport: "reflow" },
-		chromatic: { viewports: [320, 1440] },
-	},
-	play: async ({ canvas }) => {
-		await expect(
-			canvas.getByRole("radio", { name: /Only assignees with the review role/ }),
-		).toBeChecked();
-		await expectNoPageOverflow();
-	},
-};
-
-export const WideningToAllWork: Story = {
-	args: {
-		policy: { ...policy, onUpdate: fn(), settings: { ...settings, runForAllUsers: false } },
-	},
-	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("radio", { name: /All matching work/ }));
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({ runForAllUsers: true });
-	},
-};
-
-/**
  * Reviews on with both doors shut is the one state the page banner cannot see — it reads the switch
  * and the model, not the triggers — so it is said beside the switches that cause it.
  */

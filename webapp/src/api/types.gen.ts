@@ -975,16 +975,6 @@ export type UpdateRepositorySettingsRequest = {
 };
 
 /**
- * Set how much autonomy the system has here, or clear it back to inherit
- */
-export type UpdatePracticeReviewTierRequest = {
-    /**
-     * OFF = not reviewed at all · PROPOSE = the review runs and every observation is recorded, and nothing is sent · DELIVER = feedback is delivered without asking. Send null (or omit the field) to hold no tier here and inherit — a practice inherits its area's, an area inherits the workspace default.
-     */
-    reviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
-};
-
-/**
  * Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.
  */
 export type UpdatePracticeReviewSettingsRequest = {
@@ -993,9 +983,9 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     cooldownMinutes?: number;
     /**
-     * How much autonomy the system has over practices and areas that hold no tier of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet.
+     * How much autonomy the system has over practices and areas that hold no autonomy of their own. The one decision that moves a whole workspace at once. Null leaves it unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it.
      */
-    defaultReviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
+    defaultAutonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     /**
      * Deliver feedback to already-merged PRs/MRs
      */
@@ -1003,15 +993,11 @@ export type UpdatePracticeReviewSettingsRequest = {
     /**
      * Fields to reset back to inherit
      */
-    reset?: Array<'RUN_FOR_ALL_USERS' | 'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_REVIEW_TIER'>;
+    reset?: Array<'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_AUTONOMY'>;
     /**
      * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
      */
     reviewScope?: WorkspaceReviewScope;
-    /**
-     * Run practice review for all developers (vs only the run_practice_review role)
-     */
-    runForAllUsers?: boolean;
 };
 
 /**
@@ -1192,6 +1178,16 @@ export type BindPracticeAreaRequest = {
      * Destination area slug; omit or set to null for Unassigned
      */
     areaSlug?: string | null;
+};
+
+/**
+ * Set how much autonomy the system has here, or clear it back to inherit
+ */
+export type UpdatePracticeAutonomyRequest = {
+    /**
+     * Local autonomy override. Null inherits from the area or workspace.
+     */
+    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
 };
 
 /**
@@ -1459,7 +1455,7 @@ export type TracedSignal = {
     /**
      * Why it ended in that state; null once it triggered a review
      */
-    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
 };
 
 /**
@@ -1897,76 +1893,6 @@ export type RevokeSessionsResult = {
 };
 
 /**
- * Practice counts per autonomy tier, for the workspace and for each of its areas
- */
-export type ReviewTierRollup = {
-    /**
-     * The same counts per area, in catalogue order
-     */
-    areas: Array<AreaReviewTierRollup>;
-    /**
-     * Practice count per effective tier across the whole workspace; every tier is a key
-     */
-    counts: {
-        [key: string]: number;
-    };
-    /**
-     * The workspace-level decision every area and practice falls back to
-     */
-    workspaceDefault: ReviewTierAssignment;
-};
-
-/**
- * The autonomy tier in force here, whether it was set here or inherited, and the level that decided it
- */
-export type ReviewTierAssignment = {
-    /**
-     * The tier actually in force. OFF = not reviewed · PROPOSE = reviewed and recorded, feedback held back and nothing sent · DELIVER = feedback delivered without asking
-     */
-    effective: 'OFF' | 'PROPOSE' | 'DELIVER';
-    /**
-     * True when this practice or area holds no tier of its own and follows a level above
-     */
-    inherited: boolean;
-    /**
-     * The tier set on this practice or area itself, or null when it holds none and inherits. Send null to the tier endpoint to clear it back to this state.
-     */
-    override?: 'OFF' | 'PROPOSE' | 'DELIVER';
-    /**
-     * Which level decided the effective tier: PRACTICE, AREA or WORKSPACE
-     */
-    source: 'PRACTICE' | 'AREA' | 'WORKSPACE';
-};
-
-/**
- * One area's practice counts per effective tier, and the area's own tier
- */
-export type AreaReviewTierRollup = {
-    /**
-     * Area name; null for the no-area group
-     */
-    areaName?: string;
-    /**
-     * Area slug; null groups the practices that belong to no area
-     */
-    areaSlug?: string;
-    /**
-     * Practice count per effective tier in this area; every tier is a key
-     */
-    counts: {
-        [key: string]: number;
-    };
-    /**
-     * How many of this area's practices set their own tier rather than inheriting
-     */
-    overriddenCount: number;
-    /**
-     * The tier in force for this area, and where it came from
-     */
-    reviewTier: ReviewTierAssignment;
-};
-
-/**
  * A standing instruction to review recent work on a cadence, as an admin sees it.
  */
 export type ReviewSweepSchedule = {
@@ -2076,7 +2002,7 @@ export type ReviewRequestOutcome = {
     /**
      * The controlled-vocabulary reason nothing was started; absent when a review was started
      */
-    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_TIER_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
     /**
      * The reason as one sentence for the person who asked. Render it verbatim: it is written next to the reason it explains so that every surface says the same thing, and a re-worded copy is how a screen and a support answer come to disagree.
      */
@@ -2195,7 +2121,7 @@ export type ReviewBoundFeedback = {
      * When the message was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     feedbackId: string;
     /**
      * Whether the observation led the feedback or reinforced it
@@ -2204,7 +2130,7 @@ export type ReviewBoundFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -2349,7 +2275,7 @@ export type ReviewFeedbackDetail = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Source observations in render order
@@ -2374,7 +2300,7 @@ export type ReviewFeedbackDetail = {
     /**
      * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -2434,7 +2360,7 @@ export type ReviewFeedback = {
      * When the feedback was placed; null if it was not delivered
      */
     deliveredAt?: Date;
-    deliveryState: 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED';
+    deliveryState: 'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED';
     id: string;
     /**
      * Number of observations used to compose the feedback
@@ -2455,7 +2381,7 @@ export type ReviewFeedback = {
     /**
      * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -3127,6 +3053,10 @@ export type PracticeEvidenceSourceOption = {
  */
 export type PracticeTraceEntry = {
     /**
+     * How much autonomy the workspace currently gives this practice, after inheritance
+     */
+    autonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    /**
      * When the answer was settled
      */
     decidedAt?: Date;
@@ -3158,17 +3088,13 @@ export type PracticeTraceEntry = {
      */
     reviewId?: string;
     /**
-     * How much autonomy the workspace currently gives this practice, after inheritance
-     */
-    reviewTier: 'OFF' | 'PROPOSE' | 'DELIVER';
-    /**
      * The signals this practice watches
      */
     watches: Array<string>;
     /**
      * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
      */
-    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
+    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
 };
 
 /**
@@ -3184,13 +3110,13 @@ export type PracticeReviewSettings = {
      */
     cooldownMinutesOverride?: number;
     /**
-     * Effective: how much autonomy the system has over practices and areas that hold no tier of their own — the bottom of the practice → area → workspace chain
+     * Effective: how much autonomy the system has over practices and areas that hold no autonomy of their own — the bottom of the practice → area → workspace chain
      */
-    defaultReviewTier: 'OFF' | 'PROPOSE' | 'DELIVER';
+    defaultAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     /**
-     * Raw override; null = this workspace has never chosen, so DELIVER applies
+     * Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies
      */
-    defaultReviewTierOverride?: 'OFF' | 'PROPOSE' | 'DELIVER';
+    defaultAutonomyOverride?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     /**
      * Effective: deliver feedback to merged PRs/MRs
      */
@@ -3203,14 +3129,6 @@ export type PracticeReviewSettings = {
      * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
      */
     reviewScope: WorkspaceReviewScope;
-    /**
-     * Effective: run practice review for all developers
-     */
-    runForAllUsers: boolean;
-    /**
-     * Raw override; null = inheriting the fleet default
-     */
-    runForAllUsersOverride?: boolean;
 };
 
 /**
@@ -3290,6 +3208,10 @@ export type PracticeAutomatedReviewValidation = {
  * A practice area grouping related practices into a learning objective
  */
 export type PracticeArea = {
+    /**
+     * How much autonomy the system has over every practice in this area that holds no autonomy of its own, whether that was set here or inherited from the workspace, and which level decided it
+     */
+    autonomy: AutonomyAssignment;
     catalogOrigin?: CatalogOrigin;
     /**
      * Optional palette colour key for the area's chip
@@ -3320,10 +3242,6 @@ export type PracticeArea = {
      */
     name: string;
     /**
-     * How much autonomy the system has over every practice in this area that holds no tier of its own, whether that was set here or inherited from the workspace, and which level decided it
-     */
-    reviewTier: ReviewTierAssignment;
-    /**
      * URL-safe identifier unique within the workspace
      */
     slug: string;
@@ -3353,6 +3271,28 @@ export type CatalogOrigin = {
 };
 
 /**
+ * The autonomy in force here, whether it was set here or inherited, and the level that decided it
+ */
+export type AutonomyAssignment = {
+    /**
+     * The autonomy actually in force
+     */
+    effective: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    /**
+     * Whether autonomy is inherited
+     */
+    inherited: boolean;
+    /**
+     * The local override, or null when autonomy is inherited
+     */
+    override?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    /**
+     * Which level decided the effective autonomy
+     */
+    source: 'PRACTICE' | 'AREA' | 'WORKSPACE';
+};
+
+/**
  * Practice definition for evaluating developer contributions
  */
 export type Practice = {
@@ -3366,6 +3306,10 @@ export type Practice = {
     artifactKind: string;
     automatedReviewPolicy: PracticeAutomatedReviewPolicy;
     automatedReviewValidation: PracticeAutomatedReviewValidation;
+    /**
+     * How much autonomy the system has over this practice, whether that was set here or inherited from its area or workspace, and which level decided it
+     */
+    autonomy: AutonomyAssignment;
     /**
      * The one occasion this practice is reviewed on, with the evidence that review reads
      */
@@ -3395,10 +3339,6 @@ export type Practice = {
      * TypeScript/Bun precompute script for static analysis before AI review
      */
     precomputeScript?: string;
-    /**
-     * How much autonomy the system has over this practice, whether that was set here or inherited from its area or workspace, and which level decided it
-     */
-    reviewTier: ReviewTierAssignment;
     /**
      * URL-safe identifier unique within workspace
      */
@@ -4564,6 +4504,15 @@ export type GitLabGroup = {
     webUrl?: string;
 };
 
+export type FeedbackApproval = {
+    actorAccountId?: number;
+    decidedAt?: Date;
+    decision?: 'APPROVED' | 'REJECTED';
+    feedbackId?: string;
+    rejectionNote?: string;
+    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
+};
+
 /**
  * Feature flags evaluated for the current user
  */
@@ -4584,14 +4533,6 @@ export type FeatureFlags = {
      * User can receive notifications
      */
     NOTIFICATION_ACCESS?: boolean;
-    /**
-     * Practice review runs for all users regardless of role
-     */
-    PRACTICE_REVIEW_FOR_ALL?: boolean;
-    /**
-     * User's PRs trigger practice review
-     */
-    RUN_PRACTICE_REVIEW?: boolean;
 };
 
 /**
@@ -4641,6 +4582,12 @@ export type DeveloperPracticeSummary = {
      * Total number of observations
      */
     totalObservations: number;
+};
+
+export type DecideFeedbackProposalRequest = {
+    decision: 'APPROVED' | 'REJECTED';
+    rejectionNote?: string;
+    rejectionReason?: 'INCORRECT' | 'MISSING_CONTEXT' | 'UNHELPFUL' | 'DUPLICATE' | 'INAPPROPRIATE_PLACEMENT' | 'OTHER';
 };
 
 export type CurrentUserView = {
@@ -5443,6 +5390,54 @@ export type AvailableLlmModel = {
      * Whether the model supports a reasoning mode
      */
     supportsReasoning: boolean;
+};
+
+/**
+ * Practice counts per autonomy state, for the workspace and each area
+ */
+export type AutonomyRollup = {
+    /**
+     * The same counts per area, in catalogue order
+     */
+    areas: Array<AreaAutonomyRollup>;
+    /**
+     * Practice count per effective autonomy across the workspace
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * The workspace-level decision every area and practice falls back to
+     */
+    workspaceDefault: AutonomyAssignment;
+};
+
+/**
+ * One area's practice counts per effective autonomy state
+ */
+export type AreaAutonomyRollup = {
+    /**
+     * Area name; null for the no-area group
+     */
+    areaName?: string;
+    /**
+     * Area slug; null groups the practices that belong to no area
+     */
+    areaSlug?: string;
+    /**
+     * The autonomy in force for this area, and where it came from
+     */
+    autonomy: AutonomyAssignment;
+    /**
+     * Practice count per effective autonomy in this area
+     */
+    counts: {
+        [key: string]: number;
+    };
+    /**
+     * Number of practices with an explicit autonomy override
+     */
+    overriddenCount: number;
 };
 
 /**
@@ -9099,8 +9094,8 @@ export type UpdateAreaResponses = {
 
 export type UpdateAreaResponse = UpdateAreaResponses[keyof UpdateAreaResponses];
 
-export type SetAreaReviewTierData = {
-    body: UpdatePracticeReviewTierRequest;
+export type SetAreaAutonomyData = {
+    body: UpdatePracticeAutonomyRequest;
     path: {
         /**
          * Workspace slug
@@ -9109,28 +9104,24 @@ export type SetAreaReviewTierData = {
         areaSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier';
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/autonomy';
 };
 
-export type SetAreaReviewTierErrors = {
-    /**
-     * PROPOSE cannot be selected yet: there is no approval queue for the feedback it would prepare
-     */
-    400: unknown;
+export type SetAreaAutonomyErrors = {
     /**
      * Area not found
      */
     404: unknown;
 };
 
-export type SetAreaReviewTierResponses = {
+export type SetAreaAutonomyResponses = {
     /**
-     * Tier updated; the response carries the tier now in force and where it came from
+     * Autonomy updated; the response carries the autonomy now in force and where it came from
      */
     200: PracticeArea;
 };
 
-export type SetAreaReviewTierResponse = SetAreaReviewTierResponses[keyof SetAreaReviewTierResponses];
+export type SetAreaAutonomyResponse = SetAreaAutonomyResponses[keyof SetAreaAutonomyResponses];
 
 export type GetCuratedPracticeCatalogEntryData = {
     body?: never;
@@ -9164,9 +9155,9 @@ export type ListPracticesData = {
     };
     query?: {
         /**
-         * Keep only the practices whose tier IN FORCE is exactly this one, inherited or not
+         * Keep only the practices whose autonomy IN FORCE is exactly this one, inherited or not
          */
-        reviewTier?: 'OFF' | 'PROPOSE' | 'DELIVER';
+        autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
     };
     url: '/workspaces/{workspaceSlug}/practices';
 };
@@ -9213,6 +9204,27 @@ export type CreatePracticeResponses = {
 };
 
 export type CreatePracticeResponse = CreatePracticeResponses[keyof CreatePracticeResponses];
+
+export type AutonomyRollupData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/autonomy';
+};
+
+export type AutonomyRollupResponses = {
+    /**
+     * Rollup returned
+     */
+    200: AutonomyRollup;
+};
+
+export type AutonomyRollupResponse = AutonomyRollupResponses[keyof AutonomyRollupResponses];
 
 export type ListBackfillRunsData = {
     body?: never;
@@ -9720,27 +9732,6 @@ export type UpdatePracticeReviewSettingsResponses = {
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
 
-export type ReviewTierRollupData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/review-tiers';
-};
-
-export type ReviewTierRollupResponses = {
-    /**
-     * Rollup returned
-     */
-    200: ReviewTierRollup;
-};
-
-export type ReviewTierRollupResponse = ReviewTierRollupResponses[keyof ReviewTierRollupResponses];
-
 export type ListPracticeReviewsData = {
     body?: never;
     path: {
@@ -9815,8 +9806,8 @@ export type ListPracticeReviewFeedbackData = {
     query?: {
         page?: number;
         size?: number;
-        deliveryState?: Array<'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'PRACTICE_TIER_QUIET' | 'BACKFILL_QUIET'>;
+        deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;
         /**
@@ -9888,6 +9879,50 @@ export type GetPracticeReviewFeedbackResponses = {
 };
 
 export type GetPracticeReviewFeedbackResponse = GetPracticeReviewFeedbackResponses[keyof GetPracticeReviewFeedbackResponses];
+
+export type GetFeedbackProposalDecisionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/approval';
+};
+
+export type GetFeedbackProposalDecisionResponses = {
+    /**
+     * OK
+     */
+    200: FeedbackApproval;
+};
+
+export type GetFeedbackProposalDecisionResponse = GetFeedbackProposalDecisionResponses[keyof GetFeedbackProposalDecisionResponses];
+
+export type DecideFeedbackProposalData = {
+    body: DecideFeedbackProposalRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/reviews/feedback/{feedbackId}/approval';
+};
+
+export type DecideFeedbackProposalResponses = {
+    /**
+     * OK
+     */
+    200: FeedbackApproval;
+};
+
+export type DecideFeedbackProposalResponse = DecideFeedbackProposalResponses[keyof DecideFeedbackProposalResponses];
 
 export type ListPracticeReviewObservationsData = {
     body?: never;
@@ -10300,6 +10335,41 @@ export type BindAreaResponses = {
 
 export type BindAreaResponse = BindAreaResponses[keyof BindAreaResponses];
 
+export type SetAutonomyData = {
+    body: UpdatePracticeAutonomyRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        practiceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/autonomy';
+};
+
+export type SetAutonomyErrors = {
+    /**
+     * The autonomy cannot be selected because this practice's review settings cannot run an automated review at any autonomy above OFF
+     */
+    400: ProblemDetail;
+    /**
+     * Practice not found
+     */
+    404: ProblemDetail;
+};
+
+export type SetAutonomyError = SetAutonomyErrors[keyof SetAutonomyErrors];
+
+export type SetAutonomyResponses = {
+    /**
+     * Autonomy updated; the response carries the autonomy now in force and where it came from
+     */
+    200: Practice;
+};
+
+export type SetAutonomyResponse = SetAutonomyResponses[keyof SetAutonomyResponses];
+
 export type PlacePracticeData = {
     body: PlacePracticeRequest;
     path: {
@@ -10334,41 +10404,6 @@ export type PlacePracticeResponses = {
 };
 
 export type PlacePracticeResponse = PlacePracticeResponses[keyof PlacePracticeResponses];
-
-export type SetReviewTierData = {
-    body: UpdatePracticeReviewTierRequest;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        practiceSlug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier';
-};
-
-export type SetReviewTierErrors = {
-    /**
-     * The tier cannot be selected: PROPOSE has no approval queue yet, or this practice's review settings cannot run an automated review at any tier above OFF
-     */
-    400: ProblemDetail;
-    /**
-     * Practice not found
-     */
-    404: ProblemDetail;
-};
-
-export type SetReviewTierError = SetReviewTierErrors[keyof SetReviewTierErrors];
-
-export type SetReviewTierResponses = {
-    /**
-     * Tier updated; the response carries the tier now in force and where it came from
-     */
-    200: Practice;
-};
-
-export type SetReviewTierResponse = SetReviewTierResponses[keyof SetReviewTierResponses];
 
 export type GetUserProfileData = {
     body?: never;

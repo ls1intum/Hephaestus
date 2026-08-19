@@ -15,7 +15,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierRollupService;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyRollupService;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -54,7 +54,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
     }
 
     /**
-     * The tier in force is the bottom of a chain that ends at the workspace, so a hundred-row response
+     * The autonomy in force is the bottom of a chain that ends at the workspace, so a hundred-row response
      * must not ask the workspace a hundred times either.
      */
     @Test
@@ -108,7 +108,7 @@ class CatalogOriginPresentationTest extends BaseUnitTest {
         PracticeCatalogController controller = new PracticeCatalogController(
             service,
             presenter,
-            mock(ReviewTierRollupService.class),
+            mock(AutonomyRollupService.class),
             mock(PracticeAreaService.class),
             mock(PracticeDefinitionOptionsService.class)
         );

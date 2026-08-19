@@ -37,7 +37,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -114,7 +114,7 @@ class AgentJobServiceTest extends BaseUnitTest {
             handlerRegistry,
             objectMapper,
             transactionTemplate,
-            new PracticeReviewProperties(false, false, 15, 5, false, false),
+            new PracticeReviewProperties(false, 15, 5, false, false),
             practiceRepository,
             llmBudgetService,
             llmModelResolver,
@@ -127,11 +127,11 @@ class AgentJobServiceTest extends BaseUnitTest {
         workspace.setStatus(Workspace.WorkspaceStatus.ACTIVE);
         workspace.getFeatures().setPracticesEnabled(true);
         lenient().when(workspaceRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(workspace));
-        // One pull-request practice that says nothing about its own tier, so it inherits the workspace's —
-        // and the workspace has expressed no opinion either, so the chain bottoms out at DELIVER, which
+        // One pull-request practice that says nothing about its own autonomy, so it inherits the workspace's —
+        // and the workspace has expressed no opinion either, so the chain bottoms out at AUTOMATIC, which
         // admits a review.
         lenient()
-            .when(practiceRepository.findReviewTierRows(anyLong()))
+            .when(practiceRepository.findAutonomyRows(anyLong()))
             .thenReturn(List.of(tierRow(null, ArtifactKinds.PULL_REQUEST)));
 
         enabledBinding = new WorkspaceAgentBinding();
@@ -167,21 +167,21 @@ class AgentJobServiceTest extends BaseUnitTest {
     }
 
     /**
-     * One row of {@link PracticeRepository#findReviewTierRows} — a practice's raw tier column and its
+     * One row of {@link PracticeRepository#findAutonomyRows} — a practice's raw autonomy column and its
      * area's, ungrouped here so the chain runs practice → workspace.
      */
-    private static PracticeRepository.PracticeTierRow tierRow(
-        @Nullable PracticeReviewTier practiceTier,
+    private static PracticeRepository.PracticeAutonomyRow tierRow(
+        @Nullable PracticeAutonomy practiceAutonomy,
         ArtifactKind artifactKind
     ) {
-        return new PracticeRepository.PracticeTierRow() {
+        return new PracticeRepository.PracticeAutonomyRow() {
             @Override
-            public PracticeReviewTier getPracticeTier() {
-                return practiceTier;
+            public PracticeAutonomy getPracticeAutonomy() {
+                return practiceAutonomy;
             }
 
             @Override
-            public PracticeReviewTier getAreaTier() {
+            public PracticeAutonomy getAreaAutonomy() {
                 return null;
             }
 
@@ -297,10 +297,10 @@ class AgentJobServiceTest extends BaseUnitTest {
         void shouldNotSubmitWithoutAnActivePracticeForTheReviewedWork() {
             when(workspaceRepository.findById(1L)).thenReturn(Optional.of(workspace));
             // The workspace has a conversation practice, and it is switched OFF — the case that has to read
-            // differently from "nothing is bound to this work at all", and the reason the tier survives to
+            // differently from "nothing is bound to this work at all", and the reason the autonomy survives to
             // the JVM instead of being filtered away in SQL.
-            when(practiceRepository.findReviewTierRows(1L)).thenReturn(
-                List.of(tierRow(PracticeReviewTier.OFF, ArtifactKinds.CONVERSATION_THREAD))
+            when(practiceRepository.findAutonomyRows(1L)).thenReturn(
+                List.of(tierRow(PracticeAutonomy.OFF, ArtifactKinds.CONVERSATION_THREAD))
             );
             JobTypeHandler handler = mock(JobTypeHandler.class);
             when(handlerRegistry.getHandler(AgentJobType.CONVERSATION_REVIEW)).thenReturn(handler);

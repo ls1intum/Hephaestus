@@ -8,36 +8,36 @@ to maintain the catalog.
 
 The effective catalog combines three scopes:
 
-| Scope | Source | Owner | Effect |
-| --- | --- | --- | --- |
-| Hephaestus defaults | `default-catalog.json` and its precompute scripts | repository maintainers | provides bundled definitions and order |
-| Instance catalog | bundled defaults plus sparse database overrides | instance administrators | defines what new workspaces receive |
-| Workspace practices | independent database copies | workspace administrators | defines reviews in one workspace |
+| Scope               | Source                                            | Owner                    | Effect                                 |
+| ------------------- | ------------------------------------------------- | ------------------------ | -------------------------------------- |
+| Hephaestus defaults | `default-catalog.json` and its precompute scripts | repository maintainers   | provides bundled definitions and order |
+| Instance catalog    | bundled defaults plus sparse database overrides   | instance administrators  | defines what new workspaces receive    |
+| Workspace practices | independent database copies                       | workspace administrators | defines reviews in one workspace       |
 
 The same definition fields are used at all three scopes. What changes is who owns the value and when
 it propagates:
 
-| Decision | Hephaestus defaults | Instance catalog | Workspace practices |
-| --- | --- | --- | --- |
-| Name, criteria, and guidance | maintained in the repository | inherited or customized by an instance administrator | copied at workspace creation, then owned by the workspace |
-| Binding — the one occasion a practice is reviewed on and the evidence it reads | declared as `on` in the bundled catalog; optional precompute input is explicit | inherited or customized in the practice form | copied, then customizable in the same practice form |
-| Review frame — contract version, review mode, known limitations | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form | copied, then customizable in the same practice form |
-| Included in new workspaces | default is included | instance administrator can include or exclude | not applicable after installation |
-| Autonomy tier | not a repository setting | not a curated-catalog setting | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
-| Review scope | not a repository setting | not a curated-catalog setting | workspace administrator sets it once for the whole workspace |
-| Area and order | JSON array order | inherited or changed with drag-and-drop or move actions | copied, then independently managed |
+| Decision                                                                       | Hephaestus defaults                                                                     | Instance catalog                                        | Workspace practices                                                                         |
+| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Name, criteria, and guidance                                                   | maintained in the repository                                                            | inherited or customized by an instance administrator    | copied at workspace creation, then owned by the workspace                                   |
+| Binding — the one occasion a practice is reviewed on and the evidence it reads | declared as `on` in the bundled catalog; optional precompute input is explicit          | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
+| Review frame — contract version, review mode, known limitations                | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
+| Included in new workspaces                                                     | default is included                                                                     | instance administrator can include or exclude           | not applicable after installation                                                           |
+| Practice autonomy                                                              | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
+| Review scope                                                                   | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator sets it once for the whole workspace                                |
+| Area and order                                                                 | JSON array order                                                                        | inherited or changed with drag-and-drop or move actions | copied, then independently managed                                                          |
 
 This is a one-way lifecycle: a repository update can update an uncustomized instance definition, and
 an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
 definition or an existing workspace.
 
-| Stakeholder | Primary task | Deliberately not their task |
-| --- | --- | --- |
-| Practice author | Define the habit, guidance, and responsible mentoring support | Authorize collection or certify review accuracy |
-| Instance administrator | Curate the defaults offered to new workspaces | Rewrite existing workspace practices |
-| Workspace administrator | Adapt practices, set the workspace default tier and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance |
-| Instance operator | Approve source purposes, privacy, retention, and erasure coverage | Decide that connected evidence proves a practice |
-| Developer, peer, or mentor | Use observations and available human context in a review | Supply hidden context to Hephaestus implicitly |
+| Stakeholder                | Primary task                                                                                                               | Deliberately not their task                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Practice author            | Define the habit, guidance, and responsible mentoring support                                                              | Authorize collection or certify review accuracy  |
+| Instance administrator     | Curate the defaults offered to new workspaces                                                                              | Rewrite existing workspace practices             |
+| Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
+| Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                          | Decide that connected evidence proves a practice |
+| Developer, peer, or mentor | Use observations and available human context in a review                                                                   | Supply hidden context to Hephaestus implicitly   |
 
 ## Authoring experience
 
@@ -74,7 +74,7 @@ settings:
   while a developer, peer, or mentor may still review it from context the system does not collect.
   It still names its occasion — that is where its artifact kind comes from, and saying what a
   practice is about was never the same claim as asking Hephaestus to act on it — but it cannot define
-  a static-analysis script and its autonomy tier is forced to `OFF`.
+  a static-analysis script and its autonomy is forced to `OFF`.
 - **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
 The binding starts with the recommended evidence for its work type. Most authors should keep it.
@@ -87,14 +87,14 @@ workspace integrations remain separate gates.
 
 ### Example: explain what changed and why
 
-| Field | Definition |
-| --- | --- |
-| Name | Explain what changed and why |
-| Review this kind of work | Pull or merge request |
-| What to look for | Look for a description that explains the behavior change and why. Stay silent for automated dependency updates. |
-| Why it matters | Reviewers can judge a change faster when they understand its purpose. |
-| What good looks like | “This changes retry behavior so temporary network failures no longer end the sync.” |
-| Hephaestus support | AI-supported mentoring with the recommended bindings and evidence |
+| Field                    | Definition                                                                                                      |
+| ------------------------ | --------------------------------------------------------------------------------------------------------------- |
+| Name                     | Explain what changed and why                                                                                    |
+| Review this kind of work | Pull or merge request                                                                                           |
+| What to look for         | Look for a description that explains the behavior change and why. Stay silent for automated dependency updates. |
+| Why it matters           | Reviewers can judge a change faster when they understand its purpose.                                           |
+| What good looks like     | “This changes retry behavior so temporary network failures no longer end the sync.”                             |
+| Hephaestus support       | AI-supported mentoring with the recommended bindings and evidence                                               |
 
 The author does not choose source-contract identifiers or runtime states in this common path. If the
 required pull-request details or diff are missing, or captured less completely than their contract
@@ -132,14 +132,14 @@ definition change and is audited.
 
 Each effective entry is resolved from the running bundled definition and any instance override:
 
-| Existing instance state | Effective result after upgrade | Admin-page state |
-| --- | --- | --- |
-| Default not customized | new bundled definition | no badge |
-| Customized; bundled definition unchanged | saved customization | **Customized on this instance** |
-| Customized; bundled definition changed | saved customization | **Hephaestus update available** |
-| Instance-created entry | saved definition | **No Hephaestus default** |
-| Uncustomized default removed | entry disappears | — |
-| Customized default removed | saved customization | **Removed from Hephaestus defaults** |
+| Existing instance state                  | Effective result after upgrade | Admin-page state                     |
+| ---------------------------------------- | ------------------------------ | ------------------------------------ |
+| Default not customized                   | new bundled definition         | no badge                             |
+| Customized; bundled definition unchanged | saved customization            | **Customized on this instance**      |
+| Customized; bundled definition changed   | saved customization            | **Hephaestus update available**      |
+| Instance-created entry                   | saved definition               | **No Hephaestus default**            |
+| Uncustomized default removed             | entry disappears               | —                                    |
+| Customized default removed               | saved customization            | **Removed from Hephaestus defaults** |
 
 An update never replaces a customization silently. Administrators can inspect the complete bundled
 definition and whether applying it changes review rules, guidance, or area appearance. Applying an
@@ -172,13 +172,14 @@ covers name, description, icon, and color; position is excluded.
 
 ## Turning a practice down
 
-Autonomy is a workspace decision, not a catalog one: a practice's `reviewTier` and the workspace's review
+Autonomy is a workspace decision, not a catalog one: a practice's `autonomy` and the workspace's review
 scope both live outside the curated catalogue, and a curator never sets either. The
-[practice review glossary](./practice-review-glossary.mdx) defines both in full — the three tiers, what each
-one does, and the refusal reasons an out-of-scope or tier-`OFF` artifact records.
+[practice review glossary](./practice-review-glossary.mdx) defines both in full — the three autonomy states, what each
+one does, and the refusal reasons an out-of-scope or autonomy-`OFF` artifact records.
 
-What matters for curation is only this: turning a noisy practice down does **not** stop measuring it, so
-"this practice is too noisy" is never a reason to remove it from the catalogue.
+What matters for curation is only this: move a noisy but still meaningful practice to `HUMAN_APPROVAL` so
+measurement continues under supervised release. Use `OFF` when the practice itself should not run; neither
+operational choice changes the curated definition.
 
 ## Selecting a practice
 
@@ -200,7 +201,7 @@ is a declaration and nothing more — the product validates no policy independen
 policy carries the single status `AUTHOR_DECLARED` to say so. Requirements also say nothing about whether
 a developer, peer, or human mentor can review the practice outside the governed integrations.
 
-The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its *inputs* change rather
+The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its _inputs_ change rather
 than the rules, so a stored fingerprint is never compared against one computed from a different set of
 facts. Each scheme retains its original meaning, so two schemes never compare equal by accident. Bump the
 prefix in the same change that alters the input set.
@@ -210,11 +211,11 @@ act, such as recording a decision, without turning it into a claim about the who
 
 Classify evidence accurately:
 
-| Classification | Requirement |
-| --- | --- |
-| Peer-reviewed evidence | an empirical study directly supports the claimed relationship |
+| Classification                 | Requirement                                                          |
+| ------------------------------ | -------------------------------------------------------------------- |
+| Peer-reviewed evidence         | an empirical study directly supports the claimed relationship        |
 | Standard or canonical guidance | a recognized standard or established engineering guide recommends it |
-| Practitioner norm | a community convention with no controlled-outcome claim |
+| Practitioner norm              | a community convention with no controlled-outcome claim              |
 
 Record exact sources in the proposal or pull request that changes the practice. Do not present a
 standard as an experiment or a convention as a proven outcome.

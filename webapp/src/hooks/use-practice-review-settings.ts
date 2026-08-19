@@ -1,10 +1,10 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+	autonomyRollupQueryKey,
 	getPracticeReviewSettingsQueryKey,
 	listAreasQueryKey,
 	listPracticesQueryKey,
-	reviewTierRollupQueryKey,
 	updatePracticeReviewSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
@@ -17,7 +17,7 @@ export type PracticeReviewSettingsField = NonNullable<
 /**
  * One place that knows what a write to this resource invalidates, because two screens write it. The
  * workspace default sits at the bottom of the practice → area → workspace chain, so changing it
- * changes the tier in force on everything holding none of its own — and none of that is in the
+ * changes the autonomy in force on everything holding none of its own — and none of that is in the
  * response.
  */
 export function usePracticeReviewSettingsMutation(
@@ -51,9 +51,8 @@ export function usePracticeReviewSettingsMutation(
 		onSettled: () => {
 			if (queryClient.isMutating({ mutationKey }) !== 1) return;
 			void queryClient.invalidateQueries({ queryKey: settingsQueryKey });
-			// Only the server resolves the chain, so everything downstream of the default is now a guess.
 			void queryClient.invalidateQueries({
-				queryKey: reviewTierRollupQueryKey({ path: { workspaceSlug } }),
+				queryKey: autonomyRollupQueryKey({ path: { workspaceSlug } }),
 			});
 			void queryClient.invalidateQueries({
 				queryKey: listPracticesQueryKey({ path: { workspaceSlug } }),
@@ -84,23 +83,17 @@ export function patchReviewSettings(
 					deliverToMerged: patch.deliverToMerged,
 					deliverToMergedOverride: patch.deliverToMerged,
 				}),
-		...(patch.runForAllUsers === undefined
-			? {}
-			: {
-					runForAllUsers: patch.runForAllUsers,
-					runForAllUsersOverride: patch.runForAllUsers,
-				}),
 		...(patch.cooldownMinutes === undefined
 			? {}
 			: {
 					cooldownMinutes: patch.cooldownMinutes,
 					cooldownMinutesOverride: patch.cooldownMinutes,
 				}),
-		...(patch.defaultReviewTier === undefined
+		...(patch.defaultAutonomy === undefined
 			? {}
 			: {
-					defaultReviewTier: patch.defaultReviewTier,
-					defaultReviewTierOverride: patch.defaultReviewTier,
+					defaultAutonomy: patch.defaultAutonomy,
+					defaultAutonomyOverride: patch.defaultAutonomy,
 				}),
 		// The scope has no separate "override" key: it replaces wholesale and an empty scope already
 		// means "unrestricted", so the effective value is the only value there is.

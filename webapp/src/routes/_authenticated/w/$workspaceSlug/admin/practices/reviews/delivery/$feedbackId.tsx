@@ -1,11 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
+import { toast } from "sonner";
 import {
+	decideFeedbackProposalMutation,
 	getPracticeReviewFeedbackOptions,
 	listPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
 import { FeedbackDetailPage } from "@/components/admin/practice-reviews/FeedbackDetailPage";
+import {
+	type ProposalRejectionReason,
+	ProposalReviewPage,
+} from "@/components/admin/practice-reviews/ProposalReviewPage";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/reviews/delivery/$feedbackId",
@@ -22,12 +29,49 @@ function FeedbackDetailRoute() {
 		...getPracticeReviewFeedbackOptions({ path: { workspaceSlug, feedbackId } }),
 	});
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
+	const decision = useMutation({
+		...decideFeedbackProposalMutation(),
+		onSuccess: async (_, variables) => {
+			toast.success(
+				variables.body.decision === "APPROVED"
+					? "Feedback approved for delivery"
+					: "Proposal rejected",
+			);
+			await feedbackQueryResult.refetch();
+		},
+		onError: (error) =>
+			toast.error("Couldn't decide this proposal", { description: problemDetailOf(error) }),
+	});
+
+	const feedback = feedbackQueryResult.data;
+	if (feedback?.deliveryState === "AWAITING_APPROVAL") {
+		return (
+			<ProposalReviewPage
+				workspaceSlug={workspaceSlug}
+				feedback={feedback}
+				practices={practicesQuery.data}
+				isDeciding={decision.isPending}
+				onApprove={(id) =>
+					decision.mutate({
+						path: { workspaceSlug, feedbackId: id },
+						body: { decision: "APPROVED" },
+					})
+				}
+				onReject={(id, rejectionReason?: ProposalRejectionReason, rejectionNote?: string) =>
+					decision.mutate({
+						path: { workspaceSlug, feedbackId: id },
+						body: { decision: "REJECTED", rejectionReason, rejectionNote },
+					})
+				}
+			/>
+		);
+	}
 
 	return (
 		<FeedbackDetailPage
 			workspaceSlug={workspaceSlug}
 			search={search}
-			feedback={feedbackQueryResult.data}
+			feedback={feedback}
 			isLoading={feedbackQueryResult.isLoading}
 			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
 			onRetry={() => feedbackQueryResult.refetch()}

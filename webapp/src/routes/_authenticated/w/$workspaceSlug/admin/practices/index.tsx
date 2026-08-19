@@ -65,8 +65,8 @@ function PracticeCatalogRoute() {
 				description={
 					<>
 						Define practices and group them into areas. Changes apply to this workspace only. The
-						autonomy tier — whether each practice is reviewed, and how far its reviews go on their
-						own — is set on{" "}
+						autonomy — whether each practice is reviewed, and how far its reviews go on their own —
+						is set on{" "}
 						<Link
 							to="/w/$workspaceSlug/admin/practices/review"
 							params={{ workspaceSlug }}

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
+	autonomyRollupQueryKey,
 	createAreaMutation,
 	deleteAreaMutation,
 	deletePracticeMutation,
@@ -10,7 +11,6 @@ import {
 	listPracticesQueryKey,
 	placePracticeMutation,
 	reorderAreasMutation,
-	reviewTierRollupQueryKey,
 	updateAreaMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
@@ -61,25 +61,21 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		}
 	};
 
-	// The per-tier rollup is a server-resolved projection of this catalogue: every tier written here,
-	// and every practice created, deleted or moved between areas, changes a count in it. Nothing on
-	// this screen renders it, which is exactly why it has to be invalidated from here — the autonomy
-	// screen shares the cache and would otherwise open on the numbers from before the last edit.
-	const invalidateReviewTierRollup = () => {
+	const invalidateAutonomyRollup = () => {
 		void queryClient.invalidateQueries({
-			queryKey: reviewTierRollupQueryKey({ path: { workspaceSlug } }),
+			queryKey: autonomyRollupQueryKey({ path: { workspaceSlug } }),
 		});
 	};
 	const invalidateAreasAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: areaMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: areasQueryKey });
-			invalidateReviewTierRollup();
+			invalidateAutonomyRollup();
 		}
 	};
 	const invalidatePracticesAfterLastWrite = () => {
 		if (queryClient.isMutating({ mutationKey: practiceMutationKey }) === 1) {
 			void queryClient.invalidateQueries({ queryKey: practicesQueryKey });
-			invalidateReviewTierRollup();
+			invalidateAutonomyRollup();
 		}
 	};
 
@@ -283,16 +279,6 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		onSettled: invalidatePracticesAfterLastWrite,
 	});
 
-	// No tier mutation here. The catalogue reads the tier out and links to Review → How much, which is
-	// the one writer of the field — two editors over one endpoint is how an admin undid the workspace
-	// answer they had just set. This hook also held the only client-side construction of a
-	// `ReviewTierAssignment` anywhere in the app, which could only ever guess at a chain the server
-	// resolves.
-
-	// Subscribed rather than read with `getQueryData`, which is a snapshot with no subscription behind
-	// it: a catalogue that changes while a move or a delete is in flight would leave these buckets —
-	// and every reorder control they disable — describing a stale list. The one caller renders this
-	// same query, so this shares its subscription rather than adding a fetch.
 	const { data: practices = [] } = useQuery({
 		...listPracticesOptions({ path: { workspaceSlug } }),
 		select: (all) => all.map(({ slug, areaSlug }) => ({ slug, areaSlug })),

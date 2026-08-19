@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettings;
 import de.tum.cit.aet.hephaestus.core.settings.InstanceSettingsService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
@@ -37,6 +39,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -51,6 +54,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -119,6 +123,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
     @MockitoBean
     private DiffNotePoster diffNotePoster;
+
+    @MockitoBean
+    private AccountPreferencesQuery accountPreferencesQuery;
 
     private JobTypeHandler handler;
     private Workspace workspace;
@@ -220,12 +227,16 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
             new DiffNotePoster.DiffNoteResult(0, 0, List.of())
         );
+        when(accountPreferencesQuery.preferencesForUserId(anyLong())).thenReturn(
+            Optional.of(new AccountPreferencesQuery.PreferencesView(false, true))
+        );
     }
 
     private Practice createPractice(String slug, String name) {
         Practice p = new Practice();
         p.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(workspace);
+        p.setAutonomy(PracticeAutonomy.AUTOMATIC);
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Test " + slug);

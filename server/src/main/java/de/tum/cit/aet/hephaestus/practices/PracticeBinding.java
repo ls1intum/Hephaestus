@@ -25,7 +25,7 @@ import org.jspecify.annotations.Nullable;
  * <p>A practice declares exactly one of these — {@code PracticeDefinitionValidator} refuses a second.
  * One occasion may name several signals, which is how a practice judged all the way along a piece of
  * work is written; a practice that must read <em>different</em> evidence at a different moment is a
- * second practice, which is what the shipped catalogue does and what keeps one row, one tier setting
+ * second practice, which is what the shipped catalogue does and what keeps one row, one autonomy setting
  * and one feedback history describing one habit.
  *
  * <p>The evidence therefore travels with the occasion rather than being named once and shared across

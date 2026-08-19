@@ -58,16 +58,10 @@ class FeatureFlagServiceTest extends BaseUnitTest {
 
         @Test
         void returnsCorrectFlagsWithMultipleAuthorities() {
-            setSecurityContext(
-                "poweruser",
-                FeatureFlag.ADMIN.key(),
-                FeatureFlag.MENTOR_ACCESS.key(),
-                FeatureFlag.RUN_PRACTICE_REVIEW.key()
-            );
+            setSecurityContext("poweruser", FeatureFlag.ADMIN.key(), FeatureFlag.MENTOR_ACCESS.key());
 
             assertThat(featureFlagService.isEnabled(FeatureFlag.ADMIN)).isTrue();
             assertThat(featureFlagService.isEnabled(FeatureFlag.MENTOR_ACCESS)).isTrue();
-            assertThat(featureFlagService.isEnabled(FeatureFlag.RUN_PRACTICE_REVIEW)).isTrue();
             assertThat(featureFlagService.isEnabled(FeatureFlag.NOTIFICATION_ACCESS)).isFalse();
         }
     }
@@ -87,14 +81,6 @@ class FeatureFlagServiceTest extends BaseUnitTest {
             when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(false);
 
             assertThat(featureFlagService.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION)).isFalse();
-        }
-
-        @Test
-        void configFlagsIgnoreSecurityContext() {
-            when(featureProperties.isEnabled(FeatureFlag.PRACTICE_REVIEW_FOR_ALL.key())).thenReturn(true);
-
-            // No security context — CONFIG flags should still work
-            assertThat(featureFlagService.isEnabled(FeatureFlag.PRACTICE_REVIEW_FOR_ALL)).isTrue();
         }
     }
 
@@ -161,14 +147,14 @@ class FeatureFlagServiceTest extends BaseUnitTest {
         @Test
         void returnsAllFlags() {
             setSecurityContext("testuser", FeatureFlag.MENTOR_ACCESS.key());
-            when(featureProperties.isEnabled(FeatureFlag.PRACTICE_REVIEW_FOR_ALL.key())).thenReturn(true);
+            when(featureProperties.isEnabled(FeatureFlag.GITLAB_WORKSPACE_CREATION.key())).thenReturn(true);
 
             Map<FeatureFlag, Boolean> result = featureFlagService.evaluateAll();
 
             assertThat(result).hasSize(FeatureFlag.values().length);
             assertThat(result.get(FeatureFlag.MENTOR_ACCESS)).isTrue();
             assertThat(result.get(FeatureFlag.ADMIN)).isFalse();
-            assertThat(result.get(FeatureFlag.PRACTICE_REVIEW_FOR_ALL)).isTrue();
+            assertThat(result.get(FeatureFlag.GITLAB_WORKSPACE_CREATION)).isTrue();
         }
     }
 

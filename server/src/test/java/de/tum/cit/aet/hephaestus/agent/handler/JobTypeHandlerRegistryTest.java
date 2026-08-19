@@ -183,7 +183,7 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         }
     }
 
-    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
+    /** Resolves every workspace to the unset defaults — HUMAN_APPROVAL autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

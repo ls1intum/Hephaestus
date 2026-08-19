@@ -27,7 +27,7 @@ public enum ObservationOrigin {
 
     /**
      * Whether a measurement of this provenance may be <em>said out loud</em> on the given channel — the
-     * second half of the delivery predicate; {@link PracticeReviewTier#delivers} is the first, and a unit
+     * second half of the delivery predicate; {@link PracticeAutonomy#delivers} is the first, and a unit
      * travels only where <em>both</em> admit it.
      *
      * <p>{@link #BACKFILL} is entitled to {@link FeedbackChannel#IN_APP} and nothing else: posting a

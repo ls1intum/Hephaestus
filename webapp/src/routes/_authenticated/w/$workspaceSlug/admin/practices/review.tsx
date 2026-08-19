@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { toast } from "sonner";
 import {
+	autonomyRollupOptions,
 	getPracticeReviewSettingsOptions,
 	getWorkspaceOptions,
 	listAgentsOptions,
@@ -10,7 +11,6 @@ import {
 	listPracticesOptions,
 	listSweepSchedulesOptions,
 	preflightBackfillRunMutation,
-	reviewTierRollupOptions,
 	updateBackfillRunStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
@@ -24,17 +24,17 @@ import {
 	type PracticeReviewWorkspaceUpdate,
 } from "@/components/admin/practices/PracticeReviewSettings";
 import { PracticeReviewSweepSchedule } from "@/components/admin/practices/PracticeReviewSweepSchedule";
+import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
 import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import type { ReviewRunningState } from "@/components/admin/practices/review/review-readiness";
 import {
 	DEFAULT_REVIEW_SECTION,
 	reviewSearchSchema,
 } from "@/components/admin/practices/review/review-sections";
-import { ReviewAutonomyPage } from "@/components/admin/practices/review-autonomy/ReviewAutonomyPage";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Spinner } from "@/components/ui/spinner";
+import { usePracticeAutonomyMutations } from "@/hooks/use-practice-autonomy-mutations";
 import { usePracticeReviewSettingsMutation } from "@/hooks/use-practice-review-settings";
-import { useReviewAutonomyMutations } from "@/hooks/use-review-autonomy-mutations";
 import { useSweepScheduleMutations } from "@/hooks/use-sweep-schedule-mutations";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -120,10 +120,10 @@ function HowMuchSection({
 	const settingsQuery = useQuery({
 		...getPracticeReviewSettingsOptions({ path: { workspaceSlug } }),
 	});
-	const rollupQuery = useQuery({ ...reviewTierRollupOptions({ path: { workspaceSlug } }) });
+	const rollupQuery = useQuery({ ...autonomyRollupOptions({ path: { workspaceSlug } }) });
 	const practicesQuery = useQuery({ ...listPracticesOptions({ path: { workspaceSlug } }) });
 
-	const autonomy = useReviewAutonomyMutations(workspaceSlug);
+	const autonomyMutations = usePracticeAutonomyMutations(workspaceSlug);
 	const updateSettings = usePracticeReviewSettingsMutation(workspaceSlug, {
 		success: "Review settings updated",
 		error: "Failed to update review settings",
@@ -142,7 +142,7 @@ function HowMuchSection({
 		return (
 			<QueryErrorAlert
 				error={error}
-				title="Couldn't load the review tiers"
+				title="Couldn't load the autonomy settings"
 				onRetry={() => {
 					void settingsQuery.refetch();
 					void rollupQuery.refetch();
@@ -153,47 +153,51 @@ function HowMuchSection({
 	}
 
 	return (
-		<ReviewAutonomyPage
+		<PracticeAutonomyPage
 			workspaceSlug={workspaceSlug}
 			settings={settingsQuery.data}
 			rollup={rollupQuery.data}
 			practices={practicesQuery.data}
 			pending={{
 				workspace: updateSettings.isPending,
-				areaSlugs: autonomy.pendingAreaSlugs,
-				practiceSlugs: autonomy.pendingPracticeSlugs,
-				bulk: autonomy.bulk,
+				areaSlugs: autonomyMutations.pendingAreaSlugs,
+				practiceSlugs: autonomyMutations.pendingPracticeSlugs,
+				bulk: autonomyMutations.bulk,
 			}}
 			overridesOnly={overridesOnly}
 			onOverridesOnlyChange={onOverridesOnlyChange}
-			onSetWorkspaceDefault={(defaultReviewTier) =>
-				updateSettings.mutate({ path: { workspaceSlug }, body: { defaultReviewTier } })
+			onSetWorkspaceDefault={(defaultAutonomy) =>
+				updateSettings.mutate({ path: { workspaceSlug }, body: { defaultAutonomy } })
 			}
 			onClearWorkspaceDefault={() =>
 				updateSettings.mutate({
 					path: { workspaceSlug },
-					body: { reset: ["DEFAULT_REVIEW_TIER"] },
+					body: { reset: ["DEFAULT_AUTONOMY"] },
 				})
 			}
-			onSetAreaTier={(areaSlug, reviewTier) =>
-				autonomy.setAreaTier.mutate({ path: { workspaceSlug, areaSlug }, body: { reviewTier } })
+			onSetAreaAutonomy={(areaSlug, autonomy) =>
+				autonomyMutations.setAreaAutonomy.mutate({
+					path: { workspaceSlug, areaSlug },
+					body: { autonomy },
+				})
 			}
-			// Omitting the field is how the wire says "hold no tier here": the generated request
-			// types it as optional, and the server reads an absent field as clear-to-inherit.
-			onClearAreaTier={(areaSlug) =>
-				autonomy.setAreaTier.mutate({ path: { workspaceSlug, areaSlug }, body: {} })
+			onClearAreaAutonomy={(areaSlug) =>
+				autonomyMutations.setAreaAutonomy.mutate({ path: { workspaceSlug, areaSlug }, body: {} })
 			}
-			onSetPracticeTier={(practiceSlug, reviewTier) =>
-				autonomy.setPracticeTier.mutate({
+			onSetPracticeAutonomy={(practiceSlug, autonomy) =>
+				autonomyMutations.setPracticeAutonomy.mutate({
 					path: { workspaceSlug, practiceSlug },
-					body: { reviewTier },
+					body: { autonomy },
 				})
 			}
-			onClearPracticeTier={(practiceSlug) =>
-				autonomy.setPracticeTier.mutate({ path: { workspaceSlug, practiceSlug }, body: {} })
+			onClearPracticeAutonomy={(practiceSlug) =>
+				autonomyMutations.setPracticeAutonomy.mutate({
+					path: { workspaceSlug, practiceSlug },
+					body: {},
+				})
 			}
-			onBulkSetTier={(practiceSlugs, tier) => {
-				void autonomy.setManyPracticeTiers(practiceSlugs, tier);
+			onBulkSetAutonomy={(practiceSlugs, autonomy) => {
+				void autonomyMutations.setManyPracticeAutonomies(practiceSlugs, autonomy);
 			}}
 		/>
 	);

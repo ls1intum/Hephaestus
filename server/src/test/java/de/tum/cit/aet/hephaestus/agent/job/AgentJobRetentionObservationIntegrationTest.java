@@ -10,7 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -57,7 +57,7 @@ class AgentJobRetentionObservationIntegrationTest extends AbstractWorkspaceInteg
         practice.setName("Review quality");
         practice.setCriteria("Review the change");
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         practice = practiceRepository.save(practice);
 
         AgentJob referenced = oldTerminalJob(workspace);

@@ -4,7 +4,7 @@ import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -41,9 +41,9 @@ public class PracticeReviewSettingsService {
         PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings);
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
-        settings.applyPatch(req.runForAllUsers(), req.deliverToMerged(), req.cooldownMinutes());
+        settings.applyPatch(req.deliverToMerged(), req.cooldownMinutes());
         settings.applyScope(req.reviewScope());
-        settings.applyDefaultReviewTier(req.defaultReviewTier() == null ? null : req.defaultReviewTier().name());
+        settings.applyDefaultAutonomy(req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
@@ -76,15 +76,13 @@ public class PracticeReviewSettingsService {
         PracticeReviewSettings s = workspace.getReviewSettings();
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(s);
         return new PracticeReviewSettingsDTO(
-            s.resolveRunForAllUsers(reviewProperties.runForAllUsers()),
             s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
             s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
-            s.getRunForAllUsers(),
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
             s.resolveReviewScope(),
-            defaults.defaultTier(),
-            s.getDefaultReviewTier() == null ? null : PracticeReviewTier.valueOf(s.getDefaultReviewTier())
+            defaults.defaultAutonomy(),
+            s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy())
         );
     }
 }

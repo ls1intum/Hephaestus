@@ -34,10 +34,6 @@ class PracticeSignalCoverageTest extends BaseUnitTest {
     private final PracticeRepository practices = mock(PracticeRepository.class);
     private final PracticeSignalOptions options = PracticeSignalOptionsFixture.real();
 
-    /**
-     * Only reached by {@code dormantBindings}, which these tests do not exercise: the vocabulary check
-     * asks nothing of any workspace, so the tier chain has no bottom to resolve here.
-     */
     private final WorkspaceReviewDefaultsProvider workspaceDefaults = mock(WorkspaceReviewDefaultsProvider.class);
 
     @Test

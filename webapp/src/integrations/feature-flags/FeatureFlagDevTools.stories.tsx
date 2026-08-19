@@ -71,9 +71,7 @@ export const AllEnabled: Story = {
 		flags: mockFeatureFlags({
 			MENTOR_ACCESS: true,
 			NOTIFICATION_ACCESS: true,
-			RUN_PRACTICE_REVIEW: true,
 			ADMIN: true,
-			PRACTICE_REVIEW_FOR_ALL: true,
 			GITLAB_WORKSPACE_CREATION: true,
 		}),
 		isLoading: false,

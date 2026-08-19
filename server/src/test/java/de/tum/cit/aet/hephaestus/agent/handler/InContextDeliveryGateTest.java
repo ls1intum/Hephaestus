@@ -21,7 +21,7 @@ import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -37,7 +37,7 @@ import org.mockito.Mock;
 
 /**
  * The in-context delivery predicate: which observations are allowed to land on the artifact, and what is
- * written down about the ones that are not. Two rules apply — the practice's loudness tier and the run's
+ * written down about the ones that are not. Two rules apply — the practice's autonomy and the run's
  * provenance — and this holds both to their reasons.
  */
 @DisplayName("In-context delivery admission")
@@ -67,7 +67,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void deliveringPracticesReachTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("loud", PracticeReviewTier.DELIVER))
+            List.of(practice("loud", PracticeAutonomy.AUTOMATIC))
         );
         ValidatedObservation observation = observation("loud", "occ-1");
 
@@ -75,50 +75,48 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         verifyNoInteractions(feedbackLedgerRecorder);
     }
 
-    /** Every tier below {@code DELIVER} withholds; {@code PROPOSE} is measured and says nothing. */
+    /** Human-approval observations are kept for the proposal lane but never reach the artifact directly. */
     @Test
     void proposingPracticesAreWithheldFromTheArtifact() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
             List.of(
-                practice("measured", PracticeReviewTier.PROPOSE),
-                practice("proposed", PracticeReviewTier.PROPOSE),
-                practice("loud", PracticeReviewTier.DELIVER)
+                practice("measured", PracticeAutonomy.HUMAN_APPROVAL),
+                practice("proposed", PracticeAutonomy.HUMAN_APPROVAL),
+                practice("loud", PracticeAutonomy.AUTOMATIC)
             )
         );
         ValidatedObservation measured = observation("measured", "occ-1");
         ValidatedObservation proposed = observation("proposed", "occ-2");
         ValidatedObservation loud = observation("loud", "occ-3");
-        // Built BEFORE the stubbing call: mocking inside a when(...) argument leaves Mockito's stubbing
-        // half-finished and fails the next interaction instead of this line.
-        List<Observation> persisted = List.of(observation("occ-1"), observation("occ-2"), observation("occ-3"));
-        when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
-
         List<ValidatedObservation> admitted = gate().admitInContext(job(), List.of(measured, proposed, loud));
 
         assertThat(admitted).containsExactly(loud);
-        // Written down, not dropped: a later evaluation must be able to tell a deliberate quiet from a miss.
-        verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordWithheld(any(), any(), any(), anyInt());
+        assertThat(gate().awaitingApproval(job(), List.of(measured, proposed, loud))).containsExactly(
+            measured,
+            proposed
+        );
+        verifyNoInteractions(feedbackLedgerRecorder);
     }
 
     /**
      * A slug the workspace catalogue does not contain was never persisted as an observation either, so
-     * there is no tier to consult; withholding it would silently drop feedback on a lookup miss.
+     * there is no autonomy to consult; withholding it would silently drop feedback on a lookup miss.
      */
     @Test
-    void anUnknownPracticeSlugIsKept() {
+    void anUnknownPracticeSlugFailsClosed() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("known", PracticeReviewTier.PROPOSE))
+            List.of(practice("known", PracticeAutonomy.HUMAN_APPROVAL))
         );
         ValidatedObservation stranger = observation("not-in-the-catalogue", "occ-9");
 
-        assertThat(gate().admitInContext(job(), List.of(stranger))).containsExactly(stranger);
+        assertThat(gate().admitInContext(job(), List.of(stranger))).isEmpty();
         verify(feedbackLedgerRecorder, never()).recordWithheld(any(), any(), any(), anyInt());
     }
 
     @Test
     void aWithheldObservationThatWasNeverPersistedGetsNoLedgerRow() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.PROPOSE))
+            List.of(practice("measured", PracticeAutonomy.OFF))
         );
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(List.of());
 
@@ -130,7 +128,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
     @Test
     void aLedgerFailureDoesNotStopTheFindingsThatSurvived() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.PROPOSE), practice("loud", PracticeReviewTier.DELIVER))
+            List.of(practice("measured", PracticeAutonomy.OFF), practice("loud", PracticeAutonomy.AUTOMATIC))
         );
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
@@ -154,7 +152,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         ValidatedObservation alsoLoud = observation("also-loud", "occ-2");
 
         assertThat(gate().admitInContext(backfillJob(), List.of(loud, alsoLoud))).isEmpty();
-        // Never even asks for the tiers: no dial can make a retrospective observation actionable in place.
+        // Never even asks for the autonomy states: no dial can make a retrospective observation actionable in place.
         verifyNoInteractions(practiceRepository);
         verify(feedbackLedgerRecorder, org.mockito.Mockito.times(2)).recordWithheld(
             any(),
@@ -166,9 +164,9 @@ class InContextDeliveryGateTest extends BaseUnitTest {
 
     /** The two withholding rules are separately answerable, which is why they are separately recorded. */
     @Test
-    void aTierWithheldObservationIsRecordedUnderTheTierNotTheProvenance() {
+    void aAutonomyWithheldObservationIsRecordedUnderTheTierNotTheProvenance() {
         when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
-            List.of(practice("measured", PracticeReviewTier.PROPOSE))
+            List.of(practice("measured", PracticeAutonomy.OFF))
         );
         List<Observation> persisted = List.of(observation("occ-1"));
         when(observationRepository.findByAgentJobId(JOB_ID)).thenReturn(persisted);
@@ -177,7 +175,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         verify(feedbackLedgerRecorder).recordWithheld(
             any(),
             any(),
-            eq(FeedbackSuppressionReason.PRACTICE_TIER_QUIET),
+            eq(FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL),
             eq(0)
         );
     }
@@ -212,10 +210,10 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         return job;
     }
 
-    private Practice practice(String slug, PracticeReviewTier tier) {
+    private Practice practice(String slug, PracticeAutonomy autonomy) {
         Practice practice = new Practice();
         practice.setSlug(slug);
-        practice.setReviewTier(tier);
+        practice.setAutonomy(autonomy);
         return practice;
     }
 
@@ -238,7 +236,7 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         return observation;
     }
 
-    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
+    /** Resolves every workspace to the unset defaults — AUTOMATIC autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

@@ -8,40 +8,40 @@ For how the words fit together at runtime — the four stages, and the refusal v
 
 ## Product terms
 
-| Term | Plain meaning | Do not use for this concept |
-| --- | --- | --- |
-| **AI-supported practice mentoring** | The product experience in which Hephaestus uses connected work to offer practice-focused guidance while leaving room for self, peer, and human mentor context. It is support, not grading or a replacement for a person. | autonomous mentoring, performance scoring |
-| **Practice review** | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce observations. The practices it checks are the ones selected when the review starts. | practice detection, scan, mentoring relationship, run, assessment |
-| **Automated review** | The technical capability that lets Hephaestus perform a practice review. Prefer **AI-supported mentoring** in author-facing UI. | detection, detector capability, judgment |
-| **AI-supported mentoring** | Hephaestus may review connected work and offer guidance when every required source is ready. | AI mentor, guaranteed feedback |
-| **Human review needed** | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review outside the current product, and Hephaestus skips it. | human context needed, unobservable, not applicable |
-| **Guidance only** | Keep the practice's criteria and guidance without asking Hephaestus to review it. | practice guidance only, invalid practice, human-only |
-| **Review mode** | The implementation Hephaestus uses when automated review is configured. | observability, mechanical/semantic classification |
-| **No automated review** | Hephaestus does not review work against this practice. | human-only, unobservable |
-| **Automated-review policy** | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behaviour, and the known limits. Sources belong to the bindings, not here. | evidence requirements |
-| **Practice binding** | The one occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares exactly one. | trigger, review event, schedule, bare "binding" |
-| **Model binding** | Which AI model, with which execution limits, a workspace runs a given purpose on. Lives in Administration &rarr; AI models, not in the practice catalogue. | bare "binding", practice binding, agent config |
-| **Signal** | The name of an ingested event a binding can be occasioned by, such as `scm.pull_request.merged`. Its prefix is the artifact kind, which is why a practice never states its artifact kind separately. | trigger event, webhook, hook |
-| **Evidence requirement** | One source a binding reads, and the stance the practice takes towards it. | required evidence, evidence declaration, detector configuration |
-| **Evidence stance** | How a practice relates to one source: `REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL`. | required/optional lists, source role |
-| **Required capture quality** | How well a source must be captured before a practice that reads it can be reviewed. It is a property of the source in the contract, not of the practice naming it. | completeness requirement, per-practice completeness |
-| **Evidence sufficiency** | Whether passing every requirement gives Hephaestus enough context to review the practice. | evidence coverage, confidence |
-| **Source contract** | A versioned catalog defining each source and the meaning of its states. | integration version |
-| **Artifact source** | A registered logical input that can supply evidence. | file, mount, cache |
-| **Materialization** | A file, database projection, cache entry, or tool result representing a source for one use. | source kind |
-| **Source kind** | A stable identifier for one logical source, such as pull request details. | file type |
-| **Artifact kind** | The family of reviewed work a practice is about, such as `scm.pull_request`. Derived from a binding's signals, never stated separately. | work type, artifact type |
-| **Known limitation** | A claim the evidence cannot support even when every requirement passes. | blind spot, caveat |
-| **When evidence is insufficient** | The required behavior when evidence requirements are not met. Contract `1.0.0` always skips automated review. | fallback, error handling |
-| **Skip automated review** | Make no practice claim because the requirements are not met or the mode is unsupported. | not applicable, decline judgment, failure |
-| **Automated review validation** | Who stands behind a practice's automated-review policy, bound to the exact review-rule fingerprint. Its only status is `AUTHOR_DECLARED`. | certification, approval |
-| **Source authorization** | Instance governance permits a source for an explicit product use. | enabled, available |
-| **Source-use purpose** | Why Hephaestus processes evidence, such as automated review or feedback delivery. | audience, recipient |
-| **Audience / recipient** | Who may receive or inspect evidence. | purpose |
-| **Review readiness** | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks. | validation, activation |
-| **Autonomy tier** | How much the system may do on its own about one practice: `OFF`, `PROPOSE`, or `DELIVER`. The only delivery decision a workspace configures. Nullable at the practice and area levels, where null means "inherit". | loudness tier, feedback reach, used in new reviews, enabled, detectable |
-| **Effective tier** | The tier in force after resolving practice → area → workspace. Always server-resolved, always reported with the level it came from. | tier |
-| **Review scope** | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories. | filter, path filter, include pattern |
+| Term                                | Plain meaning                                                                                                                                                                                                                              | Do not use for this concept                                       |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| **AI-supported practice mentoring** | The product experience in which Hephaestus uses connected work to offer practice-focused guidance while leaving room for self, peer, and human mentor context. It is support, not grading or a replacement for a person.                   | autonomous mentoring, performance scoring                         |
+| **Practice review**                 | One evidence-bounded operation within AI-supported mentoring: Hephaestus checks one or more practices against a specific piece of work and may produce observations. The practices it checks are the ones selected when the review starts. | practice detection, scan, mentoring relationship, run, assessment |
+| **Automated review**                | The technical capability that lets Hephaestus perform a practice review. Prefer **AI-supported mentoring** in author-facing UI.                                                                                                            | detection, detector capability, judgment                          |
+| **AI-supported mentoring**          | Hephaestus may review connected work and offer guidance when every required source is ready.                                                                                                                                               | AI mentor, guaranteed feedback                                    |
+| **Human review needed**             | Connected evidence is not enough for responsible AI guidance. The practice remains useful for self, peer, or mentor review outside the current product, and Hephaestus skips it.                                                           | human context needed, unobservable, not applicable                |
+| **Guidance only**                   | Keep the practice's criteria and guidance without asking Hephaestus to review it.                                                                                                                                                          | practice guidance only, invalid practice, human-only              |
+| **Review mode**                     | The implementation Hephaestus uses when automated review is configured.                                                                                                                                                                    | observability, mechanical/semantic classification                 |
+| **No automated review**             | Hephaestus does not review work against this practice.                                                                                                                                                                                     | human-only, unobservable                                          |
+| **Automated-review policy**         | The frame a review runs in for one practice: the source-contract version, the review mode, the refusal behaviour, and the known limits. Sources belong to the bindings, not here.                                                          | evidence requirements                                             |
+| **Practice binding**                | The one occasion a practice is reviewed on, and the evidence a review occasioned that way reads. A practice declares exactly one.                                                                                                          | trigger, review event, schedule, bare "binding"                   |
+| **Model binding**                   | Which AI model, with which execution limits, a workspace runs a given purpose on. Lives in Administration &rarr; AI models, not in the practice catalogue.                                                                                 | bare "binding", practice binding, agent config                    |
+| **Signal**                          | The name of an ingested event a binding can be occasioned by, such as `scm.pull_request.merged`. Its prefix is the artifact kind, which is why a practice never states its artifact kind separately.                                       | trigger event, webhook, hook                                      |
+| **Evidence requirement**            | One source a binding reads, and the stance the practice takes towards it.                                                                                                                                                                  | required evidence, evidence declaration, detector configuration   |
+| **Evidence stance**                 | How a practice relates to one source: `REQUIRED`, `EXHAUSTIVE`, or `CONTEXTUAL`.                                                                                                                                                           | required/optional lists, source role                              |
+| **Required capture quality**        | How well a source must be captured before a practice that reads it can be reviewed. It is a property of the source in the contract, not of the practice naming it.                                                                         | completeness requirement, per-practice completeness               |
+| **Evidence sufficiency**            | Whether passing every requirement gives Hephaestus enough context to review the practice.                                                                                                                                                  | evidence coverage, confidence                                     |
+| **Source contract**                 | A versioned catalog defining each source and the meaning of its states.                                                                                                                                                                    | integration version                                               |
+| **Artifact source**                 | A registered logical input that can supply evidence.                                                                                                                                                                                       | file, mount, cache                                                |
+| **Materialization**                 | A file, database projection, cache entry, or tool result representing a source for one use.                                                                                                                                                | source kind                                                       |
+| **Source kind**                     | A stable identifier for one logical source, such as pull request details.                                                                                                                                                                  | file type                                                         |
+| **Artifact kind**                   | The family of reviewed work a practice is about, such as `scm.pull_request`. Derived from a binding's signals, never stated separately.                                                                                                    | work type, artifact type                                          |
+| **Known limitation**                | A claim the evidence cannot support even when every requirement passes.                                                                                                                                                                    | blind spot, caveat                                                |
+| **When evidence is insufficient**   | The required behavior when evidence requirements are not met. Contract `1.0.0` always skips automated review.                                                                                                                              | fallback, error handling                                          |
+| **Skip automated review**           | Make no practice claim because the requirements are not met or the mode is unsupported.                                                                                                                                                    | not applicable, decline judgment, failure                         |
+| **Automated review validation**     | Who stands behind a practice's automated-review policy, bound to the exact review-rule fingerprint. Its only status is `AUTHOR_DECLARED`.                                                                                                  | certification, approval                                           |
+| **Source authorization**            | Instance governance permits a source for an explicit product use.                                                                                                                                                                          | enabled, available                                                |
+| **Source-use purpose**              | Why Hephaestus processes evidence, such as automated review or feedback delivery.                                                                                                                                                          | audience, recipient                                               |
+| **Audience / recipient**            | Who may receive or inspect evidence.                                                                                                                                                                                                       | purpose                                                           |
+| **Review readiness**                | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks.                                                                                                 | validation, activation                                            |
+| **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), a workspace owner or administrator (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and area levels, where null means “inherit”.                         | review tier, loudness tier, shadow mode, enabled                  |
+| **Effective autonomy**              | The autonomy in force after resolving practice → area → workspace. Always server-resolved and reported with its source.                                                                                                                    | autonomy override                                                 |
+| **Review scope**                    | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories.                                                                                                         | filter, path filter, include pattern                              |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
 review is accurate, and the product says so rather than implying otherwise: every shipped policy is its
@@ -57,18 +57,19 @@ provides that context. An observation is a bounded record of observed work, not 
 Review is relational: it has a reviewer, reviewed work, a practice, a procedure, evidence, and a time. Do not
 label a practice as universally observable or unobservable.
 
-| Reviewer | Current system support |
-| --- | --- |
-| **Hephaestus** | Modeled by `automatedReview` and the governed evidence each binding declares. It can only use authorized, connected evidence. |
-| **Developer** | A self-review may be possible for a specific practice; Hephaestus does not collect it. |
-| **Peer** | A peer review may be possible from team context; Hephaestus does not collect it. |
-| **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it. |
+| Reviewer         | Current system support                                                                                                        |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| **Hephaestus**   | Modeled by `automatedReview` and the governed evidence each binding declares. It can only use authorized, connected evidence. |
+| **Developer**    | A self-review may be possible for a specific practice; Hephaestus does not collect it.                                        |
+| **Peer**         | A peer review may be possible from team context; Hephaestus does not collect it.                                              |
+| **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it.                        |
 
-Human review is outside the product: none of the three human reviewers above has consent, provenance,
+Human practice assessment is outside the product. Proposal approval authorizes delivery of Hephaestus's
+existing feedback; it is not a second assessment. None of the three human reviewers above has consent, provenance,
 retention, access, a rubric or a validation model here, and a human review would need all six plus a record of
 who reviewed and in what relationship to the author. Human reviews may use different rubrics and evidence, and
 disagreement between two of them is two provenance-bearing reviews, not a contradiction to resolve into one
-ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an
+ground truth. A statement that a person _could_ observe something must never let Hephaestus attempt an
 automated review.
 
 ## How a review was occasioned
@@ -78,14 +79,14 @@ person or a provider did. `DiscoveredVia` is how we came to know about the occur
 signal. `ObservationOrigin` is the population any resulting observation belongs to, derived from
 `DiscoveredVia` once and never re-decided.
 
-| Door | Recorded as (`DiscoveredVia`) | UI label | Observation origin | Starts a review |
-| --- | --- | --- | --- | --- |
-| A provider event on connected work | `EVENT` | Live event | `LIVE` | yes |
-| Reconciling with the provider | `SYNC` | Noticed during a sync | `LIVE` | **no**, for pull requests and issues |
-| `/hephaestus review` in a merge request comment | `MANUAL` | Requested by hand | `MANUAL` | yes |
-| The *Review this now* button | `MANUAL` | Requested by hand | `MANUAL` | yes |
-| A confirmed campaign over past work | `BACKFILL` | Backfill of past work | `BACKFILL` | yes |
-| A recurring sweep schedule | `SWEEP` | Found by a recurring check | `LIVE` | yes |
+| Door                                            | Recorded as (`DiscoveredVia`) | UI label                   | Observation origin | Starts a review                      |
+| ----------------------------------------------- | ----------------------------- | -------------------------- | ------------------ | ------------------------------------ |
+| A provider event on connected work              | `EVENT`                       | Live event                 | `LIVE`             | yes                                  |
+| Reconciling with the provider                   | `SYNC`                        | Noticed during a sync      | `LIVE`             | **no**, for pull requests and issues |
+| `/hephaestus review` in a merge request comment | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
+| The _Review this now_ button                    | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
+| A confirmed campaign over past work             | `BACKFILL`                    | Backfill of past work      | `BACKFILL`         | yes                                  |
+| A recurring sweep schedule                      | `SWEEP`                       | Found by a recurring check | `LIVE`             | yes                                  |
 
 Two consequences follow from the table rather than from any enum, so state them rather than letting a
 reader infer them:
@@ -105,100 +106,72 @@ every behavioural read. A `BACKFILL` observation is additionally entitled only t
 developer's own practice feedback — and that entitlement is a ceiling, not an instruction: the in-app
 router refuses a cluster made entirely of backfilled measurements (`BACKFILL_HELD`), so a backfill
 observation is measured and never delivered, by construction rather than by configuration. Do not write
-*profile* for this channel: **Profile** is the public page at `/user/{username}`, and the two are
+_profile_ for this channel: **Profile** is the public page at `/user/{username}`, and the two are
 different surfaces with different audiences.
 
-## Autonomy tiers
+## Practice autonomy
 
-`PracticeReviewTier` is the answer to "how much may the system do on its own about this practice" — a
-question a boolean cannot answer, because measuring and intervening are separate decisions. Each tier adds
-to the one before it.
+`PracticeAutonomy` answers one question: **who may authorize feedback for this practice?** It is not the
+whole delivery policy; recipient preferences, workspace controls, artifact validity, suppression and the
+final egress guard still apply.
 
-| Tier | Review runs | Observation recorded | Feedback delivered |
-| --- | --- | --- | --- |
-| `OFF` | no | no | no |
-| `PROPOSE` | yes | yes | no |
-| `DELIVER` | yes | yes | yes, without asking |
+| Autonomy         | Review runs | Feedback is composed | Release authority                      |
+| ---------------- | ----------- | -------------------- | -------------------------------------- |
+| `OFF`            | no          | no                   | nobody                                 |
+| `HUMAN_APPROVAL` | yes         | yes                  | a workspace owner or administrator     |
+| `AUTOMATIC`      | yes         | yes                  | the system, subject to delivery policy |
 
-Only `OFF` stops the review. `PROPOSE` runs it and records every observation exactly as `DELIVER` does; they
-differ only in what the system may do next. That is the point of the tier: turning a noisy practice down
-does not put a hole in the behaviour series. `DELIVER` is what a practice, area or workspace that has
-expressed no opinion resolves to.
+`HUMAN_APPROVAL` is an operational mode, not silent observation. An in-context unit enters
+`AWAITING_APPROVAL` with its immutable content and target. A workspace owner or administrator can approve
+that exact proposal or reject it, optionally recording a structured reason. Approval moves the unit to
+`PREPARED`; release then rechecks Silent Mode, workspace availability, artifact validity, repository scope,
+recipient preference, and prior provider delivery. Rejection moves the unit to the terminal `DISCARDED`
+state.
 
-**The tier is autonomy.** It says how far the system may act alone, which is why it orders: `OFF` does less
-than `PROPOSE`, which does less than `DELIVER`. It is also the whole of the decision — `DELIVER` means
-delivered wherever the reviewed work allows, and nothing narrows that afterwards. A second workspace
-setting once chose *where* a delivering practice might speak; it was removed because nothing set it and it
-made the ordinary case read as two decisions. The cost is recorded here rather than left to be
-rediscovered: **reviewing on its own while speaking only in the mentor conversation is no longer
-expressible.** Bringing that shape back is a decision to design, not a setting to re-expose.
+Changing a practice to `AUTOMATIC` affects newly composed feedback only. Existing proposals remain explicit
+workflow items; a configuration change must never release historical proposals implicitly. `OFF` is for a
+practice that should not be measured. Moving `AUTOMATIC` back to `HUMAN_APPROVAL` is the normal quality
+rollback because measurement continues while release returns to human control.
 
-**Nothing is composed or stored at `PROPOSE`.** A withheld observation is filtered out before the feedback
-body is built, and the ledger row it leaves behind carries no body, so there is no draft anywhere: no surface
-can show an administrator the feedback the practice would have sent, because it was never written. Do
-not describe the tier as preparing feedback or as offering a preview. Every write boundary — practice, area
-and workspace — accepts `PROPOSE` like any other tier.
+## Autonomy inheritance
 
-**A held observation stays visible as a refusal, not as a queue.** Each one is written to the feedback ledger as
-`SUPPRESSED` with reason `PRACTICE_TIER_QUIET` rather than dropped, bound to the observation it came from,
-so "we saw it and chose to stay quiet" reads differently from "we missed it" in every later evaluation. On
-the artifact's practice trace the same fact reads as outcome `REVIEWED` with `observationCount > 0`,
-`deliveredCount = 0`, and `PRACTICE_TIER_QUIET` among the `withheldReasons`. There is no approval queue and
-nobody approves an individual observation: what is held is released by raising the practice's effective tier to
-`DELIVER`. `FeedbackDeliveryState.PREPARED` is not a holding state and must not be used as one: it is the queued
-state of both longitudinal channels, and both auto-advance. An `IN_CHAT` unit is a mentor slot with a
-14-day TTL, flipped to `DELIVERED` by the next chat turn that links it; an `IN_APP` unit is flipped when
-its recipient actually reads it, which is the one delivery the system can observe rather than infer.
-Anything parked there is delivered by the parking. What `PREPARED` *does* allow is replacement: a newer
-message on the same thread may claim a still-unread one — see
-[supersession](#thread-key-and-supersession).
-
-## Tier inheritance
-
-A tier is never read raw. `practice.review_tier` and `practice_area.review_tier` are both **nullable**, and
-null means "this level holds no opinion":
+Autonomy is resolved server-side through one nullable override chain:
 
 ```text
-effective tier = practice.review_tier ?? area.review_tier ?? workspace default ?? DELIVER
+effective autonomy = practice.autonomy ?? area.autonomy ?? workspace default ?? HUMAN_APPROVAL
 ```
 
-Resolution is always server-side. A client or query that reimplemented the chain would drift when the rule
-changed.
+Null means “this level has not decided,” not `OFF`. Every API projection therefore carries the effective
+autonomy, the raw override, its `AutonomySource` (`PRACTICE`, `AREA`, or `WORKSPACE`), and whether it was
+inherited. New unset chains fail safe at `HUMAN_APPROVAL`; an explicit `AUTOMATIC` is required before the
+system may release feedback without a person.
 
-Null exists because a NOT NULL column cannot say "I have not decided", which would make every practice hold
-an opinion nobody expressed. Every API that reports a tier therefore reports four things: the effective
-tier, the raw override (null = inheriting), the level that decided it (`ReviewTierSource`: `PRACTICE`,
-`AREA`, `WORKSPACE`), and an `inherited` flag.
+Set or clear an override with:
 
-Setting a tier is `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/review-tier` or
-`PATCH /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-tier`, both with body
-`{"reviewTier": "PROPOSE"}` — or `{"reviewTier": null}` to clear the override back to inherit. Clearing has
-to be expressible or the chain is write-once. `GET /workspaces/{workspaceSlug}/practices/review-tiers`
-returns the per-area and per-workspace counts. The catalog list endpoint's `?reviewTier=<TIER>` filters on
-the **effective** tier, which is the only tier visible on the screen doing the filtering.
+- `PATCH /workspaces/{workspaceSlug}/practices/{practiceSlug}/autonomy`
+- `PATCH /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/autonomy`
 
-The bottom of the chain sits with the rest of the per-workspace review policy on `GET`/`PATCH
-/workspaces/{workspaceSlug}/practices/review-settings` as `defaultReviewTier`, reported the same way — an
-effective value plus a raw override — and cleared by naming `DEFAULT_REVIEW_TIER` in the PATCH `reset` set.
+The body is `{"autonomy":"HUMAN_APPROVAL"}` or `{"autonomy":null}` to inherit. The catalogue filter is
+`?autonomy=<VALUE>`, and autonomy rollups are returned by
+`GET /workspaces/{workspaceSlug}/practices/autonomy`. Workspace review settings expose
+`defaultAutonomy`; name `DEFAULT_AUTONOMY` in the PATCH reset set to clear the workspace override.
 
-A practice whose automated-review policy cannot attempt a review — any mode/sufficiency pair other than
-`LANGUAGE_MODEL` with `SUFFICIENT_WHEN_REQUIREMENTS_MET` — is written to `OFF` explicitly when it is created
-or edited, and cannot be set to (or left inheriting) any tier that resolves above `OFF`. That is a fact
-about the practice rather than a preference, which is why it is stored rather than inherited.
+A practice whose automated-review policy cannot run is explicitly `OFF` and cannot inherit an autonomy
+that admits review. Missing autonomy resolution fails closed for external delivery.
 
 ## Review scope
 
 `WorkspaceReviewScope` narrows which of a workspace's work is reviewed at all. It is ANDed onto every
 binding and only ever narrows; unset, it admits everything.
 
-| Axis | JSON key | Matching | Empty list means |
-| --- | --- | --- | --- |
-| Target branch | `targetBranches` | exact name against a pull request's base ref | every branch |
-| Repository | `repositories` | exact `owner/name` | every repository the workspace already syncs |
+| Axis          | JSON key         | Matching                                     | Empty list means                             |
+| ------------- | ---------------- | -------------------------------------------- | -------------------------------------------- |
+| Target branch | `targetBranches` | exact name against a pull request's base ref | every branch                                 |
+| Repository    | `repositories`   | exact `owner/name`                           | every repository the workspace already syncs |
 
 Both axes must admit an artifact; within one axis, any entry matches. It lives on the practice-review
 settings resource as `reviewScope` (`GET`/`PATCH /workspaces/{workspaceSlug}/practices/review-settings`),
-and a `PATCH` replaces it wholesale rather than merging, because the lists *are* the setting and a merge
+and a `PATCH` replaces it wholesale rather than merging, because the lists _are_ the setting and a merge
 could only ever add.
 
 Three things the scope deliberately does not do, each for a reason that outlives the current shape:
@@ -213,8 +186,8 @@ Three things the scope deliberately does not do, each for a reason that outlives
 
 An artifact outside the scope refuses its signal with `OUT_OF_REVIEW_SCOPE`, which is terminal
 (`SUPPRESSED`): the branch a merge request targeted will not change, so re-offering it could not come out
-differently. Widening the scope changes what happens next, not what already did. A practice at tier `OFF`
-refuses with `PRACTICE_TIER_OFF`, which is retryable (`PENDING`): an admin raising the tier lifts it
+differently. Widening the scope changes what happens next, not what already did. A practice at `OFF`
+refuses with `PRACTICE_AUTONOMY_OFF`, which is retryable (`PENDING`): an admin raising the autonomy lifts it
 without the artifact changing.
 
 ## Measurement and intervention
@@ -227,59 +200,59 @@ it is intervention. The seam is
 [ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md);
 how it runs is in the [practice review pipeline](./practice-review-pipeline.mdx#measurement-and-intervention).
 
-| Term | Plain meaning | Do not use for this concept |
-| --- | --- | --- |
-| **Measurement** | The first phase: reading one piece of work against each practice and recording what is there. | detection pass, scan, phase one |
-| **Observation** | One measurement — one practice's answer about one piece of work, immutable for as long as it is retained. Carries an `evidenceRationale` and never advice. | finding, verdict, result |
-| **Intervention** | The second phase: deciding what is worth saying now, to whom, and on which surface. | synthesis, rendering, formatting |
-| **Composition** | The second LLM turn in the review's existing agent session. It starts only after Java has admitted the final measurements. | the composer's turn as part of the review, second pass |
-| **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it. | feedback row, draft feedback |
-| **Feedback** | An admitted unit, written to the ledger with its channel, delivery state and the observations it rests on. | comment, message, guidance |
-| **Withhold** | The composer's own decision that a lane is not worth writing on, recorded with a reason. | suppress, skip, drop |
-| **Suppress** | The *server's* refusal to deliver a message it was given, recorded as `FeedbackSuppressionReason`. | withhold, silence |
-| **Notes** | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes *to* the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence. | move, opener, conversation message, prepared reply, script |
-| **Placement** | Where in-context feedback belongs: `DIFF` names an admitted observation and citation for server-resolved coordinates; `ARTIFACT` stays at summary level. | model-authored path, model-authored line number |
-| **Thread key** | The identity of one continuing conversation about one thing with one person on one channel. | correlation key, idempotency key |
-| **Supersession** | Replacing a queued, still-unread message with a newer one on the same thread. | edit, update, delete |
+| Term                       | Plain meaning                                                                                                                                                                                                                                        | Do not use for this concept                                |
+| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| **Measurement**            | The first phase: reading one piece of work against each practice and recording what is there.                                                                                                                                                        | detection pass, scan, phase one                            |
+| **Observation**            | One measurement — one practice's answer about one piece of work, immutable for as long as it is retained. Carries an `evidenceRationale` and never advice.                                                                                           | finding, verdict, result                                   |
+| **Intervention**           | The second phase: deciding what is worth saying now, to whom, and on which surface.                                                                                                                                                                  | synthesis, rendering, formatting                           |
+| **Composition**            | The second LLM turn in the review's existing agent session. It starts only after Java has admitted the final measurements.                                                                                                                           | the composer's turn as part of the review, second pass     |
+| **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it.                                                                                                                             | feedback row, draft feedback                               |
+| **Feedback**               | An admitted unit, written to the ledger with its channel, delivery state and the observations it rests on.                                                                                                                                           | comment, message, guidance                                 |
+| **Withhold**               | The composer's own decision that a lane is not worth writing on, recorded with a reason.                                                                                                                                                             | suppress, skip, drop                                       |
+| **Suppress**               | The _server's_ refusal to deliver feedback it was given, recorded as `FeedbackSuppressionReason`.                                                                                                                                                    | withhold, silence                                          |
+| **Notes**                  | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes _to_ the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence. | move, opener, conversation message, prepared reply, script |
+| **Placement**              | Where in-context feedback belongs: `DIFF` names an admitted observation and citation for server-resolved coordinates; `ARTIFACT` stays at summary level.                                                                                             | model-authored path, model-authored line number            |
+| **Thread key**             | The identity of one continuing conversation about one thing with one person on one channel.                                                                                                                                                          | correlation key, idempotency key                           |
+| **Supersession**           | Replacing a queued, still-unread message with a newer one on the same thread.                                                                                                                                                                        | edit, update, delete                                       |
 
 **Withhold and suppress are two different refusals and must never be merged.** A withhold reason
 (`NO_MATERIAL_CHANGE`, `ALREADY_SAID`, `BELOW_BAR`) is the composer saying nothing was worth saying. A
-suppression reason is the system saying it had something and refused to send it — a tier turned down, a
-cap reached, a backfilled measurement. Merging them makes "we had nothing to say" indistinguishable from
+suppression reason is the system saying it had something and refused to send it — for example, the recipient
+opted out, the artifact closed, a cap was reached, or the measurement came from a backfill. Merging them makes "we had nothing to say" indistinguishable from
 "we were not allowed to say it", which is the exact distinction the whole refusal vocabulary exists for.
 
 ### The three channels are three levels
 
 `FeedbackChannel` is not three renderers of one message. Each value is a different level of Hattie &
-Timperley's model, and every name answers one question — *where does this land?* — because a set of names
+Timperley's model, and every name answers one question — _where does this land?_ — because a set of names
 on different axes is how three lanes drift into saying the same thing three times.
 
-| Channel | Lands | Level | Answers | Audience |
-| --- | --- | --- | --- | --- |
-| `IN_CONTEXT` | on the work artifact — pull request summary or inline note, issue comment | task | "what is worth changing or reinforcing here?" | public — the team reads it on the work |
-| `IN_APP` | on the developer's own practice pages | process | "what keeps happening in how I work?" | private — the developer alone |
-| `IN_CHAT` | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack | self-regulation | "what capability could this conversation support?" | private — a live mentor turn |
+| Channel      | Lands                                                                                            | Level           | Answers                                            | Audience                               |
+| ------------ | ------------------------------------------------------------------------------------------------ | --------------- | -------------------------------------------------- | -------------------------------------- |
+| `IN_CONTEXT` | on the work artifact — pull request summary or inline note, issue comment                        | task            | "what is worth changing or reinforcing here?"      | public — the team reads it on the work |
+| `IN_APP`     | on the developer's own practice pages                                                            | process         | "what keeps happening in how I work?"              | private — the developer alone          |
+| `IN_CHAT`    | in a turn of a conversation, wherever it runs — the in-app mentor at `/w/:slug/mentor`, or Slack | self-regulation | "what capability could this conversation support?" | private — a live mentor turn           |
 
 **`IN_CHAT` is defined by being dialogic, `IN_APP` by being the non-dialogic practice surface.** The
 mentor renders inside the app as well, so "in the app" cannot be the test: `IN_CHAT` is a turn the
-developer can answer, and `IN_APP` is written down, where reading it is the whole interaction. Ask *is it
-a turn?* before *which screen?* — a new written surface inside Hephaestus is `IN_APP`, and a mentor in
+developer can answer, and `IN_APP` is written down, where reading it is the whole interaction. Ask _is it
+a turn?_ before _which screen?_ — a new written surface inside Hephaestus is `IN_APP`, and a mentor in
 another chat product is still `IN_CHAT`.
 
 The level is **derived from the channel and never stored**: there is no `level` column, and a stored copy
 would be a second truth that can disagree. Three words are close enough to be tempting and are still
-wrong. Do not write *profile* for `IN_APP` — **Profile** is the public page at `/user/{username}` — and
-do not write *reflection* either: it named what the developer was meant to do rather than where the
+wrong. Do not write _profile_ for `IN_APP` — **Profile** is the public page at `/user/{username}` — and
+do not write _reflection_ either: it named what the developer was meant to do rather than where the
 message lands, and it is the name this lane was renamed away from
 ([ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)).
-Do not write *conversation* for `IN_CHAT`: `chat.conversation_thread` is a kind of work Hephaestus
-*reviews*, not a place it delivers to. And do not describe `IN_CHAT` as a prepared reply; what is stored
+Do not write _conversation_ for `IN_CHAT`: `chat.conversation_thread` is a kind of work Hephaestus
+_reviews_, not a place it delivers to. And do not describe `IN_CHAT` as a prepared reply; what is stored
 is notes to the mentor, not words to speak.
 
 ### Thread key and supersession
 
 A **thread** is a chain of messages about one thing to one person on one channel, identified by a hash
-(`FeedbackThreadKey`) rather than by prose. The longitudinal channels key on the *practice*, because a
+(`FeedbackThreadKey`) rather than by prose. The longitudinal channels key on the _practice_, because a
 habit claim is about the practice and not about one merge request; the in-context channel keys on the
 artifact. `thread_key` is deliberately not unique: a thread is a chain of rows over time, and the
 invariant that matters — at most one live `PREPARED` per thread — is held by a compare-and-swap.
@@ -297,59 +270,59 @@ ledger has to say so.
 the assessment or severity moved), `UNCHANGED` (still there, nothing moved) or `RESOLVED` (was a problem,
 absent from the newest run of its artifact). Use these words for how one measured locus moved between
 runs, and never as a claim about a person's work in general: the comparison is per artifact, so "this
-keeps happening across your work" is a claim about a *practice* over the window and not something the
+keeps happening across your work" is a claim about a _practice_ over the window and not something the
 delta can say. A strength that simply was not re-observed is not `RESOLVED`.
 
 ## Machine names
 
-| Concept | JSON / API | Java | Database |
-| --- | --- | --- | --- |
-| Practice-review AI purpose | `PRACTICE_REVIEW` | `AgentPurpose.PRACTICE_REVIEW` | `PRACTICE_REVIEW` |
-| Automated-review policy | `automatedReviewPolicy` | `PracticeAutomatedReviewPolicy` | `automated_review_policy` |
-| Practice binding | `on` | `PracticeBinding` | `bindings` |
-| Model binding | `AgentBinding` | `WorkspaceAgentBinding` | `workspace_agent_binding` |
-| Signal | `signals[]` | `SignalName` | inside `bindings` |
-| Draft occasion | `onDrafts` | `PracticeBinding.onDrafts` | inside `bindings` |
-| Evidence requirement | `needs[]` | `PracticeEvidenceRequirement` | inside `bindings` |
-| Evidence stance | `stance` | `EvidenceStance` | inside `bindings` |
-| Artifact kind | `artifactKind` | `ArtifactKind` | `applies_to` |
-| Source display name | `displayName` | `ArtifactSourceContract.displayName` | source catalog |
-| Required capture quality | `requiredQuality` | `RequiredCaptureQuality` | source catalog |
-| Identity policy | `identity` | `IdentityPolicy` | source catalog |
-| Automated review | `automatedReview` | `PracticeAutomatedReview` | inside `automated_review_policy` |
-| Review mode | `mode` | `PracticeAutomatedReviewMode` | inside `automated_review_policy` |
-| Evidence sufficiency | `evidenceSufficiency` | `PracticeEvidenceSufficiency` | inside `automated_review_policy` |
-| Insufficient evidence action | `whenEvidenceIsInsufficient` | `PracticeInsufficientEvidenceAction` | inside `automated_review_policy` |
-| Reason a person is needed | `insufficiencyReason` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
-| Known limitations | `knownLimitations` | `PracticeEvidenceLimitation` | inside `automated_review_policy` |
-| Automated review validation | `automatedReviewValidation` | `PracticeAutomatedReviewValidation` | derived API value |
-| Automated review readiness | not on the HTTP API | `AutomatedReviewReadinessReport` | `agent_job.review_readiness` — its own column, not inside `evidence_snapshot` |
-| Source readiness checks | not on the HTTP API | `SourceReadinessCheck` | inside `agent_job.review_readiness` |
-| Source absence reason | inside `manifest.json` | `SourceAbsenceReason` | inside `agent_job.evidence_snapshot` |
-| Discovery provenance | `discoveredVia` | `DiscoveredVia` | `artifact_signal.discovered_via` |
-| Observation origin | `origin` | `ObservationOrigin` | `observation.origin` |
-| Occurrence state | — | `SignalState` | `artifact_signal.state` |
-| Source-use purpose | `purpose` | `SourceUsePurpose` | source-use decisions |
-| Source absence state | `supportedAbsenceStates` | `SourceAbsenceState` | source catalog |
-| Materialization | `artifacts` | `SourceArtifact` | manifest and content-addressed storage metadata |
-| Autonomy tier | `reviewTier` | `PracticeReviewTier` | `practice.review_tier`, `practice_area.review_tier` (both nullable) |
-| Effective tier | `reviewTier.effective` | `EffectiveReviewTier` | resolved, never stored |
-| Tier source | `reviewTier.source` | `ReviewTierSource` | resolved, never stored |
-| Workspace default tier | `defaultReviewTier` | `PracticeReviewTier` | `workspace.practice_default_review_tier` |
-| Review scope | `reviewScope` | `WorkspaceReviewScope` | `workspace.practice_review_scope` |
-| Feedback channel | `channel` | `FeedbackChannel` | `feedback.channel` |
-| Feedback suppression reason | `suppressionReason` | `FeedbackSuppressionReason` | `feedback.suppression_reason` |
-| Composed feedback unit | not on the HTTP API | `ComposedFeedbackUnit` | never stored as such — parsed from `out/feedback.json` |
-| Composer action | inside `out/feedback.json` | `ComposedFeedbackUnit.Action` | not stored |
-| Withhold reason | inside `out/feedback.json` | `ComposedFeedbackUnit.WithholdReason` | not stored |
-| Conversation move | not on the HTTP API | `ConversationBriefBody` | JSON inside `feedback.body` |
-| Thread key | not on the HTTP API | `FeedbackThreadKey` | `feedback.thread_key` (not unique) |
-| What a message follows | not on the HTTP API | — | `feedback.replaces_id` |
-| Locus movement | inside `inputs/history/delta.json` | `ObservationDelta.Status` | derived, never stored |
-| Signal refusal reason | — | `SignalStateReason` | `artifact_signal.state_reason` |
-| Area dashboard visibility | `visibleInPracticeDashboards` | `PracticeArea.visibleInPracticeDashboards` | `visible_in_practice_dashboards` |
-| Claim currentness | `claimCurrentness` | `ReviewClaimCurrentness` | derived API value |
-| Review-rule fingerprint | `reviewRuleFingerprint` | `ReviewRuleFingerprint` | `review_rule_fingerprint` |
+| Concept                      | JSON / API                         | Java                                       | Database                                                                      |
+| ---------------------------- | ---------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------- |
+| Practice-review AI purpose   | `PRACTICE_REVIEW`                  | `AgentPurpose.PRACTICE_REVIEW`             | `PRACTICE_REVIEW`                                                             |
+| Automated-review policy      | `automatedReviewPolicy`            | `PracticeAutomatedReviewPolicy`            | `automated_review_policy`                                                     |
+| Practice binding             | `on`                               | `PracticeBinding`                          | `bindings`                                                                    |
+| Model binding                | `AgentBinding`                     | `WorkspaceAgentBinding`                    | `workspace_agent_binding`                                                     |
+| Signal                       | `signals[]`                        | `SignalName`                               | inside `bindings`                                                             |
+| Draft occasion               | `onDrafts`                         | `PracticeBinding.onDrafts`                 | inside `bindings`                                                             |
+| Evidence requirement         | `needs[]`                          | `PracticeEvidenceRequirement`              | inside `bindings`                                                             |
+| Evidence stance              | `stance`                           | `EvidenceStance`                           | inside `bindings`                                                             |
+| Artifact kind                | `artifactKind`                     | `ArtifactKind`                             | `applies_to`                                                                  |
+| Source display name          | `displayName`                      | `ArtifactSourceContract.displayName`       | source catalog                                                                |
+| Required capture quality     | `requiredQuality`                  | `RequiredCaptureQuality`                   | source catalog                                                                |
+| Identity policy              | `identity`                         | `IdentityPolicy`                           | source catalog                                                                |
+| Automated review             | `automatedReview`                  | `PracticeAutomatedReview`                  | inside `automated_review_policy`                                              |
+| Review mode                  | `mode`                             | `PracticeAutomatedReviewMode`              | inside `automated_review_policy`                                              |
+| Evidence sufficiency         | `evidenceSufficiency`              | `PracticeEvidenceSufficiency`              | inside `automated_review_policy`                                              |
+| Insufficient evidence action | `whenEvidenceIsInsufficient`       | `PracticeInsufficientEvidenceAction`       | inside `automated_review_policy`                                              |
+| Reason a person is needed    | `insufficiencyReason`              | `PracticeEvidenceLimitation`               | inside `automated_review_policy`                                              |
+| Known limitations            | `knownLimitations`                 | `PracticeEvidenceLimitation`               | inside `automated_review_policy`                                              |
+| Automated review validation  | `automatedReviewValidation`        | `PracticeAutomatedReviewValidation`        | derived API value                                                             |
+| Automated review readiness   | not on the HTTP API                | `AutomatedReviewReadinessReport`           | `agent_job.review_readiness` — its own column, not inside `evidence_snapshot` |
+| Source readiness checks      | not on the HTTP API                | `SourceReadinessCheck`                     | inside `agent_job.review_readiness`                                           |
+| Source absence reason        | inside `manifest.json`             | `SourceAbsenceReason`                      | inside `agent_job.evidence_snapshot`                                          |
+| Discovery provenance         | `discoveredVia`                    | `DiscoveredVia`                            | `artifact_signal.discovered_via`                                              |
+| Observation origin           | `origin`                           | `ObservationOrigin`                        | `observation.origin`                                                          |
+| Occurrence state             | —                                  | `SignalState`                              | `artifact_signal.state`                                                       |
+| Source-use purpose           | `purpose`                          | `SourceUsePurpose`                         | source-use decisions                                                          |
+| Source absence state         | `supportedAbsenceStates`           | `SourceAbsenceState`                       | source catalog                                                                |
+| Materialization              | `artifacts`                        | `SourceArtifact`                           | manifest and content-addressed storage metadata                               |
+| Practice autonomy            | `autonomy`                         | `PracticeAutonomy`                         | `practice.autonomy`, `practice_area.autonomy` (both nullable)                 |
+| Effective autonomy           | `autonomy.effective`               | `EffectiveAutonomy`                        | resolved, never stored                                                        |
+| Autonomy source              | `autonomy.source`                  | `AutonomySource`                           | resolved, never stored                                                        |
+| Workspace default autonomy   | `defaultAutonomy`                  | `PracticeAutonomy`                         | `workspace.practice_default_autonomy`                                         |
+| Review scope                 | `reviewScope`                      | `WorkspaceReviewScope`                     | `workspace.practice_review_scope`                                             |
+| Feedback channel             | `channel`                          | `FeedbackChannel`                          | `feedback.channel`                                                            |
+| Feedback suppression reason  | `suppressionReason`                | `FeedbackSuppressionReason`                | `feedback.suppression_reason`                                                 |
+| Composed feedback unit       | not on the HTTP API                | `ComposedFeedbackUnit`                     | never stored as such — parsed from `out/feedback.json`                        |
+| Composer action              | inside `out/feedback.json`         | `ComposedFeedbackUnit.Action`              | not stored                                                                    |
+| Withhold reason              | inside `out/feedback.json`         | `ComposedFeedbackUnit.WithholdReason`      | not stored                                                                    |
+| Conversation move            | not on the HTTP API                | `ConversationBriefBody`                    | JSON inside `feedback.body`                                                   |
+| Thread key                   | not on the HTTP API                | `FeedbackThreadKey`                        | `feedback.thread_key` (not unique)                                            |
+| What a message follows       | not on the HTTP API                | —                                          | `feedback.replaces_id`                                                        |
+| Locus movement               | inside `inputs/history/delta.json` | `ObservationDelta.Status`                  | derived, never stored                                                         |
+| Signal refusal reason        | —                                  | `SignalStateReason`                        | `artifact_signal.state_reason`                                                |
+| Area dashboard visibility    | `visibleInPracticeDashboards`      | `PracticeArea.visibleInPracticeDashboards` | `visible_in_practice_dashboards`                                              |
+| Claim currentness            | `claimCurrentness`                 | `ReviewClaimCurrentness`                   | derived API value                                                             |
+| Review-rule fingerprint      | `reviewRuleFingerprint`            | `ReviewRuleFingerprint`                    | `review_rule_fingerprint`                                                     |
 
 The contract uses stable uppercase values. Author-facing UI combines the implementation fields into one
 mentoring choice:
@@ -363,17 +336,17 @@ mentoring choice:
 Availability, content, completeness, and collection outcome are four separate facts about one capture,
 never one field. The [artifact-source contract](./artifact-source-contract.mdx#capture-state) defines
 them and the states each may take; write about a capture in its words, and in particular do not write
-that a capture is *stale* — there is no such state, and the contract says why.
+that a capture is _stale_ — there is no such state, and the contract says why.
 
 ## Outcome states
 
 Three distinctions carry the whole weight of reading the observation table as behaviour. Do not conflate them.
 
-| Generation outcome | Meaning | Result |
-| --- | --- | --- |
-| `NO_REVIEW_OCCASION` | The practice's prerequisite situation did not occur in this work. | An observation, normalized to durable `Presence.NOT_APPLICABLE`; requires `evidence.exclusion`. |
-| `INSUFFICIENT_EVIDENCE` | The situation occurred and available evidence was read, but it did not decide the question. | An observation, normalized to durable `Presence.INCONCLUSIVE`; requires `evidence.missingEvidence`. |
-| Readiness refusal | A required source was unavailable, stale, partial, redacted, errored, or empty where content was required. | A readiness decision on the review; **no observation**. |
+| Generation outcome      | Meaning                                                                                                    | Result                                                                                              |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| `NO_REVIEW_OCCASION`    | The practice's prerequisite situation did not occur in this work.                                          | An observation, normalized to durable `Presence.NOT_APPLICABLE`; requires `evidence.exclusion`.     |
+| `INSUFFICIENT_EVIDENCE` | The situation occurred and available evidence was read, but it did not decide the question.                | An observation, normalized to durable `Presence.INCONCLUSIVE`; requires `evidence.missingEvidence`. |
+| Readiness refusal       | A required source was unavailable, stale, partial, redacted, errored, or empty where content was required. | A readiness decision on the review; **no observation**.                                             |
 
 The generation values are the only choices offered by `report_observation`; the `Presence` values are
 storage and read-projection vocabulary. `NO_REVIEW_OCCASION` is not a fallback for uncertainty: its
@@ -386,16 +359,16 @@ server admission.
 
 1. A practice author chooses **AI-supported mentoring**, **Human review needed**, or **Guidance only**.
 2. For AI-supported mentoring, the occasion's recommended evidence is applied automatically; an author customizes it only when that occasion needs different evidence or limitations. Reading different evidence at a different moment is a second practice, not a second occasion.
-3. Only AI-supported mentoring can be reviewed. The other choices force the autonomy tier to `OFF` and never start an automated review.
+3. Only AI-supported mentoring can be reviewed. The other choices force the practice autonomy to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator sets the workspace default tier, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
+6. A workspace administrator sets the workspace default autonomy, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
 10. Observations retain the exact practice revision, source contract, and evidence provenance.
 11. Practice or source-contract changes move the review-rule fingerprint, so earlier claims derive as stale. Nothing marks a claim stale by hand.
-12. Automated review validation — always `AUTHOR_DECLARED` — is separate from source authorization, autonomy tier, and per-run readiness.
+12. Automated review validation — always `AUTHOR_DECLARED` — is separate from source authorization, practice autonomy, and per-run readiness.
 
 ## Writing rules
 
@@ -405,9 +378,9 @@ server admission.
 4. Put stable reason codes in machine fields and plain explanations in UI messages.
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
-7. Say what a tier does, never how loud it is: a tier is autonomy, and it is the only delivery decision a workspace configures. Nothing a tier does reaches the public **Profile** page.
-8. Never write bare **binding**. Two unrelated things carry the word — a *practice binding* (an occasion
-   a practice is reviewed on, `PracticeBinding`) and a *model binding* (a workspace's AI model for a
+7. Describe autonomy as release authority, never as loudness or reach. It does not affect the public **Profile** page.
+8. Never write bare **binding**. Two unrelated things carry the word — a _practice binding_ (an occasion
+   a practice is reviewed on, `PracticeBinding`) and a _model binding_ (a workspace's AI model for a
    purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,
    label, or javadoc that says only "binding" has already lost that distinction, which is why the reason
    code for a missing AI model is `REVIEW_MODEL_UNBOUND` and names the thing it means.

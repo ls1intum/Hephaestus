@@ -15,14 +15,14 @@ import de.tum.cit.aet.hephaestus.practices.dto.BindPracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PlacePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierSource;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomySource;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -96,7 +96,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Detect prompt for " + slug);
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        practice.setReviewTier(active ? PracticeReviewTier.DELIVER : PracticeReviewTier.OFF);
+        practice.setAutonomy(active ? PracticeAutonomy.AUTOMATIC : PracticeAutonomy.OFF);
         return practiceRepository.save(practice);
     }
 
@@ -283,7 +283,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?reviewTier=DELIVER", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?autonomy=AUTOMATIC", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -342,9 +342,9 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("target-practice");
             assertThat(result.name()).isEqualTo("Target Practice");
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.DELIVER);
-            assertThat(result.reviewTier().inherited()).isFalse();
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.AUTOMATIC);
+            assertThat(result.autonomy().override()).isEqualTo(PracticeAutonomy.AUTOMATIC);
+            assertThat(result.autonomy().inherited()).isFalse();
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for target-practice");
             assertThat(result.createdAt()).isNotNull();
@@ -436,12 +436,11 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST)
             );
-            // A new practice states no tier of its own; the tier in force is the workspace's, which is
-            // DELIVER until the workspace says otherwise.
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
-            assertThat(result.reviewTier().override()).isNull();
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
-            assertThat(result.reviewTier().inherited()).isTrue();
+            // A new practice inherits the fail-closed workspace default until an admin widens it.
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(result.autonomy().override()).isNull();
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.WORKSPACE);
+            assertThat(result.autonomy().inherited()).isTrue();
             assertThat(result.id()).isNotNull();
             assertThat(result.createdAt()).isNotNull();
             assertThat(result.updatedAt()).isNotNull();
@@ -452,7 +451,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             );
             assertThat(persisted).isPresent();
             assertThat(persisted.get().getName()).isEqualTo("Practice new-practice");
-            assertThat(persisted.get().getReviewTier()).isNull();
+            assertThat(persisted.get().getAutonomy()).isNull();
         }
 
         @Test
@@ -488,8 +487,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             assertThat(result.slug()).isEqualTo("minimal-practice");
             assertThat(result.criteria()).isEqualTo("Minimal criteria");
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
-            assertThat(result.reviewTier().override()).isNull();
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(result.autonomy().override()).isNull();
             assertThat(result.automatedReviewPolicy()).isEqualTo(
                 evidenceDefaults.policyFor(ArtifactKinds.PULL_REQUEST)
             );
@@ -518,8 +517,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result).isNotNull();
             // Held on the practice, not inherited: a practice that cannot run a review must stay off
             // whatever its area or its workspace later decides.
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.OFF);
+            assertThat(result.autonomy().override()).isEqualTo(PracticeAutonomy.OFF);
         }
 
         @Test
@@ -981,7 +980,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
             assertThat(result.name()).isEqualTo("Updated Name");
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
             assertThat(result.criteria()).isEqualTo("Detect prompt for update-me");
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.AUTOMATIC);
             assertThat(result.areaSlug()).isEqualTo("existing-area");
         }
 
@@ -1042,8 +1041,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.OFF);
+            assertThat(result.autonomy().override()).isEqualTo(PracticeAutonomy.OFF);
             // The occasion survives — it is where the practice's kind comes from — but a practice
             // nobody automates reads nothing, so the evidence goes with the automation that read it.
             assertThat(signalsOf(result)).containsExactly(ScmSignals.PULL_REQUEST_OPENED);
@@ -1052,8 +1051,8 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), practice.getSlug())
                     .orElseThrow()
-                    .getReviewTier()
-            ).isEqualTo(PracticeReviewTier.OFF);
+                    .getAutonomy()
+            ).isEqualTo(PracticeAutonomy.OFF);
         }
 
         @Test
@@ -1587,30 +1586,30 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
     }
 
     @Nested
-    @DisplayName("PATCH /practices/{practiceSlug}/review-tier")
+    @DisplayName("PATCH /practices/{practiceSlug}/autonomy")
     class SetUsedInNewReviews {
 
         /**
-         * Every rung is settable on a practice, and setting one is the practice's own decision. PROPOSE is
+         * Every rung is settable on a practice, and setting one is the practice's own decision. HUMAN_APPROVAL is
          * in the list on purpose: it is the only way to turn one practice down without turning its
-         * measurement off, so refusing it here would make the tier a boolean again. The seed is always the
-         * opposite end of the ladder, so every case is a real change rather than a re-send of the tier
+         * measurement off, so refusing it here would make the autonomy a boolean again. The seed is always the
+         * opposite end of the ladder, so every case is a real change rather than a re-send of the autonomy
          * already in force.
          */
         @ParameterizedTest
-        @EnumSource(PracticeReviewTier.class)
+        @EnumSource(PracticeAutonomy.class)
         @WithAdminUser
-        @DisplayName("stores any tier as the practice's own and reports the practice as the source")
-        void shouldSetThePracticesOwnTier(PracticeReviewTier tier) {
+        @DisplayName("stores any autonomy as the practice's own and reports the practice as the source")
+        void shouldSetThePracticesOwnAutonomy(PracticeAutonomy autonomy) {
             ensureAdminMembership(workspace);
-            persistPractice("retier-me", "Name", tier == PracticeReviewTier.OFF);
+            persistPractice("retier-me", "Name", autonomy == PracticeAutonomy.OFF);
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "retier-me")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "retier-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(tier))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(autonomy))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1619,13 +1618,13 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(tier);
-            assertThat(result.reviewTier().override()).isEqualTo(tier);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.PRACTICE);
+            assertThat(result.autonomy().effective()).isEqualTo(autonomy);
+            assertThat(result.autonomy().override()).isEqualTo(autonomy);
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.PRACTICE);
 
             Optional<Practice> persisted = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), "retier-me");
             assertThat(persisted).isPresent();
-            assertThat(persisted.get().getReviewTier()).isEqualTo(tier);
+            assertThat(persisted.get().getAutonomy()).isEqualTo(autonomy);
         }
 
         @Test
@@ -1638,10 +1637,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "no-automated-review")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "no-automated-review")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.AUTOMATIC))
                 .exchange()
                 .expectStatus()
                 .isBadRequest();
@@ -1656,10 +1655,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "already-active")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "already-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.DELIVER))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.AUTOMATIC))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1668,7 +1667,7 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.AUTOMATIC);
         }
 
         @Test
@@ -1679,10 +1678,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "non-existent")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "non-existent")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isNotFound();
@@ -1697,26 +1696,26 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "forbidden-toggle")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "forbidden-toggle")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isForbidden();
         }
 
         /**
-         * A null tier is the only way back out of an override. Without it the chain would be write-once:
+         * A null autonomy is the only way back out of an override. Without it the chain would be write-once:
          * an administrator who set one practice explicitly could never return it to its area's decision.
          */
         @Test
         @WithAdminUser
-        @DisplayName("a null tier clears the practice's own setting and it inherits again")
+        @DisplayName("a null autonomy clears the practice's own setting and it inherits again")
         void shouldClearTheOverrideOnNullTier() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistArea("area-with-a-tier");
-            area.setReviewTier(PracticeReviewTier.PROPOSE);
+            PracticeArea area = persistArea("area-with-a-autonomy");
+            area.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
             practiceAreaRepository.save(area);
             Practice practice = persistPractice("null-active", "Name", true);
             practice.setArea(area);
@@ -1724,10 +1723,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
             PracticeDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "null-active")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "null-active")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"reviewTier\": null}")
+                .bodyValue("{\"autonomy\": null}")
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -1736,15 +1735,15 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().override()).isNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
-            assertThat(result.reviewTier().inherited()).isTrue();
+            assertThat(result.autonomy().override()).isNull();
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.AREA);
+            assertThat(result.autonomy().inherited()).isTrue();
             assertThat(
                 practiceRepository
                     .findByWorkspaceIdAndSlug(workspace.getId(), "null-active")
                     .orElseThrow()
-                    .getReviewTier()
+                    .getAutonomy()
             ).isNull();
         }
 
@@ -1753,10 +1752,10 @@ class PracticeCatalogControllerIntegrationTest extends AbstractWorkspaceIntegrat
         void shouldReturnUnauthorized() {
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{slug}/review-tier", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{slug}/autonomy", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(withCsrfForAnonymousWrite())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

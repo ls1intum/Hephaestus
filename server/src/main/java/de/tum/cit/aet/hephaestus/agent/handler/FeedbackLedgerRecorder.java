@@ -2,6 +2,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DeliveryContent;
 import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.DiffNote;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeDetectionResultParser.ValidatedObservation;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.ConversationalFeedbackPreparer;
 import de.tum.cit.aet.hephaestus.agent.handler.conversation.PracticeDetectionDeliveredEvent;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -99,11 +100,11 @@ public class FeedbackLedgerRecorder {
     private static final int GATE_SUPPRESSED_UNIT_ORDINAL = 5000;
 
     /**
-     * Tier-withheld SUPPRESSED units start here, one band clear of the one above. Public so
+     * Autonomy-withheld SUPPRESSED units start here, one band clear of the one above. Public so
      * {@code InContextDeliveryGate} derives its positions from the one shared constant rather than a second
      * literal, and so it can bound itself by {@link #UNIT_ORDINAL_BAND_WIDTH}.
      */
-    public static final int TIER_WITHHELD_UNIT_ORDINAL_BASE = 6000;
+    public static final int AUTONOMY_WITHHELD_UNIT_ORDINAL_BASE = 6000;
 
     /**
      * IN_APP units start here, one band clear of the one above. They share the review job's
@@ -552,10 +553,10 @@ public class FeedbackLedgerRecorder {
     /**
      * Record a SUPPRESSED {@code IN_CONTEXT} unit for a locus that was measured and recorded but not let
      * through to the artifact — deliberately unsaid. Sits in its own ordinal band
-     * ({@value #TIER_WITHHELD_UNIT_ORDINAL_BASE}+) so it never collides with the reaction-aware band.
+     * ({@value #AUTONOMY_WITHHELD_UNIT_ORDINAL_BASE}+) so it never collides with the reaction-aware band.
      * Best-effort like its sibling: REQUIRES_NEW, callers wrap in try/catch.
      *
-     * @param reason which of the two withholding rules fired — the practice's loudness tier, or the
+     * @param reason which of the two withholding rules fired — the practice's autonomy, or the
      *     observation's backfill provenance. Passed in rather than fixed because the two are undone by
      *     different acts and an evaluation has to be able to tell them apart.
      * @param index position within the band; the caller must keep it under
@@ -563,7 +564,62 @@ public class FeedbackLedgerRecorder {
      */
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void recordWithheld(AgentJob job, Observation observation, FeedbackSuppressionReason reason, int index) {
-        recordSuppressedAt(job, observation, reason, TIER_WITHHELD_UNIT_ORDINAL_BASE + index);
+        recordSuppressedAt(job, observation, reason, AUTONOMY_WITHHELD_UNIT_ORDINAL_BASE + index);
+    }
+
+    /** Stores the exact separately composed human-approval body before any provider side effect. */
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void recordProposal(AgentJob job, DeliveryContent delivery, List<ValidatedObservation> proposed) {
+        final int position = 7_000;
+        if (delivery == null || delivery.mrNote() == null || delivery.mrNote().isBlank()) return;
+        if (feedbackRepository.existsByAgentJobIdAndPosition(job.getId(), position)) return;
+        Map<String, Observation> stored = observationRepository
+            .findByAgentJobId(job.getId())
+            .stream()
+            .filter(observation -> observation.getOccurrenceKey() != null)
+            .collect(
+                java.util.stream.Collectors.toMap(
+                    Observation::getOccurrenceKey,
+                    observation -> observation,
+                    (first, duplicate) -> first
+                )
+            );
+        Observation first = proposed
+            .stream()
+            .map(ValidatedObservation::occurrenceKey)
+            .map(stored::get)
+            .filter(java.util.Objects::nonNull)
+            .findFirst()
+            .orElse(null);
+        if (first == null) return;
+        Feedback feedback = feedbackRepository.save(
+            Feedback.builder()
+                .agentJobId(job.getId())
+                .workspaceId(job.getWorkspace().getId())
+                .artifactKind(first.getArtifactKind())
+                .artifactId(first.getArtifactId())
+                .recipientUserId(first.getAboutUserId())
+                .aboutUserId(first.getAboutUserId())
+                .channel(FeedbackChannel.IN_CONTEXT)
+                .position(position)
+                .deliveryState(FeedbackDeliveryState.AWAITING_APPROVAL)
+                .body(delivery.mrNote())
+                .source(FeedbackSource.AGENT)
+                .createdAt(Instant.now())
+                .build()
+        );
+        int ordinal = 0;
+        for (ValidatedObservation candidate : proposed) {
+            Observation observation = stored.get(candidate.occurrenceKey());
+            if (observation != null) {
+                feedbackObservationRepository.insertIfAbsent(
+                    feedback.getId(),
+                    observation.getId(),
+                    EvidenceRole.PRIMARY.name(),
+                    ordinal++
+                );
+            }
+        }
     }
 
     private void recordSuppressedAt(

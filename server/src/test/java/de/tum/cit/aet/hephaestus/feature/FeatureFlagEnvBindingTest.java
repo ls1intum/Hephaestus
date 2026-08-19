@@ -18,8 +18,7 @@ import org.springframework.core.io.ClassPathResource;
  * Two env-var names reach each CONFIG feature flag, and both have to keep working: the long
  * {@code HEPHAESTUS_FEATURES_FLAGS_*} form that Boot's relaxed binding resolves into the flag map, and
  * the short name that {@code application.yml} reads through a placeholder — {@code GITLAB_WORKSPACE_CREATION},
- * {@code PRACTICE_REVIEW_FOR_ALL} — which is the name the operator docs, {@code docker/.env} and the
- * compose files all use.
+ * which is the name the operator docs, {@code docker/.env} and the compose files all use.
  *
  * <p>The short name is only real because {@code application.yml} carries the placeholder — a
  * Compose-file alias would leave it doing nothing anywhere else. These tests bind the shipped
@@ -38,18 +37,10 @@ class FeatureFlagEnvBindingTest extends BaseUnitTest {
     }
 
     @Test
-    void practiceReviewForAllIsSettableByItsDocumentedEnvVar() throws Exception {
-        FeatureProperties properties = bindWith(Map.of("PRACTICE_REVIEW_FOR_ALL", "true"));
-
-        assertThat(properties.isEnabled("practice-review-for-all")).isTrue();
-    }
-
-    @Test
     void bothFlagsAreOffWhenNothingIsSet() throws Exception {
         FeatureProperties properties = bindWith(Map.of());
 
         assertThat(properties.isEnabled("gitlab-workspace-creation")).isFalse();
-        assertThat(properties.isEnabled("practice-review-for-all")).isFalse();
     }
 
     /**

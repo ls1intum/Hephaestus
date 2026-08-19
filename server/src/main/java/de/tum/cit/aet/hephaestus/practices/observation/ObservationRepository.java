@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryProjection;
@@ -786,32 +786,21 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         Long getFailed();
     }
 
-    /**
-     * The raw tier columns of each observation's practice <em>and of that practice's area</em>, resolved in
-     * ONE query rather than by walking the lazy {@code Observation.practice} association: the conversational
-     * router receives observations that may already be detached, so a lazy proxy there would make the tier
-     * rule's correctness depend on whether the caller happens to hold a session.
-     *
-     * <p>Both levels are projected because null means different things at each: an unresolved lookup is
-     * admitted, while a practice that merely inherits its tier must be held to the tier it inherits.
-     * Projecting only the practice column would have made every inheriting practice look unresolved and
-     * admitted it regardless of what its area or workspace had decided.
-     */
     @Query(
         """
-        SELECT o.id AS observationId, p.reviewTier AS practiceTier, a.reviewTier AS areaTier
+        SELECT o.id AS observationId, p.autonomy AS practiceAutonomy, a.autonomy AS areaAutonomy
         FROM Observation o
         JOIN o.practice p
         LEFT JOIN p.area a
         WHERE o.id IN :observationIds
         """
     )
-    List<ObservationPracticeTier> practiceReviewTiersFor(@Param("observationIds") Collection<UUID> observationIds);
+    List<ObservationPracticeAutonomy> findPracticeAutonomyFor(@Param("observationIds") Collection<UUID> observationIds);
 
     /**
      * The practice each of {@code observationIds} measures, by slug.
      *
-     * <p>Projected for the same reason as {@link #practiceReviewTiersFor}: the composition stage names a
+     * <p>Projected for the same reason as {@link #findPracticeAutonomyFor}: the composition stage names a
      * practice and nothing else about the evidence, so this join is the whole of the match between what the
      * composer wrote and what was measured — and the producer that needs it is handed observations that may
      * already be detached. A lazy {@code o.practice.slug} there would make a composed message reach the
@@ -835,15 +824,14 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         String getPracticeSlug();
     }
 
-    /** One observation's practice tier and its area's, without loading any of the three entities. */
-    interface ObservationPracticeTier {
+    interface ObservationPracticeAutonomy {
         UUID getObservationId();
 
         @Nullable
-        PracticeReviewTier getPracticeTier();
+        PracticeAutonomy getPracticeAutonomy();
 
         @Nullable
-        PracticeReviewTier getAreaTier();
+        PracticeAutonomy getAreaAutonomy();
     }
 
     /**

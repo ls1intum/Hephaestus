@@ -11,6 +11,7 @@ import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,6 +21,50 @@ import org.springframework.transaction.annotation.Transactional;
 @Repository
 @WorkspaceAgnostic("Feedback is scoped by a raw workspace_id scalar (cross-module FK), not a Workspace association")
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
+    @Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @Query("SELECT f FROM Feedback f WHERE f.id = :id AND f.workspaceId = :workspaceId")
+    Optional<Feedback> lockByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE feedback SET delivery_state = :targetState WHERE id = :id AND workspace_id = :workspaceId " +
+            "AND delivery_state = 'AWAITING_APPROVAL'",
+        nativeQuery = true
+    )
+    int decideProposal(
+        @Param("workspaceId") Long workspaceId,
+        @Param("id") UUID id,
+        @Param("targetState") String targetState
+    );
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'AWAITING_APPROVAL'",
+        nativeQuery = true
+    )
+    int suppressProposal(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markApprovedDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markApprovedSuppressed(
+        @Param("workspaceId") Long workspaceId,
+        @Param("id") UUID id,
+        @Param("reason") String reason
+    );
+
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);
 

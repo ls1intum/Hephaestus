@@ -394,12 +394,11 @@ hephaestus:
     # CONFIG-backed feature flags evaluated by FeatureFlagService.
     # ROLE-backed flags (mentor_access, admin, etc.) are stored per account in the account_feature table.
     # Each flag names its own env var so the SHORT name works everywhere: docker/.env, the compose files
-    # and the admin docs all say GITLAB_WORKSPACE_CREATION / PRACTICE_REVIEW_FOR_ALL. The long
+    # and the admin docs all say GITLAB_WORKSPACE_CREATION. The long
     # relaxed-binding form (HEPHAESTUS_FEATURES_FLAGS_GITLAB_WORKSPACE_CREATION) also reaches these keys
     # and still wins when both are set. Pinned by FeatureFlagEnvBindingTest.
     features:
         flags:
-            practice-review-for-all: ${PRACTICE_REVIEW_FOR_ALL:false}
             gitlab-workspace-creation: ${GITLAB_WORKSPACE_CREATION:false}
 
     # ═══════════════════════════════════════════════════════════════════════════
@@ -408,8 +407,6 @@ hephaestus:
     # Controls the detection gate for the practice-aware PR review agent.
     # The gate decides whether to submit an agent job for a PR event.
     practice-review:
-        # true = run for ALL users (bypass role check); false = require the run_practice_review feature flag
-        run-for-all-users: ${PRACTICE_REVIEW_RUN_FOR_ALL:false}
         # whether to deliver feedback to already-merged PRs
         deliver-to-merged: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:false}
         # minimum minutes between reviews for the same PR (0 = no cooldown)

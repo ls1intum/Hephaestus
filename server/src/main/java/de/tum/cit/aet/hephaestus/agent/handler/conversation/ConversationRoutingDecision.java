@@ -16,8 +16,8 @@ public enum ConversationRoutingDecision {
     ALREADY_DELIVERED_IN_CONTEXT,
     /** Reviewer-targeted - deferred (ADR 0021). */
     REVIEWER_DEFERRED,
-    /** The practice's autonomy tier (OFF or PROPOSE) does not admit the conversation channel. */
-    PRACTICE_TIER_QUIET,
+    /** The practice's autonomy (OFF or HUMAN_APPROVAL) does not admit the conversation channel. */
+    PRACTICE_REQUIRES_APPROVAL,
     /**
      * From a backfill campaign - coaching on a decision made months ago would present retrospective
      * measurement as today's work, so it is recorded but raised nowhere.

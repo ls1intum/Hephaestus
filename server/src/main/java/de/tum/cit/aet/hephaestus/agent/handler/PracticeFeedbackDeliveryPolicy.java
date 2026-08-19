@@ -56,7 +56,7 @@ class PracticeFeedbackDeliveryPolicy {
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         if (workspace == null) {
-            return Decision.denied();
+            return Decision.suppressed(FeedbackSuppressionReason.WORKSPACE_DISABLED);
         }
         JsonNode metadata = job.getMetadata();
         Issue issue = integralId(metadata, "issue_id")
@@ -83,7 +83,7 @@ class PracticeFeedbackDeliveryPolicy {
         long workspaceId = requireWorkspaceId(job);
         Workspace workspace = activePracticeWorkspace(workspaceId);
         if (workspace == null) {
-            return Decision.denied();
+            return Decision.suppressed(FeedbackSuppressionReason.WORKSPACE_DISABLED);
         }
         JsonNode metadata = job.getMetadata();
         PullRequest pullRequest = integralId(metadata, "pull_request_id")
@@ -144,7 +144,7 @@ class PracticeFeedbackDeliveryPolicy {
         return accountPreferencesQuery
             .preferencesForUserId(artifact.getAuthor().getId())
             .map(AccountPreferencesQuery.PreferencesView::practiceFeedbackDeliveryEnabled)
-            .orElse(true);
+            .orElse(false);
     }
 
     private @Nullable Workspace activePracticeWorkspace(long workspaceId) {
@@ -176,10 +176,6 @@ class PracticeFeedbackDeliveryPolicy {
 
         static <T extends Issue> Decision<T> suppressed(FeedbackSuppressionReason reason) {
             return new Decision<>(null, reason);
-        }
-
-        static <T extends Issue> Decision<T> denied() {
-            return new Decision<>(null, null);
         }
 
         boolean allowed() {

@@ -1,29 +1,20 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.feature.FeatureFlag;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
-import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.atomic.AtomicReference;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
@@ -32,8 +23,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Decides whether to run the practice review agent for a PR or issue event, running checks ordered
- * cheap-to-expensive to short-circuit before sandbox execution. Preconditions: the {@link PullRequest}
- * must have labels, assignees, and repository eagerly loaded before calling {@link #evaluate}.
+ * cheap-to-expensive to short-circuit before sandbox execution. The reviewable's repository must be
+ * loaded before calling {@link #evaluate}; audience selection belongs to delivery, not detection.
  *
  * <p>{@link #evaluateSignal} is the entry point for a kind with no repository, branch or assignee; it
  * shares the workspace/signal steps below with the reviewable path via {@code evaluateWorkspaceAndSignal}.
@@ -42,39 +33,23 @@ import org.springframework.stereotype.Service;
 public class PracticeReviewDetectionGate {
 
     private static final Logger log = LoggerFactory.getLogger(PracticeReviewDetectionGate.class);
-    private static final String PRACTICE_REVIEW_ROLE = FeatureFlag.RUN_PRACTICE_REVIEW.key();
-    private static final Duration SKIP_WARNING_INTERVAL = Duration.ofSeconds(30);
-
-    private final PracticeReviewProperties properties;
-    private final UserRoleChecker userRoleChecker;
     private final PracticeReviewReadiness practiceDetectionReadiness;
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
     private final PracticeSignalOptions signalOptions;
 
-    private final AtomicLong skippedDueToUnhealthyCount = new AtomicLong(0);
-    private final AtomicReference<Instant> lastSkipWarningTime = new AtomicReference<>(Instant.EPOCH);
-
     public PracticeReviewDetectionGate(
-        PracticeReviewProperties properties,
-        UserRoleChecker userRoleChecker,
         PracticeReviewReadiness practiceDetectionReadiness,
         PracticeRepository practiceRepository,
         WorkspaceResolver workspaceResolver,
         PracticeSignalOptions signalOptions
     ) {
-        this.properties = properties;
-        this.userRoleChecker = userRoleChecker;
         this.practiceDetectionReadiness = practiceDetectionReadiness;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
         this.signalOptions = signalOptions;
     }
 
-    /**
-     * Deliberately not {@code @Transactional}: each DB read runs in its own transaction, so the gate
-     * never holds a connection across the external role-check call in {@link #checkAssigneeRoles}.
-     */
     public GateDecision evaluate(
         @NonNull PullRequest pullRequest,
         @NonNull SignalName signal,
@@ -170,87 +145,7 @@ public class PracticeReviewDetectionGate {
         if (shared instanceof GateDecision.Skip) {
             return shared;
         }
-        List<Practice> matchedPractices = ((GateDecision.Detect) shared).matchedPractices();
-
-        // Run-for-all bypass skips the role check entirely; falls back to the instance property.
-        if (workspace.getReviewSettings().resolveRunForAllUsers(properties.runForAllUsers())) {
-            log.info(
-                "Practice review gate: DETECT, reason=runForAllUsers, prId={}, matchedPractices={}",
-                reviewable.getId(),
-                matchedPractices.size()
-            );
-            return new GateDecision.Detect(workspace, matchedPractices);
-        }
-
-        var assignees = reviewable.getAssignees();
-        if (assignees == null || assignees.isEmpty()) {
-            log.debug("Practice review gate: SKIP, reason=noAssignee, prId={}", reviewable.getId());
-            return new GateDecision.Skip("no assignee");
-        }
-
-        if (!userRoleChecker.isHealthy()) {
-            logSkippedDueToUnhealthy(reviewable);
-            return new GateDecision.Skip("role checker unhealthy");
-        }
-
-        long previousCount = skippedDueToUnhealthyCount.getAndSet(0);
-        if (previousCount > 0) {
-            log.info("Role checker recovered, resuming practice review gate checks");
-        }
-
-        return checkAssigneeRoles(reviewable, assignees, workspace, matchedPractices);
-    }
-
-    /**
-     * Fails closed on the first role-check exception rather than trying the next assignee — a
-     * misbehaving role checker should not get more calls.
-     */
-    private GateDecision checkAssigneeRoles(
-        Issue reviewable,
-        Set<User> assignees,
-        Workspace workspace,
-        List<Practice> matchedPractices
-    ) {
-        for (User assignee : assignees) {
-            try {
-                // Role checks key on (gitProviderId, nativeId) — matching IdentityLink.subject, not the
-                // login — so a half-synced assignee fails safe (no role) rather than throwing.
-                var provider = assignee.getProvider();
-                if (provider == null || provider.getId() == null || assignee.getNativeId() == null) {
-                    continue;
-                }
-                if (
-                    userRoleChecker.hasRole(
-                        provider.getId(),
-                        String.valueOf(assignee.getNativeId()),
-                        PRACTICE_REVIEW_ROLE
-                    )
-                ) {
-                    log.info(
-                        "Practice review gate: DETECT, reason=hasRole, prId={}, userLogin={}, matchedPractices={}",
-                        reviewable.getId(),
-                        assignee.getLogin(),
-                        matchedPractices.size()
-                    );
-                    return new GateDecision.Detect(workspace, matchedPractices);
-                }
-            } catch (Exception e) {
-                log.warn(
-                    "Practice review gate: role check failed, prId={}, userLogin={}, error={}",
-                    reviewable.getId(),
-                    assignee.getLogin(),
-                    e.getMessage()
-                );
-                return new GateDecision.Skip("role check failed");
-            }
-        }
-
-        log.debug(
-            "Practice review gate: SKIP, reason=noAssigneeWithRole, prId={}, role={}",
-            reviewable.getId(),
-            PRACTICE_REVIEW_ROLE
-        );
-        return new GateDecision.Skip("no assignee with role: " + PRACTICE_REVIEW_ROLE);
+        return shared;
     }
 
     /**
@@ -321,7 +216,7 @@ public class PracticeReviewDetectionGate {
         if (match.admitted().isEmpty()) {
             // Two reasons, not one: "bound and turned all the way down" is a deliberate act and must stay
             // answerable apart from "nothing bound".
-            if (match.silencedByTier()) {
+            if (match.hasDisabledPractice()) {
                 log.debug(
                     "Practice review gate: SKIP, reason=allBoundPracticesOff, subject={}, signal={}, workspaceId={}",
                     subject,
@@ -330,7 +225,7 @@ public class PracticeReviewDetectionGate {
                 );
                 return new GateDecision.Skip(
                     "every practice bound to this signal is off",
-                    SignalStateReason.PRACTICE_TIER_OFF
+                    SignalStateReason.PRACTICE_AUTONOMY_OFF
                 );
             }
             log.debug(
@@ -349,11 +244,11 @@ public class PracticeReviewDetectionGate {
     }
 
     /**
-     * @param admitted the practices to review — bound to the signal and above {@link PracticeReviewTier#OFF}
-     * @param silencedByTier at least one practice was bound to the signal and sat at {@code OFF}; this is
+     * @param admitted the practices to review — bound to the signal and above {@link PracticeAutonomy#OFF}
+     * @param hasDisabledPractice at least one practice was bound to the signal and sat at {@code OFF}; this is
      *     what lets the caller record "deliberately silenced" rather than "nothing bound"
      */
-    private record SignalMatch(List<Practice> admitted, boolean silencedByTier) {}
+    private record SignalMatch(List<Practice> admitted, boolean hasDisabledPractice) {}
 
     /**
      * The practices a signal occasions. A manual request is matched differently: it admits every practice
@@ -374,32 +269,13 @@ public class PracticeReviewDetectionGate {
                     )
             )
             .toList();
-        // Reading the tier column raw would ask a practice that holds no opinion for one; resolve it
+        // Reading the autonomy column raw would ask a practice that holds no opinion for one; resolve it
         // through practice -> area -> workspace instead.
-        PracticeReviewTier workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultTier();
+        PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
         List<Practice> admitted = bound
             .stream()
-            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
+            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault).admitsReview())
             .toList();
         return new SignalMatch(admitted, admitted.isEmpty() && !bound.isEmpty());
-    }
-
-    private void logSkippedDueToUnhealthy(Issue reviewable) {
-        long currentCount = skippedDueToUnhealthyCount.incrementAndGet();
-        Instant now = Instant.now();
-        Instant lastWarning = lastSkipWarningTime.get();
-
-        log.debug(
-            "Practice review gate: SKIP, reason=roleCheckerUnhealthy, prId={}, skippedCount={}",
-            reviewable.getId(),
-            currentCount
-        );
-
-        // Rate-limit WARN logging to avoid log spam during role-checker outages
-        if (Duration.between(lastWarning, now).compareTo(SKIP_WARNING_INTERVAL) >= 0) {
-            if (lastSkipWarningTime.compareAndSet(lastWarning, now)) {
-                log.warn("Practice review gate skipping due to role checker unhealthy: skippedCount={}", currentCount);
-            }
-        }
     }
 }

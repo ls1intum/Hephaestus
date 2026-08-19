@@ -352,7 +352,7 @@ erDiagram
         BIGINT about_user_id FK "NOT NULL"
         VARCHAR(32) channel "NOT NULL"
         INTEGER position UK "NOT NULL"
-        VARCHAR(16) delivery_state "NOT NULL"
+        VARCHAR(32) delivery_state "NOT NULL"
         VARCHAR(32) suppression_reason
         TEXT body
         VARCHAR(16) source "NOT NULL"
@@ -360,6 +360,18 @@ erDiagram
         VARCHAR(64) thread_key
         TIMESTAMPTZ created_at "NOT NULL"
         TIMESTAMPTZ delivered_at
+    }
+
+    FeedbackApproval {
+        UUID id PK
+        UUID feedback_id UK "NOT NULL"
+        BIGINT workspace_id "NOT NULL"
+        BIGINT actor_account_id
+        VARCHAR(16) decision "NOT NULL"
+        VARCHAR(32) rejection_reason
+        VARCHAR(500) rejection_note
+        VARCHAR(64) content_digest "NOT NULL"
+        TIMESTAMPTZ decided_at "NOT NULL"
     }
 
     FeedbackObservation {
@@ -829,7 +841,7 @@ erDiagram
         VARCHAR(64) source_curated_slug
         VARCHAR(96) source_curated_fingerprint
         JSONB automated_review_policy "NOT NULL"
-        VARCHAR(16) review_tier
+        VARCHAR(16) autonomy
     }
 
     PracticeArea {
@@ -846,7 +858,7 @@ erDiagram
         VARCHAR(32) color
         VARCHAR(64) source_curated_slug
         VARCHAR(64) source_curated_fingerprint
-        VARCHAR(16) review_tier
+        VARCHAR(16) autonomy
     }
 
     PracticeCatalogInstallation {
@@ -1318,14 +1330,13 @@ erDiagram
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
         TIMESTAMPTZ leaderboard_league_cycle_at
-        BOOLEAN practice_run_for_all_users
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
         JSONB practice_review_scope
-        VARCHAR(16) practice_default_review_tier
+        VARCHAR(16) practice_default_autonomy
     }
 
     WorkspaceAgentBinding {

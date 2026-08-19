@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -14,8 +14,6 @@ import java.util.Set;
  */
 @Schema(description = "Update per-workspace practice-review policy. Null fields unchanged; 'reset' clears to inherit.")
 public record UpdatePracticeReviewSettingsRequestDTO(
-    @Schema(description = "Run practice review for all developers (vs only the run_practice_review role)")
-    Boolean runForAllUsers,
     @Schema(description = "Deliver feedback to already-merged PRs/MRs") Boolean deliverToMerged,
     @Min(value = 0, message = "Cooldown must not be negative")
     @Max(value = 1440, message = "Cooldown must not exceed 1440 minutes")
@@ -27,10 +25,10 @@ public record UpdatePracticeReviewSettingsRequestDTO(
     )
     WorkspaceReviewScope reviewScope,
     @Schema(
-        description = "How much autonomy the system has over practices and areas that hold no tier of " +
+        description = "How much autonomy the system has over practices and areas that hold no autonomy of " +
             "their own. The one decision that moves a whole workspace at once. Null leaves it " +
-            "unchanged; name DEFAULT_REVIEW_TIER in 'reset' to clear it. PROPOSE is not selectable yet."
+            "unchanged; name DEFAULT_AUTONOMY in 'reset' to clear it."
     )
-    PracticeReviewTier defaultReviewTier,
+    PracticeAutonomy defaultAutonomy,
     @Schema(description = "Fields to reset back to inherit") Set<PracticeReviewField> reset
 ) {}

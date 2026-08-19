@@ -25,14 +25,12 @@ public enum FeatureFlag {
     // ── Authorization flags (account_feature role flags) ──────────────────────
     MENTOR_ACCESS(Kind.ROLE, "mentor_access"),
     NOTIFICATION_ACCESS(Kind.ROLE, "notification_access"),
-    RUN_PRACTICE_REVIEW(Kind.ROLE, "run_practice_review"),
     // Reports instance-admin status: the authority key is the namespaced `app_admin` the issuer mints
     // for Account.AppRole APP_ADMIN. NOT a grantable escalation — JwtPrincipalFactory strips
     // `app_admin`/`admin` from account_feature rows, so this reflects appRole only.
     ADMIN(Kind.ROLE, "app_admin"),
 
     // Operational/development flags (Spring Boot config)
-    PRACTICE_REVIEW_FOR_ALL(Kind.CONFIG, "practice-review-for-all"),
     GITLAB_WORKSPACE_CREATION(Kind.CONFIG, "gitlab-workspace-creation");
 
     private final Kind kind;

@@ -15,11 +15,10 @@ const readyBinding: AgentBinding = {
 };
 
 const settings: PracticeReviewSettingsData = {
-	runForAllUsers: true,
 	deliverToMerged: false,
 	cooldownMinutes: 15,
 	reviewScope: { targetBranches: [], repositories: [] },
-	defaultReviewTier: "DELIVER",
+	defaultAutonomy: "AUTOMATIC",
 };
 
 function renderSettings(props: Partial<React.ComponentProps<typeof PracticeReviewSettings>> = {}) {
@@ -98,29 +97,6 @@ describe("PracticeReviewSettings", () => {
 
 		fireEvent.click(automatic);
 		expect(onUpdate).toHaveBeenCalledWith({ practiceReviewAutoTriggerEnabled: true });
-	});
-
-	it("offers both eligibility options with the sentence that explains each", async () => {
-		const onUpdate = vi.fn();
-		await renderSettings({
-			policy: {
-				settings: { ...settings, runForAllUsers: false },
-				isSaving: false,
-				onUpdate,
-				onReset: vi.fn(),
-			},
-		});
-
-		const narrow = await screen.findByRole("radio", {
-			name: /Only assignees with the review role/,
-		});
-		expect(narrow.getAttribute("aria-checked")).toBe("true");
-		// The role is granted per account outside this workspace, so the copy says so rather than
-		// naming the product as the thing that "manages" it.
-		expect(screen.getByText(/An instance admin grants that role per person/)).not.toBeNull();
-
-		fireEvent.click(screen.getByRole("radio", { name: /All matching work/ }));
-		expect(onUpdate).toHaveBeenCalledWith({ runForAllUsers: true });
 	});
 
 	it("allows conversation reviews without a project trigger", async () => {

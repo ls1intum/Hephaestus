@@ -64,7 +64,7 @@ class ConfigAuditIntegrationTest extends AbstractWorkspaceIntegrationTest {
         // Untouched fields must survive into the snapshot, or the "from what to what" is a lie.
         // Present AND null, not absent: null is "inherit the fleet default", so a serializer that
         // dropped null keys would make clearing an override indistinguishable from never setting one.
-        assertThat(row.getNewValue()).contains("\"runForAllUsers\":null").contains("\"cooldownMinutes\":45");
+        assertThat(row.getNewValue()).contains("\"cooldownMinutes\":45");
         // Through the real filter chain (JWT -> CurrentAccount -> actor): USER, not SYSTEM, because a
         // signed-in admin did this. The id stays null because the test harness mints a non-numeric
         // subject; production subjects are always the account id.

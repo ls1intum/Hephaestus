@@ -33,14 +33,12 @@ export const mockPracticeReviewSettings: PracticeReviewSettings = {
 	cooldownMinutes: 30,
 	reviewScope: { targetBranches: [], repositories: [] },
 	deliverToMerged: false,
-	runForAllUsers: true,
 	cooldownMinutesOverride: 30,
 	deliverToMergedOverride: undefined,
-	runForAllUsersOverride: undefined,
 	// Never chosen here, so it falls back to what a fresh workspace gets: the bottom of the
 	// practice → area → workspace chain speaks, and it speaks on the work itself.
-	defaultReviewTier: "DELIVER",
-	defaultReviewTierOverride: undefined,
+	defaultAutonomy: "AUTOMATIC",
+	defaultAutonomyOverride: undefined,
 };
 
 /**

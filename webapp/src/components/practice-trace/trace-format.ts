@@ -40,7 +40,7 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	// States the fact and stops: the instruction to act on it travels with the link in
 	// REFUSAL_FIXES, which only readers who can act on it are shown.
 	REVIEW_MODEL_UNBOUND: "No AI model is set up to run reviews",
-	PRACTICE_TIER_OFF: "Every practice watching this is turned off; raising one lets it run",
+	PRACTICE_AUTONOMY_OFF: "Every practice watching this is turned off; raising one lets it run",
 	BUDGET_EXHAUSTED: "The workspace's AI budget was used up; it refills",
 	SUBJECT_UNLINKED: "The author has not linked their account to Hephaestus",
 	MODEL_UNAVAILABLE: "The AI model set for reviews is no longer available",
@@ -99,7 +99,7 @@ export const REFUSAL_FIXES: Partial<Record<SignalStateReason, RefusalFix>> = {
 	GATE_SKIPPED: { section: "when-and-where", label: "Open Review: When and where" },
 	OUT_OF_REVIEW_SCOPE: { section: "when-and-where", label: "Open Review: When and where" },
 	PRACTICES_DISABLED: { section: "when-and-where", label: "Open Review: When and where" },
-	PRACTICE_TIER_OFF: { section: "how-much", label: "Open Review: How much" },
+	PRACTICE_AUTONOMY_OFF: { section: "how-much", label: "Open Review: How much" },
 	NO_ACTIVE_PRACTICE: { to: "/w/$workspaceSlug/admin/practices", label: "Open Practice setup" },
 	REVIEW_MODEL_UNBOUND: { to: "/w/$workspaceSlug/admin/models", label: "Set up a review model" },
 	MODEL_UNAVAILABLE: { to: "/w/$workspaceSlug/admin/models", label: "Open AI models" },

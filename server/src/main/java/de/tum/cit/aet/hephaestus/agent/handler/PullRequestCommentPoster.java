@@ -156,6 +156,15 @@ class PullRequestCommentPoster {
 
     @Nullable
     String postFormattedBody(AgentJob job, String formattedBody) {
+        return postFormattedBody(job, formattedBody, summaryMarkerFor(job));
+    }
+
+    @Nullable
+    String postApprovedProposal(AgentJob job, java.util.UUID feedbackId, String formattedBody) {
+        return postFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
+    }
+
+    private String postFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
         IntegrationKind kind = job.getIntegrationKind();
         if (kind == null) {
@@ -166,10 +175,7 @@ class PullRequestCommentPoster {
         SummaryChannel channel = requireChannel(kind);
         FeedbackTarget target = buildTarget(job, kind, workspaceId);
         try {
-            SummaryHandle handle = channel.postSummary(
-                target,
-                new FeedbackContent(formattedBody, summaryMarkerFor(job))
-            );
+            SummaryHandle handle = channel.postSummary(target, new FeedbackContent(formattedBody, marker));
             log.info(
                 "Posted feedback comment: jobId={}, kind={}, commentId={}",
                 job.getId(),
@@ -301,6 +307,14 @@ class PullRequestCommentPoster {
 
     /** Returns {@code UNKNOWN}, never {@code ABSENT}, when the lookup cannot be completed. */
     ExistingDeliveryLookup findExistingSummaryComment(AgentJob job) {
+        return findExistingSummaryComment(job, summaryMarkerFor(job));
+    }
+
+    ExistingDeliveryLookup findApprovedProposal(AgentJob job, java.util.UUID feedbackId) {
+        return findExistingSummaryComment(job, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
+    }
+
+    private ExistingDeliveryLookup findExistingSummaryComment(AgentJob job, String marker) {
         IntegrationKind kind = job.getIntegrationKind();
         if (kind == null) {
             return ExistingDeliveryLookup.unknown();
@@ -326,7 +340,7 @@ class PullRequestCommentPoster {
             } else {
                 return ExistingDeliveryLookup.unknown();
             }
-            SummaryChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, summaryMarkerFor(job));
+            SummaryChannel.ExistingSummaryLookup lookup = channel.findExistingSummary(target, marker);
             return switch (lookup.kind()) {
                 case FOUND -> ExistingDeliveryLookup.found(lookup.handle().externalId());
                 case ABSENT -> ExistingDeliveryLookup.absent();

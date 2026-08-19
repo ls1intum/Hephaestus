@@ -31,14 +31,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     private Workspace workspace;
     private WorkspaceContext context;
 
-    private final PracticeReviewProperties reviewProperties = new PracticeReviewProperties(
-        false,
-        false,
-        15,
-        5,
-        false,
-        false
-    );
+    private final PracticeReviewProperties reviewProperties = new PracticeReviewProperties(false, 15, 5, false, false);
 
     @BeforeEach
     void setUp() {
@@ -61,13 +54,9 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     @Test
     void getSettingsReturnsEffectiveAndRawOverrideValues() {
         readsWorkspace();
-        workspace.getReviewSettings().setRunForAllUsers(true);
-
         PracticeReviewSettingsDTO view = service.getSettings(context);
 
-        assertThat(view.runForAllUsers()).isTrue();
         assertThat(view.cooldownMinutes()).isEqualTo(15);
-        assertThat(view.runForAllUsersOverride()).isTrue();
         assertThat(view.cooldownMinutesOverride()).isNull();
     }
 
@@ -88,12 +77,11 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, true, 30, null, null, null)
+            new UpdatePracticeReviewSettingsRequestDTO(true, 30, null, null, null)
         );
 
         assertThat(workspace.getReviewSettings().getDeliverToMerged()).isTrue();
         assertThat(workspace.getReviewSettings().getCooldownMinutes()).isEqualTo(30);
-        assertThat(workspace.getReviewSettings().getRunForAllUsers()).isNull(); // untouched
         assertThat(view.deliverToMerged()).isTrue();
         assertThat(view.cooldownMinutes()).isEqualTo(30);
     }
@@ -106,7 +94,6 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
             new UpdatePracticeReviewSettingsRequestDTO(
-                null,
                 null,
                 null,
                 new WorkspaceReviewScope(List.of("main"), List.of()),
@@ -126,7 +113,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         PracticeReviewSettingsDTO view = service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, WorkspaceReviewScope.UNRESTRICTED, null, null)
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, WorkspaceReviewScope.UNRESTRICTED, null, null)
         );
 
         assertThat(view.reviewScope().isUnrestricted()).isTrue();
@@ -142,14 +129,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
         service.updatePracticeReview(
             context,
-            new UpdatePracticeReviewSettingsRequestDTO(
-                null,
-                null,
-                null,
-                null,
-                null,
-                Set.of(PracticeReviewField.REVIEW_SCOPE)
-            )
+            new UpdatePracticeReviewSettingsRequestDTO(null, null, null, null, Set.of(PracticeReviewField.REVIEW_SCOPE))
         );
 
         assertThat(workspace.getReviewSettings().getReviewScope()).isNull();

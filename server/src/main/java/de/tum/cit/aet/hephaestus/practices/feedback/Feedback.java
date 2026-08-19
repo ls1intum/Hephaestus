@@ -78,7 +78,7 @@ public class Feedback {
 
     @NotNull
     @Enumerated(EnumType.STRING)
-    @Column(name = "delivery_state", nullable = false, length = 16)
+    @Column(name = "delivery_state", nullable = false, length = 32)
     private FeedbackDeliveryState deliveryState;
 
     /** Why a unit was withheld. Set iff {@link #deliveryState} is {@code SUPPRESSED}; NULL otherwise. */

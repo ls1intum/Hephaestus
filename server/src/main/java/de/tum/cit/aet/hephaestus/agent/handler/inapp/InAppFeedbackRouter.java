@@ -3,10 +3,10 @@ package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ActorRole;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashSet;
@@ -14,18 +14,6 @@ import java.util.List;
 import java.util.Set;
 import org.jspecify.annotations.Nullable;
 
-/**
- * Decides whether one composed process-level message may be shown on its recipient's practice pages.
- *
- * <p>Pure: it is handed the message, the recipient's own measurements behind it, and the two facts a
- * query has already established (the practice's effective tier, and when this practice was last surfaced
- * to this person). It reads nothing and writes nothing, so every rule below is a unit test with no
- * database in it.
- *
- * <p>Admission runs through the same {@link FeedbackAdmission#delivers} predicate the other two lanes
- * use, so "may we say this here" cannot drift per lane; everything after it is what makes the
- * in-app lane the <em>process</em> level rather than the task level.
- */
 public final class InAppFeedbackRouter {
 
     /**
@@ -52,25 +40,10 @@ public final class InAppFeedbackRouter {
 
     private InAppFeedbackRouter() {}
 
-    /**
-     * Route one message.
-     *
-     * @param message      what the composition stage wrote
-     * @param evidence     the recipient's own observations of this message's practice inside
-     *                     {@link #PATTERN_WINDOW_DAYS}, already workspace- and recipient-scoped and
-     *                     already filtered to what the visibility policy permits
-     * @param tier         the practice's <em>effective</em> tier, or {@code null} when the caller resolved
-     *                     none. Passed in rather than read off a lazy association, for the same reason
-     *                     {@code FeedbackChannelRouter} does it.
-     * @param subjectRole  whose conduct the practice's occasion judges
-     * @param lastSurfaced when an IN_APP unit for this practice was last written for this recipient, or
-     *                     {@code null} if never
-     * @param now          the clock, injected so the cooldown is testable
-     */
     public static InAppRoutingDecision route(
         ComposedInAppMessage message,
         List<Observation> evidence,
-        @Nullable PracticeReviewTier tier,
+        @Nullable PracticeAutonomy autonomy,
         ActorRole subjectRole,
         @Nullable Instant lastSurfaced,
         Instant now
@@ -87,12 +60,11 @@ public final class InAppFeedbackRouter {
         if (problems.isEmpty()) {
             return InAppRoutingDecision.NO_EVIDENCE;
         }
-        // Provenance and tier in one predicate, shared with the in-context and conversation lanes.
         // Origin is asked of the evidence, not of the run: what makes a pattern claim sound is how the
         // measurements behind it were taken, and a live run can compose over a backfilled record.
         ObservationOrigin origin = weakestOrigin(problems);
-        if (!FeedbackAdmission.delivers(origin, tier, FeedbackChannel.IN_APP)) {
-            return InAppRoutingDecision.PRACTICE_TIER_QUIET;
+        if (!PracticeAutonomyPolicy.delivers(origin, autonomy, FeedbackChannel.IN_APP)) {
+            return InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL;
         }
         if (problems.stream().allMatch(o -> o.getOrigin() == ObservationOrigin.BACKFILL)) {
             return InAppRoutingDecision.BACKFILL_HELD;

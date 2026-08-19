@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
@@ -26,15 +26,15 @@ public class WorkspaceReviewDefaultsProvider {
     }
 
     /**
-     * The tier this workspace actually stored, or {@code null} when it has never chosen one — distinct from
+     * The autonomy this workspace actually stored, or {@code null} when it has never chosen one — distinct from
      * {@link #forWorkspace}, which answers what is in force rather than whether anybody decided it.
      */
     @Transactional(readOnly = true)
-    public @Nullable PracticeReviewTier rawDefaultTier(Long workspaceId) {
+    public @Nullable PracticeAutonomy rawDefaultAutonomy(Long workspaceId) {
         return workspaceRepository
             .findById(workspaceId)
-            .map(workspace -> workspace.getReviewSettings().getDefaultReviewTier())
-            .map(PracticeReviewTier::valueOf)
+            .map(workspace -> workspace.getReviewSettings().getDefaultAutonomy())
+            .map(PracticeAutonomy::valueOf)
             .orElse(null);
     }
 }
