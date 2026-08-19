@@ -3,11 +3,21 @@ package de.tum.cit.aet.hephaestus;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import de.tum.cit.aet.hephaestus.evidence.RequiredCaptureQuality;
+import de.tum.cit.aet.hephaestus.evidence.SourceKind;
+import de.tum.cit.aet.hephaestus.evidence.internal.ClasspathArtifactSourceCatalogRegistry;
+import de.tum.cit.aet.hephaestus.practices.EvidenceStance;
+import de.tum.cit.aet.hephaestus.practices.PracticeAutomatedReviewPolicy;
+import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
+import de.tum.cit.aet.hephaestus.practices.PracticeDefinitionValidator;
+import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptionsFixture;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.time.Clock;
 import java.util.ArrayList;
 import java.util.List;
 import liquibase.Contexts;
@@ -23,6 +33,8 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 
 @Testcontainers
 @Tag("integration")
@@ -73,14 +85,17 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         updateThrough("1785743133884-5");
         assertHistoricalFingerprintsVersioned();
         seedLegacyAuditVocabulary();
+        seedLegacyCuratedOverrides();
         try (Liquibase liquibase = liquibase()) {
             liquibase.update(contexts());
         }
 
+        assertLegacyCuratedDigestsVersioned();
+        assertMigratedCuratedPoliciesAreValid();
         assertMarkerRepair();
         assertHistoricalFingerprintsClearedForRecomputation();
         assertAuditHistoryPreserved();
-        assertEmptyCatalogBootstrap();
+        assertCatalogBootstrap(3, 1);
         assertWorkspaceRevisionBackfill();
         assertEvidenceRevisionBackfill();
         assertPointerOwnership();
@@ -108,6 +123,108 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
             )
             """
         );
+    }
+
+    private static void seedLegacyCuratedOverrides() throws SQLException {
+        execute(
+            """
+            INSERT INTO curated_area_override (
+                slug, name, description, based_on_digest, created_at, updated_at, version
+            ) VALUES (
+                'real-area', 'Real area override', 'Preserve this curated intent', repeat('a', 64), now(), now(), 0
+            )
+            """,
+            """
+            INSERT INTO curated_practice_override (
+                slug, name, applies_to, trigger_events, criteria, automated_review_policy,
+                based_on_digest, created_at, updated_at, version
+            ) VALUES
+            (
+                'real-practice', 'Real practice override', 'PULL_REQUEST', '[\"READY_FOR_REVIEW\"]'::jsonb,
+                'Keep the effective override',
+                '{"sourceContractVersion":"1.0.0","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.pull-request.core","completeness":"COMPLETE","freshness":"CURRENT"},{"sourceKind":"scm.pull-request.diff","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.pull-request.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[]}'::jsonb,
+                repeat('b', 64), now(), now(), 0
+            ), (
+                'legacy-issue', 'Legacy issue override', 'ISSUE', '[\"IssueCreated\"]'::jsonb,
+                'Preserve issue intent',
+                '{"sourceContractVersion":"1.0.0","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"scm.issue.core","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[{"sourceKind":"scm.issue.comments"}],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[]}'::jsonb,
+                NULL, now(), now(), 0
+            ), (
+                'legacy-conversation', 'Legacy conversation override', 'CONVERSATION_THREAD', '[]'::jsonb,
+                'Preserve conversation intent',
+                '{"sourceContractVersion":"1.0.0","automatedReview":{"mode":"LANGUAGE_MODEL","evidenceSufficiency":"SUFFICIENT_WHEN_REQUIREMENTS_MET"},"requiredEvidence":[{"sourceKind":"slack.conversation.thread","completeness":"COMPLETE","freshness":"CURRENT"}],"optionalContext":[],"whenEvidenceIsInsufficient":"SKIP_AUTOMATED_REVIEW","knownLimitations":[]}'::jsonb,
+                NULL, now(), now(), 0
+            )
+            """
+        );
+    }
+
+    private static void assertMigratedCuratedPoliciesAreValid() throws Exception {
+        JsonMapper mapper = JsonMapper.builder().build();
+        var sources = new ClasspathArtifactSourceCatalogRegistry(mapper, Clock.systemUTC());
+        var validator = new PracticeDefinitionValidator(sources, PracticeSignalOptionsFixture.real());
+        int validated = 0;
+        try (
+            Connection connection = connect();
+            Statement statement = connection.createStatement();
+            ResultSet rows = statement.executeQuery(
+                "SELECT slug, name, bindings::text, criteria, automated_review_policy::text, area_slug " +
+                    "FROM curated_practice_override ORDER BY slug"
+            )
+        ) {
+            while (rows.next()) {
+                List<PracticeBinding> bindings = mapper.readValue(
+                    rows.getString("bindings"),
+                    new TypeReference<List<PracticeBinding>>() {}
+                );
+                PracticeAutomatedReviewPolicy policy = mapper.readValue(
+                    rows.getString("automated_review_policy"),
+                    PracticeAutomatedReviewPolicy.class
+                );
+                validator.validate(
+                    new PracticeDefinition(
+                        rows.getString("name"),
+                        bindings,
+                        rows.getString("criteria"),
+                        null,
+                        policy,
+                        null,
+                        null,
+                        rows.getString("area_slug")
+                    )
+                );
+                if (rows.getString("slug").equals("real-practice")) {
+                    assertThat(bindings)
+                        .flatExtracting(PracticeBinding::needs)
+                        .anySatisfy(need -> {
+                            assertThat(need.sourceKind()).isEqualTo(new SourceKind("scm.pull-request.diff"));
+                            assertThat(need.stance()).isEqualTo(EvidenceStance.REQUIRED);
+                        });
+                }
+                validated++;
+            }
+        }
+        assertThat(validated).isEqualTo(3);
+        assertThat(scalar("SELECT criteria FROM curated_practice_override WHERE slug = 'real-practice'")).isEqualTo(
+            "Keep the effective override"
+        );
+        assertThat(
+            sources
+                .requireSource(
+                    new de.tum.cit.aet.hephaestus.evidence.SourceContractVersion("1.0.0"),
+                    new SourceKind("scm.pull-request.diff")
+                )
+                .requiredQuality()
+        ).isEqualTo(RequiredCaptureQuality.COMPLETE_AND_NON_EMPTY);
+    }
+
+    private static void assertLegacyCuratedDigestsVersioned() throws SQLException {
+        assertThat(scalar("SELECT based_on_digest FROM curated_area_override WHERE slug = 'real-area'")).isEqualTo(
+            "area:v1:" + "a".repeat(64)
+        );
+        assertThat(
+            scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'")
+        ).isEqualTo("practice:v1:" + "b".repeat(64));
     }
 
     private static void assertAuditHistoryPreserved() throws SQLException {
@@ -164,9 +281,9 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         assertThat(markedWorkspaceSlugs()).containsExactly("area-only", "practice-only");
     }
 
-    private static void assertEmptyCatalogBootstrap() throws SQLException {
-        assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo("0");
-        assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo("0");
+    private static void assertCatalogBootstrap(int practices, int areas) throws SQLException {
+        assertThat(scalar("SELECT count(*)::text FROM curated_practice_override")).isEqualTo(String.valueOf(practices));
+        assertThat(scalar("SELECT count(*)::text FROM curated_area_override")).isEqualTo(String.valueOf(areas));
         assertThat(
             scalar("SELECT count(*)::text FROM practice_catalog_installation WHERE provenance_linked_at IS NOT NULL")
         ).isEqualTo("1");
@@ -429,6 +546,22 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
     }
 
     private static void assertRollbackAndReapply() throws Exception {
+        execute(
+            "UPDATE curated_practice_override SET based_on_digest = 'practice:v2:' || repeat('e', 64) " +
+                "WHERE slug = 'real-practice'"
+        );
+        try (Liquibase liquibase = liquibase()) {
+            assertThatThrownBy(() ->
+                liquibase.rollback(BEFORE_CATALOG_TAG, contexts(), new LabelExpression())
+            ).hasMessageContaining("ck_curated_practice_override_rollback_v1");
+        }
+        assertThat(
+            scalar("SELECT based_on_digest FROM curated_practice_override WHERE slug = 'real-practice'")
+        ).startsWith("practice:v2:");
+        execute(
+            "UPDATE curated_practice_override SET based_on_digest = 'practice:v1:' || repeat('b', 64) " +
+                "WHERE slug = 'real-practice'"
+        );
         try (Liquibase liquibase = liquibase()) {
             liquibase.rollback(BEFORE_CATALOG_TAG, contexts(), new LabelExpression());
         }
@@ -455,7 +588,7 @@ class PracticeCatalogInstallationMigrationIntegrationTest {
         }
 
         assertMarkerRepair();
-        assertEmptyCatalogBootstrap();
+        assertCatalogBootstrap(0, 0);
         assertThat(
             scalar(
                 """

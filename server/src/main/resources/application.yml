@@ -140,14 +140,10 @@ management:
             enabled: true
         readinessState:
             enabled: true
-        # Spring Boot derives indicator bean names from the class by stripping the
-        # "HealthIndicator" suffix and lowercasing the first letter. Adding the
-        # integration-consumer probe to the readiness group makes a degraded NATS
-        # consumer (DOWN) take the pod out of the load balancer without crash-
-        # looping it — the indicator's javadoc explicitly promises this.
+        # Operational dependencies affect readiness, not process liveness.
         group:
             readiness:
-                include: readinessState,integrationConsumer
+                include: readinessState,integrationConsumer,practiceReview,catalogProvenanceBackfillStartup
 
 springdoc:
     # Off unless a profile asks for it. SecurityConfig permitAll()s /v3/api-docs/** and /swagger-ui/**

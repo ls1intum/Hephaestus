@@ -33,10 +33,10 @@ public record CatalogEntry<D extends CatalogDefinition>(
         if (shipped == null) {
             return acceptedBundledDigest == null ? CatalogEntryState.YOURS : CatalogEntryState.NO_LONGER_SHIPPED;
         }
-        if (shipped.digest(slug).equals(overridden.digest(slug))) {
+        if (CuratedDefinitionDigest.of(slug, shipped).equals(CuratedDefinitionDigest.of(slug, overridden))) {
             return CatalogEntryState.EDITED_HERE;
         }
-        return shipped.digest(slug).equals(acceptedBundledDigest)
+        return CuratedDefinitionDigest.of(slug, shipped).equals(acceptedBundledDigest)
             ? CatalogEntryState.EDITED_HERE
             : CatalogEntryState.UPDATE_WAITING;
     }
@@ -46,7 +46,7 @@ public record CatalogEntry<D extends CatalogDefinition>(
         if (shipped == null || overridden == null) {
             return CatalogChangeKind.NONE;
         }
-        if (shipped.digest(slug).equals(overridden.digest(slug))) {
+        if (CuratedDefinitionDigest.of(slug, shipped).equals(CuratedDefinitionDigest.of(slug, overridden))) {
             return CatalogChangeKind.NONE;
         }
         if (overridden instanceof AreaDefinition) {
@@ -64,8 +64,8 @@ public record CatalogEntry<D extends CatalogDefinition>(
     public String etag() {
         return new CanonicalDigest()
             .add(slug)
-            .add(effective.digest(slug))
-            .addNullable(shipped == null ? null : shipped.digest(slug))
+            .add(CuratedDefinitionDigest.of(slug, effective))
+            .addNullable(shipped == null ? null : CuratedDefinitionDigest.of(slug, shipped))
             .addNullable(acceptedBundledDigest)
             .add(state().name())
             .add(changeKind().name())

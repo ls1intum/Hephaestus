@@ -149,10 +149,11 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
     }
 
     @Override
-    public Optional<Instant> earliestUseDecisionExpiry() {
+    public Optional<Instant> earliestUseDecisionExpiry(@Nullable SourceUsePurpose purpose) {
         return useDecisions
             .values()
             .stream()
+            .filter(decision -> purpose == null || decision.purpose() == purpose)
             .map(SourceUseDecision::expiresAt)
             .filter(java.util.Objects::nonNull)
             .min(Instant::compareTo);

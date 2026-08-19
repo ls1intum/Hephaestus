@@ -17,7 +17,7 @@ final class ArtifactSourceGovernanceMetrics {
     ) {
         Gauge.builder("artifact.source.governance.expiry.seconds", sourceCatalogs, catalogs ->
             catalogs
-                .earliestUseDecisionExpiry()
+                .earliestUseDecisionExpiry(null)
                 .map(expiry -> (double) Duration.between(clock.instant(), expiry).toSeconds())
                 .orElse(Double.NaN)
         )

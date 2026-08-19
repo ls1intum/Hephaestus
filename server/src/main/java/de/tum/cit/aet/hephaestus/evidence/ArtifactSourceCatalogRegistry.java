@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 
 public interface ArtifactSourceCatalogRegistry {
     ArtifactSourceCatalog current();
@@ -32,5 +33,5 @@ public interface ArtifactSourceCatalogRegistry {
 
     SourceUseDecision requireUseDecision(SourceContractVersion version, String decisionId);
 
-    Optional<Instant> earliestUseDecisionExpiry();
+    Optional<Instant> earliestUseDecisionExpiry(@Nullable SourceUsePurpose purpose);
 }

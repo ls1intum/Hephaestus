@@ -96,14 +96,14 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     boolean existsByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
     @Query(
-        "SELECT DISTINCT p FROM Practice p JOIN FETCH p.currentRevision current, PracticeRevision previous " +
+        "SELECT DISTINCT p.id FROM Practice p JOIN p.currentRevision current, PracticeRevision previous " +
             "WHERE p.sourceCuratedSlug IS NOT NULL " +
             "AND previous.practice = p " +
             "AND previous.revisionNumber = current.revisionNumber - 1 " +
             "AND p.sourceCuratedFingerprint = previous.reviewRuleFingerprint " +
             "AND p.sourceCuratedFingerprint LIKE 'v1:%'"
     )
-    List<Practice> findSourceAlignedV1Practices();
+    List<Long> findSourceAlignedV1PracticeIds();
 
     /**
      * Every practice of a workspace in the order the admin catalogue shows them, areas first. No tier

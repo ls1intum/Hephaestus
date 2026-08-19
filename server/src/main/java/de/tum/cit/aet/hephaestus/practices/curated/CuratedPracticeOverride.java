@@ -64,7 +64,7 @@ public class CuratedPracticeOverride {
     @Column(name = "position")
     private @Nullable Integer position;
 
-    @Column(name = "based_on_digest", length = 64)
+    @Column(name = "based_on_digest", length = 128)
     private @Nullable String acceptedBundledDigest;
 
     @Column(name = "retired_at")

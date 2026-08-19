@@ -32,7 +32,7 @@ public class CatalogProvenanceBackfill {
     private final PracticeAreaRepository practiceAreaRepository;
     private final PracticeRevisionRepository revisionRepository;
     private final PracticeRevisionService revisionService;
-    private final BundledPracticeCatalogLoader bundledCatalogLoader;
+    private final CuratedCatalogService curatedCatalogService;
     private final TransactionOperations transactionOperations;
     private final Clock clock;
 
@@ -43,7 +43,7 @@ public class CatalogProvenanceBackfill {
         if (pending.isEmpty()) {
             return new Stamped(0, 0);
         }
-        BundledPracticeCatalog catalog = bundledCatalogLoader.catalog();
+        EffectiveCatalog catalog = curatedCatalogService.catalog();
         Stamped total = new Stamped(0, 0);
         int completed = 0;
         for (Long workspaceId : pending) {
@@ -64,21 +64,40 @@ public class CatalogProvenanceBackfill {
     }
 
     private void alignVersionedEvidence() {
-        BundledPracticeCatalog catalog = bundledCatalogLoader.catalog();
-        for (Practice practice : practiceRepository.findSourceAlignedV1Practices()) {
-            catalog
-                .practices()
-                .stream()
-                .filter(entry -> entry.slug().equals(practice.getSourceCuratedSlug()))
-                .findFirst()
-                .ifPresent(entry ->
-                    transactionOperations.executeWithoutResult(ignored -> {
-                        Practice managed = practiceRepository.findById(practice.getId()).orElseThrow();
-                        managed.setAutomatedReviewPolicy(entry.definition().automatedReviewPolicy());
-                        managed.setSourceCuratedFingerprint(entry.definition().provenanceFingerprint(entry.slug()));
-                        revisionService.append(managed);
-                    })
-                );
+        EffectiveCatalog catalog = curatedCatalogService.catalog();
+        for (Long practiceId : practiceRepository.findSourceAlignedV1PracticeIds()) {
+            try {
+                transactionOperations.executeWithoutResult(ignored -> {
+                    Practice managed = practiceRepository.findById(practiceId).orElseThrow();
+                    catalog
+                        .practice(managed.getSourceCuratedSlug())
+                        .ifPresent(entry -> {
+                            PracticeDefinition effective = entry.effective();
+                            PracticeDefinition aligned = new PracticeDefinition(
+                                managed.getName(),
+                                managed.getBindings(),
+                                managed.getCriteria(),
+                                managed.getPrecomputeScript(),
+                                effective.automatedReviewPolicy(),
+                                managed.getWhyItMatters(),
+                                managed.getWhatGoodLooksLike(),
+                                managed.getArea() == null ? null : managed.getArea().getSlug()
+                            );
+                            if (
+                                !aligned
+                                    .provenanceFingerprint(entry.slug())
+                                    .equals(effective.provenanceFingerprint(entry.slug()))
+                            ) {
+                                return;
+                            }
+                            managed.setAutomatedReviewPolicy(effective.automatedReviewPolicy());
+                            managed.setSourceCuratedFingerprint(effective.provenanceFingerprint(entry.slug()));
+                            revisionService.append(managed);
+                        });
+                });
+            } catch (RuntimeException exception) {
+                log.error("Could not align catalog evidence: practiceId={}", practiceId, exception);
+            }
         }
     }
 
@@ -98,7 +117,7 @@ public class CatalogProvenanceBackfill {
         }
     }
 
-    private Stamped stamp(Long workspaceId, BundledPracticeCatalog catalog) {
+    private Stamped stamp(Long workspaceId, EffectiveCatalog catalog) {
         PracticeCatalogInstallation installation = installationRepository
             .findByWorkspaceIdForUpdate(workspaceId)
             .orElse(null);
@@ -118,7 +137,7 @@ public class CatalogProvenanceBackfill {
         }
     }
 
-    private int stampPractices(Long workspaceId, BundledPracticeCatalog catalog) {
+    private int stampPractices(Long workspaceId, EffectiveCatalog catalog) {
         int stamped = 0;
         for (Practice practice : practiceRepository.findAllForCatalog(workspaceId)) {
             if (practice.getSourceCuratedSlug() != null || practice.getCurrentRevision() == null) {
@@ -130,7 +149,7 @@ public class CatalogProvenanceBackfill {
                 .stream()
                 .filter(entry -> entry.slug().equals(practice.getSlug()))
                 .findFirst()
-                .map(entry -> entry.definition().provenanceFingerprint(entry.slug()).equals(fingerprint))
+                .map(entry -> entry.effective().provenanceFingerprint(entry.slug()).equals(fingerprint))
                 .orElse(false);
             if (!matchesCatalog) {
                 continue;
@@ -143,7 +162,7 @@ public class CatalogProvenanceBackfill {
         return stamped;
     }
 
-    private int stampAreas(Long workspaceId, BundledPracticeCatalog catalog) {
+    private int stampAreas(Long workspaceId, EffectiveCatalog catalog) {
         int stamped = 0;
         for (PracticeArea area : practiceAreaRepository.findByWorkspaceIdOrderByDisplayOrderAscNameAsc(workspaceId)) {
             if (area.getSourceCuratedSlug() != null) {
@@ -155,7 +174,7 @@ public class CatalogProvenanceBackfill {
                 .stream()
                 .filter(entry -> entry.slug().equals(area.getSlug()))
                 .findFirst()
-                .map(entry -> entry.definition().provenanceFingerprint(entry.slug()).equals(fingerprint))
+                .map(entry -> entry.effective().provenanceFingerprint(entry.slug()).equals(fingerprint))
                 .orElse(false);
             if (!matchesCatalog) {
                 continue;
