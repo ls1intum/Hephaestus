@@ -78,6 +78,17 @@ the real deltas** — never commit the raw diff. Then `pnpm run db:generate-erd-
 Title follows Conventional Commits (types and scopes in `CONTRIBUTING.md`); the PR template walks the
 rest.
 
+### Stacked pull requests
+
+For dependent work that is easier to review in coherent layers, follow `CONTRIBUTING.md` § Stacked Pull
+Requests. Plan the dependency order before creating layers, put foundations below their dependants,
+and do not create a layer that cannot satisfy the normal PR, release, and quality requirements on its
+own.
+
+When `gh stack` manages a stack, use the installed `gh-stack` skill instead of manually retargeting its
+branches. Restack descendants after changing a lower layer. Do not stage, commit, push, submit, or
+merge without explicit user permission.
+
 ### Changesets (release notes)
 
 `.changeset/*.md` files that become `CHANGELOG.md` and drive the version bump. **Not** the same thing
