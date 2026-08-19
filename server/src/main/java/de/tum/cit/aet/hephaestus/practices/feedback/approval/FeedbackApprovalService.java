@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -43,7 +44,7 @@ public class FeedbackApprovalService {
             feedbackRepository.suppressProposal(
                 workspaceId,
                 feedbackId,
-                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
+                FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
             );
             throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal is no longer eligible for approval");
         }
