@@ -45,7 +45,7 @@ public class CatalogAdoptionService {
         try {
             plan = plans.plan(context, slug);
         } catch (EntityNotFoundException exception) {
-            throw new StaleCatalogAdoptionPlanException();
+            throw new StaleCatalogAdoptionPlanException(exception);
         }
         requireCurrentPlan(ifMatch, plan.etag());
         if (plan.availability() != CatalogAdoptionAvailability.AVAILABLE) {
@@ -56,7 +56,7 @@ public class CatalogAdoptionService {
         if (plan.areaDisposition() == CatalogAreaDisposition.CREATE_CATALOG_AREA) {
             areaService.adoptAreaFromCatalog(context, plan.areaSlug(), plan.areaDefinition(), plan.areaDisplayOrder());
         }
-        return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition());
+        return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition(), plan.initialAutonomy());
     }
 
     private static void requireCurrentPlan(String ifMatch, String currentEtag) {
@@ -64,15 +64,9 @@ public class CatalogAdoptionService {
         try {
             precondition = EntityTagPrecondition.parse(ifMatch);
         } catch (IllegalArgumentException exception) {
-            throw new StaleCatalogAdoptionPlanException();
+            throw new StaleCatalogAdoptionPlanException(exception);
         }
-        if (
-            precondition
-                .candidates()
-                .stream()
-                .anyMatch(candidate -> candidate.isWildcard()) ||
-            !precondition.matches(currentEtag)
-        ) {
+        if (!precondition.matches(currentEtag)) {
             throw new StaleCatalogAdoptionPlanException();
         }
     }

@@ -23,14 +23,15 @@ export function PracticeAdoptionReview({
 	isPending,
 }: PracticeAdoptionReviewProps) {
 	const unavailable = preview.availability !== "AVAILABLE";
+	const initialAutonomy = AUTONOMY_DEFS[preview.initialAutonomy];
 	return (
 		<div className="space-y-6">
 			{!unavailable && (
 				<Alert variant="success">
 					<Eye />
-					<AlertTitle>Starts with {AUTONOMY_DEFS.HUMAN_APPROVAL.label}</AlertTitle>
+					<AlertTitle>Starts with {initialAutonomy.label}</AlertTitle>
 					<AlertDescription>
-						{AUTONOMY_DEFS.HUMAN_APPROVAL.description} Adoption never authorizes automatic sending.
+						{initialAutonomy.description} Adoption never authorizes automatic sending.
 					</AlertDescription>
 				</Alert>
 			)}
@@ -130,8 +131,9 @@ export function PracticeAdoptionReview({
 
 function areaOutcome(preview: CatalogPracticePreview): string {
 	if (preview.area.disposition === "UNASSIGNED") return "Leave unassigned";
+	const areaName = preview.area.definition?.name ?? preview.area.slug ?? "the catalog area";
 	if (preview.area.disposition === "REUSE_EXISTING_AREA") {
-		return `Reuse existing area “${preview.area.definition?.name ?? preview.area.slug}” without changing it`;
+		return `Reuse existing area “${areaName}” without changing it`;
 	}
-	return `Create area “${preview.area.definition?.name ?? preview.area.slug}”`;
+	return `Create area “${areaName}”`;
 }

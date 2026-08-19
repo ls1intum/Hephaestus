@@ -17,15 +17,12 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
-/** Repairs legacy workspace catalog snapshots once; new workspaces adopt practices explicitly. */
+/** Repairs incomplete catalog installations; new workspaces adopt practices explicitly. */
 @Component
 @ConditionalOnServerRole
 class DefaultPracticeCatalogSeeder {
@@ -41,7 +38,6 @@ class DefaultPracticeCatalogSeeder {
     private final CuratedCatalogLock catalogLock;
     private final PracticeCatalogInstallationRepository installationRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final AsyncTaskExecutor taskExecutor;
     private final TransactionOperations transactionOperations;
     private final Clock clock;
 
@@ -55,7 +51,6 @@ class DefaultPracticeCatalogSeeder {
         CuratedCatalogLock catalogLock,
         PracticeCatalogInstallationRepository installationRepository,
         WorkspaceRepository workspaceRepository,
-        @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
         TransactionOperations transactionOperations,
         Clock clock
     ) {
@@ -68,7 +63,6 @@ class DefaultPracticeCatalogSeeder {
         this.catalogLock = catalogLock;
         this.installationRepository = installationRepository;
         this.workspaceRepository = workspaceRepository;
-        this.taskExecutor = taskExecutor;
         this.transactionOperations = transactionOperations;
         this.clock = clock;
     }
@@ -91,28 +85,7 @@ class DefaultPracticeCatalogSeeder {
 
     @EventListener(WorkspaceCreatedEvent.class)
     public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
-        if (!enabled) {
-            return;
-        }
-        try {
-            taskExecutor.execute(() -> {
-                try {
-                    transactionOperations.executeWithoutResult(ignored -> markCatalogReady(event.workspaceId()));
-                } catch (RuntimeException exception) {
-                    log.error(
-                        "Could not initialize explicit practice catalog adoption for workspace {}",
-                        event.workspaceId(),
-                        exception
-                    );
-                }
-            });
-        } catch (RuntimeException exception) {
-            log.error(
-                "Could not schedule default practice catalog seeding: workspaceId={}",
-                event.workspaceId(),
-                exception
-            );
-        }
+        transactionOperations.executeWithoutResult(ignored -> markCatalogReady(event.workspaceId()));
     }
 
     private void markCatalogReady(Long workspaceId) {

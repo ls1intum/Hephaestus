@@ -5,4 +5,11 @@ public class StaleCatalogAdoptionPlanException extends RuntimeException {
     public StaleCatalogAdoptionPlanException() {
         super("The practice or its workspace adoption outcome changed. Review the current definition before adopting.");
     }
+
+    public StaleCatalogAdoptionPlanException(Throwable cause) {
+        super(
+            "The practice or its workspace adoption outcome changed. Review the current definition before adopting.",
+            cause
+        );
+    }
 }

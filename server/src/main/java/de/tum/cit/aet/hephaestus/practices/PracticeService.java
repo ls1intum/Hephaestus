@@ -198,15 +198,13 @@ public class PracticeService {
     }
 
     @Transactional
-    public Practice adoptPracticeFromCatalog(WorkspaceContext ctx, String slug, PracticeDefinition definition) {
-        return createPractice(
-            ctx,
-            slug,
-            definition,
-            slug,
-            definition.provenanceFingerprint(slug),
-            PracticeAutonomy.HUMAN_APPROVAL
-        );
+    public Practice adoptPracticeFromCatalog(
+        WorkspaceContext ctx,
+        String slug,
+        PracticeDefinition definition,
+        PracticeAutonomy initialAutonomy
+    ) {
+        return createPractice(ctx, slug, definition, slug, definition.provenanceFingerprint(slug), initialAutonomy);
     }
 
     private Practice createPractice(

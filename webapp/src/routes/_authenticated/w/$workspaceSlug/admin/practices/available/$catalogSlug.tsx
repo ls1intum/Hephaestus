@@ -65,7 +65,7 @@ function PracticeAdoptionRoute() {
 				}),
 				queryClient.invalidateQueries({ queryKey: listAreasQueryKey({ path: { workspaceSlug } }) }),
 			]);
-			toast.success("Practice adopted with Review before sending");
+			toast.success("Practice adopted");
 			await navigate({
 				to: "/w/$workspaceSlug/admin/practices/$practiceSlug",
 				params: { workspaceSlug, practiceSlug: practice.slug },

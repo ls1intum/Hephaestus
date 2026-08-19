@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -31,7 +30,6 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.transaction.support.TransactionOperations;
 
 class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
@@ -60,11 +58,9 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     @Mock
     private WorkspaceRepository workspaceRepository;
 
-    private final AsyncTaskExecutor directExecutor = Runnable::run;
-
     @Test
     void doesNothingWhenDisabled() {
-        seeder(false, directExecutor).seed();
+        seeder(false).seed();
 
         verifyNoInteractions(workspaceRepository, catalogService, installationRepository);
     }
@@ -75,7 +71,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(catalogService.catalog()).thenReturn(catalog());
         when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
 
-        seeder(true, directExecutor).seed();
+        seeder(true).seed();
 
         verify(areaService).createAreaFromCatalog(any(), eq("packaging"), any(), eq(0));
         ArgumentCaptor<PracticeDefinition> definition = ArgumentCaptor.forClass(PracticeDefinition.class);
@@ -93,7 +89,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(workspaceRepository.findAll()).thenReturn(List.of(workspace(1L)));
         when(installationRepository.existsById(1L)).thenReturn(true);
 
-        seeder(true, directExecutor).seed();
+        seeder(true).seed();
 
         verifyNoInteractions(catalogService, practiceService);
         verify(installationRepository, never()).save(any());
@@ -106,22 +102,26 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         when(areaService.createAreaFromCatalog(any(), any(), any(), anyInt())).thenReturn(new PracticeArea());
         when(practiceService.createPracticeFromCatalog(any(), any(), any())).thenThrow(new RuntimeException("nope"));
 
-        assertThatCode(() -> seeder(true, directExecutor).seed()).doesNotThrowAnyException();
+        assertThatCode(() -> seeder(true).seed()).doesNotThrowAnyException();
 
         verify(installationRepository, never()).save(any());
     }
 
     @Test
-    void marksANewWorkspaceForExplicitAdoptionWithoutBlockingCreation() {
-        AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
+    void shouldMarkWorkspaceWhenCreated() {
+        seeder(true).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
-        seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
-
-        ArgumentCaptor<Runnable> task = ArgumentCaptor.forClass(Runnable.class);
-        verify(executor).execute(task.capture());
-        task.getValue().run();
         verify(installationRepository).save(any());
         verifyNoInteractions(catalogService, practiceService, areaService);
+    }
+
+    @Test
+    void shouldMarkWorkspaceWhenLegacyRepairIsDisabled() {
+        when(workspaceRepository.findByIdForUpdate(7L)).thenReturn(Optional.of(workspace(7L)));
+
+        seeder(false).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
+
+        verify(installationRepository).save(any());
     }
 
     private static EffectiveCatalog catalog() {
@@ -142,7 +142,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         );
     }
 
-    private DefaultPracticeCatalogSeeder seeder(boolean enabled, AsyncTaskExecutor executor) {
+    private DefaultPracticeCatalogSeeder seeder(boolean enabled) {
         if (enabled) {
             when(workspaceRepository.findByIdForUpdate(any())).thenAnswer(invocation ->
                 Optional.of(workspace(invocation.getArgument(0)))
@@ -158,7 +158,6 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
             catalogLock,
             installationRepository,
             workspaceRepository,
-            executor,
             TransactionOperations.withoutTransaction(),
             Clock.systemUTC()
         );

@@ -275,8 +275,6 @@ READY="$(api GET "/workspaces/$WS_SLUG/agents" | jq -r '[.[] | select(.ready)] |
 say "catalog model bound to practice reviews and mentor (both ready)"
 
 # ---- 6. explicit catalogue adoption + focused review practices ------------
-# Exercise the production adoption contract before adding purpose-built E2E practices: inspect the
-# exact offered definition, adopt the reviewed ETag, and verify the copy starts behind human approval.
 ADOPTION_SLUG="$(api GET "/workspaces/$WS_SLUG/practice-catalog/adoption" | jq -r '.[] | select(.availability == "AVAILABLE") | .slug' | head -1)"
 if [ -n "$ADOPTION_SLUG" ]; then
   PREVIEW_HEADERS="$SECRET_DIR/adoption-preview-headers"
@@ -294,6 +292,8 @@ if [ -n "$ADOPTION_SLUG" ]; then
     die "adopted practice did not start with an explicit human-approval autonomy"
   say "catalogue preview and explicit adoption succeeded"
 else
+  ADOPTED_COUNT="$(api GET "/workspaces/$WS_SLUG/practice-catalog/adoption" | jq '[.[] | select(.availability == "ADOPTED")] | length')"
+  [ "$ADOPTED_COUNT" -gt 0 ] || die "the catalogue contains neither an available nor an adopted practice"
   say "catalogue adoption already exercised in this workspace"
 fi
 
@@ -314,8 +314,7 @@ practice() { local slug="$1" name="$2" signals="$3" crit="$4" body
     echo "$body" | api POST "/workspaces/$WS_SLUG/practices" \
       -H 'content-type: application/json' --data-binary @- >/dev/null
   fi
-  # Automatic is intentional here: this isolated loop exists to verify that feedback reaches the MR.
-  # Normal catalogue adoption starts at human approval and never grants this autonomy itself.
+  # Automatic lets this isolated E2E workspace verify delivery; catalogue adoption remains human approval.
   api PATCH "/workspaces/$WS_SLUG/practices/$slug/autonomy" \
     -H 'content-type: application/json' -d '{"autonomy":"AUTOMATIC"}' >/dev/null
 }

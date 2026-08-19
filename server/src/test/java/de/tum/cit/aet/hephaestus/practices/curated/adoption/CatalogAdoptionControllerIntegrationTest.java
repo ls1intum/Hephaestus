@@ -60,7 +60,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void workspaceCreationDoesNotInstallCatalogEntries() {
+    void shouldInstallNoCatalogEntriesWhenWorkspaceIsCreated() {
         ensureAdminMembership(workspace);
 
         assertThat(practiceRepository.existsByWorkspaceId(workspace.getId())).isFalse();
@@ -80,7 +80,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void previewIncludesDefinitionAreaOutcomeInitialAutonomyAndValidation() {
+    void shouldReturnDefinitionAreaAutonomyAndValidationWhenPreviewIsRequested() {
         ensureAdminMembership(workspace);
 
         webTestClient
@@ -113,7 +113,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void adoptionRejectsMissingOrInvalidPreviewEtags() {
+    void shouldRejectAdoptionWhenPreviewValidatorIsMissingOrInvalid() {
         ensureAdminMembership(workspace);
 
         webTestClient
@@ -149,14 +149,21 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .jsonPath("$.title")
             .isEqualTo("Practice adoption preview changed");
 
-        adopt("*").expectStatus().isEqualTo(412);
         adopt("W/" + previewEtag()).expectStatus().isEqualTo(412);
         adopt("malformed").expectStatus().isEqualTo(412);
     }
 
     @Test
     @WithAdminUser
-    void adoptsOneIndependentHumanApprovalCopyWithProvenanceRevisionAndAudit() {
+    void shouldAdoptWhenIfMatchUsesStandardWildcard() {
+        ensureAdminMembership(workspace);
+
+        adopt("*").expectStatus().isCreated();
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldAdoptIndependentHumanApprovalCopyWhenPreviewValidatorMatches() {
         ensureAdminMembership(workspace);
         String etag = previewEtag();
 
@@ -214,7 +221,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void duplicateAdoptionReturnsConflictWithoutCreatingAnotherCopy() {
+    void shouldReturnConflictWhenPracticeIsAlreadyAdopted() {
         ensureAdminMembership(workspace);
         String etag = previewEtag();
         adopt(etag).expectStatus().isCreated();
@@ -240,7 +247,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void concurrentAdoptersCreateExactlyOneCompleteCopy() throws Exception {
+    void shouldCreateExactlyOneCopyWhenAdoptersRunConcurrently() throws Exception {
         ensureAdminMembership(workspace);
         String etag = previewEtag();
         String token = TestAuthUtils.getCurrentUserToken();
@@ -281,7 +288,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithMentorUser
-    void memberCannotReadReviewRulesOrAdopt() {
+    void shouldForbidCatalogAccessWhenCallerIsWorkspaceMember() {
         User member = persistUser("mentor");
         ensureWorkspaceMembership(workspace, member, WorkspaceMembership.WorkspaceRole.MEMBER);
 

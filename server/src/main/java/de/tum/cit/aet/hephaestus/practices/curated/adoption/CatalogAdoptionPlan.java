@@ -16,6 +16,7 @@ record CatalogAdoptionPlan(
     @Nullable String areaSlug,
     @Nullable AreaDefinition areaDefinition,
     int areaDisplayOrder,
+    PracticeAutonomy initialAutonomy,
     String etag
 ) {
     static CatalogAdoptionPlan create(
@@ -27,6 +28,12 @@ record CatalogAdoptionPlan(
         @Nullable AreaDefinition areaDefinition,
         int areaDisplayOrder
     ) {
+        PracticeAutonomy initialAutonomy = definition
+            .automatedReviewPolicy()
+            .automatedReview()
+            .canAttemptAutomatedReview()
+            ? PracticeAutonomy.HUMAN_APPROVAL
+            : PracticeAutonomy.OFF;
         CanonicalDigest digest = new CanonicalDigest()
             .add("catalog-adoption-plan-v1")
             .add(slug)
@@ -36,7 +43,7 @@ record CatalogAdoptionPlan(
             .addNullable(areaSlug)
             .addNullable(areaDefinition == null || areaSlug == null ? null : areaDefinition.digest(areaSlug))
             .addInt(areaDisplayOrder)
-            .add(PracticeAutonomy.HUMAN_APPROVAL.name());
+            .add(initialAutonomy.name());
         return new CatalogAdoptionPlan(
             slug,
             definition,
@@ -45,6 +52,7 @@ record CatalogAdoptionPlan(
             areaSlug,
             areaDefinition,
             areaDisplayOrder,
+            initialAutonomy,
             digest.hex()
         );
     }
@@ -59,7 +67,7 @@ record CatalogAdoptionPlan(
                 areaSlug,
                 areaDefinition == null ? null : CuratedAreaRequestDTO.of(areaDefinition)
             ),
-            PracticeAutonomy.HUMAN_APPROVAL,
+            initialAutonomy,
             definition.provenanceFingerprint(slug),
             CatalogAdoptionService.formatted(etag)
         );

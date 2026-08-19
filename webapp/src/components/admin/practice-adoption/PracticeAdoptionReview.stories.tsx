@@ -69,12 +69,23 @@ export const ReusesExistingArea: Story = {
 
 export const AlreadyAdopted: Story = {
 	args: { preview: { ...preview, availability: "ADOPTED" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Adopt practice" })).toBeDisabled();
+		await expect(canvas.getByText("Already adopted")).toBeVisible();
+	},
 };
 
 export const SlugConflict: Story = {
 	args: { preview: { ...preview, availability: "SLUG_CONFLICT" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Adopt practice" })).toBeDisabled();
+		await expect(canvas.getByText("Slug conflict")).toBeVisible();
+	},
 };
 
 export const Adopting: Story = {
 	args: { isPending: true },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("button", { name: "Adopting…" })).toBeDisabled();
+	},
 };
