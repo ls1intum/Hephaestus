@@ -202,7 +202,7 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
         BIGINT workspace_id FK
         VARCHAR(16) actor_kind "NOT NULL"
-        BIGINT actor_account_id FK
+        BIGINT actor_account_id
         BIGINT acting_account_id FK
         VARCHAR(48) entity_type "NOT NULL"
         VARCHAR(64) entity_id "NOT NULL"
@@ -364,9 +364,9 @@ erDiagram
 
     FeedbackApproval {
         UUID id PK
-        UUID feedback_id FK,UK "NOT NULL"
+        UUID feedback_id UK "NOT NULL"
         BIGINT workspace_id "NOT NULL"
-        BIGINT actor_account_id FK
+        BIGINT actor_account_id
         VARCHAR(16) decision "NOT NULL"
         VARCHAR(32) rejection_reason
         VARCHAR(64) content_digest "NOT NULL"
@@ -1429,7 +1429,6 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessageVote : has
     DiscussionComment ||--|| Discussion : references
-    Feedback ||--|| FeedbackApproval : has
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
@@ -1477,7 +1476,6 @@ erDiagram
     Feedback ||--o{ Feedback : references
     User ||--o{ Feedback : about_user_id
     Workspace ||--o{ Feedback : has
-    Account ||--o{ FeedbackApproval : has
     Feedback ||--o{ FeedbackPlacement : has
     ChatMessage ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by
