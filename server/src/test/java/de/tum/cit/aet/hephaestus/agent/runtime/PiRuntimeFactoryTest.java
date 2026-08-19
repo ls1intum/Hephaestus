@@ -101,6 +101,7 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             }
             assertThat(PRACTICE.sidecarScripts()).contains(
                 "pi-observation-normalize.mjs",
+                "pi-runner-timings.mjs",
                 "pi-runner-usage.mjs",
                 "pi-provider.mjs"
             );

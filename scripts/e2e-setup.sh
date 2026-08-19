@@ -92,6 +92,7 @@ psql_e2e() { PGSERVICEFILE="$PG_SERVICE_FILE" psql 'service=e2e' "$@"; }
 [[ "$LLM_PROTOCOL" =~ ^openai-(completions|responses)$ ]] || die "E2E_LLM_PROTOCOL must be openai-completions or openai-responses"
 [[ "$LLM_AUTH_MODE" =~ ^(BEARER|API_KEY)$ ]] || die "E2E_LLM_AUTH_MODE must be BEARER or API_KEY"
 if [ -n "$PR_ID" ]; then [[ "$PR_ID" =~ ^[0-9]+$ ]] || die "E2E_PR_ID must be numeric"; fi
+if [ -n "$REPO" ]; then [[ "$REPO" =~ ^[A-Za-z0-9._/-]+$ ]] || die "E2E_REPO contains unsupported characters"; fi
 [[ "$LLM_PRICING_MODE" =~ ^(PRICED|NO_CHARGE)$ ]] || die "set E2E_LLM_PRICING_MODE to PRICED or NO_CHARGE; the E2E setup never guesses cost"
 if [ "$LLM_PRICING_MODE" = PRICED ]; then
   [[ "$LLM_INPUT_USD" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "E2E_LLM_INPUT_USD is required for PRICED"
@@ -137,6 +138,18 @@ else
   SCM_JSON="$(curl -fsS -m10 -H @"$SCM_HEADER_FILE" "$SERVER_URL/api/v4/user")"
   SCM_ID="$(echo "$SCM_JSON" | jq -r '.id')"; SCM_LOGIN="$(echo "$SCM_JSON" | jq -r '.username')"
   PROVIDER_ORIGIN="$SERVER_URL"
+fi
+
+if [ -n "$REPO" ]; then
+  ENCODED_REPO="$(jq -rn --arg r "$REPO" '$r|@uri')"
+  if [ "$PROVIDER" = github ]; then
+    RESOLVED_REPO="$(curl -fsS -m10 -H @"$SCM_HEADER_FILE" "https://api.github.com/repos/$REPO" | jq -r '.full_name')" ||
+      die "the target repository is not accessible through the SCM credential"
+  else
+    RESOLVED_REPO="$(curl -fsS -m10 -H @"$SCM_HEADER_FILE" "$SERVER_URL/api/v4/projects/$ENCODED_REPO" | jq -r '.path_with_namespace')" ||
+      die "the target repository is not accessible through the SCM credential"
+  fi
+  [ "${RESOLVED_REPO,,}" = "${REPO,,}" ] || die "the SCM provider resolved a different target repository"
 fi
 if [ -z "$SCM_ID" ] || [ "$SCM_ID" = null ]; then die "could not resolve SCM user from the PAT"; fi
 # These flow into raw SQL below; validate their shape so a hostile/odd login can't break (or inject) it.
@@ -261,7 +274,29 @@ READY="$(api GET "/workspaces/$WS_SLUG/agents" | jq -r '[.[] | select(.ready)] |
 [ "$READY" = "2" ] || die "expected both purposes bound and ready, got $READY"
 say "catalog model bound to practice reviews and mentor (both ready)"
 
-# ---- 6. the practices ------------------------------------------------------
+# ---- 6. explicit catalogue adoption + focused review practices ------------
+# Exercise the production adoption contract before adding purpose-built E2E practices: inspect the
+# exact offered definition, adopt the reviewed ETag, and verify the copy starts behind human approval.
+ADOPTION_SLUG="$(api GET "/workspaces/$WS_SLUG/practice-catalog/adoption" | jq -r '.[] | select(.availability == "AVAILABLE") | .slug' | head -1)"
+if [ -n "$ADOPTION_SLUG" ]; then
+  PREVIEW_HEADERS="$SECRET_DIR/adoption-preview-headers"
+  PREVIEW_BODY="$SECRET_DIR/adoption-preview.json"
+  curl -fsS -m30 -D "$PREVIEW_HEADERS" -o "$PREVIEW_BODY" \
+    "$APP_URL/workspaces/$WS_SLUG/practice-catalog/adoption/$ADOPTION_SLUG" -H @"$AUTH_HEADER_FILE"
+  jq -e --arg slug "$ADOPTION_SLUG" '
+    .slug == $slug and .availability == "AVAILABLE" and .initialAutonomy == "HUMAN_APPROVAL"
+    and (.definition.criteria | length > 0) and (.sourceReviewRuleFingerprint | length > 0)
+  ' "$PREVIEW_BODY" >/dev/null || die "catalogue adoption preview is incomplete or inconsistent"
+  ADOPTION_ETAG="$(sed -nE 's/^[Ee][Tt][Aa][Gg]:[[:space:]]*(.*)$/\1/p' "$PREVIEW_HEADERS" | tr -d '\r' | tail -1)"
+  [ -n "$ADOPTION_ETAG" ] || die "catalogue adoption preview returned no ETag"
+  ADOPTED="$(api POST "/workspaces/$WS_SLUG/practice-catalog/adoption/$ADOPTION_SLUG" -H "If-Match: $ADOPTION_ETAG")"
+  echo "$ADOPTED" | jq -e '.autonomy.effective == "HUMAN_APPROVAL" and .autonomy.override == "HUMAN_APPROVAL"' >/dev/null ||
+    die "adopted practice did not start with an explicit human-approval autonomy"
+  say "catalogue preview and explicit adoption succeeded"
+else
+  say "catalogue adoption already exercised in this workspace"
+fi
+
 # A practice declares BINDINGS: the signals that occasion a review, and the evidence that review reads.
 # The kind of work is derived from the signal prefix, so it is never stated. The API does not fill in
 # default evidence (only the bundled-catalog loader does), so each binding spells its `needs` out; this
@@ -279,17 +314,16 @@ practice() { local slug="$1" name="$2" signals="$3" crit="$4" body
     echo "$body" | api POST "/workspaces/$WS_SLUG/practices" \
       -H 'content-type: application/json' --data-binary @- >/dev/null
   fi
-  # ENGAGE is the loudest tier: reviewed, and delivered both on the merge request and in the mentor
-  # conversation. The E2E loop exists to watch feedback land, so anything quieter would hide the thing
-  # under test. OFF below is the tier that stops the review outright.
-  api PATCH "/workspaces/$WS_SLUG/practices/$slug/review-tier" \
-    -H 'content-type: application/json' -d '{"reviewTier":"ENGAGE"}' >/dev/null
+  # Automatic is intentional here: this isolated loop exists to verify that feedback reaches the MR.
+  # Normal catalogue adoption starts at human approval and never grants this autonomy itself.
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/autonomy" \
+    -H 'content-type: application/json' -d '{"autonomy":"AUTOMATIC"}' >/dev/null
 }
 PRACTICES="$(api GET "/workspaces/$WS_SLUG/practices")"
 while IFS= read -r slug; do
-  api PATCH "/workspaces/$WS_SLUG/practices/$slug/review-tier" \
-    -H 'content-type: application/json' -d '{"reviewTier":"OFF"}' >/dev/null
-done < <(echo "$PRACTICES" | jq -r '.[] | select(.reviewTier != "OFF") | .slug')
+  api PATCH "/workspaces/$WS_SLUG/practices/$slug/autonomy" \
+    -H 'content-type: application/json' -d '{"autonomy":"OFF"}' >/dev/null
+done < <(echo "$PRACTICES" | jq -r '.[] | select(.autonomy.effective != "OFF") | .slug')
 practice submit-reviewable-work "Submit reviewable work" \
   '["scm.pull_request.opened","scm.pull_request.ready","scm.pull_request.synchronized"]' \
   "The MR is appropriately scoped, has a clear description, passes CI, and is not a draft dump. Flag oversized/unfocused MRs and missing descriptions."
@@ -318,7 +352,6 @@ PR_SCOPE_SQL="
     AND (rtm.native_id IS NULL OR rtm.native_id = r.native_id)
   WHERE i.issue_type = 'PULL_REQUEST'"
 if [ -n "$REPO" ]; then
-  [[ "$REPO" =~ ^[A-Za-z0-9._/-]+$ ]] || die "E2E_REPO contains unsupported characters"
   PR_SCOPE_SQL+=" AND lower(r.name_with_owner) = lower('$REPO')"
 fi
 if [ -n "$PR_ID" ]; then
@@ -329,8 +362,11 @@ else
 fi
 echo
 printf '\033[32m✓ E2E ready.\033[0m  Open the local UI, use Dev sign in, and select the E2E workspace.\n'
+printf '  Authenticate the dev trigger:\n    JWT="$(curl -fsS -i -X POST %q/auth/dev-login -H %q -d %q | grep -Ei %q | sed -E %q | tr -d "\\r")"\n' \
+  "$APP_URL" 'content-type: application/json' "{\"username\":\"$USERNAME\",\"admin\":true}" \
+  'set-cookie: (__Host-)?HEPHAESTUS_AT=' 's/.*(__Host-)?HEPHAESTUS_AT=([^;]+).*/\2/'
 if [ -n "$PR_ID" ]; then
-  printf '  Trigger a real review:\n    curl -X POST "%s/api/dev/trigger-review?prId=%s&workspaceId=%s"\n' "$APP_URL" "$PR_ID" "$WS_ID"
+  printf '  Trigger a real review:\n    curl -fsS -X POST -H "Authorization: Bearer $JWT" "%s/api/dev/trigger-review?prId=%s&workspaceId=%s"\n' "$APP_URL" "$PR_ID" "$WS_ID"
 else
-  printf '  No PR synced yet — push/open an MR on the connected repo (webhook), or sync, then:\n    curl -X POST "%s/api/dev/trigger-review?prId=<id>&workspaceId=%s"\n' "$APP_URL" "$WS_ID"
+  printf '  No PR synced yet — push/open an MR on the connected repo (webhook), or sync, then:\n    curl -fsS -X POST -H "Authorization: Bearer $JWT" "%s/api/dev/trigger-review?prId=<id>&workspaceId=%s"\n' "$APP_URL" "$WS_ID"
 fi
