@@ -114,7 +114,14 @@ for the architectural decision.
   freely; rename a slug only with an explicit remapping strategy.
 - **Definitions and order are independent.** Reordering does not create a definition override or an
   audit event. **Use Hephaestus order** removes custom positions.
-- **Workspace installation happens once.** Later instance changes never rewrite workspace copies.
+- **Legacy workspace installation happens once.** Startup repair preserves the snapshots created before
+  explicit adoption shipped; later instance changes never rewrite those workspace copies. New workspaces
+  start empty and choose what to adopt.
+- **Adoption is deliberate.** Workspace administrators can browse the entries the instance currently
+  offers, inspect the complete effective definition and its validation fingerprint, and then adopt an
+  independent copy. The preview's entity tag must still match when the copy is created.
+- **Adoption does not enable delivery.** A newly adopted practice receives its own `PROPOSE` tier: reviews
+  may record observations, but feedback remains held back until a workspace administrator graduates it.
 - **Provenance is descriptive, not referential.** Matched workspace copies retain the source slug and
   comparison fingerprint without a foreign key. A bundled source may have no database row and may
   disappear in a later release.

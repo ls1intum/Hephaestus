@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { GripVertical, MoreHorizontal, Plus } from "lucide-react";
+import { GripVertical, Library, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
@@ -305,7 +305,15 @@ function CatalogToolbar({
 					</ToggleGroupItem>
 				))}
 			</ToggleGroup>
-			<div className="grid grid-cols-2 gap-2 sm:flex">
+			<div className="grid gap-2 sm:flex">
+				<Link
+					to="/w/$workspaceSlug/admin/practices/available"
+					params={{ workspaceSlug }}
+					className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
+				>
+					<Library className="mr-1.5 size-4" />
+					Browse catalog
+				</Link>
 				<CreateAreaButton
 					onCreate={onCreateArea}
 					pending={creatingArea}

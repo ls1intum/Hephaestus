@@ -25,7 +25,7 @@ import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
-/** Installs the effective instance catalog once; workspace copies remain independent afterwards. */
+/** Repairs legacy workspace catalog snapshots once; new workspaces adopt practices explicitly. */
 @Component
 @ConditionalOnServerRole
 class DefaultPracticeCatalogSeeder {
@@ -97,10 +97,10 @@ class DefaultPracticeCatalogSeeder {
         try {
             taskExecutor.execute(() -> {
                 try {
-                    workspaceRepository.findById(event.workspaceId()).ifPresent(this::seedCatalogSafely);
+                    transactionOperations.executeWithoutResult(ignored -> markCatalogReady(event.workspaceId()));
                 } catch (RuntimeException exception) {
                     log.error(
-                        "Could not load workspace {} for default practice catalog seeding",
+                        "Could not initialize explicit practice catalog adoption for workspace {}",
                         event.workspaceId(),
                         exception
                     );
@@ -113,6 +113,15 @@ class DefaultPracticeCatalogSeeder {
                 exception
             );
         }
+    }
+
+    private void markCatalogReady(Long workspaceId) {
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId).orElse(null);
+        if (workspace == null || installationRepository.existsById(workspaceId)) {
+            return;
+        }
+        Instant now = clock.instant();
+        installationRepository.save(new PracticeCatalogInstallation(workspaceId, now, now));
     }
 
     private void seedCatalogSafely(Workspace workspace) {

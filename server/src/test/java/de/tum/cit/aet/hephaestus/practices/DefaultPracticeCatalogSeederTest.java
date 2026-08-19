@@ -112,10 +112,8 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
     }
 
     @Test
-    void givesANewWorkspaceTheCatalogWithoutBlockingItsCreation() {
+    void marksANewWorkspaceForExplicitAdoptionWithoutBlockingCreation() {
         AsyncTaskExecutor executor = mock(AsyncTaskExecutor.class);
-        when(workspaceRepository.findById(7L)).thenReturn(Optional.of(workspace(7L)));
-        when(catalogService.catalog()).thenReturn(new EffectiveCatalog(List.of(), List.of()));
 
         seeder(true, executor).onWorkspaceCreated(new WorkspaceCreatedEvent(7L, IntegrationKind.GITLAB));
 
@@ -123,6 +121,7 @@ class DefaultPracticeCatalogSeederTest extends BaseUnitTest {
         verify(executor).execute(task.capture());
         task.getValue().run();
         verify(installationRepository).save(any());
+        verifyNoInteractions(catalogService, practiceService, areaService);
     }
 
     private static EffectiveCatalog catalog() {

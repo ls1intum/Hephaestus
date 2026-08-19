@@ -159,6 +159,25 @@ public class PracticeAreaService {
         return practiceAreaRepository.save(area);
     }
 
+    @Transactional
+    public PracticeArea adoptAreaFromCatalog(
+        WorkspaceContext ctx,
+        String slug,
+        AreaDefinition definition,
+        int displayOrder
+    ) {
+        PracticeArea area = createAreaFromCatalog(ctx, slug, definition, displayOrder);
+        configAudit.record(
+            ConfigAuditEntry.created(
+                ConfigAuditEntityType.PRACTICE_AREA,
+                area.getId(),
+                ctx.id(),
+                PracticeAreaSnapshot.of(area)
+            )
+        );
+        return area;
+    }
+
     /**
      * Sets — or clears — the tier this area imposes on the practices under it that hold no tier of their own.
      *
