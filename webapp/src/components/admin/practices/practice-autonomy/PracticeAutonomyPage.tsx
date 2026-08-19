@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { AutonomyRollup, Practice, PracticeReviewSettings } from "@/api/types.gen";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
+import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import {
 	Accordion,
 	AccordionContent,
@@ -324,11 +325,15 @@ function BulkActionBar({
 						<DropdownMenuContent align="end">
 							<DropdownMenuGroup>
 								<DropdownMenuLabel>Set every selected practice to</DropdownMenuLabel>
-								{PRACTICE_AUTONOMY_ORDER.map((autonomy) => (
-									<DropdownMenuItem key={autonomy} onClick={() => onSet(autonomy)}>
-										{PRACTICE_AUTONOMY_LABELS[autonomy]}
-									</DropdownMenuItem>
-								))}
+								{PRACTICE_AUTONOMY_ORDER.map((autonomy) => {
+									const { icon: Icon, label } = AUTONOMY_DEFS[autonomy];
+									return (
+										<DropdownMenuItem key={autonomy} onClick={() => onSet(autonomy)}>
+											<Icon aria-hidden />
+											{label}
+										</DropdownMenuItem>
+									);
+								})}
 							</DropdownMenuGroup>
 							<DropdownMenuSeparator />
 							<DropdownMenuItem onClick={() => onSet(null)}>

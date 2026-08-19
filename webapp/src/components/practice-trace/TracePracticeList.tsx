@@ -1,12 +1,13 @@
 import { ArrowUpIcon } from "lucide-react";
 import type { PracticeTraceEntry, TracedSignal } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
+import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { PRACTICE_AUTONOMY_DESCRIPTIONS, PRACTICE_AUTONOMY_LABELS } from "@/lib/practice-autonomy";
+import { PRACTICE_AUTONOMY_DESCRIPTIONS } from "@/lib/practice-autonomy";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import { deliveryLabel, occurrenceDomId, WITHHELD_REASON_LABELS } from "./trace-format";
 
@@ -90,8 +91,8 @@ function TracePracticeEntry({ entry, occurrence }: TracePracticeEntryProps) {
 							<dt className="sr-only">Autonomy</dt>
 							<dd>
 								<Tooltip>
-									<TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-4">
-										{PRACTICE_AUTONOMY_LABELS[entry.autonomy]}
+									<TooltipTrigger className="cursor-help">
+										<AutonomyBadge autonomy={entry.autonomy} />
 									</TooltipTrigger>
 									<TooltipContent>{PRACTICE_AUTONOMY_DESCRIPTIONS[entry.autonomy]}</TooltipContent>
 								</Tooltip>

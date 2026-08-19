@@ -71,8 +71,7 @@ class ApprovedFeedbackDeliveryListener {
         if (!policy.allowed()) {
             if (
                 policy.suppressionReason() != null &&
-                policy.suppressionReason() !=
-                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason.INSTANCE_SILENCED
+                policy.suppressionReason() != FeedbackSuppressionReason.INSTANCE_SILENCED
             ) {
                 feedbackRepository.markApprovedSuppressed(
                     event.workspaceId(),

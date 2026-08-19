@@ -1,27 +1,36 @@
 import {
 	ArrowUpRightIcon,
 	CheckIcon,
+	CircleXIcon,
 	Clock3Icon,
 	FileCode2Icon,
 	ShieldCheckIcon,
-	XIcon,
 } from "lucide-react";
 import { useState } from "react";
 import type { DecideFeedbackProposalRequest } from "@/api/types.gen";
 import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-	AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+	DELIVERY_PLACE_DEFS,
+	type DeliveryPlace,
+} from "@/components/practice-vocabulary/delivery-place-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+	Item,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemMedia,
+	ItemTitle,
+} from "@/components/ui/item";
+import {
+	Popover,
+	PopoverContent,
+	PopoverDescription,
+	PopoverHeader,
+	PopoverTitle,
+	PopoverTrigger,
+} from "@/components/ui/popover";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Spinner } from "@/components/ui/spinner";
 import { FeedbackBody } from "./FeedbackBody";
@@ -33,13 +42,14 @@ export interface FeedbackProposal {
 	practiceNames: string[];
 	recipientName: string;
 	body: string;
+	deliveryPlace: DeliveryPlace;
+	placements: string[];
 	artifact?: {
 		label: string;
 		title: string;
 		repositoryName: string;
 		url?: string;
 	};
-	placement: string;
 	evidence: Array<{
 		id: string;
 		practiceName: string;
@@ -56,12 +66,12 @@ export interface ProposalReviewPageProps {
 }
 
 const REJECTION_REASONS: Array<{ value: ProposalRejectionReason; label: string }> = [
-	{ value: "INCORRECT", label: "The feedback is incorrect" },
-	{ value: "MISSING_CONTEXT", label: "It is missing important context" },
-	{ value: "UNHELPFUL", label: "It would not be useful" },
-	{ value: "DUPLICATE", label: "It repeats feedback already given" },
-	{ value: "INAPPROPRIATE_PLACEMENT", label: "It is aimed at the wrong place" },
-	{ value: "OTHER", label: "Another reason" },
+	{ value: "INCORRECT", label: "Incorrect" },
+	{ value: "MISSING_CONTEXT", label: "Missing important context" },
+	{ value: "UNHELPFUL", label: "Not useful to the recipient" },
+	{ value: "DUPLICATE", label: "Already covered elsewhere" },
+	{ value: "INAPPROPRIATE_PLACEMENT", label: "Wrong delivery place" },
+	{ value: "OTHER", label: "Something else" },
 ];
 
 export function ProposalReviewPage({
@@ -70,39 +80,48 @@ export function ProposalReviewPage({
 	onApprove,
 	onReject,
 }: ProposalReviewPageProps) {
+	const place = DELIVERY_PLACE_DEFS[proposal.deliveryPlace];
 	return (
-		<article className="mx-auto max-w-5xl space-y-5">
-			<header className="space-y-2 border-b pb-5">
-				<div className="space-y-2">
-					<div className="flex flex-wrap items-center gap-2">
-						<Badge variant="secondary">
-							<Clock3Icon />
-							Awaiting approval
-						</Badge>
-						<span className="text-sm text-muted-foreground">Ready for your decision</span>
-					</div>
+		<article className="mx-auto max-w-5xl space-y-6">
+			<header className="space-y-3 border-b pb-5">
+				<div className="flex flex-wrap items-center gap-2">
+					<Badge variant="warning">
+						<Clock3Icon />
+						Awaiting approval
+					</Badge>
+					<StatusBadge def={place} />
+				</div>
+				<div className="space-y-1.5">
 					<h2 className="text-2xl font-semibold tracking-tight">
 						Review feedback for {proposal.recipientName}
 					</h2>
-					<p className="text-sm text-muted-foreground">
-						Check the evidence and exact message before it is sent.
+					<p className="max-w-3xl text-sm text-muted-foreground">
+						Approve or reject this complete {place.label.toLowerCase()} feedback unit. Approval
+						sends exactly what appears below; it does not approve other feedback from the same
+						review.
 					</p>
 				</div>
 			</header>
 
-			<div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_20rem]">
-				<div className="space-y-5">
-					<section aria-labelledby="proposal-message-heading" className="space-y-3">
-						<div className="flex flex-wrap items-center justify-between gap-2">
-							<h3 id="proposal-message-heading" className="font-semibold">
-								Message that will be sent
+			<div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+				<div className="space-y-7">
+					<section aria-labelledby="proposal-feedback-heading" className="space-y-3">
+						<div className="space-y-2">
+							<h3 id="proposal-feedback-heading" className="text-lg font-semibold">
+								Feedback to send
 							</h3>
-							<Badge variant="outline">{proposal.placement}</Badge>
+							<div className="flex flex-wrap gap-1.5" role="group" aria-label="Planned placements">
+								{proposal.placements.map((placement) => (
+									<Badge key={placement} variant="outline">
+										{placement}
+									</Badge>
+								))}
+							</div>
 						</div>
 						<FeedbackBody
 							feedback={{
 								body: proposal.body,
-								channel: "IN_CONTEXT",
+								channel: proposal.deliveryPlace,
 								deliveryState: "AWAITING_APPROVAL",
 							}}
 						/>
@@ -110,46 +129,46 @@ export function ProposalReviewPage({
 
 					<section aria-labelledby="proposal-evidence-heading" className="space-y-3">
 						<div className="flex items-center gap-2">
-							<ShieldCheckIcon className="size-4 text-muted-foreground" aria-hidden="true" />
-							<h3 id="proposal-evidence-heading" className="font-semibold">
+							<ShieldCheckIcon className="size-4 text-muted-foreground" aria-hidden />
+							<h3 id="proposal-evidence-heading" className="text-lg font-semibold">
 								Evidence to verify
 							</h3>
 						</div>
-						<ul className="space-y-3" aria-label="Observations behind this proposal">
+						<ItemGroup aria-label="Observations behind this feedback">
 							{proposal.evidence.map((evidence) => (
-								<li key={evidence.id} className="rounded-lg border p-4">
-									<div className="mb-2 flex items-center gap-2 text-sm font-medium">
-										<FileCode2Icon className="size-4" aria-hidden="true" />
-										<span>{evidence.practiceName}</span>
-									</div>
-									<blockquote className="border-l-2 pl-3 text-sm leading-6 text-muted-foreground">
-										{evidence.excerpt}
-									</blockquote>
-									{evidence.url && (
-										<a
-											className="mt-2 inline-block text-sm font-medium underline underline-offset-4"
-											href={evidence.url}
-										>
-											Inspect observation and source evidence
-										</a>
-									)}
-								</li>
+								<Item key={evidence.id} variant="outline" role="listitem">
+									<ItemMedia variant="icon">
+										<FileCode2Icon />
+									</ItemMedia>
+									<ItemContent>
+										<ItemTitle>{evidence.practiceName}</ItemTitle>
+										<ItemDescription className="line-clamp-none">
+											{evidence.excerpt}
+										</ItemDescription>
+										{evidence.url && (
+											<a
+												className="w-fit text-sm font-medium underline underline-offset-4"
+												href={evidence.url}
+											>
+												Inspect observation and source evidence
+											</a>
+										)}
+									</ItemContent>
+								</Item>
 							))}
-						</ul>
+						</ItemGroup>
 					</section>
 				</div>
 
-				<aside className="space-y-4 lg:sticky lg:top-5 lg:self-start">
+				<aside className="space-y-5 lg:sticky lg:top-5 lg:self-start">
 					{proposal.artifact && (
-						<Card>
-							<CardHeader>
-								<CardTitle className="text-base">Reviewed work</CardTitle>
-							</CardHeader>
-							<CardContent className="space-y-3 text-sm">
-								<div>
-									<p className="font-medium">{proposal.artifact.label}</p>
-									<p className="mt-1 text-muted-foreground">{proposal.artifact.title}</p>
-								</div>
+						<section aria-labelledby="reviewed-work-heading" className="space-y-2">
+							<h3 id="reviewed-work-heading" className="text-sm font-semibold">
+								Reviewed work
+							</h3>
+							<div className="space-y-1 text-sm">
+								<p className="font-medium">{proposal.artifact.label}</p>
+								<p className="text-muted-foreground">{proposal.artifact.title}</p>
 								<p className="text-muted-foreground">{proposal.artifact.repositoryName}</p>
 								{proposal.artifact.url && (
 									<a
@@ -159,32 +178,28 @@ export function ProposalReviewPage({
 										className="inline-flex items-center gap-1 font-medium underline underline-offset-4"
 									>
 										Open reviewed work
-										<ArrowUpRightIcon className="size-3.5" aria-hidden="true" />
+										<ArrowUpRightIcon className="size-3.5" aria-hidden />
 									</a>
 								)}
-							</CardContent>
-						</Card>
+							</div>
+						</section>
 					)}
-					<div className="rounded-lg border p-4 text-sm">
-						<p className="font-medium">
+					<section aria-labelledby="proposal-practices-heading" className="space-y-2 border-t pt-4">
+						<h3 id="proposal-practices-heading" className="text-sm font-semibold">
 							{proposal.practiceNames.length === 1 ? "Practice" : "Practices"}
-						</p>
-						<ul className="mt-1 space-y-1 text-muted-foreground">
+						</h3>
+						<ul className="space-y-1 text-sm text-muted-foreground">
 							{proposal.practiceNames.map((practiceName) => (
 								<li key={practiceName}>{practiceName}</li>
 							))}
 						</ul>
-					</div>
+					</section>
 				</aside>
 			</div>
 
-			<footer className="sticky bottom-3 z-10 flex flex-col-reverse gap-2 rounded-xl border bg-background/95 p-3 shadow-lg backdrop-blur sm:flex-row sm:justify-end">
-				<RejectProposalDialog proposal={proposal} disabled={isDeciding} onReject={onReject} />
-				<Button
-					aria-label="Approve and send"
-					disabled={isDeciding}
-					onClick={() => onApprove(proposal.id)}
-				>
+			<footer className="sticky bottom-0 z-10 flex flex-col-reverse gap-2 border-t bg-background/95 py-3 backdrop-blur sm:flex-row sm:justify-end">
+				<RejectProposalPopover proposal={proposal} disabled={isDeciding} onReject={onReject} />
+				<Button disabled={isDeciding} onClick={() => onApprove(proposal.id)}>
 					{isDeciding ? <Spinner /> : <CheckIcon />} Approve and send
 				</Button>
 			</footer>
@@ -192,7 +207,7 @@ export function ProposalReviewPage({
 	);
 }
 
-function RejectProposalDialog({
+function RejectProposalPopover({
 	proposal,
 	disabled,
 	onReject,
@@ -201,47 +216,52 @@ function RejectProposalDialog({
 	disabled: boolean;
 	onReject: ProposalReviewPageProps["onReject"];
 }) {
+	const [open, setOpen] = useState(false);
 	const [reason, setReason] = useState<ProposalRejectionReason | "">("");
 	return (
-		<AlertDialog>
-			<AlertDialogTrigger render={<Button variant="outline" disabled={disabled} />}>
-				<XIcon />
-				Reject proposal
-			</AlertDialogTrigger>
-			<AlertDialogContent>
-				<AlertDialogHeader>
-					<AlertDialogTitle>Reject this proposal?</AlertDialogTitle>
-					<AlertDialogDescription>
-						You can optionally choose a category to help improve this practice.
-					</AlertDialogDescription>
-				</AlertDialogHeader>
+		<Popover open={open} onOpenChange={setOpen}>
+			<PopoverTrigger render={<Button variant="outline" disabled={disabled} />}>
+				<CircleXIcon />
+				Reject feedback
+			</PopoverTrigger>
+			<PopoverContent align="end" side="top" className="w-80 gap-3 p-3">
+				<PopoverHeader>
+					<PopoverTitle>Why should this not be sent?</PopoverTitle>
+					<PopoverDescription>
+						A category is optional. It helps distinguish quality problems from duplicate or
+						misplaced feedback.
+					</PopoverDescription>
+				</PopoverHeader>
 				<RadioGroup
 					value={reason}
 					onValueChange={(value) => setReason(value as ProposalRejectionReason)}
 					aria-label="Rejection reason"
-					className="gap-2"
+					className="gap-1"
 				>
 					{REJECTION_REASONS.map((option) => (
 						<label
 							key={option.value}
 							htmlFor={`rejection-${option.value}`}
-							className="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm has-data-checked:border-primary has-data-checked:bg-muted/50"
+							className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted has-data-checked:bg-muted"
 						>
 							<RadioGroupItem id={`rejection-${option.value}`} value={option.value} />
 							<span>{option.label}</span>
 						</label>
 					))}
 				</RadioGroup>
-				<AlertDialogFooter>
-					<AlertDialogCancel>Keep reviewing</AlertDialogCancel>
-					<AlertDialogAction
+				<div className="flex justify-end gap-2 border-t pt-3">
+					<Button variant="ghost" size="sm" onClick={() => setOpen(false)}>
+						Cancel
+					</Button>
+					<Button
 						variant="destructive"
+						size="sm"
 						onClick={() => onReject(proposal.id, reason || undefined)}
 					>
-						Reject proposal
-					</AlertDialogAction>
-				</AlertDialogFooter>
-			</AlertDialogContent>
-		</AlertDialog>
+						Reject feedback
+					</Button>
+				</div>
+			</PopoverContent>
+		</Popover>
 	);
 }

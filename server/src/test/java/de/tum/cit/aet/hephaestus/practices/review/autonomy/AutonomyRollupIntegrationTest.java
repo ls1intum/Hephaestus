@@ -280,11 +280,11 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
             AutonomyRollupDTO rollup = fetchRollup();
 
-            assertThat(rollup.workspaceDefault().effective()).isEqualTo(PracticeAutonomy.AUTOMATIC);
+            assertThat(rollup.workspaceDefault().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(rollup.workspaceDefault().override()).isNull();
             assertThat(rollup.workspaceDefault().inherited()).isTrue();
             assertThat(rollup.workspaceDefault().source()).isEqualTo(AutonomySource.WORKSPACE);
-            assertThat(rollup.counts()).containsEntry(PracticeAutonomy.AUTOMATIC, 1);
+            assertThat(rollup.counts()).containsEntry(PracticeAutonomy.HUMAN_APPROVAL, 1);
         }
 
         @Test
@@ -340,7 +340,7 @@ class AutonomyRollupIntegrationTest extends AbstractWorkspaceIntegrationTest {
         AutonomyRollupDTO rollup = fetchRollup();
 
         assertThat(rollup.counts().values().stream().mapToInt(Integer::intValue).sum()).isEqualTo(1);
-        assertThat(rollup.counts()).containsEntry(PracticeAutonomy.AUTOMATIC, 1);
+        assertThat(rollup.counts()).containsEntry(PracticeAutonomy.HUMAN_APPROVAL, 1);
         assertThat(rollup.counts()).containsEntry(PracticeAutonomy.OFF, 0);
     }
 }

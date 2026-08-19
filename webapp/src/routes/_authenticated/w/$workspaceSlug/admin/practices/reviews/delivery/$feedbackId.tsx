@@ -48,7 +48,6 @@ function FeedbackDetailRoute() {
 
 	const feedback = feedbackQueryResult.data;
 	if (feedback?.deliveryState === "AWAITING_APPROVAL") {
-		const firstPlacement = feedback.placements[0];
 		return (
 			<ProposalReviewPage
 				proposal={{
@@ -66,7 +65,14 @@ function FeedbackDetailRoute() {
 								url: feedback.artifact.url,
 							}
 						: undefined,
-					placement: placementLabel(feedback.channel, firstPlacement?.placementType),
+					deliveryPlace: feedback.channel,
+					placements: Array.from(
+						new Set(
+							feedback.placements.map((placement) =>
+								placementLabel(feedback.channel, placement.placementType),
+							),
+						),
+					),
 					evidence: feedback.observations.map((observation) => ({
 						id: observation.observationId,
 						practiceName: observation.practiceName,

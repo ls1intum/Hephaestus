@@ -13,7 +13,8 @@ const proposal = {
 		repositoryName: "hephaestus/course-project",
 		url: "https://gitlab.example.com/hephaestus/course-project/-/merge_requests/184",
 	},
-	placement: "Merge request comment",
+	deliveryPlace: "IN_CONTEXT",
+	placements: ["Summary comment", "Inline comments"],
 	evidence: [
 		{
 			id: "evidence-1",
@@ -48,7 +49,8 @@ export const Ready: Story = {
 		await expect(
 			canvas.getByRole("heading", { name: "Review feedback for Alex Morgan" }),
 		).toBeVisible();
-		await expect(canvas.getByText("Merge request comment")).toBeVisible();
+		await expect(canvas.getByText("Summary comment")).toBeVisible();
+		await expect(canvas.getByText("Inline comments")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Approve and send" }));
 		await expect(args.onApprove).toHaveBeenCalledWith("feedback-42");
 	},
@@ -56,10 +58,10 @@ export const Ready: Story = {
 
 export const Rejecting: Story = {
 	play: async ({ canvas, args }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Reject proposal" }));
-		const dialog = await screen.findByRole("alertdialog");
-		await userEvent.click(within(dialog).getByText("It is missing important context"));
-		await userEvent.click(within(dialog).getByRole("button", { name: "Reject proposal" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Reject feedback" }));
+		const popover = await screen.findByRole("dialog");
+		await userEvent.click(within(popover).getByText("Missing important context"));
+		await userEvent.click(within(popover).getByRole("button", { name: "Reject feedback" }));
 		await expect(args.onReject).toHaveBeenCalledWith("feedback-42", "MISSING_CONTEXT");
 	},
 };
@@ -67,8 +69,8 @@ export const Rejecting: Story = {
 export const Deciding: Story = {
 	args: { isDeciding: true },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Approve and send" })).toBeDisabled();
-		await expect(canvas.getByRole("button", { name: "Reject proposal" })).toBeDisabled();
+		await expect(canvas.getByRole("button", { name: /Approve and send/ })).toBeDisabled();
+		await expect(canvas.getByRole("button", { name: "Reject feedback" })).toBeDisabled();
 	},
 };
 

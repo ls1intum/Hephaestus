@@ -73,6 +73,7 @@
         </preConditions>
         <comment>Persist the immutable human decision for feedback that requires approval.</comment>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
+            ALTER TABLE feedback ALTER COLUMN delivery_state TYPE VARCHAR(32);
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
             ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (delivery_state IN ('AWAITING_APPROVAL', 'PREPARED', 'DELIVERED', 'DISCARDED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
             ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
@@ -121,6 +122,7 @@
                     WHERE suppression_reason IN ('WORKSPACE_DISABLED', 'APPROVAL_STALE');
                 ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
                 ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (delivery_state IN ('PREPARED', 'DELIVERED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
+                ALTER TABLE feedback ALTER COLUMN delivery_state TYPE VARCHAR(16);
                 ALTER TABLE feedback DROP CONSTRAINT chk_feedback_suppression_reason;
                 UPDATE feedback SET suppression_reason = 'PRACTICE_TIER_QUIET'
                     WHERE suppression_reason = 'PRACTICE_REQUIRES_APPROVAL';

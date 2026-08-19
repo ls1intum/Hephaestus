@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import static de.tum.cit.aet.hephaestus.testconfig.TestEntities.agentJob;
 import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
@@ -35,12 +36,12 @@ class ApprovedFeedbackDeliveryListenerTest {
         UUID feedbackId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
         Feedback feedback = proposal(feedbackId, jobId);
-        AgentJob job = mock(AgentJob.class);
+        AgentJob job = agentJob();
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
         when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(mock(PullRequest.class))
+            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
         );
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
 
@@ -66,12 +67,12 @@ class ApprovedFeedbackDeliveryListenerTest {
         UUID feedbackId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
         Feedback feedback = proposal(feedbackId, jobId);
-        AgentJob job = mock(AgentJob.class);
+        AgentJob job = agentJob();
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);
         when(jobRepository.findByIdAndWorkspaceId(jobId, 7L)).thenReturn(Optional.of(job));
         when(policy.evaluatePullRequest(job)).thenReturn(
-            PracticeFeedbackDeliveryPolicy.Decision.allowed(mock(PullRequest.class))
+            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
         );
         when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.found("already-there"));
 
@@ -96,7 +97,7 @@ class ApprovedFeedbackDeliveryListenerTest {
         PullRequestCommentPoster poster = mock(PullRequestCommentPoster.class);
         UUID feedbackId = UUID.randomUUID();
         UUID jobId = UUID.randomUUID();
-        AgentJob job = mock(AgentJob.class);
+        AgentJob job = agentJob();
         Feedback feedback = proposal(feedbackId, jobId);
         when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
         approve(approvalRepository, feedback);

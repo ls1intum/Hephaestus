@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { FieldLabel } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
@@ -41,13 +42,14 @@ export function AutonomyLadder({
 				if (autonomy && autonomy !== value) onChange(autonomy);
 			}}
 			className={cn(
-				"flex min-w-0 flex-col gap-0 divide-y overflow-hidden rounded-md border bg-background",
-				"sm:flex-row sm:divide-x sm:divide-y-0",
+				"grid min-w-0 grid-cols-1 gap-px overflow-hidden rounded-lg border bg-border",
+				"sm:grid-cols-3",
 				muted && "opacity-70",
 				className,
 			)}
 		>
 			{PRACTICE_AUTONOMY_ORDER.map((autonomy) => {
+				const Icon = AUTONOMY_DEFS[autonomy].icon;
 				const titleId = `${rungIdPrefix}-${autonomy}`;
 				const addsId = `${rungIdPrefix}-${autonomy}-adds`;
 				const selected = autonomy === value;
@@ -55,8 +57,8 @@ export function AutonomyLadder({
 					<FieldLabel
 						key={autonomy}
 						className={cn(
-							"w-full min-w-0 cursor-pointer items-center gap-2 p-2 font-normal transition-colors sm:flex-1",
-							"has-data-unchecked:hover:bg-muted/50",
+							"w-full min-w-0 cursor-pointer items-center gap-2 bg-background p-2 font-normal transition-colors",
+							"has-data-unchecked:hover:bg-muted/60 has-data-checked:bg-accent",
 							"has-data-disabled:cursor-not-allowed has-data-disabled:opacity-60",
 							full && "flex-col items-start gap-1.5 p-3",
 						)}
@@ -66,6 +68,13 @@ export function AutonomyLadder({
 								value={autonomy}
 								aria-labelledby={titleId}
 								aria-describedby={full ? addsId : undefined}
+							/>
+							<Icon
+								className={cn(
+									"size-4 shrink-0 text-muted-foreground",
+									selected && "text-foreground",
+								)}
+								aria-hidden
 							/>
 							<span id={titleId} className={cn("truncate text-sm", selected && "font-medium")}>
 								{PRACTICE_AUTONOMY_LABELS[autonomy]}

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
+import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.ApprovedFeedbackReadyEvent;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
 import lombok.RequiredArgsConstructor;
@@ -20,6 +21,7 @@ class ApprovedFeedbackRecovery {
 
     @Scheduled(fixedDelayString = "PT1M", initialDelayString = "PT1M")
     @SchedulerLock(name = "approved-feedback-recovery", lockAtMostFor = "PT1M", lockAtLeastFor = "PT5S")
+    @WorkspaceAgnostic("The query returns workspace-scoped identifiers used for every recovered delivery")
     public void recover() {
         for (var pending : approvalRepository.findPendingApproved(PageRequest.of(0, 50))) {
             try {

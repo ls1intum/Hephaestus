@@ -12,6 +12,7 @@ import {
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
+import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -46,7 +47,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import { inheritedAutonomySourceSentence, PRACTICE_AUTONOMY_LABELS } from "@/lib/practice-autonomy";
+import { inheritedAutonomySourceSentence } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
@@ -579,12 +580,7 @@ function PracticeRowDetails({
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
-				<Badge variant="outline">
-					{/* `position: absolute` blockifies the prefix, so every engine inserts the space and it is
-					    announced as a sentence rather than welded to the autonomy name. */}
-					<span className="sr-only">Autonomy: </span>
-					{PRACTICE_AUTONOMY_LABELS[practice.autonomy.effective]}
-				</Badge>
+				<AutonomyBadge autonomy={practice.autonomy.effective} />
 				<span>{follows ?? "Set for this practice"}</span>
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />

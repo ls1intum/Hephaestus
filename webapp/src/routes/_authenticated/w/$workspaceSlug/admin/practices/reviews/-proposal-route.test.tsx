@@ -80,10 +80,10 @@ describe("feedback proposal route", () => {
 
 		renderRouteAtWithRouter(`/w/acme/admin/practices/reviews/delivery/${FEEDBACK_ID}`);
 		await screen.findByRole("heading", { name: /Review feedback for/ }, ROUTE_RENDER_WAIT);
-		await userEvent.click(screen.getByRole("button", { name: "Reject proposal" }));
-		const dialog = await screen.findByRole("alertdialog");
-		await userEvent.click(within(dialog).getByText("It is missing important context"));
-		await userEvent.click(within(dialog).getByRole("button", { name: "Reject proposal" }));
+		await userEvent.click(screen.getByRole("button", { name: "Reject feedback" }));
+		const dialog = await screen.findByRole("dialog");
+		await userEvent.click(within(dialog).getByText("Missing important context"));
+		await userEvent.click(within(dialog).getByRole("button", { name: "Reject feedback" }));
 
 		expect(requestBody).toEqual({ decision: "REJECTED", rejectionReason: "MISSING_CONTEXT" });
 	});

@@ -506,7 +506,7 @@ export const AutonomyLevels: Story = {
 			const listitem = canvas.getByText(name).closest('[role="listitem"]');
 			if (!(listitem instanceof HTMLElement)) throw new Error(`No row for ${name}`);
 			const row = within(listitem);
-			await expect(row.getByText(autonomy, { selector: '[data-slot="badge"]' })).toBeVisible();
+			await expect(row.getByText(autonomy).closest('[data-slot="badge"]')).toBeVisible();
 			await expect(row.getByText(decidedBy)).toBeVisible();
 		}
 		await expectNoPageOverflow();
