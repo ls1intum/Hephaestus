@@ -14,11 +14,11 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -199,7 +199,7 @@ public class InAppCompositionListener {
         List<ComposedInAppMessage> messages,
         int positionBase
     ) {
-        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultTier();
+        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
         Instant now = Instant.now();
         Instant since = now.minus(Duration.ofDays(InAppFeedbackRouter.PATTERN_WINDOW_DAYS));
         List<InAppFeedbackPreparer.RoutedMessage> routed = new ArrayList<>(messages.size());
@@ -268,24 +268,25 @@ public class InAppCompositionListener {
     }
 
     /**
-     * The practice's effective tier, resolved through the practice → area → workspace chain from a
+     * The practice's effective autonomy, resolved through the practice → area → workspace chain from a
      * projection rather than by walking associations — the same reason {@code FeedbackChannelRouter}
      * projects it: the routing rule must not depend on whether the caller holds a session.
      */
-    private @Nullable PracticeReviewTier effectiveTier(
-        List<Observation> evidence,
-        PracticeReviewTier workspaceDefault
-    ) {
+    private @Nullable PracticeAutonomy effectiveTier(List<Observation> evidence, PracticeAutonomy workspaceDefault) {
         List<UUID> ids = evidence.stream().map(Observation::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) {
             return null;
         }
         return observationRepository
-            .practiceReviewTiersFor(ids)
+            .findPracticeAutonomyFor(ids)
             .stream()
             .findFirst()
             .map(row ->
-                ReviewTierResolver.resolvePractice(row.getPracticeTier(), row.getAreaTier(), workspaceDefault).tier()
+                AutonomyResolver.resolvePractice(
+                    row.getPracticeAutonomy(),
+                    row.getAreaAutonomy(),
+                    workspaceDefault
+                ).autonomy()
             )
             .orElse(null);
     }

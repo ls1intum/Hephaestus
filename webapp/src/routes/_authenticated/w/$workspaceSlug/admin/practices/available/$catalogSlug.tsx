@@ -65,7 +65,7 @@ function PracticeAdoptionRoute() {
 				}),
 				queryClient.invalidateQueries({ queryKey: listAreasQueryKey({ path: { workspaceSlug } }) }),
 			]);
-			toast.success("Practice adopted in Propose");
+			toast.success("Practice adopted with Review before sending");
 			await navigate({
 				to: "/w/$workspaceSlug/admin/practices/$practiceSlug",
 				params: { workspaceSlug, practiceSlug: practice.slug },
@@ -114,8 +114,9 @@ function PracticeAdoptionRoute() {
 				</Alert>
 			)}
 			{previewQuery.isPending || definitionOptionsQuery.isPending ? (
-				<div className="flex h-64 items-center justify-center">
+				<div className="flex h-64 items-center justify-center gap-3" role="status">
 					<Spinner className="size-8" />
+					<span className="sr-only">Loading adoption preview</span>
 				</div>
 			) : previewQuery.isError || definitionOptionsQuery.isError ? (
 				<QueryErrorAlert

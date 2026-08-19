@@ -26,6 +26,7 @@ Use the executable sources for exact details:
 | `PracticeRevision`    | Criteria snapshot used to interpret a past result                          | Belongs to one practice; an observation may pin one revision                    |
 | `Observation`         | Evidence produced by one review job                                        | Belongs to one practice and one job; may support many pieces of feedback        |
 | `Feedback`            | One recipient-specific piece of feedback and its delivery outcome          | Belongs to one job; may draw on many observations and have many placements      |
+| `FeedbackApproval`    | Immutable decision to approve or reject one exact feedback proposal        | Stores the feedback ID, workspace, actor, decision context, content digest, and time |
 | `FeedbackObservation` | Ordered evidence binding between one piece of feedback and one observation | Joins feedback to observations with a primary or supporting role                |
 | `FeedbackPlacement`   | Where a piece of feedback was placed                                       | Belongs to one `Feedback`; records a summary, inline, or conversation placement |
 | `Reaction`            | A developer response to delivered feedback                                 | Belongs to one `Feedback` and retains its recurrence key                        |
@@ -108,6 +109,11 @@ be inferred from each other.
 Each feedback row retains its delivery outcome. See
 [Evaluation Provenance Contract](./evaluation-provenance.md) for state interpretation, evaluation joins,
 and limitations.
+
+`AWAITING_APPROVAL` is actionable feedback, not suppression. A guarded decision moves it once to
+`PREPARED` or terminal `DISCARDED` and writes one `FeedbackApproval`. The digest binds the approved content,
+recipient, channel, and artifact target; release refuses a stale or mismatched decision. Approval records
+retain identifier snapshots rather than JPA relationships so account erasure does not rewrite the audit.
 
 ## Read projections and access
 

@@ -4,13 +4,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,7 +24,7 @@ import tools.jackson.databind.JsonNode;
 /**
  * Decides which of a cycle's observations are eligible for conversational delivery. An observation is
  * {@link ConversationRoutingDecision#ADMIT admitted} to the IN_CHAT channel iff ALL of: its provenance admits the
- * conversation channel, its practice's autonomy tier admits the conversation channel, author-targeted, a
+ * conversation channel, its practice autonomy admits the conversation channel, author-targeted, a
  * {@link Assessment#BAD} problem, has no natural inline anchor, and does not share a {@code recurrence_key} with a
  * DELIVERED IN_CONTEXT unit for the same recipient. Every other case is a named, testable non-admission reason.
  *
@@ -48,15 +48,17 @@ public class FeedbackChannelRouter {
         this.workspaceDefaults = workspaceDefaults;
     }
 
-    /** The observations from {@code observations} that are eligible for conversational delivery, order preserved. */
     public List<Observation> admit(List<Observation> observations, long workspaceId, RoutingContext context) {
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(workspaceId);
-        Map<UUID, PracticeReviewTier> tiers = tiersFor(observations, defaults.defaultTier());
+        Map<UUID, PracticeAutonomy> autonomyByPracticeId = autonomyByPracticeId(
+            observations,
+            defaults.defaultAutonomy()
+        );
         List<Observation> admitted = new ArrayList<>();
         for (Observation observation : observations) {
             ConversationRoutingDecision decision = route(
                 observation,
-                tiers.get(observation.getId()),
+                autonomyByPracticeId.get(observation.getId()),
                 workspaceId,
                 context
             );
@@ -67,43 +69,26 @@ public class FeedbackChannelRouter {
         return admitted;
     }
 
-    /**
-     * Route a single observation. See the class javadoc for the admission predicate.
-     *
-     * @param tier the <em>effective</em> tier of the observation's practice, already resolved through the
-     *     practice → area → workspace chain, or {@code null} when it could not be resolved. Passed in rather
-     *     than read off {@code observation.getPractice()} on purpose: that association is lazy, so reading it
-     *     here would make the routing rule depend on whether the caller happens to hold a session. A null
-     *     tier lets the remaining rules decide rather than silently withholding coaching the developer was
-     *     owed.
-     */
     public ConversationRoutingDecision route(
         Observation observation,
-        @Nullable PracticeReviewTier tier,
+        @Nullable PracticeAutonomy autonomy,
         long workspaceId,
         RoutingContext context
     ) {
-        // Provenance and tier in one predicate, so this path and the in-context one cannot drift on what
-        // "may we say this here" means.
-        if (!FeedbackAdmission.delivers(observation.getOrigin(), tier, FeedbackChannel.IN_CHAT)) {
+        if (!PracticeAutonomyPolicy.delivers(observation.getOrigin(), autonomy, FeedbackChannel.IN_CHAT)) {
             return observation.getOrigin().delivers(FeedbackChannel.IN_CHAT)
-                ? ConversationRoutingDecision.PRACTICE_TIER_QUIET
+                ? ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL
                 : ConversationRoutingDecision.BACKFILL_QUIET;
         }
-        // Reviewer-targeted delivery: deferred (ADR 0021).
         if (context.recipientRole() != RecipientRole.AUTHOR) {
             return ConversationRoutingDecision.REVIEWER_DEFERRED;
         }
-        // Only a problem is raised in a coaching turn; strengths, abstentions and undecided measurements
-        // are not delivered.
         if (!observation.getPresence().carriesValence() || observation.getAssessment() != Assessment.BAD) {
             return ConversationRoutingDecision.NOT_DELIVERABLE;
         }
-        // A locus with a natural diff anchor belongs in-context, not in the conversation.
         if (hasNaturalInlineAnchor(observation)) {
             return ConversationRoutingDecision.HAS_INLINE_ANCHOR;
         }
-        // Do not re-raise a locus the developer already received in-context (keyed on the cross-run recurrence key).
         String recurrenceKey = observation.getRecurrenceKey();
         if (
             recurrenceKey != null &&
@@ -118,26 +103,26 @@ public class FeedbackChannelRouter {
         return ConversationRoutingDecision.ADMIT;
     }
 
-    /**
-     * One projection query for the whole cycle's tiers. An observation with no id yet is simply absent
-     * from the map, which the null-tier rule above already covers.
-     */
-    private Map<UUID, PracticeReviewTier> tiersFor(
+    private Map<UUID, PracticeAutonomy> autonomyByPracticeId(
         List<Observation> observations,
-        PracticeReviewTier workspaceDefault
+        PracticeAutonomy workspaceDefault
     ) {
         List<UUID> ids = observations.stream().map(Observation::getId).filter(Objects::nonNull).toList();
         if (ids.isEmpty()) {
             return Map.of();
         }
-        Map<UUID, PracticeReviewTier> tiers = new HashMap<>();
-        for (var row : observationRepository.practiceReviewTiersFor(ids)) {
-            tiers.put(
+        Map<UUID, PracticeAutonomy> autonomyByPracticeId = new HashMap<>();
+        for (var row : observationRepository.findPracticeAutonomyFor(ids)) {
+            autonomyByPracticeId.put(
                 row.getObservationId(),
-                ReviewTierResolver.resolvePractice(row.getPracticeTier(), row.getAreaTier(), workspaceDefault).tier()
+                AutonomyResolver.resolvePractice(
+                    row.getPracticeAutonomy(),
+                    row.getAreaAutonomy(),
+                    workspaceDefault
+                ).autonomy()
             );
         }
-        return tiers;
+        return autonomyByPracticeId;
     }
 
     private static boolean hasNaturalInlineAnchor(Observation observation) {

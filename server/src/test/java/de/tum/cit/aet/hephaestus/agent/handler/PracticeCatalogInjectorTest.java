@@ -19,7 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
@@ -71,7 +71,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
 
     /**
      * A workspace that has expressed no review opinion of its own, so every practice below it resolves to
-     * {@link PracticeReviewTier#DEFAULT}.
+     * {@link PracticeAutonomy#DEFAULT}.
      */
     private Workspace workspace() {
         Workspace ws = new Workspace();
@@ -184,13 +184,13 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a practice whose effective tier is OFF is not staged, and one that inherits its tier is")
+    @DisplayName("a practice whose effective autonomy is OFF is not staged, and one that inherits its autonomy is")
     void offPracticesAreFilteredOutAfterTheTierIsResolved() {
-        // The repository does not filter by tier: a `review_tier <> 'OFF'` predicate would answer UNKNOWN
+        // The repository does not filter by autonomy: a `autonomy <> 'OFF'` predicate would answer UNKNOWN
         // for the null column that means "inherit", making the inheritance chain vanish from the
         // catalogue. The injector resolves the chain and filters here instead.
         Practice off = practice("silenced", ScmSignals.PULL_REQUEST_OPENED);
-        off.setReviewTier(PracticeReviewTier.OFF);
+        off.setAutonomy(PracticeAutonomy.OFF);
         Practice inherits = practice("authoring", ScmSignals.PULL_REQUEST_OPENED);
         when(practiceRepository.findByWorkspaceIdAndArtifactKind(1L, ArtifactKinds.PULL_REQUEST)).thenReturn(
             List.of(off, inherits)
@@ -306,7 +306,7 @@ class PracticeCatalogInjectorTest extends BaseUnitTest {
         assertThat(slugs).containsExactly("authoring");
     }
 
-    /** Resolves every workspace to the unset defaults — DELIVER autonomy, reach on the work. */
+    /** Resolves every workspace to the unset defaults — AUTOMATIC autonomy, reach on the work. */
     private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
         WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
         lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);

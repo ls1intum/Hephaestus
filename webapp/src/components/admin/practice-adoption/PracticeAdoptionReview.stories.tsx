@@ -13,7 +13,7 @@ const preview: CatalogPracticePreview = {
 	slug: "describe-what-and-why",
 	availability: "AVAILABLE",
 	etag: '"adoption-plan"',
-	initialReviewTier: "PROPOSE",
+	initialAutonomy: "HUMAN_APPROVAL",
 	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
 	area: {
 		slug: "review-ready-work",
@@ -54,7 +54,7 @@ type Story = StoryObj<typeof meta>;
 export const Available: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("button", { name: "Adopt practice" })).toBeEnabled();
-		await expect(canvas.getByText("Starts in Propose")).toBeVisible();
+		await expect(canvas.getByText("Starts with Review before sending")).toBeVisible();
 	},
 };
 

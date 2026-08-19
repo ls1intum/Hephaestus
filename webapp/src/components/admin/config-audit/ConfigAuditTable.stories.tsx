@@ -54,8 +54,8 @@ const entries: ConfigAuditEntryView[] = [
 		entityType: "PRACTICE_REVIEW_SETTINGS",
 		entityId: "12",
 		action: "CREATED",
-		changedKeys: ["runForAllUsers"],
-		newValue: '{"runForAllUsers":false}',
+		changedKeys: ["cooldownMinutes"],
+		newValue: '{"cooldownMinutes":30}',
 		workspaceId: 12,
 	},
 ];

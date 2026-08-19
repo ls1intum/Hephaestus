@@ -30,8 +30,9 @@ function AvailablePracticesRoute() {
 				description="Review and adopt practices offered by the instance catalog."
 			/>
 			{practicesQuery.isPending ? (
-				<div className="flex h-64 items-center justify-center">
+				<div className="flex h-64 items-center justify-center gap-3" role="status">
 					<Spinner className="size-8" />
+					<span className="sr-only">Loading available practices</span>
 				</div>
 			) : practicesQuery.isError ? (
 				<QueryErrorAlert

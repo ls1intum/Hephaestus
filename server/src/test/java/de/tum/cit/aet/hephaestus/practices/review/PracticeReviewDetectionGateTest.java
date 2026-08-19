@@ -1,15 +1,11 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.anyLong;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProvider;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
@@ -24,9 +20,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
-import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
@@ -45,12 +40,8 @@ import org.mockito.Mock;
 class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     private static final SignalName SIGNAL = ScmSignals.PULL_REQUEST_OPENED;
-    private static final String PRACTICE_REVIEW_ROLE = "run_practice_review";
     private static final Long WORKSPACE_ID = 1L;
     private static final Long PR_ID = 42L;
-
-    @Mock
-    private UserRoleChecker userRoleChecker;
 
     @Mock
     private PracticeReviewReadiness practiceDetectionReadiness;
@@ -72,10 +63,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        PracticeReviewProperties properties = new PracticeReviewProperties(false, false, 15, 5, false, false);
         gate = new PracticeReviewDetectionGate(
-            properties,
-            userRoleChecker,
             practiceDetectionReadiness,
             practiceRepository,
             workspaceResolver,
@@ -105,29 +93,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         return label;
     }
 
-    private static final long TEST_PROVIDER_ID = 1L;
-
-    /** Stable, positive provider-native id per login (single source of truth for the test identity). */
-    private static long nativeIdOf(String login) {
-        return Math.abs((long) login.hashCode()) + 1;
-    }
-
-    /** The {@code IdentityLink.subject} the gate keys on for this user (== {@code String.valueOf(nativeId)}). */
-    private static String subjectOf(String login) {
-        return String.valueOf(nativeIdOf(login));
-    }
-
-    private User createUser(String login) {
-        User user = new User();
-        user.setLogin(login);
-        // The gate resolves the role by the stable (gitProviderId, subject) identity, not the login.
-        user.setNativeId(nativeIdOf(login));
-        IdentityProvider provider = new IdentityProvider();
-        provider.setId(TEST_PROVIDER_ID);
-        user.setProvider(provider);
-        return user;
-    }
-
     private Workspace createWorkspace() {
         Workspace workspace = new Workspace();
         workspace.setId(WORKSPACE_ID);
@@ -143,7 +108,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     private Practice createPractice(SignalName... signals) {
         Practice practice = new Practice();
         practice.setBindings(PracticeTestEvidence.bindings(signals));
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         return practice;
     }
 
@@ -154,7 +119,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 new PracticeBinding(List.of(signals), PracticeTestEvidence.needsFor(ArtifactKinds.PULL_REQUEST), true)
             )
         );
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         return practice;
     }
 
@@ -188,10 +153,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice onOpened = createPractice(ScmSignals.PULL_REQUEST_OPENED);
             Practice onMerged = createPractice(ScmSignals.PULL_REQUEST_MERGED);
             Workspace workspace = setupThroughPracticeMatching(pr, onOpened, onMerged);
-            // Past the role gate, which is a question about who the work belongs to rather than about
-            // which practices a request occasions.
-            workspace.getReviewSettings().applyPatch(true, null, null);
-
             GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
@@ -208,7 +169,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setDraft(true);
             Practice notOnDrafts = createPractice(ScmSignals.PULL_REQUEST_OPENED);
             Workspace workspace = setupThroughPracticeMatching(pr, notOnDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
 
@@ -221,14 +181,14 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void requestDoesNotOverrideTheTier() {
             PullRequest pr = createPullRequest();
             Practice silenced = createPractice(ScmSignals.PULL_REQUEST_OPENED);
-            silenced.setReviewTier(PracticeReviewTier.OFF);
+            silenced.setAutonomy(PracticeAutonomy.OFF);
             setupThroughPracticeMatching(pr, silenced);
 
             GateDecision decision = gate.evaluate(pr, REQUEST, TriggerMode.MANUAL);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).resolvedSignalReason()).isEqualTo(
-                SignalStateReason.PRACTICE_TIER_OFF
+                SignalStateReason.PRACTICE_AUTONOMY_OFF
             );
         }
 
@@ -275,7 +235,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setDraft(true);
             Practice onDrafts = createDraftPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, onDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -290,7 +249,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setDraft(true);
             Practice onDrafts = createDraftPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL), onDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -303,7 +261,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             PullRequest pr = createPullRequest();
             Practice onDrafts = createDraftPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, onDrafts);
-            workspace.getReviewSettings().applyPatch(true, null, null);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -352,7 +309,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("practices disabled for workspace");
-            verifyNoInteractions(practiceDetectionReadiness, practiceRepository, userRoleChecker);
+            verifyNoInteractions(practiceDetectionReadiness, practiceRepository);
         }
     }
 
@@ -370,7 +327,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("auto-trigger disabled for workspace");
-            verifyNoInteractions(practiceDetectionReadiness, practiceRepository, userRoleChecker);
+            verifyNoInteractions(practiceDetectionReadiness, practiceRepository);
         }
 
         @Test
@@ -384,7 +341,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("manual trigger disabled for workspace");
-            verifyNoInteractions(practiceDetectionReadiness, practiceRepository, userRoleChecker);
+            verifyNoInteractions(practiceDetectionReadiness, practiceRepository);
         }
 
         @Test
@@ -480,13 +437,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 List.of(matching1, matching2, nonMatching)
             );
 
-            User assignee = createUser("test-user");
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
-                true
-            );
-
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
@@ -497,243 +447,20 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     @Nested
-    class RunForAllTests {
+    class DetectionAudienceTests {
 
         @Test
-        void detectWhenRunForAllUsers() {
-            PracticeReviewProperties runForAllProps = new PracticeReviewProperties(true, false, 15, 5, false, false);
-            PracticeReviewDetectionGate runForAllGate = new PracticeReviewDetectionGate(
-                runForAllProps,
-                userRoleChecker,
-                practiceDetectionReadiness,
-                practiceRepository,
-                workspaceResolver,
-                signalOptions
-            );
-
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            GateDecision decision = runForAllGate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
-            GateDecision.Detect detect = (GateDecision.Detect) decision;
-            assertThat(detect.workspace().getId()).isEqualTo(WORKSPACE_ID);
-            assertThat(detect.matchedPractices()).containsExactly(practice);
-            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
-            verify(userRoleChecker, never()).isHealthy();
-        }
-    }
-
-    @Nested
-    class AssigneeGateTests {
-
-        @Test
-        @DisplayName("Should SKIP when PR has no assignees")
-        void skipWhenNoAssignee() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no assignee");
-        }
-
-        @Test
-        void skipWhenNullAssignees() {
-            PullRequest pr = createPullRequest();
-            pr.setAssignees(null);
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("no assignee");
-        }
-    }
-
-    @Nested
-    class RoleCheckerHealthTests {
-
-        @Test
-        void skipWhenRoleCheckerUnhealthy() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            User assignee = createUser("test-user");
-            pr.setAssignees(Set.of(assignee));
-
-            when(userRoleChecker.isHealthy()).thenReturn(false);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("role checker unhealthy");
-            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
-        }
-    }
-
-    @Nested
-    class RoleCheckTests {
-
-        @Test
-        void detectWhenHasRole() {
+        void detectsWithoutAssigneeOrRoleCheck() {
             PullRequest pr = createPullRequest();
             Practice practice = createPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, practice);
 
-            User assignee = createUser("test-user");
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
-                true
-            );
-
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
             GateDecision.Detect detect = (GateDecision.Detect) decision;
-            assertThat(detect.workspace().getId()).isEqualTo(WORKSPACE_ID);
+            assertThat(detect.workspace()).isEqualTo(workspace);
             assertThat(detect.matchedPractices()).containsExactly(practice);
-        }
-
-        @Test
-        void skipWhenMissingRole() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            User assignee = createUser("test-user");
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
-                false
-            );
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
-                "no assignee with role: " + PRACTICE_REVIEW_ROLE
-            );
-        }
-
-        @Test
-        void detectWhenAnyAssigneeHasRole() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            Workspace workspace = setupThroughPracticeMatching(pr, practice);
-
-            User userWithRole = createUser("user-with-role");
-            User userWithoutRole = createUser("user-without-role");
-            pr.setAssignees(Set.of(userWithRole, userWithoutRole));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(
-                userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-with-role"), PRACTICE_REVIEW_ROLE)
-            ).thenReturn(true);
-            // Lenient: HashSet iteration order is nondeterministic, so this mock may not be reached
-            lenient()
-                .when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-without-role"), PRACTICE_REVIEW_ROLE))
-                .thenReturn(false);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Detect.class);
-            GateDecision.Detect detect = (GateDecision.Detect) decision;
-            assertThat(detect.workspace().getId()).isEqualTo(WORKSPACE_ID);
-            assertThat(detect.matchedPractices()).containsExactly(practice);
-        }
-
-        @Test
-        void skipWhenNoAssigneeHasRole() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            User user1 = createUser("user-1");
-            User user2 = createUser("user-2");
-            pr.setAssignees(Set.of(user1, user2));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-1"), PRACTICE_REVIEW_ROLE)).thenReturn(
-                false
-            );
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("user-2"), PRACTICE_REVIEW_ROLE)).thenReturn(
-                false
-            );
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
-                "no assignee with role: " + PRACTICE_REVIEW_ROLE
-            );
-        }
-
-        @Test
-        void skipWhenAssigneeHalfSyncedNoProvider() {
-            // Fail-safe guard: an assignee whose provider didn't sync has no resolvable identity, so the
-            // gate must skip WITHOUT a role lookup rather than pass a null subject to hasRole.
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            User assignee = createUser("half-synced");
-            assignee.setProvider(null);
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
-                "no assignee with role: " + PRACTICE_REVIEW_ROLE
-            );
-            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
-        }
-
-        @Test
-        void skipWhenAssigneeHalfSyncedNoNativeId() {
-            // Same fail-safe guard for the other half of the (provider, subject) identity.
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            User assignee = createUser("half-synced");
-            assignee.setNativeId(null);
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo(
-                "no assignee with role: " + PRACTICE_REVIEW_ROLE
-            );
-            verify(userRoleChecker, never()).hasRole(anyLong(), anyString(), anyString());
-        }
-
-        @Test
-        void skipWhenRoleCheckThrowsException() {
-            PullRequest pr = createPullRequest();
-            Practice practice = createPractice(SIGNAL);
-            setupThroughPracticeMatching(pr, practice);
-
-            User assignee = createUser("test-user");
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenThrow(
-                new RuntimeException("Connection refused")
-            );
-
-            GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
-
-            assertThat(decision).isInstanceOf(GateDecision.Skip.class);
-            assertThat(((GateDecision.Skip) decision).reason()).isEqualTo("role check failed");
         }
     }
 
@@ -748,13 +475,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice practice = createPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, practice);
 
-            User assignee = createUser("test-user");
-            pr.setAssignees(Set.of(assignee));
-            when(userRoleChecker.isHealthy()).thenReturn(true);
-            when(userRoleChecker.hasRole(TEST_PROVIDER_ID, subjectOf("test-user"), PRACTICE_REVIEW_ROLE)).thenReturn(
-                true
-            );
-
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
@@ -766,19 +486,18 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     }
 
     /**
-     * OFF is the only tier that stops a review; PROPOSE is as reviewed as DELIVER and differs only in what
-     * may be said about the result, so its signals must reach the agent exactly like DELIVER's do.
+     * OFF is the only autonomy that stops a review; HUMAN_APPROVAL is as reviewed as AUTOMATIC and differs only in what
+     * may be said about the result, so its signals must reach the agent exactly like AUTOMATIC's do.
      */
     @Nested
-    class ReviewTierAdmissionTests {
+    class AutonomyAdmissionTests {
 
         @Test
         void detectsWhenTheOnlyBoundPracticeIsProposingSilently() {
             PullRequest pr = createPullRequest();
             Practice measured = createPractice(SIGNAL);
-            measured.setReviewTier(PracticeReviewTier.PROPOSE);
+            measured.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
             Workspace workspace = setupThroughPracticeMatching(pr, measured);
-            workspace.getReviewSettings().setRunForAllUsers(true);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -790,7 +509,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void skipsAndNamesTheTierWhenEveryBoundPracticeIsOff() {
             PullRequest pr = createPullRequest();
             Practice silenced = createPractice(SIGNAL);
-            silenced.setReviewTier(PracticeReviewTier.OFF);
+            silenced.setAutonomy(PracticeAutonomy.OFF);
             setupThroughPracticeMatching(pr, silenced);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
@@ -799,7 +518,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             GateDecision.Skip skip = (GateDecision.Skip) decision;
             assertThat(skip.reason()).isEqualTo("every practice bound to this signal is off");
             // The whole point of the separate reason: an admin turned this down, and can turn it back up.
-            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.PRACTICE_TIER_OFF);
+            assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
             assertThat(skip.resolvedSignalReason().isRetryable()).isTrue();
         }
 
@@ -807,7 +526,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void keepsTheGenericReasonWhenNothingIsBoundAtAll() {
             PullRequest pr = createPullRequest();
             Practice other = createPractice(ScmSignals.PULL_REQUEST_MERGED);
-            other.setReviewTier(PracticeReviewTier.OFF);
+            other.setAutonomy(PracticeAutonomy.OFF);
             setupThroughPracticeMatching(pr, other);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
@@ -822,10 +541,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void admitsOnlyTheReviewablePracticesWhenTheSignalIsSharedWithAnOffOne() {
             PullRequest pr = createPullRequest();
             Practice silenced = createPractice(SIGNAL);
-            silenced.setReviewTier(PracticeReviewTier.OFF);
+            silenced.setAutonomy(PracticeAutonomy.OFF);
             Practice delivering = createPractice(SIGNAL);
             Workspace workspace = setupThroughPracticeMatching(pr, silenced, delivering);
-            workspace.getReviewSettings().setRunForAllUsers(true);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -846,7 +564,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("main");
             Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
             workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
-            workspace.getReviewSettings().setRunForAllUsers(true);
 
             assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Detect.class);
         }
@@ -914,7 +631,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Practice issuePractice = createPractice(ScmSignals.ISSUE_OPENED);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(issuePractice));
             workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
-            workspace.getReviewSettings().setRunForAllUsers(true);
 
             GateDecision decision = gate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
 
@@ -953,14 +669,14 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Workspace workspace = createWorkspace();
             when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
             Practice silenced = createPractice(DOCUMENT_PUBLISHED);
-            silenced.setReviewTier(PracticeReviewTier.OFF);
+            silenced.setAutonomy(PracticeAutonomy.OFF);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(silenced));
 
             GateDecision silencedDecision = gate.evaluateSignal(workspace, DOCUMENT_PUBLISHED, TriggerMode.AUTO);
 
             assertThat(silencedDecision).isInstanceOf(GateDecision.Skip.class);
             assertThat(((GateDecision.Skip) silencedDecision).resolvedSignalReason()).isEqualTo(
-                SignalStateReason.PRACTICE_TIER_OFF
+                SignalStateReason.PRACTICE_AUTONOMY_OFF
             );
 
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of());

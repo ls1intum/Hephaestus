@@ -244,8 +244,8 @@ class CatalogProvenanceBackfillIntegrationTest extends AbstractWorkspaceIntegrat
                 INSERT INTO practice (
                     workspace_id, practice_area_id, slug, name, applies_to, display_order, bindings,
                     criteria, automated_review_policy, why_it_matters, source_curated_slug,
-                    source_curated_fingerprint, review_tier, created_at
-                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, 'DELIVER', now())
+                    source_curated_fingerprint, autonomy, created_at
+                ) VALUES (?, ?, ?, ?, ?, 0, ?::jsonb, ?, ?::jsonb, 'Reviewers need context', ?, ?, 'AUTOMATIC', now())
                 RETURNING id
                 """,
                 Long.class,

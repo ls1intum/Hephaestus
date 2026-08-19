@@ -27,7 +27,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.LlmCatalogTestFixtures;
 import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
@@ -128,9 +128,6 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         workspace = WorkspaceTestFixtures.activeWorkspace("sweep-guard");
         workspace.setAccountLogin("sweeporg");
         workspace.getFeatures().setPracticesEnabled(true);
-        // The assignee role check is step 6 of the gate and is not what this test is about; the bypass
-        // keeps the assertion on the ledger rather than on a role fixture.
-        workspace.getReviewSettings().applyPatch(true, null, null);
         workspace = workspaceRepository.save(workspace);
 
         // An open, non-draft, unmerged pull request stands at "ready for review", so that is the signal
@@ -142,7 +139,7 @@ class ReviewSweepSpendGuardIntegrationTest extends BaseIntegrationTest {
         practice.setName("Sweep guard practice");
         practice.setCriteria("Review the pull request");
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_READY));
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         practiceRepository.save(practice);
 
         LlmConnection connection = llmConnectionRepository.save(LlmCatalogTestFixtures.connection("sweep-guard"));

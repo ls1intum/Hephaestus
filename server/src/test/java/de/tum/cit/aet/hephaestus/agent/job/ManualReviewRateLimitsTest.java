@@ -67,7 +67,7 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
     /** The workspace's cooldown override beats the fleet default; a second knob would let them disagree. */
     @Test
     void theArtifactWindowIsTheWorkspacesOwnCooldown() {
-        workspace.getReviewSettings().applyPatch(null, null, 90);
+        workspace.getReviewSettings().applyPatch(null, 90);
         Instant before = Instant.now();
 
         refusalFrom(limits(15, 5));
@@ -87,7 +87,7 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
 
     @Test
     void aCooldownOfZeroTurnsThePerArtifactLimitOff() {
-        workspace.getReviewSettings().applyPatch(null, null, 0);
+        workspace.getReviewSettings().applyPatch(null, 0);
 
         assertThat(refusalFrom(limits(15, 5))).isEmpty();
         verify(signals, never()).existsManualRequestSince(anyLong(), anyString(), anyLong(), any());
@@ -132,7 +132,7 @@ class ManualReviewRateLimitsTest extends BaseUnitTest {
     private ManualReviewRateLimits limits(int cooldownMinutes, int allowance) {
         return new ManualReviewRateLimits(
             signals,
-            new PracticeReviewProperties(false, false, cooldownMinutes, allowance, false, false)
+            new PracticeReviewProperties(false, cooldownMinutes, allowance, false, false)
         );
     }
 

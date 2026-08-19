@@ -1,7 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.trace;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.PracticeReadinessOutcome;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
 import de.tum.cit.aet.hephaestus.practices.trace.TraceInputs.PracticeOutput;
@@ -26,7 +26,7 @@ import org.jspecify.annotations.Nullable;
  * measured, not as silenced. Below that, the workspace's own choice outranks anything mechanical —
  * "you turned this off" beats "the cooldown was active" even when both are true.
  *
- * <p>Configuration is therefore current, not as-of-run: a tier or binding changed since a review is
+ * <p>Configuration is therefore current, not as-of-run: an autonomy or binding changed since a review is
  * matched as it reads now, and the outcome is derived from what the run recorded wherever a recording
  * exists.
  */
@@ -167,7 +167,7 @@ final class PracticeTraceDeriver {
         }
 
         // 3. The workspace's own choice, before any mechanical reason.
-        if (practice.reviewTier() == PracticeReviewTier.OFF) {
+        if (practice.autonomy() == PracticeAutonomy.OFF) {
             return entry(
                 practice,
                 PracticeTraceOutcome.TURNED_OFF,
@@ -334,7 +334,7 @@ final class PracticeTraceDeriver {
         return new PracticeTraceEntryDTO(
             practice.slug(),
             practice.name(),
-            practice.reviewTier(),
+            practice.autonomy(),
             outcome,
             explanation,
             practice.watches(),

@@ -64,7 +64,7 @@ export function hasObservationFilter(search: ObservationsSearch): boolean {
 }
 
 /**
- * Typed by what the derivation reads rather than by the whole record: an area's tier and dashboard
+ * Typed by what the derivation reads rather than by the whole record: an area's autonomy and dashboard
  * visibility are nothing to a facet, and asking for them would make a caller hand over fields it has
  * no reason to hold.
  */

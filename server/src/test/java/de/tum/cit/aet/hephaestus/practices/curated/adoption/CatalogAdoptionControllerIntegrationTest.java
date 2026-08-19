@@ -6,7 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -80,7 +80,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void previewIncludesDefinitionAreaOutcomeProposeTierAndValidation() {
+    void previewIncludesDefinitionAreaOutcomeInitialAutonomyAndValidation() {
         ensureAdminMembership(workspace);
 
         webTestClient
@@ -103,8 +103,8 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .isEqualTo(AREA)
             .jsonPath("$.area.definition.name")
             .isNotEmpty()
-            .jsonPath("$.initialReviewTier")
-            .isEqualTo("PROPOSE")
+            .jsonPath("$.initialAutonomy")
+            .isEqualTo("HUMAN_APPROVAL")
             .jsonPath("$.sourceReviewRuleFingerprint")
             .value(value -> assertThat((String) value).matches("v3:[0-9a-f]{64}"))
             .jsonPath("$.definition.automatedReviewValidation.status")
@@ -156,7 +156,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
-    void adoptsOneIndependentProposeCopyWithProvenanceRevisionAndAudit() {
+    void adoptsOneIndependentHumanApprovalCopyWithProvenanceRevisionAndAudit() {
         ensureAdminMembership(workspace);
         String etag = previewEtag();
 
@@ -173,8 +173,8 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .expectHeader()
             .valueMatches(HttpHeaders.LOCATION, ".*/workspaces/adoption/practices/" + PRACTICE)
             .expectBody()
-            .jsonPath("$.reviewTier.effective")
-            .isEqualTo("PROPOSE")
+            .jsonPath("$.autonomy.effective")
+            .isEqualTo("HUMAN_APPROVAL")
             .jsonPath("$.catalogOrigin.link")
             .isEqualTo("IN_SYNC")
             .jsonPath("$.catalogOrigin.slug")
@@ -183,7 +183,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
         var practice = practiceRepository.findByWorkspaceIdAndSlug(workspace.getId(), PRACTICE).orElseThrow();
         assertThat(practice.getSourceCuratedSlug()).isEqualTo(PRACTICE);
         assertThat(practice.getSourceCuratedFingerprint()).matches("v3:[0-9a-f]{64}");
-        assertThat(practice.getReviewTier()).isEqualTo(PracticeReviewTier.PROPOSE);
+        assertThat(practice.getAutonomy()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
         assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
         assertThat(revisionRepository.findFirstByPracticeIdOrderByRevisionNumberDesc(practice.getId()))
             .get()
@@ -209,7 +209,7 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
                 String.class,
                 workspace.getId()
             )
-        ).contains("PROPOSE");
+        ).contains("HUMAN_APPROVAL");
     }
 
     @Test

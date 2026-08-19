@@ -31,10 +31,9 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewDetectionGate;
-import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.practices.spi.UserRoleChecker;
@@ -811,10 +810,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                 var practiceDetectionReadiness = mock(PracticeReviewReadiness.class);
                 var practiceRepository = mock(PracticeRepository.class);
                 var workspaceResolver = mock(WorkspaceResolver.class);
-                var properties = new PracticeReviewProperties(true, false, 15, 5, false, false);
                 var realGate = new PracticeReviewDetectionGate(
-                    properties,
-                    userRoleChecker,
                     practiceDetectionReadiness,
                     practiceRepository,
                     workspaceResolver,
@@ -869,7 +865,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
 
             Practice practice = new Practice();
             practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            practice.setReviewTier(PracticeReviewTier.DELIVER);
+            practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
             when(fixture.practiceRepository().findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
 
             setupCollaborationPR();
@@ -897,7 +893,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
             // Practice only matches ReviewSubmitted, not PullRequestCreated
             Practice practice = new Practice();
             practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_REVIEWED));
-            practice.setReviewTier(PracticeReviewTier.DELIVER);
+            practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
             when(fixture.practiceRepository().findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(practice));
 
             setupCollaborationPR();

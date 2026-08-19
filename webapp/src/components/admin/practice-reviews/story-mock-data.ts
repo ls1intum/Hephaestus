@@ -1,5 +1,6 @@
 import type {
 	AgentJob,
+	AutonomyAssignment,
 	EvidenceCitation,
 	Practice,
 	ReviewArtifact,
@@ -9,7 +10,6 @@ import type {
 	ReviewObservationDetail,
 	ReviewRunSummary,
 	ReviewSubject,
-	ReviewTierAssignment,
 	WorkspaceMembership,
 } from "@/api/types.gen";
 
@@ -156,16 +156,16 @@ function practiceFixture(
 	practice: Pick<
 		Practice,
 		"id" | "slug" | "name" | "areaSlug" | "criteria" | "whyItMatters" | "whatGoodLooksLike"
-	> & { displayOrder: number; tier: ReviewTierAssignment["effective"] },
+	> & { displayOrder: number; autonomy: AutonomyAssignment["effective"] },
 ): Practice {
-	const { tier, ...rest } = practice;
+	const { autonomy, ...rest } = practice;
 	return {
 		...rest,
 		artifactKind: "scm.pull_request",
 		createdAt: new Date("2026-01-01T00:00:00Z"),
 		updatedAt: new Date("2026-06-01T00:00:00Z"),
 		bindings: [],
-		reviewTier: { effective: tier, inherited: false, source: "PRACTICE" },
+		autonomy: { effective: autonomy, inherited: false, source: "PRACTICE" },
 		automatedReviewPolicy: {
 			automatedReview: {
 				evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
@@ -196,7 +196,7 @@ export const workspacePractices: Practice[] = [
 		whatGoodLooksLike:
 			"The controller method reads as a list of three steps and names a service that does the work.",
 		displayOrder: 0,
-		tier: "PROPOSE",
+		autonomy: "HUMAN_APPROVAL",
 	}),
 	practiceFixture({
 		id: 2,
@@ -209,7 +209,7 @@ export const workspacePractices: Practice[] = [
 		whatGoodLooksLike:
 			"A route, a class or a column could be read aloud in a planning meeting without explanation.",
 		displayOrder: 1,
-		tier: "DELIVER",
+		autonomy: "AUTOMATIC",
 	}),
 	practiceFixture({
 		id: 3,
@@ -223,7 +223,7 @@ export const workspacePractices: Practice[] = [
 		whatGoodLooksLike:
 			"The message names the thing being acted on and the action attempted, and two different causes do not share one status code.",
 		displayOrder: 2,
-		tier: "DELIVER",
+		autonomy: "AUTOMATIC",
 	}),
 	practiceFixture({
 		id: 4,
@@ -235,7 +235,7 @@ export const workspacePractices: Practice[] = [
 			"A red build should say what broke before anyone opens the file; a name like testCache2 makes the reader run the test to find out.",
 		whatGoodLooksLike: "The failure line of a broken build reads as a sentence about the system.",
 		displayOrder: 3,
-		tier: "PROPOSE",
+		autonomy: "HUMAN_APPROVAL",
 	}),
 	practiceFixture({
 		id: 5,
@@ -248,7 +248,7 @@ export const workspacePractices: Practice[] = [
 		whatGoodLooksLike:
 			"A reviewer who was not in the room can tell what problem the change is answering.",
 		displayOrder: 4,
-		tier: "PROPOSE",
+		autonomy: "HUMAN_APPROVAL",
 	}),
 	practiceFixture({
 		id: 6,
@@ -262,7 +262,7 @@ export const workspacePractices: Practice[] = [
 		whatGoodLooksLike:
 			"The thread ends with what was chosen, who chose it, and a link to where it now lives.",
 		displayOrder: 5,
-		tier: "DELIVER",
+		autonomy: "AUTOMATIC",
 	}),
 ];
 
@@ -877,7 +877,9 @@ function disposition(observationId: string) {
 	const counts = { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 0 };
 	for (const { item } of feedbackFor(observationId)) {
 		const key = {
+			AWAITING_APPROVAL: "prepared",
 			DELIVERED: "delivered",
+			DISCARDED: "suppressed",
 			FAILED: "failed",
 			PREPARED: "prepared",
 			SUPERSEDED: "superseded",

@@ -6,9 +6,9 @@ import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
-	areaTier,
-	chosenTier,
-	inheritedTier,
+	areaAutonomy,
+	chosenAutonomy,
+	inheritedAutonomy,
 	mockAreas,
 	mockPracticeLongText,
 	mockPractices,
@@ -469,7 +469,7 @@ export const BlockedDestinationDrag: Story = {
 	},
 };
 
-export const AutonomyTiers: Story = {
+export const AutonomyLevels: Story = {
 	args: {
 		areas: mockAreas,
 		practices: [
@@ -477,19 +477,19 @@ export const AutonomyTiers: Story = {
 				...mockPractices[0],
 				slug: "from-workspace",
 				name: "Nobody has touched this one",
-				reviewTier: inheritedTier("DELIVER"),
+				autonomy: inheritedAutonomy("AUTOMATIC"),
 			},
 			{
 				...mockPractices[0],
 				slug: "from-area",
 				name: "Its area decided",
-				reviewTier: areaTier("PROPOSE"),
+				autonomy: areaAutonomy("HUMAN_APPROVAL"),
 			},
 			{
 				...mockPractices[0],
 				slug: "held",
 				name: "Singled out",
-				reviewTier: chosenTier("OFF"),
+				autonomy: chosenAutonomy("OFF"),
 			},
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
@@ -497,27 +497,32 @@ export const AutonomyTiers: Story = {
 		// Scoped row by row: asserting that all three sentences exist somewhere on the page would pass
 		// just as well if every row carried the same one, which is the mix-up this story is about.
 		const expected = [
-			["Nobody has touched this one", "Deliver", "Follows the workspace default"],
-			["Its area decided", "Propose", `Follows ${mockAreas[0].name}`],
+			["Nobody has touched this one", "Send automatically", "Follows the workspace default"],
+			["Its area decided", "Review before sending", `Follows ${mockAreas[0].name}`],
 			["Singled out", "Off", "Set for this practice"],
 		];
 
-		for (const [name, tier, decidedBy] of expected) {
+		for (const [name, autonomy, decidedBy] of expected) {
 			const listitem = canvas.getByText(name).closest('[role="listitem"]');
 			if (!(listitem instanceof HTMLElement)) throw new Error(`No row for ${name}`);
 			const row = within(listitem);
-			await expect(row.getByText(tier, { selector: '[data-slot="badge"]' })).toBeVisible();
+			await expect(row.getByText(autonomy).closest('[data-slot="badge"]')).toBeVisible();
 			await expect(row.getByText(decidedBy)).toBeVisible();
 		}
 		await expectNoPageOverflow();
 	},
 };
 
-export const TierIsReadOnlyHere: Story = {
+export const AutonomyIsReadOnlyHere: Story = {
 	args: {
 		areas: mockAreas,
 		practices: [
-			{ ...mockPractices[0], slug: "held", name: "Set here", reviewTier: chosenTier("PROPOSE") },
+			{
+				...mockPractices[0],
+				slug: "held",
+				name: "Set here",
+				autonomy: chosenAutonomy("HUMAN_APPROVAL"),
+			},
 		].map((practice) => ({ ...practice, areaSlug: mockAreas[0].slug })),
 	},
 	parameters: {
@@ -528,8 +533,6 @@ export const TierIsReadOnlyHere: Story = {
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		// Name-independent on purpose: the point is that no tier *control* exists here, and pinning the
-		// radiogroup's label would make this pass vacuously the next time that label is reworded.
 		await expect(canvas.queryByRole("radiogroup")).not.toBeInTheDocument();
 
 		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));

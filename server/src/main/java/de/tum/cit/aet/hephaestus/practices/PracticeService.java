@@ -11,9 +11,9 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -49,40 +49,40 @@ public class PracticeService {
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
 
     /**
-     * The workspace catalogue, optionally narrowed to one tier.
+     * The workspace catalogue, optionally narrowed to one autonomy.
      *
-     * <p>The filter is on the <em>effective</em> tier, which is the only tier an administrator can see on
+     * <p>The filter is on the <em>effective</em> autonomy, which is the only autonomy an administrator can see on
      * the screen they are filtering. Filtering the stored column instead would answer "which practices
-     * happen to hold this value", and would return nothing at all for the tier most practices are actually
+     * happen to hold this value", and would return nothing at all for the autonomy most practices are actually
      * at — the inherited one.
      */
     @Transactional(readOnly = true)
-    public List<Practice> listPractices(WorkspaceContext ctx, @Nullable PracticeReviewTier reviewTier) {
-        log.debug("Listing practices for workspace {} (reviewTier={})", ctx.slug(), reviewTier);
+    public List<Practice> listPractices(WorkspaceContext ctx, @Nullable PracticeAutonomy autonomy) {
+        log.debug("Listing practices for workspace {} (autonomy={})", ctx.slug(), autonomy);
         List<Practice> all = practiceRepository.findAllForCatalog(ctx.id());
-        if (reviewTier == null) {
+        if (autonomy == null) {
             return all;
         }
-        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultTier();
+        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy();
         return all
             .stream()
-            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault) == reviewTier)
+            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault) == autonomy)
             .toList();
     }
 
     /**
-     * Every practice this workspace actually reviews, at any effective tier above {@code OFF}.
+     * Every practice this workspace actually reviews, at any effective autonomy above {@code OFF}.
      *
-     * <p>Includes {@code PROPOSE}: that tier promises the developer no <em>feedback</em>, not concealment,
-     * so the learner-facing catalogue lists what is observed while the tier governs what is said.
+     * <p>Includes {@code HUMAN_APPROVAL}: that autonomy promises the developer no <em>feedback</em>, not concealment,
+     * so the learner-facing catalogue lists what is observed while the autonomy governs what is said.
      */
     @Transactional(readOnly = true)
     public List<Practice> listReviewedPractices(WorkspaceContext ctx) {
-        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultTier();
+        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy();
         return practiceRepository
             .findAllForCatalog(ctx.id())
             .stream()
-            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
+            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault).admitsReview())
             .toList();
     }
 
@@ -205,7 +205,7 @@ public class PracticeService {
             definition,
             slug,
             definition.provenanceFingerprint(slug),
-            PracticeReviewTier.PROPOSE
+            PracticeAutonomy.HUMAN_APPROVAL
         );
     }
 
@@ -215,7 +215,7 @@ public class PracticeService {
         PracticeDefinition definition,
         @Nullable String sourceCuratedSlug,
         @Nullable String sourceCuratedFingerprint,
-        @Nullable PracticeReviewTier initialTier
+        @Nullable PracticeAutonomy initialAutonomy
     ) {
         if (practiceRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeSlugConflictException(
@@ -245,10 +245,10 @@ public class PracticeService {
         // workspace's) — stamping the resolved default here would give every practice an opinion nobody
         // expressed. Exception: a practice whose policy cannot attempt automated review is written OFF
         // explicitly, since that's a fact about the practice, not a preference to inherit over.
-        practice.setReviewTier(
+        practice.setAutonomy(
             definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
-                ? initialTier
-                : PracticeReviewTier.OFF
+                ? initialAutonomy
+                : PracticeAutonomy.OFF
         );
         definitionValidator.validate(definition);
 
@@ -272,13 +272,13 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
-        if (initialTier != null) {
+        if (initialAutonomy != null) {
             configAudit.record(
                 ConfigAuditEntry.created(
                     ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
-                    new PracticeUsageSnapshot(practice.getReviewTier())
+                    new PracticeUsageSnapshot(practice.getAutonomy())
                 )
             );
         }
@@ -354,10 +354,10 @@ public class PracticeService {
         if (request.area() != null) {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
-        PracticeReviewTier tierBefore = practice.getReviewTier();
+        PracticeAutonomy autonomyBefore = practice.getAutonomy();
         applyDefinition(practice, afterDefinition);
         if (!afterDefinition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
-            practice.setReviewTier(PracticeReviewTier.OFF);
+            practice.setAutonomy(PracticeAutonomy.OFF);
         }
         validateUpdate(afterDefinition, request.bindings() != null);
         practice = practiceRepository.save(practice);
@@ -371,14 +371,14 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
-        if (tierBefore != practice.getReviewTier()) {
+        if (autonomyBefore != practice.getAutonomy()) {
             configAudit.record(
                 ConfigAuditEntry.updated(
                     ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
-                    new PracticeUsageSnapshot(tierBefore),
-                    new PracticeUsageSnapshot(practice.getReviewTier())
+                    new PracticeUsageSnapshot(autonomyBefore),
+                    new PracticeUsageSnapshot(practice.getAutonomy())
                 )
             );
         }
@@ -387,31 +387,31 @@ public class PracticeService {
     }
 
     /**
-     * Sets one practice's own tier, or clears it back to inherit.
+     * Sets one practice's own autonomy, or clears it back to inherit.
      *
-     * @param reviewTier the tier to hold, or {@code null} to hold none and inherit the area's — and through
+     * @param autonomy the autonomy to hold, or {@code null} to hold none and inherit the area's — and through
      *     it the workspace's. Clearing has to be expressible or the chain is write-once: an administrator
      *     who set one practice explicitly could never put it back under the area's decision.
      */
     @Transactional
-    public Practice setReviewTier(WorkspaceContext ctx, String slug, @Nullable PracticeReviewTier reviewTier) {
+    public Practice setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
         lockWorkspace(ctx);
         Practice practice = practiceRepository
             .findByWorkspaceIdAndSlug(ctx.id(), slug)
             .orElseThrow(() -> new EntityNotFoundException("Practice", slug));
 
-        PracticeReviewTier before = practice.getReviewTier();
-        if (before == reviewTier) {
+        PracticeAutonomy before = practice.getAutonomy();
+        if (before == autonomy) {
             return practice;
         }
-        // Every tier above OFF starts a review, so every tier above OFF needs a policy that can run one.
-        // Asked of the tier that would be IN FORCE, not of the one being written: "inherit" is a request
+        // Every autonomy above OFF starts a review, so every autonomy above OFF needs a policy that can run one.
+        // Asked of the autonomy that would be IN FORCE, not of the one being written: "inherit" is a request
         // for whatever the area says, and if that admits a review the practice still cannot run it.
-        PracticeReviewTier effective = ReviewTierResolver.resolvePractice(
-            reviewTier,
-            practice.getArea() == null ? null : practice.getArea().getReviewTier(),
-            workspaceDefaults.forWorkspace(ctx.id()).defaultTier()
-        ).tier();
+        PracticeAutonomy effective = AutonomyResolver.resolvePractice(
+            autonomy,
+            practice.getArea() == null ? null : practice.getArea().getAutonomy(),
+            workspaceDefaults.forWorkspace(ctx.id()).defaultAutonomy()
+        ).autonomy();
         if (
             effective.admitsReview() &&
             !practice.getAutomatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
@@ -421,7 +421,7 @@ public class PracticeService {
             );
         }
 
-        practice.setReviewTier(reviewTier);
+        practice.setAutonomy(autonomy);
         practice = practiceRepository.save(practice);
         configAudit.record(
             ConfigAuditEntry.updated(
@@ -429,14 +429,14 @@ public class PracticeService {
                 practice.getId(),
                 ctx.id(),
                 new PracticeUsageSnapshot(before),
-                new PracticeUsageSnapshot(reviewTier)
+                new PracticeUsageSnapshot(autonomy)
             )
         );
         log.info(
-            "Set practice '{}' (slug={}) reviewTier={} in workspace {}",
+            "Set practice '{}' (slug={}) autonomy={} in workspace {}",
             practice.getName(),
             slug,
-            reviewTier,
+            autonomy,
             ctx.slug()
         );
         return practice;

@@ -5,15 +5,15 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
-import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -24,12 +24,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Decides which observations reach the artifact itself, by applying {@link FeedbackAdmission} to the
- * {@link FeedbackChannel#IN_CONTEXT} channel: an observation is posted only if its practice's autonomy tier
+ * Decides which observations reach the artifact itself, by applying {@link PracticeAutonomyPolicy} to the
+ * {@link FeedbackChannel#IN_CONTEXT} channel: an observation is posted only if its practice autonomy
  * admits the channel <em>and</em> the run's provenance does.
  *
  * <p>Runs strictly after the observations are persisted and stamped with their observation keys — a
- * {@code PROPOSE} practice and a backfill are measured and recorded exactly like an engaged live run, and
+ * {@code HUMAN_APPROVAL} practice and a backfill are measured and recorded exactly like an engaged live run, and
  * differ only in how far the result travels. Nothing here touches the behaviour time series.
  *
  * <p>The provenance rule keeps a backfill campaign from commenting on merged pull requests, where every
@@ -40,7 +40,7 @@ import org.springframework.transaction.annotation.Transactional;
  * evaluation can tell a deliberate quiet from a detection miss. Writing the row is best-effort: a ledger
  * failure never blocks the delivery of the observations that survived.
  *
- * <p>A slug the catalogue read does not resolve is kept when only the tier would have withheld it — it is
+ * <p>A slug the catalogue read does not resolve is kept when only autonomy would have withheld it — it is
  * never an unknown practice ({@code PracticeDetectionDeliveryService.deliver} refuses those first), only a
  * practice renamed mid-review. Dropping it would cost a developer feedback over a rename, so it is logged
  * instead.
@@ -85,45 +85,64 @@ class InContextDeliveryGate {
             return List.of();
         }
 
-        // Resolved from the workspace ID, not job.getWorkspace(): the job reaches this gate detached on some
-        // paths, so reading a lazy association here would depend on whether the caller holds a session.
-        // Tiers go through ReviewTierResolver rather than the raw column, since a practice with no opinion of
-        // its own must inherit its area's or workspace's rather than reading NULL as "admit anyway".
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
-        Map<String, PracticeReviewTier> tierBySlug = new HashMap<>();
+        Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
         for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
-            tierBySlug.put(practice.getSlug(), ReviewTierResolver.effectiveTierOf(practice, defaults.defaultTier()));
+            autonomyBySlug.put(
+                practice.getSlug(),
+                AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
+            );
         }
 
         List<ValidatedObservation> admitted = new ArrayList<>(observations.size());
         List<ValidatedObservation> withheld = new ArrayList<>();
         for (ValidatedObservation observation : observations) {
-            PracticeReviewTier tier = tierBySlug.get(observation.practiceSlug());
-            if (tier == null) {
+            PracticeAutonomy autonomy = autonomyBySlug.get(observation.practiceSlug());
+            if (autonomy == null) {
                 log.warn(
-                    "No tier resolved for a delivered observation's practice, so the tier axis cannot " +
-                        "withhold it: slug={}, jobId={}",
+                    "No autonomy resolved for observation; withholding it: slug={}, jobId={}",
                     observation.practiceSlug(),
                     job.getId()
                 );
             }
-            if (FeedbackAdmission.delivers(origin, tier, FeedbackChannel.IN_CONTEXT)) {
+            if (PracticeAutonomyPolicy.delivers(origin, autonomy, FeedbackChannel.IN_CONTEXT)) {
                 admitted.add(observation);
-            } else {
+            } else if (autonomy != PracticeAutonomy.HUMAN_APPROVAL) {
                 withheld.add(observation);
             }
         }
         if (withheld.isEmpty()) {
-            return observations;
+            return admitted.size() == observations.size() ? observations : List.copyOf(admitted);
         }
         log.info(
-            "Autonomy tier withheld {} of {} observation(s) from the artifact: jobId={}",
+            "Practice autonomy withheld {} of {} observation(s) from the artifact: jobId={}",
             withheld.size(),
             observations.size(),
             job.getId()
         );
-        recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_TIER_QUIET);
+        recordWithheld(job, withheld, FeedbackSuppressionReason.PRACTICE_REQUIRES_APPROVAL);
         return admitted;
+    }
+
+    @Transactional(readOnly = true)
+    List<ValidatedObservation> awaitingApproval(AgentJob job, List<ValidatedObservation> observations) {
+        if (
+            observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
+        ) return List.of();
+        ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
+        if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
+        WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
+        Map<String, PracticeAutonomy> autonomyBySlug = new HashMap<>();
+        for (Practice practice : practiceRepository.findByWorkspaceId(job.getWorkspace().getId())) {
+            autonomyBySlug.put(
+                practice.getSlug(),
+                AutonomyResolver.effectiveAutonomyOf(practice, defaults.defaultAutonomy())
+            );
+        }
+        return observations
+            .stream()
+            .filter(observation -> autonomyBySlug.get(observation.practiceSlug()) == PracticeAutonomy.HUMAN_APPROVAL)
+            .toList();
     }
 
     private void recordWithheld(AgentJob job, List<ValidatedObservation> withheld, FeedbackSuppressionReason reason) {

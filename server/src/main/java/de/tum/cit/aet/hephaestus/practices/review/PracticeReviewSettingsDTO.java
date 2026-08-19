@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.media.Schema;
 import org.jspecify.annotations.NonNull;
@@ -13,12 +13,10 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "A workspace's practice-review policy: effective values plus raw overrides")
 public record PracticeReviewSettingsDTO(
-    @NonNull @Schema(description = "Effective: run practice review for all developers") Boolean runForAllUsers,
     @NonNull @Schema(description = "Effective: deliver feedback to merged PRs/MRs") Boolean deliverToMerged,
     @NonNull
     @Schema(description = "Effective: minimum minutes between reviews for the same PR")
     Integer cooldownMinutes,
-    @Schema(description = "Raw override; null = inheriting the fleet default") Boolean runForAllUsersOverride,
     @Schema(description = "Raw override; null = inheriting the fleet default") Boolean deliverToMergedOverride,
     @Schema(description = "Raw override; null = inheriting the fleet default") Integer cooldownMinutesOverride,
     @NonNull
@@ -31,9 +29,9 @@ public record PracticeReviewSettingsDTO(
     @NonNull
     @Schema(
         description = "Effective: how much autonomy the system has over practices and areas that hold no " +
-            "tier of their own — the bottom of the practice → area → workspace chain"
+            "autonomy of their own — the bottom of the practice → area → workspace chain"
     )
-    PracticeReviewTier defaultReviewTier,
-    @Schema(description = "Raw override; null = this workspace has never chosen, so DELIVER applies")
-    PracticeReviewTier defaultReviewTierOverride
+    PracticeAutonomy defaultAutonomy,
+    @Schema(description = "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies")
+    PracticeAutonomy defaultAutonomyOverride
 ) {}

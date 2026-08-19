@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { CircleAlert, Eye, ShieldCheck } from "lucide-react";
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
+import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,12 +26,11 @@ export function PracticeAdoptionReview({
 	return (
 		<div className="space-y-6">
 			{!unavailable && (
-				<Alert variant="success" role="status">
+				<Alert variant="success">
 					<Eye />
-					<AlertTitle>Starts in Propose</AlertTitle>
+					<AlertTitle>Starts with {AUTONOMY_DEFS.HUMAN_APPROVAL.label}</AlertTitle>
 					<AlertDescription>
-						Reviews can run and observations are saved for administrators, but feedback is held
-						back.
+						{AUTONOMY_DEFS.HUMAN_APPROVAL.description} Adoption never authorizes automatic sending.
 					</AlertDescription>
 				</Alert>
 			)}
@@ -44,7 +44,7 @@ export function PracticeAdoptionReview({
 				<CardContent className="space-y-4">
 					<dl className="grid gap-3 sm:grid-cols-2">
 						<div>
-							<dt className="font-medium">Immutable catalog slug</dt>
+							<dt className="font-medium">Catalog source</dt>
 							<dd className="mt-1 break-all text-muted-foreground">
 								<code>{preview.slug}</code>
 							</dd>
@@ -83,7 +83,7 @@ export function PracticeAdoptionReview({
 			<PracticeDefinitionPreview definition={preview.definition} options={definitionOptions} />
 
 			{unavailable && (
-				<Alert variant="warning" role="status">
+				<Alert variant="warning">
 					<CircleAlert />
 					<AlertTitle>
 						{preview.availability === "ADOPTED" ? "Already adopted" : "Slug conflict"}

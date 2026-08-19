@@ -30,12 +30,10 @@ export const EveryOutcome: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("2 measurements, none sent")).toBeVisible();
 		await expect(
-			canvas.getByText("This practice is set to measure quietly rather than to speak up."),
+			canvas.getByText("This feedback is waiting for a person to approve it."),
 		).toBeVisible();
 		await expect(canvas.getAllByText("Reviewed")).toHaveLength(2);
-		// The word, not `REVIEW_TIER_LABELS.PROPOSE`: reading the registry back would agree with any
-		// label it happens to hold, including a renamed one.
-		await expect(canvas.getByText("Propose")).toBeVisible();
+		await expect(canvas.getByText("Review before sending")).toBeVisible();
 	},
 };
 

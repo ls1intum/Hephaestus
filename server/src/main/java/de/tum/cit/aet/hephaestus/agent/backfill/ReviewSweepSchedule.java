@@ -35,9 +35,9 @@ import org.jspecify.annotations.Nullable;
  * declined — both have no ledger row and no observation.
  *
  * <p><strong>A schedule says when, not whose.</strong> Do not add a repository or author list here:
- * {@code WorkspaceReviewScope.repositories} and the {@code run_practice_review} role plus
- * {@code runForAllUsers} already answer both, and {@code PracticeReviewDetectionGate} ANDs them onto this
- * path too, so a second copy would disagree the first time somebody changed one of them.
+ * {@code WorkspaceReviewScope.repositories} already defines the compute scope, and
+ * {@code PracticeReviewDetectionGate} applies it to this path too. A second copy would disagree the first
+ * time somebody changed one of them; recipient selection belongs to delivery policy instead.
  *
  * <p>Each tick opens a {@link ReviewBackfillRun} rather than driving artifacts itself, because the
  * campaign machinery already paces per tick, pauses on an exhausted budget, keeps a cursor and isolates

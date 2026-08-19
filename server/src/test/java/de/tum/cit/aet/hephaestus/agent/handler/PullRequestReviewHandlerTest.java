@@ -37,7 +37,7 @@ import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -111,14 +111,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                     de.tum.cit.aet.hephaestus.practices.observation.reaction.ReactionRepository.class
                 ),
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(
-                    false,
-                    false,
-                    15,
-                    5,
-                    false,
-                    false
-                )
+                new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(false, 15, 5, false, false)
             ),
             new InContextDeliveryGate(
                 practiceRepository,
@@ -210,7 +203,7 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria(criteria);
-        p.setReviewTier(PracticeReviewTier.DELIVER);
+        p.setAutonomy(PracticeAutonomy.AUTOMATIC);
         p.setBindings(PracticeTestEvidence.bindings(ArtifactKinds.PULL_REQUEST));
         p.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
         var revision = new PracticeRevision();

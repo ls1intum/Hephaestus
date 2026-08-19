@@ -199,15 +199,15 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     @Test
     void aGateRefusalIsRecordedAndExplained() {
         when(gate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_TIER_OFF)
+            new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF)
         );
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
         assertThat(outcome.status()).isEqualTo(ManualReviewOutcome.Status.REFUSED);
-        assertThat(outcome.reason()).isEqualTo(SignalStateReason.PRACTICE_TIER_OFF);
-        assertThat(outcome.describeReason()).isEqualTo(SignalStateReason.PRACTICE_TIER_OFF.describe());
-        verify(signalRecorder).markRefused(any(), eq(SignalStateReason.PRACTICE_TIER_OFF));
+        assertThat(outcome.reason()).isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
+        assertThat(outcome.describeReason()).isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF.describe());
+        verify(signalRecorder).markRefused(any(), eq(SignalStateReason.PRACTICE_AUTONOMY_OFF));
         verify(agentJobService, never()).submitWithOutcome(any(), any(), any(), any());
     }
 

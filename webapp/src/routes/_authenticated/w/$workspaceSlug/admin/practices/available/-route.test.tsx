@@ -16,7 +16,7 @@ const preview: CatalogPracticePreview = {
 	slug: "describe-what-and-why",
 	availability: "AVAILABLE",
 	etag: '"reviewed-plan"',
-	initialReviewTier: "PROPOSE",
+	initialAutonomy: "HUMAN_APPROVAL",
 	sourceReviewRuleFingerprint: mockAuthorDeclaredEvidenceValidation.reviewRuleFingerprint,
 	area: {
 		slug: "review-ready-work",
@@ -124,9 +124,9 @@ describe("available practice routes", () => {
 						...adoptedPractice,
 						slug: preview.slug,
 						name: preview.definition.name,
-						reviewTier: {
-							effective: "PROPOSE",
-							override: "PROPOSE",
+						autonomy: {
+							effective: "HUMAN_APPROVAL",
+							override: "HUMAN_APPROVAL",
 							source: "PRACTICE",
 							inherited: false,
 						},
@@ -139,9 +139,9 @@ describe("available practice routes", () => {
 					...adoptedPractice,
 					slug: preview.slug,
 					name: preview.definition.name,
-					reviewTier: {
-						effective: "PROPOSE",
-						override: "PROPOSE",
+					autonomy: {
+						effective: "HUMAN_APPROVAL",
+						override: "HUMAN_APPROVAL",
 						source: "PRACTICE",
 						inherited: false,
 					},

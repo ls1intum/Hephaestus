@@ -56,6 +56,14 @@ class FeedbackDeliveryService {
         deliverFeedback(job, delivery, null);
     }
 
+    void recordProposal(
+        AgentJob job,
+        @Nullable DeliveryContent delivery,
+        List<PracticeDetectionResultParser.ValidatedObservation> observations
+    ) {
+        feedbackLedgerRecorder.recordProposal(job, delivery, observations);
+    }
+
     ExistingDeliveryLookup findExistingDeliveryCommentId(AgentJob job) {
         return commentPoster.findExistingSummaryComment(job);
     }

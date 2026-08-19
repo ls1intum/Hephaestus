@@ -17,7 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithUser;
@@ -100,7 +100,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setName(name);
         practice.setCriteria("Description for " + slug);
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         practice = practiceRepository.saveAndFlush(practice);
         PracticeRevision revision = practiceRevisionRepository.save(new PracticeRevision(practice, 1));
         practice.setCurrentRevision(revision);
@@ -505,7 +505,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             otherPractice.setName("Other Practice");
             otherPractice.setCriteria("Desc");
             otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            otherPractice.setReviewTier(PracticeReviewTier.DELIVER);
+            otherPractice.setAutonomy(PracticeAutonomy.AUTOMATIC);
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();
@@ -1083,7 +1083,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             otherPractice.setName("WS2 Practice");
             otherPractice.setCriteria("Desc");
             otherPractice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-            otherPractice.setReviewTier(PracticeReviewTier.DELIVER);
+            otherPractice.setAutonomy(PracticeAutonomy.AUTOMATIC);
             otherPractice = practiceRepository.save(otherPractice);
 
             AgentJob otherJob = new AgentJob();

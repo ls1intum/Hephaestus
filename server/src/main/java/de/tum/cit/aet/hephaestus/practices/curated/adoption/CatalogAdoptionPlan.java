@@ -5,7 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.CanonicalDigest;
 import de.tum.cit.aet.hephaestus.practices.PracticeDefinition;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.curated.dto.CuratedPracticeDefinitionDTO;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import org.jspecify.annotations.Nullable;
 
 record CatalogAdoptionPlan(
@@ -36,7 +36,7 @@ record CatalogAdoptionPlan(
             .addNullable(areaSlug)
             .addNullable(areaDefinition == null || areaSlug == null ? null : areaDefinition.digest(areaSlug))
             .addInt(areaDisplayOrder)
-            .add(PracticeReviewTier.PROPOSE.name());
+            .add(PracticeAutonomy.HUMAN_APPROVAL.name());
         return new CatalogAdoptionPlan(
             slug,
             definition,
@@ -59,7 +59,7 @@ record CatalogAdoptionPlan(
                 areaSlug,
                 areaDefinition == null ? null : CuratedAreaRequestDTO.of(areaDefinition)
             ),
-            PracticeReviewTier.PROPOSE,
+            PracticeAutonomy.HUMAN_APPROVAL,
             definition.provenanceFingerprint(slug),
             CatalogAdoptionService.formatted(etag)
         );

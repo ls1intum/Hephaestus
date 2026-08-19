@@ -15,7 +15,7 @@ import org.jspecify.annotations.Nullable;
  *
  * <p>Every field is nullable on purpose: {@code null} means "this workspace has not decided". Scalars
  * resolve to the fleet default ({@code hephaestus.practice-review.*}) via the {@code resolveX(fallback)}
- * accessors; {@link #reviewScope} and {@link #defaultReviewTier} have no fleet default and resolve
+ * accessors; {@link #reviewScope} and {@link #defaultAutonomy} have no fleet default and resolve
  * {@code null} to a constant instead, documented at each field.
  *
  * <p>PATCH {@code null} means "no change"; to reset a field back to inherit, name it in the PATCH
@@ -25,11 +25,6 @@ import org.jspecify.annotations.Nullable;
 @Getter
 @Setter
 public class PracticeReviewSettings {
-
-    /** Run practice review for all contributors (vs only the {@code run_practice_review} role). */
-    @Column(name = "practice_run_for_all_users")
-    @Nullable
-    private Boolean runForAllUsers;
 
     /** Unused; kept one release under deprecate-then-remove so schema and entity agree meanwhile. */
     @Deprecated(forRemoval = true)
@@ -58,23 +53,10 @@ public class PracticeReviewSettings {
     @Nullable
     private WorkspaceReviewScope reviewScope;
 
-    /**
-     * Autonomy tier for every practice in this workspace that holds no opinion (and whose area holds
-     * none either). A {@code PracticeReviewTier} name, or {@code null} for that tier's own default; no
-     * fleet default to inherit.
-     *
-     * <p>Stored as a String, not the enum: {@code PracticeReviewTier} belongs to the practices module,
-     * which already depends on this one, so naming it here would close a cycle {@code
-     * ModulithVerificationTest} rejects. Held to the vocabulary by the DB CHECK
-     * {@code chk_workspace_default_review_tier}.
-     */
-    @Column(name = "practice_default_review_tier", length = 16)
+    // Kept as a String because the workspace module cannot depend on the practices module.
+    @Column(name = "practice_default_autonomy", length = 16)
     @Nullable
-    private String defaultReviewTier;
-
-    public boolean resolveRunForAllUsers(boolean fallback) {
-        return runForAllUsers != null ? runForAllUsers : fallback;
-    }
+    private String defaultAutonomy;
 
     public boolean resolveDeliverToMerged(boolean fallback) {
         return deliverToMerged != null ? deliverToMerged : fallback;
@@ -89,12 +71,7 @@ public class PracticeReviewSettings {
     }
 
     /** PATCH semantics: only non-null fields overwrite; null leaves the current value untouched. */
-    public void applyPatch(
-        @Nullable Boolean runForAllUsers,
-        @Nullable Boolean deliverToMerged,
-        @Nullable Integer cooldownMinutes
-    ) {
-        if (runForAllUsers != null) this.runForAllUsers = runForAllUsers;
+    public void applyPatch(@Nullable Boolean deliverToMerged, @Nullable Integer cooldownMinutes) {
         if (deliverToMerged != null) this.deliverToMerged = deliverToMerged;
         if (cooldownMinutes != null) this.cooldownMinutes = cooldownMinutes;
     }
@@ -110,13 +87,13 @@ public class PracticeReviewSettings {
     }
 
     /**
-     * PATCH semantics, same as the scalars. Clearing back to the tier vocabulary's own default is a
-     * {@link PracticeReviewField#DEFAULT_REVIEW_TIER} reset, not a null here — otherwise a client that
+     * PATCH semantics, same as the scalars. Clearing back to the autonomy vocabulary's own default is a
+     * {@link PracticeReviewField#DEFAULT_AUTONOMY} reset, not a null here — otherwise a client that
      * simply omitted the field would silently reset it.
      */
-    public void applyDefaultReviewTier(@Nullable String tierName) {
+    public void applyDefaultAutonomy(@Nullable String tierName) {
         if (tierName != null) {
-            this.defaultReviewTier = tierName;
+            this.defaultAutonomy = tierName;
         }
     }
 
@@ -129,10 +106,6 @@ public class PracticeReviewSettings {
             // Switch EXPRESSION, not statement: the compiler then forces every constant to be handled
             // here. The yielded value is unused; the exhaustiveness check is the point.
             boolean ignored = switch (field) {
-                case RUN_FOR_ALL_USERS -> {
-                    this.runForAllUsers = null;
-                    yield true;
-                }
                 // Kept so a reset request naming this field from an older client is still understood.
                 case SKIP_DRAFTS -> {
                     this.skipDrafts = null;
@@ -150,8 +123,8 @@ public class PracticeReviewSettings {
                     this.reviewScope = null;
                     yield true;
                 }
-                case DEFAULT_REVIEW_TIER -> {
-                    this.defaultReviewTier = null;
+                case DEFAULT_AUTONOMY -> {
+                    this.defaultAutonomy = null;
                     yield true;
                 }
             };

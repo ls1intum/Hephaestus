@@ -6,7 +6,7 @@ package de.tum.cit.aet.hephaestus.agent.handler.inapp;
  * shown it.
  */
 public enum InAppRoutingDecision {
-    /** A corroborated, live, tier-admitted pattern the developer has not been shown lately — prepare it. */
+    /** A corroborated, live, autonomy-admitted pattern the developer has not been shown lately — prepare it. */
     ADMIT,
 
     /**
@@ -22,8 +22,8 @@ public enum InAppRoutingDecision {
      */
     UNCORROBORATED,
 
-    /** The practice's autonomy tier (OFF or PROPOSE) does not admit the in-app lane. */
-    PRACTICE_TIER_QUIET,
+    /** The practice's autonomy (OFF or HUMAN_APPROVAL) does not admit the in-app lane. */
+    PRACTICE_REQUIRES_APPROVAL,
 
     /**
      * Every measurement behind the message came from a backfill campaign. Backfill is sound as a

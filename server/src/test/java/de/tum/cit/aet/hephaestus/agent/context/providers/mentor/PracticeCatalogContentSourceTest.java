@@ -11,6 +11,7 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
@@ -56,6 +57,7 @@ class PracticeCatalogContentSourceTest extends BaseUnitTest {
         practice.setSlug("error-state-handling");
         practice.setName("Error State Handling");
         practice.setCriteria("Show an error view for failed network calls.");
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         when(practiceRepository.findByWorkspaceId(eq(1L))).thenReturn(List.of(practice));
 
         Map<String, byte[]> files = new HashMap<>();

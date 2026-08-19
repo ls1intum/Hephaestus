@@ -89,8 +89,8 @@ public class CatalogAdoptionController {
     }
 
     @PostMapping("/{slug}")
-    @Operation(summary = "Adopt a practice in Propose", operationId = "adoptPractice")
-    @ApiResponse(responseCode = "201", description = "Practice adopted in Propose")
+    @Operation(summary = "Adopt a practice in Review before sending", operationId = "adoptPractice")
+    @ApiResponse(responseCode = "201", description = "Practice adopted in Review before sending")
     @ApiResponse(
         responseCode = "409",
         description = "The practice slug already exists in the workspace",

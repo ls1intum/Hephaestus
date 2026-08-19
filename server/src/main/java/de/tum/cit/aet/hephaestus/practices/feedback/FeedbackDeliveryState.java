@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
 public enum FeedbackDeliveryState {
+    /** Composed and immutable, but requires an authorized human decision before it can enter delivery. */
+    AWAITING_APPROVAL,
     /**
      * Decided, but not yet received by the developer. What is already written varies by channel and the
      * state deliberately does not say: an IN_CHAT unit carries a NULL body because the mentor writes
@@ -20,4 +22,6 @@ public enum FeedbackDeliveryState {
     SUPPRESSED,
     /** Delivery was attempted but failed. */
     FAILED,
+    /** An authorized reviewer deliberately rejected this exact composed unit. */
+    DISCARDED,
 }

@@ -1,12 +1,12 @@
 import type {
+	AutonomyAssignment,
 	Practice,
 	PracticeArea,
 	PracticeReviewSettings,
 	ReviewBackfillRun,
 	ReviewSweepSchedule,
-	ReviewTierAssignment,
 } from "@/api/types.gen";
-import type { ReviewTier } from "@/lib/review-tiers";
+import type { PracticeAutonomy } from "@/lib/practice-autonomy";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockMergeBinding,
@@ -14,16 +14,14 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 
-/** What a workspace that has never been configured gets. */
 export function mockReviewSettings(
 	overrides: Partial<PracticeReviewSettings> = {},
 ): PracticeReviewSettings {
 	return {
 		cooldownMinutes: 30,
-		defaultReviewTier: "DELIVER",
+		defaultAutonomy: "AUTOMATIC",
 		deliverToMerged: true,
 		reviewScope: { targetBranches: [], repositories: [] },
-		runForAllUsers: true,
 		...overrides,
 	};
 }
@@ -47,7 +45,6 @@ export function sweepSchedule(overrides: Partial<ReviewSweepSchedule> = {}): Rev
 	};
 }
 
-/** A past-work campaign, on the same terms as {@link sweepSchedule}. */
 export function backfillRun(overrides: Partial<ReviewBackfillRun> = {}): ReviewBackfillRun {
 	return {
 		id: "11111111-1111-1111-1111-111111111111",
@@ -67,22 +64,15 @@ export function backfillRun(overrides: Partial<ReviewBackfillRun> = {}): ReviewB
 	};
 }
 
-/** A practice that holds no tier of its own, under an area that holds none either. */
-export function inheritedTier(effective: ReviewTier = "DELIVER"): ReviewTierAssignment {
+export function inheritedAutonomy(effective: PracticeAutonomy = "AUTOMATIC"): AutonomyAssignment {
 	return { effective, source: "WORKSPACE", inherited: true };
 }
 
-/**
- * A tier inherited from the area, which holds one of its own. `source` is the field that decides
- * what a row may say: only this shape may name the area, {@link inheritedTier} must name the
- * workspace.
- */
-export function areaTier(effective: ReviewTier): ReviewTierAssignment {
+export function areaAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
 	return { effective, source: "AREA", inherited: true };
 }
 
-/** A tier somebody chose on this practice itself. */
-export function chosenTier(effective: ReviewTier): ReviewTierAssignment {
+export function chosenAutonomy(effective: PracticeAutonomy): AutonomyAssignment {
 	return { effective, override: effective, source: "PRACTICE", inherited: false };
 }
 
@@ -102,7 +92,7 @@ export const mockPractices: Practice[] = [
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
-		reviewTier: inheritedTier(),
+		autonomy: inheritedAutonomy(),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-15"),
 	},
@@ -122,7 +112,7 @@ export const mockPractices: Practice[] = [
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
-		reviewTier: inheritedTier(),
+		autonomy: inheritedAutonomy(),
 		createdAt: new Date("2025-06-02"),
 		updatedAt: new Date("2025-06-14"),
 	},
@@ -142,7 +132,7 @@ export const mockPractices: Practice[] = [
 		automatedReviewPolicy: mockPullRequestPolicy,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 		displayOrder: 0,
-		reviewTier: chosenTier("OFF"),
+		autonomy: chosenAutonomy("OFF"),
 		createdAt: new Date("2025-06-03"),
 		updatedAt: new Date("2025-06-10"),
 	},
@@ -161,7 +151,7 @@ export const mockUnassignedPractice: Practice = {
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
-	reviewTier: inheritedTier(),
+	autonomy: inheritedAutonomy(),
 	createdAt: new Date("2025-06-05"),
 	updatedAt: new Date("2025-06-17"),
 };
@@ -177,7 +167,7 @@ export const mockPracticeLongText: Practice = {
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
-	reviewTier: inheritedTier(),
+	autonomy: inheritedAutonomy(),
 	createdAt: new Date("2025-06-06"),
 	updatedAt: new Date("2025-06-18"),
 };
@@ -209,7 +199,7 @@ export const mockPracticeWithAllTriggers: Practice = {
 	automatedReviewPolicy: mockPullRequestPolicy,
 	automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	displayOrder: 0,
-	reviewTier: inheritedTier(),
+	autonomy: inheritedAutonomy(),
 	createdAt: new Date("2025-06-04"),
 	updatedAt: new Date("2025-06-16"),
 };
@@ -222,7 +212,7 @@ export const mockAreas: PracticeArea[] = [
 		description: "Make each change easy and fast to review.",
 		visibleInPracticeDashboards: true,
 		displayOrder: 1,
-		reviewTier: inheritedTier(),
+		autonomy: inheritedAutonomy(),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-01"),
 	},
@@ -233,7 +223,7 @@ export const mockAreas: PracticeArea[] = [
 		description: "Give a maintainer enough to start work.",
 		visibleInPracticeDashboards: true,
 		displayOrder: 3,
-		reviewTier: inheritedTier(),
+		autonomy: inheritedAutonomy(),
 		createdAt: new Date("2025-06-01"),
 		updatedAt: new Date("2025-06-01"),
 	},
