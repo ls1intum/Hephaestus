@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -226,7 +227,7 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
         when(diffNotePoster.reconcileInlineNotes(any(), any())).thenReturn(
             new DiffNotePoster.DiffNoteResult(0, 0, List.of())
         );
-        when(accountPreferencesQuery.preferencesForUserId(any())).thenReturn(
+        when(accountPreferencesQuery.preferencesForUserId(anyLong())).thenReturn(
             Optional.of(new AccountPreferencesQuery.PreferencesView(false, true))
         );
     }
