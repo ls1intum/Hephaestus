@@ -33,6 +33,23 @@ Contributions that do not adhere to these guidelines will be rejected. We align 
 3. **Follow pull request title guidelines**: Ensure your PR title follows the [Conventional Commits](https://www.conventionalcommits.org/) specification.
 4. **Submit a pull request**: Once your work is complete, submit a pull request for review.
 
+### Stacked Pull Requests
+
+We encourage [stacked pull requests](https://docs.github.com/en/pull-requests/get-started/about-stacked-prs)
+when a change has dependent steps that are easier to review separately. Each layer must be a coherent
+review unit that builds, passes its applicable checks, and is safe to release before later layers. Use
+one PR when splitting would create artificial or incomplete layers, and separate PRs when the changes
+are independent.
+
+Each layer follows the normal PR rules: include applicable tests and generated artefacts, and add a
+changeset when it changes shipped code. Base each PR on the layer below it, with the bottom PR based on
+`main`, and merge reviewed, green layers from the bottom up.
+
+The optional [`gh stack`](https://github.com/github/gh-stack) extension manages the branch and PR chain;
+follow GitHub's [stacked PR quickstart](https://docs.github.com/en/pull-requests/get-started/stacked-prs-quickstart).
+This workflow is for branches in this repository; contributors working from forks should use one PR or
+coordinate with a maintainer.
+
 ## Pull Request Title Guidelines
 
 We use automated semantic pull request validation to ensure consistent and meaningful commit history. Your pull request titles must follow the [Conventional Commits](https://www.conventionalcommits.org/) specification.
