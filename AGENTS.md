@@ -27,6 +27,7 @@ Load these rather than reasoning from scratch.
 | `/web-design-guidelines` | UI accessibility and UX review |
 | `/react-best-practices` | Frontend performance (~40% Next.js-specific — check applicability) |
 | `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments |
+| `/gh-stack` | Creating and maintaining stacked pull requests |
 
 ## Quality gates
 
@@ -85,7 +86,7 @@ Requests. Plan the dependency order before creating layers, put foundations belo
 and do not create a layer that cannot satisfy the normal PR, release, and quality requirements on its
 own.
 
-When `gh stack` manages a stack, use the installed `gh-stack` skill instead of manually retargeting its
+When `gh stack` manages a stack, use `/gh-stack` instead of manually retargeting its
 branches. Restack descendants after changing a lower layer. Do not stage, commit, push, submit, or
 merge without explicit user permission.
 
