@@ -5138,6 +5138,7 @@ paths:
             - INSTANCE_SILENCED
             - WORKSPACE_DISABLED
             - APPROVAL_STALE
+            - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
             - BACKFILL_QUIET
       - in: query
@@ -11037,7 +11038,7 @@ components:
           - AUTOMATIC
         defaultAutonomyOverride:
           type: string
-          description: "Raw override; null = this workspace has never chosen, so AUTOMATIC\
+          description: "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL\
             \ applies"
           enum:
           - "OFF"
@@ -11203,6 +11204,7 @@ components:
             - INSTANCE_SILENCED
             - WORKSPACE_DISABLED
             - APPROVAL_STALE
+            - APPROVAL_NO_LONGER_ELIGIBLE
             - PRACTICE_REQUIRES_APPROVAL
             - BACKFILL_QUIET
       required:
@@ -12190,6 +12192,7 @@ components:
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
           - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
           - BACKFILL_QUIET
       required:
@@ -12341,6 +12344,7 @@ components:
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
           - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
           - BACKFILL_QUIET
       required:
@@ -12456,6 +12460,7 @@ components:
           - INSTANCE_SILENCED
           - WORKSPACE_DISABLED
           - APPROVAL_STALE
+          - APPROVAL_NO_LONGER_ELIGIBLE
           - PRACTICE_REQUIRES_APPROVAL
           - BACKFILL_QUIET
         threadKey:

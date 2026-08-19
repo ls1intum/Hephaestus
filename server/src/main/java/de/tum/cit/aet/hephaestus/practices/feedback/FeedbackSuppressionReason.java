@@ -34,6 +34,7 @@ public enum FeedbackSuppressionReason {
     INSTANCE_SILENCED,
     WORKSPACE_DISABLED,
     APPROVAL_STALE,
+    APPROVAL_NO_LONGER_ELIGIBLE,
     PRACTICE_REQUIRES_APPROVAL,
     /**
      * Like {@link #PRACTICE_REQUIRES_APPROVAL}, but for a backfill campaign: measured retrospectively, so it is

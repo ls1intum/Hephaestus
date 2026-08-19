@@ -84,7 +84,8 @@
                     'VOLUME_CAPPED', 'COMPOSER_DEDUPED', 'REACTED_DISPUTED', 'REACTED_NOT_APPLICABLE',
                     'CONVERSATION_EXPIRED', 'ARTIFACT_GONE', 'ARTIFACT_CLOSED', 'ARTIFACT_MERGED',
                     'ARTIFACT_DRAFT', 'RECIPIENT_OPTED_OUT', 'EMPTY_AFTER_SANITIZE', 'INSTANCE_SILENCED',
-                    'PRACTICE_REQUIRES_APPROVAL', 'BACKFILL_QUIET', 'WORKSPACE_DISABLED', 'APPROVAL_STALE'));
+                    'PRACTICE_REQUIRES_APPROVAL', 'BACKFILL_QUIET', 'WORKSPACE_DISABLED', 'APPROVAL_STALE',
+                    'APPROVAL_NO_LONGER_ELIGIBLE'));
         ]]></sql>
         <createTable tableName="feedback_approval">
             <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_feedback_approval"/></column>
@@ -114,7 +115,7 @@
             <sql splitStatements="true" endDelimiter=";"><![CDATA[
                 DELETE FROM feedback WHERE delivery_state IN ('AWAITING_APPROVAL', 'DISCARDED');
                 UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL
-                    WHERE suppression_reason IN ('WORKSPACE_DISABLED', 'APPROVAL_STALE');
+                    WHERE suppression_reason IN ('WORKSPACE_DISABLED', 'APPROVAL_STALE', 'APPROVAL_NO_LONGER_ELIGIBLE');
                 ALTER TABLE feedback DROP CONSTRAINT chk_feedback_state;
                 ALTER TABLE feedback ADD CONSTRAINT chk_feedback_state CHECK (delivery_state IN ('PREPARED', 'DELIVERED', 'SUPERSEDED', 'SUPPRESSED', 'FAILED'));
                 ALTER TABLE feedback ALTER COLUMN delivery_state TYPE VARCHAR(16);

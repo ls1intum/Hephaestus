@@ -4,6 +4,7 @@ import static de.tum.cit.aet.hephaestus.testconfig.TestEntities.agentJob;
 import static org.mockito.Mockito.*;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -16,6 +17,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.ApprovedFeedbackReadyEvent;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApproval;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDigest;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalEligibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import java.util.Optional;
@@ -25,6 +27,92 @@ import org.junit.jupiter.api.Test;
 
 @Tag("unit")
 class ApprovedFeedbackDeliveryListenerTest {
+
+    @Test
+    void shouldSuppressWhenContributingPracticeNoLongerRequiresApproval() {
+        FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
+        FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
+        FeedbackApprovalEligibility eligibility = mock(FeedbackApprovalEligibility.class);
+        UUID feedbackId = UUID.randomUUID();
+        Feedback feedback = proposal(feedbackId, UUID.randomUUID());
+        when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
+        approve(approvalRepository, feedback);
+
+        new ApprovedFeedbackDeliveryListener(
+            feedbackRepository,
+            approvalRepository,
+            mock(AgentJobRepository.class),
+            mock(PracticeFeedbackDeliveryPolicy.class),
+            mock(PullRequestCommentPoster.class),
+            eligibility
+        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+
+        verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "APPROVAL_NO_LONGER_ELIGIBLE");
+    }
+
+    @Test
+    void shouldTerminallySuppressApprovedProposalWhileSilentModeIsActive() {
+        FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
+        FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
+        AgentJobRepository jobRepository = mock(AgentJobRepository.class);
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        PullRequestCommentPoster poster = mock(PullRequestCommentPoster.class);
+        UUID feedbackId = UUID.randomUUID();
+        Feedback feedback = proposal(feedbackId, UUID.randomUUID());
+        AgentJob job = agentJob();
+        when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
+        approve(approvalRepository, feedback);
+        when(jobRepository.findByIdAndWorkspaceId(feedback.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
+        when(policy.evaluatePullRequest(job)).thenReturn(
+            PracticeFeedbackDeliveryPolicy.Decision.suppressed(FeedbackSuppressionReason.INSTANCE_SILENCED)
+        );
+
+        new ApprovedFeedbackDeliveryListener(
+            feedbackRepository,
+            approvalRepository,
+            jobRepository,
+            policy,
+            poster,
+            eligible()
+        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+
+        verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "INSTANCE_SILENCED");
+        verifyNoInteractions(poster);
+    }
+
+    @Test
+    void shouldTerminallySuppressWhenSilentModeRacesTheProviderPost() {
+        FeedbackRepository feedbackRepository = mock(FeedbackRepository.class);
+        FeedbackApprovalRepository approvalRepository = mock(FeedbackApprovalRepository.class);
+        AgentJobRepository jobRepository = mock(AgentJobRepository.class);
+        PracticeFeedbackDeliveryPolicy policy = mock(PracticeFeedbackDeliveryPolicy.class);
+        PullRequestCommentPoster poster = mock(PullRequestCommentPoster.class);
+        UUID feedbackId = UUID.randomUUID();
+        Feedback feedback = proposal(feedbackId, UUID.randomUUID());
+        AgentJob job = agentJob();
+        when(feedbackRepository.lockByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
+        approve(approvalRepository, feedback);
+        when(jobRepository.findByIdAndWorkspaceId(feedback.getAgentJobId(), 7L)).thenReturn(Optional.of(job));
+        when(policy.evaluatePullRequest(job)).thenReturn(
+            PracticeFeedbackDeliveryPolicy.Decision.allowed(new PullRequest())
+        );
+        when(poster.findApprovedProposal(job, feedbackId)).thenReturn(ExistingDeliveryLookup.absent());
+        doThrow(new JobDeliverySuppressedException("silent", new RuntimeException("silent")))
+            .when(poster)
+            .postApprovedProposal(job, feedbackId, "Exact proposal");
+
+        new ApprovedFeedbackDeliveryListener(
+            feedbackRepository,
+            approvalRepository,
+            jobRepository,
+            policy,
+            poster,
+            eligible()
+        ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
+
+        verify(feedbackRepository).markApprovedSuppressed(7L, feedbackId, "INSTANCE_SILENCED");
+        verify(feedbackRepository, never()).markApprovedDelivered(anyLong(), any());
+    }
 
     @Test
     void shouldPostApprovedProposalExactlyOnceWhenProviderConfirmsAbsence() {
@@ -50,7 +138,8 @@ class ApprovedFeedbackDeliveryListenerTest {
             approvalRepository,
             jobRepository,
             policy,
-            poster
+            poster,
+            eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(poster).postApprovedProposal(job, feedbackId, "Exact proposal");
@@ -81,7 +170,8 @@ class ApprovedFeedbackDeliveryListenerTest {
             approvalRepository,
             jobRepository,
             policy,
-            poster
+            poster,
+            eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(poster, never()).postApprovedProposal(any(), any(), any());
@@ -111,7 +201,8 @@ class ApprovedFeedbackDeliveryListenerTest {
             approvalRepository,
             jobRepository,
             policy,
-            poster
+            poster,
+            eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verifyNoInteractions(poster);
@@ -144,7 +235,8 @@ class ApprovedFeedbackDeliveryListenerTest {
             approvalRepository,
             jobRepository,
             policy,
-            poster
+            poster,
+            eligible()
         ).deliver(new ApprovedFeedbackReadyEvent(7L, feedbackId));
 
         verify(feedbackRepository).markApprovedSuppressed(
@@ -165,6 +257,12 @@ class ApprovedFeedbackDeliveryListenerTest {
                     .build()
             )
         );
+    }
+
+    private static FeedbackApprovalEligibility eligible() {
+        FeedbackApprovalEligibility eligibility = mock(FeedbackApprovalEligibility.class);
+        when(eligibility.isEligible(anyLong(), any())).thenReturn(true);
+        return eligibility;
     }
 
     private static Feedback proposal(UUID feedbackId, UUID jobId) {

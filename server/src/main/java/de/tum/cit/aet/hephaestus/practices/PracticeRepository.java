@@ -70,6 +70,19 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
 
+    @EntityGraph(attributePaths = { "area" })
+    @Query(
+        """
+        SELECT DISTINCT fo.observation.practice FROM FeedbackObservation fo
+        WHERE fo.feedback.id = :feedbackId
+          AND fo.feedback.workspaceId = :workspaceId
+        """
+    )
+    List<Practice> findContributingPractices(
+        @Param("workspaceId") Long workspaceId,
+        @Param("feedbackId") java.util.UUID feedbackId
+    );
+
     List<Practice> findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(Long workspaceId, Long areaId);
 
     @Query(

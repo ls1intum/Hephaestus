@@ -38,12 +38,15 @@ class FeedbackApprovalServiceTest {
     @Mock
     private ApplicationEventPublisher eventPublisher;
 
+    @Mock
+    private FeedbackApprovalEligibility eligibility;
+
     private FeedbackApprovalService service;
     private UUID feedbackId;
 
     @BeforeEach
     void setUp() {
-        service = new FeedbackApprovalService(feedbackRepository, approvalRepository, eventPublisher);
+        service = new FeedbackApprovalService(feedbackRepository, approvalRepository, eventPublisher, eligibility);
         feedbackId = UUID.randomUUID();
         Feedback feedback = Feedback.builder()
             .id(feedbackId)
@@ -58,6 +61,7 @@ class FeedbackApprovalServiceTest {
             .source(FeedbackSource.AGENT)
             .build();
         when(feedbackRepository.findByIdAndWorkspaceId(feedbackId, 7L)).thenReturn(Optional.of(feedback));
+        lenient().when(eligibility.isEligible(7L, feedbackId)).thenReturn(true);
         lenient()
             .when(approvalRepository.save(any()))
             .thenAnswer(invocation -> invocation.getArgument(0));
@@ -77,6 +81,22 @@ class FeedbackApprovalServiceTest {
         verify(feedbackRepository).decideProposal(7L, feedbackId, "PREPARED");
         assertThat(result.getActorAccountId()).isEqualTo(42L);
         assertThat(result.getContentDigest()).matches("[0-9a-f]{64}");
+    }
+
+    @Test
+    void shouldSuppressWhenProposalNoLongerRequiresApproval() {
+        when(eligibility.isEligible(7L, feedbackId)).thenReturn(false);
+
+        assertThatThrownBy(() ->
+            service.decide(
+                7L,
+                feedbackId,
+                42L,
+                new DecideFeedbackProposalRequestDTO(FeedbackApprovalDecision.APPROVED, null, null)
+            )
+        ).isInstanceOf(ResponseStatusException.class);
+
+        verify(feedbackRepository).suppressProposal(7L, feedbackId, "APPROVAL_NO_LONGER_ELIGIBLE");
     }
 
     @Test

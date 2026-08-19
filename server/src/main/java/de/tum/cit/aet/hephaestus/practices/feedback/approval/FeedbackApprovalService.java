@@ -21,8 +21,9 @@ public class FeedbackApprovalService {
     private final FeedbackRepository feedbackRepository;
     private final FeedbackApprovalRepository approvalRepository;
     private final ApplicationEventPublisher eventPublisher;
+    private final FeedbackApprovalEligibility eligibility;
 
-    @Transactional
+    @Transactional(noRollbackFor = ResponseStatusException.class)
     public FeedbackApproval decide(
         Long workspaceId,
         UUID feedbackId,
@@ -35,6 +36,16 @@ public class FeedbackApprovalService {
         validate(request);
         if (feedback.getChannel() != FeedbackChannel.IN_CONTEXT) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only in-context feedback can be approved");
+        }
+        if (
+            request.decision() == FeedbackApprovalDecision.APPROVED && !eligibility.isEligible(workspaceId, feedbackId)
+        ) {
+            feedbackRepository.suppressProposal(
+                workspaceId,
+                feedbackId,
+                de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
+            );
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal is no longer eligible for approval");
         }
         FeedbackApproval existing = approvalRepository
             .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)

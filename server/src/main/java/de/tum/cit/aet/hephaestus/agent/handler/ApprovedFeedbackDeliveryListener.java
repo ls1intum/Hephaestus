@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
 import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
@@ -9,6 +10,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.ApprovedFeedbackReadyEvent;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalDigest;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalEligibility;
 import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +32,7 @@ class ApprovedFeedbackDeliveryListener {
     private final AgentJobRepository agentJobRepository;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PullRequestCommentPoster commentPoster;
+    private final FeedbackApprovalEligibility approvalEligibility;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     @Transactional(propagation = Propagation.REQUIRES_NEW)
@@ -47,6 +50,14 @@ class ApprovedFeedbackDeliveryListener {
                 event.workspaceId(),
                 feedback.getId(),
                 FeedbackSuppressionReason.APPROVAL_STALE.name()
+            );
+            return;
+        }
+        if (!approvalEligibility.isEligible(event.workspaceId(), feedback.getId())) {
+            feedbackRepository.markApprovedSuppressed(
+                event.workspaceId(),
+                feedback.getId(),
+                FeedbackSuppressionReason.APPROVAL_NO_LONGER_ELIGIBLE.name()
             );
             return;
         }
@@ -69,10 +80,7 @@ class ApprovedFeedbackDeliveryListener {
             return;
         }
         if (!policy.allowed()) {
-            if (
-                policy.suppressionReason() != null &&
-                policy.suppressionReason() != FeedbackSuppressionReason.INSTANCE_SILENCED
-            ) {
+            if (policy.suppressionReason() != null) {
                 feedbackRepository.markApprovedSuppressed(
                     event.workspaceId(),
                     feedback.getId(),
@@ -87,7 +95,16 @@ class ApprovedFeedbackDeliveryListener {
             return;
         }
         if (existing.kind() == ExistingDeliveryLookup.Kind.ABSENT) {
-            commentPoster.postApprovedProposal(job, feedback.getId(), feedback.getBody());
+            try {
+                commentPoster.postApprovedProposal(job, feedback.getId(), feedback.getBody());
+            } catch (JobDeliverySuppressedException exception) {
+                feedbackRepository.markApprovedSuppressed(
+                    event.workspaceId(),
+                    feedback.getId(),
+                    FeedbackSuppressionReason.INSTANCE_SILENCED.name()
+                );
+                return;
+            }
         }
         feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
     }

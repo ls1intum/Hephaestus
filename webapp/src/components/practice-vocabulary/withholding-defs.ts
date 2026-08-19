@@ -49,6 +49,7 @@ const REASON_FAMILY: Record<WithholdingReason, WithholdingFamily> = {
 	INSTANCE_SILENCED: "POLICY",
 	WORKSPACE_DISABLED: "POLICY",
 	APPROVAL_STALE: "POLICY",
+	APPROVAL_NO_LONGER_ELIGIBLE: "POLICY",
 	RECIPIENT_OPTED_OUT: "DEVELOPER_CHOICE",
 	REACTED_DISPUTED: "DEVELOPER_CHOICE",
 	REACTED_NOT_APPLICABLE: "DEVELOPER_CHOICE",
@@ -73,6 +74,8 @@ export const WITHHOLDING_REASON_DEFS: Record<WithholdingReason, string> = {
 	WORKSPACE_DISABLED: "Practice feedback is not enabled for this workspace.",
 	APPROVAL_STALE:
 		"The approved proposal no longer matches the content or destination being released.",
+	APPROVAL_NO_LONGER_ELIGIBLE:
+		"The practices behind this proposal no longer require human approval.",
 	RECIPIENT_OPTED_OUT: "The developer has opted out of AI feedback.",
 	REACTED_DISPUTED: "The developer disputed feedback like this before.",
 	REACTED_NOT_APPLICABLE: "The developer marked feedback like this not applicable before.",

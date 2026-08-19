@@ -32,6 +32,6 @@ public record PracticeReviewSettingsDTO(
             "autonomy of their own — the bottom of the practice → area → workspace chain"
     )
     PracticeAutonomy defaultAutonomy,
-    @Schema(description = "Raw override; null = this workspace has never chosen, so AUTOMATIC applies")
+    @Schema(description = "Raw override; null = this workspace has never chosen, so HUMAN_APPROVAL applies")
     PracticeAutonomy defaultAutonomyOverride
 ) {}

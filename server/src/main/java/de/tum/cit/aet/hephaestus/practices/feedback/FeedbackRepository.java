@@ -39,6 +39,14 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
     @Query(
+        value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'AWAITING_APPROVAL'",
+        nativeQuery = true
+    )
+    int suppressProposal(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
         value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP " +
             "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
         nativeQuery = true
