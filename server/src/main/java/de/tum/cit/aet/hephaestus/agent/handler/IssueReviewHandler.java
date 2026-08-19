@@ -249,8 +249,17 @@ public class IssueReviewHandler implements JobTypeHandler {
             job,
             observations
         );
+        List<PracticeDetectionResultParser.ValidatedObservation> proposals = inContextDeliveryGate.awaitingApproval(
+            job,
+            observations
+        );
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.ISSUE);
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
+        feedbackLedgerRecorder.recordProposal(
+            job,
+            DeliveryComposer.compose(proposals, ArtifactKinds.ISSUE, why, null, units),
+            proposals
+        );
         postIssueNote(job, DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units));
     }
 

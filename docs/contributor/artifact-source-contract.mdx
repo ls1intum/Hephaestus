@@ -20,7 +20,7 @@ The contract separates three identities:
 
 1. **Source catalog:** logical source kinds and their authority, identity anchoring, completeness, required
    capture quality, privacy, and absence-state semantics.
-2. **Practice binding:** the occasion a review runs on and the evidence that review *requires* before it may
+2. **Practice binding:** the occasion a review runs on and the evidence that review _requires_ before it may
    run at all. A source declares the artifact kinds it applies to, so the catalog constrains which sources a
    binding may name.
 3. **Capture manifest:** the state, provenance facts, and materialized artifacts for one invocation.
@@ -156,7 +156,7 @@ into one state.
 - `COLLECTION_ERROR`: an attempted collection failed.
 
 A non-available source contains no artifacts or source identifiers, and carries a typed
-`SourceAbsenceReason` saying *why* — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `NO_WORKING_COPY`,
+`SourceAbsenceReason` saying _why_ — `GOVERNANCE_NOT_EFFECTIVE`, `NO_PROVIDER`, `NO_WORKING_COPY`,
 `CONSENT_NOT_ACTIVE`, and the rest. Safe, typed reason codes may be role-filtered; free-form exception text
 must not enter the manifest.
 
@@ -178,8 +178,8 @@ Logical content is independent of serialized bytes: a JSON file containing `[]` 
 Field-level redaction remains an available, usually partial source; whole-source redaction uses `REDACTED`.
 
 There is no staleness verdict, and there is deliberately no age-based mode. An age threshold needs a
-watermark recording when a copy was last *verified* against upstream; the mirror records only when a row was
-last *written*, so an age derived from it measures time since the last upstream change — reporting a
+watermark recording when a copy was last _verified_ against upstream; the mirror records only when a row was
+last _written_, so an age derived from it measures time since the last upstream change — reporting a
 correctly mirrored quiet record as stale and a record modified moments ago as current. Adding one therefore
 has a prerequisite: a reconciliation pass that advances a verified-as-of watermark after confirming a record
 is unchanged. Until that watermark exists, a currentness guarantee on a mirrored source would be a claim the
@@ -188,7 +188,7 @@ anchored to something immutable at all.
 
 A readiness report names the contract version, the catalog digest it was interpreted under, the artifact
 kind, the manifest's capture time, and one decision per practice. A manifest captured under a contract
-version the runtime no longer ships is *unreplayable* rather than invalid: the recorded result stands, and
+version the runtime no longer ships is _unreplayable_ rather than invalid: the recorded result stands, and
 only the ability to re-derive it is unavailable.
 
 ## Practice automated-review policy
@@ -223,7 +223,7 @@ Each entry in `needs` names a source and the stance the practice takes towards i
 | Stance       | Meaning                                                                                                                                                                               |
 | ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `REQUIRED`   | The claim reads this source. If it could not be captured to the quality its contract demands, the review is refused rather than run.                                                  |
-| `EXHAUSTIVE` | The claim reads this source and asserts something is *not* in it. Required, and additionally not satisfiable by a partial capture whatever the source contract's floor happens to be. |
+| `EXHAUSTIVE` | The claim reads this source and asserts something is _not_ in it. Required, and additionally not satisfiable by a partial capture whatever the source contract's floor happens to be. |
 | `CONTEXTUAL` | Used when present, noted when absent, never a reason to refuse.                                                                                                                       |
 
 `EXHAUSTIVE` exists because an absence is the one claim a fragment cannot support: a partial capture of the
@@ -321,9 +321,9 @@ back as automated-review input needs a governed source kind and purpose authoriz
 Two workspace-level gates decide whether a review is admitted at all, before any source is captured. Both
 refuse the signal with a typed reason rather than silently doing nothing.
 
-- **Autonomy tier.** A practice at `OFF` admits no review; `PROPOSE` and `DELIVER` both run it and differ
-  only in whether the result is sent. When every practice bound to a signal sits at `OFF`, the signal is
-  refused with `PRACTICE_TIER_OFF`.
+- **Autonomy tier.** A practice at `OFF` admits no review; `HUMAN_APPROVAL` and `AUTOMATIC` both run it and differ
+  in whether a person must authorize release. When every practice bound to a signal sits at `OFF`, the signal is
+  refused with `PRACTICE_AUTONOMY_OFF`.
 - **Review scope.** An artifact outside the workspace's declared branches or repositories is refused with
   `OUT_OF_REVIEW_SCOPE`.
 

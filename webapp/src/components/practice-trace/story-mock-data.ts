@@ -124,12 +124,11 @@ export const tracedSignals = [
 	},
 ] satisfies TracedSignal[];
 
-/** One entry per `outcome`, plus the measured-but-deliberately-silent case that the tiers create. */
 export const practiceTraceEntries = [
 	{
 		practiceSlug: "thin-controllers",
 		practiceName: "Thin controllers",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "REVIEWED",
 		explanation:
 			"Reviewed on the commits pushed at 14:48. Three measurements were taken and one was raised with you; the rest repeated a point already made on this pull request.",
@@ -145,10 +144,10 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "product-language",
 		practiceName: "Product language",
-		reviewTier: "PROPOSE",
+		autonomy: "HUMAN_APPROVAL",
 		outcome: "REVIEWED",
 		explanation:
-			"Reviewed, and two measurements were recorded. This practice is set to Propose, so nothing was said to you; raise its tier to Deliver to hear about results like these.",
+			"Reviewed, and two measurements were recorded. This practice is set to Review before sending, so nothing was said to you; raise its autonomy to Send automatically to hear about results like these.",
 		watches: ["scm.pull_request.ready"],
 		occasionedBy: "scm.pull_request.ready",
 		occasionedById: "sig-ready",
@@ -156,12 +155,12 @@ export const practiceTraceEntries = [
 		reviewId: "11111111-1111-1111-1111-111111111111",
 		observationCount: 2,
 		deliveredCount: 0,
-		withheldReasons: ["PRACTICE_TIER_QUIET"],
+		withheldReasons: ["PRACTICE_REQUIRES_APPROVAL"],
 	},
 	{
 		practiceSlug: "meaningful-commits",
 		practiceName: "Meaningful commit history",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "RUNNING",
 		explanation:
 			"A review started when the last commits landed and has not finished yet. Check back in a few minutes.",
@@ -176,7 +175,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "tests-accompany-behaviour",
 		practiceName: "Tests accompany behaviour changes",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "PENDING",
 		explanation:
 			"Queued behind the reviews already running for this workspace. It will start on its own; nothing is needed from you.",
@@ -192,7 +191,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "small-changes",
 		practiceName: "Small, reviewable changes",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "SKIPPED",
 		explanation:
 			"Skipped because this pull request was reviewed 40 minutes ago and the workspace's cooldown is one hour. The next push after that window will be reviewed.",
@@ -207,7 +206,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "migration-safety",
 		practiceName: "Migration safety",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "NOT_ASSESSABLE",
 		explanation:
 			"The diff for these commits could not be read, so this practice could not be judged either way. Re-run once the provider serves the diff again.",
@@ -223,7 +222,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "descriptive-pull-requests",
 		practiceName: "Descriptive pull requests",
-		reviewTier: "OFF",
+		autonomy: "OFF",
 		outcome: "TURNED_OFF",
 		explanation:
 			"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
@@ -235,7 +234,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "timely-review-response",
 		practiceName: "Timely review response",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "NOT_OCCASIONED",
 		explanation:
 			"Nothing this practice watches for has happened on this pull request yet. It reacts when a review is submitted.",
@@ -247,7 +246,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "discussion-hygiene",
 		practiceName: "Discussion hygiene",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "DORMANT",
 		explanation:
 			"This practice needs a chat integration, and this workspace has none connected. It will start answering once one is.",
@@ -259,7 +258,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "draft-not-left-open",
 		practiceName: "Drafts are not left open",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "LAPSED",
 		explanation:
 			"This one waited longer than the workspace allows before a reviewer was free, so the question expired unanswered. A new push will ask it again.",
@@ -274,7 +273,7 @@ export const practiceTraceEntries = [
 	{
 		practiceSlug: "dependency-risk",
 		practiceName: "Dependency risk",
-		reviewTier: "DELIVER",
+		autonomy: "AUTOMATIC",
 		outcome: "FAILED",
 		explanation:
 			"The review of this practice failed with an error and produced nothing. It will be retried on the next push; tell a workspace admin if it keeps failing.",
@@ -323,7 +322,7 @@ export const untouchedArtifactTrace = {
 		{
 			practiceSlug: "issue-hygiene",
 			practiceName: "Issue hygiene",
-			reviewTier: "OFF",
+			autonomy: "OFF",
 			outcome: "TURNED_OFF",
 			explanation:
 				"This workspace has turned this practice off, so it was not run. A workspace admin can turn it back on in the practice settings.",
@@ -357,7 +356,7 @@ export const documentArtifactTrace = {
 		{
 			practiceSlug: "written-for-a-newcomer",
 			practiceName: "Written for a newcomer",
-			reviewTier: "PROPOSE",
+			autonomy: "HUMAN_APPROVAL",
 			outcome: "REVIEWED",
 			explanation: "Assessed on this artifact.",
 			watches: ["docs.document.published"],
@@ -366,7 +365,7 @@ export const documentArtifactTrace = {
 			decidedAt: new Date("2026-08-03T14:19:00Z"),
 			observationCount: 3,
 			deliveredCount: 0,
-			withheldReasons: ["PRACTICE_TIER_QUIET"],
+			withheldReasons: ["PRACTICE_REQUIRES_APPROVAL"],
 		},
 	],
 } satisfies ArtifactTrace;

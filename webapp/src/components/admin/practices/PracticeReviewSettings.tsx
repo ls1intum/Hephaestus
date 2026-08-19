@@ -15,13 +15,9 @@ import {
 	FieldDescription,
 	FieldError,
 	FieldLabel,
-	FieldLegend,
-	FieldSet,
-	FieldTitle,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { reviewModelRunnable } from "./review/review-readiness";
@@ -54,13 +50,6 @@ export interface PracticeReviewSettingsProps {
 		onReset: (field: PracticeReviewField) => void;
 	};
 }
-
-const COVERAGE_ALL = "all";
-const COVERAGE_ROLE = "role";
-const COVERAGE_LABEL: Record<string, string> = {
-	[COVERAGE_ALL]: "All matching work",
-	[COVERAGE_ROLE]: "Only assignees with the review role",
-};
 
 /**
  * Sections rather than cards, and no rules between them: hierarchy is carried by the heading and the
@@ -342,8 +331,6 @@ function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "poli
 				</p>
 			</div>
 
-			<CoverageField policy={policy} />
-
 			<ScopeList
 				id="scope-branches"
 				label="Target branches"
@@ -403,66 +390,6 @@ function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "poli
 				/>
 			</Field>
 		</section>
-	);
-}
-
-/**
- * Two options, both of which need a sentence to be understood, so they are radio rows rather than a
- * closed menu: a select hides the option not chosen, and with it the reason to choose it.
- */
-function CoverageField({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
-	const settings = policy.settings;
-	const value = settings.runForAllUsers ? COVERAGE_ALL : COVERAGE_ROLE;
-
-	return (
-		<FieldSet>
-			<FieldLegend variant="label" id="policy-coverage-legend">
-				Eligible work
-			</FieldLegend>
-			{/* Named by the visible legend rather than by a second string of its own, so the group a
-			    screen reader announces is the one the page shows. */}
-			<RadioGroup
-				value={value}
-				disabled={policy.isSaving}
-				aria-labelledby="policy-coverage-legend"
-				onValueChange={(next) => {
-					if (next && next !== value) policy.onUpdate({ runForAllUsers: next === COVERAGE_ALL });
-				}}
-			>
-				<FieldLabel htmlFor="policy-coverage-all">
-					<Field orientation="horizontal">
-						<RadioGroupItem id="policy-coverage-all" value={COVERAGE_ALL} />
-						<FieldContent>
-							<FieldTitle>{COVERAGE_LABEL[COVERAGE_ALL]}</FieldTitle>
-							<FieldDescription>
-								Every piece of connected work a practice watches for, whoever it belongs to.
-							</FieldDescription>
-						</FieldContent>
-					</Field>
-				</FieldLabel>
-				<FieldLabel htmlFor="policy-coverage-role">
-					<Field orientation="horizontal">
-						<RadioGroupItem id="policy-coverage-role" value={COVERAGE_ROLE} />
-						<FieldContent>
-							<FieldTitle>{COVERAGE_LABEL[COVERAGE_ROLE]}</FieldTitle>
-							{/* The role is an account flag granted per person outside this workspace, so the copy
-							    says where it comes from rather than naming the product as its owner. */}
-							<FieldDescription>
-								A review starts only when an assignee holds the review role. An instance admin
-								grants that role per person; it is not set here.
-							</FieldDescription>
-						</FieldContent>
-					</Field>
-				</FieldLabel>
-			</RadioGroup>
-			<InheritedSettingHint
-				label="Eligible work"
-				overridden={settings.runForAllUsersOverride != null}
-				field="RUN_FOR_ALL_USERS"
-				inheritedValue={COVERAGE_LABEL[value]}
-				policy={policy}
-			/>
-		</FieldSet>
 	);
 }
 

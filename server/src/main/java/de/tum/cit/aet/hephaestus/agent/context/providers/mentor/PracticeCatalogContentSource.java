@@ -6,11 +6,11 @@ import de.tum.cit.aet.hephaestus.agent.context.ContextRequest.MentorChatRequest;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
-import de.tum.cit.aet.hephaestus.practices.model.FeedbackAdmission;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomyPolicy;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
@@ -90,18 +90,18 @@ public class PracticeCatalogContentSource implements ContentSource {
             .findById(workspaceId)
             .orElseThrow(() -> new EntityNotFoundException("Workspace", workspaceId.toString()));
 
-        // Only the practices this workspace may actually raise in a conversation. A PROPOSE practice is
+        // Only the practices this workspace may actually raise in a conversation. A HUMAN_APPROVAL practice is
         // deliberately silent everywhere, so putting it in the mentor's catalogue would hand the mentor a
-        // subject it is not allowed to raise, and an OFF practice is not reviewed at all. Tier is the
+        // subject it is not allowed to raise, and an OFF practice is not reviewed at all. Autonomy is the
         // effective one, resolved through the practice -> area -> workspace chain.
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(workspace);
         List<Practice> practices = practiceRepository
             .findByWorkspaceId(workspaceId)
             .stream()
             .filter(p ->
-                FeedbackAdmission.delivers(
+                PracticeAutonomyPolicy.delivers(
                     ObservationOrigin.LIVE,
-                    ReviewTierResolver.effectiveTierOf(p, defaults.defaultTier()),
+                    AutonomyResolver.effectiveAutonomyOf(p, defaults.defaultAutonomy()),
                     FeedbackChannel.IN_CHAT
                 )
             )

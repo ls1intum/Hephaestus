@@ -82,7 +82,7 @@ export const REVIEW_RUNNING_DEFS: StatusDefs<ReviewRunningTone> = {
 
 /**
  * Is this workspace reviewing anything? Every review control is otherwise a plausible-looking set of
- * settings that does nothing, and an admin can tune target branches and autonomy tiers for a long
+ * settings that does nothing, and an admin can tune target branches and autonomy settings for a long
  * time before finding that out.
  *
  * <p>The switch and the model are checked separately because they are fixed in different places. The

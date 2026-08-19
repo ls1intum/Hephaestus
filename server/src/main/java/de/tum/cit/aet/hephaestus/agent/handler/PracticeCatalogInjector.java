@@ -13,10 +13,10 @@ import de.tum.cit.aet.hephaestus.practices.PracticeEvidenceLimitation;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
@@ -176,21 +176,21 @@ class PracticeCatalogInjector {
     }
 
     /**
-     * The practices of one workspace and work type whose <em>effective</em> tier admits a review.
+     * The practices of one workspace and work type whose <em>effective</em> autonomy admits a review.
      *
-     * <p>Resolved in the JVM rather than filtered in SQL. A practice that holds no tier of its own inherits
-     * one, and a {@code review_tier <> 'OFF'} predicate answers UNKNOWN for it — so the SQL form silently
+     * <p>Resolved in the JVM rather than filtered in SQL. A practice that holds no autonomy of its own inherits
+     * one, and a {@code autonomy <> 'OFF'} predicate answers UNKNOWN for it — so the SQL form silently
      * dropped exactly the practices the inheritance chain exists to serve.
      */
     private List<Practice> reviewedPractices(Workspace workspace, ArtifactKind focus) {
         // By ID, not off the entity: the job's workspace association is lazy and the job is detached on
         // some paths, so reading the settings here would make the catalogue depend on whether the caller
         // holds a session.
-        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(workspace.getId()).defaultTier();
+        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspace.getId()).defaultAutonomy();
         return practiceRepository
             .findByWorkspaceIdAndArtifactKind(workspace.getId(), focus)
             .stream()
-            .filter(p -> ReviewTierResolver.effectiveTierOf(p, workspaceDefault).admitsReview())
+            .filter(p -> AutonomyResolver.effectiveAutonomyOf(p, workspaceDefault).admitsReview())
             .toList();
     }
 

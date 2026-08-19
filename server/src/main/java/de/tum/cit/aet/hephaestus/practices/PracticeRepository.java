@@ -3,7 +3,7 @@ package de.tum.cit.aet.hephaestus.practices;
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import jakarta.persistence.LockModeType;
 import java.util.List;
 import java.util.Optional;
@@ -23,43 +23,43 @@ import org.springframework.transaction.annotation.Transactional;
 )
 public interface PracticeRepository extends JpaRepository<Practice, Long> {
     /**
-     * Every practice of the workspace, at any tier — including {@code OFF}, so the detection gate can tell
+     * Every practice of the workspace, at any autonomy — including {@code OFF}, so the detection gate can tell
      * "nothing is bound to this signal" apart from "something is bound and turned off".
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceId(Long workspaceId);
 
     /**
-     * Every practice of the workspace for one work type, at any tier. Deliberately unfiltered: pushing
-     * {@code review_tier <> 'OFF'} into SQL is a trap once the column can be null, since
+     * Every practice of the workspace for one work type, at any autonomy. Deliberately unfiltered: pushing
+     * {@code autonomy <> 'OFF'} into SQL is a trap once the column can be null, since
      * {@code NULL <> 'OFF'} is UNKNOWN and an inheriting practice would silently vanish from the query.
-     * Tier is resolved in the JVM by {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
+     * Autonomy is resolved in the JVM by {@link de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver}.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     List<Practice> findByWorkspaceIdAndArtifactKind(Long workspaceId, ArtifactKind artifactKind);
 
     /**
-     * The raw tier columns of every practice in a workspace, with its area's, for callers that only need to
-     * count or test tiers without hydrating the whole catalogue.
+     * The raw autonomy columns of every practice in a workspace, with its area's, for callers that only need to
+     * count or test autonomy states without hydrating the whole catalogue.
      */
     @Query(
         """
-        SELECT p.reviewTier AS practiceTier, a.reviewTier AS areaTier,
+        SELECT p.autonomy AS practiceAutonomy, a.autonomy AS areaAutonomy,
                a.id AS areaId, p.artifactKind AS artifactKind
         FROM Practice p
         LEFT JOIN p.area a
         WHERE p.workspace.id = :workspaceId
         """
     )
-    List<PracticeTierRow> findReviewTierRows(@Param("workspaceId") Long workspaceId);
+    List<PracticeAutonomyRow> findAutonomyRows(@Param("workspaceId") Long workspaceId);
 
-    /** One practice's tier and its area's, without hydrating either entity. */
-    interface PracticeTierRow {
+    /** One practice's autonomy and its area's, without hydrating either entity. */
+    interface PracticeAutonomyRow {
         @Nullable
-        PracticeReviewTier getPracticeTier();
+        PracticeAutonomy getPracticeAutonomy();
 
         @Nullable
-        PracticeReviewTier getAreaTier();
+        PracticeAutonomy getAreaAutonomy();
 
         @Nullable
         Long getAreaId();
@@ -106,8 +106,8 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
     List<Long> findSourceAlignedV1PracticeIds();
 
     /**
-     * Every practice of a workspace in the order the admin catalogue shows them, areas first. No tier
-     * predicate: filtering to a tier means filtering to an <em>effective</em> tier, which is not a column
+     * Every practice of a workspace in the order the admin catalogue shows them, areas first. No autonomy
+     * predicate: filtering to an autonomy means filtering to an <em>effective</em> autonomy, which is not a column
      * on this row — the caller resolves, then filters.
      */
     @EntityGraph(attributePaths = { "area", "currentRevision" })

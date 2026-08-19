@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -164,23 +164,18 @@ public class PracticeAreaController {
         return ResponseEntity.ok(presenter.present(workspaceContext.id(), area));
     }
 
-    @PatchMapping("/{areaSlug}/review-tier")
+    @PatchMapping("/{areaSlug}/autonomy")
     @Operation(
         summary = "Set how much autonomy the system has over one area",
-        description = "Applies to every practice in the area that holds no tier of its own; practices that " +
-            "set their own are left alone. OFF stops their reviews entirely. PROPOSE runs them and records " +
-            "every observation, and sends nothing. DELIVER sends feedback without asking. Send a null " +
-            "tier to clear the area's own setting so it follows the workspace default."
+        description = "Applies to every practice in the area that holds no autonomy of its own; practices that " +
+            "set their own are left alone. OFF stops their reviews entirely. HUMAN_APPROVAL runs them and records " +
+            "every observation, and holds feedback for an authorized reviewer. AUTOMATIC sends feedback without asking. Send a null " +
+            "autonomy to clear the area's own setting so it follows the workspace default."
     )
     @ApiResponse(
         responseCode = "200",
-        description = "Tier updated; the response carries the tier now in force and where it came from",
+        description = "Autonomy updated; the response carries the autonomy now in force and where it came from",
         content = @Content(schema = @Schema(implementation = PracticeAreaDTO.class))
-    )
-    @ApiResponse(
-        responseCode = "400",
-        description = "PROPOSE cannot be selected yet: there is no approval queue for the feedback it would prepare",
-        content = @Content(schema = @Schema(hidden = true))
     )
     @ApiResponse(
         responseCode = "404",
@@ -189,12 +184,12 @@ public class PracticeAreaController {
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
-    public ResponseEntity<PracticeAreaDTO> setAreaReviewTier(
+    public ResponseEntity<PracticeAreaDTO> setAreaAutonomy(
         WorkspaceContext workspaceContext,
         @PathVariable String areaSlug,
-        @Valid @RequestBody UpdatePracticeReviewTierRequestDTO request
+        @Valid @RequestBody UpdatePracticeAutonomyRequestDTO request
     ) {
-        PracticeArea area = areaService.setReviewTier(workspaceContext, areaSlug, request.reviewTier());
+        PracticeArea area = areaService.setAutonomy(workspaceContext, areaSlug, request.autonomy());
         return ResponseEntity.ok(presenter.present(workspaceContext.id(), area));
     }
 

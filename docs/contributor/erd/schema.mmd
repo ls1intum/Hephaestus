@@ -362,6 +362,17 @@ erDiagram
         TIMESTAMPTZ delivered_at
     }
 
+    FeedbackApproval {
+        UUID id PK
+        UUID feedback_id FK,UK "NOT NULL"
+        BIGINT workspace_id "NOT NULL"
+        BIGINT actor_account_id FK
+        VARCHAR(16) decision "NOT NULL"
+        VARCHAR(32) rejection_reason
+        VARCHAR(64) content_digest "NOT NULL"
+        TIMESTAMPTZ decided_at "NOT NULL"
+    }
+
     FeedbackObservation {
         UUID feedback_id PK,FK
         UUID observation_id PK,FK
@@ -829,7 +840,7 @@ erDiagram
         VARCHAR(64) source_curated_slug
         VARCHAR(96) source_curated_fingerprint
         JSONB automated_review_policy "NOT NULL"
-        VARCHAR(16) review_tier
+        VARCHAR(16) autonomy
     }
 
     PracticeArea {
@@ -846,7 +857,7 @@ erDiagram
         VARCHAR(32) color
         VARCHAR(64) source_curated_slug
         VARCHAR(64) source_curated_fingerprint
-        VARCHAR(16) review_tier
+        VARCHAR(16) autonomy
     }
 
     PracticeCatalogInstallation {
@@ -1318,14 +1329,13 @@ erDiagram
         BOOLEAN practice_review_manual_trigger_enabled "NOT NULL"
         BOOLEAN mentor_enabled "NOT NULL"
         TIMESTAMPTZ leaderboard_league_cycle_at
-        BOOLEAN practice_run_for_all_users
         BOOLEAN practice_skip_drafts
         BOOLEAN practice_deliver_to_merged
         INTEGER practice_cooldown_minutes
         NUMERIC(10,2) monthly_llm_budget_usd
         NUMERIC(10,2) monthly_byo_llm_budget_usd
         JSONB practice_review_scope
-        VARCHAR(16) practice_default_review_tier
+        VARCHAR(16) practice_default_autonomy
     }
 
     WorkspaceAgentBinding {
@@ -1419,6 +1429,7 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessageVote : has
     DiscussionComment ||--|| Discussion : references
+    Feedback ||--|| FeedbackApproval : has
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed
@@ -1466,6 +1477,7 @@ erDiagram
     Feedback ||--o{ Feedback : references
     User ||--o{ Feedback : about_user_id
     Workspace ||--o{ Feedback : has
+    Account ||--o{ FeedbackApproval : has
     Feedback ||--o{ FeedbackPlacement : has
     ChatMessage ||--o{ FeedbackPlacement : has
     User ||--o{ GitCommit : authored_by

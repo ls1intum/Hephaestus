@@ -2,12 +2,14 @@ import {
 	BotMessageSquareIcon,
 	CircleAlertIcon,
 	CircleCheckIcon,
+	ClipboardCheckIcon,
 	ClockIcon,
 	EyeOffIcon,
 	HistoryIcon,
 	HourglassIcon,
 	MessageSquareDashedIcon,
 	UserRoundIcon,
+	XCircleIcon,
 } from "lucide-react";
 import type { ReviewFeedback } from "@/api/types.gen";
 import type { StatusDef, StatusDefs } from "./status-def";
@@ -25,6 +27,12 @@ export type DeliveryFacts = Pick<ReviewFeedback, "channel" | "deliveryState" | "
  * different things depending on the lane the unit went down, so both are refined per lane below.
  */
 export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
+	AWAITING_APPROVAL: {
+		label: "Awaiting approval",
+		icon: ClipboardCheckIcon,
+		badgeVariant: "secondary",
+		description: "An authorized reviewer must approve or reject it before anything is sent.",
+	},
 	DELIVERED: {
 		label: "Delivered",
 		icon: CircleCheckIcon,
@@ -58,6 +66,12 @@ export const DELIVERY_STATE_DEFS: StatusDefs<DeliveryState> = {
 		icon: CircleAlertIcon,
 		badgeVariant: "destructive",
 		description: "Sending was attempted and did not succeed.",
+	},
+	DISCARDED: {
+		label: "Rejected",
+		icon: XCircleIcon,
+		badgeVariant: "outline",
+		description: "An authorized reviewer decided this proposal should not be sent.",
 	},
 };
 

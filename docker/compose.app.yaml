@@ -4,11 +4,9 @@
 # does not receive it falls back to the built-in default and the operator's setting does nothing.
 x-practice-review-env: &practice-review-env
   # Auto-trigger is a per-workspace setting; this is the instance gate above it.
-  PRACTICE_REVIEW_RUN_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
   PRACTICE_REVIEW_DELIVER_TO_MERGED: ${PRACTICE_REVIEW_DELIVER_TO_MERGED:-false}
   PRACTICE_REVIEW_COOLDOWN_MINUTES: ${PRACTICE_REVIEW_COOLDOWN_MINUTES:-15}
   # Feature visibility, separate from the review gate above.
-  PRACTICE_REVIEW_FOR_ALL: ${PRACTICE_REVIEW_FOR_ALL:-false}
   PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR: ${PRACTICE_REVIEW_MAX_REQUESTS_PER_REQUESTER_PER_HOUR:-5}
   PRACTICE_REVIEW_PROGRESS_FOOTER: ${PRACTICE_REVIEW_PROGRESS_FOOTER:-false}
   PRACTICE_REVIEW_REACTION_SUPPRESSION: ${PRACTICE_REVIEW_REACTION_SUPPRESSION:-false}

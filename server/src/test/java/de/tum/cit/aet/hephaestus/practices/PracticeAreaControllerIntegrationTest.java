@@ -10,10 +10,10 @@ import de.tum.cit.aet.hephaestus.practices.dto.CreatePracticeAreaRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.ReorderPracticeAreasRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAreaRequestDTO;
-import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeReviewTierRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeAutonomyRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierSource;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomySource;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
 import de.tum.cit.aet.hephaestus.testconfig.WithMentorUser;
@@ -39,11 +39,11 @@ import org.springframework.test.web.reactive.server.WebTestClient;
  * Access-control coverage for {@link PracticeAreaController}.
  *
  * <p>Read operations are annotated {@code @SecurityRequirements} (any workspace member); the five
- * mutating operations (create / update / review-tier / reorder / delete) are
+ * mutating operations (create / update / review-autonomy / reorder / delete) are
  * {@code @RequireAtLeastWorkspaceAdmin}. These tests assert that a plain workspace MEMBER is forbidden on
  * every mutation and permitted on reads, and that anonymous callers are rejected. Functional CRUD
  * behaviour for the bind endpoint lives on {@code PracticeCatalogControllerIntegrationTest}; the
- * review-tier PATCH's own behaviour is pinned here, because the area is the middle level of the
+ * review-autonomy PATCH's own behaviour is pinned here, because the area is the middle level of the
  * inheritance chain and nothing else exercises it.
  */
 class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegrationTest {
@@ -523,32 +523,32 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         }
     }
 
-    // PATCH /{areaSlug}/review-tier — @RequireAtLeastWorkspaceAdmin
+    // PATCH /{areaSlug}/autonomy — @RequireAtLeastWorkspaceAdmin
 
     /**
      * The middle level of the practice → area → workspace chain. A null clears the area's own answer back
-     * to the workspace's, and re-sending the tier already in force does nothing at all — including to the
+     * to the workspace's, and re-sending the autonomy already in force does nothing at all — including to the
      * audit ledger.
      */
     @Nested
-    @DisplayName("PATCH /practice-areas/{areaSlug}/review-tier")
-    class SetAreaReviewTier {
+    @DisplayName("PATCH /practice-areas/{areaSlug}/autonomy")
+    class SetAreaAutonomy {
 
-        private PracticeArea persistAreaAt(String slug, @Nullable PracticeReviewTier tier) {
+        private PracticeArea persistAreaAt(String slug, @Nullable PracticeAutonomy autonomy) {
             PracticeArea area = persistArea(slug, "Area " + slug);
-            area.setReviewTier(tier);
+            area.setAutonomy(autonomy);
             return areaRepository.save(area);
         }
 
         /** Gives the workspace an opinion of its own, so "inherit" has something to resolve to. */
-        private void workspaceDefaultsTo(PracticeReviewTier tier) {
+        private void workspaceDefaultsTo(PracticeAutonomy autonomy) {
             Workspace stored = workspaceRepository.findById(workspace.getId()).orElseThrow();
-            stored.getReviewSettings().applyDefaultReviewTier(tier.name());
+            stored.getReviewSettings().applyDefaultAutonomy(autonomy.name());
             workspaceRepository.save(stored);
         }
 
-        private @Nullable PracticeReviewTier storedTierOf(String slug) {
-            return areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), slug).orElseThrow().getReviewTier();
+        private @Nullable PracticeAutonomy storedTierOf(String slug) {
+            return areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), slug).orElseThrow().getAutonomy();
         }
 
         /**
@@ -576,23 +576,23 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         }
 
         /**
-         * PROPOSE is included on purpose: refusing the middle rung would leave OFF/DELIVER, the on/off
-         * switch the tier chain exists to remove.
+         * HUMAN_APPROVAL is included on purpose: refusing the middle rung would leave OFF/AUTOMATIC, the on/off
+         * switch the autonomy chain exists to remove.
          */
         @ParameterizedTest
-        @EnumSource(PracticeReviewTier.class)
+        @EnumSource(PracticeAutonomy.class)
         @WithAdminUser
-        @DisplayName("sets the area's own tier and reports it as the area's decision, not an inheritance")
-        void shouldSetTheAreasOwnTier(PracticeReviewTier tier) {
+        @DisplayName("sets the area's own autonomy and reports it as the area's decision, not an inheritance")
+        void shouldSetTheAreasOwnAutonomy(PracticeAutonomy autonomy) {
             ensureAdminMembership(workspace);
             persistAreaAt("decides", null);
 
             PracticeAreaDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "decides")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "decides")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(tier))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(autonomy))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -601,27 +601,27 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(tier);
-            assertThat(result.reviewTier().override()).isEqualTo(tier);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.AREA);
-            assertThat(result.reviewTier().inherited()).isFalse();
-            assertThat(storedTierOf("decides")).isEqualTo(tier);
+            assertThat(result.autonomy().effective()).isEqualTo(autonomy);
+            assertThat(result.autonomy().override()).isEqualTo(autonomy);
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.AREA);
+            assertThat(result.autonomy().inherited()).isFalse();
+            assertThat(storedTierOf("decides")).isEqualTo(autonomy);
         }
 
         @Test
         @WithAdminUser
-        @DisplayName("an explicit null clears the area's tier back to inheriting the workspace's")
+        @DisplayName("an explicit null clears the area's autonomy back to inheriting the workspace's")
         void shouldClearToInheritOnExplicitNull() {
             ensureAdminMembership(workspace);
-            workspaceDefaultsTo(PracticeReviewTier.PROPOSE);
-            persistAreaAt("clear-me", PracticeReviewTier.OFF);
+            workspaceDefaultsTo(PracticeAutonomy.HUMAN_APPROVAL);
+            persistAreaAt("clear-me", PracticeAutonomy.OFF);
 
             PracticeAreaDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "clear-me")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "clear-me")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue("{\"reviewTier\": null}")
+                .bodyValue("{\"autonomy\": null}")
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -630,10 +630,10 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().override()).isNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
-            assertThat(result.reviewTier().inherited()).isTrue();
+            assertThat(result.autonomy().override()).isNull();
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.WORKSPACE);
+            assertThat(result.autonomy().inherited()).isTrue();
             assertThat(storedTierOf("clear-me")).isNull();
         }
 
@@ -644,15 +644,15 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
          */
         @Test
         @WithAdminUser
-        @DisplayName("an absent tier key clears just as an explicit null does")
+        @DisplayName("an absent autonomy key clears just as an explicit null does")
         void shouldClearToInheritWhenTheKeyIsAbsent() {
             ensureAdminMembership(workspace);
-            workspaceDefaultsTo(PracticeReviewTier.OFF);
-            persistAreaAt("absent-key", PracticeReviewTier.DELIVER);
+            workspaceDefaultsTo(PracticeAutonomy.OFF);
+            persistAreaAt("absent-key", PracticeAutonomy.AUTOMATIC);
 
             PracticeAreaDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "absent-key")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "absent-key")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
                 .bodyValue("{}")
@@ -664,31 +664,31 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().override()).isNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.OFF);
-            assertThat(result.reviewTier().source()).isEqualTo(ReviewTierSource.WORKSPACE);
+            assertThat(result.autonomy().override()).isNull();
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.OFF);
+            assertThat(result.autonomy().source()).isEqualTo(AutonomySource.WORKSPACE);
             assertThat(storedTierOf("absent-key")).isNull();
         }
 
         /**
-         * Re-sending the tier already in force short-circuits before the write. The observable is the audit
+         * Re-sending the autonomy already in force short-circuits before the write. The observable is the audit
          * ledger: a config change that did not happen must not be recorded as one, or a reviewer reading
          * the ledger sees a decision nobody made.
          */
         @Test
         @WithAdminUser
-        @DisplayName("re-sending the tier already in force records nothing in the audit ledger")
+        @DisplayName("re-sending the autonomy already in force records nothing in the audit ledger")
         void shouldBeIdempotentAndNotAudited() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistAreaAt("unchanged", PracticeReviewTier.PROPOSE);
+            PracticeArea area = persistAreaAt("unchanged", PracticeAutonomy.HUMAN_APPROVAL);
             long auditedBefore = auditedChangesTo(area);
 
             PracticeAreaDTO result = webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "unchanged")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "unchanged")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.PROPOSE))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.HUMAN_APPROVAL))
                 .exchange()
                 .expectStatus()
                 .isOk()
@@ -697,9 +697,9 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
                 .getResponseBody();
 
             assertThat(result).isNotNull();
-            assertThat(result.reviewTier().effective()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(result.reviewTier().override()).isEqualTo(PracticeReviewTier.PROPOSE);
-            assertThat(storedTierOf("unchanged")).isEqualTo(PracticeReviewTier.PROPOSE);
+            assertThat(result.autonomy().effective()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(result.autonomy().override()).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
+            assertThat(storedTierOf("unchanged")).isEqualTo(PracticeAutonomy.HUMAN_APPROVAL);
             assertThat(auditedChangesTo(area)).isEqualTo(auditedBefore);
         }
 
@@ -709,15 +709,15 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
         @DisplayName("a real change IS recorded in the audit ledger")
         void shouldAuditARealChange() {
             ensureAdminMembership(workspace);
-            PracticeArea area = persistAreaAt("changes", PracticeReviewTier.PROPOSE);
+            PracticeArea area = persistAreaAt("changes", PracticeAutonomy.HUMAN_APPROVAL);
             long auditedBefore = auditedChangesTo(area);
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "changes")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "changes")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isOk();
@@ -733,10 +733,10 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "no-such-area")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "no-such-area")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isNotFound();
@@ -744,22 +744,22 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
 
         @Test
         @WithMentorUser
-        @DisplayName("forbids a plain workspace member from setting an area's tier")
+        @DisplayName("forbids a plain workspace member from setting an area's autonomy")
         void shouldReturn403ForNonAdmin() {
             asMember();
-            persistAreaAt("forbidden-tier", PracticeReviewTier.DELIVER);
+            persistAreaAt("forbidden-autonomy", PracticeAutonomy.AUTOMATIC);
 
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "forbidden-tier")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "forbidden-autonomy")
                 .headers(TestAuthUtils.withCurrentUser())
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isForbidden();
 
-            assertThat(storedTierOf("forbidden-tier")).isEqualTo(PracticeReviewTier.DELIVER);
+            assertThat(storedTierOf("forbidden-autonomy")).isEqualTo(PracticeAutonomy.AUTOMATIC);
         }
 
         @Test
@@ -768,10 +768,10 @@ class PracticeAreaControllerIntegrationTest extends AbstractWorkspaceIntegration
             String csrf = TestAuthUtils.fetchCsrfToken(webTestClient);
             webTestClient
                 .patch()
-                .uri(BASE_URI + "/{areaSlug}/review-tier", workspace.getWorkspaceSlug(), "any-slug")
+                .uri(BASE_URI + "/{areaSlug}/autonomy", workspace.getWorkspaceSlug(), "any-slug")
                 .headers(TestAuthUtils.withCsrf(csrf))
                 .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(new UpdatePracticeReviewTierRequestDTO(PracticeReviewTier.OFF))
+                .bodyValue(new UpdatePracticeAutonomyRequestDTO(PracticeAutonomy.OFF))
                 .exchange()
                 .expectStatus()
                 .isUnauthorized();

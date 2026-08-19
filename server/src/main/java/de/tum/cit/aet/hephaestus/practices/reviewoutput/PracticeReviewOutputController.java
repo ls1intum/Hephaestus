@@ -1,5 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.reviewoutput;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
+import de.tum.cit.aet.hephaestus.core.security.SecurityUtils;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.FeedbackApprovalService;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.FeedbackApprovalDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewFeedbackDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewoutput.dto.ReviewObservationDTO;
@@ -27,6 +32,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
@@ -40,6 +46,7 @@ public class PracticeReviewOutputController {
 
     private final ReviewObservationQueryService observationQueryService;
     private final ReviewFeedbackQueryService feedbackQueryService;
+    private final FeedbackApprovalService feedbackApprovalService;
 
     @GetMapping("/observations")
     @Operation(
@@ -149,5 +156,32 @@ public class PracticeReviewOutputController {
         @PathVariable UUID feedbackId
     ) {
         return ResponseEntity.ok(feedbackQueryService.get(workspaceContext.id(), feedbackId));
+    }
+
+    @PutMapping("/feedback/{feedbackId}/approval")
+    @AuditExempt(reason = "The immutable feedback_approval row is the domain audit trail")
+    @Operation(summary = "Approve or reject an immutable feedback proposal", operationId = "decideFeedbackProposal")
+    public ResponseEntity<FeedbackApprovalDTO> decideFeedbackProposal(
+        WorkspaceContext workspaceContext,
+        @PathVariable UUID feedbackId,
+        @Valid @org.springframework.web.bind.annotation.RequestBody DecideFeedbackProposalRequestDTO request
+    ) {
+        long actorAccountId = SecurityUtils.getCurrentAccountId().orElseThrow();
+        return ResponseEntity.ok(
+            FeedbackApprovalDTO.from(
+                feedbackApprovalService.decide(workspaceContext.id(), feedbackId, actorAccountId, request)
+            )
+        );
+    }
+
+    @GetMapping("/feedback/{feedbackId}/approval")
+    @Operation(summary = "Get the decision for a feedback proposal", operationId = "getFeedbackProposalDecision")
+    public ResponseEntity<FeedbackApprovalDTO> getFeedbackProposalDecision(
+        WorkspaceContext workspaceContext,
+        @PathVariable UUID feedbackId
+    ) {
+        return ResponseEntity.ok(
+            FeedbackApprovalDTO.from(feedbackApprovalService.get(workspaceContext.id(), feedbackId))
+        );
     }
 }

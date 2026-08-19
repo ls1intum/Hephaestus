@@ -6,7 +6,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/u
 import { Item, ItemContent, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { REVIEW_TIER_DESCRIPTIONS, REVIEW_TIER_LABELS } from "@/lib/review-tiers";
+import { PRACTICE_AUTONOMY_DESCRIPTIONS, PRACTICE_AUTONOMY_LABELS } from "@/lib/practice-autonomy";
 import { TraceOutcomeBadge } from "./TraceOutcomeBadge";
 import { deliveryLabel, occurrenceDomId, WITHHELD_REASON_LABELS } from "./trace-format";
 
@@ -87,13 +87,13 @@ function TracePracticeEntry({ entry, occurrence }: TracePracticeEntryProps) {
 							<dd className="break-words">{deliveryLabel(entry)}</dd>
 						</div>
 						<div className="flex min-w-0 items-center gap-1">
-							<dt className="sr-only">Loudness tier</dt>
+							<dt className="sr-only">Autonomy</dt>
 							<dd>
 								<Tooltip>
 									<TooltipTrigger className="cursor-help underline decoration-dotted underline-offset-4">
-										{REVIEW_TIER_LABELS[entry.reviewTier]}
+										{PRACTICE_AUTONOMY_LABELS[entry.autonomy]}
 									</TooltipTrigger>
-									<TooltipContent>{REVIEW_TIER_DESCRIPTIONS[entry.reviewTier]}</TooltipContent>
+									<TooltipContent>{PRACTICE_AUTONOMY_DESCRIPTIONS[entry.autonomy]}</TooltipContent>
 								</Tooltip>
 							</dd>
 						</div>

@@ -32,13 +32,11 @@ public enum FeedbackSuppressionReason {
     /** The composed body sanitised to blank and no inline note was placed. */
     EMPTY_AFTER_SANITIZE,
     INSTANCE_SILENCED,
+    WORKSPACE_DISABLED,
+    APPROVAL_STALE,
+    PRACTICE_REQUIRES_APPROVAL,
     /**
-     * The practice's autonomy tier does not admit this channel: measured and recorded, but never said out
-     * loud. Written rather than dropped so "we chose to stay quiet" reads differently from "we missed it".
-     */
-    PRACTICE_TIER_QUIET,
-    /**
-     * Like {@link #PRACTICE_TIER_QUIET}, but for a backfill campaign: measured retrospectively, so it is
+     * Like {@link #PRACTICE_REQUIRES_APPROVAL}, but for a backfill campaign: measured retrospectively, so it is
      * not said out loud where it would read as today's work.
      *
      * <p>The in-app lane holds a backfill back too, under its own name

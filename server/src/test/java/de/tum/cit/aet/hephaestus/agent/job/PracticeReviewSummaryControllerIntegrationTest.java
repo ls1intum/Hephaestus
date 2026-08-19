@@ -16,7 +16,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
 import de.tum.cit.aet.hephaestus.testconfig.WithAdminUser;
@@ -354,7 +354,7 @@ class PracticeReviewSummaryControllerIntegrationTest extends AbstractWorkspaceIn
         result.setName("Review quality");
         result.setCriteria("Review the change");
         result.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
-        result.setReviewTier(PracticeReviewTier.DELIVER);
+        result.setAutonomy(PracticeAutonomy.AUTOMATIC);
         return practiceRepository.save(result);
     }
 

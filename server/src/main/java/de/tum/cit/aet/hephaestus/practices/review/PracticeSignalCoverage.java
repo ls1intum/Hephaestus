@@ -8,8 +8,8 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeSignalOptions;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -90,9 +90,9 @@ public class PracticeSignalCoverage {
     public List<DormantBinding> dormantBindings(long workspaceId) {
         Set<SignalName> connected = coverage.connectedCoverage(workspaceId);
         List<DormantBinding> dormant = new ArrayList<>();
-        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultTier();
+        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
         for (Practice practice : practices.findByWorkspaceId(workspaceId)) {
-            if (!ReviewTierResolver.effectiveTierOf(practice, workspaceDefault).admitsReview()) {
+            if (!AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault).admitsReview()) {
                 continue;
             }
             Set<SignalName> bound = signalsOf(practice);

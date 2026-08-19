@@ -2,14 +2,14 @@ import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
-import { buildAutonomyFixture } from "@/components/admin/practices/review-autonomy/story-mock-data";
+import { buildAutonomyFixture } from "@/components/admin/practices/practice-autonomy/story-mock-data";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
 
 const fixture = buildAutonomyFixture({
-	workspaceDefault: "PROPOSE",
+	workspaceDefault: "HUMAN_APPROVAL",
 	areas: [
 		{
 			slug: "hygiene",
@@ -29,7 +29,7 @@ function stubWorkspace(extra: Parameters<typeof server.use>) {
 		http.get("*/workspaces/:workspaceSlug/practices/review-settings", () =>
 			HttpResponse.json(fixture.settings),
 		),
-		http.get("*/workspaces/:workspaceSlug/practices/review-tiers", () =>
+		http.get("*/workspaces/:workspaceSlug/practices/autonomy", () =>
 			HttpResponse.json(fixture.rollup),
 		),
 		http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json(fixture.practices)),
@@ -49,8 +49,8 @@ describe("review route", () => {
 		// over, on purpose: once for the workspace in the strip that stays on screen, once for the only
 		// area, which happens to hold every practice. The strip's copy carries a second sentence — how
 		// many of those counts somebody chose one at a time — which the area heading has no room for.
-		screen.getByText("2 practices: 1 off and 1 propose. 1 practice set by hand.");
-		screen.getByText("2 practices: 1 off and 1 propose.");
+		screen.getByText("2 practices: 1 off and 1 review before sending. 1 practice set by hand.");
+		screen.getByText("2 practices: 1 off and 1 review before sending.");
 		expect(screen.queryByText("States the motivation")).toBeNull();
 	});
 
@@ -89,7 +89,7 @@ describe("review route", () => {
 				return HttpResponse.json(body);
 			});
 		stubWorkspace([
-			recorded("*/workspaces/:workspaceSlug/practices/review-tiers", fixture.rollup),
+			recorded("*/workspaces/:workspaceSlug/practices/autonomy", fixture.rollup),
 			recorded("*/workspaces/:workspaceSlug/practices/backfill-runs", []),
 		]);
 
@@ -99,12 +99,12 @@ describe("review route", () => {
 			() => expect(requested.some((path) => path.endsWith("/backfill-runs"))).toBe(true),
 			ROUTE_RENDER_WAIT,
 		);
-		expect(requested.some((path) => path.endsWith("/review-tiers"))).toBe(false);
+		expect(requested.some((path) => path.endsWith("/autonomy"))).toBe(false);
 
 		await userEvent.click(screen.getByRole("tab", { name: "How much" }));
 
 		await waitFor(
-			() => expect(requested.some((path) => path.endsWith("/review-tiers"))).toBe(true),
+			() => expect(requested.some((path) => path.endsWith("/autonomy"))).toBe(true),
 			ROUTE_RENDER_WAIT,
 		);
 	});
@@ -122,20 +122,20 @@ describe("review route", () => {
 	});
 
 	/**
-	 * The one wire detail a screen can get wrong silently. The generated request types the tier as
-	 * optional rather than nullable, and the server reads an absent field as "hold no tier here and
+	 * The one wire detail a screen can get wrong silently. The generated request types the autonomy as
+	 * optional rather than nullable, and the server reads an absent field as "hold no autonomy here and
 	 * inherit" — so clearing an override means omitting the key, not sending `null`.
 	 */
-	it("clears an override by omitting the tier, not by sending null", async () => {
+	it("clears an override by omitting the autonomy, not by sending null", async () => {
 		const bodies: Array<Record<string, unknown>> = [];
 		stubWorkspace([
 			http.patch(
-				"*/workspaces/:workspaceSlug/practices/:practiceSlug/review-tier",
+				"*/workspaces/:workspaceSlug/practices/:practiceSlug/autonomy",
 				async ({ request }) => {
 					bodies.push((await request.json()) as Record<string, unknown>);
 					return HttpResponse.json({
 						...fixture.practices[1],
-						reviewTier: { effective: "PROPOSE", source: "AREA", inherited: true },
+						autonomy: { effective: "HUMAN_APPROVAL", source: "AREA", inherited: true },
 					});
 				},
 			),
@@ -160,6 +160,6 @@ describe("review route", () => {
 
 		await waitFor(() => expect(bodies).toHaveLength(1));
 		expect(bodies[0]).toEqual({});
-		expect("reviewTier" in bodies[0]).toBe(false);
+		expect("autonomy" in bodies[0]).toBe(false);
 	});
 });

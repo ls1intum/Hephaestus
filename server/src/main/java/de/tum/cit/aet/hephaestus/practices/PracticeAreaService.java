@@ -7,7 +7,7 @@ import de.tum.cit.aet.hephaestus.core.exception.DataIntegrityViolationConstraint
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
@@ -160,24 +160,24 @@ public class PracticeAreaService {
     }
 
     /**
-     * Sets — or clears — the tier this area imposes on the practices under it that hold no tier of their own.
+     * Sets — or clears — the autonomy this area imposes on the practices under it that hold no autonomy of their own.
      *
      * <p>The level that makes the chain worth having. An area is the grain a team reasons in, so one write
      * here settles what would otherwise be one write per practice under it. Practices that set their own
-     * tier are untouched: they disagreed on purpose, and an area-wide setting is not a reason to overrule
+     * autonomy are untouched: they disagreed on purpose, and an area-wide setting is not a reason to overrule
      * them.
      *
-     * @param reviewTier the tier to impose, or {@code null} to hold none and follow the workspace default
+     * @param autonomy the autonomy to impose, or {@code null} to hold none and follow the workspace default
      */
     @Transactional
-    public PracticeArea setReviewTier(WorkspaceContext ctx, String slug, @Nullable PracticeReviewTier reviewTier) {
+    public PracticeArea setAutonomy(WorkspaceContext ctx, String slug, @Nullable PracticeAutonomy autonomy) {
         lockWorkspace(ctx);
         PracticeArea area = getArea(ctx, slug);
-        if (area.getReviewTier() == reviewTier) {
+        if (area.getAutonomy() == autonomy) {
             return area;
         }
         PracticeAreaSnapshot before = PracticeAreaSnapshot.of(area);
-        area.setReviewTier(reviewTier);
+        area.setAutonomy(autonomy);
         area = practiceAreaRepository.save(area);
         configAudit.record(
             ConfigAuditEntry.updated(

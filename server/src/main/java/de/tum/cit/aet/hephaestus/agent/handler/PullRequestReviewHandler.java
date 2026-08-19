@@ -329,6 +329,10 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             .toList();
         if (scopedObservations.isEmpty()) throw new JobDeliveryException("Admitted observation set is empty");
         String unifiedDiff = capturedDiff(job);
+        List<PracticeDetectionResultParser.ValidatedObservation> proposals = inContextDeliveryGate.awaitingApproval(
+            job,
+            scopedObservations
+        );
         List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
             job,
             scopedObservations
@@ -338,6 +342,11 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             .deliverable();
         List<ComposedFeedbackUnit> units = compositionResultParser.parse(job.getOutput(), FeedbackChannel.IN_CONTEXT);
         Map<String, String> why = practiceCatalogInjector.whyBySlug(job.getWorkspace(), ArtifactKinds.PULL_REQUEST);
+        feedbackService.recordProposal(
+            job,
+            DeliveryComposer.compose(proposals, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units),
+            proposals
+        );
         var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units);
         feedbackService.deliverFeedback(job, content, delivered ->
             DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units)
@@ -498,23 +507,17 @@ public class PullRequestReviewHandler implements JobTypeHandler {
 
         if (admissionOnly) return;
 
-        // Loudness tier BEFORE the reaction filter (ADR 0021): the workspace's standing policy on how loud
-        // a practice may be settles first, so an observation it already chose not to place on the artifact is
-        // never also charged to the developer's own per-locus reaction history. Runs AFTER deliver()
-        // because recurrence_key is persisted there; before compose() so the drop reaches both the summary
-        // and the inline notes.
-        List<PracticeDetectionResultParser.ValidatedObservation> loudEnough = inContextDeliveryGate.admitInContext(
-            job,
-            scopedObservations
-        );
-        if (loudEnough.isEmpty() && !scopedObservations.isEmpty()) {
-            // The observations are persisted and the SUPPRESSED rows are written; posting an empty summary
-            // would be the noise the tier was turned down to avoid.
-            log.info("All {} observations withheld by loudness tier: jobId={}", scopedObservations.size(), job.getId());
+        List<PracticeDetectionResultParser.ValidatedObservation> admittedInContext =
+            inContextDeliveryGate.admitInContext(job, scopedObservations);
+        if (admittedInContext.isEmpty() && !scopedObservations.isEmpty()) {
+            log.info("All {} observations withheld by autonomy: jobId={}", scopedObservations.size(), job.getId());
             return;
         }
 
-        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(job, loudEnough);
+        ReactionSuppressionFilter.ReactionDecision reactions = reactionSuppressionFilter.evaluate(
+            job,
+            admittedInContext
+        );
         List<PracticeDetectionResultParser.ValidatedObservation> deliverable = reactions.deliverable();
         if (deliverable.isEmpty() && !scopedObservations.isEmpty()) {
             // A SUCCESS (the student told us to stop nagging), not a delivery failure: the SUPPRESSED

@@ -14,7 +14,7 @@ const EXPECTED_HREFS: Partial<Record<SignalStateReason, string>> = {
 	GATE_SKIPPED: "/w/demo/admin/practices/review?section=when-and-where",
 	OUT_OF_REVIEW_SCOPE: "/w/demo/admin/practices/review?section=when-and-where",
 	PRACTICES_DISABLED: "/w/demo/admin/practices/review?section=when-and-where",
-	PRACTICE_TIER_OFF: "/w/demo/admin/practices/review",
+	PRACTICE_AUTONOMY_OFF: "/w/demo/admin/practices/review",
 	NO_ACTIVE_PRACTICE: "/w/demo/admin/practices",
 	REVIEW_MODEL_UNBOUND: "/w/demo/admin/models",
 	MODEL_UNAVAILABLE: "/w/demo/admin/models",

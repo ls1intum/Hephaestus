@@ -9,8 +9,8 @@
  * same module.
  *
  * <p>Sub-packages expose narrow APIs via {@link org.springframework.modulith.NamedInterface}:
- * {@code model}, {@code spi}, {@code review}, {@code review.tier}, {@code observation}, {@code feedback},
- * and {@code observation.reaction}. {@code review.tier} carries the practice → area → workspace resolution
+ * {@code model}, {@code spi}, {@code review}, {@code review.autonomy}, {@code observation}, {@code feedback},
+ * and {@code observation.reaction}. {@code review.autonomy} carries the practice → area → workspace resolution
  * the agent module needs at both delivery gates; note that a nested package is a boundary of its own to
  * Modulith rather than part of its parent's grant. The latter two let the {@code agent} delivery layer write the
  * delivered-feedback ledger and read reactions for re-nag suppression; the {@code observation.reaction}

@@ -18,13 +18,13 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ArtifactFeedbackRow;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.ArtifactObservationRow;
 import de.tum.cit.aet.hephaestus.practices.review.DormantBinding;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeSignalCoverage;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewOutcomeLookup.ReviewOutcome;
 import de.tum.cit.aet.hephaestus.practices.trace.TraceInputs.PracticeOutput;
@@ -171,9 +171,9 @@ class ArtifactTraceQueryService {
      */
     private List<TracedPractice> tracedPractices(Long workspaceId, ArtifactKind artifactKind) {
         Map<Long, String> dormancy = dormancyContradictedByTheLedger(workspaceId, artifactKind);
-        // The tier the trace shows is the EFFECTIVE one. A reader asking why a practice said nothing is
+        // The autonomy the trace shows is the EFFECTIVE one. A reader asking why a practice said nothing is
         // asking what is in force here, not which of the three levels happens to hold the row.
-        PracticeReviewTier workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultTier();
+        PracticeAutonomy workspaceDefault = workspaceDefaults.forWorkspace(workspaceId).defaultAutonomy();
         return practices
             .findByWorkspaceId(workspaceId)
             .stream()
@@ -183,7 +183,7 @@ class ArtifactTraceQueryService {
                     practice.getId(),
                     practice.getSlug(),
                     practice.getName(),
-                    ReviewTierResolver.effectiveTierOf(practice, workspaceDefault),
+                    AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault),
                     watches(practice),
                     dormancy.get(practice.getId())
                 )

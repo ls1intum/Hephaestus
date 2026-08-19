@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.signal.ScmSignals;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.testconfig.BaseIntegrationTest;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -54,12 +54,12 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         return practice;
     }
 
-    private PracticeArea persistArea(String slug, PracticeReviewTier reviewTier, int displayOrder) {
+    private PracticeArea persistArea(String slug, PracticeAutonomy autonomy, int displayOrder) {
         PracticeArea area = new PracticeArea();
         area.setWorkspace(workspace);
         area.setSlug(slug);
         area.setName("Area " + slug);
-        area.setReviewTier(reviewTier);
+        area.setAutonomy(autonomy);
         area.setDisplayOrder(displayOrder);
         return practiceAreaRepository.save(area);
     }
@@ -71,7 +71,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void savesAndRetrieves() {
             Practice practice = createPractice("test-slug", "Test Practice");
             practice.setCriteria("Check for quality");
-            practice.setReviewTier(PracticeReviewTier.OFF);
+            practice.setAutonomy(PracticeAutonomy.OFF);
 
             Practice saved = practiceRepository.save(practice);
 
@@ -84,7 +84,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             assertThat(found.getName()).isEqualTo("Test Practice");
             assertThat(found.getBindings()).isEqualTo(saved.getBindings());
             assertThat(found.getCriteria()).isEqualTo("Check for quality");
-            assertThat(found.getReviewTier()).isEqualTo(PracticeReviewTier.OFF);
+            assertThat(found.getAutonomy()).isEqualTo(PracticeAutonomy.OFF);
         }
     }
 
@@ -120,7 +120,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
     class QueryTests {
 
         /**
-         * The gate reads the whole catalogue, at every tier, on purpose: it has to tell "nothing is bound
+         * The gate reads the whole catalogue, at every autonomy, on purpose: it has to tell "nothing is bound
          * to this signal" apart from "something is bound and the workspace turned it off", which are
          * different answers to "why did nothing happen" and get different recorded reasons.
          */
@@ -128,7 +128,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         void findsEveryPracticeOfTheWorkspaceWhateverItsTier() {
             Practice loud = createPractice("loud", "Loud");
             Practice silent = createPractice("silent", "Silent");
-            silent.setReviewTier(PracticeReviewTier.OFF);
+            silent.setAutonomy(PracticeAutonomy.OFF);
             practiceRepository.save(loud);
             practiceRepository.save(silent);
 
@@ -138,20 +138,20 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * The work-type finder narrows by kind of work and by nothing else — tier resolution happens in
-         * the JVM, not SQL. A {@code review_tier <> 'OFF'} predicate here would silently drop every
+         * The work-type finder narrows by kind of work and by nothing else — autonomy resolution happens in
+         * the JVM, not SQL. A {@code autonomy <> 'OFF'} predicate here would silently drop every
          * inheriting (NULL) practice, since {@code NULL <> 'OFF'} is UNKNOWN in SQL.
          */
         @Test
-        @DisplayName("findByWorkspaceIdAndArtifactKind returns every tier, including the inheriting NULL")
+        @DisplayName("findByWorkspaceIdAndArtifactKind returns every autonomy, including the inheriting NULL")
         void workTypeQueryReturnsEveryTierIncludingTheInheritingOnes() {
             Practice loud = createPractice("loud", "Loud");
-            loud.setReviewTier(PracticeReviewTier.DELIVER);
+            loud.setAutonomy(PracticeAutonomy.AUTOMATIC);
             Practice observed = createPractice("observed", "Observed");
-            observed.setReviewTier(PracticeReviewTier.PROPOSE);
+            observed.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
             Practice silent = createPractice("silent", "Silent");
-            silent.setReviewTier(PracticeReviewTier.OFF);
-            // Holds no tier of its own — the inheriting case a `<> 'OFF'` predicate would silently drop.
+            silent.setAutonomy(PracticeAutonomy.OFF);
+            // Holds no autonomy of its own — the inheriting case a `<> 'OFF'` predicate would silently drop.
             Practice inheriting = createPractice("inheriting", "Inheriting");
             practiceRepository.saveAll(List.of(loud, observed, silent, inheriting));
 
@@ -183,18 +183,18 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
         }
 
         /**
-         * The tier rows are what the rollup and the "is anything switched on here" check read instead of
+         * The autonomy rows are what the rollup and the "is anything switched on here" check read instead of
          * hydrating the catalogue. They carry both levels of the chain raw — a null means "this level
          * decided nothing", which the resolver needs in order to fall through to the next one, so a
          * projection that turned it into a value would resolve the chain wrongly and silently.
          */
         @Test
-        @DisplayName("findReviewTierRows carries the practice's tier and its area's, nulls kept as nulls")
-        void reviewTierRowsCarryBothLevelsAndKeepTheirNulls() {
-            PracticeArea silencedArea = persistArea("silenced-area", PracticeReviewTier.OFF, 0);
+        @DisplayName("findAutonomyRows carries the practice's autonomy and its area's, nulls kept as nulls")
+        void autonomyRowsCarryBothLevelsAndKeepTheirNulls() {
+            PracticeArea silencedArea = persistArea("silenced-area", PracticeAutonomy.OFF, 0);
             PracticeArea undecidedArea = persistArea("undecided-area", null, 1);
-            Practice ownTier = createPractice("own-tier", "Own tier");
-            ownTier.setReviewTier(PracticeReviewTier.PROPOSE);
+            Practice ownTier = createPractice("own-autonomy", "Own autonomy");
+            ownTier.setAutonomy(PracticeAutonomy.HUMAN_APPROVAL);
             ownTier.setArea(silencedArea);
             Practice fromArea = createPractice("from-area", "From area");
             fromArea.setArea(silencedArea);
@@ -203,23 +203,23 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             Practice unfiled = createPractice("unfiled", "Unfiled");
             practiceRepository.saveAll(List.of(ownTier, fromArea, fromWorkspace, unfiled));
 
-            List<PracticeRepository.PracticeTierRow> rows = practiceRepository.findReviewTierRows(workspace.getId());
+            List<PracticeRepository.PracticeAutonomyRow> rows = practiceRepository.findAutonomyRows(workspace.getId());
 
             assertThat(rows)
                 .extracting(
-                    PracticeRepository.PracticeTierRow::getPracticeTier,
-                    PracticeRepository.PracticeTierRow::getAreaTier,
-                    PracticeRepository.PracticeTierRow::getAreaId,
-                    PracticeRepository.PracticeTierRow::getArtifactKind
+                    PracticeRepository.PracticeAutonomyRow::getPracticeAutonomy,
+                    PracticeRepository.PracticeAutonomyRow::getAreaAutonomy,
+                    PracticeRepository.PracticeAutonomyRow::getAreaId,
+                    PracticeRepository.PracticeAutonomyRow::getArtifactKind
                 )
                 .containsExactlyInAnyOrder(
                     tuple(
-                        PracticeReviewTier.PROPOSE,
-                        PracticeReviewTier.OFF,
+                        PracticeAutonomy.HUMAN_APPROVAL,
+                        PracticeAutonomy.OFF,
                         silencedArea.getId(),
                         ArtifactKinds.PULL_REQUEST
                     ),
-                    tuple(null, PracticeReviewTier.OFF, silencedArea.getId(), ArtifactKinds.PULL_REQUEST),
+                    tuple(null, PracticeAutonomy.OFF, silencedArea.getId(), ArtifactKinds.PULL_REQUEST),
                     tuple(null, null, undecidedArea.getId(), ArtifactKinds.PULL_REQUEST),
                     // No area at all: the chain falls straight through to the workspace.
                     tuple(null, null, null, ArtifactKinds.PULL_REQUEST)
@@ -235,7 +235,7 @@ class PracticeRepositoryIntegrationTest extends BaseIntegrationTest {
             inSecond.setArea(second);
             Practice inFirst = createPractice("in-first", "In first");
             inFirst.setArea(first);
-            // Holds no tier: findByFilters' `p.reviewTier = :reviewTier` could never have matched it.
+            // Holds no autonomy: findByFilters' `p.autonomy = :autonomy` could never have matched it.
             Practice unfiled = createPractice("unfiled", "Unfiled");
             practiceRepository.saveAll(List.of(inSecond, inFirst, unfiled));
 

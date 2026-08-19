@@ -26,10 +26,10 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
@@ -281,8 +281,8 @@ public class AgentJobService {
                 );
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
             }
-            // Resolved, not filtered in SQL: a practice that inherits its tier stores NULL, and
-            // `review_tier <> 'OFF'` answers UNKNOWN for it, which would refuse review for every
+            // Resolved, not filtered in SQL: a practice that inherits its autonomy stores NULL, and
+            // `autonomy <> 'OFF'` answers UNKNOWN for it, which would refuse review for every
             // workspace that left a practice to inherit.
             if (!hasReviewablePractice(currentWorkspace, artifactKind)) {
                 log.debug(
@@ -415,16 +415,16 @@ public class AgentJobService {
         return SubmissionOutcome.refused(reason);
     }
 
-    /** Whether any practice of this work type resolves to a tier that admits a review. */
+    /** Whether any practice of this work type resolves to an autonomy that admits a review. */
     private boolean hasReviewablePractice(Workspace workspace, ArtifactKind artifactKind) {
-        PracticeReviewTier workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultTier();
+        PracticeAutonomy workspaceDefault = WorkspaceReviewDefaults.of(workspace).defaultAutonomy();
         return practiceRepository
-            .findReviewTierRows(workspace.getId())
+            .findAutonomyRows(workspace.getId())
             .stream()
             .filter(row -> artifactKind.equals(row.getArtifactKind()))
             .anyMatch(row ->
-                ReviewTierResolver.resolvePractice(row.getPracticeTier(), row.getAreaTier(), workspaceDefault)
-                    .tier()
+                AutonomyResolver.resolvePractice(row.getPracticeAutonomy(), row.getAreaAutonomy(), workspaceDefault)
+                    .autonomy()
                     .admitsReview()
             );
     }

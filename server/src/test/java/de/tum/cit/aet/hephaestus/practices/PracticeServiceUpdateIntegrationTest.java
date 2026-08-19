@@ -9,7 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.dto.UpdatePracticeRequestDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -74,7 +74,7 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
         );
         practice.setCriteria("Assess the review");
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         return practiceRepository.save(practice);
     }
 
@@ -200,7 +200,7 @@ class PracticeServiceUpdateIntegrationTest extends AbstractWorkspaceIntegrationT
         practice.setBindings(PracticeTestEvidence.bindings(ScmSignals.PULL_REQUEST_OPENED));
         practice.setCriteria("Assess the review");
         practice.setAutomatedReviewPolicy(PracticeTestEvidence.forArtifact(ArtifactKinds.PULL_REQUEST));
-        practice.setReviewTier(PracticeReviewTier.DELIVER);
+        practice.setAutonomy(PracticeAutonomy.AUTOMATIC);
         practiceRepository.save(practice);
 
         assertThatCode(() ->

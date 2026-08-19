@@ -8,7 +8,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
@@ -29,7 +29,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @Test
     void admitsACorroboratedLivePatternNobodyHasBeenShownLately() {
         assertThat(
-            route(problems(2, ObservationOrigin.LIVE), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, null)
+            route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)
         ).isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
@@ -41,7 +41,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
             InAppFeedbackRouter.route(
                 incomplete,
                 problems(2, ObservationOrigin.LIVE),
-                PracticeReviewTier.DELIVER,
+                PracticeAutonomy.AUTOMATIC,
                 ActorRole.AUTHOR,
                 null,
                 NOW
@@ -58,7 +58,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @Test
     void refusesAPracticeThatJudgesSomebodyOtherThanTheAuthor() {
         assertThat(
-            route(problems(5, ObservationOrigin.LIVE), PracticeReviewTier.DELIVER, ActorRole.REVIEWER, null)
+            route(problems(5, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.REVIEWER, null)
         ).isEqualTo(InAppRoutingDecision.REVIEWER_ATTRIBUTED);
     }
 
@@ -66,7 +66,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     void refusesAPracticeWithNoProblemsBehindIt() {
         Observation strength = observation(1L, ObservationOrigin.LIVE, Assessment.GOOD);
 
-        assertThat(route(List.of(strength), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, null)).isEqualTo(
+        assertThat(route(List.of(strength), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)).isEqualTo(
             InAppRoutingDecision.NO_EVIDENCE
         );
     }
@@ -74,15 +74,15 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @Test
     void refusesAPracticeWhoseTierDoesNotAdmitTheLane() {
         assertThat(
-            route(problems(2, ObservationOrigin.LIVE), PracticeReviewTier.PROPOSE, ActorRole.AUTHOR, null)
-        ).isEqualTo(InAppRoutingDecision.PRACTICE_TIER_QUIET);
+            route(problems(2, ObservationOrigin.LIVE), PracticeAutonomy.HUMAN_APPROVAL, ActorRole.AUTHOR, null)
+        ).isEqualTo(InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
     /** The day-one bound: a sweep over a year of finished work does not become a wall of feedback. */
     @Test
     void refusesAPatternWhoseEveryMeasurementCameFromABackfill() {
         assertThat(
-            route(problems(4, ObservationOrigin.BACKFILL), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, null)
+            route(problems(4, ObservationOrigin.BACKFILL), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)
         ).isEqualTo(InAppRoutingDecision.BACKFILL_HELD);
     }
 
@@ -92,7 +92,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Observation backfilled = observation(1L, ObservationOrigin.BACKFILL, Assessment.BAD);
         Observation live = observation(2L, ObservationOrigin.LIVE, Assessment.BAD);
 
-        assertThat(route(List.of(backfilled, live), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, null)).isEqualTo(
+        assertThat(route(List.of(backfilled, live), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)).isEqualTo(
             InAppRoutingDecision.ADMIT
         );
     }
@@ -101,7 +101,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
     @Test
     void refusesAProblemSeenOnOnlyOnePieceOfWork() {
         assertThat(
-            route(problems(1, ObservationOrigin.LIVE), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, null)
+            route(problems(1, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)
         ).isEqualTo(InAppRoutingDecision.UNCORROBORATED);
     }
 
@@ -111,7 +111,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Observation first = observation(42L, ObservationOrigin.LIVE, Assessment.BAD);
         Observation second = observation(42L, ObservationOrigin.LIVE, Assessment.BAD);
 
-        assertThat(route(List.of(first, second), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, null)).isEqualTo(
+        assertThat(route(List.of(first, second), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, null)).isEqualTo(
             InAppRoutingDecision.UNCORROBORATED
         );
     }
@@ -121,7 +121,7 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Instant yesterday = NOW.minus(Duration.ofDays(1));
 
         assertThat(
-            route(problems(3, ObservationOrigin.LIVE), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, yesterday)
+            route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, yesterday)
         ).isEqualTo(InAppRoutingDecision.RECENTLY_SURFACED);
     }
 
@@ -130,18 +130,14 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
         Instant longAgo = NOW.minus(Duration.ofDays(InAppFeedbackRouter.RESURFACE_COOLDOWN_DAYS + 1));
 
         assertThat(
-            route(problems(3, ObservationOrigin.LIVE), PracticeReviewTier.DELIVER, ActorRole.AUTHOR, longAgo)
+            route(problems(3, ObservationOrigin.LIVE), PracticeAutonomy.AUTOMATIC, ActorRole.AUTHOR, longAgo)
         ).isEqualTo(InAppRoutingDecision.ADMIT);
     }
 
-    /**
-     * An unresolved tier is admitted on the provenance-and-tier predicate, exactly as it is on the other
-     * lanes: withholding feedback somebody was owed because a lookup missed is the worse failure.
-     */
     @Test
-    void admitsWhenNoTierCouldBeResolved() {
+    void unresolvedAutonomyFailsClosed() {
         assertThat(route(problems(2, ObservationOrigin.LIVE), null, ActorRole.AUTHOR, null)).isEqualTo(
-            InAppRoutingDecision.ADMIT
+            InAppRoutingDecision.PRACTICE_REQUIRES_APPROVAL
         );
     }
 
@@ -168,11 +164,11 @@ class InAppFeedbackRouterTest extends BaseUnitTest {
 
     private static InAppRoutingDecision route(
         List<Observation> evidence,
-        PracticeReviewTier tier,
+        PracticeAutonomy autonomy,
         ActorRole subjectRole,
         Instant lastSurfaced
     ) {
-        return InAppFeedbackRouter.route(message(), evidence, tier, subjectRole, lastSurfaced, NOW);
+        return InAppFeedbackRouter.route(message(), evidence, autonomy, subjectRole, lastSurfaced, NOW);
     }
 
     private static ComposedInAppMessage message() {

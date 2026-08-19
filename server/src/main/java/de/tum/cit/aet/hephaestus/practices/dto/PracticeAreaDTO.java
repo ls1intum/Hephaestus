@@ -1,8 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.dto;
 
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
-import de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
 import org.jspecify.annotations.NonNull;
@@ -26,19 +26,19 @@ public record PracticeAreaDTO(
     @NonNull
     @Schema(
         description = "How much autonomy the system has over every practice in this area that holds no " +
-            "tier of its own, whether that was set here or inherited from the workspace, and which level " +
+            "autonomy of its own, whether that was set here or inherited from the workspace, and which level " +
             "decided it"
     )
-    ReviewTierAssignmentDTO reviewTier,
+    AutonomyAssignmentDTO autonomy,
     @NonNull @Schema(description = "Timestamp when the area was created") Instant createdAt,
     @Nullable @Schema(description = "Timestamp when the area was last updated") Instant updatedAt,
     @Nullable CatalogOriginDTO catalogOrigin
 ) {
-    /** @param workspaceDefault the workspace's effective default tier, the bottom of the inheritance chain */
+    /** @param workspaceDefault the workspace's effective default autonomy, the bottom of the inheritance chain */
     public static PracticeAreaDTO from(
         PracticeArea area,
         @Nullable CatalogOriginDTO catalogOrigin,
-        PracticeReviewTier workspaceDefault
+        PracticeAutonomy workspaceDefault
     ) {
         return new PracticeAreaDTO(
             area.getId(),
@@ -49,7 +49,7 @@ public record PracticeAreaDTO(
             area.getColor(),
             area.isVisibleInPracticeDashboards(),
             area.getDisplayOrder(),
-            ReviewTierAssignmentDTO.of(ReviewTierResolver.resolveArea(area, workspaceDefault), area.getReviewTier()),
+            AutonomyAssignmentDTO.of(AutonomyResolver.resolveArea(area, workspaceDefault), area.getAutonomy()),
             area.getCreatedAt(),
             area.getUpdatedAt(),
             catalogOrigin

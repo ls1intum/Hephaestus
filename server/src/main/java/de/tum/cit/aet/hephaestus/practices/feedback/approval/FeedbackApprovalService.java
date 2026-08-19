@@ -1,0 +1,91 @@
+package de.tum.cit.aet.hephaestus.practices.feedback.approval;
+
+import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
+import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.approval.dto.DecideFeedbackProposalRequestDTO;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+@Service
+@RequiredArgsConstructor
+public class FeedbackApprovalService {
+
+    private final FeedbackRepository feedbackRepository;
+    private final FeedbackApprovalRepository approvalRepository;
+    private final ApplicationEventPublisher eventPublisher;
+
+    @Transactional
+    public FeedbackApproval decide(
+        Long workspaceId,
+        UUID feedbackId,
+        Long actorAccountId,
+        DecideFeedbackProposalRequestDTO request
+    ) {
+        Feedback feedback = feedbackRepository
+            .findByIdAndWorkspaceId(feedbackId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
+        validate(request);
+        if (feedback.getChannel() != FeedbackChannel.IN_CONTEXT) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only in-context feedback can be approved");
+        }
+        FeedbackApproval existing = approvalRepository
+            .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
+            .orElse(null);
+        if (existing != null) {
+            if (
+                existing.getDecision() != request.decision() ||
+                existing.getRejectionReason() != request.rejectionReason()
+            ) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal has already been decided");
+            }
+            if (existing.getDecision() == FeedbackApprovalDecision.APPROVED) {
+                eventPublisher.publishEvent(new ApprovedFeedbackReadyEvent(workspaceId, feedbackId));
+            }
+            return existing;
+        }
+
+        FeedbackDeliveryState target =
+            request.decision() == FeedbackApprovalDecision.APPROVED
+                ? FeedbackDeliveryState.PREPARED
+                : FeedbackDeliveryState.DISCARDED;
+        if (feedbackRepository.decideProposal(workspaceId, feedbackId, target.name()) != 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "This proposal has already been decided");
+        }
+
+        FeedbackApproval approval = approvalRepository.save(
+            FeedbackApproval.builder()
+                .feedbackId(feedbackId)
+                .workspaceId(workspaceId)
+                .actorAccountId(actorAccountId)
+                .decision(request.decision())
+                .rejectionReason(request.rejectionReason())
+                .contentDigest(FeedbackApprovalDigest.of(feedback))
+                .build()
+        );
+        if (request.decision() == FeedbackApprovalDecision.APPROVED) {
+            eventPublisher.publishEvent(new ApprovedFeedbackReadyEvent(workspaceId, feedbackId));
+        }
+        return approval;
+    }
+
+    @Transactional(readOnly = true)
+    public FeedbackApproval get(Long workspaceId, UUID feedbackId) {
+        return approvalRepository
+            .findByFeedbackIdAndWorkspaceId(feedbackId, workspaceId)
+            .orElseThrow(() -> new EntityNotFoundException("Feedback approval", feedbackId.toString()));
+    }
+
+    private static void validate(DecideFeedbackProposalRequestDTO request) {
+        if (request.decision() == FeedbackApprovalDecision.APPROVED && request.rejectionReason() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "An approval cannot have a rejection reason");
+        }
+    }
+}

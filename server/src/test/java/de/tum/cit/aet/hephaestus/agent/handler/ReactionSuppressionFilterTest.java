@@ -63,7 +63,7 @@ class ReactionSuppressionFilterTest extends BaseUnitTest {
             observationRepository,
             reactionRepository,
             feedbackLedgerRecorder,
-            new PracticeReviewProperties(false, false, 15, 5, false, enabled)
+            new PracticeReviewProperties(false, 15, 5, false, enabled)
         );
     }
 

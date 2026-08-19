@@ -198,12 +198,12 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         givenWorkspace();
         givenDocument(document(42L));
         when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO)).thenReturn(
-            new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_TIER_OFF)
+            new GateDecision.Skip("every practice bound to this signal is off", SignalStateReason.PRACTICE_AUTONOMY_OFF)
         );
 
         submitter.onDocumentSignal(KEY, DiscoveredVia.EVENT);
 
-        verify(signalRecorder).markRefused(KEY, SignalStateReason.PRACTICE_TIER_OFF);
+        verify(signalRecorder).markRefused(KEY, SignalStateReason.PRACTICE_AUTONOMY_OFF);
         verify(agentJobService, never()).submit(any(), any(), any(), any());
     }
 

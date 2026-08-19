@@ -33,7 +33,7 @@ import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
-import de.tum.cit.aet.hephaestus.practices.model.PracticeReviewTier;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationVisibilityPolicy;
@@ -221,12 +221,12 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
             }
         };
 
-        assertThat(router().route(obs, PracticeReviewTier.DELIVER, WS, ctx)).isEqualTo(expected);
+        assertThat(router().route(obs, PracticeAutonomy.AUTOMATIC, WS, ctx)).isEqualTo(expected);
     }
 
     /**
      * Coaching a developer in a mentor turn about a decision they made months ago presents retrospective
-     * measurement as though it were today's work. Asked before the tier, because it needs no lookup and
+     * measurement as though it were today's work. Asked before the autonomy, because it needs no lookup and
      * no per-practice dial can undo it.
      */
     @Test
@@ -234,7 +234,7 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         Observation obs = problem(null, null);
         lenient().when(obs.getOrigin()).thenReturn(ObservationOrigin.BACKFILL);
 
-        assertThat(router().route(obs, PracticeReviewTier.DELIVER, WS, RoutingContext.author())).isEqualTo(
+        assertThat(router().route(obs, PracticeAutonomy.AUTOMATIC, WS, RoutingContext.author())).isEqualTo(
             ConversationRoutingDecision.BACKFILL_QUIET
         );
     }
@@ -413,51 +413,37 @@ class ConversationalDeliveryLoopUnitTest extends BaseUnitTest {
         verify(feedbackRepository).markConversationDelivered(eq(fidA), any());
     }
 
-    /**
-     * The autonomy tier's conversation half. Only DELIVER may speak without being asked; PROPOSE promises
-     * silence on every channel and must be refused here — and refused with a NAMED reason, because "the
-     * workspace turned this practice down" is a different answer to "why did nothing happen" than "there
-     * was nothing worth raising".
-     */
     @ParameterizedTest
-    @MethodSource("tierRoutingCases")
-    void routerAppliesTheAutonomyTierBeforeAnythingElse(PracticeReviewTier tier, ConversationRoutingDecision expected) {
+    @MethodSource("autonomyRoutingCases")
+    void routerAppliesAutonomyBeforeAnythingElse(PracticeAutonomy autonomy, ConversationRoutingDecision expected) {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, tier, WS, RoutingContext.author())).isEqualTo(expected);
+        assertThat(router().route(observation, autonomy, WS, RoutingContext.author())).isEqualTo(expected);
     }
 
-    static Stream<Arguments> tierRoutingCases() {
+    static Stream<Arguments> autonomyRoutingCases() {
         return Stream.of(
-            arguments(PracticeReviewTier.OFF, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
-            arguments(PracticeReviewTier.PROPOSE, ConversationRoutingDecision.PRACTICE_TIER_QUIET),
-            arguments(PracticeReviewTier.DELIVER, ConversationRoutingDecision.ADMIT)
+            arguments(PracticeAutonomy.OFF, ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL),
+            arguments(PracticeAutonomy.HUMAN_APPROVAL, ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL),
+            arguments(PracticeAutonomy.AUTOMATIC, ConversationRoutingDecision.ADMIT)
         );
     }
 
-    /**
-     * A tier-quiet observation is refused even when it is reviewer-targeted, i.e. the tier is asked first.
-     * That ordering matters for the trace view: the standing workspace policy is the more useful answer.
-     */
     @Test
-    void tierIsAskedBeforeTheReviewerDeferral() {
+    void autonomyIsAppliedBeforeReviewerDeferral() {
         Observation observation = problem(null, null);
 
-        assertThat(router().route(observation, PracticeReviewTier.PROPOSE, WS, RoutingContext.reviewer())).isEqualTo(
-            ConversationRoutingDecision.PRACTICE_TIER_QUIET
-        );
+        assertThat(
+            router().route(observation, PracticeAutonomy.HUMAN_APPROVAL, WS, RoutingContext.reviewer())
+        ).isEqualTo(ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL);
     }
 
-    /**
-     * A tier the projection could not resolve must not silence the observation: a lookup miss is our
-     * problem, and withholding coaching over it would be a refusal nobody asked for.
-     */
     @Test
-    void anUnresolvedTierLeavesTheRemainingRulesInCharge() {
+    void anUnresolvedAutonomyFailsClosed() {
         Observation observation = problem(null, null);
 
         assertThat(router().route(observation, null, WS, RoutingContext.author())).isEqualTo(
-            ConversationRoutingDecision.ADMIT
+            ConversationRoutingDecision.PRACTICE_REQUIRES_APPROVAL
         );
     }
 

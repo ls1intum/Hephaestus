@@ -10,8 +10,6 @@ import org.springframework.validation.annotation.Validated;
  *
  * <p>Binds to the {@code hephaestus.practice-review} prefix in application configuration.
  *
- * @param runForAllUsers      whether to run practice review for all PRs (true) or only for users
- *                            with the {@code run_practice_review} feature flag (false)
  * @param deliverToMerged     whether to deliver feedback to already-merged PRs
  * @param cooldownMinutes     minimum minutes between reviews for the same PR. 0 disables cooldown.
  * @param maxRequestsPerRequesterPerHour
@@ -27,7 +25,6 @@ import org.springframework.validation.annotation.Validated;
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.practice-review")
 public record PracticeReviewProperties(
-    @DefaultValue("false") boolean runForAllUsers,
     @DefaultValue("false") boolean deliverToMerged,
     @Min(0) @DefaultValue("15") int cooldownMinutes,
     @Min(0) @DefaultValue("5") int maxRequestsPerRequesterPerHour,

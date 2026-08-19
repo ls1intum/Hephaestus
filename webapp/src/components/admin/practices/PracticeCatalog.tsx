@@ -46,7 +46,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import { inheritedTierSourceSentence, REVIEW_TIER_LABELS } from "@/lib/review-tiers";
+import { inheritedAutonomySourceSentence, PRACTICE_AUTONOMY_LABELS } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
@@ -114,8 +114,6 @@ export function PracticeCatalog({
 	const supportedModesFor = (practice: Practice) =>
 		definitionOptions.workTypes.find((option) => option.artifactKind === practice.artifactKind)
 			?.supportedAutomatedReviewModes ?? [];
-	// Null rather than the slug when the area has no name here: `inheritedTierSourceSentence` degrades
-	// to "its area" instead of claiming the workspace decided.
 	const areaNames = new Map(areas.map((area) => [area.slug, area.name]));
 	const inheritedFromFor = (practice: Practice) =>
 		(practice.areaSlug ? areaNames.get(practice.areaSlug) : null) ?? null;
@@ -443,8 +441,6 @@ function PracticeActions({
 					Edit practice
 				</DropdownMenuItem>
 				<DropdownMenuSeparator />
-				{/* A link out, not a picker: the tier has one writer, on Review. A control bound to the
-				 *effective* value would pin a practice-level override the moment it was touched. */}
 				<DropdownMenuItem
 					render={
 						<Link
@@ -577,7 +573,7 @@ function PracticeRowDetails({
 		practice.automatedReviewPolicy,
 		supportedModes,
 	);
-	const follows = inheritedTierSourceSentence(practice.reviewTier, inheritedFrom);
+	const follows = inheritedAutonomySourceSentence(practice.autonomy, inheritedFrom);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
@@ -585,13 +581,10 @@ function PracticeRowDetails({
 				<span>{artifactKindLabel(practice.artifactKind)}</span>
 				<Badge variant="outline">
 					{/* `position: absolute` blockifies the prefix, so every engine inserts the space and it is
-					    announced as a sentence rather than welded to the tier name. */}
-					<span className="sr-only">Autonomy tier: </span>
-					{REVIEW_TIER_LABELS[practice.reviewTier.effective]}
+					    announced as a sentence rather than welded to the autonomy name. */}
+					<span className="sr-only">Autonomy: </span>
+					{PRACTICE_AUTONOMY_LABELS[practice.autonomy.effective]}
 				</Badge>
-				{/* The tier alone cannot be acted on: an admin who reads "Off" needs to know whether this
-				    practice was singled out or whether the whole workspace is off, and those have
-				    different fixes. */}
 				<span>{follows ?? "Set for this practice"}</span>
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />

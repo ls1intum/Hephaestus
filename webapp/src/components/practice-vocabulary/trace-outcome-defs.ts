@@ -18,7 +18,7 @@ export type TraceOutcome = PracticeTraceEntry["outcome"];
 /**
  * What became of one practice on one piece of work — the *measurement* axis, and nothing more.
  * Whether anybody heard about it is the separate question the delivery registries answer, so
- * "Reviewed" having delivered nothing is the PROPOSE tier working as configured, not a failure.
+ * "Reviewed" having delivered nothing is the HUMAN_APPROVAL setting working as configured, not a failure.
  */
 export const TRACE_OUTCOME_DEFS: StatusDefs<TraceOutcome> = {
 	REVIEWED: {

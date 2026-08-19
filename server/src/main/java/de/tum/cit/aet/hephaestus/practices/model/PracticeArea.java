@@ -96,12 +96,12 @@ public class PracticeArea {
      * <p>The middle level of the chain, and the one that makes the whole thing worth having: an area is the
      * grain a team actually reasons in ("we are not ready for the system to comment on our test practices
      * yet"), so one decision here covers the practices under it without touching any of them. Resolve with
-     * {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
+     * {@link de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver}.
      */
-    @Column(name = "review_tier", length = PracticeReviewTier.MAX_LENGTH)
+    @Column(name = "autonomy", length = PracticeAutonomy.MAX_LENGTH)
     @Enumerated(EnumType.STRING)
     @Nullable
-    private PracticeReviewTier reviewTier;
+    private PracticeAutonomy autonomy;
 
     /** Admin dashboard ordering. */
     @Column(name = "display_order", nullable = false)

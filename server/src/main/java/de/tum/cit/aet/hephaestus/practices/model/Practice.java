@@ -43,8 +43,8 @@ import org.jspecify.annotations.Nullable;
  * <p>{@code practice_requires_current_revision_projection} is declared {@code AFTER UPDATE OF slug, name,
  * applies_to, bindings, criteria, …} — and Postgres fires an {@code UPDATE OF} trigger when a column
  * appears in the SET list, whether or not its value changed. Hibernate's default whole-row update names
- * every column on every save, so changing something as unrelated as {@code review_tier} re-asserted the
- * whole projection and had the deferred trigger re-check it at commit. Setting a practice's review tier
+ * every column on every save, so changing something as unrelated as {@code autonomy} re-asserted the
+ * whole projection and had the deferred trigger re-check it at commit. Setting a practice's review autonomy
  * through the API therefore failed with a 409 while the identical write in SQL succeeded.
  *
  * <p>With this, an update names only what actually changed, so the trigger fires when the projection is
@@ -59,7 +59,7 @@ import org.jspecify.annotations.Nullable;
         columnNames = { "workspace_id", "slug" }
     ),
     indexes = {
-        @Index(name = "idx_practice_workspace_tier", columnList = "workspace_id, review_tier"),
+        @Index(name = "idx_practice_workspace_autonomy", columnList = "workspace_id, autonomy"),
         @Index(name = "idx_practice_practice_area", columnList = "practice_area_id"),
         @Index(name = "idx_practice_area_order", columnList = "practice_area_id, display_order"),
         @Index(name = "idx_practice_source_curated_slug", columnList = "source_curated_slug"),
@@ -181,16 +181,16 @@ public class Practice {
 
     /**
      * This practice's own answer to how much autonomy the system has over it, or {@code null} to inherit its
-     * area's (and through it the workspace's) — a tier rather than a boolean so silencing a noisy practice
+     * area's (and through it the workspace's) — an autonomy rather than a boolean so silencing a noisy practice
      * does not also cost its measurement.
      *
      * <p>Never read raw for a decision: {@code null} means "holds no opinion", not {@code OFF}. Resolve it
-     * with {@link de.tum.cit.aet.hephaestus.practices.review.tier.ReviewTierResolver}.
+     * with {@link de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver}.
      */
-    @Column(name = "review_tier", length = PracticeReviewTier.MAX_LENGTH)
+    @Column(name = "autonomy", length = PracticeAutonomy.MAX_LENGTH)
     @Enumerated(EnumType.STRING)
     @Nullable
-    private PracticeReviewTier reviewTier;
+    private PracticeAutonomy autonomy;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

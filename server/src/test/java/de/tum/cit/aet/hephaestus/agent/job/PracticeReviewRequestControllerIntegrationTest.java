@@ -288,7 +288,7 @@ class PracticeReviewRequestControllerIntegrationTest extends AbstractWorkspaceIn
      */
     private void giveTheWorkspaceACooldown() {
         Workspace stored = workspaceRepository.findById(workspace.getId()).orElseThrow();
-        stored.getReviewSettings().applyPatch(null, null, 15);
+        stored.getReviewSettings().applyPatch(null, 15);
         workspaceRepository.save(stored);
     }
 

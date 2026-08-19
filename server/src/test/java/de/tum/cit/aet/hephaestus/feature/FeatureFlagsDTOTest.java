@@ -97,8 +97,6 @@ class FeatureFlagsDTOTest extends BaseUnitTest {
             FeatureFlagsDTO dto = FeatureFlagsDTO.from(featureFlagService);
 
             assertThat(dto.GITLAB_WORKSPACE_CREATION()).isTrue();
-            // Other CONFIG flags should be false
-            assertThat(dto.PRACTICE_REVIEW_FOR_ALL()).isFalse();
         }
     }
 }

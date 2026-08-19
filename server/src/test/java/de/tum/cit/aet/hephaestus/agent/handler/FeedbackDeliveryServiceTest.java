@@ -130,6 +130,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         org.mockito.Mockito.lenient()
             .when(workspaceRepository.findById(WORKSPACE_ID))
             .thenReturn(Optional.of(activePracticeWorkspace()));
+        org.mockito.Mockito.lenient()
+            .when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
+            .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, true)));
     }
 
     private Workspace activePracticeWorkspace() {
@@ -671,15 +674,21 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
         }
 
         @Test
-        void suspendedWorkspaceStopsDeliveryWithoutLedgerEgress() {
+        void suspendedWorkspaceRecordsSuppressedDelivery() {
             AgentJob job = createJob();
             Workspace workspace = activePracticeWorkspace();
             workspace.setStatus(Workspace.WorkspaceStatus.SUSPENDED);
             when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
 
-            service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of(), List.of()));
+            var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
+            service.deliverFeedback(job, delivery);
 
-            verifyNoInteractions(pullRequestRepository, commentPoster, accountPreferencesQuery, feedbackLedgerRecorder);
+            verifyNoInteractions(pullRequestRepository, commentPoster, accountPreferencesQuery);
+            verify(feedbackLedgerRecorder).recordSuppressedUnit(
+                job,
+                delivery,
+                FeedbackSuppressionReason.WORKSPACE_DISABLED
+            );
         }
 
         @Test
@@ -1012,7 +1021,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     }
 
     private static PracticeReviewProperties reviewProperties(boolean progressFooter) {
-        return new PracticeReviewProperties(false, false, 15, 5, progressFooter, false);
+        return new PracticeReviewProperties(false, 15, 5, progressFooter, false);
     }
 
     private static TrendDelta resolvedTrend() {

@@ -30,7 +30,7 @@ public enum SignalStateReason {
     CONCURRENT_DUPLICATE(SignalState.SUPPRESSED),
 
     /**
-     * Terminal rather than pending, unlike the tier reasons: it turns on facts belonging to the artifact
+     * Terminal rather than pending, unlike configuration reasons: it turns on facts belonging to the artifact
      * that cannot change, so widening the scope alters what happens next, not what already did.
      */
     OUT_OF_REVIEW_SCOPE(SignalState.SUPPRESSED),
@@ -47,7 +47,7 @@ public enum SignalStateReason {
      * Separate from {@link #NO_ACTIVE_PRACTICE} on purpose: collapsing them would make "we are
      * deliberately not reviewing this" indistinguishable from "nobody ever set this up".
      */
-    PRACTICE_TIER_OFF(SignalState.PENDING),
+    PRACTICE_AUTONOMY_OFF(SignalState.PENDING),
 
     BUDGET_EXHAUSTED(SignalState.PENDING),
 
@@ -96,7 +96,7 @@ public enum SignalStateReason {
             case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
             case NO_ACTIVE_PRACTICE -> "No practice was bound to this occurrence when it was recorded.";
             case REVIEW_MODEL_UNBOUND -> "No AI model is bound to practice review for this workspace; binding one in Administration re-offers it.";
-            case PRACTICE_TIER_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
+            case PRACTICE_AUTONOMY_OFF -> "Every practice bound to this occurrence sits at Off; raising one re-offers it.";
             case BUDGET_EXHAUSTED -> "The budget funding this review was exhausted; it is re-offered when the budget refills.";
             case SUBJECT_UNLINKED -> "Nobody this could be attributed to has linked their account; linking one re-offers it.";
             case MODEL_UNAVAILABLE -> "The model this review is bound to left the catalog; re-pointing the binding re-offers it.";

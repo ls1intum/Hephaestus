@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Practice, PracticeBinding } from "@/api/types.gen";
 import {
-	chosenTier,
-	inheritedTier,
+	chosenAutonomy,
+	inheritedAutonomy,
 	mockPractices,
 } from "@/components/admin/practices/story-mock-data";
 import {
@@ -96,18 +96,18 @@ describe("practice catalog cache updates", () => {
 
 	it("supports empty destinations and structural-only rollback", () => {
 		const practices = [
-			{ ...practice("moving", "quality", 0), reviewTier: inheritedTier("DELIVER") },
+			{ ...practice("moving", "quality", 0), autonomy: inheritedAutonomy("AUTOMATIC") },
 			practice("remaining", "quality", 1),
 		];
 		const snapshot = practicePlacementSnapshot(practices, "moving", null);
 		const moved = placePractice(practices, "moving", null, 0).map((item) =>
-			item.slug === "moving" ? { ...item, reviewTier: chosenTier("OFF") } : item,
+			item.slug === "moving" ? { ...item, autonomy: chosenAutonomy("OFF") } : item,
 		);
 
 		const restored = applyPracticePlacements(moved, snapshot);
 
 		expect(restored.find(({ slug }) => slug === "moving")).toMatchObject({
-			reviewTier: chosenTier("OFF"),
+			autonomy: chosenAutonomy("OFF"),
 			areaSlug: "quality",
 			displayOrder: 0,
 		});
@@ -117,7 +117,7 @@ describe("practice catalog cache updates", () => {
 	it("reconciles only fields owned by the edit request", () => {
 		const updated = {
 			...practice("edited", "delivery", 4),
-			reviewTier: chosenTier("OFF"),
+			autonomy: chosenAutonomy("OFF"),
 			name: "Updated",
 		};
 
