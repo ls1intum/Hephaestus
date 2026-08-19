@@ -2,4 +2,4 @@
 "hephaestus": patch
 ---
 
-Practice reviews now start reliably when the runner applies its shared timeout policy, including practices without precompute scripts.
+Practice reviews now start reliably, including when a practice has no precompute script.

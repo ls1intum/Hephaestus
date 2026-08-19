@@ -4327,7 +4327,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Practice"
-          description: Practice adopted in Review before sending
+          description: Practice adopted
         "403":
           content:
             application/problem+json:
@@ -4352,7 +4352,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProblemDetail"
           description: The If-Match preview validator is required
-      summary: Adopt a practice in Review before sending
+      summary: Adopt a catalog practice
       tags:
       - Practice Catalog Adoption
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:

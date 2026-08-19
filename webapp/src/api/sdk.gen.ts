@@ -1645,7 +1645,7 @@ export const previewPracticeAdoption = <ThrowOnError extends boolean = false>(op
 });
 
 /**
- * Adopt a practice in Review before sending
+ * Adopt a catalog practice
  */
 export const adoptPractice = <ThrowOnError extends boolean = false>(options: Options<AdoptPracticeData, ThrowOnError>) => (options.client ?? client).post<AdoptPracticeResponses, AdoptPracticeErrors, ThrowOnError>({
     responseTransformer: adoptPracticeResponseTransformer,

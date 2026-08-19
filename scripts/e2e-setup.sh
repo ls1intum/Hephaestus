@@ -314,7 +314,6 @@ practice() { local slug="$1" name="$2" signals="$3" crit="$4" body
     echo "$body" | api POST "/workspaces/$WS_SLUG/practices" \
       -H 'content-type: application/json' --data-binary @- >/dev/null
   fi
-  # Automatic lets this isolated E2E workspace verify delivery; catalogue adoption remains human approval.
   api PATCH "/workspaces/$WS_SLUG/practices/$slug/autonomy" \
     -H 'content-type: application/json' -d '{"autonomy":"AUTOMATIC"}' >/dev/null
 }

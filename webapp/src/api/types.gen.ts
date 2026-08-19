@@ -9253,7 +9253,7 @@ export type AdoptPracticeError = AdoptPracticeErrors[keyof AdoptPracticeErrors];
 
 export type AdoptPracticeResponses = {
     /**
-     * Practice adopted in Review before sending
+     * Practice adopted
      */
     201: Practice;
 };

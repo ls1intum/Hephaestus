@@ -2935,7 +2935,7 @@ export const previewPracticeAdoptionOptions = (options: Options<PreviewPracticeA
 });
 
 /**
- * Adopt a practice in Review before sending
+ * Adopt a catalog practice
  */
 export const adoptPracticeMutation = (options?: Partial<Options<AdoptPracticeData>>): UseMutationOptions<AdoptPracticeResponse, AdoptPracticeError, Options<AdoptPracticeData>> => {
     const mutationOptions: UseMutationOptions<AdoptPracticeResponse, AdoptPracticeError, Options<AdoptPracticeData>> = {

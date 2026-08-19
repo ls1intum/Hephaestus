@@ -63,6 +63,7 @@ JWT="$(curl -fsS -i -X POST http://localhost:8080/auth/dev-login \
   -H 'content-type: application/json' \
   -d '{"username":"e2e","admin":true}' \
   | sed -nE 's/.*(__Host-)?HEPHAESTUS_AT=([^;]+).*/\2/p' | tr -d '\r')"
+test -n "$JWT"
 curl -fsS -X POST -H "Authorization: Bearer $JWT" \
   "http://localhost:8080/api/dev/trigger-review?prId=<id>&workspaceId=<id>"
 ```
