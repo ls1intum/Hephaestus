@@ -202,7 +202,7 @@ erDiagram
         TIMESTAMPTZ occurred_at "NOT NULL"
         BIGINT workspace_id FK
         VARCHAR(16) actor_kind "NOT NULL"
-        BIGINT actor_account_id
+        BIGINT actor_account_id FK
         BIGINT acting_account_id FK
         VARCHAR(48) entity_type "NOT NULL"
         VARCHAR(64) entity_id "NOT NULL"
