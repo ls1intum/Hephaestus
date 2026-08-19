@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect, fn, userEvent } from "storybook/test";
 import type { CatalogPracticePreview } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -7,6 +7,7 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { expectGenuinelyDisabled } from "@/test/controls";
 import { PracticeAdoptionReview } from "./PracticeAdoptionReview";
 
 const preview: CatalogPracticePreview = {
@@ -52,9 +53,12 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Available: Story = {
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Adopt practice" })).toBeEnabled();
+	play: async ({ canvas, args }) => {
+		const adopt = canvas.getByRole("button", { name: "Adopt practice" });
+		await expect(adopt).toBeEnabled();
 		await expect(canvas.getByText("Starts with Review before sending")).toBeVisible();
+		await userEvent.click(adopt);
+		await expect(args.onAdopt).toHaveBeenCalledOnce();
 	},
 };
 
@@ -70,7 +74,7 @@ export const ReusesExistingArea: Story = {
 export const AlreadyAdopted: Story = {
 	args: { preview: { ...preview, availability: "ADOPTED" } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Adopt practice" })).toBeDisabled();
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adopt practice" }));
 		await expect(canvas.getByText("Already adopted")).toBeVisible();
 	},
 };
@@ -78,7 +82,7 @@ export const AlreadyAdopted: Story = {
 export const SlugConflict: Story = {
 	args: { preview: { ...preview, availability: "SLUG_CONFLICT" } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Adopt practice" })).toBeDisabled();
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adopt practice" }));
 		await expect(canvas.getByText("Slug conflict")).toBeVisible();
 	},
 };
@@ -86,6 +90,34 @@ export const SlugConflict: Story = {
 export const Adopting: Story = {
 	args: { isPending: true },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Adopting…" })).toBeDisabled();
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adopting…" }));
 	},
+};
+
+export const UnassignedAndOff: Story = {
+	args: {
+		preview: {
+			...preview,
+			initialAutonomy: "OFF",
+			area: { disposition: "UNASSIGNED" },
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Starts with Off")).toBeVisible();
+		await expect(canvas.getByText("Leave unassigned")).toBeVisible();
+	},
+};
+
+export const LongContentInDarkMode: Story = {
+	args: {
+		preview: {
+			...preview,
+			definition: {
+				...preview.definition,
+				criteria:
+					"Confirm that the pull request explains the behavior change, the operational constraints that shaped it, the alternatives considered, and the evidence used to verify the result. Stay silent when the change is generated automatically and no meaningful author decision exists.",
+			},
+		},
+	},
+	globals: { theme: "dark" },
 };

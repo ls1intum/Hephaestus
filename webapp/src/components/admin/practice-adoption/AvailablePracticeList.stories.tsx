@@ -46,9 +46,25 @@ export const AllAvailabilityStates: Story = {
 		await expect(canvas.getByText("Available")).toBeVisible();
 		await expect(canvas.getByText("Adopted")).toBeVisible();
 		await expect(canvas.getByText("Slug conflict")).toBeVisible();
+		await expect(
+			canvas.getByRole("link", { name: /Review practice.*Describe what changed and why/ }),
+		).toHaveAttribute("href", "/w/demo/admin/practices/available/describe-what-and-why");
 	},
 };
 
 export const Empty: Story = {
 	args: { practices: [] },
+};
+
+export const LongContentInDarkMode: Story = {
+	args: {
+		practices: [
+			{
+				...practices[0],
+				name: "Explain architectural trade-offs, operational constraints, and the evidence behind the chosen implementation",
+				areaName: "Decisions, documentation, and long-lived operational knowledge",
+			},
+		],
+	},
+	globals: { theme: "dark" },
 };

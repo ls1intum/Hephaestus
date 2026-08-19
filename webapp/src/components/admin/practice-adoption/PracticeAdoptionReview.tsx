@@ -2,6 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { CircleAlert, Eye, ShieldCheck } from "lucide-react";
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
+import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -58,17 +59,12 @@ export function PracticeAdoptionReview({
 									{preview.area.definition.description && (
 										<p className="whitespace-pre-wrap">{preview.area.definition.description}</p>
 									)}
-									{(preview.area.definition.icon || preview.area.definition.color) && (
-										<p>
-											Visuals: {preview.area.definition.icon ?? "default icon"},{" "}
-											{preview.area.definition.color ?? "default color"}
-										</p>
-									)}
+									<AreaVisual preview={preview} />
 								</dd>
 							</div>
 						)}
 						<div>
-							<dt className="font-medium">Reviewed rule fingerprint</dt>
+							<dt className="font-medium">Source review-rule fingerprint</dt>
 							<dd className="mt-1 break-all text-muted-foreground">
 								<code>{preview.sourceReviewRuleFingerprint}</code>
 							</dd>
@@ -126,6 +122,23 @@ export function PracticeAdoptionReview({
 				</Button>
 			</div>
 		</div>
+	);
+}
+
+function AreaVisual({ preview }: { preview: CatalogPracticePreview }) {
+	const definition = preview.area.definition;
+	if (!definition) return null;
+	const { Icon, pill } = getAreaVisual(
+		preview.area.slug ?? preview.slug,
+		definition.name,
+		definition.icon,
+		definition.color,
+	);
+	return (
+		<span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-1 text-sm ${pill}`}>
+			<Icon className="size-4" aria-hidden="true" />
+			{definition.name}
+		</span>
 	);
 }
 
