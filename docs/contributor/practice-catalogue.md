@@ -23,7 +23,7 @@ it propagates:
 | Binding — the one occasion a practice is reviewed on and the evidence it reads | declared as `on` in the bundled catalog; optional precompute input is explicit          | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
 | Review frame — contract version, review mode, known limitations                | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
 | Included in new workspaces                                                     | default is included                                                                     | instance administrator can include or exclude           | not applicable after installation                                                           |
-| Autonomy tier                                                                  | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
+| Practice autonomy                                                              | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
 | Review scope                                                                   | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator sets it once for the whole workspace                                |
 | Area and order                                                                 | JSON array order                                                                        | inherited or changed with drag-and-drop or move actions | copied, then independently managed                                                          |
 
@@ -31,13 +31,13 @@ This is a one-way lifecycle: a repository update can update an uncustomized inst
 an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
 definition or an existing workspace.
 
-| Stakeholder                | Primary task                                                                                                           | Deliberately not their task                      |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Practice author            | Define the habit, guidance, and responsible mentoring support                                                          | Authorize collection or certify review accuracy  |
-| Instance administrator     | Curate the defaults offered to new workspaces                                                                          | Rewrite existing workspace practices             |
-| Workspace administrator    | Adapt practices, set the workspace default tier and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
-| Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                      | Decide that connected evidence proves a practice |
-| Developer, peer, or mentor | Use observations and available human context in a review                                                               | Supply hidden context to Hephaestus implicitly   |
+| Stakeholder                | Primary task                                                                                                               | Deliberately not their task                      |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Practice author            | Define the habit, guidance, and responsible mentoring support                                                              | Authorize collection or certify review accuracy  |
+| Instance administrator     | Curate the defaults offered to new workspaces                                                                              | Rewrite existing workspace practices             |
+| Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
+| Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                          | Decide that connected evidence proves a practice |
+| Developer, peer, or mentor | Use observations and available human context in a review                                                                   | Supply hidden context to Hephaestus implicitly   |
 
 ## Authoring experience
 
@@ -74,7 +74,7 @@ settings:
   while a developer, peer, or mentor may still review it from context the system does not collect.
   It still names its occasion — that is where its artifact kind comes from, and saying what a
   practice is about was never the same claim as asking Hephaestus to act on it — but it cannot define
-  a static-analysis script and its autonomy tier is forced to `OFF`.
+  a static-analysis script and its autonomy is forced to `OFF`.
 - **Guidance only** keeps the criteria and guidance without configuring Hephaestus to review it.
 
 The binding starts with the recommended evidence for its work type. Most authors should keep it.

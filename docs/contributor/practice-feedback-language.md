@@ -5,7 +5,7 @@ Use these product terms in user-facing interfaces, documentation, and release no
 This page owns the vocabulary for **observations and the feedback built from them**. The
 [practice review glossary](./practice-review-glossary.mdx) owns the vocabulary for **the review
 operation, the evidence contract, and the exact API, Java, and persistence names**, including
-*practice review*, *binding*, *signal*, *evidence stance* and *autonomy tier*. A term is defined in
+*practice review*, *binding*, *signal*, *evidence stance* and *practice autonomy*. A term is defined in
 one of the two and cited from the other; when the two disagree, that is a bug in one of them, not a
 choice for the writer.
 
@@ -90,10 +90,8 @@ records the naming
 decision. On an operator surface, the place reads **On their practice pages**.
 
 **Feedback waiting for a mentor conversation is *prepared*, never *queued*.** A queue implies somebody has
-to work it; nothing does — `FeedbackDeliveryState.PREPARED` auto-advances to `DELIVERED` on the next chat
-turn that links the feedback. The label is **Prepared for conversation**. *Prepared* is also not available
-for a suppressed observation: at the **Propose** tier no feedback is composed at all, so nothing is prepared
-there either.
+to work it; nothing does — `FeedbackDeliveryState.PREPARED` advances to `DELIVERED` on the next chat turn
+that links the feedback. The label is **Prepared for conversation**.
 
 **Observation, not finding**, for the measurement — in copy, URLs, API schema, field names, and Java.
 Delivery uses `FeedbackAnchor` and `InlineFeedbackChannel`; the mentor uses `link_observation` and
@@ -108,21 +106,15 @@ workspace-admin route `/workspaces/{workspaceSlug}/practices/reviews/observation
 reads live under `/workspaces/{workspaceSlug}/practices/observations`. Apart from the web-route redirect, a
 *finding* in this subsystem is a bug.
 
-For how much a workspace lets the system do on its own about a practice — including whether it is
-reviewed at all — use **autonomy tier** and its three values **Off**, **Propose**, **Deliver**, as
-the [practice review glossary](./practice-review-glossary.mdx#product-terms) defines them. Do not write
-*used in new reviews*: it is a boolean where the concept has three values, so it cannot express the tier
-between silent measurement and unasked delivery. "Not reviewed at all" is the **Off** tier, not a separate
-concept. **Propose** reviews the work and records everything it sees and sends nothing; do not write that
-it prepares, drafts or previews feedback, because at that tier no feedback is ever composed. Do not write
-*loudness tier*: it reads as a volume control, and the tier is not one — it is the whole delivery decision,
-so **Deliver** means delivered wherever the reviewed work allows. There is no second setting narrowing
-where a delivering practice may speak; do not write *feedback reach*, which named one that no longer exists.
+Use **practice autonomy** for who may authorize feedback: **Off**, **Review before sending**, or
+**Send automatically**. **Off** stops the review. **Review before sending** composes in-context feedback but
+requires a workspace owner or administrator to approve the exact proposal. **Send automatically** lets new
+feedback proceed without that decision, subject to delivery policy. Do not call this a tier, loudness, reach,
+or shadow mode: those names obscure the human authorization step.
 
-A tier is also rarely a fact about one practice alone. Most practices hold no tier and inherit their area's,
-and most areas inherit the workspace's, so write **effective tier** for the one in force and **override**
-for a tier set at the level being discussed. *Inherited* is about the level being described, not about
-which level answered.
+Most practices inherit from their area, and most areas inherit from the workspace. Use **effective autonomy**
+for the resolved value, **override** for a value set at the level being discussed, and **inherited** when a
+parent supplied it.
 
 For whether an instance entry is copied into new workspaces, use **include / exclude** (see the table
 above). Do not use *shipped*, *offered*, *retired*, *ours*, *yours*, or *here* in catalog UI copy;

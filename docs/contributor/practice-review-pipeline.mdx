@@ -61,7 +61,7 @@ The four are not ranked and do not substitute for one another. "We could not loo
 representable as a `Presence` value, because a `Presence` is a claim about the developer's work and a
 missing source is a fact about the instrument — which is exactly what lets the whole `observation` table be
 read as behaviour. In the other direction, "we chose to stay quiet" must never be recorded as an absent
-observation: a tier turned down is a delivery decision, and the measurement it withholds still happened.
+observation: requiring human approval is a release decision, and the measurement still happened.
 When you add a reason code, the first question is which of these four columns it belongs in. If the honest
 answer is "two of them", the reason is really two reasons.
 
@@ -170,14 +170,14 @@ flowchart TB
         compose --> quiet["WITHHOLD: say nothing"]
     end
 
-    incontext --> gate{"Admission, tier, routers, caps"}
+    incontext --> gate{"Autonomy, routing, and delivery policy"}
     page --> gate
     chat --> gate
     gate --> ledger["The feedback ledger"]
     quiet --> compositionResult["Composition output only:<br/>retained until job payload stripping"]
 ```
 
-Note where the arrows converge. **The model proposes; the server admits.** Origin, effective tier,
+Note where the arrows converge. **The model proposes; the server admits.** Origin, effective autonomy,
 channel-specific routing, placement checks, and per-lane caps still apply after composition. Giving the
 model more context is not a reason to relax these gates; it gives them more proposals to assess.
 
@@ -241,7 +241,7 @@ Staying quiet is the fourth action, not a gap: `action: "WITHHOLD"` with `NO_MAT
 `ALREADY_SAID` or `BELOW_BAR`. That enum is deliberately **not** `FeedbackSuppressionReason` — a
 withhold reason is the composer's own judgement, and `FeedbackSuppressionReason` is a database check
 constraint listing reasons the _server_ refused. Merging them would make "we had nothing worth saying"
-indistinguishable from "the tier held it back".
+indistinguishable from "delivery policy refused it".
 
 ### Supersession preserves read feedback
 
@@ -267,14 +267,15 @@ means there was nothing useful to say and creates no feedback row. A policy refu
 Practice autonomy is resolved as `practice.autonomy ?? area.autonomy ?? workspace default ?? HUMAN_APPROVAL`:
 
 - `OFF` prevents the review, so no intervention is composed.
-- `HUMAN_APPROVAL` stores in-context feedback as `AWAITING_APPROVAL`. An authorized workspace reviewer may
-  approve the exact content and target or reject it. Approval changes the unit to `PREPARED` and invokes the
-  ordinary delivery path; rejection records `DISCARDED` and its structured reason.
+- `HUMAN_APPROVAL` stores in-context feedback as `AWAITING_APPROVAL`. A workspace owner or administrator may
+  approve the exact content and target or reject it with an optional structured reason. Approval changes the
+  unit to `PREPARED` for asynchronous release; rejection records `DISCARDED`.
 - `AUTOMATIC` permits the system to prepare new feedback for delivery without that human decision.
 
-Autonomy is only the authority step. `PracticeAutonomyPolicy` also applies immutable observation provenance,
-and the delivery path retains recipient, workspace, artifact, suppression, idempotency and egress controls.
-An approval is never an override for those controls. Missing effective autonomy denies external delivery.
+Autonomy is only the authority step. `PracticeAutonomyPolicy` also applies immutable observation provenance.
+At release, approved feedback rechecks Silent Mode, workspace availability, artifact validity, repository
+scope and recipient preference, then reconciles a stable proposal marker with the provider before posting.
+An approval overrides none of those controls. Missing effective autonomy denies automatic delivery.
 
 Existing `AWAITING_APPROVAL` rows remain proposals when autonomy changes. This prospective behavior prevents
 a promotion to `AUTOMATIC` from releasing historical output. Conversely, demoting to `HUMAN_APPROVAL` keeps

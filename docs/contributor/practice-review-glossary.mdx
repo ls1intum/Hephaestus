@@ -39,8 +39,8 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Source-use purpose**              | Why Hephaestus processes evidence, such as automated review or feedback delivery.                                                                                                                                                          | audience, recipient                                               |
 | **Audience / recipient**            | Who may receive or inspect evidence.                                                                                                                                                                                                       | purpose                                                           |
 | **Review readiness**                | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks.                                                                                                 | validation, activation                                            |
-| **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), an authorized person (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and area levels, where null means “inherit”.                                       | review tier, loudness tier, shadow mode, enabled                  |
-| **Effective tier**                  | The tier in force after resolving practice → area → workspace. Always server-resolved, always reported with the level it came from.                                                                                                        | tier                                                              |
+| **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), a workspace owner or administrator (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and area levels, where null means “inherit”.                         | review tier, loudness tier, shadow mode, enabled                  |
+| **Effective autonomy**              | The autonomy in force after resolving practice → area → workspace. Always server-resolved and reported with its source.                                                                                                                    | autonomy override                                                 |
 | **Review scope**                    | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories.                                                                                                         | filter, path filter, include pattern                              |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
@@ -64,7 +64,8 @@ label a practice as universally observable or unobservable.
 | **Peer**         | A peer review may be possible from team context; Hephaestus does not collect it.                                              |
 | **Human mentor** | A mentor review may be possible from interpersonal or private context; Hephaestus does not collect it.                        |
 
-Human review is outside the product: none of the three human reviewers above has consent, provenance,
+Human practice assessment is outside the product. Proposal approval authorizes delivery of Hephaestus's
+existing feedback; it is not a second assessment. None of the three human reviewers above has consent, provenance,
 retention, access, a rubric or a validation model here, and a human review would need all six plus a record of
 who reviewed and in what relationship to the author. Human reviews may use different rubrics and evidence, and
 disagreement between two of them is two provenance-bearing reviews, not a contradiction to resolve into one
@@ -117,14 +118,15 @@ final egress guard still apply.
 | Autonomy         | Review runs | Feedback is composed | Release authority                      |
 | ---------------- | ----------- | -------------------- | -------------------------------------- |
 | `OFF`            | no          | no                   | nobody                                 |
-| `HUMAN_APPROVAL` | yes         | yes                  | an authorized workspace reviewer       |
+| `HUMAN_APPROVAL` | yes         | yes                  | a workspace owner or administrator     |
 | `AUTOMATIC`      | yes         | yes                  | the system, subject to delivery policy |
 
 `HUMAN_APPROVAL` is an operational mode, not silent observation. An in-context unit enters
-`AWAITING_APPROVAL` with its immutable content and target. An authorized reviewer can approve that exact
-proposal or reject it with a structured reason. Approval moves the unit to `PREPARED` and triggers the normal
-delivery path; it does not bypass recipient choice, workspace pause, Silent Mode, artifact validity,
-idempotency, or any other release-time control. Rejection moves the unit to the terminal `DISCARDED` state.
+`AWAITING_APPROVAL` with its immutable content and target. A workspace owner or administrator can approve
+that exact proposal or reject it, optionally recording a structured reason. Approval moves the unit to
+`PREPARED`; release then rechecks Silent Mode, workspace availability, artifact validity, repository scope,
+recipient preference, and prior provider delivery. Rejection moves the unit to the terminal `DISCARDED`
+state.
 
 Changing a practice to `AUTOMATIC` affects newly composed feedback only. Existing proposals remain explicit
 workflow items; a configuration change must never release historical proposals implicitly. `OFF` is for a
@@ -151,7 +153,7 @@ Set or clear an override with:
 
 The body is `{"autonomy":"HUMAN_APPROVAL"}` or `{"autonomy":null}` to inherit. The catalogue filter is
 `?autonomy=<VALUE>`, and autonomy rollups are returned by
-`GET /workspaces/{workspaceSlug}/practices/autonomies`. Workspace review settings expose
+`GET /workspaces/{workspaceSlug}/practices/autonomy`. Workspace review settings expose
 `defaultAutonomy`; name `DEFAULT_AUTONOMY` in the PATCH reset set to clear the workspace override.
 
 A practice whose automated-review policy cannot run is explicitly `OFF` and cannot inherit an autonomy
@@ -184,8 +186,8 @@ Three things the scope deliberately does not do, each for a reason that outlives
 
 An artifact outside the scope refuses its signal with `OUT_OF_REVIEW_SCOPE`, which is terminal
 (`SUPPRESSED`): the branch a merge request targeted will not change, so re-offering it could not come out
-differently. Widening the scope changes what happens next, not what already did. A practice at tier `OFF`
-refuses with `PRACTICE_AUTONOMY_OFF`, which is retryable (`PENDING`): an admin raising the tier lifts it
+differently. Widening the scope changes what happens next, not what already did. A practice at `OFF`
+refuses with `PRACTICE_AUTONOMY_OFF`, which is retryable (`PENDING`): an admin raising the autonomy lifts it
 without the artifact changing.
 
 ## Measurement and intervention
@@ -207,7 +209,7 @@ how it runs is in the [practice review pipeline](./practice-review-pipeline.mdx#
 | **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it.                                                                                                                             | feedback row, draft feedback                               |
 | **Feedback**               | An admitted unit, written to the ledger with its channel, delivery state and the observations it rests on.                                                                                                                                           | comment, message, guidance                                 |
 | **Withhold**               | The composer's own decision that a lane is not worth writing on, recorded with a reason.                                                                                                                                                             | suppress, skip, drop                                       |
-| **Suppress**               | The _server's_ refusal to deliver a message it was given, recorded as `FeedbackSuppressionReason`.                                                                                                                                                   | withhold, silence                                          |
+| **Suppress**               | The _server's_ refusal to deliver feedback it was given, recorded as `FeedbackSuppressionReason`.                                                                                                                                                    | withhold, silence                                          |
 | **Notes**                  | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes _to_ the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence. | move, opener, conversation message, prepared reply, script |
 | **Placement**              | Where in-context feedback belongs: `DIFF` names an admitted observation and citation for server-resolved coordinates; `ARTIFACT` stays at summary level.                                                                                             | model-authored path, model-authored line number            |
 | **Thread key**             | The identity of one continuing conversation about one thing with one person on one channel.                                                                                                                                                          | correlation key, idempotency key                           |
@@ -215,8 +217,8 @@ how it runs is in the [practice review pipeline](./practice-review-pipeline.mdx#
 
 **Withhold and suppress are two different refusals and must never be merged.** A withhold reason
 (`NO_MATERIAL_CHANGE`, `ALREADY_SAID`, `BELOW_BAR`) is the composer saying nothing was worth saying. A
-suppression reason is the system saying it had something and refused to send it — a tier turned down, a
-cap reached, a backfilled measurement. Merging them makes "we had nothing to say" indistinguishable from
+suppression reason is the system saying it had something and refused to send it — for example, the recipient
+opted out, the artifact closed, a cap was reached, or the measurement came from a backfill. Merging them makes "we had nothing to say" indistinguishable from
 "we were not allowed to say it", which is the exact distinction the whole refusal vocabulary exists for.
 
 ### The three channels are three levels
@@ -357,16 +359,16 @@ server admission.
 
 1. A practice author chooses **AI-supported mentoring**, **Human review needed**, or **Guidance only**.
 2. For AI-supported mentoring, the occasion's recommended evidence is applied automatically; an author customizes it only when that occasion needs different evidence or limitations. Reading different evidence at a different moment is a second practice, not a second occasion.
-3. Only AI-supported mentoring can be reviewed. The other choices force the autonomy tier to `OFF` and never start an automated review.
+3. Only AI-supported mentoring can be reviewed. The other choices force the practice autonomy to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator sets the workspace default tier, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
+6. A workspace administrator sets the workspace default autonomy, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
 10. Observations retain the exact practice revision, source contract, and evidence provenance.
 11. Practice or source-contract changes move the review-rule fingerprint, so earlier claims derive as stale. Nothing marks a claim stale by hand.
-12. Automated review validation — always `AUTHOR_DECLARED` — is separate from source authorization, autonomy tier, and per-run readiness.
+12. Automated review validation — always `AUTHOR_DECLARED` — is separate from source authorization, practice autonomy, and per-run readiness.
 
 ## Writing rules
 
@@ -376,7 +378,7 @@ server admission.
 4. Put stable reason codes in machine fields and plain explanations in UI messages.
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
-7. Say what a tier does, never how loud it is: a tier is autonomy, and it is the only delivery decision a workspace configures. Nothing a tier does reaches the public **Profile** page.
+7. Describe autonomy as release authority, never as loudness or reach. It does not affect the public **Profile** page.
 8. Never write bare **binding**. Two unrelated things carry the word — a _practice binding_ (an occasion
    a practice is reviewed on, `PracticeBinding`) and a _model binding_ (a workspace's AI model for a
    purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,
