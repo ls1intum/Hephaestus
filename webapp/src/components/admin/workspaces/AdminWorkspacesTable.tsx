@@ -1,6 +1,7 @@
-import { Building2 } from "lucide-react";
+import { Building2, LogInIcon } from "lucide-react";
 import type { AdminWorkspaceView } from "@/api/types.gen";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import {
 	Table,
@@ -17,6 +18,7 @@ export interface AdminWorkspacesTableProps {
 	isLoading: boolean;
 	isError: boolean;
 	hasSearch: boolean;
+	onImpersonateOwner: (workspace: AdminWorkspaceView) => void;
 }
 
 function statusVariant(status: string): "secondary" | "destructive" | "outline" {
@@ -38,6 +40,7 @@ export function AdminWorkspacesTable({
 	isLoading,
 	isError,
 	hasSearch,
+	onImpersonateOwner,
 }: AdminWorkspacesTableProps) {
 	if (isError) {
 		return (
@@ -76,6 +79,9 @@ export function AdminWorkspacesTable({
 							Members
 						</TableHead>
 						<TableHead scope="col">Created</TableHead>
+						<TableHead scope="col" className="text-right">
+							<span className="sr-only">Support access</span>
+						</TableHead>
 					</TableRow>
 				</TableHeader>
 				<TableBody>
@@ -101,6 +107,22 @@ export function AdminWorkspacesTable({
 							<TableCell className="text-right tabular-nums">{ws.memberCount}</TableCell>
 							<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
 								{formatDate(ws.createdAt)}
+							</TableCell>
+							<TableCell className="text-right">
+								<Button
+									variant="outline"
+									size="sm"
+									disabled={ws.ownerAccountId == null}
+									title={
+										ws.ownerAccountId == null
+											? "The workspace owner has not signed in, so there is no account to impersonate."
+											: `View ${ws.displayName} as ${ws.ownerLogin ?? "its owner"}`
+									}
+									onClick={() => onImpersonateOwner(ws)}
+								>
+									<LogInIcon aria-hidden />
+									View as owner
+								</Button>
 							</TableCell>
 						</TableRow>
 					))}

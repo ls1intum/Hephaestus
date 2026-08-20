@@ -1,0 +1,51 @@
+name: Preview cleanup
+
+on:
+  pull_request:
+    branches: ["**"]
+    types: [closed]
+
+permissions:
+  contents: read
+
+jobs:
+  cleanup:
+    name: "Preview / Delete Coolify resources"
+    if: >-
+      vars.COOLIFY_URL != '' &&
+      vars.COOLIFY_APP_UUID != '' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+    steps:
+      - name: Delete preview containers, volumes, and network
+        run: |
+          set -euo pipefail
+
+          if [ -z "${COOLIFY_TOKEN}" ]; then
+            echo "::notice::COOLIFY_API_TOKEN is not configured; preview cleanup must be done manually."
+            exit 0
+          fi
+
+          body=$(mktemp)
+          status=$(curl -sS -o "${body}" -w '%{http_code}' -X DELETE \
+            -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+            -H 'Accept: application/json' \
+            --retry 3 --retry-connrefused --max-time 60 \
+            "${COOLIFY_URL}/api/v1/applications/${COOLIFY_APP_UUID}/previews/${PR_NUMBER}")
+
+          if [ "${status}" -eq 404 ]; then
+            echo "::notice::PR #${PR_NUMBER} had no Coolify preview to clean up."
+            exit 0
+          fi
+          if [ "${status}" -ge 400 ]; then
+            echo "::error::Coolify preview cleanup returned HTTP ${status}: $(cat "${body}")"
+            exit 1
+          fi
+
+          echo "::notice::Deleted Coolify preview and persistent volumes for PR #${PR_NUMBER}."
