@@ -93,19 +93,27 @@ export interface PracticeEvidenceSummaryProps {
 	signals?: readonly PracticeSignalOption[];
 	workTypeLabel: string;
 	className?: string;
+	showValidation?: boolean;
+	showValidationDetails?: boolean;
 }
 
 export interface PracticeAutomatedReviewValidationSummaryProps {
 	validation: PracticeAutomatedReviewValidation;
 }
 
-export function PracticeAutomatedReviewValidationSummary({
+export function PracticeAutomatedReviewValidationBadge({
 	validation,
 }: PracticeAutomatedReviewValidationSummaryProps) {
 	const def = VALIDATION_DEFS[validation.status];
+	return <Badge variant={def.variant}>{def.label}</Badge>;
+}
+
+export function PracticeAutomatedReviewValidationSummary({
+	validation,
+}: PracticeAutomatedReviewValidationSummaryProps) {
 	return (
 		<div className="space-y-1 text-sm">
-			<Badge variant={def.variant}>{def.label}</Badge>
+			<PracticeAutomatedReviewValidationBadge validation={validation} />
 			{/* Monospaced and breakable: nobody reads a digest, they compare one against another. */}
 			<p className="text-muted-foreground text-xs">
 				Rules <code className="break-all">{validation.reviewRuleFingerprint}</code> · policy{" "}
@@ -123,6 +131,8 @@ export function PracticeEvidenceSummary({
 	signals = [],
 	workTypeLabel,
 	className,
+	showValidation = true,
+	showValidationDetails = true,
 }: PracticeEvidenceSummaryProps) {
 	return (
 		<dl className={cn("grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2", className)}>
@@ -165,12 +175,18 @@ export function PracticeEvidenceSummary({
 					)}
 				</dd>
 			</div>
-			<div>
-				<dt className="font-medium">AI mentoring validation</dt>
-				<dd>
-					<PracticeAutomatedReviewValidationSummary validation={validation} />
-				</dd>
-			</div>
+			{showValidation && (
+				<div>
+					<dt className="font-medium">AI mentoring validation</dt>
+					<dd>
+						{showValidationDetails ? (
+							<PracticeAutomatedReviewValidationSummary validation={validation} />
+						) : (
+							<PracticeAutomatedReviewValidationBadge validation={validation} />
+						)}
+					</dd>
+				</div>
+			)}
 			{policy.knownLimitations.length > 0 && (
 				<div className="sm:col-span-2">
 					<dt className="font-medium">What the evidence cannot support</dt>

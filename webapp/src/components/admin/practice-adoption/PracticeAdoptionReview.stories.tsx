@@ -54,9 +54,10 @@ type Story = StoryObj<typeof meta>;
 
 export const Available: Story = {
 	play: async ({ canvas, args }) => {
-		const adopt = canvas.getByRole("button", { name: "Adopt practice" });
+		const adopt = canvas.getByRole("button", { name: "Add practice" });
 		await expect(adopt).toBeEnabled();
-		await expect(canvas.getByText("Starts with Review before sending")).toBeVisible();
+		await expect(canvas.getByText("Review before sending")).toBeVisible();
+		await expect(canvas.getByText("Creates “Review-ready work”")).toBeVisible();
 		await userEvent.click(adopt);
 		await expect(args.onAdopt).toHaveBeenCalledOnce();
 	},
@@ -71,26 +72,30 @@ export const ReusesExistingArea: Story = {
 	},
 };
 
-export const AlreadyAdopted: Story = {
+export const AlreadyAdded: Story = {
 	args: { preview: { ...preview, availability: "ADOPTED" } },
 	play: async ({ canvas }) => {
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adopt practice" }));
-		await expect(canvas.getByText("Already adopted")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
+		await expect(canvas.getByText("Already in this workspace")).toBeVisible();
+		await expect(canvas.getByRole("link", { name: "Open workspace practice" })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/practices/describe-what-and-why",
+		);
 	},
 };
 
-export const SlugConflict: Story = {
+export const NameUnavailable: Story = {
 	args: { preview: { ...preview, availability: "SLUG_CONFLICT" } },
 	play: async ({ canvas }) => {
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adopt practice" }));
-		await expect(canvas.getByText("Slug conflict")).toBeVisible();
+		await expect(canvas.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
+		await expect(canvas.getByText("Name unavailable")).toBeVisible();
 	},
 };
 
-export const Adopting: Story = {
+export const Adding: Story = {
 	args: { isPending: true },
 	play: async ({ canvas }) => {
-		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adopting…" }));
+		await expectGenuinelyDisabled(canvas.getByRole("button", { name: "Adding…" }));
 	},
 };
 
@@ -103,8 +108,8 @@ export const UnassignedAndOff: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Starts with Off")).toBeVisible();
-		await expect(canvas.getByText("Leave unassigned")).toBeVisible();
+		await expect(canvas.getByText("Off")).toBeVisible();
+		await expect(canvas.getByText("No area")).toBeVisible();
 	},
 };
 

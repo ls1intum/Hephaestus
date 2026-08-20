@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect, userEvent } from "storybook/test";
 import type { CuratedPracticeDefinition } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
@@ -32,7 +33,16 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Complete: Story = {};
+export const Complete: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByText("Pull request details")).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/hasDescription/)).not.toBeInTheDocument();
+		await userEvent.click(canvas.getByRole("button", { name: "How reviews work" }));
+		await expect(canvas.getByText("Pull request details")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Advanced: static analysis" }));
+		await expect(canvas.getByText(/hasDescription/)).toBeVisible();
+	},
+};
 
 export const WithoutOptionalGuidance: Story = {
 	args: {

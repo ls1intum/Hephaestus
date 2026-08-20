@@ -41,14 +41,21 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const AllAvailabilityStates: Story = {
+export const CatalogStates: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Available")).toBeVisible();
-		await expect(canvas.getByText("Adopted")).toBeVisible();
-		await expect(canvas.getByText("Slug conflict")).toBeVisible();
+		await expect(canvas.queryByText("Available")).not.toBeInTheDocument();
+		await expect(canvas.getByText("Added")).toBeVisible();
+		await expect(canvas.getByText("Name unavailable")).toBeVisible();
 		await expect(
-			canvas.getByRole("link", { name: /Review practice.*Describe what changed and why/ }),
+			canvas.getByRole("link", {
+				name: "Describe what changed and why, review for adoption",
+			}),
 		).toHaveAttribute("href", "/w/demo/admin/practices/available/describe-what-and-why");
+		await expect(
+			canvas.getByRole("link", {
+				name: "Keep pull requests focused, open workspace practice, added",
+			}),
+		).toHaveAttribute("href", "/w/demo/admin/practices/review-scope");
 	},
 };
 

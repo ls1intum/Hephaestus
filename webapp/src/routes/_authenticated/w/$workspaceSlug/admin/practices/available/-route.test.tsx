@@ -98,15 +98,19 @@ describe("available practice routes", () => {
 		renderRouteAt("/w/acme/admin/practices/available");
 
 		await screen.findByRole("heading", { name: "Available practices" }, ROUTE_RENDER_WAIT);
-		expect(await screen.findByText("Available")).not.toBeNull();
-		expect(await screen.findByText("Adopted")).not.toBeNull();
-		expect(await screen.findByText("Slug conflict")).not.toBeNull();
-		expect(await screen.findAllByText("Not independently validated")).toHaveLength(3);
+		expect(screen.queryByText("Available")).toBeNull();
+		expect(await screen.findByText("Added")).not.toBeNull();
+		expect(await screen.findByText("Name unavailable")).not.toBeNull();
+		expect(screen.queryByText("Not independently validated")).toBeNull();
 		expect(
-			screen.getByRole("link", { name: `Review practice: ${preview.definition.name}` }),
+			screen.getByRole("link", { name: `${preview.definition.name}, review for adoption` }),
 		).not.toBeNull();
-		expect(screen.getByRole("link", { name: "Review practice: Already there" })).not.toBeNull();
-		expect(screen.getByRole("link", { name: "Review practice: Local collision" })).not.toBeNull();
+		expect(
+			screen.getByRole("link", { name: "Already there, open workspace practice, added" }),
+		).not.toBeNull();
+		expect(
+			screen.getByRole("link", { name: "Local collision, view details, name unavailable" }),
+		).not.toBeNull();
 	});
 
 	it("adopts the reviewed practice and opens the workspace copy", async () => {
@@ -150,9 +154,7 @@ describe("available practice routes", () => {
 		);
 
 		const { router } = renderRouteAtWithRouter(`/w/acme/admin/practices/available/${preview.slug}`);
-		fireEvent.click(
-			await screen.findByRole("button", { name: "Adopt practice" }, ROUTE_RENDER_WAIT),
-		);
+		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith(preview.etag));
 		await waitFor(
@@ -192,7 +194,7 @@ describe("available practice routes", () => {
 		);
 
 		renderRouteAt(`/w/acme/admin/practices/available/${preview.slug}`);
-		const adopt = await screen.findByRole("button", { name: "Adopt practice" }, ROUTE_RENDER_WAIT);
+		const adopt = await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);
 		fireEvent.click(adopt);
 
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith(preview.etag));
@@ -224,9 +226,7 @@ describe("available practice routes", () => {
 		);
 
 		renderRouteAt(`/w/acme/admin/practices/available/${preview.slug}`);
-		fireEvent.click(
-			await screen.findByRole("button", { name: "Adopt practice" }, ROUTE_RENDER_WAIT),
-		);
+		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await screen.findByText("Couldn't load the adoption preview", {}, ROUTE_RENDER_WAIT);
 		expect(screen.queryByRole("heading", { name: "The adoption preview changed" })).toBeNull();
@@ -261,9 +261,7 @@ describe("available practice routes", () => {
 		);
 
 		const { router } = renderRouteAtWithRouter(`/w/acme/admin/practices/available/${preview.slug}`);
-		fireEvent.click(
-			await screen.findByRole("button", { name: "Adopt practice" }, ROUTE_RENDER_WAIT),
-		);
+		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(
 			() => expect(router.state.location.pathname).toBe(`/w/acme/admin/practices/${preview.slug}`),
