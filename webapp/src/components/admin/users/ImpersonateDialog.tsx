@@ -1,5 +1,4 @@
 import { useId, useState } from "react";
-import type { AdminAccountView } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -14,14 +13,22 @@ import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 
+export interface ImpersonationTarget {
+	id?: number;
+	displayName?: string;
+	primaryEmail?: string;
+}
+
 export interface ImpersonateDialogProps {
 	/** The user to impersonate; `null` keeps the dialog closed. */
-	user: AdminAccountView | null;
+	user: ImpersonationTarget | null;
 	isPending: boolean;
+	/** Optional pre-filled audit reason for a task-specific support entry point. */
+	defaultReason?: string;
 	/** Server refusal (e.g. admin→admin 409) shown inline; the dialog stays open so it can be read. */
 	errorMessage?: string;
 	onOpenChange: (open: boolean) => void;
-	onConfirm: (user: AdminAccountView, reason: string) => void;
+	onConfirm: (user: ImpersonationTarget, reason: string) => void;
 }
 
 /**
@@ -32,12 +39,13 @@ export interface ImpersonateDialogProps {
 export function ImpersonateDialog({
 	user,
 	isPending,
+	defaultReason = "",
 	errorMessage,
 	onOpenChange,
 	onConfirm,
 }: ImpersonateDialogProps) {
 	const reasonId = useId();
-	const [reason, setReason] = useState("");
+	const [reason, setReason] = useState(defaultReason);
 
 	// Reset the reason when the dialog targets a (different) user, so a previous entry never
 	// leaks into the next impersonation. Done as a render-phase reset (React's recommended
@@ -45,7 +53,7 @@ export function ImpersonateDialog({
 	const [lastUserId, setLastUserId] = useState<number | null | undefined>(user?.id);
 	if (user?.id !== lastUserId) {
 		setLastUserId(user?.id);
-		setReason("");
+		setReason(defaultReason);
 	}
 
 	const name = user?.displayName ?? user?.primaryEmail ?? "this account";

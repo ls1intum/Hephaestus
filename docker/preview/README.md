@@ -1,74 +1,76 @@
-# Preview Deployment Setup
+# Preview deployment setup
 
-This directory contains Docker Compose configuration for PR preview deployments on Coolify.
+Coolify deploys one application stack per pull request from `compose.app.yaml`. A preview has its own
+PostgreSQL and git-checkout volumes, but shares staging's NATS event stream and starts from a sanitized
+copy of the staging database.
 
-## Database Seeding for PR Previews
+## Runtime topology
 
-Uses the **main (non-PR) postgres data volume** via Docker socket: seed-loader will start a temporary postgres container from that volume (if no base container is running), `pg_dump`, restore into the preview DB via `docker exec` to the preview postgres container, then clean up. No DNS/host resolution needed.
+| Concern | Preview behavior | Why |
+|---|---|---|
+| PostgreSQL | Private volume per PR | Tests cannot mutate staging or another preview |
+| Seed data | One live `pg_dump` from `app-postgres-1` on first deploy | Realistic data without touching the staging data volume |
+| NATS | Shared staging `nats-server:4222` on `shared-network` | Previews see the same integration events as staging |
+| NATS consumer | `${SERVICE_NAME_APPSERVER}-consumer` | Every preview has an independent JetStream cursor |
+| App image | Immutable `${SOURCE_COMMIT}` tag from CI | The API and SPA both reflect the PR without a shared mutable tag |
+| Agent runtime | Enabled, one sandbox at a time | A selected workspace can run real reviews without exhausting the host |
+| Review automation | Paused in every cloned workspace | A clone cannot post reviews until an admin explicitly opts it in |
 
-### How It Works
+Before the first restore, the seeder recreates only the uniquely resolved preview database. The marker
+`/var/lib/postgresql/data/.hephaestus-preview-seeded` is written only after the restore and sanitization
+both succeed. A failed or partial first attempt can therefore retry cleanly, while redeploying an
+already seeded PR preserves changes made while testing. A new preview volume gets a fresh staging clone.
 
-**Key Insight:** Coolify renames PR resources, but the base (non-PR) postgres volume keeps its name. We use Docker socket to start a temporary postgres container from that volume when needed, `pg_dump`, and pipe into the preview DB.
+## Silence policy
 
-1. The main deployment provides the base postgres volume (no `-pr-*`).
-2. seed-loader (in previews) uses Docker socket to either reuse a running base container or spin up a temporary postgres container with the base volume attached, then `pg_dump`.
-3. seed-loader pipes the dump into the preview postgres via `psql` using `docker exec -i <preview-postgres-container>`; it prefers `$SERVICE_NAME_POSTGRES` (only if that container exists), otherwise it tries `postgres-<project>-pr-<PR_ID>` and finally the first `postgres-*pr-*`.
-4. Graceful fallback if the base volume is missing or dump fails.
-5. DB host is configurable via `SERVICE_NAME_POSTGRES`; defaults to `postgres` with a short DNS retry loop.
+Before the application server starts, `seed-loader`:
 
-### Setup on Server (one-time)
+1. disables automatic and manual practice-review triggers for every workspace;
+2. disables each `PRACTICE_REVIEW` model binding while preserving its selected model;
+3. pauses recurring review sweep schedules;
+4. cancels cloned active sync and agent jobs; and
+5. marks cloned pending feedback deliveries failed so recovery cannot publish a staging result.
 
-1. Ensure the main deployment exists; seed-loader will start a temporary postgres using the base volume if no base container is running.
-2. Nothing to pre-seed: seed-loader live-dumps from the base volume each preview deploy.
-3. Docker socket must be available to seed-loader (compose mounts `/var/run/docker.sock:ro`).
+It deliberately does **not** disable the practices feature. The review settings and existing data stay
+visible in the UI. To test reviews for one workspace, enable its practice-review model binding and then
+enable the desired manual or automatic trigger in that workspace's practice-review settings. Those
+changes persist for the lifetime of the PR preview.
 
-### Deployment Flow
+## One-time server and Coolify setup
 
-1. **postgres container starts** - fresh empty database
-2. **seed-loader waits** for postgres to be healthy
-3. **seed-loader uses docker socket** to run `pg_dump` from a running base container or a temporary container started with the base volume (no `-pr-*`).
-4. **seed-loader restores dump** via `psql` into preview postgres using `docker exec -i <preview-postgres-container>` (prefers `$SERVICE_NAME_POSTGRES`, otherwise uses the fallback order above).
-5. **seed-loader exits** (success or failure doesn't matter).
-6. **application-server waits for seed-loader to finish**.
-7. **Rest of stack runs** with seeded data (or empty DB fallback).
+1. Keep staging's `nats-server` attached to the external Docker network `shared-network`.
+2. Point the Coolify application at `/docker/preview/compose.app.yaml` and enable preview deployments.
+3. Keep **Connect to predefined network** enabled for Coolify proxy routing. The app server explicitly
+   joins `shared-network` as a second network.
+4. Set `PREVIEW_SEED_SOURCE_CONTAINER=app-postgres-1` if the staging Compose project/container name
+   ever changes. The source user defaults to `root` and database to `hephaestus`.
+5. Assign the web and API services sibling wildcard domains. With the current template these are
+   `pr<id>.hephaestus.felixdietrich.com` and `pr<id>.api.hephaestus.felixdietrich.com`.
+6. Leave the preview `IMAGE_TAG` unset. Coolify injects `SOURCE_COMMIT`, and CI publishes the matching
+   application-server image before the preview update is requested.
 
-### Why This Works
+The Docker socket mount is privileged access to the host Docker daemon even though it is mounted
+read-only. It is intentionally confined to the trusted preview application and used only for
+`pg_dump`, restore, and sandbox execution. Coolify's `SERVICE_NAME_POSTGRES` is a network alias, so
+the seeder resolves the physical target container only when exactly one container has both its own
+Compose project label and that service label.
 
-- ✅ Works despite Coolify renaming preview resources (we target the base non-PR volume)
-- ✅ No manual seed files or extra volumes required (live dump)
-- ✅ Standard `pg_dump` → `psql` flow
-- ✅ Graceful fallback if base volume missing or dump fails
+## Failure behavior
 
-### Fallback Behavior
+Seeding is fail-closed. If staging Postgres is unavailable, the target container cannot be resolved,
+restore fails, or sanitization fails, `seed-loader` exits non-zero and the application server does not
+start. This prevents an apparently healthy but empty or unsanitized preview. Fix the source and
+redeploy; because the success marker is absent, the next deployment retries the clone.
 
-If base volume missing or dump fails:
-
-- seed-loader logs the issue
-- Exits cleanly (non-blocking)
-- Postgres starts with empty database
-- Liquibase creates schema from scratch (~30s)
-
-### Troubleshooting
-
-Check base postgres volume (no `-pr-*`):
+Useful checks on the staging VM:
 
 ```bash
-docker volume ls --format '{{.Name}}' | grep postgres-data | grep -v pr-
+docker ps --format '{{.Names}}' | grep -E '^(app-postgres-1|core-nats-server-1)$'
+docker network inspect shared-network
+docker exec app-postgres-1 pg_dump -U root -d hephaestus --schema-only >/dev/null
 ```
 
-Manual test dump with temp container:
+## File
 
-```bash
-BASE_VOL=$(docker volume ls --format '{{.Name}}' | grep postgres-data | grep -v pr- | head -1)
-TEMP_CTN=temp-seed-test
-docker rm -f "$TEMP_CTN" >/dev/null 2>&1 || true
-docker run -d --name "$TEMP_CTN" -v "$BASE_VOL":/var/lib/postgresql/data postgres:17-alpine
-sleep 5
-docker exec "$TEMP_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists | head
-docker rm -f "$TEMP_CTN"
-```
-
-## Files
-
-- `compose.app.yaml` - Main Docker Compose for preview deployments
-- `compose.shared-infra.yaml` - Shared webhook-server (application-server image with webhook profile) and NATS stack for previews
+`compose.app.yaml` is the complete per-PR application stack. Shared NATS and webhook handling belong
+to staging and are deliberately not duplicated in this directory.

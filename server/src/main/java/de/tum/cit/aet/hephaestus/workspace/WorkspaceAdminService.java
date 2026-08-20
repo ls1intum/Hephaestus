@@ -1,8 +1,10 @@
 package de.tum.cit.aet.hephaestus.workspace;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
+import de.tum.cit.aet.hephaestus.core.auth.spi.AccountIdentityQuery;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.connection.IdentityProviderType;
+import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import de.tum.cit.aet.hephaestus.workspace.dto.AdminWorkspaceViewDTO;
 import java.util.List;
@@ -22,15 +24,18 @@ public class WorkspaceAdminService {
     private final WorkspaceRepository workspaceRepository;
     private final WorkspaceMembershipRepository membershipRepository;
     private final ConnectionService connectionService;
+    private final AccountIdentityQuery accountIdentityQuery;
 
     public WorkspaceAdminService(
         WorkspaceRepository workspaceRepository,
         WorkspaceMembershipRepository membershipRepository,
-        ConnectionService connectionService
+        ConnectionService connectionService,
+        AccountIdentityQuery accountIdentityQuery
     ) {
         this.workspaceRepository = workspaceRepository;
         this.membershipRepository = membershipRepository;
         this.connectionService = connectionService;
+        this.accountIdentityQuery = accountIdentityQuery;
     }
 
     @Transactional(readOnly = true)
@@ -43,11 +48,13 @@ public class WorkspaceAdminService {
             .findActiveProviderKind(ws.getId())
             .map(IdentityProviderType::from)
             .orElse(null);
-        String ownerLogin = membershipRepository
-            .findUserLoginsByWorkspaceIdAndRole(ws.getId(), WorkspaceRole.OWNER)
+        User owner = membershipRepository
+            .findUsersByWorkspaceIdAndRole(ws.getId(), WorkspaceRole.OWNER)
             .stream()
             .findFirst()
             .orElse(null);
+        Long ownerAccountId =
+            owner != null ? accountIdentityQuery.resolveAccountIdForActor(owner.getId()).orElse(null) : null;
         return new AdminWorkspaceViewDTO(
             ws.getId(),
             ws.getWorkspaceSlug(),
@@ -55,7 +62,8 @@ public class WorkspaceAdminService {
             ws.getStatus() != null ? ws.getStatus().name() : null,
             ws.getAccountLogin(),
             providerType,
-            ownerLogin,
+            owner != null ? owner.getLogin() : null,
+            ownerAccountId,
             membershipRepository.countByWorkspace_Id(ws.getId()),
             ws.getCreatedAt()
         );
