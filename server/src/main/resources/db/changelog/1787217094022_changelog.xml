@@ -29,8 +29,8 @@
         </createTable>
         <addUniqueConstraint tableName="practice_review_repository_target" columnNames="workspace_id,repository_monitor_id" constraintName="uk_practice_review_repository_target"/>
         <addUniqueConstraint tableName="repository_to_monitor" columnNames="workspace_id,id" constraintName="uk_repository_to_monitor_workspace_id"/>
-        <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="fk_practice_review_repository_target_workspace" onDelete="CASCADE"/>
-        <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id,repository_monitor_id" referencedTableName="repository_to_monitor" referencedColumnNames="workspace_id,id" constraintName="fk_practice_review_repository_target_monitor" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_practice_review_repository_target_workspace" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="practice_review_repository_target" baseColumnNames="workspace_id,repository_monitor_id" referencedTableName="repository_to_monitor" referencedColumnNames="workspace_id,id" constraintName="sfk_practice_review_repository_target_monitor" onDelete="CASCADE"/>
         <createIndex tableName="practice_review_repository_target" indexName="idx_practice_review_repository_target_workspace"><column name="workspace_id"/></createIndex>
         <createTable tableName="practice_review_repository_branch">
             <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_repository_branch"/></column>
@@ -40,16 +40,17 @@
         </createTable>
         <addUniqueConstraint tableName="practice_review_repository_branch" columnNames="workspace_id,repository_target_id,base_branch" constraintName="uk_practice_review_repository_branch"/>
         <addUniqueConstraint tableName="practice_review_repository_target" columnNames="workspace_id,id" constraintName="uk_practice_review_repository_target_workspace_id"/>
-        <addForeignKeyConstraint baseTableName="practice_review_repository_branch" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="fk_practice_review_repository_branch_workspace" onDelete="CASCADE"/>
-        <addForeignKeyConstraint baseTableName="practice_review_repository_branch" baseColumnNames="workspace_id,repository_target_id" referencedTableName="practice_review_repository_target" referencedColumnNames="workspace_id,id" constraintName="fk_practice_review_repository_branch_target" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="practice_review_repository_branch" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_practice_review_repository_branch_workspace" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="practice_review_repository_branch" baseColumnNames="workspace_id,repository_target_id" referencedTableName="practice_review_repository_target" referencedColumnNames="workspace_id,id" constraintName="sfk_practice_review_repository_branch_target" onDelete="CASCADE"/>
         <createIndex tableName="practice_review_repository_branch" indexName="idx_practice_review_repository_branch_target"><column name="repository_target_id"/></createIndex>
+        <createIndex tableName="practice_review_repository_branch" indexName="idx_practice_review_repository_branch_workspace"><column name="workspace_id"/></createIndex>
         <createTable tableName="practice_review_person_target">
             <column name="id" type="UUID"><constraints nullable="false" primaryKey="true" primaryKeyName="pk_practice_review_person_target"/></column>
             <column name="workspace_id" type="BIGINT"><constraints nullable="false"/></column>
             <column name="user_id" type="BIGINT"><constraints nullable="false"/></column>
         </createTable>
         <addUniqueConstraint tableName="practice_review_person_target" columnNames="workspace_id,user_id" constraintName="uk_practice_review_person_target"/>
-        <addForeignKeyConstraint baseTableName="practice_review_person_target" baseColumnNames="workspace_id,user_id" referencedTableName="workspace_membership" referencedColumnNames="workspace_id,user_id" constraintName="fk_practice_review_person_target_membership" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="practice_review_person_target" baseColumnNames="workspace_id,user_id" referencedTableName="workspace_membership" referencedColumnNames="workspace_id,user_id" constraintName="sfk_practice_review_person_target_membership" onDelete="CASCADE"/>
         <createIndex tableName="practice_review_person_target" indexName="idx_practice_review_person_target_workspace"><column name="workspace_id"/></createIndex>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             UPDATE workspace
@@ -141,9 +142,9 @@
         </createTable>
         <addUniqueConstraint tableName="agent_job" columnNames="workspace_id,id" constraintName="uk_agent_job_workspace_id"/>
         <addUniqueConstraint tableName="feedback" columnNames="workspace_id,id" constraintName="uk_feedback_workspace_id"/>
-        <addForeignKeyConstraint baseTableName="delivery_policy_evaluation" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="fk_delivery_policy_eval_workspace" onDelete="CASCADE"/>
-        <addForeignKeyConstraint baseTableName="delivery_policy_evaluation" baseColumnNames="workspace_id,agent_job_id" referencedTableName="agent_job" referencedColumnNames="workspace_id,id" constraintName="fk_delivery_policy_eval_job" onDelete="CASCADE"/>
-        <sql>ALTER TABLE delivery_policy_evaluation ADD CONSTRAINT fk_delivery_policy_eval_feedback FOREIGN KEY (workspace_id, feedback_id) REFERENCES feedback (workspace_id, id) ON DELETE SET NULL (feedback_id);</sql>
+        <addForeignKeyConstraint baseTableName="delivery_policy_evaluation" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_delivery_policy_eval_workspace" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="delivery_policy_evaluation" baseColumnNames="workspace_id,agent_job_id" referencedTableName="agent_job" referencedColumnNames="workspace_id,id" constraintName="sfk_delivery_policy_eval_job" onDelete="CASCADE"/>
+        <sql>ALTER TABLE delivery_policy_evaluation ADD CONSTRAINT sfk_delivery_policy_eval_feedback FOREIGN KEY (workspace_id, feedback_id) REFERENCES feedback (workspace_id, id) ON DELETE SET NULL (feedback_id);</sql>
         <createIndex tableName="delivery_policy_evaluation" indexName="idx_delivery_policy_eval_job"><column name="agent_job_id"/><column name="evaluated_at" descending="true"/></createIndex>
         <createIndex tableName="delivery_policy_evaluation" indexName="idx_delivery_policy_eval_feedback"><column name="feedback_id"/><column name="evaluated_at" descending="true"/></createIndex>
         <createIndex tableName="delivery_policy_evaluation" indexName="idx_delivery_policy_eval_workspace"><column name="workspace_id"/><column name="evaluated_at" descending="true"/></createIndex>
@@ -180,9 +181,9 @@
             <column name="created_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
             <column name="updated_at" type="TIMESTAMP WITH TIME ZONE"><constraints nullable="false"/></column>
         </createTable>
-        <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="fk_feedback_dispatch_workspace" onDelete="CASCADE"/>
-        <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id,agent_job_id" referencedTableName="agent_job" referencedColumnNames="workspace_id,id" constraintName="fk_feedback_dispatch_job" onDelete="CASCADE"/>
-        <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id,feedback_id" referencedTableName="feedback" referencedColumnNames="workspace_id,id" constraintName="fk_feedback_dispatch_feedback" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id" referencedTableName="workspace" referencedColumnNames="id" constraintName="sfk_feedback_dispatch_workspace" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id,agent_job_id" referencedTableName="agent_job" referencedColumnNames="workspace_id,id" constraintName="sfk_feedback_dispatch_job" onDelete="CASCADE"/>
+        <addForeignKeyConstraint baseTableName="feedback_dispatch" baseColumnNames="workspace_id,feedback_id" referencedTableName="feedback" referencedColumnNames="workspace_id,id" constraintName="sfk_feedback_dispatch_feedback" onDelete="CASCADE"/>
         <sql splitStatements="true" endDelimiter=";"><![CDATA[
             ALTER TABLE feedback_dispatch ADD CONSTRAINT chk_feedback_dispatch_state
                 CHECK (state IN ('PENDING', 'CLAIMED', 'SENT', 'SUPPRESSED', 'UNCERTAIN', 'FAILED'));
