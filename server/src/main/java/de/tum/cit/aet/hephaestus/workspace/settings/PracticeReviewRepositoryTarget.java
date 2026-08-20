@@ -15,10 +15,16 @@ import lombok.Setter;
 @Entity
 @Table(
     name = "practice_review_repository_target",
-    uniqueConstraints = @UniqueConstraint(
-        name = "uk_practice_review_repository_target",
-        columnNames = { "workspace_id", "repository_monitor_id" }
-    ),
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_practice_review_repository_target",
+            columnNames = { "workspace_id", "repository_monitor_id" }
+        ),
+        @UniqueConstraint(
+            name = "uk_practice_review_repository_target_workspace_id",
+            columnNames = { "workspace_id", "id" }
+        ),
+    },
     indexes = @Index(name = "idx_practice_review_repository_target_workspace", columnList = "workspace_id")
 )
 @Getter

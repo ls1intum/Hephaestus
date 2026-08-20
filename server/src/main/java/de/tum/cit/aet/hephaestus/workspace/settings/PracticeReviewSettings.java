@@ -7,6 +7,7 @@ import jakarta.persistence.Enumerated;
 import java.util.Set;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 import org.jspecify.annotations.Nullable;
 
 /**
@@ -43,22 +44,27 @@ public class PracticeReviewSettings {
     private Integer cooldownMinutes;
 
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ALL_MONITORED'")
     @Column(name = "practice_repository_coverage_mode", nullable = false, length = 24)
     private ReviewRepositoryMode repositoryCoverageMode = ReviewRepositoryMode.ALL_MONITORED;
 
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ALL_ELIGIBLE'")
     @Column(name = "practice_person_coverage_mode", nullable = false, length = 24)
     private ReviewPersonMode personCoverageMode = ReviewPersonMode.ALL_ELIGIBLE;
 
     @Enumerated(EnumType.STRING)
+    @ColumnDefault("'ACTIVE'")
     @Column(name = "practice_delivery_status", nullable = false, length = 16)
     private PracticeDeliveryStatus deliveryStatus = PracticeDeliveryStatus.ACTIVE;
 
     /** Monotonic admission provenance; never reuse a revision after reverting configuration. */
+    @ColumnDefault("0")
     @Column(name = "practice_rollout_revision", nullable = false)
     private long rolloutRevision;
 
     /** Optimistic-concurrency version, independent of rollout provenance. */
+    @ColumnDefault("0")
     @Column(name = "practice_config_version", nullable = false)
     private long configVersion;
 

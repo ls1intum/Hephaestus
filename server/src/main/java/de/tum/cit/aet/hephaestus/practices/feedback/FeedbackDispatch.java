@@ -14,6 +14,7 @@ import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import tools.jackson.databind.JsonNode;
@@ -74,6 +75,7 @@ public class FeedbackDispatch {
     private JsonNode practiceSlugs;
 
     @NotNull
+    @ColumnDefault("false")
     @Column(name = "write_started", nullable = false)
     private Boolean writeStarted;
 

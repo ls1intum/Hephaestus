@@ -56,7 +56,10 @@ import tools.jackson.databind.JsonNode;
             columnList = "workspace_id, purpose, created_at DESC, id DESC"
         ),
     },
-    uniqueConstraints = @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" })
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" }),
+        @UniqueConstraint(name = "uk_agent_job_workspace_id", columnNames = { "workspace_id", "id" }),
+    }
 )
 @Getter
 @Setter
@@ -108,14 +111,17 @@ public class AgentJob {
     @Nullable
     private ArtifactKind artifactKind;
 
-    @Column(name = "practice_rollout_revision")
+    @ColumnDefault("0")
+    @Column(name = "practice_rollout_revision", nullable = false)
     private Long practiceRolloutRevision = 0L;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "practice_trigger_mode", length = 20)
+    @ColumnDefault("'MANUAL'")
+    @Column(name = "practice_trigger_mode", nullable = false, length = 24)
     private TriggerMode practiceTriggerMode;
 
     /** Administrative evaluations set this false. */
+    @ColumnDefault("true")
     @Column(name = "external_delivery_allowed", nullable = false)
     private boolean externalDeliveryAllowed = true;
 
