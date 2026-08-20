@@ -9145,8 +9145,6 @@ components:
           - ADMINISTRATIVE
     DeliveryPolicyTrace:
       type: object
-      description: "One immutable delivery decision, exposed only under Review activity's\
-        \ technical disclosure."
       properties:
         admittedRevision:
           type: integer
@@ -13047,8 +13045,6 @@ components:
       - slug
     ReviewRepositoryTarget:
       type: object
-      description: One selected monitored repository and its optional exact base-branch
-        restriction.
       properties:
         baseBranches:
           type: array
@@ -15089,13 +15085,8 @@ components:
           description: "GitLab workspace provider config, null if not available"
     WorkspaceReviewScope:
       type: object
-      description: |-
-        Effective practice-review coverage for one workspace.
-
-         <p>The modes are explicit because an empty selected set means nobody, while an empty list in
-         <code>ALL_*</code> mode is the ordinary broad-coverage configuration. Repository branch restrictions are
-         attached to the repository they qualify; an empty branch list means every base branch in that
-         repository.
+      description: Selected mode with no targets admits nobody; a selected repository
+        with no branches admits every branch.
       properties:
         personMode:
           type: string
