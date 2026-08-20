@@ -54,8 +54,8 @@ erDiagram
     }
 
     AgentJob {
-        UUID id PK
-        BIGINT workspace_id FK "NOT NULL"
+        UUID id PK,UK
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(50) job_type "NOT NULL"
         VARCHAR(20) status "NOT NULL"
         JSONB metadata
@@ -289,13 +289,15 @@ erDiagram
         BIGINT workspace_id FK "NOT NULL"
         UUID agent_job_id FK "NOT NULL"
         UUID feedback_id FK
-        BIGINT rollout_revision "NOT NULL"
+        BIGINT admitted_revision "NOT NULL"
+        BIGINT evaluated_revision
         VARCHAR(16) resolver_version "NOT NULL"
         VARCHAR(24) surface "NOT NULL"
         VARCHAR(24) stage "NOT NULL"
         BOOLEAN allowed "NOT NULL"
         VARCHAR(48) decisive_reason
         JSONB checks "NOT NULL"
+        JSONB facts "NOT NULL"
         TIMESTAMPTZ evaluated_at "NOT NULL"
     }
 
@@ -361,9 +363,9 @@ erDiagram
     }
 
     Feedback {
-        UUID id PK
+        UUID id PK,UK
         UUID agent_job_id FK,UK "NOT NULL"
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         VARCHAR(64) artifact_kind
         BIGINT artifact_id
         BIGINT recipient_user_id FK "NOT NULL"
@@ -402,9 +404,12 @@ erDiagram
         VARCHAR(16) state "NOT NULL"
         TEXT body "NOT NULL"
         VARCHAR(255) target_external_ref
+        JSONB practice_slugs "NOT NULL"
+        BOOLEAN write_started "NOT NULL"
         VARCHAR(255) delivered_external_ref
         VARCHAR(64) lease_owner
         TIMESTAMPTZ lease_expires_at
+        TIMESTAMPTZ next_attempt_at "NOT NULL"
         INTEGER attempt_count "NOT NULL"
         VARCHAR(512) last_error
         TIMESTAMPTZ created_at "NOT NULL"
@@ -918,7 +923,7 @@ erDiagram
     }
 
     PracticeReviewRepositoryTarget {
-        UUID id PK
+        UUID id PK,UK
         BIGINT workspace_id FK,UK "NOT NULL"
         BIGINT repository_monitor_id FK,UK "NOT NULL"
     }
@@ -1137,12 +1142,12 @@ erDiagram
     }
 
     RepositoryToMonitor {
-        BIGINT id PK
+        BIGINT id PK,UK
         TIMESTAMPTZ labels_synced_at
         TIMESTAMPTZ milestones_synced_at
         VARCHAR(255) name_with_owner
         TIMESTAMPTZ repository_synced_at
-        BIGINT workspace_id FK "NOT NULL"
+        BIGINT workspace_id FK,UK "NOT NULL"
         TIMESTAMPTZ backfill_last_run_at
         TIMESTAMPTZ collaborators_synced_at
         VARCHAR(255) issue_sync_cursor
@@ -1396,6 +1401,7 @@ erDiagram
         VARCHAR(24) practice_person_coverage_mode "NOT NULL"
         VARCHAR(16) practice_delivery_status "NOT NULL"
         BIGINT practice_rollout_revision "NOT NULL"
+        BIGINT practice_config_version "NOT NULL"
     }
 
     WorkspaceAgentBinding {
@@ -1522,8 +1528,8 @@ erDiagram
     Workspace ||--o{ ConfigAuditEvent : has
     Workspace ||--o{ Connection : has
     Connection ||--o{ ConnectionAudit : has
-    Feedback ||--o{ DeliveryPolicyEvaluation : has
-    AgentJob ||--o{ DeliveryPolicyEvaluation : has
+    Feedback ||--o{ DeliveryPolicyEvaluation : references
+    AgentJob ||--o{ DeliveryPolicyEvaluation : references
     Workspace ||--o{ DeliveryPolicyEvaluation : has
     User ||--o{ Discussion : references
     User ||--o{ Discussion : authored_by
@@ -1540,8 +1546,8 @@ erDiagram
     Feedback ||--o{ Feedback : references
     User ||--o{ Feedback : about_user_id
     Workspace ||--o{ Feedback : has
-    Feedback ||--o{ FeedbackDispatch : has
-    AgentJob ||--o{ FeedbackDispatch : has
+    Feedback ||--o{ FeedbackDispatch : references
+    AgentJob ||--o{ FeedbackDispatch : references
     Workspace ||--o{ FeedbackDispatch : has
     Feedback ||--o{ FeedbackPlacement : has
     ChatMessage ||--o{ FeedbackPlacement : has
