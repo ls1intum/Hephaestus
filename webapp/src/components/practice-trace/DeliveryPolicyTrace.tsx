@@ -61,7 +61,14 @@ export function DeliveryPolicyTrace({ evaluations }: DeliveryPolicyTraceProps) {
 											<Icon aria-hidden className="size-3.5" />
 											{deliveryCheckLabels[check.check]}
 										</span>
-										<Badge variant={check.status === "DENIED" ? "destructive" : "secondary"}>
+										<Badge
+											variant={check.status === "DENIED" ? "outline" : "secondary"}
+											className={
+												check.status === "DENIED"
+													? "border-destructive/40 text-destructive"
+													: undefined
+											}
+										>
 											{deliveryStatusLabels[check.status]}
 										</Badge>
 									</li>
