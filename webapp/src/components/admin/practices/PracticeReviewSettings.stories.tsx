@@ -289,7 +289,7 @@ export const WideningRequiresConfirmation: Story = {
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByLabelText("All monitored repositories"));
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 		await expect(canvas.getByRole("alertdialog")).toBeVisible();
 		await expect(canvas.getByText(/Monitored repositories covered:/)).toHaveTextContent("3");
 		await expect(canvas.getByText(/Workspace-wide context:/)).toHaveTextContent(
@@ -310,7 +310,7 @@ export const CoveragePreviewLoading: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await userEvent.click(canvas.getByLabelText("All monitored repositories"));
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 		await expect(canvas.getByText("Calculating the proposed coverage…")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
 	},
@@ -325,7 +325,7 @@ export const CoveragePreviewUnavailable: Story = {
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByLabelText("All monitored repositories"));
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 		await expect(canvas.getByText("Couldn't preview this change")).toBeVisible();
 		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
 		await expect(args.coverage.preview.onPreview).toHaveBeenCalledTimes(2);
