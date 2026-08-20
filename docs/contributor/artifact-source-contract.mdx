@@ -318,18 +318,17 @@ back as automated-review input needs a governed source kind and purpose authoriz
 
 ## What runs before evidence
 
-Two workspace-level gates decide whether a review is admitted at all, before any source is captured. Both
+Workspace-level gates decide whether a review is admitted at all, before any source is captured. They
 refuse the signal with a typed reason rather than silently doing nothing.
 
 - **Practice autonomy.** A practice at `OFF` admits no review; `HUMAN_APPROVAL` and `AUTOMATIC` both run it and differ
   in whether a person must authorize release. When every practice bound to a signal sits at `OFF`, the signal is
   refused with `PRACTICE_AUTONOMY_OFF`.
-- **Review scope.** An artifact outside the workspace's declared branches or repositories is refused with
-  `OUT_OF_REVIEW_SCOPE`.
+- **Review coverage.** Repository and linked-person coverage are intersected. Selected-empty, an unlinked
+  author, or a repository/base branch outside the selection is refused before evidence capture.
 
-Both are defined in the [practice review glossary](./practice-review-glossary.mdx), including which refusal
-is retryable and which is terminal. Neither is an evidence concern — they decide whether evidence is
-collected at all.
+These controls are defined in the [practice review glossary](./practice-review-glossary.mdx). They are not
+evidence concerns—they decide whether evidence is collected at all.
 
 ## Conservative examples
 

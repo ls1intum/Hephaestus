@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import jakarta.persistence.LockModeType;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.jspecify.annotations.Nullable;
@@ -69,6 +70,9 @@ public interface PracticeRepository extends JpaRepository<Practice, Long> {
 
     @EntityGraph(attributePaths = { "area", "currentRevision" })
     Optional<Practice> findByWorkspaceIdAndSlug(Long workspaceId, String slug);
+
+    @EntityGraph(attributePaths = { "area" })
+    List<Practice> findByWorkspaceIdAndSlugIn(Long workspaceId, Collection<String> slugs);
 
     @EntityGraph(attributePaths = { "area" })
     @Query(

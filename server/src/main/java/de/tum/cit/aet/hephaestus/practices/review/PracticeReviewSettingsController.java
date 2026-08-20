@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.core.AuditExempt;
 import de.tum.cit.aet.hephaestus.core.AuditLedger;
 import de.tum.cit.aet.hephaestus.core.Audited;
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.workspace.authorization.RequireAtLeastWorkspaceAdmin;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceScopedController;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,11 +15,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 
 @WorkspaceScopedController
@@ -37,7 +44,18 @@ public class PracticeReviewSettingsController {
     )
     @RequireAtLeastWorkspaceAdmin
     public ResponseEntity<PracticeReviewSettingsDTO> getPracticeReviewSettings(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(practiceReviewSettingsService.getSettings(workspaceContext));
+        return response(practiceReviewSettingsService.getSettings(workspaceContext));
+    }
+
+    @PostMapping("/coverage-preview")
+    @Operation(summary = "Preview the effective counts for proposed practice-review coverage")
+    @RequireAtLeastWorkspaceAdmin
+    @AuditExempt(reason = "computes a read-only coverage preview; stores no configuration")
+    public PracticeReviewCoveragePreviewDTO previewCoverage(
+        WorkspaceContext workspaceContext,
+        @Valid @RequestBody WorkspaceReviewScope proposed
+    ) {
+        return practiceReviewSettingsService.previewCoverage(workspaceContext, proposed);
     }
 
     @PatchMapping
@@ -51,8 +69,19 @@ public class PracticeReviewSettingsController {
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_REVIEW_SETTINGS")
     public ResponseEntity<PracticeReviewSettingsDTO> updatePracticeReviewSettings(
         WorkspaceContext workspaceContext,
+        @RequestHeader(name = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch,
         @Valid @RequestBody UpdatePracticeReviewSettingsRequestDTO request
     ) {
-        return ResponseEntity.ok(practiceReviewSettingsService.updatePracticeReview(workspaceContext, request));
+        return response(
+            practiceReviewSettingsService.updatePracticeReview(
+                workspaceContext,
+                request,
+                ifMatch == null ? null : EntityTagPrecondition.parse(ifMatch)
+            )
+        );
+    }
+
+    private static ResponseEntity<PracticeReviewSettingsDTO> response(PracticeReviewSettingsDTO settings) {
+        return ResponseEntity.ok().eTag(settings.etag()).body(settings);
     }
 }

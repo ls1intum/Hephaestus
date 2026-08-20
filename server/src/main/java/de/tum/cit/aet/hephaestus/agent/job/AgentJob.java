@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -106,6 +107,17 @@ public class AgentJob {
     @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH)
     @Nullable
     private ArtifactKind artifactKind;
+
+    @Column(name = "practice_rollout_revision")
+    private Long practiceRolloutRevision = 0L;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "practice_trigger_mode", length = 20)
+    private TriggerMode practiceTriggerMode;
+
+    /** Administrative evaluations set this false. */
+    @Column(name = "external_delivery_allowed", nullable = false)
+    private boolean externalDeliveryAllowed = true;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")

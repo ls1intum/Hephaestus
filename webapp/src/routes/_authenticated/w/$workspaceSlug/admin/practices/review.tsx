@@ -5,13 +5,16 @@ import { toast } from "sonner";
 import {
 	autonomyRollupOptions,
 	getPracticeReviewSettingsOptions,
+	getRepositoriesToMonitorOptions,
 	getWorkspaceOptions,
 	listAgentsOptions,
 	listBackfillRunsOptions,
 	listBackfillRunsQueryKey,
+	listMembersOptions,
 	listPracticesOptions,
 	listSweepSchedulesOptions,
 	preflightBackfillRunMutation,
+	previewCoverageMutation,
 	updateBackfillRunStatusMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type {
@@ -210,6 +213,9 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 	const bindingsQuery = useQuery({ ...listAgentsOptions({ path: { workspaceSlug } }) });
 	const workspaceQuery = useQuery({ ...getWorkspaceOptions({ path: { workspaceSlug } }) });
 	const schedulesQuery = useQuery(listSweepSchedulesOptions({ path: { workspaceSlug } }));
+	const repositoriesQuery = useQuery(getRepositoriesToMonitorOptions({ path: { workspaceSlug } }));
+	const membersQuery = useQuery(listMembersOptions({ path: { workspaceSlug } }));
+	const coveragePreview = useMutation(previewCoverageMutation());
 
 	const updatePracticeReviewSettings = usePracticeReviewSettingsMutation(workspaceSlug, {
 		success: "Review settings updated",
@@ -282,6 +288,36 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 								path: { workspaceSlug },
 								body: { reset: [field] },
 							}),
+					}}
+					coverage={{
+						preview: {
+							data: coveragePreview.data,
+							isPending: coveragePreview.isPending,
+							isError: coveragePreview.isError,
+							onPreview: (scope) => {
+								coveragePreview.reset();
+								coveragePreview.mutate({ path: { workspaceSlug }, body: scope });
+							},
+						},
+						repositories: {
+							options: (repositoriesQuery.data ?? []).map((repository) => ({
+								value: repository,
+								label: repository,
+							})),
+							isLoading: repositoriesQuery.isLoading,
+							isError: repositoriesQuery.isError,
+						},
+						people: {
+							options: (membersQuery.data ?? [])
+								.filter((member) => member.userId != null)
+								.map((member) => ({
+									value: member.userId as number,
+									label: member.userName || member.userLogin || `Member ${member.userId}`,
+									description: member.userLogin ? `@${member.userLogin}` : undefined,
+								})),
+							isLoading: membersQuery.isLoading,
+							isError: membersQuery.isError,
+						},
 					}}
 				/>
 			)}

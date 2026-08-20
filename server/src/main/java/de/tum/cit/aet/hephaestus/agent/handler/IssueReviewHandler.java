@@ -27,6 +27,7 @@ import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelope;
 import de.tum.cit.aet.hephaestus.agent.task.TaskEnvelopeWriter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
@@ -67,6 +68,7 @@ public class IssueReviewHandler implements JobTypeHandler {
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
     private final PracticeFeedbackCommentFormatter commentFormatter;
     private final ObservationRepository observationRepository;
+    private final PracticeFeedbackDispatchService dispatchService;
 
     IssueReviewHandler(
         JsonMapper objectMapper,
@@ -81,7 +83,8 @@ public class IssueReviewHandler implements JobTypeHandler {
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         PracticeFeedbackCommentFormatter commentFormatter,
-        ObservationRepository observationRepository
+        ObservationRepository observationRepository,
+        PracticeFeedbackDispatchService dispatchService
     ) {
         this.objectMapper = objectMapper;
         this.workspaceContextBuilder = workspaceContextBuilder;
@@ -96,6 +99,7 @@ public class IssueReviewHandler implements JobTypeHandler {
         this.deliveryPolicy = deliveryPolicy;
         this.commentFormatter = commentFormatter;
         this.observationRepository = observationRepository;
+        this.dispatchService = dispatchService;
     }
 
     @Override
@@ -265,7 +269,14 @@ public class IssueReviewHandler implements JobTypeHandler {
             DeliveryComposer.compose(proposals, ArtifactKinds.ISSUE, why, null, units),
             proposals
         );
-        postIssueNote(job, DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units));
+        postIssueNote(
+            job,
+            DeliveryComposer.compose(loudEnough, ArtifactKinds.ISSUE, why, null, units),
+            loudEnough
+                .stream()
+                .map(PracticeDetectionResultParser.ValidatedObservation::practiceSlug)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet())
+        );
     }
 
     private PracticeDetectionResultParser.ValidatedObservation validated(Observation observation) {
@@ -304,9 +315,18 @@ public class IssueReviewHandler implements JobTypeHandler {
         return commentPoster.findExistingSummaryComment(job);
     }
 
-    void postIssueNote(AgentJob job, PracticeDetectionResultParser.@Nullable DeliveryContent delivery) {
+    void postIssueNote(
+        AgentJob job,
+        PracticeDetectionResultParser.@Nullable DeliveryContent delivery,
+        Set<String> contributingPracticeSlugs
+    ) {
         if (delivery == null || delivery.mrNote() == null) return;
-        PracticeFeedbackDeliveryPolicy.Decision<Issue> decision = deliveryPolicy.evaluateIssue(job);
+        PracticeFeedbackDeliveryPolicy.Decision<Issue> decision = deliveryPolicy.evaluateIssue(
+            job,
+            DeliveryPolicyStage.AUTOMATIC,
+            null,
+            contributingPracticeSlugs
+        );
         if (!decision.allowed()) {
             if (decision.suppressionReason() != null) recordSuppressed(job, delivery, decision.suppressionReason());
             return;
@@ -318,21 +338,29 @@ public class IssueReviewHandler implements JobTypeHandler {
         }
         try {
             String formatted = commentFormatter.format(sanitized, job);
-            String prior = feedbackLedgerRecorder.priorLiveSummaryRef(job).orElse(null);
-            PullRequestCommentPoster.UpdateResult update =
-                prior == null ? null : commentPoster.updateFormattedBody(job, prior, formatted);
-            if (update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
-                job.setDeliveryCommentId(prior);
+            PracticeFeedbackDispatchService.Result result = dispatchService.dispatchAutomaticSummary(
+                job,
+                formatted,
+                null,
+                contributingPracticeSlugs
+            );
+            if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
+                recordSuppressed(
+                    job,
+                    delivery,
+                    result.suppressionReason() == null
+                        ? FeedbackSuppressionReason.INSTANCE_SILENCED
+                        : result.suppressionReason()
+                );
                 return;
             }
-            String commentId =
-                update != null && update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED
-                    ? update.externalId()
-                    : commentPoster.postIssueFormattedBody(job, formatted);
-            if (commentId == null) {
+            if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT || result.externalRef() == null) {
                 feedbackLedgerRecorder.recordUndelivered(job, delivery);
-                return;
+                throw new JobDeliveryException(
+                    "Issue summary dispatch is awaiting reconciliation: jobId=" + job.getId()
+                );
             }
+            String commentId = result.externalRef();
             job.setDeliveryCommentId(commentId);
             feedbackLedgerRecorder.record(job, delivery, ArtifactKinds.ISSUE, List.of());
         } catch (JobDeliverySuppressedException e) {

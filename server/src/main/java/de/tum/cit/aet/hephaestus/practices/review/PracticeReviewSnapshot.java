@@ -15,13 +15,26 @@ record PracticeReviewSnapshot(
     @Nullable Boolean deliverToMerged,
     @Nullable Integer cooldownMinutes,
     @Nullable WorkspaceReviewScope reviewScope,
+    String deliveryStatus,
+    long revision,
     @Nullable String defaultAutonomy
 ) implements ConfigAuditSnapshot {
-    static PracticeReviewSnapshot of(PracticeReviewSettings s) {
+    boolean samePolicyAs(PracticeReviewSnapshot other) {
+        return (
+            java.util.Objects.equals(deliverToMerged, other.deliverToMerged) &&
+            java.util.Objects.equals(reviewScope, other.reviewScope) &&
+            deliveryStatus.equals(other.deliveryStatus) &&
+            java.util.Objects.equals(defaultAutonomy, other.defaultAutonomy)
+        );
+    }
+
+    static PracticeReviewSnapshot of(PracticeReviewSettings s, WorkspaceReviewScope scope) {
         return new PracticeReviewSnapshot(
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
-            s.getReviewScope(),
+            scope,
+            s.getDeliveryStatus().name(),
+            s.getRolloutRevision(),
             s.getDefaultAutonomy()
         );
     }

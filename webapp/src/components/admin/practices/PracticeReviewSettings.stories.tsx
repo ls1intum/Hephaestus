@@ -36,6 +36,32 @@ const policy = {
 	onReset: fn(),
 };
 
+const coverage = {
+	preview: {
+		data: {
+			current: settings.coverageSummary,
+			proposed: { ...settings.coverageSummary, coveredRepositories: 3 },
+			widens: true,
+		},
+		isPending: false,
+		isError: false,
+		onPreview: fn(),
+	},
+	repositories: {
+		options: ["acme/widgets", "acme/gadgets"].map((value) => ({ value, label: value })),
+		isLoading: false,
+		isError: false,
+	},
+	people: {
+		options: [
+			{ value: 7, label: "Ada Lovelace", description: "@ada" },
+			{ value: 8, label: "Grace Hopper", description: "@grace" },
+		],
+		isLoading: false,
+		isError: false,
+	},
+};
+
 const meta = {
 	title: "Workspace admin/Practices/Review/When and where",
 	component: PracticeReviewSettings,
@@ -49,6 +75,7 @@ const meta = {
 		model,
 		workspace,
 		policy,
+		coverage,
 	},
 	decorators: [
 		(Story) => (
@@ -142,25 +169,6 @@ export const TriggersOff: Story = {
 	},
 };
 
-export const RequestedReviewsNamesEveryDoor: Story = {
-	play: async ({ canvas }) => {
-		const requested = canvas.getByRole("switch", { name: "Reviews somebody asks for" });
-		await expect(requested).toBeVisible();
-
-		// This story runs at the default viewport; the width is asserted so the row check below cannot
-		// pass by being measured at a narrow one.
-		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
-		await expectSwitchSitsBesideItsLabel(requested);
-
-		const description = canvas.getByText(/Turning this off stops every one of them/i);
-		await expect(description).toHaveTextContent("Review this now");
-		await expect(description).toHaveTextContent("backfill of past work");
-		await expect(description).toHaveTextContent("recurring check");
-		// Only GitLab publishes the comment event, so the copy must not promise it everywhere.
-		await expect(description).toHaveTextContent("GitLab merge request comment");
-	},
-};
-
 export const ReviewsPaused: Story = {
 	args: { workspace: { ...workspace, enabled: false } },
 };
@@ -172,8 +180,12 @@ export const ReviewScopeNarrowed: Story = {
 			settings: {
 				...settings,
 				reviewScope: {
-					targetBranches: ["main", "release/2026.1"],
-					repositories: ["acme/widgets", "acme/gadgets"],
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [
+						{ nameWithOwner: "acme/widgets", baseBranches: ["main", "release/2026.1"] },
+					],
+					personUserIds: [7],
 				},
 			},
 		},
@@ -198,28 +210,32 @@ export const AddingATargetBranch: Story = {
 			onUpdate: fn(),
 			settings: {
 				...settings,
-				reviewScope: { targetBranches: [], repositories: ["acme/widgets"] },
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+					personUserIds: [],
+				},
 			},
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.type(canvas.getByLabelText("Target branches"), "  release/2026.1  ");
-		await userEvent.click(canvas.getByRole("button", { name: "Add to target branches" }));
+		await userEvent.type(
+			canvas.getByLabelText("Base branches for acme/widgets"),
+			"  release/2026.1  ",
+		);
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
+		);
 
 		// Trimmed on the way out: a name with a stray space matches no branch the gate ever sees.
 		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: ["release/2026.1"], repositories: ["acme/widgets"] },
-		});
-	},
-};
-
-export const EnterAddsTheEntry: Story = {
-	args: { policy: { ...policy, onUpdate: fn() } },
-	play: async ({ args, canvas }) => {
-		await userEvent.type(canvas.getByLabelText("Repositories"), "acme/gadgets{Enter}");
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: [], repositories: ["acme/gadgets"] },
+			reviewScope: {
+				repositoryMode: "SELECTED",
+				personMode: "ALL_ELIGIBLE",
+				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["release/2026.1"] }],
+				personUserIds: [],
+			},
 		});
 	},
 };
@@ -230,59 +246,110 @@ export const RefusingADuplicate: Story = {
 		policy: {
 			...policy,
 			onUpdate: fn(),
-			settings: { ...settings, reviewScope: { targetBranches: ["main"], repositories: [] } },
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+					personUserIds: [],
+				},
+			},
 		},
 	},
 	play: async ({ args, canvas }) => {
-		const input = canvas.getByLabelText("Target branches");
+		const input = canvas.getByLabelText("Base branches for acme/widgets");
 		await userEvent.type(input, "main");
 
 		await expect(input).toBeInvalid();
 		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
-		await expect(canvas.getByRole("button", { name: "Add to target branches" })).toBeDisabled();
+		await expect(
+			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
+		).toBeDisabled();
 
 		await userEvent.type(input, "{Enter}");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
 };
 
-export const RemovingATargetBranch: Story = {
+export const SelectedEmptyMeansNobody: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [],
+					personUserIds: [],
+				},
+			},
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("No repositories are covered.")).toBeVisible();
+		await expect(canvas.getByText("No people are covered.")).toBeVisible();
+	},
+};
+
+export const WideningRequiresConfirmation: Story = {
 	args: {
 		policy: {
 			...policy,
 			onUpdate: fn(),
 			settings: {
 				...settings,
-				reviewScope: { targetBranches: ["main", "release/2026.1"], repositories: [] },
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+					personUserIds: [],
+				},
 			},
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Remove release/2026.1" }));
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: ["main"], repositories: [] },
-		});
+		await userEvent.click(canvas.getByLabelText("All monitored repositories"));
+		await expect(canvas.getByRole("alertdialog")).toBeVisible();
+		await expect(canvas.getByText(/Monitored repositories covered:/)).toHaveTextContent("3");
+		await expect(canvas.getByText(/Workspace-wide context:/)).toHaveTextContent(
+			"not just this proposed population",
+		);
+		await expect(args.coverage.preview.onPreview).toHaveBeenCalled();
+		await userEvent.click(canvas.getByRole("button", { name: "Widen coverage" }));
+		await expect(args.policy.onUpdate).toHaveBeenCalled();
 	},
 };
 
-/** Widening back to everything is a reset rather than an empty save. */
-export const WideningTheScopeAgain: Story = {
+export const CoveragePreviewLoading: Story = {
 	args: {
-		policy: {
-			...policy,
-			onReset: fn(),
-			settings: {
-				...settings,
-				reviewScope: { targetBranches: ["main"], repositories: [] },
-			},
+		...WideningRequiresConfirmation.args,
+		coverage: {
+			...coverage,
+			preview: { data: undefined, isPending: true, isError: false, onPreview: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await userEvent.click(canvas.getByLabelText("All monitored repositories"));
+		await expect(canvas.getByText("Calculating the proposed coverage…")).toBeVisible();
+		await expect(canvas.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+	},
+};
+
+export const CoveragePreviewUnavailable: Story = {
+	args: {
+		...WideningRequiresConfirmation.args,
+		coverage: {
+			...coverage,
+			preview: { data: undefined, isPending: false, isError: true, onPreview: fn() },
 		},
 	},
 	play: async ({ args, canvas }) => {
-		const reset = canvas.getByRole("button", { name: /^Review everything again/ });
-		await userEvent.click(reset);
-
-		await expect(args.policy.onReset).toHaveBeenCalledWith("REVIEW_SCOPE");
+		await userEvent.click(canvas.getByLabelText("All monitored repositories"));
+		await expect(canvas.getByText("Couldn't preview this change")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		await expect(args.coverage.preview.onPreview).toHaveBeenCalledTimes(2);
 	},
 };
 

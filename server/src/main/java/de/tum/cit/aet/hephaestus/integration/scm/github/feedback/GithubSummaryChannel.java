@@ -101,7 +101,7 @@ public class GithubSummaryChannel implements SummaryChannel {
         if (isIssueSubject(subject)) {
             IssueCoordinates issue = parseIssueSubjectExternalId(subject);
             String issueNodeId = prNodeIdResolver.resolveIssue(scopeId, issue.owner(), issue.name(), issue.number());
-            String commentNodeId = createComment(scopeId, issueNodeId, content.body());
+            String commentNodeId = createComment(scopeId, issueNodeId, content.externalBody());
             log.info(
                 "Posted GitHub issue comment: workspaceId={}, issueNodeId={}, commentId={}",
                 scopeId,
@@ -113,7 +113,7 @@ public class GithubSummaryChannel implements SummaryChannel {
 
         PrCoordinates pr = parseSubjectExternalId(subject);
         String prNodeId = prNodeIdResolver.resolve(scopeId, pr.owner(), pr.name(), pr.number());
-        String commentNodeId = createComment(scopeId, prNodeId, content.body());
+        String commentNodeId = createComment(scopeId, prNodeId, content.externalBody());
         log.info(
             "Posted GitHub PR comment: workspaceId={}, prNodeId={}, commentId={}",
             scopeId,
@@ -151,7 +151,7 @@ public class GithubSummaryChannel implements SummaryChannel {
                 .forScope(scopeId)
                 .documentName("UpdateIssueComment")
                 .variable("id", externalId)
-                .variable("body", content.body())
+                .variable("body", content.externalBody())
                 .execute()
                 .block(GRAPHQL_TIMEOUT);
         } catch (OutboundEgressSuppressedException e) {

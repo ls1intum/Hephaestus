@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import static de.tum.cit.aet.hephaestus.practices.review.GateDecisionTestFixtures.automaticDetection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -151,7 +152,8 @@ class ManualReviewRequestsTest extends BaseUnitTest {
             eq(WORKSPACE_ID),
             eq(AgentJobType.PULL_REQUEST_REVIEW),
             captor.capture(),
-            any()
+            any(),
+            any(GateDecision.Detect.class)
         );
         assertThat(captor.getValue().triggerSignal()).isNull();
         assertThat(captor.getValue().observationOrigin()).isEqualTo(ObservationOrigin.MANUAL);
@@ -208,16 +210,16 @@ class ManualReviewRequestsTest extends BaseUnitTest {
         assertThat(outcome.reason()).isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF);
         assertThat(outcome.describeReason()).isEqualTo(SignalStateReason.PRACTICE_AUTONOMY_OFF.describe());
         verify(signalRecorder).markRefused(any(), eq(SignalStateReason.PRACTICE_AUTONOMY_OFF));
-        verify(agentJobService, never()).submitWithOutcome(any(), any(), any(), any());
+        verify(agentJobService, never()).submitWithOutcome(any(), any(), any(), any(), any(GateDecision.Detect.class));
     }
 
     /** A submission refusal — an exhausted budget, a cooldown — travels out with its own reason too. */
     @Test
     void aSubmissionRefusalKeepsTheReasonTheSubmissionStoppedOn() {
         givenGateDetects();
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenReturn(
-            SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED)
-        );
+        when(
+            agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class))
+        ).thenReturn(SubmissionOutcome.refused(SignalStateReason.BUDGET_EXHAUSTED));
 
         ManualReviewOutcome outcome = requests.requestPullRequestReview(workspace, pullRequest(), requesters());
 
@@ -301,15 +303,15 @@ class ManualReviewRequestsTest extends BaseUnitTest {
     // Fixtures
 
     private void givenGateDetects() {
-        when(gate.evaluate(any(), any(), any())).thenReturn(
-            new GateDecision.Detect(workspace, List.of(new Practice()))
-        );
+        when(gate.evaluate(any(), any(), any())).thenReturn(automaticDetection(workspace, List.of(new Practice())));
     }
 
     private void givenSubmissionSucceeds() {
         AgentJob job = new AgentJob();
         job.setId(UUID.randomUUID());
-        when(agentJobService.submitWithOutcome(anyLong(), any(), any(), any())).thenReturn(SubmissionOutcome.of(job));
+        when(
+            agentJobService.submitWithOutcome(anyLong(), any(), any(), any(), any(GateDecision.Detect.class))
+        ).thenReturn(SubmissionOutcome.of(job));
     }
 
     private PullRequest pullRequest() {

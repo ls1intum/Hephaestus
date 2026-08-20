@@ -92,7 +92,8 @@ public class PullRequestSignalResubmitter implements PendingSignalResubmitter {
                     // in the live series hours after the campaign paused.
                     SignalOrigins.observationOriginOf(signal.getDiscoveredVia())
                 ),
-                key
+                key,
+                detect
             );
         }
     }

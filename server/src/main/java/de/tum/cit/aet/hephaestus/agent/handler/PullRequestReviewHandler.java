@@ -343,8 +343,16 @@ public class PullRequestReviewHandler implements JobTypeHandler {
             proposals
         );
         var content = DeliveryComposer.compose(deliverable, ArtifactKinds.PULL_REQUEST, why, unifiedDiff, units);
-        feedbackService.deliverFeedback(job, content, delivered ->
-            DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units)
+        Set<String> contributingPracticeSlugs = deliverable
+            .stream()
+            .map(PracticeDetectionResultParser.ValidatedObservation::practiceSlug)
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+        feedbackService.deliverFeedback(
+            job,
+            content,
+            delivered ->
+                DeliveryComposer.recomposeMrNote(deliverable, ArtifactKinds.PULL_REQUEST, why, delivered, units),
+            contributingPracticeSlugs
         );
     }
 

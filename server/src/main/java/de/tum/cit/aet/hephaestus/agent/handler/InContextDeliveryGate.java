@@ -73,6 +73,11 @@ class InContextDeliveryGate {
         if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
             return observations;
         }
+        FeedbackSuppressionReason rolloutRefusal = rolloutRefusal(job);
+        if (rolloutRefusal != null) {
+            recordWithheld(job, observations, rolloutRefusal);
+            return List.of();
+        }
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
             log.info(
@@ -129,6 +134,7 @@ class InContextDeliveryGate {
         if (
             observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
         ) return List.of();
+        if (rolloutRefusal(job) != null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
@@ -176,5 +182,16 @@ class InContextDeliveryGate {
                 log.warn("Withheld-feedback ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
             }
         }
+    }
+
+    private static FeedbackSuppressionReason rolloutRefusal(AgentJob job) {
+        if (!job.isExternalDeliveryAllowed()) {
+            return FeedbackSuppressionReason.ADMINISTRATIVE_INTERNAL_ONLY;
+        }
+        Long revision = job.getPracticeRolloutRevision();
+        if (revision == null || revision.longValue() != job.getWorkspace().getReviewSettings().getRolloutRevision()) {
+            return FeedbackSuppressionReason.STALE_ROLLOUT_REVISION;
+        }
+        return null;
     }
 }

@@ -116,7 +116,8 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             feedbackLedgerRecorder,
             mock(PracticeFeedbackDeliveryPolicy.class),
             mock(PracticeFeedbackCommentFormatter.class),
-            mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
+            mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+            mock(PracticeFeedbackDispatchService.class)
         );
         lenient()
             .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))

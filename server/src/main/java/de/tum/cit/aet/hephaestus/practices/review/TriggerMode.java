@@ -9,4 +9,6 @@ public enum TriggerMode {
     AUTO,
     /** Explicit user action (bot command {@code /hephaestus review}). */
     MANUAL,
+    /** OWNER/ADMIN evaluation allowed outside coverage; its results remain internal-only. */
+    ADMINISTRATIVE,
 }

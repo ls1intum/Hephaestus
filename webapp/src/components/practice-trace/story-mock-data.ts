@@ -296,6 +296,46 @@ export const artifactTrace = {
 	container: "ls1intum/Hephaestus",
 	url: "https://github.com/ls1intum/Hephaestus/pull/1423",
 	signals: tracedSignals,
+	deliveryPolicy: [
+		{
+			reviewId: "22222222-2222-2222-2222-222222222222",
+			admittedRevision: 4,
+			evaluatedRevision: 5,
+			facts: {
+				artifactKind: "scm.pull_request",
+				repository: "ls1intum/Hephaestus",
+				baseBranch: "develop",
+				subject: "RESOLVED_LINKED_HUMAN",
+				repositoryMode: "SELECTED",
+				personMode: "SELECTED",
+				repositoryMatched: true,
+				branchMatched: true,
+				personMatched: true,
+				recipientConsent: false,
+				deliveryStatus: "ACTIVE",
+				triggerMode: "AUTO",
+				externalDeliveryAllowed: true,
+				contributingPractices: [{ slug: "review-feedback", autonomy: "AUTOMATIC" }],
+			},
+			resolverVersion: "1",
+			surface: "ARTIFACT",
+			stage: "EGRESS",
+			allowed: false,
+			decisiveReason: "RECIPIENT_OPTED_OUT",
+			evaluatedAt: new Date("2026-08-06T10:20:30Z"),
+			checks: [
+				{ check: "INSTANCE_SILENT_MODE", status: "PASSED" },
+				{ check: "WORKSPACE_ENABLED", status: "PASSED" },
+				{ check: "ROLLOUT_REVISION", status: "PASSED" },
+				{ check: "WORKSPACE_DELIVERY", status: "PASSED" },
+				{ check: "CURRENT_COVERAGE", status: "PASSED" },
+				{ check: "PRACTICE_AUTHORITY", status: "PASSED" },
+				{ check: "HUMAN_APPROVAL", status: "NOT_APPLICABLE" },
+				{ check: "RECIPIENT_CONSENT", status: "DENIED" },
+				{ check: "ARTIFACT_ELIGIBILITY", status: "NOT_REACHED" },
+			],
+		},
+	],
 	practices: practiceTraceEntries,
 } satisfies ArtifactTrace;
 
@@ -318,6 +358,7 @@ export const untouchedArtifactTrace = {
 			stateReason: "NO_ACTIVE_PRACTICE",
 		},
 	],
+	deliveryPolicy: [],
 	practices: [
 		{
 			practiceSlug: "issue-hygiene",
@@ -352,6 +393,7 @@ export const documentArtifactTrace = {
 			state: "TRIGGERED",
 		},
 	],
+	deliveryPolicy: [],
 	practices: [
 		{
 			practiceSlug: "written-for-a-newcomer",

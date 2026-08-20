@@ -1,9 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.handler;
 
-import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
-import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedException;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
@@ -17,8 +16,6 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.transaction.annotation.Propagation;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
@@ -31,14 +28,13 @@ class ApprovedFeedbackDeliveryListener {
     private final FeedbackApprovalRepository approvalRepository;
     private final AgentJobRepository agentJobRepository;
     private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
-    private final PullRequestCommentPoster commentPoster;
+    private final PracticeFeedbackDispatchService dispatchService;
     private final FeedbackApprovalEligibility approvalEligibility;
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
-    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void deliver(ApprovedFeedbackReadyEvent event) {
         Feedback feedback = feedbackRepository
-            .lockByIdAndWorkspaceId(event.feedbackId(), event.workspaceId())
+            .findByIdAndWorkspaceId(event.feedbackId(), event.workspaceId())
             .orElse(null);
         if (feedback == null || feedback.getDeliveryState() != FeedbackDeliveryState.PREPARED) return;
         var approval = approvalRepository
@@ -68,9 +64,9 @@ class ApprovedFeedbackDeliveryListener {
 
         PracticeFeedbackDeliveryPolicy.Decision<?> policy;
         if (ArtifactKinds.ISSUE.equals(feedback.getArtifactKind())) {
-            policy = deliveryPolicy.evaluateIssue(job);
+            policy = deliveryPolicy.evaluateIssue(job, DeliveryPolicyStage.APPROVED, feedback.getId());
         } else if (ArtifactKinds.PULL_REQUEST.equals(feedback.getArtifactKind())) {
-            policy = deliveryPolicy.evaluatePullRequest(job);
+            policy = deliveryPolicy.evaluatePullRequest(job, DeliveryPolicyStage.APPROVED, feedback.getId());
         } else {
             log.error(
                 "Approved proposal has no supported artifact kind: feedbackId={}, artifactKind={}",
@@ -89,22 +85,18 @@ class ApprovedFeedbackDeliveryListener {
             }
             return;
         }
-        ExistingDeliveryLookup existing = commentPoster.findApprovedProposal(job, feedback.getId());
-        if (existing.kind() == ExistingDeliveryLookup.Kind.UNKNOWN) {
-            log.warn("Approved proposal deferred after inconclusive provider lookup: feedbackId={}", feedback.getId());
+        PracticeFeedbackDispatchService.Result result = dispatchService.dispatchApproved(job, feedback);
+        if (result.status() == PracticeFeedbackDispatchService.Result.Status.SUPPRESSED) {
+            FeedbackSuppressionReason reason =
+                result.suppressionReason() == null
+                    ? FeedbackSuppressionReason.INSTANCE_SILENCED
+                    : result.suppressionReason();
+            feedbackRepository.markApprovedSuppressed(event.workspaceId(), feedback.getId(), reason.name());
             return;
         }
-        if (existing.kind() == ExistingDeliveryLookup.Kind.ABSENT) {
-            try {
-                commentPoster.postApprovedProposal(job, feedback.getId(), feedback.getBody());
-            } catch (JobDeliverySuppressedException exception) {
-                feedbackRepository.markApprovedSuppressed(
-                    event.workspaceId(),
-                    feedback.getId(),
-                    FeedbackSuppressionReason.INSTANCE_SILENCED.name()
-                );
-                return;
-            }
+        if (result.status() != PracticeFeedbackDispatchService.Result.Status.SENT) {
+            log.warn("Approved proposal deferred for dispatch reconciliation: feedbackId={}", feedback.getId());
+            return;
         }
         feedbackRepository.markApprovedDelivered(event.workspaceId(), feedback.getId());
     }

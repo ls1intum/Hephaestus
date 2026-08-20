@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -15,6 +16,7 @@ public class FeedbackApprovalEligibility {
     private final PracticeRepository practiceRepository;
     private final WorkspaceReviewDefaultsProvider defaultsProvider;
 
+    @Transactional(readOnly = true)
     public boolean isEligible(Long workspaceId, UUID feedbackId) {
         var practices = practiceRepository.findContributingPractices(workspaceId, feedbackId);
         if (practices.isEmpty()) return false;

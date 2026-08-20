@@ -1,15 +1,21 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
+import de.tum.cit.aet.hephaestus.core.EntityTagPrecondition;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntityType;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditEntry;
 import de.tum.cit.aet.hephaestus.core.audit.spi.ConfigAuditPort;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewVolumeQuery;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
+import org.jspecify.annotations.Nullable;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,31 +31,65 @@ public class PracticeReviewSettingsService {
     private final WorkspaceRepository workspaceRepository;
     private final PracticeReviewProperties reviewProperties;
     private final ConfigAuditPort configAudit;
+    private final PracticeReviewCoverageService coverageService;
+    private final ObjectProvider<PracticeReviewVolumeQuery> volumeQuery;
 
     public PracticeReviewSettingsDTO getSettings(WorkspaceContext workspaceContext) {
         return toView(requireWorkspace(workspaceContext));
     }
 
+    public PracticeReviewCoveragePreviewDTO previewCoverage(
+        WorkspaceContext workspaceContext,
+        de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope proposed
+    ) {
+        Workspace workspace = requireWorkspace(workspaceContext);
+        return coverageService.preview(workspace, proposed, recentVolume(workspace));
+    }
+
     @Transactional
     public PracticeReviewSettingsDTO updatePracticeReview(
         WorkspaceContext workspaceContext,
-        UpdatePracticeReviewSettingsRequestDTO req
+        UpdatePracticeReviewSettingsRequestDTO req,
+        @Nullable EntityTagPrecondition precondition
     ) {
         Workspace workspace = requireWorkspaceForUpdate(workspaceContext);
         PracticeReviewSettings settings = workspace.getReviewSettings();
-        PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings);
+        if (precondition == null) {
+            throw new PracticeReviewPreconditionRequiredException();
+        }
+        if (!precondition.matches(Long.toString(settings.getConfigVersion()))) {
+            throw new StalePracticeReviewSettingsException();
+        }
+        var beforeScope = coverageService.scope(workspace);
+        PracticeReviewSnapshot before = PracticeReviewSnapshot.of(settings, beforeScope);
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
         settings.applyPatch(req.deliverToMerged(), req.cooldownMinutes());
-        settings.applyScope(req.reviewScope());
+        if (
+            req.reset() != null &&
+            req.reset().contains(de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField.REVIEW_SCOPE)
+        ) {
+            coverageService.replace(workspace, de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope.ALL);
+        }
+        if (req.reviewScope() != null) {
+            coverageService.replace(workspace, req.reviewScope());
+        }
+        settings.applyRollout(null, null, req.deliveryStatus());
         settings.applyDefaultAutonomy(req.defaultAutonomy() == null ? null : req.defaultAutonomy().name());
+        var afterScope = coverageService.scope(workspace);
+        PracticeReviewSnapshot after = PracticeReviewSnapshot.of(settings, afterScope);
+        if (!before.samePolicyAs(after)) {
+            settings.incrementRolloutRevision();
+            after = PracticeReviewSnapshot.of(settings, afterScope);
+        }
+        settings.incrementConfigVersion();
         configAudit.record(
             ConfigAuditEntry.updated(
                 ConfigAuditEntityType.PRACTICE_REVIEW_SETTINGS,
                 workspaceContext.id(),
                 workspaceContext.id(),
                 before,
-                PracticeReviewSnapshot.of(settings)
+                after
             )
         );
         return toView(workspaceRepository.save(workspace));
@@ -74,14 +114,25 @@ public class PracticeReviewSettingsService {
     private PracticeReviewSettingsDTO toView(Workspace workspace) {
         PracticeReviewSettings s = workspace.getReviewSettings();
         WorkspaceReviewDefaults defaults = WorkspaceReviewDefaults.of(s);
+        int recentVolume = recentVolume(workspace);
         return new PracticeReviewSettingsDTO(
+            EntityTagPrecondition.format(Long.toString(s.getConfigVersion())),
+            s.getRolloutRevision(),
             s.resolveDeliverToMerged(reviewProperties.deliverToMerged()),
             s.resolveCooldownMinutes(reviewProperties.cooldownMinutes()),
             s.getDeliverToMerged(),
             s.getCooldownMinutes(),
-            s.resolveReviewScope(),
+            coverageService.scope(workspace),
+            s.getDeliveryStatus(),
+            coverageService.summary(workspace, recentVolume),
             defaults.defaultAutonomy(),
             s.getDefaultAutonomy() == null ? null : PracticeAutonomy.valueOf(s.getDefaultAutonomy())
         );
+    }
+
+    private int recentVolume(Workspace workspace) {
+        return java.util.Optional.ofNullable(volumeQuery.getIfAvailable())
+            .map(query -> query.countSince(workspace.getId(), Instant.now().minus(30, ChronoUnit.DAYS)))
+            .orElse(0);
     }
 }

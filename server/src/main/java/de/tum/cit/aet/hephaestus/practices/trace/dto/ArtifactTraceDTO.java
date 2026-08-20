@@ -25,6 +25,9 @@ public record ArtifactTraceDTO(
     @Schema(description = "Everything recorded about this artifact, oldest first")
     List<TracedSignalDTO> signals,
     @NonNull
+    @Schema(description = "Immutable ordered policy evaluations; intended for progressive technical disclosure")
+    List<DeliveryPolicyTraceDTO> deliveryPolicy,
+    @NonNull
     @Schema(
         description = "Every practice this workspace runs against this kind of work, the ones with " +
             "something to report first, then the rest; ties broken by practice name"

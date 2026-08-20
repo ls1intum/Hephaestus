@@ -264,6 +264,15 @@ class PullRequestCommentPoster {
 
     @Nullable
     String postIssueFormattedBody(AgentJob job, String formattedBody) {
+        return postIssueFormattedBody(job, formattedBody, summaryMarkerFor(job));
+    }
+
+    @Nullable
+    String postIssueApprovedProposal(AgentJob job, java.util.UUID feedbackId, String formattedBody) {
+        return postIssueFormattedBody(job, formattedBody, "<!-- hephaestus:approved-feedback:" + feedbackId + " -->");
+    }
+
+    private String postIssueFormattedBody(AgentJob job, String formattedBody, String marker) {
         long workspaceId = job.getWorkspace().getId();
         IntegrationKind kind = job.getIntegrationKind();
         if (kind == null) {
@@ -287,10 +296,7 @@ class PullRequestCommentPoster {
             null
         );
         try {
-            SummaryHandle handle = channel.postSummary(
-                target,
-                new FeedbackContent(formattedBody, summaryMarkerFor(job))
-            );
+            SummaryHandle handle = channel.postSummary(target, new FeedbackContent(formattedBody, marker));
             log.info(
                 "Posted issue feedback comment: jobId={}, kind={}, commentId={}",
                 job.getId(),
