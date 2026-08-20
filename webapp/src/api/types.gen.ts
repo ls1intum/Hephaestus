@@ -45,12 +45,7 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
- * Effective practice-review coverage for one workspace.
- *
- * <p>The modes are explicit because an empty selected set means nobody, while an empty list in
- * <code>ALL_*</code> mode is the ordinary broad-coverage configuration. Repository branch restrictions are
- * attached to the repository they qualify; an empty branch list means every base branch in that
- * repository.
+ * Selected mode with no targets admits nobody; a selected repository with no branches admits every branch.
  */
 export type WorkspaceReviewScope = {
     personMode: 'ALL_ELIGIBLE' | 'SELECTED';
@@ -59,9 +54,6 @@ export type WorkspaceReviewScope = {
     repositoryMode: 'ALL_MONITORED' | 'SELECTED';
 };
 
-/**
- * One selected monitored repository and its optional exact base-branch restriction.
- */
 export type ReviewRepositoryTarget = {
     baseBranches: Array<string>;
     nameWithOwner: string;
@@ -4611,9 +4603,6 @@ export type DeliveryPolicyTraceCheck = {
     status: 'PASSED' | 'DENIED' | 'NOT_APPLICABLE' | 'NOT_REACHED';
 };
 
-/**
- * One immutable delivery decision, exposed only under Review activity's technical disclosure.
- */
 export type DeliveryPolicyTrace = {
     admittedRevision: number;
     allowed: boolean;
