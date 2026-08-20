@@ -1,6 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -132,7 +132,7 @@ public class PracticeReviewCoverageService {
         }
         Set<Long> eligible = eligibleMemberships(workspaceId)
             .stream()
-            .map(membership -> membership.getUser().getId())
+            .map(WorkspaceMembership::getUserId)
             .collect(Collectors.toSet());
         if (!eligible.containsAll(requested.personUserIds())) {
             throw new InvalidReviewCoverageException(
@@ -164,7 +164,7 @@ public class PracticeReviewCoverageService {
             ) return true;
         }
         for (WorkspaceMembership membership : eligibleMemberships(workspaceId)) {
-            Long userId = membership.getUser().getId();
+            Long userId = membership.getUserId();
             if (proposed.admitsPerson(userId) && !current.admitsPerson(userId)) return true;
         }
         return false;
@@ -180,7 +180,12 @@ public class PracticeReviewCoverageService {
     }
 
     @Transactional(readOnly = true)
-    public boolean admits(Workspace workspace, String repositoryNameWithOwner, String baseBranch, User subject) {
+    public boolean admits(
+        Workspace workspace,
+        String repositoryNameWithOwner,
+        String baseBranch,
+        ReviewSubject subject
+    ) {
         return admits(workspace, repositoryNameWithOwner, baseBranch, subject, true);
     }
 
@@ -189,7 +194,7 @@ public class PracticeReviewCoverageService {
         Workspace workspace,
         String repositoryNameWithOwner,
         String baseBranch,
-        User subject,
+        ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
         return assess(workspace, repositoryNameWithOwner, baseBranch, subject, branchRestrictionsApply).admitted();
@@ -200,16 +205,16 @@ public class PracticeReviewCoverageService {
         Workspace workspace,
         String repositoryNameWithOwner,
         String baseBranch,
-        User subject,
+        ReviewSubject subject,
         boolean branchRestrictionsApply
     ) {
         WorkspaceReviewScope scope = scope(workspace);
         SubjectStatus subjectStatus;
-        if (subject == null || subject.getId() == null) {
+        if (subject == null || subject.actorId() == null) {
             subjectStatus = SubjectStatus.MISSING;
-        } else if (subject.getType() != User.Type.USER) {
+        } else if (!subject.human()) {
             subjectStatus = SubjectStatus.NON_HUMAN;
-        } else if (membershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), subject.getId()).isEmpty()) {
+        } else if (membershipRepository.findByWorkspace_IdAndUser_Id(workspace.getId(), subject.actorId()).isEmpty()) {
             subjectStatus = SubjectStatus.UNLINKED;
         } else {
             subjectStatus = SubjectStatus.RESOLVED_LINKED_HUMAN;
@@ -230,7 +235,7 @@ public class PracticeReviewCoverageService {
                 selectedRepository.baseBranches().isEmpty() ||
                 (baseBranch != null && selectedRepository.baseBranches().contains(baseBranch)));
         boolean personMatched =
-            subjectStatus == SubjectStatus.RESOLVED_LINKED_HUMAN && scope.admitsPerson(subject.getId());
+            subjectStatus == SubjectStatus.RESOLVED_LINKED_HUMAN && scope.admitsPerson(subject.actorId());
         return new CoverageAssessment(
             scope.repositoryMode(),
             scope.personMode(),
@@ -268,7 +273,7 @@ public class PracticeReviewCoverageService {
             .collect(Collectors.toMap(RepositoryToMonitor::getNameWithOwner, Function.identity()));
         Map<Long, WorkspaceMembership> eligibleById = eligibleMemberships(workspaceId)
             .stream()
-            .collect(Collectors.toMap(membership -> membership.getUser().getId(), Function.identity()));
+            .collect(Collectors.toMap(WorkspaceMembership::getUserId, Function.identity()));
 
         LinkedHashMap<String, ReviewRepositoryTarget> requestedRepositories = new LinkedHashMap<>();
         for (ReviewRepositoryTarget selection : requested.repositories()) {
@@ -335,7 +340,7 @@ public class PracticeReviewCoverageService {
         return membershipRepository
             .findAllWithUserByWorkspaceId(workspaceId)
             .stream()
-            .filter(membership -> membership.getUser().getType() == User.Type.USER)
+            .filter(WorkspaceMembership::hasHumanUser)
             .toList();
     }
 

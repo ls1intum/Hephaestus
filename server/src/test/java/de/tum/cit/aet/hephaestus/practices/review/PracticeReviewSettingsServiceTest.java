@@ -24,7 +24,6 @@ import java.util.Set;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
-import org.springframework.beans.factory.ObjectProvider;
 
 class PracticeReviewSettingsServiceTest extends BaseUnitTest {
 
@@ -38,7 +37,7 @@ class PracticeReviewSettingsServiceTest extends BaseUnitTest {
     private PracticeReviewCoverageService coverageService;
 
     @Mock
-    private ObjectProvider<PracticeReviewVolumeQuery> volumeQuery;
+    private PracticeReviewVolumeQuery volumeQuery;
 
     private PracticeReviewSettingsService service;
     private Workspace workspace;

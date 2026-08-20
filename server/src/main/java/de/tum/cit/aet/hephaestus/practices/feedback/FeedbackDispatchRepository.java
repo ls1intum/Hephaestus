@@ -24,25 +24,15 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
             id, destination_key, workspace_id, agent_job_id, feedback_id, destination, state, body,
             target_external_ref, practice_slugs, write_started, next_attempt_at, attempt_count, created_at, updated_at
         ) SELECT
-            :id, :destinationKey, :workspaceId, :agentJobId, :feedbackId, :destination, 'PENDING', :body,
-            :targetExternalRef, CAST(:practiceSlugs AS jsonb), FALSE, CURRENT_TIMESTAMP, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            :#{#command.id()}, :#{#command.destinationKey()}, :#{#command.workspaceId()}, :#{#command.agentJobId()}, :#{#command.feedbackId()}, :#{#command.destination()}, 'PENDING', :#{#command.body()},
+            :#{#command.targetExternalRef()}, CAST(:#{#command.practiceSlugs()} AS jsonb), FALSE, CURRENT_TIMESTAMP, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
           FROM agent_job j
-         WHERE j.id = :agentJobId AND j.workspace_id = :workspaceId
+         WHERE j.id = :#{#command.agentJobId()} AND j.workspace_id = :#{#command.workspaceId()}
         ON CONFLICT (destination_key) DO NOTHING
         """,
         nativeQuery = true
     )
-    int insertIfAbsent(
-        @Param("id") UUID id,
-        @Param("destinationKey") String destinationKey,
-        @Param("workspaceId") Long workspaceId,
-        @Param("agentJobId") UUID agentJobId,
-        @Param("feedbackId") UUID feedbackId,
-        @Param("destination") String destination,
-        @Param("body") String body,
-        @Param("targetExternalRef") String targetExternalRef,
-        @Param("practiceSlugs") String practiceSlugs
-    );
+    int insertIfAbsent(@Param("command") FeedbackDispatchInsert command);
 
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
@@ -80,22 +70,14 @@ public interface FeedbackDispatchRepository extends JpaRepository<FeedbackDispat
     @Modifying(clearAutomatically = true, flushAutomatically = true)
     @Query(
         value = """
-        UPDATE feedback_dispatch SET state = :state, delivered_external_ref = :externalRef,
-               lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = :nextAttemptAt,
-               last_error = :error, updated_at = CURRENT_TIMESTAMP
-         WHERE id = :id AND workspace_id = :workspaceId AND state = 'CLAIMED' AND lease_owner = :owner
+        UPDATE feedback_dispatch SET state = :#{#completion.state()}, delivered_external_ref = :#{#completion.externalRef()},
+               lease_owner = NULL, lease_expires_at = NULL, next_attempt_at = :#{#completion.nextAttemptAt()},
+               last_error = :#{#completion.error()}, updated_at = CURRENT_TIMESTAMP
+         WHERE id = :#{#completion.id()} AND workspace_id = :#{#completion.workspaceId()} AND state = 'CLAIMED' AND lease_owner = :#{#completion.owner()}
         """,
         nativeQuery = true
     )
-    int finish(
-        @Param("id") UUID id,
-        @Param("workspaceId") Long workspaceId,
-        @Param("owner") String owner,
-        @Param("state") String state,
-        @Param("externalRef") String externalRef,
-        @Param("error") String error,
-        @Param("nextAttemptAt") Instant nextAttemptAt
-    );
+    int finish(@Param("completion") FeedbackDispatchCompletion completion);
 
     @Query(
         """

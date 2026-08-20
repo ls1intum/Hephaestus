@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitor;
@@ -85,8 +86,8 @@ class PracticeReviewCoverageServiceTest extends BaseUnitTest {
 
     @Test
     void missingBotAndNonMemberSubjectsFailClosed() {
-        User human = user(7L, User.Type.USER);
-        User bot = user(8L, User.Type.BOT);
+        ReviewSubject human = new ReviewSubject(7L, true);
+        ReviewSubject bot = new ReviewSubject(8L, false);
         when(memberships.findByWorkspace_IdAndUser_Id(1L, 7L)).thenReturn(Optional.empty());
 
         assertThat(service.admits(workspace, "owner/repo", "main", null)).isFalse();

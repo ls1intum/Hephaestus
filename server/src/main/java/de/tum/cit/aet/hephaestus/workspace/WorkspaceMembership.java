@@ -95,6 +95,14 @@ public class WorkspaceMembership {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt = Instant.now();
 
+    public boolean hasHumanUser() {
+        return user != null && user.getType() == User.Type.USER;
+    }
+
+    public Long getUserId() {
+        return user == null ? null : user.getId();
+    }
+
     /**
      * Composite primary key for workspace membership.
      * <p>

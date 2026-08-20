@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -181,7 +182,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                     any(Workspace.class),
                     nullable(String.class),
                     nullable(String.class),
-                    nullable(User.class)
+                    nullable(ReviewSubject.class)
                 )
             )
             .thenReturn(true);

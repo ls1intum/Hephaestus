@@ -7,6 +7,7 @@ import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliverySuppressedExceptio
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService;
@@ -89,7 +90,7 @@ class FeedbackDeliveryService {
 
         PracticeFeedbackDeliveryPolicy.Decision<PullRequest> decision = deliveryPolicy.evaluatePullRequest(
             job,
-            de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage.AUTOMATIC,
+            DeliveryPolicyStage.AUTOMATIC,
             null,
             contributingPracticeSlugs
         );
@@ -361,12 +362,7 @@ class FeedbackDeliveryService {
         try {
             if (
                 !deliveryPolicy
-                    .evaluatePullRequest(
-                        job,
-                        de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage.EGRESS,
-                        null,
-                        contributingPracticeSlugs
-                    )
+                    .evaluatePullRequest(job, DeliveryPolicyStage.EGRESS, null, contributingPracticeSlugs)
                     .allowed()
             ) return;
             PullRequestCommentPoster.UpdateResult update = commentPoster.updateFormattedBody(
@@ -412,12 +408,7 @@ class FeedbackDeliveryService {
         try {
             if (
                 !deliveryPolicy
-                    .evaluatePullRequest(
-                        job,
-                        de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage.EGRESS,
-                        null,
-                        contributingPracticeSlugs
-                    )
+                    .evaluatePullRequest(job, DeliveryPolicyStage.EGRESS, null, contributingPracticeSlugs)
                     .allowed()
             ) return;
             String pingId = commentPoster.postFormattedBody(job, body);
@@ -435,7 +426,7 @@ class FeedbackDeliveryService {
         // Empty reconciliation must still remove stale inline notes after policy guards pass.
         PracticeFeedbackDeliveryPolicy.Decision<PullRequest> decision = deliveryPolicy.evaluatePullRequest(
             job,
-            de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage.EGRESS,
+            DeliveryPolicyStage.EGRESS,
             null,
             contributingPracticeSlugs
         );

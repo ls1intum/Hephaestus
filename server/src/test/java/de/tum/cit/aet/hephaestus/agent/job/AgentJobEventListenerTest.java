@@ -21,6 +21,7 @@ import de.tum.cit.aet.hephaestus.integration.core.events.ScmEventPayload;
 import de.tum.cit.aet.hephaestus.integration.core.signal.DiscoveredVia;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalRecorder;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.DataSource;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -828,7 +829,7 @@ class AgentJobEventListenerTest extends BaseUnitTest {
                             any(Workspace.class),
                             nullable(String.class),
                             nullable(String.class),
-                            nullable(User.class)
+                            nullable(ReviewSubject.class)
                         )
                     )
                     .thenReturn(true);
