@@ -18,7 +18,7 @@
  */
 import { readdir, readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
 
@@ -43,6 +43,9 @@ const FENCED = /```mermaid[^\n]*\n([\s\S]*?)```/g;
 const diagrams = [];
 for (const root of ROOTS) {
   for (const entry of await readdir(root, { recursive: true })) {
+    // Dependency READMEs are neither committed documentation nor rendered by Docusaurus. pnpm may
+    // materialize docs/node_modules as a real directory, so recursive readdir must exclude it itself.
+    if (entry.split(sep).includes("node_modules")) continue;
     const path = join(root, entry);
     if (entry.endsWith(".mmd")) {
       diagrams.push({

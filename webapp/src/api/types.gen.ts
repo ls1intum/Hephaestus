@@ -5587,6 +5587,7 @@ export type AdminWorkspaceView = {
     displayName: string;
     id: number;
     memberCount: number;
+    ownerAccountId?: number;
     ownerLogin?: string;
     providerType?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
     status: string;

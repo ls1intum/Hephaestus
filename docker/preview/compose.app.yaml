@@ -1,7 +1,7 @@
 # Per-PR application stack for Coolify preview deployments.
 #
 # Deploy as a Docker Compose application pointed at this file, with "Connect to Predefined
-# Network" enabled so the stack can reach the shared infra in compose.shared-infra.yaml.
+# Network" enabled. The app server also joins staging's `shared-network` to consume from its NATS.
 # Assign two domains on the base application: webapp → the SPA host, appserver → its API
 # sibling (api.<domain>). Previews inherit both with a pr<id> prefix.
 #
@@ -36,9 +36,15 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
 
-  # Clones the base deployment's database into a preview so it starts with real data.
-  # No-op on the base deployment and on any failure — Liquibase then builds the schema instead.
+  # Clones the running staging database into a PR preview so it starts with real data. This only
+  # ever reads through pg_dump: it never mounts staging's data volume or starts a second Postgres
+  # against that live volume. After restore, all review entry points are paused before the app boots.
   seed-loader:
     image: postgres:17-alpine
     depends_on:
@@ -49,96 +55,115 @@ services:
       SERVICE_NAME_POSTGRES: ${SERVICE_NAME_POSTGRES:-}
       SERVICE_FQDN_APPSERVER: ${SERVICE_FQDN_APPSERVER:-}
       SERVICE_FQDN_WEBAPP: ${SERVICE_FQDN_WEBAPP:-}
-    command: |
-      sh -c '
-        set -e
+      PREVIEW_SEED_SOURCE_CONTAINER: ${PREVIEW_SEED_SOURCE_CONTAINER:-app-postgres-1}
+      PREVIEW_SEED_SOURCE_USERNAME: ${PREVIEW_SEED_SOURCE_USERNAME:-root}
+      PREVIEW_SEED_SOURCE_DATABASE: ${PREVIEW_SEED_SOURCE_DATABASE:-hephaestus}
+    command:
+      - sh
+      - -c
+      - |
+        set -eu
         apk add --no-cache docker-cli >/tmp/apk.log 2>&1
 
-        APP_FQDN="${SERVICE_FQDN_APPSERVER:-${SERVICE_FQDN_WEBAPP:-}}"
+        APP_FQDN="$${SERVICE_FQDN_APPSERVER:-$${SERVICE_FQDN_WEBAPP:-}}"
         if ! echo "$$APP_FQDN" | grep -Eq "^pr[0-9]+"; then
           echo "Skipping seed-loader: non-PR deployment detected"
           exit 0
         fi
 
-        PR_ID=$$(echo "$$APP_FQDN" | sed -n "s/^pr\\([0-9]\\+\\).*/\\1/p")
-        PROJECT_NAME=${COMPOSE_PROJECT_NAME:-}
-
-        BASE_VOL=$$(docker volume ls --format "{{.Name}}" | grep "postgres-data" | grep -v "pr-" | head -1 || true)
-        if [ -z "$$BASE_VOL" ]; then
-          echo "✗ No base postgres volume found; Liquibase will initialize schema"
-          exit 0
-        fi
-        echo "Using base volume: $$BASE_VOL"
-
-        BASE_CTN=$$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep -v "pr-" | head -1 || true)
-        TEMP_STARTED=0
-        if [ -z "$$BASE_CTN" ]; then
-          BASE_CTN="seed-base-$$RANDOM"
-          echo "Starting temporary postgres from base volume: $$BASE_CTN"
-          docker run -d --name "$$BASE_CTN" -v "$$BASE_VOL":/var/lib/postgresql/data ghcr.io/ls1intum/hephaestus/postgres:${IMAGE_TAG:-latest} >/tmp/base-start.log 2>/tmp/base-start.err || {
-            echo "✗ Failed to start temporary base container; falling back to Liquibase"
-            cat /tmp/base-start.err || true
-            exit 0
-          }
-          TEMP_STARTED=1
-          for i in $$(seq 1 10); do
-            if docker exec "$$BASE_CTN" pg_isready -U hephaestus -d hephaestus >/dev/null 2>&1; then break; fi
-            sleep 2
-          done
-        else
-          echo "Using running base container: $$BASE_CTN"
-        fi
-
-        PREVIEW_PG=${SERVICE_NAME_POSTGRES:-}
-        if [ -n "$$PREVIEW_PG" ] && ! docker ps --format "{{.Names}}" | grep -qx "$$PREVIEW_PG"; then
-          PREVIEW_PG=""
-        fi
-
-        if [ -z "$$PREVIEW_PG" ] && [ -n "$$PR_ID" ]; then
-          CANDIDATE="postgres-$$PROJECT_NAME-pr-$$PR_ID"
-          if docker ps --format "{{.Names}}" | grep -qx "$$CANDIDATE"; then
-            PREVIEW_PG="$$CANDIDATE"
-          fi
-        fi
-
-        if [ -z "$$PREVIEW_PG" ]; then
-          PREVIEW_PG=$$(docker ps --format "{{.Names}}" | grep "^postgres-" | grep "pr-" | head -1 || true)
-        fi
-
-        if [ -z "$$PREVIEW_PG" ]; then
-          echo "✗ Could not resolve preview postgres container (expected SERVICE_NAME_POSTGRES or postgres-*pr-*)."
+        SOURCE_CTN="$$PREVIEW_SEED_SOURCE_CONTAINER"
+        PREVIEW_PG_SERVICE="$${SERVICE_NAME_POSTGRES:-}"
+        COMPOSE_PROJECT=$$(docker inspect "$$HOSTNAME" \
+          --format '{{ index .Config.Labels "com.docker.compose.project" }}')
+        PREVIEW_PG=$$(docker ps \
+          --filter "label=com.docker.compose.project=$$COMPOSE_PROJECT" \
+          --filter "label=com.docker.compose.service=$$PREVIEW_PG_SERVICE" \
+          --format "{{.Names}}")
+        PREVIEW_PG_COUNT=$$(printf '%s\n' "$$PREVIEW_PG" | awk 'NF { count++ } END { print count + 0 }')
+        if [ -z "$$PREVIEW_PG_SERVICE" ] || [ "$$PREVIEW_PG_COUNT" -ne 1 ]; then
+          echo "Could not uniquely resolve this preview's Postgres container from its Compose labels"
           exit 1
         fi
-
-        if docker exec "$$BASE_CTN" pg_dump -U hephaestus -d hephaestus --clean --if-exists > /tmp/dump.sql 2>/tmp/dump.err; then
-          if [ -s /tmp/dump.sql ]; then
-            echo "Loading seed from base into preview DB via docker exec to $$PREVIEW_PG..."
-            if cat /tmp/dump.sql | docker exec -i "$$PREVIEW_PG" psql -U hephaestus -d hephaestus; then
-              echo "✓ Seed loaded successfully"
-            else
-              echo "✗ Failed to restore database (Liquibase will create schema)"
-            fi
-          else
-            echo "✓ Dump was empty; Liquibase will initialize schema"
-          fi
-        else
-          echo "✗ Dump failed; see error log below"
-          cat /tmp/dump.err || true
-          echo "✓ Database will be initialized by Liquibase"
+        if [ "$$SOURCE_CTN" = "$$PREVIEW_PG" ]; then
+          echo "Refusing to use the preview database as its own seed source"
+          exit 1
+        fi
+        if ! docker ps --format "{{.Names}}" | grep -Fxq "$$SOURCE_CTN"; then
+          echo "Staging seed source '$$SOURCE_CTN' is not running"
+          exit 1
+        fi
+        if docker exec "$$PREVIEW_PG" test -f /var/lib/postgresql/data/.hephaestus-preview-seeded; then
+          echo "Skipping seed-loader: this preview has already been seeded"
+          exit 0
         fi
 
-        if [ "$$TEMP_STARTED" -eq 1 ]; then
-          echo "Stopping temporary base container: $$BASE_CTN"
-          docker rm -f "$$BASE_CTN" >/tmp/base-stop.log 2>/tmp/base-stop.err || {
-            echo "! Warning: failed to stop temporary base container; check /tmp/base-stop.err"
-            cat /tmp/base-stop.err || true
-          }
-        fi
-        exit 0
-      '
+        echo "Dumping staging data from $$SOURCE_CTN"
+        docker exec "$$SOURCE_CTN" pg_dump \
+          -U "$$PREVIEW_SEED_SOURCE_USERNAME" \
+          -d "$$PREVIEW_SEED_SOURCE_DATABASE" \
+          --format=custom --no-owner --no-privileges > /tmp/seed.dump
+        test -s /tmp/seed.dump
+
+        echo "Resetting the private preview database"
+        docker exec "$$PREVIEW_PG" psql \
+          -v ON_ERROR_STOP=1 -U hephaestus -d postgres \
+          -c 'DROP DATABASE IF EXISTS hephaestus WITH (FORCE);' \
+          -c 'CREATE DATABASE hephaestus OWNER hephaestus;'
+
+        echo "Restoring staging data into $$PREVIEW_PG"
+        docker exec -i "$$PREVIEW_PG" pg_restore \
+          -U hephaestus -d hephaestus \
+          --exit-on-error --no-owner --no-privileges < /tmp/seed.dump
+
+        echo "Applying preview silence policy"
+        docker exec -i "$$PREVIEW_PG" psql -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus <<'SQL'
+        UPDATE workspace
+           SET practice_review_auto_trigger_enabled = FALSE,
+               practice_review_manual_trigger_enabled = FALSE;
+
+        UPDATE workspace_agent_binding
+           SET enabled = FALSE,
+               updated_at = NOW()
+         WHERE purpose = 'PRACTICE_REVIEW';
+
+        UPDATE review_sweep_schedule
+           SET enabled = FALSE,
+               updated_at = NOW();
+
+        UPDATE agent_job
+           SET status = 'CANCELLED',
+               completed_at = COALESCE(completed_at, NOW()),
+               worker_id = NULL,
+               error_message = 'Cancelled when staging data was cloned into a preview.',
+               cancellation_reason = NULL
+         WHERE status IN ('QUEUED', 'RUNNING');
+
+        UPDATE agent_job
+           SET delivery_status = 'FAILED',
+               error_message = CONCAT_WS(E'\n', NULLIF(error_message, ''),
+                   'Delivery paused when staging data was cloned into a preview.')
+         WHERE status = 'COMPLETED'
+           AND delivery_status = 'PENDING';
+
+        UPDATE sync_job
+           SET status = 'CANCELLED',
+               cancel_requested = TRUE,
+               finished_at = COALESCE(finished_at, NOW()),
+               heartbeat_at = NULL,
+               error_summary = 'Cancelled when staging data was cloned into a preview.'
+         WHERE status IN ('PENDING', 'RUNNING');
+        SQL
+
+        docker exec "$$PREVIEW_PG" touch /var/lib/postgresql/data/.hephaestus-preview-seeded
+        echo "Seed loaded; every cloned workspace starts with practice reviews paused"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
 
   # Docker creates named volumes as root:root; the buildpack image runs as `cnb` (1002:1001) and
   # needs to write git checkouts and Tomcat access logs. Every deploy gets fresh volumes, so the
@@ -159,13 +184,13 @@ services:
   #
   # There is no server/Dockerfile — the image comes from Paketo buildpacks (spring-boot:build-image
   # in server/pom.xml), which also supplies the /workspace/health-check binary. ci-docker-build.yml
-  # publishes `latest` (main), `pr-<id>`, `<sha>` and `<branch>`. The webapp below builds from
-  # source, so a preview always runs the PR's frontend; set IMAGE_TAG=pr-<id> to run its server too.
+  # publishes an immutable image for every code PR commit. Coolify injects that commit as
+  # SOURCE_COMMIT, so previews cannot accidentally share or race on a mutable PR-wide image tag.
   #
   # Previews are single-replica, so the mentor sticky-cookie labels from docker/compose.app.yaml
   # would be a no-op and are omitted (docs/contributor/unified-pi-runtime.mdx).
   appserver:
-    image: ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG:-latest}
+    image: ghcr.io/ls1intum/hephaestus/application-server:${IMAGE_TAG:-${SOURCE_COMMIT:-latest}}
     restart: unless-stopped
     expose:
       - "8080"
@@ -197,12 +222,12 @@ services:
       DATABASE_URL: postgresql://${SERVICE_NAME_POSTGRES:-postgres}:5432/hephaestus?sslmode=disable
       DATABASE_USERNAME: hephaestus
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-hephaestus-preview}
-      NATS_SERVER: nats://nats-server:4222
+      NATS_SERVER: ${NATS_SERVER:-nats://nats-server:4222}
       # hephaestus.sync.nats.server defaults to ${NATS_SERVER} and can be pinned separately: the
       # integration consumer may point at an upstream NATS (e.g. staging's) to consume events a
       # shared GitHub App delivers there. The agent job queue runs on PostgreSQL, not NATS, so it
       # has no server to pin — it is always local to this stack's own database.
-      HEPHAESTUS_SYNC_NATS_SERVER: ${HEPHAESTUS_SYNC_NATS_SERVER:-nats://nats-server:4222}
+      HEPHAESTUS_SYNC_NATS_SERVER: ${HEPHAESTUS_SYNC_NATS_SERVER:-${NATS_SERVER:-nats://nats-server:4222}}
       NATS_ENABLED: ${NATS_ENABLED:-true}
       # Per-deploy durable name, so base and previews get their own JetStream consumers instead of
       # competing for one and stealing each other's messages.
@@ -244,8 +269,8 @@ services:
       # matchIfMissing=false, so an unset flag means no admin surface, no sync, no content projection.
       # This pod also runs the worker role in-process (see above), and the Outline ContentSource has no
       # runtime-role gate — the same flag is what puts wiki documents into the sandbox context here.
-      # Inbound change notifications land on the shared-infra webhook-server, which needs the flag too
-      # but no secret: Outline's webhook secret is per-subscription and stored on the connection row.
+      # Inbound change notifications land on staging's webhook receiver, which enables this flag
+      # independently but needs no shared secret: Outline's secret is stored on the connection row.
       HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED: ${HEPHAESTUS_INTEGRATION_OUTLINE_ENABLED:-false}
       HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS: ${HEPHAESTUS_INTEGRATION_OUTLINE_ALLOWED_ORIGINS:-}
       # Link-only login provider (Slack-style account linking, never a sign-in button). BASE_URL is
@@ -259,18 +284,18 @@ services:
       OUTLINE_OAUTH_CLIENT_ID: ${OUTLINE_OAUTH_CLIENT_ID:-}
       OUTLINE_OAUTH_CLIENT_SECRET: ${OUTLINE_OAUTH_CLIENT_SECRET:-}
       # Feature flag; application.yml reads this exact name (see docker/compose.app.yaml).
-      AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      AGENT_ENABLED: ${AGENT_ENABLED:-true}
       HEPHAESTUS_FABRIC_ROOT: /data/git-repos
       HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
-      GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
+      GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-true}
       # There is no separate worker container: hephaestus.runtime.worker.enabled defaults to true,
       # so this pod runs the worker role in-process and executes agent runs itself. That needs the
       # host Docker daemon — hence the docker.sock mount below.
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
       # Previews share one host — keep the sandbox footprint small.
-      SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-2}
-      SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-4294967296}
-      SANDBOX_CPUS: ${SANDBOX_CPUS:-2.0}
+      SANDBOX_MAX_CONCURRENT: ${SANDBOX_MAX_CONCURRENT:-1}
+      SANDBOX_MEMORY_BYTES: ${SANDBOX_MEMORY_BYTES:-2147483648}
+      SANDBOX_CPUS: ${SANDBOX_CPUS:-1.0}
       # LLM providers are registered at runtime (Instance admin → AI models); the proxy reads each
       # connection's base URL/auth from the catalog per request, so no env var routes it here.
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-14}
@@ -279,15 +304,18 @@ services:
       MONITORING_BACKFILL_ENABLED: "false"
       LEADERBOARD_NOTIFICATION_ENABLED: "false"
       SENTRY_DSN: ${SENTRY_DSN:-}
-      # Auto-registration target for GitLab webhooks: the shared-infra receiver's own host, not this
-      # deploy's origin. Bare origin — GitLabWebhookService appends /webhooks/gitlab itself.
+      # Auto-registration target for GitLab webhooks: staging's receiver, not this deploy's origin.
+      # Bare origin — GitLabWebhookService appends /webhooks/gitlab itself.
       WEBHOOK_SECRET: ${WEBHOOK_SECRET:-}
-      WEBHOOK_EXTERNAL_URL: ${WEBHOOK_EXTERNAL_URL:-https://${PREVIEW_DOMAIN}}
+      WEBHOOK_EXTERNAL_URL: ${WEBHOOK_EXTERNAL_URL:-https://staging.hephaestus.aet.cit.tum.de}
       THC_PORT: "8080"
       THC_PATH: /actuator/health/liveness
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
+    networks:
+      - default
+      - staging-shared
     depends_on:
       postgres:
         condition: service_healthy
@@ -308,6 +336,11 @@ services:
       options:
         max-size: "50m"
         max-file: "5"
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 3G
 
   webapp:
     build:
@@ -344,6 +377,16 @@ services:
       options:
         max-size: "50m"
         max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 256M
+
+networks:
+  staging-shared:
+    external: true
+    name: shared-network
 
 volumes:
   postgres-data:

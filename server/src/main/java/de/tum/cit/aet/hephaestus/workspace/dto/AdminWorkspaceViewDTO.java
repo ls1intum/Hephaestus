@@ -9,7 +9,8 @@ import org.jspecify.annotations.Nullable;
 /**
  * Metadata-only view of a workspace for the instance-admin overview. DELIBERATELY excludes any tenant
  * content (member lists, repo names, etc.) — an instance admin sees the shape of a workspace, and
- * reaches its content only via audited impersonation. Owner is the first OWNER-role member's git login.
+ * reaches its content only via audited impersonation. Owner is the oldest OWNER-role member. Its account
+ * id is present only when that SCM actor has signed in and can therefore be impersonated.
  */
 @Schema(description = "Metadata-only workspace summary for the instance-admin overview")
 public record AdminWorkspaceViewDTO(
@@ -20,6 +21,7 @@ public record AdminWorkspaceViewDTO(
     @NonNull String accountLogin,
     @Nullable IdentityProviderType providerType,
     @Nullable String ownerLogin,
+    @Nullable Long ownerAccountId,
     @NonNull Long memberCount,
     @NonNull Instant createdAt
 ) {}

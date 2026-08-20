@@ -57,7 +57,12 @@ jobs:
 
   application-server-build:
     name: "App Server"
-    if: inputs.should_skip != 'true' && inputs.application_server_changed == 'true'
+    # Every code PR receives an immutable app-server tag. If server code did not change, this is
+    # intentionally a cached rebuild of main; previews can then use SOURCE_COMMIT uniformly instead
+    # of racing on a global IMAGE_TAG or failing because the commit tag does not exist.
+    if: >-
+      inputs.should_skip != 'true' &&
+      (inputs.application_server_changed == 'true' || github.event_name == 'pull_request')
     uses: ./.github/workflows/reusable-docker-build.yml
     with:
       image-name: "ls1intum/hephaestus/application-server"
@@ -68,9 +73,12 @@ jobs:
       registry: "ghcr.io"
       # amd64-only on PRs (main/release build both arches). See reusable-docker-build.yml.
       single-arch: ${{ github.event_name == 'pull_request' }}
+      # github.sha is a synthetic merge commit on pull_request. Coolify injects the checked-out PR
+      # head as SOURCE_COMMIT, so publish both immutable identifiers.
       tags: |
         ${{ github.ref_name }}
         ${{ github.sha }}
+        ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || '' }}
         ci-${{ github.run_number }}
         ${{ github.event_name == 'pull_request' && format('pr-{0}', github.event.number) || '' }}
       labels: |

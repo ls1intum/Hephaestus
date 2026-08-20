@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { InfoIcon } from "lucide-react";
 import { toast } from "sonner";
 import {
 	autonomyRollupOptions,
@@ -32,7 +33,9 @@ import {
 	reviewSearchSchema,
 } from "@/components/admin/practices/review/review-sections";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
+import environment from "@/environment";
 import { usePracticeAutonomyMutations } from "@/hooks/use-practice-autonomy-mutations";
 import { usePracticeReviewSettingsMutation } from "@/hooks/use-practice-review-settings";
 import { useSweepScheduleMutations } from "@/hooks/use-sweep-schedule-mutations";
@@ -231,6 +234,17 @@ function WhenAndWhereSection({ workspaceSlug }: { workspaceSlug: string }) {
 	// same rhythm as the sections inside them rather than looking like a separate panel.
 	return (
 		<div className="max-w-3xl space-y-8">
+			{environment.deployment.environment === "preview" && (
+				<Alert>
+					<InfoIcon aria-hidden />
+					<AlertTitle>This preview starts in silence mode</AlertTitle>
+					<AlertDescription>
+						Staging data is available, but cloned model bindings, triggers, and recurring checks
+						start paused. To test a review in this preview only, select and enable the practice
+						review model below, then enable the manual or automatic trigger you need.
+					</AlertDescription>
+				</Alert>
+			)}
 			{isLoading ? (
 				<div className="flex h-40 items-center justify-center">
 					<Spinner className="size-6" />

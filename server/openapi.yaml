@@ -7441,6 +7441,9 @@ components:
         memberCount:
           type: integer
           format: int64
+        ownerAccountId:
+          type: integer
+          format: int64
         ownerLogin:
           type: string
         providerType:

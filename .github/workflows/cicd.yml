@@ -62,15 +62,22 @@ jobs:
               - '.github/workflows/**'
               - '.github/actions/**'
 
-  # Coolify's preview switch is all-or-nothing: enabled, it deploys every open PR. We leave it
-  # disabled and create a preview per PR from the Coolify UI, and this job keeps the ones that
-  # exist up to date. Coolify's deploy API only accepts a pull request that already has a preview,
-  # so a PR without one is a no-op. Instance identifiers come from repository variables; a fork or
-  # an unconfigured instance simply skips.
+  # Coolify creates previews for trusted same-repository pull requests. This job waits for the
+  # immutable application-server image, then updates the preview to the exact head commit. Coolify's
+  # deploy API only accepts a pull request that already has a preview, so a missing preview remains a
+  # safe no-op. Instance identifiers come from repository variables; forks never receive credentials.
   preview:
     name: "Preview / Coolify"
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' && vars.COOLIFY_URL != '' && vars.COOLIFY_APP_UUID != ''
+    # Wait for Docker so SOURCE_COMMIT always names an image that already exists in GHCR. `always`
+    # preserves the link/no-op behavior when the Docker workflow is legitimately skipped.
+    needs: [detect-changes, Docker]
+    if: >-
+      always() &&
+      github.event_name == 'pull_request' &&
+      vars.COOLIFY_URL != '' &&
+      vars.COOLIFY_APP_UUID != '' &&
+      (needs.Docker.result == 'success' || needs.Docker.result == 'skipped')
     permissions:
       statuses: write
     timeout-minutes: 2
@@ -98,7 +105,11 @@ jobs:
 
       # Forks are skipped deliberately: a preview runs with the instance's real credentials.
       - name: Update this PR's preview deployment, if it has one
-        if: github.event.action == 'synchronize' && github.event.pull_request.head.repo.full_name == github.repository
+        if: >-
+          (github.event.action == 'opened' ||
+           github.event.action == 'reopened' ||
+           github.event.action == 'synchronize') &&
+          github.event.pull_request.head.repo.full_name == github.repository
         env:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
