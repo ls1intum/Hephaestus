@@ -105,6 +105,53 @@ class CatalogAdoptionPlanAssembler {
         );
     }
 
+    CatalogAreaAdoptionPlan areaPlan(WorkspaceContext context, String slug) {
+        EffectiveCatalog catalog = catalogService.catalog();
+        CatalogEntry<AreaDefinition> entry = catalog
+            .installableAreas()
+            .stream()
+            .filter(candidate -> candidate.slug().equals(slug))
+            .findFirst()
+            .orElseThrow(() -> new EntityNotFoundException("Offered catalog area", slug));
+        PracticeArea existingArea = areaRepository.findByWorkspaceIdAndSlug(context.id(), slug).orElse(null);
+        CatalogAreaDisposition disposition =
+            existingArea == null
+                ? CatalogAreaDisposition.CREATE_CATALOG_AREA
+                : CatalogAreaDisposition.REUSE_EXISTING_AREA;
+        AreaDefinition definition = existingArea == null ? entry.effective() : AreaDefinition.from(existingArea);
+        int displayOrder =
+            existingArea == null
+                ? areaRepository.findMaxDisplayOrder(context.id()) + 1
+                : existingArea.getDisplayOrder();
+        List<CatalogAdoptionPlan> practices = catalog
+            .installablePractices()
+            .stream()
+            .filter(practice -> slug.equals(practice.effective().areaSlug()))
+            .map(practice -> plan(context, practice.slug()))
+            .toList();
+        List<CatalogAreaPracticeActionDTO> actions = practices
+            .stream()
+            .map(practice -> new CatalogAreaPracticeActionDTO(practice.slug(), areaAction(context, slug, practice)))
+            .toList();
+        return CatalogAreaAdoptionPlan.create(slug, definition, disposition, displayOrder, practices, actions);
+    }
+
+    private CatalogAreaPracticeAction areaAction(WorkspaceContext context, String areaSlug, CatalogAdoptionPlan plan) {
+        if (plan.availability() == CatalogAdoptionAvailability.AVAILABLE) {
+            return CatalogAreaPracticeAction.ADD;
+        }
+        if (plan.availability() == CatalogAdoptionAvailability.SLUG_CONFLICT) {
+            return CatalogAreaPracticeAction.BLOCKED;
+        }
+        Practice existing = practiceRepository.findByWorkspaceIdAndSlug(context.id(), plan.slug()).orElseThrow();
+        if (existing.getArea() == null) {
+            return CatalogAreaPracticeAction.MOVE_TO_AREA;
+        }
+        return areaSlug.equals(existing.getArea().getSlug())
+            ? CatalogAreaPracticeAction.KEEP
+            : CatalogAreaPracticeAction.BLOCKED;
+    }
+
     private static CatalogAdoptionAvailability availability(String slug, Practice existingPractice) {
         if (existingPractice == null) {
             return CatalogAdoptionAvailability.AVAILABLE;

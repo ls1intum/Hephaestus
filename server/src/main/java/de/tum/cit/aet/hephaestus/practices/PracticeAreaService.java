@@ -271,18 +271,36 @@ public class PracticeAreaService {
 
     @Transactional
     public void deleteArea(WorkspaceContext ctx, String slug) {
+        deleteArea(ctx, slug, false);
+    }
+
+    @Transactional
+    public void deleteArea(WorkspaceContext ctx, String slug, boolean deletePractices) {
         lockWorkspace(ctx);
         PracticeArea area = getArea(ctx, slug);
         PracticeAreaSnapshot areaBefore = PracticeAreaSnapshot.of(area);
-        int nextOrder = practiceRepository.findMaxDisplayOrder(ctx.id(), null) + 1;
-        for (Practice practice : practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
+        List<Practice> practices = practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(
             ctx.id(),
             area.getId()
-        )) {
+        );
+        int nextOrder = deletePractices ? 0 : practiceRepository.findMaxDisplayOrder(ctx.id(), null) + 1;
+        for (Practice practice : practices) {
             PracticeDefinitionSnapshot before = PracticeDefinitionSnapshot.of(
                 practice,
                 practiceRevisionService.currentRevisionNumber(practice)
             );
+            if (deletePractices) {
+                practiceRepository.delete(practice);
+                configAudit.record(
+                    ConfigAuditEntry.deleted(
+                        ConfigAuditEntityType.PRACTICE_DEFINITION,
+                        practice.getId(),
+                        ctx.id(),
+                        before
+                    )
+                );
+                continue;
+            }
             practice.setArea(null);
             practice.setDisplayOrder(nextOrder++);
             practiceRepository.save(practice);
@@ -293,7 +311,12 @@ public class PracticeAreaService {
         configAudit.record(
             ConfigAuditEntry.deleted(ConfigAuditEntityType.PRACTICE_AREA, area.getId(), ctx.id(), areaBefore)
         );
-        log.info("Deleted practice area (slug={}) in workspace {}", slug, ctx.slug());
+        log.info(
+            "Deleted practice area (slug={}) with deletePractices={} in workspace {}",
+            slug,
+            deletePractices,
+            ctx.slug()
+        );
     }
 
     @Transactional

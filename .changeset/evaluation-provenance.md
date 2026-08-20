@@ -1,11 +1,5 @@
 ---
-"hephaestus": patch
+"hephaestus": minor
 ---
 
-Every practice-review result can now be traced back to what produced it: the run records the model
-and prompt version that ran and a fingerprint of the evidence the review actually saw, so a result
-that looks wrong can be told apart from a result produced from different inputs than you assumed.
-
-Every piece of feedback the instance prepares is also recorded as either delivered or withheld, with
-the reason it was withheld. Feedback that never left the instance no longer looks the same as
-feedback a developer saw and chose not to act on.
+Workspace administrators can now manage their practices and browse the instance library from one Practice setup page. They can review and add one practice or an entire area as independent, editable workspace copies, restore a removed library area, and choose whether removing an area keeps or deletes its practices. Adding never enables automatic sending: reviewable practices start with Review before sending, while practices Hephaestus cannot review remain Off.

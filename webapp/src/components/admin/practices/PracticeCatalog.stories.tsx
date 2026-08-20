@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import {
+	mockAuthorDeclaredEvidenceValidation,
+	mockPracticeDefinitionOptions,
+} from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
@@ -154,6 +157,40 @@ type Story = StoryObj<typeof meta>;
 export const Populated: Story = {
 	play: async () => {
 		await expectNoPageOverflow();
+	},
+};
+
+export const WithPracticeLibrary: Story = {
+	args: {
+		showLibrary: true,
+		onShowLibraryChange: fn(),
+		catalogPractices: [
+			{
+				slug: "explain-change",
+				name: "Explain what changed and why",
+				artifactKind: "scm.pull_request",
+				areaSlug: "review-ready-work",
+				areaName: "Review-ready work",
+				availability: "AVAILABLE",
+				automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+			},
+			{
+				slug: practices[0].slug,
+				name: practices[0].name,
+				artifactKind: practices[0].artifactKind,
+				areaSlug: practices[0].areaSlug,
+				areaName: areas[0].name,
+				availability: "ADOPTED",
+				automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+			},
+		],
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Practice library" })).toBeVisible();
+		await expect(canvas.getByRole("heading", { name: "Review-ready work" })).toBeVisible();
+		await expect(canvas.getByText("Explain what changed and why")).toBeVisible();
+		await expect(canvas.queryByText(practices[0].name)).toBeVisible();
+		await expect(canvas.queryByText("Added")).not.toBeInTheDocument();
 	},
 };
 

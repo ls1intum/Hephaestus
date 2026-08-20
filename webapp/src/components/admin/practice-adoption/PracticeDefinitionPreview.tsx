@@ -13,17 +13,22 @@ import { artifactKindLabel } from "@/lib/artifact-kinds";
 export interface PracticeDefinitionPreviewProps {
 	definition: CuratedPracticeDefinition;
 	options: PracticeDefinitionOptions;
+	idPrefix?: string;
 }
 
-export function PracticeDefinitionPreview({ definition, options }: PracticeDefinitionPreviewProps) {
+export function PracticeDefinitionPreview({
+	definition,
+	options,
+	idPrefix = "practice",
+}: PracticeDefinitionPreviewProps) {
 	const workType = options.workTypes?.find(
 		(candidate) => candidate.artifactKind === definition.artifactKind,
 	);
 
 	return (
 		<div className="space-y-8">
-			<section aria-labelledby="practice-checks-heading" className="space-y-3">
-				<h2 id="practice-checks-heading" className="text-sm font-medium">
+			<section aria-labelledby={`${idPrefix}-checks-heading`} className="space-y-3">
+				<h2 id={`${idPrefix}-checks-heading`} className="text-sm font-medium">
 					What this practice checks
 				</h2>
 				<p className="whitespace-pre-wrap text-xl font-semibold tracking-tight">

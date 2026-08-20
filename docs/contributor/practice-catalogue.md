@@ -22,7 +22,7 @@ it propagates:
 | Name, criteria, and guidance                                                   | maintained in the repository                                                            | inherited or customized by an instance administrator    | adopted explicitly, then owned by the workspace                                             |
 | Binding — the one occasion a practice is reviewed on and the evidence it reads | declared as `on` in the bundled catalog; optional precompute input is explicit          | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
 | Review frame — contract version, review mode, known limitations                | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
-| Included in new workspaces                                                     | default is included                                                                     | instance administrator can include or exclude           | not applicable after installation                                                           |
+| Offered for workspace adoption                                                     | default is offered                                                                     | instance administrator can offer or stop offering           | not applicable after adoption                                                           |
 | Practice autonomy                                                              | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
 | Review scope                                                                   | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator sets it once for the whole workspace                                |
 | Area and order                                                                 | JSON array order                                                                        | inherited or changed with drag-and-drop or move actions | copied, then independently managed                                                          |
@@ -34,7 +34,7 @@ instance definition or an existing workspace practice.
 | Stakeholder                | Primary task                                                                                                               | Deliberately not their task                      |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | Practice author            | Define the habit, guidance, and responsible mentoring support                                                              | Authorize collection or certify review accuracy  |
-| Instance administrator     | Curate the defaults offered to new workspaces                                                                              | Rewrite existing workspace practices             |
+| Instance administrator     | Curate the library offered for workspace adoption                                                                              | Rewrite existing workspace practices             |
 | Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
 | Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                          | Decide that connected evidence proves a practice |
 | Developer, peer, or mentor | Use observations and available human context in a review                                                                   | Supply hidden context to Hephaestus implicitly   |
@@ -116,10 +116,14 @@ for the architectural decision.
   audit event. **Use Hephaestus order** removes custom positions.
 - **Automatic installation is repair-only.** Workspaces without a recorded catalogue installation retain
   a one-time repair path. New workspaces start empty and adopt practices explicitly.
-- **Adoption is deliberate.** Workspace administrators can browse the entries the instance currently
-  offers, inspect the complete effective definition and its review-rule fingerprint, and then adopt an
-  independent copy. Adoption fails when the reviewed definition or resulting workspace configuration
-  has changed.
+- **Adoption is deliberate.** Workspace administrators can show the instance library alongside their
+  workspace configuration, inspect a complete effective definition, and add either one practice or all
+  available practices in an area as independent copies. Area adoption is one transaction. Both flows
+  fail when the reviewed definition or resulting workspace configuration has changed.
+- **Area removal is explicit.** Administrators choose whether an area's practices move to Unassigned or
+  are deleted with the area. The library can restore a removed catalog area by moving its matching,
+  unassigned workspace copies back without replacing local edits. Practices deliberately placed in a
+  different area are never moved implicitly.
 - **Adoption does not authorize automatic sending.** A reviewable practice starts at `HUMAN_APPROVAL`
   (**Review before sending**), while a practice Hephaestus cannot review remains `OFF`. Moving to **Send
   automatically** is a separate administrator decision; validation evidence does not make that

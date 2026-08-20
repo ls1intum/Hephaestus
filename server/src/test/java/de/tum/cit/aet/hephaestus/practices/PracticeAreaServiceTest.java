@@ -291,6 +291,31 @@ class PracticeAreaServiceTest extends BaseUnitTest {
     }
 
     @Test
+    void deleteArea_deletesContainedPracticesWhenRequested() {
+        PracticeArea area = area("deleted");
+        area.setId(20L);
+        Practice first = practice("first");
+        first.setId(1L);
+        first.setArea(area);
+        Practice second = practice("second");
+        second.setId(2L);
+        second.setArea(area);
+        when(practiceAreaRepository.findByWorkspaceIdAndSlug(1L, "deleted")).thenReturn(Optional.of(area));
+        when(practiceRepository.findByWorkspaceIdAndAreaIdOrderByDisplayOrderAscNameAsc(1L, 20L)).thenReturn(
+            List.of(first, second)
+        );
+
+        service.deleteArea(CTX, "deleted", true);
+
+        verify(practiceRepository).delete(first);
+        verify(practiceRepository).delete(second);
+        verify(practiceRepository, never()).save(any());
+        verify(practiceRevisionService, never()).append(any());
+        verify(configAudit, times(3)).record(any());
+        verify(practiceAreaRepository).delete(area);
+    }
+
+    @Test
     void deleteArea_recordsTheDeletedConfiguration() {
         PracticeArea area = area("deleted");
         area.setId(20L);

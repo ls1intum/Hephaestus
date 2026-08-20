@@ -181,7 +181,7 @@ function AreaActions({
 				onCheckedChange={(offered) => (offered ? onStatusChange(area, true) : onExclude(area))}
 				disabled={disabled}
 				aria-busy={pending}
-				aria-label={`Include ${area.definition.name} in new workspaces`}
+				aria-label={`Offer ${area.definition.name} to workspaces`}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -223,11 +223,11 @@ function AreaActions({
 					<DropdownMenuSeparator />
 					{area.status.offered ? (
 						<DropdownMenuItem variant="destructive" onClick={() => onExclude(area)}>
-							Exclude from new workspaces
+							Stop offering
 						</DropdownMenuItem>
 					) : (
 						<DropdownMenuItem onClick={() => onStatusChange(area, true)}>
-							Include in new workspaces
+							Offer to workspaces
 						</DropdownMenuItem>
 					)}
 				</DropdownMenuContent>
@@ -294,14 +294,14 @@ function PracticeActions({
 		? "Move to Unassigned or an included area first"
 		: parentUnavailable
 			? "Include when its area is included"
-			: "Include in new workspaces";
+			: "Offer to workspaces";
 	const switchLabel = practice.missingAreaSlug
 		? `${practice.name} cannot be included until it is moved out of the missing area`
 		: parentUnavailable
 			? practice.status.offered
 				? `${practice.name} is excluded because its area is excluded`
-				: `${practice.name} is excluded from new workspaces`
-			: `Include ${practice.name} in new workspaces`;
+				: `${practice.name} is not offered to workspaces`
+			: `Offer ${practice.name} to workspaces`;
 	const persistedPractice = practice.missingAreaSlug
 		? { ...practice, areaSlug: practice.missingAreaSlug }
 		: practice;
@@ -391,7 +391,7 @@ function PracticeActions({
 					<DropdownMenuSeparator />
 					{practice.status.offered ? (
 						<DropdownMenuItem variant="destructive" onClick={() => onExclude(persistedPractice)}>
-							Exclude from new workspaces
+							Stop offering
 						</DropdownMenuItem>
 					) : (
 						<DropdownMenuItem

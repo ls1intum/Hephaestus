@@ -34,6 +34,11 @@ public class CatalogAdoptionService {
         return plans.plan(context, slug);
     }
 
+    @Transactional(readOnly = true)
+    public CatalogAreaAdoptionPlan previewArea(WorkspaceContext context, String slug) {
+        return plans.areaPlan(context, slug);
+    }
+
     @Transactional
     public Practice adopt(WorkspaceContext context, String slug, String ifMatch) {
         catalogLock.acquire();
@@ -58,6 +63,51 @@ public class CatalogAdoptionService {
         }
         return practiceService.adoptPracticeFromCatalog(context, slug, plan.definition(), plan.initialAutonomy());
     }
+
+    @Transactional
+    public CatalogAreaAdoptionResult adoptArea(WorkspaceContext context, String slug, String ifMatch) {
+        catalogLock.acquire();
+        workspaceRepository
+            .findByIdForUpdate(context.id())
+            .orElseThrow(() -> new EntityNotFoundException("Workspace", context.slug()));
+
+        CatalogAreaAdoptionPlan plan;
+        try {
+            plan = plans.areaPlan(context, slug);
+        } catch (EntityNotFoundException exception) {
+            throw new StaleCatalogAdoptionPlanException(exception);
+        }
+        requireCurrentPlan(ifMatch, plan.etag());
+        if (plan.disposition() == CatalogAreaDisposition.CREATE_CATALOG_AREA) {
+            areaService.adoptAreaFromCatalog(context, slug, plan.definition(), plan.displayOrder());
+        }
+        List<Practice> added = plan
+            .practices()
+            .stream()
+            .filter(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE)
+            .map(practice ->
+                practiceService.adoptPracticeFromCatalog(
+                    context,
+                    practice.slug(),
+                    practice.definition(),
+                    practice.initialAutonomy()
+                )
+            )
+            .toList();
+        List<Practice> moved = new java.util.ArrayList<>();
+        int position = 0;
+        for (CatalogAreaPracticeActionDTO action : plan.actions()) {
+            if (action.action() == CatalogAreaPracticeAction.MOVE_TO_AREA) {
+                practiceService.placePractice(context, action.slug(), slug, position++);
+                moved.add(practiceService.getPractice(context, action.slug()));
+            } else if (action.action() == CatalogAreaPracticeAction.ADD) {
+                position++;
+            }
+        }
+        return new CatalogAreaAdoptionResult(added, List.copyOf(moved));
+    }
+
+    record CatalogAreaAdoptionResult(List<Practice> added, List<Practice> moved) {}
 
     private static void requireCurrentPlan(String ifMatch, String currentEtag) {
         EntityTagPrecondition precondition;

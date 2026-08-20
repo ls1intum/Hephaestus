@@ -247,6 +247,146 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
 
     @Test
     @WithAdminUser
+    void shouldAllowAdoptionAgainAfterWorkspacePracticeIsDeleted() {
+        ensureAdminMembership(workspace);
+        adopt(previewEtag()).expectStatus().isCreated();
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{workspaceSlug}/practices/{practiceSlug}", workspace.getWorkspaceSlug(), PRACTICE)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNoContent();
+
+        webTestClient
+            .get()
+            .uri(BASE, workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$[?(@.slug == '" + PRACTICE + "')].availability")
+            .isEqualTo("AVAILABLE");
+
+        adopt(previewEtag()).expectStatus().isCreated();
+
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(1);
+        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldAdoptEveryAvailablePracticeInAreaAtomically() {
+        ensureAdminMembership(workspace);
+        var preview = webTestClient
+            .get()
+            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectHeader()
+            .exists(HttpHeaders.ETAG)
+            .expectBody(CatalogAreaAdoptionPreviewDTO.class)
+            .returnResult()
+            .getResponseBody();
+        assertThat(preview).isNotNull();
+        assertThat(preview.practices())
+            .isNotEmpty()
+            .allMatch(practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE);
+
+        webTestClient
+            .post()
+            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .headers(headers -> {
+                TestAuthUtils.withCurrentUser().accept(headers);
+                headers.set(HttpHeaders.IF_MATCH, preview.etag());
+            })
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.added.length()")
+            .isEqualTo(preview.practices().size())
+            .jsonPath("$.moved.length()")
+            .isEqualTo(0);
+
+        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(preview.practices().size());
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldAllowWholeAreaAdoptionAgainAfterAreaAndPracticesAreDeleted() {
+        ensureAdminMembership(workspace);
+        CatalogAreaAdoptionPreviewDTO firstPreview = previewArea();
+        adoptArea(firstPreview.etag()).expectStatus().isOk();
+
+        webTestClient
+            .delete()
+            .uri(
+                "/workspaces/{workspaceSlug}/practice-areas/{areaSlug}?deletePractices=true",
+                workspace.getWorkspaceSlug(),
+                AREA
+            )
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNoContent();
+
+        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isEmpty();
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId())).isEmpty();
+        CatalogAreaAdoptionPreviewDTO secondPreview = previewArea();
+        assertThat(secondPreview.practices()).allMatch(
+            practice -> practice.availability() == CatalogAdoptionAvailability.AVAILABLE
+        );
+
+        adoptArea(secondPreview.etag()).expectStatus().isOk();
+
+        assertThat(areaRepository.findByWorkspaceIdAndSlug(workspace.getId(), AREA)).isPresent();
+        assertThat(practiceRepository.findAllForCatalog(workspace.getId())).hasSize(secondPreview.practices().size());
+    }
+
+    @Test
+    @WithAdminUser
+    void shouldRestoreUnassignedCatalogPracticesWhenDeletedAreaIsAdoptedAgain() {
+        ensureAdminMembership(workspace);
+        CatalogAreaAdoptionPreviewDTO firstPreview = previewArea();
+        adoptArea(firstPreview.etag()).expectStatus().isOk();
+
+        webTestClient
+            .delete()
+            .uri("/workspaces/{workspaceSlug}/practice-areas/{areaSlug}", workspace.getWorkspaceSlug(), AREA)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isNoContent();
+
+        CatalogAreaAdoptionPreviewDTO restorePreview = previewArea();
+        assertThat(restorePreview.actions()).allMatch(
+            action -> action.action() == CatalogAreaPracticeAction.MOVE_TO_AREA
+        );
+        adoptArea(restorePreview.etag())
+            .expectStatus()
+            .isOk()
+            .expectBody()
+            .jsonPath("$.added.length()")
+            .isEqualTo(0)
+            .jsonPath("$.moved.length()")
+            .isEqualTo(restorePreview.practices().size());
+
+        assertThat(
+            practiceRepository
+                .findAllForCatalog(workspace.getId())
+                .stream()
+                .map(practice -> practice.getArea() == null ? null : practice.getArea().getSlug())
+        ).containsOnly(AREA);
+    }
+
+    @Test
+    @WithAdminUser
     void shouldCreateExactlyOneCopyWhenAdoptersRunConcurrently() throws Exception {
         ensureAdminMembership(workspace);
         String etag = previewEtag();
@@ -331,6 +471,30 @@ class CatalogAdoptionControllerIntegrationTest extends AbstractWorkspaceIntegrat
             .returnResult(CatalogPracticePreviewDTO.class)
             .getResponseHeaders()
             .getETag();
+    }
+
+    private CatalogAreaAdoptionPreviewDTO previewArea() {
+        return webTestClient
+            .get()
+            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .expectBody(CatalogAreaAdoptionPreviewDTO.class)
+            .returnResult()
+            .getResponseBody();
+    }
+
+    private WebTestClient.ResponseSpec adoptArea(String etag) {
+        return webTestClient
+            .post()
+            .uri(BASE + "/areas/" + AREA, workspace.getWorkspaceSlug())
+            .headers(headers -> {
+                TestAuthUtils.withCurrentUser().accept(headers);
+                headers.set(HttpHeaders.IF_MATCH, etag);
+            })
+            .exchange();
     }
 
     private WebTestClient.ResponseSpec adopt(String etag) {

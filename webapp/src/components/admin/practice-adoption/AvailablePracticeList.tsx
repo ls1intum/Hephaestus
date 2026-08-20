@@ -3,6 +3,7 @@ import { Check, ChevronRight, CircleAlert, CircleDashed, Library } from "lucide-
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
 	Empty,
 	EmptyDescription,
@@ -25,25 +26,106 @@ import { cn } from "@/lib/utils";
 export interface AvailablePracticeListProps {
 	workspaceSlug: string;
 	practices: CatalogPracticeSummary[];
+	groupByArea?: boolean;
+	hideAdopted?: boolean;
+	onReviewArea?: (areaSlug: string) => void;
+	existingAreaSlugs?: ReadonlySet<string>;
 }
 
-export function AvailablePracticeList({ workspaceSlug, practices }: AvailablePracticeListProps) {
-	if (practices.length === 0) {
+export function AvailablePracticeList({
+	workspaceSlug,
+	practices,
+	groupByArea = false,
+	hideAdopted = false,
+	onReviewArea,
+	existingAreaSlugs = new Set(),
+}: AvailablePracticeListProps) {
+	const visiblePractices = hideAdopted
+		? practices.filter(
+				(practice) =>
+					practice.availability !== "ADOPTED" ||
+					(practice.areaSlug !== undefined && !existingAreaSlugs.has(practice.areaSlug)),
+			)
+		: practices;
+	if (visiblePractices.length === 0) {
+		const allAdded = hideAdopted && practices.length > 0;
 		return (
 			<Empty className="border">
 				<EmptyHeader>
 					<EmptyMedia variant="icon">
 						<Library />
 					</EmptyMedia>
-					<EmptyTitle>No practices available</EmptyTitle>
+					<EmptyTitle>
+						{allAdded ? "Everything is already added" : "No practices available"}
+					</EmptyTitle>
 					<EmptyDescription>
-						The instance catalog does not currently offer any practices to this workspace.
+						{allAdded
+							? "This workspace already has every practice currently offered in the library."
+							: "The instance catalog does not currently offer any practices to this workspace."}
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
 		);
 	}
+	if (groupByArea) {
+		const groups = new Map<string, CatalogPracticeSummary[]>();
+		for (const practice of visiblePractices) {
+			const areaKey = practice.areaSlug ?? "__unassigned__";
+			groups.set(areaKey, [...(groups.get(areaKey) ?? []), practice]);
+		}
+		return (
+			<div className="space-y-4">
+				{Array.from(groups, ([areaKey, entries]) => {
+					const areaName = entries[0]?.areaName ?? "Unassigned";
+					const areaSlug = entries[0]?.areaSlug;
+					const availableCount = entries.filter(
+						(entry) => entry.availability === "AVAILABLE",
+					).length;
+					const restoreCount = entries.filter((entry) => entry.availability === "ADOPTED").length;
+					const areaMissing = areaSlug !== undefined && !existingAreaSlugs.has(areaSlug);
+					return (
+						<section
+							key={areaKey}
+							className="space-y-2"
+							aria-labelledby={`library-${entries[0].areaSlug ?? "unassigned"}`}
+						>
+							<div className="flex flex-wrap items-center justify-between gap-3">
+								<h3 id={`library-${entries[0].areaSlug ?? "unassigned"}`} className="font-medium">
+									{areaName}
+								</h3>
+								{areaSlug &&
+								(availableCount > 0 || (areaMissing && restoreCount > 0)) &&
+								onReviewArea ? (
+									<Button
+										size="sm"
+										variant="outline"
+										onClick={() => {
+											onReviewArea(areaSlug);
+										}}
+									>
+										{areaMissing && availableCount === 0
+											? `Restore area · ${restoreCount} ${restoreCount === 1 ? "practice" : "practices"}`
+											: existingAreaSlugs.has(areaSlug)
+												? `Review ${availableCount} ${availableCount === 1 ? "practice" : "practices"}`
+												: `Review area · ${availableCount} ${availableCount === 1 ? "practice" : "practices"}`}
+									</Button>
+								) : (
+									<span className="text-xs text-muted-foreground">
+										{entries.length} {entries.length === 1 ? "practice" : "practices"}
+									</span>
+								)}
+							</div>
+							<PracticeItems workspaceSlug={workspaceSlug} practices={entries} />
+						</section>
+					);
+				})}
+			</div>
+		);
+	}
+	return <PracticeItems workspaceSlug={workspaceSlug} practices={visiblePractices} />;
+}
 
+function PracticeItems({ workspaceSlug, practices }: AvailablePracticeListProps) {
 	return (
 		<ItemGroup>
 			{practices.map((practice) => (

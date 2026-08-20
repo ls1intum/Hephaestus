@@ -230,7 +230,7 @@ public class PracticeAreaController {
     @DeleteMapping("/{areaSlug}")
     @Operation(
         summary = "Delete a practice area",
-        description = "Moves its practices to Unassigned, then deletes the area"
+        description = "Deletes the area. By default its practices move to Unassigned; deletePractices=true deletes them too."
     )
     @ApiResponse(responseCode = "204", description = "Area deleted")
     @ApiResponse(
@@ -240,8 +240,12 @@ public class PracticeAreaController {
     )
     @RequireAtLeastWorkspaceAdmin
     @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_AREA")
-    public ResponseEntity<Void> deleteArea(WorkspaceContext workspaceContext, @PathVariable String areaSlug) {
-        areaService.deleteArea(workspaceContext, areaSlug);
+    public ResponseEntity<Void> deleteArea(
+        WorkspaceContext workspaceContext,
+        @PathVariable String areaSlug,
+        @RequestParam(defaultValue = "false") boolean deletePractices
+    ) {
+        areaService.deleteArea(workspaceContext, areaSlug, deletePractices);
         return ResponseEntity.noContent().build();
     }
 }

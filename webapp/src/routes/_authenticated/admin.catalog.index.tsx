@@ -65,9 +65,7 @@ function AdminCuratedCatalogPage() {
 			invalidateCatalog();
 			toast.success(
 				successMessage ??
-					(offered
-						? "Practice included in new workspaces"
-						: "Practice excluded from new workspaces"),
+					(offered ? "Practice offered to workspaces" : "Practice is no longer offered"),
 			);
 		},
 		onError: (error: unknown) => {
@@ -85,9 +83,7 @@ function AdminCuratedCatalogPage() {
 		onSuccess: (catalog: Catalog) => {
 			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
 			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
-			toast.success(
-				offered ? "Area included in new workspaces" : "Area excluded from new workspaces",
-			);
+			toast.success(offered ? "Area offered to workspaces" : "Area is no longer offered");
 		},
 		onError: (error: unknown) => {
 			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
@@ -227,8 +223,8 @@ function AdminCuratedCatalogPage() {
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
-				title="Practice catalog"
-				description="Set what each new workspace starts with. Each Hephaestus default updates automatically until you customize that entry. Existing workspaces never change automatically."
+				title="Practice library"
+				description="Choose which areas and practices workspace administrators can add. Library changes never rewrite existing workspace practices."
 				actions={
 					<div className="flex flex-wrap gap-2">
 						{writePending ? (

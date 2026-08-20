@@ -194,7 +194,7 @@ export function CuratedCatalog({
 							</EmptyMedia>
 							<EmptyTitle>The catalog is empty</EmptyTitle>
 							<EmptyDescription>
-								Create a practice or area to build the starting configuration for new workspaces.
+								Create an area or practice, then offer it to workspace administrators.
 							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>
@@ -278,13 +278,11 @@ export function CuratedCatalog({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>
-							Exclude “{excludingPractice?.name}” from new workspaces?
-						</AlertDialogTitle>
+						<AlertDialogTitle>Stop offering “{excludingPractice?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{excludingPractice?.effectivelyOffered === false
-								? "Its area is already excluded. This keeps the practice excluded if the area is included again. Existing workspaces will not change."
-								: "New workspaces will not receive this practice. Existing workspaces will not change. You can include it again later."}
+								? "Its area is already not offered. This keeps the practice unavailable if the area is offered again. Existing workspace copies will not change."
+								: "Workspace administrators will no longer be able to add this practice. Existing workspace copies will not change. You can offer it again later."}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -295,7 +293,7 @@ export function CuratedCatalog({
 								setExcludingPractice(null);
 							}}
 						>
-							Exclude practice
+							Stop offering
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -309,15 +307,13 @@ export function CuratedCatalog({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>
-							Exclude “{excludingArea?.definition.name}” from new workspaces?
-						</AlertDialogTitle>
+						<AlertDialogTitle>Stop offering “{excludingArea?.definition.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{practicesExcludedWithArea.length === 0
-								? "New workspaces will not receive this area. No additional practices will be excluded. Existing workspaces will not change."
-								: `New workspaces will not receive this area. This also excludes ${practicesExcludedWithArea.length} currently included ${
+								? "Workspace administrators will no longer be able to add this area. No additional practices are affected. Existing workspace copies will not change."
+								: `Workspace administrators will no longer be able to add this area. This also stops offering ${practicesExcludedWithArea.length} currently offered ${
 										practicesExcludedWithArea.length === 1 ? "practice" : "practices"
-									}. Existing workspaces will not change.`}
+									}. Existing workspace copies will not change.`}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					{practicesExcludedWithArea.length > 0 && (
@@ -338,7 +334,7 @@ export function CuratedCatalog({
 								setExcludingArea(null);
 							}}
 						>
-							Exclude area
+							Stop offering
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>
@@ -394,7 +390,7 @@ function CatalogFilters({
 			>
 				<SelectTrigger
 					className="w-full lg:hidden"
-					aria-label="Filter by inclusion in new workspaces"
+					aria-label="Filter by availability to workspaces"
 				>
 					<SelectValue />
 				</SelectTrigger>
@@ -421,7 +417,7 @@ function CatalogFilters({
 				}
 				variant="outline"
 				size="sm"
-				aria-label="Filter by inclusion in new workspaces"
+				aria-label="Filter by availability to workspaces"
 				className="hidden lg:flex"
 			>
 				{STATUS_FILTERS.map((filter) => (

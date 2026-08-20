@@ -1,13 +1,18 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { createFileRoute, Link, retainSearchParams, useNavigate } from "@tanstack/react-router";
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 import {
+	adoptAreaMutation,
 	getPracticeDefinitionOptionsOptions,
+	listAdoptablePracticesOptions,
 	listAreasOptions,
 	listPracticesOptions,
+	previewAreaAdoptionOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
+import { CatalogAreaAdoptionDialog } from "@/components/admin/practice-adoption/CatalogAreaAdoptionDialog";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import {
@@ -30,6 +35,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practices"),
@@ -40,11 +46,12 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 
 function PracticeCatalogRoute() {
 	const { workspaceSlug } = Route.useParams();
-	const { focus } = Route.useSearch();
+	const { focus, library } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	const [deletingArea, setDeletingArea] = useState<PracticeArea | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
+	const [reviewingAreaSlug, setReviewingAreaSlug] = useState<string | null>(null);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
 
 	const areasQuery = useQuery({
@@ -56,15 +63,43 @@ function PracticeCatalogRoute() {
 	const definitionOptionsQuery = useQuery({
 		...getPracticeDefinitionOptionsOptions({ path: { workspaceSlug } }),
 	});
+	const catalogQuery = useQuery({
+		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
+		enabled: library === true,
+	});
+	const areaPreviewQuery = useQuery({
+		...previewAreaAdoptionOptions({ path: { workspaceSlug, slug: reviewingAreaSlug ?? "" } }),
+		enabled: reviewingAreaSlug !== null,
+	});
+	const adoptCatalogArea = useMutation({
+		...adoptAreaMutation(),
+		onSuccess: async (result) => {
+			setReviewingAreaSlug(null);
+			await Promise.all([areasQuery.refetch(), practicesQuery.refetch(), catalogQuery.refetch()]);
+			const changes = [
+				result.added.length > 0 && `${result.added.length} added`,
+				result.moved.length > 0 && `${result.moved.length} moved`,
+			].filter(Boolean);
+			toast.success("Area updated", { description: changes.join(", ") });
+		},
+		onError: (error) => {
+			void areaPreviewQuery.refetch();
+			toast.error(
+				problemStatusOf(error) === 412
+					? "The library changed before the area was added. Review the current contents."
+					: "Couldn't add the area. Nothing was changed.",
+			);
+		},
+	});
 
 	return (
 		<PageLayout>
 			<PageHeader
 				icon={<ListChecks />}
-				title="Practices"
+				title="Practice setup"
 				description={
 					<>
-						Define practices and group them into areas. Changes apply to this workspace only. The
+						Organize this workspace's practices and add suggestions from the instance catalog. The
 						autonomy — whether each practice is reviewed, and how far its reviews go on their own —
 						is set on{" "}
 						<Link
@@ -108,9 +143,22 @@ function PracticeCatalogRoute() {
 						creatingArea: catalog.createArea.isPending,
 					}}
 					focusFilter={focus ?? "ALL"}
+					catalogPractices={catalogQuery.data}
+					catalogUnavailable={catalogQuery.isError}
+					onRetryCatalog={() => catalogQuery.refetch()}
+					showLibrary={library === true}
+					onReviewCatalogArea={setReviewingAreaSlug}
+					onShowLibraryChange={(showLibrary) =>
+						navigate({
+							search: (previous) => ({ ...previous, library: showLibrary || undefined }),
+						})
+					}
 					onFocusFilterChange={(next: FocusFilter) =>
 						navigate({
-							search: { focus: next === "ALL" ? undefined : next },
+							search: (previous) => ({
+								...previous,
+								focus: next === "ALL" ? undefined : next,
+							}),
 						})
 					}
 					onCreateArea={async (name) => {
@@ -160,6 +208,28 @@ function PracticeCatalogRoute() {
 				/>
 			)}
 
+			<CatalogAreaAdoptionDialog
+				definitionOptions={
+					definitionOptionsQuery.data ?? { sourceContractVersion: "", workTypes: [] }
+				}
+				open={reviewingAreaSlug !== null}
+				preview={areaPreviewQuery.data}
+				isLoading={areaPreviewQuery.isPending}
+				isError={areaPreviewQuery.isError}
+				isPending={adoptCatalogArea.isPending}
+				onOpenChange={(open) => {
+					if (!open) setReviewingAreaSlug(null);
+				}}
+				onRetry={() => areaPreviewQuery.refetch()}
+				onConfirm={() => {
+					if (!reviewingAreaSlug || !areaPreviewQuery.data) return;
+					adoptCatalogArea.mutate({
+						path: { workspaceSlug, slug: reviewingAreaSlug },
+						headers: { "If-Match": areaPreviewQuery.data.etag },
+					});
+				}}
+			/>
+
 			<AlertDialog
 				open={deletingArea !== null}
 				onOpenChange={(open) => {
@@ -170,15 +240,14 @@ function PracticeCatalogRoute() {
 					<AlertDialogHeader>
 						<AlertDialogTitle>Delete “{deletingArea?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
-							Practices in this area will move to Unassigned. The practices themselves won't be
-							deleted.
+							Choose whether to keep this area's practices in the workspace or delete them with the
+							area. Deleting practices also permanently deletes their observations.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
-					<AlertDialogFooter>
+					<AlertDialogFooter className="sm:grid sm:grid-cols-3">
 						<AlertDialogCancel>Cancel</AlertDialogCancel>
 						<AlertDialogAction
-							variant="destructive"
-							className="min-w-24"
+							variant="outline"
 							disabled={catalog.deleteArea.isPending}
 							onClick={() => {
 								if (!deletingArea) return;
@@ -188,7 +257,23 @@ function PracticeCatalogRoute() {
 								);
 							}}
 						>
-							{catalog.deleteArea.isPending ? "Deleting…" : "Delete area"}
+							{catalog.deleteArea.isPending ? "Deleting…" : "Keep practices unassigned"}
+						</AlertDialogAction>
+						<AlertDialogAction
+							variant="destructive"
+							disabled={catalog.deleteArea.isPending}
+							onClick={() => {
+								if (!deletingArea) return;
+								catalog.deleteArea.mutate(
+									{
+										path: { workspaceSlug, areaSlug: deletingArea.slug },
+										query: { deletePractices: true },
+									},
+									{ onSuccess: () => setDeletingArea(null) },
+								);
+							}}
+						>
+							{catalog.deleteArea.isPending ? "Deleting…" : "Delete area and practices"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

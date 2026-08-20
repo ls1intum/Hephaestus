@@ -5364,6 +5364,25 @@ export type CatalogAdoptionArea = {
     slug?: string;
 };
 
+export type CatalogAreaPracticeAction = {
+    action: 'ADD' | 'MOVE_TO_AREA' | 'KEEP' | 'BLOCKED';
+    slug: string;
+};
+
+export type CatalogAreaAdoptionResult = {
+    added: Array<Practice>;
+    moved: Array<Practice>;
+};
+
+export type CatalogAreaAdoptionPreview = {
+    actions: Array<CatalogAreaPracticeAction>;
+    definition: CuratedAreaRequest;
+    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
+    etag: string;
+    practices: Array<CatalogPracticePreview>;
+    slug: string;
+};
+
 /**
  * Binary progress indicating unlocked state
  */
@@ -9042,7 +9061,9 @@ export type DeleteAreaData = {
         workspaceSlug: string;
         areaSlug: string;
     };
-    query?: never;
+    query?: {
+        deletePractices?: boolean;
+    };
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
 };
 
@@ -9178,6 +9199,53 @@ export type ListAdoptablePracticesResponses = {
 };
 
 export type ListAdoptablePracticesResponse = ListAdoptablePracticesResponses[keyof ListAdoptablePracticesResponses];
+
+export type PreviewAreaAdoptionData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+};
+
+export type PreviewAreaAdoptionResponses = {
+    /**
+     * OK
+     */
+    200: CatalogAreaAdoptionPreview;
+};
+
+export type PreviewAreaAdoptionResponse = PreviewAreaAdoptionResponses[keyof PreviewAreaAdoptionResponses];
+
+export type AdoptAreaData = {
+    body?: never;
+    headers?: {
+        'If-Match'?: string;
+    };
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        slug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+};
+
+export type AdoptAreaResponses = {
+    /**
+     * OK
+     */
+    200: CatalogAreaAdoptionResult;
+};
+
+export type AdoptAreaResponse = AdoptAreaResponses[keyof AdoptAreaResponses];
 
 export type PreviewPracticeAdoptionData = {
     body?: never;

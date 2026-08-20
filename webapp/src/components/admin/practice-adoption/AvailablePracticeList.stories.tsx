@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
+import { expect, fn } from "storybook/test";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
 import { AvailablePracticeList } from "./AvailablePracticeList";
@@ -10,6 +10,7 @@ const practices: CatalogPracticeSummary[] = [
 		name: "Describe what changed and why",
 		artifactKind: "scm.pull_request",
 		areaSlug: "review-ready-work",
+		areaName: "Review-ready work",
 		availability: "AVAILABLE" as const,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	},
@@ -18,6 +19,7 @@ const practices: CatalogPracticeSummary[] = [
 		name: "Keep pull requests focused",
 		artifactKind: "scm.pull_request",
 		areaSlug: "review-ready-work",
+		areaName: "Review-ready work",
 		availability: "ADOPTED" as const,
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	},
@@ -61,6 +63,48 @@ export const CatalogStates: Story = {
 
 export const Empty: Story = {
 	args: { practices: [] },
+};
+
+export const GroupedLibrary: Story = {
+	args: {
+		groupByArea: true,
+		hideAdopted: true,
+		onReviewArea: fn(),
+		existingAreaSlugs: new Set(["review-ready-work"]),
+	},
+	play: async ({ args, canvas }) => {
+		await expect(canvas.getByRole("heading", { name: "Review-ready work" })).toBeVisible();
+		await expect(canvas.queryByText("Added")).not.toBeInTheDocument();
+		await canvas.getByRole("button", { name: "Review 1 practice" }).click();
+		await expect(args.onReviewArea).toHaveBeenCalledWith("review-ready-work");
+		await expect(canvas.queryByRole("button", { name: /0 practices/ })).not.toBeInTheDocument();
+	},
+};
+
+export const EverythingAdded: Story = {
+	args: {
+		practices: [practices[1]],
+		groupByArea: true,
+		hideAdopted: true,
+		existingAreaSlugs: new Set(["review-ready-work"]),
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Everything is already added")).toBeVisible();
+	},
+};
+
+export const RestoreDeletedArea: Story = {
+	args: {
+		practices: [practices[1]],
+		groupByArea: true,
+		hideAdopted: true,
+		existingAreaSlugs: new Set(),
+		onReviewArea: fn(),
+	},
+	play: async ({ args, canvas }) => {
+		await canvas.getByRole("button", { name: "Restore area · 1 practice" }).click();
+		await expect(args.onReviewArea).toHaveBeenCalledWith("review-ready-work");
+	},
 };
 
 export const LongContentInDarkMode: Story = {

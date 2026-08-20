@@ -106,8 +106,9 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 						<AlertDialogTitle>{resetLabel}?</AlertDialogTitle>
 						<AlertDialogDescription>
 							This replaces the customization and discards unsaved changes. It does not change
-							whether the practice is included in new workspaces. Existing workspaces remain
-							unchanged. Future updates apply automatically until the practice is customized again.
+							whether workspace administrators can add the practice. Existing workspace copies
+							remain unchanged. Future updates apply automatically until the practice is customized
+							again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -131,15 +132,15 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
 			>
 				<ArrowLeft className="size-4" aria-hidden />
-				Practice catalog
+				Practice library
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
 				title={mode === "create" ? "Create practice" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Define a practice for the instance catalog."
-						: "Saving updates the instance catalog. Existing workspaces will not change."
+						? "Define a practice for the instance library."
+						: "Saving updates the instance library. Existing workspace copies will not change."
 				}
 			/>
 

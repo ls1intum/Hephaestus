@@ -88,6 +88,19 @@ public class CatalogAdoptionController {
             .body(plan.preview());
     }
 
+    @GetMapping("/areas/{slug}")
+    @Operation(summary = "Preview adoption of a catalog area and its practices", operationId = "previewAreaAdoption")
+    public ResponseEntity<CatalogAreaAdoptionPreviewDTO> previewArea(
+        WorkspaceContext context,
+        @PathVariable String slug
+    ) {
+        CatalogAreaAdoptionPlan plan = service.previewArea(context, slug);
+        return ResponseEntity.ok()
+            .cacheControl(CacheControl.noStore().cachePrivate())
+            .eTag(CatalogAdoptionService.formatted(plan.etag()))
+            .body(plan.preview());
+    }
+
     @PostMapping("/{slug}")
     @Operation(summary = "Adopt a catalog practice", operationId = "adoptPractice")
     @ApiResponse(responseCode = "201", description = "Practice adopted")
@@ -140,5 +153,32 @@ public class CatalogAdoptionController {
         return ResponseEntity.created(location)
             .cacheControl(CacheControl.noStore().cachePrivate())
             .body(presenter.present(context.id(), adopted));
+    }
+
+    @PostMapping("/areas/{slug}")
+    @Operation(summary = "Adopt all available practices in a catalog area", operationId = "adoptArea")
+    @Audited(ledger = AuditLedger.CONFIG_AUDIT, type = "PRACTICE_DEFINITION")
+    public ResponseEntity<CatalogAreaAdoptionResultDTO> adoptArea(
+        WorkspaceContext context,
+        @PathVariable String slug,
+        @RequestHeader(value = HttpHeaders.IF_MATCH, required = false) @Nullable String ifMatch
+    ) {
+        if (ifMatch == null || ifMatch.isBlank()) {
+            throw new CatalogAdoptionPreconditionRequiredException();
+        }
+        CatalogAdoptionService.CatalogAreaAdoptionResult result = service.adoptArea(context, slug, ifMatch);
+        CatalogAreaAdoptionResultDTO response = new CatalogAreaAdoptionResultDTO(
+            result
+                .added()
+                .stream()
+                .map(practice -> presenter.present(context.id(), practice))
+                .toList(),
+            result
+                .moved()
+                .stream()
+                .map(practice -> presenter.present(context.id(), practice))
+                .toList()
+        );
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore().cachePrivate()).body(response);
     }
 }

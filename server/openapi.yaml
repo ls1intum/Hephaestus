@@ -4105,7 +4105,8 @@ paths:
       - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
-      description: "Moves its practices to Unassigned, then deletes the area"
+      description: Deletes the area. By default its practices move to Unassigned;
+        deletePractices=true deletes them too.
       operationId: deleteArea
       parameters:
       - description: Workspace slug
@@ -4120,6 +4121,12 @@ paths:
         required: true
         schema:
           type: string
+      - in: query
+        name: deletePractices
+        required: false
+        schema:
+          type: boolean
+          default: false
       responses:
         "204":
           description: Area deleted
@@ -4257,6 +4264,62 @@ paths:
                 $ref: "#/components/schemas/ProblemDetail"
           description: Workspace administrator access is required
       summary: List practices available for adoption
+      tags:
+      - Practice Catalog Adoption
+  /workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}:
+    get:
+      operationId: previewAreaAdoption
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogAreaAdoptionPreview"
+          description: OK
+      summary: Preview adoption of a catalog area and its practices
+      tags:
+      - Practice Catalog Adoption
+    post:
+      operationId: adoptArea
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: slug
+        required: true
+        schema:
+          type: string
+      - in: header
+        name: If-Match
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogAreaAdoptionResult"
+          description: OK
+      summary: Adopt all available practices in a catalog area
       tags:
       - Practice Catalog Adoption
   /workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}:
@@ -7888,6 +7951,65 @@ components:
           type: string
       required:
       - disposition
+    CatalogAreaAdoptionPreview:
+      type: object
+      properties:
+        actions:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogAreaPracticeAction"
+        definition:
+          $ref: "#/components/schemas/CuratedAreaRequest"
+        disposition:
+          type: string
+          enum:
+          - UNASSIGNED
+          - REUSE_EXISTING_AREA
+          - CREATE_CATALOG_AREA
+        etag:
+          type: string
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/CatalogPracticePreview"
+        slug:
+          type: string
+      required:
+      - actions
+      - definition
+      - disposition
+      - etag
+      - practices
+      - slug
+    CatalogAreaAdoptionResult:
+      type: object
+      properties:
+        added:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practice"
+        moved:
+          type: array
+          items:
+            $ref: "#/components/schemas/Practice"
+      required:
+      - added
+      - moved
+    CatalogAreaPracticeAction:
+      type: object
+      properties:
+        action:
+          type: string
+          enum:
+          - ADD
+          - MOVE_TO_AREA
+          - KEEP
+          - BLOCKED
+        slug:
+          type: string
+      required:
+      - action
+      - slug
     CatalogEntryStatus:
       type: object
       properties:

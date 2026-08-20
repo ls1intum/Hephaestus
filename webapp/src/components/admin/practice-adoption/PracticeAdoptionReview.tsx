@@ -96,11 +96,12 @@ export function PracticeAdoptionReview({
 							</Button>
 						)}
 						<Link
-							to="/w/$workspaceSlug/admin/practices/available"
+							to="/w/$workspaceSlug/admin/practices"
 							params={{ workspaceSlug }}
+							search={{ library: true }}
 							className={cn(buttonVariants({ variant: "ghost" }), "w-full")}
 						>
-							Back to catalog
+							Back to practice setup
 						</Link>
 					</CardFooter>
 				</Card>

@@ -1,7 +1,13 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, Library, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
-import type { Practice, PracticeArea, PracticeDefinitionOptions } from "@/api/types.gen";
+import type {
+	CatalogPracticeSummary,
+	Practice,
+	PracticeArea,
+	PracticeDefinitionOptions,
+} from "@/api/types.gen";
+import { AvailablePracticeList } from "@/components/admin/practice-adoption/AvailablePracticeList";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
@@ -78,6 +84,12 @@ export interface PracticeCatalogProps {
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
+	catalogPractices?: CatalogPracticeSummary[];
+	catalogUnavailable?: boolean;
+	onRetryCatalog?: () => void;
+	showLibrary?: boolean;
+	onShowLibraryChange?: (show: boolean) => void;
+	onReviewCatalogArea?: (areaSlug: string) => void;
 }
 
 export function PracticeCatalog({
@@ -96,12 +108,21 @@ export function PracticeCatalog({
 	onSetAreaVisual,
 	onDeletePractice,
 	onPlacePractice,
+	catalogPractices,
+	catalogUnavailable = false,
+	onRetryCatalog,
+	showLibrary = false,
+	onShowLibraryChange,
+	onReviewCatalogArea,
 }: PracticeCatalogProps) {
 	const [renamingArea, setRenamingArea] = useState<PracticeArea | null>(null);
 	const visiblePracticeSlugs = new Set(
 		practices
 			.filter((practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter)
 			.map((practice) => practice.slug),
+	);
+	const visibleCatalogPractices = catalogPractices?.filter(
+		(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
 	);
 	const forceOpenAreaSlugs =
 		focusFilter === "ALL"
@@ -128,7 +149,45 @@ export function PracticeCatalog({
 				onCreateArea={onCreateArea}
 				creatingArea={pending.creatingArea}
 				areaStructurePending={pending.areaStructure}
+				showLibrary={showLibrary}
+				onShowLibraryChange={onShowLibraryChange}
 			/>
+			{showLibrary && (
+				<section
+					className="space-y-3 rounded-lg border bg-muted/20 p-4"
+					aria-labelledby="library-heading"
+				>
+					<div className="space-y-1">
+						<h2 id="library-heading" className="font-semibold">
+							Practice library
+						</h2>
+						<p className="text-sm text-muted-foreground">
+							Add a practice as an independent workspace copy. You can change or remove it later.
+						</p>
+					</div>
+					{catalogUnavailable ? (
+						<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
+							<p className="text-sm">The catalog couldn't be loaded.</p>
+							<Button size="sm" variant="outline" onClick={onRetryCatalog}>
+								Try again
+							</Button>
+						</div>
+					) : visibleCatalogPractices ? (
+						<AvailablePracticeList
+							workspaceSlug={workspaceSlug}
+							practices={visibleCatalogPractices}
+							groupByArea
+							hideAdopted
+							onReviewArea={onReviewCatalogArea}
+							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
+						/>
+					) : (
+						<div className="flex h-24 items-center justify-center" role="status">
+							<span className="text-sm text-muted-foreground">Loading catalog…</span>
+						</div>
+					)}
+				</section>
+			)}
 			{focusFilter !== "ALL" && (
 				<p className="text-muted-foreground text-sm">Clear the filter to reorder practices.</p>
 			)}
@@ -244,6 +303,8 @@ function CatalogToolbar({
 	onCreateArea,
 	creatingArea,
 	areaStructurePending,
+	showLibrary,
+	onShowLibraryChange,
 }: {
 	workspaceSlug: string;
 	focusFilter: FocusFilter;
@@ -251,6 +312,9 @@ function CatalogToolbar({
 	onCreateArea: (name: string) => Promise<boolean>;
 	creatingArea: boolean;
 	areaStructurePending: boolean;
+	showLibrary: boolean;
+	onShowLibraryChange?: (show: boolean) => void;
+	onReviewCatalogArea?: (areaSlug: string) => void;
 }) {
 	return (
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -305,14 +369,14 @@ function CatalogToolbar({
 				))}
 			</ToggleGroup>
 			<div className="grid gap-2 sm:flex">
-				<Link
-					to="/w/$workspaceSlug/admin/practices/available"
-					params={{ workspaceSlug }}
-					className={cn(buttonVariants({ variant: "outline" }), "w-full sm:w-auto")}
+				<Button
+					variant="outline"
+					aria-pressed={showLibrary}
+					onClick={() => onShowLibraryChange?.(!showLibrary)}
 				>
 					<Library className="mr-1.5 size-4" />
-					Browse catalog
-				</Link>
+					{showLibrary ? "Hide library" : "Show library"}
+				</Button>
 				<CreateAreaButton
 					onCreate={onCreateArea}
 					pending={creatingArea}
