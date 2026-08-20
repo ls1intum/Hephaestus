@@ -79,7 +79,8 @@ public class JobTypeHandlerConfiguration {
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         ObservationTrendService observationTrendService,
-        PracticeFeedbackCommentFormatter commentFormatter
+        PracticeFeedbackCommentFormatter commentFormatter,
+        PracticeFeedbackDispatchService dispatchService
     ) {
         return new FeedbackDeliveryService(
             commentPoster,
@@ -88,7 +89,8 @@ public class JobTypeHandlerConfiguration {
             reviewProperties,
             feedbackLedgerRecorder,
             observationTrendService,
-            commentFormatter
+            commentFormatter,
+            dispatchService
         );
     }
 
@@ -146,7 +148,8 @@ public class JobTypeHandlerConfiguration {
         FeedbackLedgerRecorder feedbackLedgerRecorder,
         PracticeFeedbackDeliveryPolicy deliveryPolicy,
         PracticeFeedbackCommentFormatter commentFormatter,
-        ObservationRepository observationRepository
+        ObservationRepository observationRepository,
+        PracticeFeedbackDispatchService dispatchService
     ) {
         return new IssueReviewHandler(
             objectMapper,
@@ -161,7 +164,8 @@ public class JobTypeHandlerConfiguration {
             feedbackLedgerRecorder,
             deliveryPolicy,
             commentFormatter,
-            observationRepository
+            observationRepository,
+            dispatchService
         );
     }
 

@@ -3,11 +3,24 @@ import { AlertCircle } from "lucide-react";
 import { useState } from "react";
 import type {
 	AgentBinding,
+	PracticeReviewCoveragePreview,
 	PracticeReviewSettings as PracticeReviewSettingsData,
 	UpdatePracticeReviewSettingsRequest,
 	UpdateWorkspaceFeaturesRequest,
+	WorkspaceReviewScope,
 } from "@/api/types.gen";
+import { FacetMultiSelect, type FacetSource } from "@/components/common/FacetMultiSelect";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+	AlertDialog,
+	AlertDialogAction,
+	AlertDialogCancel,
+	AlertDialogContent,
+	AlertDialogDescription,
+	AlertDialogFooter,
+	AlertDialogHeader,
+	AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
 	Field,
@@ -18,6 +31,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import { reviewModelRunnable } from "./review/review-readiness";
@@ -49,6 +63,16 @@ export interface PracticeReviewSettingsProps {
 		onUpdate: (settings: UpdatePracticeReviewSettingsRequest) => void;
 		onReset: (field: PracticeReviewField) => void;
 	};
+	coverage: {
+		preview: {
+			data?: PracticeReviewCoveragePreview;
+			isPending: boolean;
+			isError: boolean;
+			onPreview: (scope: WorkspaceReviewScope) => void;
+		};
+		repositories: FacetSource;
+		people: FacetSource<{ value: number; label: string; description?: string }>;
+	};
 }
 
 /**
@@ -61,12 +85,13 @@ export function PracticeReviewSettings({
 	model,
 	workspace,
 	policy,
+	coverage,
 }: PracticeReviewSettingsProps) {
 	return (
 		<div className="space-y-8">
 			<ReviewStatusSection workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
 			<ReviewTimingSection workspace={workspace} policy={policy} />
-			<ReviewedWorkSection policy={policy} />
+			<ReviewedWorkSection policy={policy} coverage={coverage} />
 		</div>
 	);
 }
@@ -310,15 +335,49 @@ function CooldownField({
  * <p>Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
  * holds the pull request row and not the diff.
  */
-function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
+function ReviewedWorkSection({
+	policy,
+	coverage,
+}: Pick<PracticeReviewSettingsProps, "policy" | "coverage">) {
 	const settings = policy.settings;
 	const scope = settings.reviewScope;
-	const targetBranches = scope?.targetBranches ?? [];
-	const repositories = scope?.repositories ?? [];
-	const restricted = targetBranches.length > 0 || repositories.length > 0;
-
-	const update = (next: { targetBranches?: string[]; repositories?: string[] }) =>
-		policy.onUpdate({ reviewScope: { targetBranches, repositories, ...next } });
+	const [pendingScope, setPendingScope] = useState<WorkspaceReviewScope>();
+	const repositoryNames = scope.repositories.map((repository) => repository.nameWithOwner);
+	const repositoryOptions = [
+		...coverage.repositories.options,
+		...repositoryNames
+			.filter((name) => !coverage.repositories.options.some((option) => option.value === name))
+			.map((name) => ({ value: name, label: `${name} (unavailable)` })),
+	];
+	const personOptions = [
+		...coverage.people.options,
+		...scope.personUserIds
+			.filter((id) => !coverage.people.options.some((option) => option.value === id))
+			.map((id) => ({ value: id, label: `Member ${id} (unavailable)` })),
+	];
+	const requestScope = (next: WorkspaceReviewScope, widens: boolean) => {
+		if (widens) {
+			setPendingScope(next);
+			coverage.preview.onPreview(next);
+		} else policy.onUpdate({ reviewScope: next });
+	};
+	const replaceRepositories = (names: string[]) => {
+		const byName = new Map(
+			scope.repositories.map((repository) => [repository.nameWithOwner, repository]),
+		);
+		const next = {
+			...scope,
+			repositories: names.map(
+				(name) => byName.get(name) ?? { nameWithOwner: name, baseBranches: [] },
+			),
+		};
+		requestScope(
+			next,
+			names.some((name) => !repositoryNames.includes(name)),
+		);
+	};
+	const summary = settings.coverageSummary;
+	const preview = coverage.preview.data;
 
 	return (
 		<section className="space-y-6" aria-labelledby="reviewed-work-heading">
@@ -331,42 +390,147 @@ function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "poli
 				</p>
 			</div>
 
-			<ScopeList
-				id="scope-branches"
-				label="Target branches"
-				description="A pull request is reviewed only if it targets one of these. Issues are unaffected. Exact names — no wildcards."
-				placeholder="main"
-				values={targetBranches}
-				disabled={policy.isSaving}
-				onChange={(next) => update({ targetBranches: next })}
-			/>
-			<ScopeList
-				id="scope-repositories"
-				label="Repositories"
-				description="Only work in these repositories is reviewed. Use the full owner/name."
-				placeholder="acme/widgets"
-				values={repositories}
-				disabled={policy.isSaving}
-				onChange={(next) => update({ repositories: next })}
-			/>
-			{restricted ? (
-				<Button
-					variant="link"
-					size="sm"
-					className="h-auto p-0 text-xs"
+			<Alert>
+				<AlertTitle>Effective coverage</AlertTitle>
+				<AlertDescription>
+					Hephaestus currently reviews work in {summary.coveredRepositories} of{" "}
+					{summary.monitoredRepositories} monitored repositories, authored by{" "}
+					{summary.coveredPeople} of {summary.eligiblePeople} eligible linked members. This
+					population produced approximately {summary.recentReviewVolume} reviews in the last{" "}
+					{summary.estimateWindowDays} days.
+				</AlertDescription>
+			</Alert>
+
+			<Field>
+				<FieldLabel id="repositories-covered-label">Repositories covered</FieldLabel>
+				<FieldDescription>
+					Choose all monitored repositories or an exact selected set.
+				</FieldDescription>
+				<RadioGroup
+					aria-labelledby="repositories-covered-label"
+					value={scope.repositoryMode}
 					disabled={policy.isSaving}
-					onClick={() => policy.onReset("REVIEW_SCOPE")}
+					onValueChange={(value) => {
+						const mode = value as WorkspaceReviewScope["repositoryMode"];
+						requestScope({ ...scope, repositoryMode: mode }, mode === "ALL_MONITORED");
+					}}
 				>
-					{/* The visible words open the accessible name rather than being replaced by an
-						    `aria-label`, so a voice-control user can say what they read (WCAG 2.2 SC 2.5.3). */}
-					Review everything again
-					<span className="sr-only"> — use the default for Review scope</span>
-				</Button>
-			) : (
-				<span className="text-muted-foreground text-xs">
-					Default: every repository and every target branch
-				</span>
-			)}
+					<label className="flex items-center gap-2" htmlFor="repositories-all">
+						<RadioGroupItem id="repositories-all" value="ALL_MONITORED" />
+						All monitored repositories
+					</label>
+					<label className="flex items-center gap-2" htmlFor="repositories-selected">
+						<RadioGroupItem id="repositories-selected" value="SELECTED" />
+						Selected repositories
+					</label>
+				</RadioGroup>
+				{scope.repositoryMode === "SELECTED" ? (
+					<div className="space-y-4">
+						<FacetMultiSelect
+							id="covered-repositories"
+							title="Choose repositories"
+							variant="field"
+							options={repositoryOptions}
+							selected={repositoryNames}
+							onChange={replaceRepositories}
+							disabled={policy.isSaving || coverage.repositories.isLoading}
+							emptyLabel={
+								coverage.repositories.isError
+									? "Repositories unavailable"
+									: "No monitored repositories"
+							}
+						/>
+						{scope.repositories.map((repository) => (
+							<ScopeList
+								key={repository.nameWithOwner}
+								id={`branches-${repository.nameWithOwner.replaceAll("/", "-")}`}
+								label={`Base branches for ${repository.nameWithOwner}`}
+								description="Leave empty for every base branch in this repository. Names are exact."
+								placeholder="main"
+								values={repository.baseBranches}
+								disabled={policy.isSaving}
+								onChange={(baseBranches) => {
+									const next = {
+										...scope,
+										repositories: scope.repositories.map((entry) =>
+											entry.nameWithOwner === repository.nameWithOwner
+												? { ...entry, baseBranches }
+												: entry,
+										),
+									};
+									requestScope(next, baseBranches.length < repository.baseBranches.length);
+								}}
+							/>
+						))}
+						{scope.repositories.length === 0 ? (
+							<p className="text-muted-foreground text-sm">No repositories are covered.</p>
+						) : null}
+					</div>
+				) : null}
+			</Field>
+
+			<Field>
+				<FieldLabel id="people-covered-label">People covered</FieldLabel>
+				<FieldDescription>Only linked human workspace members are eligible.</FieldDescription>
+				<RadioGroup
+					aria-labelledby="people-covered-label"
+					value={scope.personMode}
+					disabled={policy.isSaving}
+					onValueChange={(value) => {
+						const mode = value as WorkspaceReviewScope["personMode"];
+						requestScope({ ...scope, personMode: mode }, mode === "ALL_ELIGIBLE");
+					}}
+				>
+					<label className="flex items-center gap-2" htmlFor="people-all">
+						<RadioGroupItem id="people-all" value="ALL_ELIGIBLE" />
+						All eligible linked members
+					</label>
+					<label className="flex items-center gap-2" htmlFor="people-selected">
+						<RadioGroupItem id="people-selected" value="SELECTED" />
+						Selected members
+					</label>
+				</RadioGroup>
+				{scope.personMode === "SELECTED" ? (
+					<div className="space-y-2">
+						<FacetMultiSelect
+							id="covered-people"
+							title="Choose members"
+							variant="field"
+							options={personOptions}
+							selected={scope.personUserIds}
+							onChange={(personUserIds) =>
+								requestScope(
+									{ ...scope, personUserIds },
+									personUserIds.some((id) => !scope.personUserIds.includes(id)),
+								)
+							}
+							disabled={policy.isSaving || coverage.people.isLoading}
+							emptyLabel={coverage.people.isError ? "Members unavailable" : "No linked members"}
+						/>
+						{scope.personUserIds.length === 0 ? (
+							<p className="text-muted-foreground text-sm">No people are covered.</p>
+						) : null}
+					</div>
+				) : null}
+			</Field>
+
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="policy-delivery-active">Delivery active</FieldLabel>
+					<FieldDescription>
+						Pausing keeps review running but terminally withholds new external feedback. Resuming
+						never sends older work.
+					</FieldDescription>
+				</FieldContent>
+				<Switch
+					id="policy-delivery-active"
+					checked={settings.deliveryStatus === "ACTIVE"}
+					disabled={policy.isSaving}
+					onCheckedChange={(checked) =>
+						policy.onUpdate({ deliveryStatus: checked ? "ACTIVE" : "PAUSED" })
+					}
+				/>
+			</Field>
 
 			<Field orientation="horizontal">
 				<FieldContent>
@@ -389,6 +553,72 @@ function ReviewedWorkSection({ policy }: Pick<PracticeReviewSettingsProps, "poli
 					onCheckedChange={(checked) => policy.onUpdate({ deliverToMerged: checked })}
 				/>
 			</Field>
+
+			<AlertDialog
+				open={pendingScope !== undefined}
+				onOpenChange={(open) => !open && setPendingScope(undefined)}
+			>
+				<AlertDialogContent>
+					<AlertDialogHeader>
+						<AlertDialogTitle>Widen practice-review coverage?</AlertDialogTitle>
+						<AlertDialogDescription>
+							This may admit more new work. Historical work will not be released.
+						</AlertDialogDescription>
+					</AlertDialogHeader>
+					{coverage.preview.isPending ? (
+						<p role="status" className="text-muted-foreground text-sm">
+							Calculating the proposed coverage…
+						</p>
+					) : coverage.preview.isError ? (
+						<Alert variant="warning">
+							<AlertCircle />
+							<AlertTitle>Couldn't preview this change</AlertTitle>
+							<AlertDescription>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => pendingScope && coverage.preview.onPreview(pendingScope)}
+								>
+									Retry
+								</Button>
+							</AlertDescription>
+						</Alert>
+					) : preview ? (
+						<div className="space-y-2 text-sm">
+							<p>
+								Monitored repositories covered:{" "}
+								<strong>{preview.current.coveredRepositories}</strong>
+								{" → "}
+								<strong>{preview.proposed.coveredRepositories}</strong> of{" "}
+								{preview.proposed.monitoredRepositories}
+							</p>
+							<p>
+								Eligible linked members covered: <strong>{preview.current.coveredPeople}</strong>
+								{" → "}
+								<strong>{preview.proposed.coveredPeople}</strong> of{" "}
+								{preview.proposed.eligiblePeople}
+							</p>
+							<p className="text-muted-foreground text-xs">
+								Workspace-wide context: {preview.proposed.recentReviewVolume} reviews ran in the
+								last {preview.proposed.estimateWindowDays} days across all review coverage, not just
+								this proposed population.
+							</p>
+						</div>
+					) : null}
+					<AlertDialogFooter>
+						<AlertDialogCancel>Keep current coverage</AlertDialogCancel>
+						<AlertDialogAction
+							disabled={!preview || coverage.preview.isPending || coverage.preview.isError}
+							onClick={() => {
+								if (pendingScope) policy.onUpdate({ reviewScope: pendingScope });
+								setPendingScope(undefined);
+							}}
+						>
+							Widen coverage
+						</AlertDialogAction>
+					</AlertDialogFooter>
+				</AlertDialogContent>
+			</AlertDialog>
 		</section>
 	);
 }

@@ -26,6 +26,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     Optional<Feedback> lockByIdAndWorkspaceId(@Param("id") UUID id, @Param("workspaceId") Long workspaceId);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
         value = "UPDATE feedback SET delivery_state = :targetState WHERE id = :id AND workspace_id = :workspaceId " +
             "AND delivery_state = 'AWAITING_APPROVAL'",
@@ -46,6 +47,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int suppressProposal(@Param("workspaceId") Long workspaceId, @Param("id") UUID id, @Param("reason") String reason);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
         value = "UPDATE feedback SET delivery_state = 'DELIVERED', delivered_at = CURRENT_TIMESTAMP " +
             "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
@@ -54,6 +56,7 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     int markApprovedDelivered(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Transactional
     @Query(
         value = "UPDATE feedback SET delivery_state = 'SUPPRESSED', suppression_reason = :reason " +
             "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
@@ -64,6 +67,15 @@ public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
         @Param("id") UUID id,
         @Param("reason") String reason
     );
+
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Transactional
+    @Query(
+        value = "UPDATE feedback SET delivery_state = 'FAILED', suppression_reason = NULL " +
+            "WHERE id = :id AND workspace_id = :workspaceId AND delivery_state = 'PREPARED'",
+        nativeQuery = true
+    )
+    int markApprovedFailed(@Param("workspaceId") Long workspaceId, @Param("id") UUID id);
 
     /** Idempotency guard for the ledger recorder: has this job already recorded this unit? */
     boolean existsByAgentJobIdAndPosition(UUID agentJobId, Integer position);

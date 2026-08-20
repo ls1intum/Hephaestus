@@ -41,7 +41,8 @@ For how the words fit together at runtime — the four stages, and the refusal v
 | **Review readiness**                | For one review, Hephaestus supports the configured mode, the declared evidence is sufficient, and every required source passes its checks.                                                                                                 | validation, activation                                            |
 | **Practice autonomy**               | Who may authorize feedback for one practice: nobody (`OFF`), a workspace owner or administrator (`HUMAN_APPROVAL`), or the system (`AUTOMATIC`). Nullable at practice and area levels, where null means “inherit”.                         | review tier, loudness tier, shadow mode, enabled                  |
 | **Effective autonomy**              | The autonomy in force after resolving practice → area → workspace. Always server-resolved and reported with its source.                                                                                                                    | autonomy override                                                 |
-| **Review scope**                    | Which of a workspace's work is reviewed at all, ANDed onto every binding. Two exact-match lists: target branches and repositories.                                                                                                         | filter, path filter, include pattern                              |
+| **Review coverage**                 | Which repositories and linked members' work may be reviewed. Repository and person modes are independent; effective coverage is their intersection.                                                                                        | filter, audience, pilot allowlist, review scope                   |
+| **Delivery status**                 | Whether new external practice feedback may leave a workspace (`ACTIVE` or `PAUSED`). Pausing does not stop review or erase coverage.                                                                                                       | review status, practice autonomy, Silent Mode                     |
 
 A practice author defines requirements. That definition is not proof that the evidence is sufficient or that a
 review is accurate, and the product says so rather than implying otherwise: every shipped policy is its
@@ -69,7 +70,7 @@ existing feedback; it is not a second assessment. None of the three human review
 retention, access, a rubric or a validation model here, and a human review would need all six plus a record of
 who reviewed and in what relationship to the author. Human reviews may use different rubrics and evidence, and
 disagreement between two of them is two provenance-bearing reviews, not a contradiction to resolve into one
-ground truth. A statement that a person _could_ observe something must never let Hephaestus attempt an
+ground truth. A statement that a person *could* observe something must never let Hephaestus attempt an
 automated review.
 
 ## How a review was occasioned
@@ -84,7 +85,7 @@ signal. `ObservationOrigin` is the population any resulting observation belongs 
 | A provider event on connected work              | `EVENT`                       | Live event                 | `LIVE`             | yes                                  |
 | Reconciling with the provider                   | `SYNC`                        | Noticed during a sync      | `LIVE`             | **no**, for pull requests and issues |
 | `/hephaestus review` in a merge request comment | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
-| The _Review this now_ button                    | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
+| The *Review this now* button                    | `MANUAL`                      | Requested by hand          | `MANUAL`           | yes                                  |
 | A confirmed campaign over past work             | `BACKFILL`                    | Backfill of past work      | `BACKFILL`         | yes                                  |
 | A recurring sweep schedule                      | `SWEEP`                       | Found by a recurring check | `LIVE`             | yes                                  |
 
@@ -106,7 +107,7 @@ every behavioural read. A `BACKFILL` observation is additionally entitled only t
 developer's own practice feedback — and that entitlement is a ceiling, not an instruction: the in-app
 router refuses a cluster made entirely of backfilled measurements (`BACKFILL_HELD`), so a backfill
 observation is measured and never delivered, by construction rather than by configuration. Do not write
-_profile_ for this channel: **Profile** is the public page at `/user/{username}`, and the two are
+*profile* for this channel: **Profile** is the public page at `/user/{username}`, and the two are
 different surfaces with different audiences.
 
 ## Practice autonomy
@@ -159,36 +160,47 @@ The body is `{"autonomy":"HUMAN_APPROVAL"}` or `{"autonomy":null}` to inherit. T
 A practice whose automated-review policy cannot run is explicitly `OFF` and cannot inherit an autonomy
 that admits review. Missing autonomy resolution fails closed for external delivery.
 
-## Review scope
+## Review coverage and delivery status
 
-`WorkspaceReviewScope` narrows which of a workspace's work is reviewed at all. It is ANDed onto every
-binding and only ever narrows; unset, it admits everything.
+`WorkspaceReviewScope` defines the workspace population that automatic review may admit. It has two
+independent modes:
 
-| Axis          | JSON key         | Matching                                     | Empty list means                             |
-| ------------- | ---------------- | -------------------------------------------- | -------------------------------------------- |
-| Target branch | `targetBranches` | exact name against a pull request's base ref | every branch                                 |
-| Repository    | `repositories`   | exact `owner/name`                           | every repository the workspace already syncs |
+| Axis       | Broad mode                    | Narrow mode                                                              | Selected-empty means |
+| ---------- | ----------------------------- | ------------------------------------------------------------------------ | -------------------- |
+| Repository | `ALL_MONITORED`               | `SELECTED` repositories, each optionally narrowed to exact base branches | no repositories      |
+| Person     | `ALL_ELIGIBLE` linked members | `SELECTED` linked members                                                | no people            |
 
-Both axes must admit an artifact; within one axis, any entry matches. It lives on the practice-review
-settings resource as `reviewScope` (`GET`/`PATCH /workspaces/{workspaceSlug}/practices/review-settings`),
-and a `PATCH` replaces it wholesale rather than merging, because the lists _are_ the setting and a merge
-could only ever add.
+Both axes must admit an artifact. An empty base-branch list on a selected repository means every branch in
+that repository. Branch restrictions apply to pull and merge requests; issues have no base branch and are
+matched by repository and person only. Names are exact—there are no glob or path rules.
 
-Three things the scope deliberately does not do, each for a reason that outlives the current shape:
+The review subject for pull requests, merge requests, and issues is their author. A missing, ambiguous,
+unlinked, non-human, or non-member author is not expanded to all eligible people. This makes coverage an
+operator-selected population while preserving the recipient's delivery preference as a separate veto.
 
-- **No path scope.** The detection gate holds the `PullRequest` row, not the diff. Changed paths do not
-  exist until the evidence stage, by which point the review has already been admitted and paid for, so a
-  path predicate here would quietly never narrow anything.
-- **No patterns.** Exact names only. Widening the matcher to globs stays backward compatible; narrowing it
-  back would not.
-- **A branch scope cannot narrow issue review.** An issue has no target branch, so a null branch passes
-  the branch axis rather than failing it. Only `repositories` narrows issue review.
+Coverage is returned as `reviewScope` by
+`GET /workspaces/{workspaceSlug}/practices/review-settings`. A `PATCH` replaces the complete coverage value;
+`POST /workspaces/{workspaceSlug}/practices/review-settings/coverage-preview` returns authoritative current
+and proposed repository/member counts before a widening change. Updates require the current resource ETag
+in `If-Match`.
 
-An artifact outside the scope refuses its signal with `OUT_OF_REVIEW_SCOPE`, which is terminal
-(`SUPPRESSED`): the branch a merge request targeted will not change, so re-offering it could not come out
-differently. Widening the scope changes what happens next, not what already did. A practice at `OFF`
-refuses with `PRACTICE_AUTONOMY_OFF`, which is retryable (`PENDING`): an admin raising the autonomy lifts it
-without the artifact changing.
+`deliveryStatus` is a separate workspace brake. `PAUSED` stops external practice feedback without stopping
+review or deleting coverage. Resuming is prospective: feedback admitted under an earlier rollout revision
+is not released. Instance Silent Mode remains the stronger instance-wide egress boundary.
+
+Every composition and egress decision appends a versioned policy evaluation. It records the admitted and
+current rollout revisions, destination, stage, first decisive reason, ordered check results, and a bounded
+snapshot of the repository, branch, subject resolution, coverage modes, and contributing-practice
+autonomies that were evaluated. Check results are `PASSED`, `DENIED`, `NOT_APPLICABLE`, or `NOT_REACHED`;
+`NOT_REACHED` preserves precedence by showing which checks were skipped after the first denial. The trace
+must not persist feedback bodies or member profile data.
+
+Automatic admission records the current workspace `revision`. Workspace coverage, delivery, and default-autonomy
+changes advance it. Area and practice autonomy changes remain prospective through the proposal lifecycle and
+the current-autonomy egress check rather than a second revision counter. Composition and egress compare the
+admitted and current workspace revisions and re-evaluate identity, coverage, autonomy, recipient preference,
+artifact validity, and egress controls. An artifact refused before review records a typed terminal reason; changing
+coverage affects later work, not the refused occurrence.
 
 ## Measurement and intervention
 
@@ -209,8 +221,8 @@ how it runs is in the [practice review pipeline](./practice-review-pipeline.mdx#
 | **Composed feedback unit** | One intervention the composition turn proposes for one channel and one practice, before any server gate has admitted it.                                                                                                                             | feedback row, draft feedback                               |
 | **Feedback**               | An admitted unit, written to the ledger with its channel, delivery state and the observations it rests on.                                                                                                                                           | comment, message, guidance                                 |
 | **Withhold**               | The composer's own decision that a lane is not worth writing on, recorded with a reason.                                                                                                                                                             | suppress, skip, drop                                       |
-| **Suppress**               | The _server's_ refusal to deliver feedback it was given, recorded as `FeedbackSuppressionReason`.                                                                                                                                                    | withhold, silence                                          |
-| **Notes**                  | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes _to_ the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence. | move, opener, conversation message, prepared reply, script |
+| **Suppress**               | The *server's* refusal to deliver feedback it was given, recorded as `FeedbackSuppressionReason`.                                                                                                                                                    | withhold, silence                                          |
+| **Notes**                  | What is composed for the mentor conversation: `situation`, `capability`, `evidenceSummary`, and `inConversationSignal`. Notes *to* the mentor, never a sentence for it to say — it writes the turn from the live conversation and admitted evidence. | move, opener, conversation message, prepared reply, script |
 | **Placement**              | Where in-context feedback belongs: `DIFF` names an admitted observation and citation for server-resolved coordinates; `ARTIFACT` stays at summary level.                                                                                             | model-authored path, model-authored line number            |
 | **Thread key**             | The identity of one continuing conversation about one thing with one person on one channel.                                                                                                                                                          | correlation key, idempotency key                           |
 | **Supersession**           | Replacing a queued, still-unread message with a newer one on the same thread.                                                                                                                                                                        | edit, update, delete                                       |
@@ -224,7 +236,7 @@ opted out, the artifact closed, a cap was reached, or the measurement came from 
 ### The three channels are three levels
 
 `FeedbackChannel` is not three renderers of one message. Each value is a different level of Hattie &
-Timperley's model, and every name answers one question — _where does this land?_ — because a set of names
+Timperley's model, and every name answers one question — *where does this land?* — because a set of names
 on different axes is how three lanes drift into saying the same thing three times.
 
 | Channel      | Lands                                                                                            | Level           | Answers                                            | Audience                               |
@@ -235,24 +247,24 @@ on different axes is how three lanes drift into saying the same thing three time
 
 **`IN_CHAT` is defined by being dialogic, `IN_APP` by being the non-dialogic practice surface.** The
 mentor renders inside the app as well, so "in the app" cannot be the test: `IN_CHAT` is a turn the
-developer can answer, and `IN_APP` is written down, where reading it is the whole interaction. Ask _is it
-a turn?_ before _which screen?_ — a new written surface inside Hephaestus is `IN_APP`, and a mentor in
+developer can answer, and `IN_APP` is written down, where reading it is the whole interaction. Ask *is it
+a turn?* before *which screen?* — a new written surface inside Hephaestus is `IN_APP`, and a mentor in
 another chat product is still `IN_CHAT`.
 
 The level is **derived from the channel and never stored**: there is no `level` column, and a stored copy
 would be a second truth that can disagree. Three words are close enough to be tempting and are still
-wrong. Do not write _profile_ for `IN_APP` — **Profile** is the public page at `/user/{username}` — and
-do not write _reflection_ either: it named what the developer was meant to do rather than where the
+wrong. Do not write *profile* for `IN_APP` — **Profile** is the public page at `/user/{username}` — and
+do not write *reflection* either: it named what the developer was meant to do rather than where the
 message lands, and it is the name this lane was renamed away from
 ([ADR 0029](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0029-measurement-intervention-seam-and-channel-levels.md)).
-Do not write _conversation_ for `IN_CHAT`: `chat.conversation_thread` is a kind of work Hephaestus
-_reviews_, not a place it delivers to. And do not describe `IN_CHAT` as a prepared reply; what is stored
+Do not write *conversation* for `IN_CHAT`: `chat.conversation_thread` is a kind of work Hephaestus
+*reviews*, not a place it delivers to. And do not describe `IN_CHAT` as a prepared reply; what is stored
 is notes to the mentor, not words to speak.
 
 ### Thread key and supersession
 
 A **thread** is a chain of messages about one thing to one person on one channel, identified by a hash
-(`FeedbackThreadKey`) rather than by prose. The longitudinal channels key on the _practice_, because a
+(`FeedbackThreadKey`) rather than by prose. The longitudinal channels key on the *practice*, because a
 habit claim is about the practice and not about one merge request; the in-context channel keys on the
 artifact. `thread_key` is deliberately not unique: a thread is a chain of rows over time, and the
 invariant that matters — at most one live `PREPARED` per thread — is held by a compare-and-swap.
@@ -270,7 +282,7 @@ ledger has to say so.
 the assessment or severity moved), `UNCHANGED` (still there, nothing moved) or `RESOLVED` (was a problem,
 absent from the newest run of its artifact). Use these words for how one measured locus moved between
 runs, and never as a claim about a person's work in general: the comparison is per artifact, so "this
-keeps happening across your work" is a claim about a _practice_ over the window and not something the
+keeps happening across your work" is a claim about a *practice* over the window and not something the
 delta can say. A strength that simply was not re-observed is not `RESOLVED`.
 
 ## Machine names
@@ -309,7 +321,9 @@ delta can say. A strength that simply was not re-observed is not `RESOLVED`.
 | Effective autonomy           | `autonomy.effective`               | `EffectiveAutonomy`                        | resolved, never stored                                                        |
 | Autonomy source              | `autonomy.source`                  | `AutonomySource`                           | resolved, never stored                                                        |
 | Workspace default autonomy   | `defaultAutonomy`                  | `PracticeAutonomy`                         | `workspace.practice_default_autonomy`                                         |
-| Review scope                 | `reviewScope`                      | `WorkspaceReviewScope`                     | `workspace.practice_review_scope`                                             |
+| Review coverage              | `reviewScope`                      | `WorkspaceReviewScope`                     | workspace coverage modes plus repository/member target tables                 |
+| Delivery status              | `deliveryStatus`                   | `PracticeDeliveryStatus`                   | `workspace.practice_delivery_status`                                          |
+| Rollout revision             | `revision`                         | `long`                                     | `workspace.practice_rollout_revision`                                         |
 | Feedback channel             | `channel`                          | `FeedbackChannel`                          | `feedback.channel`                                                            |
 | Feedback suppression reason  | `suppressionReason`                | `FeedbackSuppressionReason`                | `feedback.suppression_reason`                                                 |
 | Composed feedback unit       | not on the HTTP API                | `ComposedFeedbackUnit`                     | never stored as such — parsed from `out/feedback.json`                        |
@@ -336,7 +350,7 @@ mentoring choice:
 Availability, content, completeness, and collection outcome are four separate facts about one capture,
 never one field. The [artifact-source contract](./artifact-source-contract.mdx#capture-state) defines
 them and the states each may take; write about a capture in its words, and in particular do not write
-that a capture is _stale_ — there is no such state, and the contract says why.
+that a capture is *stale* — there is no such state, and the contract says why.
 
 ## Outcome states
 
@@ -362,7 +376,7 @@ server admission.
 3. Only AI-supported mentoring can be reviewed. The other choices force the practice autonomy to `OFF` and never start an automated review.
 4. An instance operator authorizes each source and product use through a reviewed governance decision.
 5. A workspace integration makes authorized sources available.
-6. A workspace administrator sets the workspace default autonomy, then overrides per area or per practice only where the default is wrong. Optionally they also set the workspace review scope.
+6. A workspace administrator sets repository and linked-member coverage, delivery status, and the workspace default autonomy, then overrides autonomy per area or practice only where the default is wrong.
 7. Each review captures evidence and records explicit source states.
 8. Source readiness checks decide whether every required source meets its requirements.
 9. Hephaestus reviews the work or records that the practice was skipped.
@@ -379,8 +393,8 @@ server admission.
 5. Prefer short names only when they remain unambiguous.
 6. Use **AI-supported mentoring** for the product promise and **practice review** for the bounded operation.
 7. Describe autonomy as release authority, never as loudness or reach. It does not affect the public **Profile** page.
-8. Never write bare **binding**. Two unrelated things carry the word — a _practice binding_ (an occasion
-   a practice is reviewed on, `PracticeBinding`) and a _model binding_ (a workspace's AI model for a
+8. Never write bare **binding**. Two unrelated things carry the word — a *practice binding* (an occasion
+   a practice is reviewed on, `PracticeBinding`) and a *model binding* (a workspace's AI model for a
    purpose, `WorkspaceAgentBinding`) — and they send an operator to different screens. A reason code,
    label, or javadoc that says only "binding" has already lost that distinction, which is why the reason
    code for a missing AI model is `REVIEW_MODEL_UNBOUND` and names the thing it means.

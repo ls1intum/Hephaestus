@@ -13,7 +13,6 @@ import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewReadiness;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
@@ -37,17 +36,20 @@ public class PracticeReviewDetectionGate {
     private final PracticeRepository practiceRepository;
     private final WorkspaceResolver workspaceResolver;
     private final PracticeSignalOptions signalOptions;
+    private final PracticeReviewCoverageService coverageService;
 
     public PracticeReviewDetectionGate(
         PracticeReviewReadiness practiceDetectionReadiness,
         PracticeRepository practiceRepository,
         WorkspaceResolver workspaceResolver,
-        PracticeSignalOptions signalOptions
+        PracticeSignalOptions signalOptions,
+        PracticeReviewCoverageService coverageService
     ) {
         this.practiceDetectionReadiness = practiceDetectionReadiness;
         this.practiceRepository = practiceRepository;
         this.workspaceResolver = workspaceResolver;
         this.signalOptions = signalOptions;
+        this.coverageService = coverageService;
     }
 
     public GateDecision evaluate(
@@ -112,25 +114,28 @@ public class PracticeReviewDetectionGate {
             return new GateDecision.Skip("no workspace");
         }
 
-        // A binding names a signal, not the trunk it targets (that varies per workspace), so scope is
-        // ANDed on here — the one place that has the artifact's repository and branch to check it against.
+        // Administrative evaluations bypass coverage but cannot deliver externally.
         GateDecision.@Nullable Skip scopeSkip = null;
-        WorkspaceReviewScope scope = workspace.getReviewSettings().resolveReviewScope();
-        if (!scope.isUnrestricted()) {
-            // Only a pull request has a target branch; an issue passes the branch axis by construction.
-            String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
-            if (!scope.admits(nameWithOwner, targetBranch)) {
-                log.debug(
-                    "Practice review gate: SKIP, reason=outOfReviewScope, prId={}, repo={}, targetBranch={}",
-                    reviewable.getId(),
-                    nameWithOwner,
-                    targetBranch
-                );
-                scopeSkip = new GateDecision.Skip(
-                    "outside the workspace review scope",
-                    SignalStateReason.OUT_OF_REVIEW_SCOPE
-                );
-            }
+        String targetBranch = reviewable instanceof PullRequest pr ? pr.getBaseRefName() : null;
+        if (
+            triggerMode != TriggerMode.ADMINISTRATIVE &&
+            !(reviewable instanceof PullRequest
+                ? coverageService.admits(workspace, nameWithOwner, targetBranch, reviewable.getAuthor())
+                : coverageService.admits(workspace, nameWithOwner, null, reviewable.getAuthor(), false))
+        ) {
+            log.debug(
+                "Practice review gate: SKIP, reason=outsideCoverage, artifactId={}, repo={}, targetBranch={}, authorId={}",
+                reviewable.getId(),
+                nameWithOwner,
+                targetBranch,
+                reviewable.getAuthor() == null ? null : reviewable.getAuthor().getId()
+            );
+            scopeSkip = new GateDecision.Skip(
+                "the repository, branch, or linked author is outside review coverage",
+                reviewable.getAuthor() == null
+                    ? SignalStateReason.SUBJECT_UNLINKED
+                    : SignalStateReason.OUT_OF_REVIEW_SCOPE
+            );
         }
 
         // Workspace- and signal-level checks, shared with evaluateSignal.
@@ -240,7 +245,13 @@ public class PracticeReviewDetectionGate {
                 draft ? "no practices bound to this signal on drafts" : "no matching practices"
             );
         }
-        return new GateDecision.Detect(workspace, match.admitted());
+        return new GateDecision.Detect(
+            workspace,
+            match.admitted(),
+            workspace.getReviewSettings().getRolloutRevision(),
+            triggerMode,
+            triggerMode != TriggerMode.ADMINISTRATIVE
+        );
     }
 
     /**

@@ -112,10 +112,10 @@ Identity is assigned at persistence, not by the detector: an occurrence key dedu
 is recognisable across runs.
 
 **An observation carries `evidenceRationale` and no advice.** `evidenceRationale` is the measurement's own
-justification — _"the change adds a tax-exempt branch, and no test file in this diff calls `total`"_ —
+justification — *"the change adds a tax-exempt branch, and no test file in this diff calls `total`"* —
 and it is the only prose the observation carries anywhere. The detector emits no next step: there is no
 `guidance` field on the tool, on the parsed observation, or on the ledger. Advice is a property of a
-_delivery_ (ADR 0021, ADR 0022), and the stage that decides deliveries is the subject of the next
+*delivery* (ADR 0021, ADR 0022), and the stage that decides deliveries is the subject of the next
 section.
 
 ## Measurement and intervention
@@ -125,13 +125,13 @@ to say something to a person. Those are separate turns in one agent session. An 
 between them, so composition retains context but can use only the persisted projection. Keeping that boundary
 is why one fact can read three different ways.
 
-**A measurement is falsifiable.** _"This change adds a tax-exempt branch, and nothing in the change
-tests it"_ is either true or false, and you check it by opening the file. It says nothing about what
+**A measurement is falsifiable.** *"This change adds a tax-exempt branch, and nothing in the change
+tests it"* is either true or false, and you check it by opening the file. It says nothing about what
 anybody should do, and it remains unedited for as long as it is retained, so later readings can
 be compared with it.
 
-**An intervention must stay grounded, but grounding alone does not make it useful.** _"Write the assertion
-that distinguishes the new branch before you write the branch"_ can be supported by the observation and
+**An intervention must stay grounded, but grounding alone does not make it useful.** *"Write the assertion
+that distinguishes the new branch before you write the branch"* can be supported by the observation and
 still be badly timed, repetitive, or irrelevant to the recipient. Composition therefore considers the
 audience, surface, history, and current conversation as well as the evidence.
 
@@ -141,7 +141,7 @@ intervention.**
 
 They are separated because the good version of each ruins the other. A measurement authored as advice
 starts bending toward whatever makes good advice — the observation you can write a nice tip about gets
-reported, the one you cannot gets quietly dropped. It also bends toward _fault_, because a next step
+reported, the one you cannot gets quietly dropped. It also bends toward *fault*, because a next step
 presupposes something to step away from: the three answers that assert nothing is wrong (a strength, a
 practice with no subject here, a question the evidence left open) are the ones that suffer for it. And advice written at the moment of measurement can
 only ever be about the one thing just measured: it cannot know that this is the third time, it cannot
@@ -195,7 +195,7 @@ Three constraints shape how that context may be used:
 
 - Only pull-request and issue handlers enable composition, and not for backfills. Document and conversation
   reviews record observations but compose no feedback.
-- History is bounded and therefore supports recurrence claims, never claims that something has _never_
+- History is bounded and therefore supports recurrence claims, never claims that something has *never*
   happened before.
 - Deltas describe a locus on one artifact as `NEW`, `RECURRING`, `UNCHANGED`, or `RESOLVED`. Cross-artifact
   habits require distinct-artifact evidence from history; an unobserved prior strength is not `RESOLVED`.
@@ -240,7 +240,7 @@ practiceSlug)`; the rest are dropped.
 Staying quiet is the fourth action, not a gap: `action: "WITHHOLD"` with `NO_MATERIAL_CHANGE`,
 `ALREADY_SAID` or `BELOW_BAR`. That enum is deliberately **not** `FeedbackSuppressionReason` — a
 withhold reason is the composer's own judgement, and `FeedbackSuppressionReason` is a database check
-constraint listing reasons the _server_ refused. Merging them would make "we had nothing worth saying"
+constraint listing reasons the *server* refused. Merging them would make "we had nothing worth saying"
 indistinguishable from "delivery policy refused it".
 
 ### Supersession preserves read feedback

@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.agent.job;
 
+import static de.tum.cit.aet.hephaestus.practices.review.GateDecisionTestFixtures.automaticDetection;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -114,7 +115,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         givenWorkspace();
         givenDocument(document(42L));
         when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO)).thenReturn(
-            new GateDecision.Detect(workspace, List.of())
+            automaticDetection(workspace, List.of())
         );
 
         submitter.onDocumentSignal(KEY, DiscoveredVia.EVENT);
@@ -122,7 +123,13 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         ArgumentCaptor<DocumentReviewSubmissionRequest> request = ArgumentCaptor.forClass(
             DocumentReviewSubmissionRequest.class
         );
-        verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.DOCUMENT_REVIEW), request.capture(), eq(KEY));
+        verify(agentJobService).submit(
+            eq(WORKSPACE_ID),
+            eq(AgentJobType.DOCUMENT_REVIEW),
+            request.capture(),
+            eq(KEY),
+            any(GateDecision.Detect.class)
+        );
         assertThat(request.getValue().documentId()).isEqualTo(DOCUMENT_ID);
         assertThat(request.getValue().aboutUserId()).isEqualTo(42L);
         assertThat(request.getValue().signal()).isEqualTo(PUBLISHED);
@@ -138,7 +145,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         givenWorkspace();
         givenDocument(document(42L));
         when(gate.evaluateSignal(workspace, PUBLISHED, TriggerMode.AUTO)).thenReturn(
-            new GateDecision.Detect(workspace, List.of())
+            automaticDetection(workspace, List.of())
         );
         ArtifactSignal signal = new ArtifactSignal();
         signal.setWorkspace(workspace);
@@ -153,7 +160,13 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         ArgumentCaptor<DocumentReviewSubmissionRequest> request = ArgumentCaptor.forClass(
             DocumentReviewSubmissionRequest.class
         );
-        verify(agentJobService).submit(eq(WORKSPACE_ID), eq(AgentJobType.DOCUMENT_REVIEW), request.capture(), any());
+        verify(agentJobService).submit(
+            eq(WORKSPACE_ID),
+            eq(AgentJobType.DOCUMENT_REVIEW),
+            request.capture(),
+            any(),
+            any(GateDecision.Detect.class)
+        );
         assertThat(request.getValue().observationOrigin()).isEqualTo(ObservationOrigin.BACKFILL);
     }
 
@@ -166,7 +179,7 @@ class DocumentReviewSubmitterTest extends BaseUnitTest {
         submitter.onDocumentSignal(KEY, DiscoveredVia.EVENT);
 
         verify(signalRecorder).markRefused(KEY, SignalStateReason.ARTIFACT_GONE);
-        verify(agentJobService, never()).submit(any(), any(), any(), any());
+        verify(agentJobService, never()).submit(any(), any(), any(), any(), any(GateDecision.Detect.class));
     }
 
     @Test

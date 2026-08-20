@@ -1,6 +1,8 @@
 package de.tum.cit.aet.hephaestus.practices.review;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -26,7 +28,6 @@ import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceFeatures;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceResolver;
-import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -59,6 +60,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
     @Mock(strictness = Mock.Strictness.LENIENT)
     private PracticeSignalOptions signalOptions;
 
+    @Mock(strictness = Mock.Strictness.LENIENT)
+    private PracticeReviewCoverageService coverageService;
+
     private PracticeReviewDetectionGate gate;
 
     @BeforeEach
@@ -67,8 +71,26 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             practiceDetectionReadiness,
             practiceRepository,
             workspaceResolver,
-            signalOptions
+            signalOptions,
+            coverageService
         );
+        when(
+            coverageService.admits(
+                any(Workspace.class),
+                nullable(String.class),
+                nullable(String.class),
+                nullable(User.class)
+            )
+        ).thenReturn(true);
+        when(
+            coverageService.admits(
+                any(Workspace.class),
+                nullable(String.class),
+                nullable(String.class),
+                nullable(User.class),
+                org.mockito.ArgumentMatchers.anyBoolean()
+            )
+        ).thenReturn(true);
     }
 
     // Helpers
@@ -79,6 +101,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         pr.setLabels(new HashSet<>());
         pr.setAssignees(new HashSet<>());
         pr.setDraft(false);
+        User author = new User();
+        author.setId(7L);
+        author.setType(User.Type.USER);
+        pr.setAuthor(author);
 
         Repository repo = new Repository();
         repo.setNameWithOwner("ls1intum/Hephaestus");
@@ -562,8 +588,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
         void admitsAPullRequestTargetingAScopedBranch() {
             PullRequest pr = createPullRequest();
             pr.setBaseRefName("main");
-            Workspace workspace = setupThroughPracticeMatching(pr, createPractice(SIGNAL));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            setupThroughPracticeMatching(pr, createPractice(SIGNAL));
 
             assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Detect.class);
         }
@@ -574,13 +599,13 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("develop");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.getAuthor())).thenReturn(false);
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Skip.class);
             GateDecision.Skip skip = (GateDecision.Skip) decision;
-            assertThat(skip.reason()).isEqualTo("outside the workspace review scope");
+            assertThat(skip.reason()).contains("outside review coverage");
             assertThat(skip.resolvedSignalReason()).isEqualTo(SignalStateReason.OUT_OF_REVIEW_SCOPE);
             // Terminal, not pending: the branch the artifact targeted will not change, so re-offering it
             // would be the reaper re-deciding a decision that cannot come out differently.
@@ -594,7 +619,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("develop");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.getAuthor())).thenReturn(false);
 
             gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -608,7 +633,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("main");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of(), List.of("ls1intum/Artemis")));
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "main", pr.getAuthor())).thenReturn(false);
 
             assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Skip.class);
         }
@@ -622,6 +647,10 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             Issue issue = new Issue();
             issue.setId(7L);
             issue.setAssignees(new HashSet<>());
+            User author = new User();
+            author.setId(7L);
+            author.setType(User.Type.USER);
+            issue.setAuthor(author);
             Repository repo = new Repository();
             repo.setNameWithOwner("ls1intum/Hephaestus");
             issue.setRepository(repo);
@@ -630,8 +659,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
             Practice issuePractice = createPractice(ScmSignals.ISSUE_OPENED);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(List.of(issuePractice));
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of()));
-
             GateDecision decision = gate.evaluateIssue(issue, ScmSignals.ISSUE_OPENED, TriggerMode.AUTO);
 
             assertThat(decision).isInstanceOf(GateDecision.Detect.class);
@@ -715,7 +742,6 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             // silence every document in any workspace that had ever narrowed its SCM review scope — a
             // refusal about one domain leaking into another.
             Workspace workspace = createWorkspace();
-            workspace.getReviewSettings().applyScope(new WorkspaceReviewScope(List.of("main"), List.of("other/repo")));
             when(practiceDetectionReadiness.hasRunnableAgent(WORKSPACE_ID)).thenReturn(true);
             when(practiceRepository.findByWorkspaceId(WORKSPACE_ID)).thenReturn(
                 List.of(createPractice(DOCUMENT_PUBLISHED))

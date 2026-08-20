@@ -45,39 +45,26 @@ export type WorkspaceTeamRepositorySettings = {
 };
 
 /**
- * The workspace's answer to "which of our work is reviewed at all", ANDed onto every practice binding.
- * It exists because a binding says <code>scm.pull_request.merged</code> and cannot say <em>merged into
- * what</em>: a trunk is named <code>main</code> here and <code>develop</code> there, which is a deployment fact
- * about one workspace that a centrally curated catalogue cannot carry.
+ * Effective practice-review coverage for one workspace.
  *
- * <p>The scope only ever narrows, never widens: an empty or absent list means "no restriction on this
- * axis".
- *
- * <h2>What this cannot express, and why</h2>
- *
- * <ul>
- * <li><strong>Changed paths.</strong> Not decidable here: the detection gate holds the
- * <code>PullRequest</code> row, not the diff, and changed paths do not exist until the evidence stage,
- * by which point the review has been admitted and paid for. A path axis here would be a predicate
- * that quietly never narrows anything.
- * <li><strong>Branch patterns.</strong> Exact names only; adding globs later stays backward
- * compatible, taking them away would not.
- * <li><strong>Any third key.</strong> The vocabulary is closed at the column
- * (<code>chk_workspace_review_scope</code>), not by this type: a reader configured to ignore unknown
- * fields would drop the key in silence, leaving a workspace believing a restriction was in force.
- * </ul>
+ * <p>The modes are explicit because an empty selected set means nobody, while an empty list in
+ * <code>ALL_*</code> mode is the ordinary broad-coverage configuration. Repository branch restrictions are
+ * attached to the repository they qualify; an empty branch list means every base branch in that
+ * repository.
  */
 export type WorkspaceReviewScope = {
-    /**
-     * exact <code>owner/name</code> repository identifiers. Empty = every monitored
-     * repository. This narrows <em>review</em> within the set the workspace already syncs; it never
-     * adds one.
-     */
-    repositories?: Array<string>;
-    /**
-     * exact target-branch names (a PR's base ref). Empty = every branch.
-     */
-    targetBranches?: Array<string>;
+    personMode: 'ALL_ELIGIBLE' | 'SELECTED';
+    personUserIds: Array<number>;
+    repositories: Array<ReviewRepositoryTarget>;
+    repositoryMode: 'ALL_MONITORED' | 'SELECTED';
+};
+
+/**
+ * One selected monitored repository and its optional exact base-branch restriction.
+ */
+export type ReviewRepositoryTarget = {
+    baseBranches: Array<string>;
+    nameWithOwner: string;
 };
 
 /**
@@ -991,11 +978,15 @@ export type UpdatePracticeReviewSettingsRequest = {
      */
     deliverToMerged?: boolean;
     /**
+     * Pause or activate external feedback. Resume never releases work from an older revision.
+     */
+    deliveryStatus?: 'ACTIVE' | 'PAUSED';
+    /**
      * Fields to reset back to inherit
      */
     reset?: Array<'SKIP_DRAFTS' | 'DELIVER_TO_MERGED' | 'COOLDOWN_MINUTES' | 'REVIEW_SCOPE' | 'DEFAULT_AUTONOMY'>;
     /**
-     * Replaces the review scope wholesale (the lists ARE the setting, so a merge could only ever add). Null leaves it unchanged; two empty lists clear it back to unrestricted.
+     * Replaces repository and person coverage wholesale. Null leaves it unchanged.
      */
     reviewScope?: WorkspaceReviewScope;
 };
@@ -1455,7 +1446,7 @@ export type TracedSignal = {
     /**
      * Why it ended in that state; null once it triggered a review
      */
-    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    stateReason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
 };
 
 /**
@@ -2002,7 +1993,7 @@ export type ReviewRequestOutcome = {
     /**
      * The controlled-vocabulary reason nothing was started; absent when a review was started
      */
-    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
+    reason?: 'GATE_SKIPPED' | 'COOLDOWN_ACTIVE' | 'REQUEST_COOLDOWN_ACTIVE' | 'REQUESTER_QUOTA_EXHAUSTED' | 'CONCURRENT_DUPLICATE' | 'OUT_OF_REVIEW_SCOPE' | 'STALE_ROLLOUT_REVISION' | 'WORKSPACE_INACTIVE' | 'PRACTICES_DISABLED' | 'NO_ACTIVE_PRACTICE' | 'REVIEW_MODEL_UNBOUND' | 'PRACTICE_AUTONOMY_OFF' | 'BUDGET_EXHAUSTED' | 'SUBJECT_UNLINKED' | 'MODEL_UNAVAILABLE' | 'PENDING_DEADLINE_EXCEEDED' | 'ARTIFACT_GONE';
     /**
      * The reason as one sentence for the person who asked. Render it verbatim: it is written next to the reason it explains so that every surface says the same thing, and a re-worded copy is how a screen and a support answer come to disagree.
      */
@@ -2130,7 +2121,7 @@ export type ReviewBoundFeedback = {
     /**
      * Why the message was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'ADMINISTRATIVE_INTERNAL_ONLY' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -2300,7 +2291,7 @@ export type ReviewFeedbackDetail = {
     /**
      * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'ADMINISTRATIVE_INTERNAL_ONLY' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
     /**
      * Cross-run continuity key tying successive deliveries together
      */
@@ -2381,7 +2372,7 @@ export type ReviewFeedback = {
     /**
      * Why the feedback was withheld; null unless the state is SUPPRESSED
      */
-    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    suppressionReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'ADMINISTRATIVE_INTERNAL_ONLY' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
 };
 
 /**
@@ -3094,7 +3085,7 @@ export type PracticeTraceEntry = {
     /**
      * Why prepared feedback was withheld. Non-empty with observations present means we measured and deliberately said nothing.
      */
-    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
+    withheldReasons: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'ADMINISTRATIVE_INTERNAL_ONLY' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
 };
 
 /**
@@ -3109,6 +3100,7 @@ export type PracticeReviewSettings = {
      * Raw override; null = inheriting the fleet default
      */
     cooldownMinutesOverride?: number;
+    coverageSummary: PracticeReviewCoverageSummary;
     /**
      * Effective: how much autonomy the system has over practices and areas that hold no autonomy of their own — the bottom of the practice → area → workspace chain
      */
@@ -3126,9 +3118,41 @@ export type PracticeReviewSettings = {
      */
     deliverToMergedOverride?: boolean;
     /**
-     * Which work is reviewed at all, ANDed onto every practice binding. Empty lists mean no restriction on that axis. Exact names only — no patterns, and no path scope (changed paths are not known where the decision is made).
+     * Whether new external practice feedback may be sent
+     */
+    deliveryStatus: 'ACTIVE' | 'PAUSED';
+    /**
+     * Strong entity tag to send in If-Match when updating this rollout
+     */
+    etag: string;
+    /**
+     * Explicit all-or-selected repository and person coverage. Selected-empty means nobody.
      */
     reviewScope: WorkspaceReviewScope;
+    /**
+     * Monotonic rollout revision carried by automatically admitted review jobs
+     */
+    revision: number;
+};
+
+export type PracticeReviewCoverageSummary = {
+    coveredPeople: number;
+    coveredRepositories: number;
+    eligiblePeople: number;
+    estimateWindowDays: number;
+    monitoredRepositories: number;
+    recentReviewVolume: number;
+};
+
+export type PracticeReviewCoveragePreview = {
+    current: PracticeReviewCoverageSummary;
+    proposed: PracticeReviewCoverageSummary;
+    widens: boolean;
+};
+
+export type PracticeFact = {
+    autonomy?: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
+    slug?: string;
 };
 
 /**
@@ -4584,6 +4608,48 @@ export type DeveloperPracticeSummary = {
     totalObservations: number;
 };
 
+export type DeliveryPolicyTraceCheck = {
+    check: 'INSTANCE_SILENT_MODE' | 'WORKSPACE_ENABLED' | 'ROLLOUT_REVISION' | 'WORKSPACE_DELIVERY' | 'CURRENT_COVERAGE' | 'PRACTICE_AUTHORITY' | 'HUMAN_APPROVAL' | 'RECIPIENT_CONSENT' | 'ARTIFACT_ELIGIBILITY';
+    status: 'PASSED' | 'DENIED' | 'NOT_APPLICABLE' | 'NOT_REACHED';
+};
+
+/**
+ * One immutable delivery decision, exposed only under Review activity's technical disclosure.
+ */
+export type DeliveryPolicyTrace = {
+    admittedRevision: number;
+    allowed: boolean;
+    checks: Array<DeliveryPolicyTraceCheck>;
+    decisiveReason?: 'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'ADMINISTRATIVE_INTERNAL_ONLY' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET';
+    evaluatedAt: Date;
+    evaluatedRevision?: number;
+    facts: DeliveryPolicyFactsSnapshot;
+    resolverVersion: string;
+    reviewId: string;
+    stage: 'COMPOSITION' | 'AUTOMATIC' | 'APPROVED' | 'EGRESS';
+    surface: 'ARTIFACT' | 'IN_APP' | 'CONVERSATION';
+};
+
+/**
+ * Compact immutable facts used for one delivery decision; excludes payload and personal identifiers.
+ */
+export type DeliveryPolicyFactsSnapshot = {
+    artifactKind?: string;
+    baseBranch?: string;
+    branchMatched?: boolean;
+    contributingPractices?: Array<PracticeFact>;
+    deliveryStatus?: 'ACTIVE' | 'PAUSED';
+    externalDeliveryAllowed?: boolean;
+    personMatched?: boolean;
+    personMode?: 'ALL_ELIGIBLE' | 'SELECTED';
+    recipientConsent?: boolean;
+    repository?: string;
+    repositoryMatched?: boolean;
+    repositoryMode?: 'ALL_MONITORED' | 'SELECTED';
+    subject?: 'RESOLVED_LINKED_HUMAN' | 'MISSING' | 'NON_HUMAN' | 'UNLINKED';
+    triggerMode?: 'AUTO' | 'MANUAL' | 'ADMINISTRATIVE';
+};
+
 export type DecideFeedbackProposalRequest = {
     decision: 'APPROVED' | 'REJECTED';
     rejectionNote?: string;
@@ -5464,6 +5530,10 @@ export type ArtifactTrace = {
      * Repository, collection or channel it sits in
      */
     container?: string;
+    /**
+     * Immutable ordered policy evaluations; intended for progressive technical disclosure
+     */
+    deliveryPolicy: Array<DeliveryPolicyTrace>;
     /**
      * The number the provider shows, for kinds that have one
      */
@@ -9714,6 +9784,9 @@ export type GetPracticeReviewSettingsResponse = GetPracticeReviewSettingsRespons
 
 export type UpdatePracticeReviewSettingsData = {
     body: UpdatePracticeReviewSettingsRequest;
+    headers?: {
+        'If-Match'?: string;
+    };
     path: {
         /**
          * Workspace slug
@@ -9732,6 +9805,27 @@ export type UpdatePracticeReviewSettingsResponses = {
 };
 
 export type UpdatePracticeReviewSettingsResponse = UpdatePracticeReviewSettingsResponses[keyof UpdatePracticeReviewSettingsResponses];
+
+export type PreviewCoverageData = {
+    body: WorkspaceReviewScope;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/review-settings/coverage-preview';
+};
+
+export type PreviewCoverageResponses = {
+    /**
+     * OK
+     */
+    200: PracticeReviewCoveragePreview;
+};
+
+export type PreviewCoverageResponse = PreviewCoverageResponses[keyof PreviewCoverageResponses];
 
 export type ListPracticeReviewsData = {
     body?: never;
@@ -9808,7 +9902,7 @@ export type ListPracticeReviewFeedbackData = {
         page?: number;
         size?: number;
         deliveryState?: Array<'AWAITING_APPROVAL' | 'PREPARED' | 'DELIVERED' | 'SUPERSEDED' | 'SUPPRESSED' | 'FAILED' | 'DISCARDED'>;
-        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
+        suppressionReason?: Array<'VOLUME_CAPPED' | 'COMPOSER_DEDUPED' | 'REACTED_DISPUTED' | 'REACTED_NOT_APPLICABLE' | 'CONVERSATION_EXPIRED' | 'ARTIFACT_GONE' | 'ARTIFACT_CLOSED' | 'ARTIFACT_MERGED' | 'ARTIFACT_DRAFT' | 'RECIPIENT_OPTED_OUT' | 'EMPTY_AFTER_SANITIZE' | 'INSTANCE_SILENCED' | 'WORKSPACE_DISABLED' | 'WORKSPACE_DELIVERY_PAUSED' | 'STALE_ROLLOUT_REVISION' | 'OUTSIDE_CURRENT_COVERAGE' | 'ADMINISTRATIVE_INTERNAL_ONLY' | 'APPROVAL_STALE' | 'APPROVAL_NO_LONGER_ELIGIBLE' | 'PRACTICE_REQUIRES_APPROVAL' | 'BACKFILL_QUIET'>;
         channel?: Array<'IN_CONTEXT' | 'IN_CHAT' | 'IN_APP'>;
         agentJobId?: string;
         /**

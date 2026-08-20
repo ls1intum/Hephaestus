@@ -46,6 +46,7 @@ export const SIGNAL_STATE_REASON_LABELS: Record<SignalStateReason, string> = {
 	MODEL_UNAVAILABLE: "The AI model set for reviews is no longer available",
 	PENDING_DEADLINE_EXCEEDED: "It waited too long to be picked up",
 	ARTIFACT_GONE: "The work no longer exists",
+	STALE_ROLLOUT_REVISION: "Review settings changed after this work was admitted",
 };
 
 /**
