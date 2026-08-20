@@ -9,6 +9,7 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationCommand;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRecorder;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyFactsSnapshot;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyResolver;
@@ -160,7 +161,7 @@ public class PracticeFeedbackDeliveryPolicy {
                       workspace,
                       issue == null || issue.getRepository() == null ? null : issue.getRepository().getNameWithOwner(),
                       null,
-                      issue == null ? null : issue.getAuthor(),
+                      issue == null ? null : issue.reviewSubject(),
                       false
                   );
         Resolution resolution = resolve(
@@ -274,7 +275,7 @@ public class PracticeFeedbackDeliveryPolicy {
                           ? null
                           : pullRequest.getRepository().getNameWithOwner(),
                       pullRequest == null ? null : pullRequest.getBaseRefName(),
-                      pullRequest == null ? null : pullRequest.getAuthor(),
+                      pullRequest == null ? null : pullRequest.reviewSubject(),
                       true
                   );
         Resolution resolution = resolve(
@@ -492,15 +493,17 @@ public class PracticeFeedbackDeliveryPolicy {
         Resolution resolution
     ) {
         evaluationRecorder.record(
-            workspaceId,
-            job.getId(),
-            feedbackId,
-            job.getPracticeRolloutRevision() == null ? -1 : job.getPracticeRolloutRevision(),
-            resolution.evaluatedRevision(),
-            surface,
-            stage,
-            resolution.result(),
-            resolution.facts()
+            new DeliveryPolicyEvaluationCommand(
+                workspaceId,
+                job.getId(),
+                feedbackId,
+                job.getPracticeRolloutRevision() == null ? -1 : job.getPracticeRolloutRevision(),
+                resolution.evaluatedRevision(),
+                surface,
+                stage,
+                resolution.result(),
+                resolution.facts()
+            )
         );
     }
 

@@ -120,19 +120,19 @@ public class PracticeReviewDetectionGate {
         if (
             triggerMode != TriggerMode.ADMINISTRATIVE &&
             !(reviewable instanceof PullRequest
-                ? coverageService.admits(workspace, nameWithOwner, targetBranch, reviewable.getAuthor())
-                : coverageService.admits(workspace, nameWithOwner, null, reviewable.getAuthor(), false))
+                ? coverageService.admits(workspace, nameWithOwner, targetBranch, reviewable.reviewSubject())
+                : coverageService.admits(workspace, nameWithOwner, null, reviewable.reviewSubject(), false))
         ) {
             log.debug(
                 "Practice review gate: SKIP, reason=outsideCoverage, artifactId={}, repo={}, targetBranch={}, authorId={}",
                 reviewable.getId(),
                 nameWithOwner,
                 targetBranch,
-                reviewable.getAuthor() == null ? null : reviewable.getAuthor().getId()
+                reviewable.reviewSubject().actorId()
             );
             scopeSkip = new GateDecision.Skip(
                 "the repository, branch, or linked author is outside review coverage",
-                reviewable.getAuthor() == null
+                reviewable.reviewSubject().actorId() == null
                     ? SignalStateReason.SUBJECT_UNLINKED
                     : SignalStateReason.OUT_OF_REVIEW_SCOPE
             );

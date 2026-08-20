@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.handler;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
@@ -89,7 +90,7 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         );
         lenient().when(repository.claim(any(), any(), anyString(), any(), any(Integer.class))).thenReturn(1);
         lenient().when(repository.beginWrite(any(), any(), anyString())).thenReturn(1);
-        lenient().when(repository.finish(any(), any(), anyString(), anyString(), any(), any(), any())).thenReturn(1);
+        lenient().when(repository.finish(any())).thenReturn(1);
         lenient()
             .when(policy.evaluatePullRequest(any(), any(), any(), any()))
             .thenReturn(
@@ -114,13 +115,12 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         assertThat(result.externalRef()).isEqualTo("provider-42");
         verify(poster, never()).postFormattedBody(any(), any());
         verify(repository).finish(
-            any(),
-            any(),
-            anyString(),
-            org.mockito.ArgumentMatchers.eq("SENT"),
-            org.mockito.ArgumentMatchers.eq("provider-42"),
-            org.mockito.ArgumentMatchers.isNull(),
-            any()
+            argThat(
+                completion ->
+                    completion.state().equals("SENT") &&
+                    completion.externalRef().equals("provider-42") &&
+                    completion.error() == null
+            )
         );
     }
 
@@ -138,13 +138,12 @@ class PracticeFeedbackDispatchServiceTest extends BaseUnitTest {
         assertThat(result.status()).isEqualTo(PracticeFeedbackDispatchService.Result.Status.UNCERTAIN);
         verify(poster, never()).postFormattedBody(any(), any());
         verify(repository).finish(
-            any(),
-            any(),
-            anyString(),
-            org.mockito.ArgumentMatchers.eq("UNCERTAIN"),
-            org.mockito.ArgumentMatchers.isNull(),
-            anyString(),
-            any()
+            argThat(
+                completion ->
+                    completion.state().equals("UNCERTAIN") &&
+                    completion.externalRef() == null &&
+                    completion.error() != null
+            )
         );
     }
 

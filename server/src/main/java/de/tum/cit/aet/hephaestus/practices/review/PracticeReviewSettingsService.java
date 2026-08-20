@@ -10,12 +10,13 @@ import de.tum.cit.aet.hephaestus.practices.spi.PracticeReviewVolumeQuery;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
+import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField;
 import de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewSettings;
+import de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,7 +33,7 @@ public class PracticeReviewSettingsService {
     private final PracticeReviewProperties reviewProperties;
     private final ConfigAuditPort configAudit;
     private final PracticeReviewCoverageService coverageService;
-    private final ObjectProvider<PracticeReviewVolumeQuery> volumeQuery;
+    private final PracticeReviewVolumeQuery volumeQuery;
 
     public PracticeReviewSettingsDTO getSettings(WorkspaceContext workspaceContext) {
         return toView(requireWorkspace(workspaceContext));
@@ -40,7 +41,7 @@ public class PracticeReviewSettingsService {
 
     public PracticeReviewCoveragePreviewDTO previewCoverage(
         WorkspaceContext workspaceContext,
-        de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope proposed
+        WorkspaceReviewScope proposed
     ) {
         Workspace workspace = requireWorkspace(workspaceContext);
         return coverageService.preview(workspace, proposed, recentVolume(workspace));
@@ -65,11 +66,8 @@ public class PracticeReviewSettingsService {
         // Reset-to-inherit first, then the value patch, so a field can be reset and re-set in one request.
         settings.reset(req.reset());
         settings.applyPatch(req.deliverToMerged(), req.cooldownMinutes());
-        if (
-            req.reset() != null &&
-            req.reset().contains(de.tum.cit.aet.hephaestus.workspace.settings.PracticeReviewField.REVIEW_SCOPE)
-        ) {
-            coverageService.replace(workspace, de.tum.cit.aet.hephaestus.workspace.settings.WorkspaceReviewScope.ALL);
+        if (req.reset() != null && req.reset().contains(PracticeReviewField.REVIEW_SCOPE)) {
+            coverageService.replace(workspace, WorkspaceReviewScope.ALL);
         }
         if (req.reviewScope() != null) {
             coverageService.replace(workspace, req.reviewScope());
@@ -131,8 +129,6 @@ public class PracticeReviewSettingsService {
     }
 
     private int recentVolume(Workspace workspace) {
-        return java.util.Optional.ofNullable(volumeQuery.getIfAvailable())
-            .map(query -> query.countSince(workspace.getId(), Instant.now().minus(30, ChronoUnit.DAYS)))
-            .orElse(0);
+        return volumeQuery.countSince(workspace.getId(), Instant.now().minus(30, ChronoUnit.DAYS));
     }
 }

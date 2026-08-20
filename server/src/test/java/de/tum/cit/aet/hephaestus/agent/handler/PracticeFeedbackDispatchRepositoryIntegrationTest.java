@@ -8,6 +8,7 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.workspace.AbstractWorkspaceIntegrationTest;
 import de.tum.cit.aet.hephaestus.workspace.AccountType;
@@ -131,15 +132,17 @@ class PracticeFeedbackDispatchRepositoryIntegrationTest extends AbstractWorkspac
         UUID id = UUID.randomUUID();
         Integer inserted = transactions.execute(status ->
             dispatchRepository.insertIfAbsent(
-                id,
-                key,
-                workspaceId,
-                owningJobId,
-                null,
-                "ARTIFACT_SUMMARY",
-                "body",
-                null,
-                "[]"
+                new FeedbackDispatchInsert(
+                    id,
+                    key,
+                    workspaceId,
+                    owningJobId,
+                    null,
+                    "ARTIFACT_SUMMARY",
+                    "body",
+                    null,
+                    "[]"
+                )
             )
         );
         return inserted != null && inserted == 1 ? id : null;

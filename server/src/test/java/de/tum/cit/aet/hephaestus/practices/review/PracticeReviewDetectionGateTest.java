@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalStateReason;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.label.Label;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
@@ -79,7 +80,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 any(Workspace.class),
                 nullable(String.class),
                 nullable(String.class),
-                nullable(User.class)
+                nullable(ReviewSubject.class)
             )
         ).thenReturn(true);
         when(
@@ -87,7 +88,7 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
                 any(Workspace.class),
                 nullable(String.class),
                 nullable(String.class),
-                nullable(User.class),
+                nullable(ReviewSubject.class),
                 org.mockito.ArgumentMatchers.anyBoolean()
             )
         ).thenReturn(true);
@@ -599,7 +600,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("develop");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.getAuthor())).thenReturn(false);
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject())).thenReturn(
+                false
+            );
 
             GateDecision decision = gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -619,7 +622,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("develop");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.getAuthor())).thenReturn(false);
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "develop", pr.reviewSubject())).thenReturn(
+                false
+            );
 
             gate.evaluate(pr, SIGNAL, TriggerMode.AUTO);
 
@@ -633,7 +638,9 @@ class PracticeReviewDetectionGateTest extends BaseUnitTest {
             pr.setBaseRefName("main");
             Workspace workspace = createWorkspace();
             when(workspaceResolver.resolveForRepository("ls1intum/Hephaestus")).thenReturn(Optional.of(workspace));
-            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "main", pr.getAuthor())).thenReturn(false);
+            when(coverageService.admits(workspace, "ls1intum/Hephaestus", "main", pr.reviewSubject())).thenReturn(
+                false
+            );
 
             assertThat(gate.evaluate(pr, SIGNAL, TriggerMode.AUTO)).isInstanceOf(GateDecision.Skip.class);
         }

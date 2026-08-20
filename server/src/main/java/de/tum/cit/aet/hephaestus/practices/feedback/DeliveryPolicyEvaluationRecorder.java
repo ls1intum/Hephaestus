@@ -1,7 +1,5 @@
 package de.tum.cit.aet.hephaestus.practices.feedback;
 
-import java.util.UUID;
-import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,31 +17,21 @@ public class DeliveryPolicyEvaluationRecorder {
     }
 
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void record(
-        Long workspaceId,
-        UUID agentJobId,
-        @Nullable UUID feedbackId,
-        long admittedRevision,
-        @Nullable Long evaluatedRevision,
-        DeliveryPolicySurface surface,
-        DeliveryPolicyStage stage,
-        DeliveryPolicyResolver.Result result,
-        DeliveryPolicyFactsSnapshot facts
-    ) {
+    public void record(DeliveryPolicyEvaluationCommand command) {
         repository.save(
             DeliveryPolicyEvaluation.builder()
-                .workspaceId(workspaceId)
-                .agentJobId(agentJobId)
-                .feedbackId(feedbackId)
-                .admittedRevision(admittedRevision)
-                .evaluatedRevision(evaluatedRevision)
+                .workspaceId(command.workspaceId())
+                .agentJobId(command.agentJobId())
+                .feedbackId(command.feedbackId())
+                .admittedRevision(command.admittedRevision())
+                .evaluatedRevision(command.evaluatedRevision())
                 .resolverVersion(DeliveryPolicyResolver.VERSION)
-                .surface(surface)
-                .stage(stage)
-                .allowed(result.allowed())
-                .decisiveReason(result.suppressionReason())
-                .checks(objectMapper.valueToTree(result.checks()))
-                .facts(objectMapper.valueToTree(facts))
+                .surface(command.surface())
+                .stage(command.stage())
+                .allowed(command.result().allowed())
+                .decisiveReason(command.result().suppressionReason())
+                .checks(objectMapper.valueToTree(command.result().checks()))
+                .facts(objectMapper.valueToTree(command.facts()))
                 .build()
         );
     }

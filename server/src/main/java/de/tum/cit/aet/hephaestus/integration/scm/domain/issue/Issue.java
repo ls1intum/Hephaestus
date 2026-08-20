@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.scm.domain.issue;
 
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.BaseGitServiceEntity;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuecomment.IssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issuetype.IssueType;
@@ -53,6 +54,12 @@ import org.jspecify.annotations.NonNull;
 @NoArgsConstructor
 @ToString(callSuper = true)
 public class Issue extends BaseGitServiceEntity {
+
+    public ReviewSubject reviewSubject() {
+        return author == null
+            ? ReviewSubject.MISSING
+            : new ReviewSubject(author.getId(), author.getType() == User.Type.USER);
+    }
 
     private int number;
 

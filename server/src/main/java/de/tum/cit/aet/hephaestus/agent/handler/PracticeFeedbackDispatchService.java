@@ -7,7 +7,9 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyStage;
 import de.tum.cit.aet.hephaestus.practices.feedback.Feedback;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatch;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchCompletion;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchDestination;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchInsert;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDispatchState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
@@ -102,15 +104,17 @@ class PracticeFeedbackDispatchService {
         Long workspaceId = job.getWorkspace().getId();
         transactionTemplate.executeWithoutResult(status ->
             repository.insertIfAbsent(
-                UUID.randomUUID(),
-                key,
-                workspaceId,
-                job.getId(),
-                feedbackId,
-                destination.name(),
-                body,
-                targetExternalRef,
-                objectMapper.valueToTree(contributingPracticeSlugs.stream().sorted().toList()).toString()
+                new FeedbackDispatchInsert(
+                    UUID.randomUUID(),
+                    key,
+                    workspaceId,
+                    job.getId(),
+                    feedbackId,
+                    destination.name(),
+                    body,
+                    targetExternalRef,
+                    objectMapper.valueToTree(contributingPracticeSlugs.stream().sorted().toList()).toString()
+                )
             )
         );
         FeedbackDispatch dispatch = repository
@@ -265,13 +269,15 @@ class PracticeFeedbackDispatchService {
     ) {
         Integer affected = transactionTemplate.execute(status ->
             repository.finish(
-                dispatch.getId(),
-                dispatch.getWorkspaceId(),
-                owner,
-                state.name(),
-                externalRef,
-                bounded(error),
-                nextAttemptAt == null ? Instant.now() : nextAttemptAt
+                new FeedbackDispatchCompletion(
+                    dispatch.getId(),
+                    dispatch.getWorkspaceId(),
+                    owner,
+                    state.name(),
+                    externalRef,
+                    bounded(error),
+                    nextAttemptAt == null ? Instant.now() : nextAttemptAt
+                )
             )
         );
         if (affected == null || affected != 1) return false;
