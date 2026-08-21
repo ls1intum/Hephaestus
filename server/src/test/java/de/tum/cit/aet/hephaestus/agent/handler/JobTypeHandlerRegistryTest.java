@@ -52,7 +52,11 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
         return new PullRequestReviewHandler(
             objectMapper,
             cas,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults()
+            ),
             workspaceContextBuilder,
             envelopeWriter,
             parser,
@@ -61,11 +65,10 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             feedbackService,
             new SecretDiffScanner(),
             org.mockito.Mockito.mock(ReactionSuppressionFilter.class),
-            new InContextDeliveryGate(
+            InContextDeliveryGateFixtures.gate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                workspaceDefaults()
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
             ),
             org.mockito.Mockito.mock(ApplicationEventPublisher.class),
             org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
@@ -79,15 +82,18 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults()
+            ),
             parser,
             new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
-            new InContextDeliveryGate(
+            InContextDeliveryGateFixtures.gate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                workspaceDefaults()
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
             ),
             org.mockito.Mockito.mock(PullRequestCommentPoster.class),
             org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
@@ -105,7 +111,11 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults()
+            ),
             parser,
             deliveryService,
             org.mockito.Mockito.mock(ApplicationEventPublisher.class),
@@ -120,7 +130,11 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             envelopeWriter,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults()
+            ),
             parser,
             deliveryService
         );
@@ -185,9 +199,4 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
     }
 
     /** Resolves every workspace to the unset defaults — HUMAN_APPROVAL autonomy, reach on the work. */
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
-    }
 }

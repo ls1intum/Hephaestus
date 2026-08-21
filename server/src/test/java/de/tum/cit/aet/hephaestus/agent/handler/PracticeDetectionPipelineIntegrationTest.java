@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
+import de.tum.cit.aet.hephaestus.agent.handler.spi.ExistingDeliveryLookup;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException;
 import de.tum.cit.aet.hephaestus.agent.handler.spi.JobTypeHandler;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
@@ -49,6 +50,8 @@ import de.tum.cit.aet.hephaestus.testconfig.TestUserFactory;
 import de.tum.cit.aet.hephaestus.testconfig.WorkspaceTestFixtures;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembershipService;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -107,6 +110,9 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     private RepositoryToMonitorRepository repositoryToMonitorRepository;
 
     @Autowired
+    private WorkspaceMembershipService workspaceMembershipService;
+
+    @Autowired
     private PullRequestRepository pullRequestRepository;
 
     @Autowired
@@ -136,6 +142,8 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
     void setUp() {
         databaseTestUtils.cleanDatabase();
         releaseSilentMode();
+        // Dispatch reconciles against the provider before it writes; nothing has been posted here yet.
+        when(commentPoster.findExistingSummaryComment(any())).thenReturn(ExistingDeliveryLookup.absent());
 
         workspace = WorkspaceTestFixtures.activeWorkspace("pipeline-test");
         workspace.getFeatures().setPracticesEnabled(true);
@@ -152,6 +160,13 @@ class PracticeDetectionPipelineIntegrationTest extends BaseIntegrationTest {
 
         User developer = TestUserFactory.createUser(500L, "pipeline-author", provider);
         developer = userRepository.save(developer);
+        // The author this pull request belongs to: delivery re-checks review coverage, which admits work
+        // about linked members only.
+        workspaceMembershipService.createMembership(
+            workspace,
+            developer.getId(),
+            WorkspaceMembership.WorkspaceRole.MEMBER
+        );
 
         Repository repo = new Repository();
         repo.setNativeId(4001L);

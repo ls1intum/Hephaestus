@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
 import { mockReviewSettings } from "./story-mock-data";
@@ -290,13 +291,15 @@ export const WideningRequiresConfirmation: Story = {
 	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
-		await expect(canvas.getByRole("alertdialog")).toBeVisible();
-		await expect(canvas.getByText(/Monitored repositories covered:/)).toHaveTextContent("3");
-		await expect(canvas.getByText(/Workspace-wide context:/)).toHaveTextContent(
+
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent("3");
+		await expect(dialog.getByText(/Workspace-wide context:/)).toHaveTextContent(
 			"not just this proposed population",
 		);
 		await expect(args.coverage.preview.onPreview).toHaveBeenCalled();
-		await userEvent.click(canvas.getByRole("button", { name: "Widen coverage" }));
+
+		await userEvent.click(dialog.getByRole("button", { name: "Widen coverage" }));
 		await expect(args.policy.onUpdate).toHaveBeenCalled();
 	},
 };
@@ -311,8 +314,10 @@ export const CoveragePreviewLoading: Story = {
 	},
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
-		await expect(canvas.getByText("Calculating the proposed coverage…")).toBeVisible();
-		await expect(canvas.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectSettledVisible(dialog.getByText("Calculating the proposed coverage…"));
+		await expect(dialog.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
 	},
 };
 
@@ -326,8 +331,12 @@ export const CoveragePreviewUnavailable: Story = {
 	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
-		await expect(canvas.getByText("Couldn't preview this change")).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectSettledVisible(dialog.getByText("Couldn't preview this change"));
+		await expect(dialog.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+
+		await userEvent.click(dialog.getByRole("button", { name: "Retry" }));
 		await expect(args.coverage.preview.onPreview).toHaveBeenCalledTimes(2);
 	},
 };

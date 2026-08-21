@@ -111,44 +111,42 @@ class LiquibaseSchemaValidationIntegrationTest {
     }
 
     /**
-     * {@code WorkspaceReviewScope} is a two-key vocabulary whose closure is enforced at the column, not by
-     * the deserializer: a reader configured to ignore unknown fields would drop a third key in silence and
-     * leave a workspace believing a restriction was in force. The column outlives every version of the code
-     * that reads it, so {@code chk_workspace_review_scope} is the thing that has to refuse the write — and
-     * only the Liquibase-built schema carries it, because the shared test profile builds the schema with
+     * Review coverage is decided from two mode columns, and a mode the code cannot name reads as neither
+     * "all" nor "selected" — the branch every gate takes for an unrecognised mode is a guess. The column
+     * outlives every version of the code that reads it, so the CHECK constraints are what refuse the write,
+     * and only the Liquibase-built schema carries them: the shared test profile builds the schema with
      * Hibernate {@code ddl-auto: create} and never runs a changeset.
      */
     @Test
-    @DisplayName("The review-scope column refuses a scope key the vocabulary does not have")
-    void reviewScopeColumnRefusesAnythingOutsideItsVocabulary() {
-        long workspaceId = insertWorkspace("review-scope-check");
+    @DisplayName("The coverage-mode columns refuse a mode the vocabulary does not have")
+    void coverageModeColumnsRefuseAnythingOutsideTheirVocabulary() {
+        long workspaceId = insertWorkspace("coverage-mode-check");
 
-        assertThatCode(() -> setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"repositories\": []}"))
-            .as("the two declared keys, each an array, are the shape the entity writes")
+        assertThatCode(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "SELECTED"))
+            .as("a declared mode is what the entity writes")
             .doesNotThrowAnyException();
 
-        assertThatThrownBy(() ->
-            setReviewScope(workspaceId, "{\"targetBranches\": [\"main\"], \"paths\": [\"src/**\"]}")
-        )
-            .as("a third key would be read as no restriction at all on that axis")
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_repository_coverage_mode", "ALL"))
             .isInstanceOf(DataIntegrityViolationException.class)
-            .hasMessageContaining("chk_workspace_review_scope");
+            .hasMessageContaining("chk_workspace_practice_repository_coverage");
 
-        assertThatThrownBy(() -> setReviewScope(workspaceId, "{\"targetBranches\": \"main\"}"))
-            .as("an axis that is not an array cannot be read as the list it claims to be")
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_person_coverage_mode", "EVERYONE"))
             .isInstanceOf(DataIntegrityViolationException.class)
-            .hasMessageContaining("chk_workspace_review_scope");
+            .hasMessageContaining("chk_workspace_practice_person_coverage");
+
+        assertThatThrownBy(() -> setCoverageMode(workspaceId, "practice_delivery_status", "STOPPED"))
+            .isInstanceOf(DataIntegrityViolationException.class)
+            .hasMessageContaining("chk_workspace_practice_delivery_status");
 
         assertThat(
             jdbcTemplate.queryForObject(
-                "SELECT practice_review_scope::text FROM workspace WHERE id = ?",
+                "SELECT practice_repository_coverage_mode FROM workspace WHERE id = ?",
                 String.class,
                 workspaceId
             )
         )
-            .as("a refused write leaves the last accepted scope in force")
-            .contains("targetBranches")
-            .doesNotContain("paths");
+            .as("a refused write leaves the last accepted mode in force")
+            .isEqualTo("SELECTED");
     }
 
     /** A workspace row with only the columns the schema demands; every setting below is left at its default. */
@@ -164,12 +162,10 @@ class LiquibaseSchemaValidationIntegrationTest {
         return Objects.requireNonNull(id, "workspace insert returned no id");
     }
 
-    private void setReviewScope(long workspaceId, String json) {
-        jdbcTemplate.update(
-            "UPDATE workspace SET practice_review_scope = CAST(? AS jsonb) WHERE id = ?",
-            json,
-            workspaceId
-        );
+    private void setCoverageMode(long workspaceId, String column, String mode) {
+        // The column name is a literal from this test, never input, so it is safe to interpolate — and it
+        // has to be, because Postgres will not take a parameter where a column name belongs.
+        jdbcTemplate.update("UPDATE workspace SET " + column + " = ? WHERE id = ?", mode, workspaceId);
     }
 
     private void assertIndexExists(String indexName) {

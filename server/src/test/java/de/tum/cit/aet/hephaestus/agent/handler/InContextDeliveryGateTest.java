@@ -29,7 +29,9 @@ import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -60,7 +62,8 @@ class InContextDeliveryGateTest extends BaseUnitTest {
             practiceRepository,
             observationRepository,
             feedbackLedgerRecorder,
-            workspaceDefaults()
+            InContextDeliveryGateFixtures.workspaceDefaults(),
+            InContextDeliveryGateFixtures.workspaces()
         );
     }
 
@@ -234,12 +237,5 @@ class InContextDeliveryGateTest extends BaseUnitTest {
         Observation observation = org.mockito.Mockito.mock(Observation.class);
         org.mockito.Mockito.lenient().when(observation.getOccurrenceKey()).thenReturn(occurrenceKey);
         return observation;
-    }
-
-    /** Resolves every workspace to the unset defaults — AUTOMATIC autonomy, reach on the work. */
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
     }
 }
