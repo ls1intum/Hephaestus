@@ -13,8 +13,8 @@ import {
 	PRACTICE_SEARCH_PARAMS,
 	practiceSearchSchema,
 } from "@/components/admin/practices/practice-search";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { Spinner } from "@/components/ui/spinner";
 import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-catalog-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
@@ -76,9 +76,7 @@ function CreatePracticeContainer() {
 	if (areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
-				<div className="flex h-64 max-w-3xl items-center justify-center">
-					<Spinner className="size-8" />
-				</div>
+				<LoadingBlock size="lg" label="Loading the practice form" />
 			</PracticeFormShell>
 		);
 	}

@@ -418,11 +418,16 @@ export function SortableCatalogTree<
 					value={sortedAreas
 						.map((area) => area.slug)
 						.filter((slug) => forceOpenAreaSlugs?.has(slug) || !collapsedAreas.includes(slug))}
-					onValueChange={(open) =>
-						setCollapsedAreas(
-							sortedAreas.map((area) => area.slug).filter((slug) => !open.includes(slug)),
-						)
-					}
+					onValueChange={(open) => {
+						// Only the areas currently rendered are re-derived. Recomputing the whole set from
+						// `sortedAreas` drops every area a filter is hiding, so collapsing one row while a
+						// search is active would silently expand everything the search hid.
+						const rendered = new Set(sortedAreas.map((area) => area.slug));
+						setCollapsedAreas([
+							...collapsedAreas.filter((slug) => !rendered.has(slug)),
+							...sortedAreas.map((area) => area.slug).filter((slug) => !open.includes(slug)),
+						]);
+					}}
 				>
 					{sortedAreas.map((area) => (
 						<SortableAreaSection

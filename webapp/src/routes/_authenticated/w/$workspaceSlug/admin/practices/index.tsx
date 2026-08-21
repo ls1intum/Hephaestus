@@ -29,6 +29,7 @@ import {
 	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
 import { WorkspacePracticePanel } from "@/components/admin/practices/WorkspacePracticePanel";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { detailStackKey, parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
@@ -45,7 +46,6 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Spinner } from "@/components/ui/spinner";
 import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -197,9 +197,7 @@ function PracticeCatalogRoute() {
 				}
 			/>
 			{areasQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
-				<div className="flex h-64 items-center justify-center">
-					<Spinner className="size-8" />
-				</div>
+				<LoadingBlock size="lg" label="Loading practices" />
 			) : areasQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError ? (
 				<QueryErrorAlert
 					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
@@ -225,9 +223,17 @@ function PracticeCatalogRoute() {
 						creatingArea: catalog.createArea.isPending,
 					}}
 					focusFilter={focus ?? "ALL"}
-					catalogPractices={catalogQuery.data}
-					catalogUnavailable={catalogQuery.isError}
-					onRetryCatalog={() => catalogQuery.refetch()}
+					library={
+						catalogQuery.isError
+							? {
+									status: "error",
+									error: catalogQuery.error,
+									onRetry: () => catalogQuery.refetch(),
+								}
+							: catalogQuery.data
+								? { status: "ready", practices: catalogQuery.data }
+								: { status: "loading" }
+					}
 					showLibrary={library === true}
 					onShowLibraryChange={(showLibrary) =>
 						navigate({

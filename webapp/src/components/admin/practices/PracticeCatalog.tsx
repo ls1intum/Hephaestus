@@ -8,6 +8,7 @@ import type {
 	PracticeDefinitionOptions,
 } from "@/api/types.gen";
 import { AvailablePracticeList } from "@/components/admin/practice-adoption/AvailablePracticeList";
+import { AreaNameDialog } from "@/components/admin/practice-catalog/AreaNameDialog";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
@@ -17,17 +18,13 @@ import {
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
+import { Section } from "@/components/core/Section";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-	Dialog,
-	DialogContent,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from "@/components/ui/dialog";
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -40,9 +37,7 @@ import {
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
-import { Input } from "@/components/ui/input";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
 	Select,
 	SelectContent,
@@ -68,6 +63,12 @@ export interface PracticeCatalogPendingState {
 	creatingArea: boolean;
 }
 
+/** The practice library's own state, independent of the tree beside it. */
+export type LibraryState =
+	| { status: "loading" }
+	| { status: "error"; error: unknown; onRetry: () => void }
+	| { status: "ready"; practices: CatalogPracticeSummary[] };
+
 export interface PracticeCatalogProps {
 	workspaceSlug: string;
 	areas: PracticeArea[];
@@ -84,9 +85,11 @@ export interface PracticeCatalogProps {
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
-	catalogPractices?: CatalogPracticeSummary[];
-	catalogUnavailable?: boolean;
-	onRetryCatalog?: () => void;
+	/**
+	 * The library's state as one value. Four parallel props could describe a loaded-and-failed
+	 * region, and `onRetry` sat outside the branch that can use it.
+	 */
+	library?: LibraryState;
 	showLibrary?: boolean;
 	onShowLibraryChange?: (show: boolean) => void;
 }
@@ -107,21 +110,23 @@ export function PracticeCatalog({
 	onSetAreaVisual,
 	onDeletePractice,
 	onPlacePractice,
-	catalogPractices,
-	catalogUnavailable = false,
-	onRetryCatalog,
+	library,
 	showLibrary = false,
 	onShowLibraryChange,
 }: PracticeCatalogProps) {
-	const [renamingArea, setRenamingArea] = useState<PracticeArea | null>(null);
+	// `null` while creating, an area while renaming; `namingArea !== undefined` is "open".
+	const [namingArea, setNamingArea] = useState<PracticeArea | null | undefined>(undefined);
 	const visiblePracticeSlugs = new Set(
 		practices
 			.filter((practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter)
 			.map((practice) => practice.slug),
 	);
-	const visibleCatalogPractices = catalogPractices?.filter(
-		(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
-	);
+	const visibleCatalogPractices =
+		library?.status === "ready"
+			? library.practices.filter(
+					(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
+				)
+			: undefined;
 	const forceOpenAreaSlugs =
 		focusFilter === "ALL"
 			? undefined
@@ -144,43 +149,34 @@ export function PracticeCatalog({
 				workspaceSlug={workspaceSlug}
 				focusFilter={focusFilter}
 				onFocusFilterChange={onFocusFilterChange}
-				onCreateArea={onCreateArea}
+				onCreateArea={() => setNamingArea(null)}
 				creatingArea={pending.creatingArea}
 				areaStructurePending={pending.areaStructure}
 				showLibrary={showLibrary}
 				onShowLibraryChange={onShowLibraryChange}
 			/>
 			{showLibrary && (
-				<section
-					className="space-y-3 rounded-lg border bg-muted/20 p-4"
-					aria-labelledby="library-heading"
+				<Section
+					size="sm"
+					title="Practice library"
+					description="Add a practice as an independent workspace copy. You can change or remove it later."
+					className="rounded-lg border bg-muted/20 p-4"
 				>
-					<div className="space-y-1">
-						<h2 id="library-heading" className="font-semibold">
-							Practice library
-						</h2>
-						<p className="text-sm text-muted-foreground">
-							Add a practice as an independent workspace copy. You can change or remove it later.
-						</p>
-					</div>
-					{catalogUnavailable ? (
-						<div className="flex flex-wrap items-center justify-between gap-3 rounded-md border bg-background p-3">
-							<p className="text-sm">The catalog couldn't be loaded.</p>
-							<Button size="sm" variant="outline" onClick={onRetryCatalog}>
-								Try again
-							</Button>
-						</div>
+					{library?.status === "error" ? (
+						<QueryErrorAlert
+							error={library.error}
+							title="Couldn't load the library"
+							onRetry={library.onRetry}
+						/>
 					) : visibleCatalogPractices ? (
 						<AvailablePracticeList
 							practices={visibleCatalogPractices}
 							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
 						/>
 					) : (
-						<div className="flex h-24 items-center justify-center" role="status">
-							<span className="text-sm text-muted-foreground">Loading catalog…</span>
-						</div>
+						<LoadingBlock size="sm" label="Loading the practice library" />
 					)}
-				</section>
+				</Section>
 			)}
 			{focusFilter !== "ALL" && (
 				<p className="text-muted-foreground text-sm">Clear the filter to reorder practices.</p>
@@ -223,7 +219,7 @@ export function PracticeCatalog({
 						move={move}
 						pending={pending.areaSlugs.has(area.slug)}
 						structurePending={pending.areaStructure}
-						onRename={() => setRenamingArea(area)}
+						onRename={() => setNamingArea(area)}
 						onSetDashboardVisibility={onSetAreaDashboardVisibility}
 						onDelete={onDeleteArea}
 					/>
@@ -280,11 +276,14 @@ export function PracticeCatalog({
 				</Empty>
 			)}
 
-			<RenameAreaDialog
-				area={renamingArea}
-				onClose={() => setRenamingArea(null)}
-				onRename={onRenameArea}
-				pending={renamingArea ? pending.areaSlugs.has(renamingArea.slug) : false}
+			<AreaNameDialog
+				area={namingArea ?? null}
+				open={namingArea !== undefined}
+				pending={namingArea ? pending.areaSlugs.has(namingArea.slug) : pending.creatingArea}
+				onOpenChange={(open) => {
+					if (!open) setNamingArea(undefined);
+				}}
+				onSubmit={(name) => (namingArea ? onRenameArea(namingArea.slug, name) : onCreateArea(name))}
 			/>
 		</div>
 	);
@@ -303,7 +302,7 @@ function CatalogToolbar({
 	workspaceSlug: string;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (filter: FocusFilter) => void;
-	onCreateArea: (name: string) => Promise<boolean>;
+	onCreateArea: () => void;
 	creatingArea: boolean;
 	areaStructurePending: boolean;
 	showLibrary: boolean;
@@ -370,11 +369,14 @@ function CatalogToolbar({
 					<Library className="mr-1.5 size-4" />
 					{showLibrary ? "Hide library" : "Show library"}
 				</Button>
-				<CreateAreaButton
-					onCreate={onCreateArea}
-					pending={creatingArea}
+				<Button
+					variant="outline"
+					onClick={onCreateArea}
 					disabled={areaStructurePending && !creatingArea}
-				/>
+				>
+					<Plus className="mr-1.5 size-4" />
+					Create area
+				</Button>
 				<Link
 					to="/w/$workspaceSlug/admin/practices/new"
 					params={{ workspaceSlug }}
@@ -569,60 +571,6 @@ function PracticeActions({
 	);
 }
 
-function RenameAreaDialog({
-	area,
-	onClose,
-	onRename,
-	pending,
-}: {
-	area: PracticeArea | null;
-	onClose: () => void;
-	onRename: (slug: string, name: string) => Promise<boolean>;
-	pending: boolean;
-}) {
-	return (
-		<Dialog open={area !== null} onOpenChange={(open) => !open && onClose()}>
-			<DialogContent className="sm:max-w-sm">
-				<DialogHeader>
-					<DialogTitle>Rename area</DialogTitle>
-				</DialogHeader>
-				<form
-					onSubmit={async (event) => {
-						event.preventDefault();
-						// `namedItem` answers with a RadioNodeList when a name is shared, so narrow rather
-						// than cast.
-						const input = event.currentTarget.elements.namedItem("areaName");
-						if (!(input instanceof HTMLInputElement)) return;
-						const name = input.value.trim();
-						if (!area || !name || name === area.name) {
-							onClose();
-							return;
-						}
-						if (await onRename(area.slug, name)) onClose();
-					}}
-					className="space-y-4"
-				>
-					<Input
-						name="areaName"
-						defaultValue={area?.name ?? ""}
-						aria-label="Area name"
-						autoComplete="off"
-						disabled={pending}
-					/>
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={onClose} disabled={pending}>
-							Cancel
-						</Button>
-						<Button type="submit" className="min-w-20" disabled={pending}>
-							{pending ? "Saving…" : "Save"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
-	);
-}
-
 function PracticeRowDetails({
 	practice,
 	title,
@@ -680,52 +628,5 @@ function PracticeDragPreview({
 				title={<span className="break-words">{practice.name}</span>}
 			/>
 		</Item>
-	);
-}
-
-function CreateAreaButton({
-	onCreate,
-	pending,
-	disabled,
-}: {
-	onCreate: (name: string) => Promise<boolean>;
-	pending: boolean;
-	disabled: boolean;
-}) {
-	const [open, setOpen] = useState(false);
-	return (
-		<Popover open={open} onOpenChange={setOpen}>
-			<PopoverTrigger
-				render={
-					<Button variant="outline" disabled={disabled}>
-						<Plus className="mr-1.5 size-4" />
-						Create area
-					</Button>
-				}
-			/>
-			<PopoverContent align="end" className="w-72">
-				<form
-					onSubmit={async (event) => {
-						event.preventDefault();
-						const input = event.currentTarget.elements.namedItem("areaName");
-						if (!(input instanceof HTMLInputElement)) return;
-						const name = input.value.trim();
-						if (name && (await onCreate(name))) setOpen(false);
-					}}
-					className="flex items-center gap-2"
-				>
-					<Input
-						name="areaName"
-						placeholder="New area name…"
-						aria-label="New area name"
-						autoComplete="off"
-						disabled={pending}
-					/>
-					<Button type="submit" size="sm" className="min-w-16" disabled={pending}>
-						{pending ? "Creating…" : "Create"}
-					</Button>
-				</form>
-			</PopoverContent>
-		</Popover>
 	);
 }

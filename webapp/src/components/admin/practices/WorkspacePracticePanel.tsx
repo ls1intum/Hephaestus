@@ -5,6 +5,7 @@ import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBadge";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
@@ -13,7 +14,6 @@ import { buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerDescription, DrawerFooter, DrawerTitle } from "@/components/ui/drawer";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
-import { Spinner } from "@/components/ui/spinner";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { inheritedAutonomySourceSentence } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
@@ -63,10 +63,7 @@ export function WorkspacePracticePanel({
 				</DetailDrawerHeader>
 				<DrawerBody>
 					{state.status === "loading" ? (
-						<div className="flex min-h-32 items-center justify-center" role="status">
-							<Spinner />
-							<span className="sr-only">Loading practice</span>
-						</div>
+						<LoadingBlock size="sm" label="Loading practice" />
 					) : (
 						<QueryErrorAlert
 							error={state.error}

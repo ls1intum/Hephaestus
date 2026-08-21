@@ -97,7 +97,7 @@ export const Unassigned: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Loading practice"));
+		await expectSettledVisible(await screen.findByRole("status", { name: "Loading practice" }));
 	},
 };
 

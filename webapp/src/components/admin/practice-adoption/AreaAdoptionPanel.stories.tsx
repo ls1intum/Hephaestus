@@ -151,7 +151,7 @@ export const NothingToChange: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Loading area preview"));
+		await expectSettledVisible(await screen.findByRole("status", { name: "Loading area preview" }));
 		// The header cannot invent an area colour for a slug that has not loaded.
 		await expect(screen.getByRole("heading", { name: "Practice area" })).toBeVisible();
 	},

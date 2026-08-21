@@ -36,19 +36,33 @@ export interface DetailDrawerStackProps<TKind extends string = string> {
  * Base UI decides whether a drawer is nested from the React tree rather than the DOM, so each level
  * renders the next as its own child and inherits the stacking for free: the drawers behind the
  * frontmost step back, and Escape, a rightward swipe or a press on the page all pop one level.
+ *
+ * Two things here are deliberately out of step with the URL, in opposite directions:
+ *
+ * - **Opening**, levels appear one frame apart. Base UI hides everything outside the frontmost popup
+ *   when a drawer opens, and two levels opening in the same commit each hide the other — leaving a
+ *   stack that is on screen but absent from the accessibility tree. Only a deep link mounts two at
+ *   once, but the same one-at-a-time reveal also keeps a hand-opened level from animating on top of
+ *   a parent that has not settled.
+ * - **Closing**, the drawer shuts first and the URL follows when the exit animation finishes. The
+ *   obvious alternative — let the URL drop the level and keep rendering the old entry while it
+ *   leaves — was tried and is worse in two ways: the stack would call `children` for a level the
+ *   caller no longer has data for (the caller sizes its per-level queries from the same URL stack,
+ *   so it indexes past the end and throws), and a retained entry goes stale the moment the URL
+ *   replaces an entry at that depth, so the panel animates out showing the *previous* level's
+ *   content. Holding the navigation instead means `children` only ever sees a live entry.
+ *
+ * The cost is that the address bar lags the animation by the length of the transition. A browser
+ * Back during that window wins, and the level disappears without animating — which is the right
+ * outcome, because Back is its own transition.
  */
 export function DetailDrawerStack<TKind extends string>({
 	stack,
 	onClose,
 	children,
 }: DetailDrawerStackProps<TKind>) {
-	// Levels appear one frame apart. Base UI hides everything outside the frontmost popup when a
-	// drawer opens, and two levels opening in the same commit each hide the other — leaving a stack
-	// that is on screen but absent from the accessibility tree. Only a deep link into a multi-level
-	// stack can mount two at once, but the same one-at-a-time reveal also keeps a hand-opened level
-	// from animating on top of a parent that has not settled, so it is not special-cased.
-	// `DetailDrawerStack.stories.tsx` § Two levels fails without this.
 	const [revealedDepth, setRevealedDepth] = useState(Math.min(stack.length, 1));
+	const [closingDepth, setClosingDepth] = useState<number | null>(null);
 	const openDepth = Math.min(revealedDepth, stack.length);
 
 	useEffect(() => {
@@ -63,10 +77,17 @@ export function DetailDrawerStack<TKind extends string>({
 		return (
 			<Drawer
 				key={detailStackKey(entry)}
-				open
+				// A level closing at `closingDepth` takes the levels above it with it, which is what
+				// Base UI does anyway when a parent drawer shuts.
+				open={closingDepth === null || depth < closingDepth}
 				swipeDirection="right"
-				onOpenChange={(open) => {
-					if (!open) onClose(depth);
+				onOpenChange={(next) => {
+					if (!next) setClosingDepth(depth);
+				}}
+				onOpenChangeComplete={(next) => {
+					if (next || closingDepth !== depth) return;
+					setClosingDepth(null);
+					onClose(depth);
 				}}
 			>
 				<DrawerContent className={DETAIL_DRAWER_CLASS} dimWhenNested={false}>

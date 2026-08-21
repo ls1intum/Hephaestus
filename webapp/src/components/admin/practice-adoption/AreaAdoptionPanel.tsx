@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { CatalogAreaAdoptionPreview } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import {
@@ -19,7 +20,6 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@/components/ui/item";
-import { Spinner } from "@/components/ui/spinner";
 
 /**
  * The panel's body is one of three things, never a combination, so it is one union rather than
@@ -85,12 +85,7 @@ export function AreaAdoptionPanel({
 			</DetailDrawerHeader>
 
 			<DrawerBody className="space-y-6">
-				{state.status === "loading" && (
-					<div className="flex min-h-32 items-center justify-center" role="status">
-						<Spinner />
-						<span className="sr-only">Loading area preview</span>
-					</div>
-				)}
+				{state.status === "loading" && <LoadingBlock size="sm" label="Loading area preview" />}
 				{state.status === "error" && (
 					<QueryErrorAlert
 						error={state.error}

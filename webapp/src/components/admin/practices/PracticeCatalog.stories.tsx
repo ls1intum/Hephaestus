@@ -163,26 +163,29 @@ export const WithPracticeLibrary: Story = {
 	args: {
 		showLibrary: true,
 		onShowLibraryChange: fn(),
-		catalogPractices: [
-			{
-				slug: "explain-change",
-				name: "Explain what changed and why",
-				artifactKind: "scm.pull_request",
-				areaSlug: "review-ready-work",
-				areaName: "Review-ready work",
-				availability: "AVAILABLE",
-				automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-			},
-			{
-				slug: practices[0].slug,
-				name: practices[0].name,
-				artifactKind: practices[0].artifactKind,
-				areaSlug: practices[0].areaSlug,
-				areaName: areas[0].name,
-				availability: "ADOPTED",
-				automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-			},
-		],
+		library: {
+			status: "ready",
+			practices: [
+				{
+					slug: "explain-change",
+					name: "Explain what changed and why",
+					artifactKind: "scm.pull_request",
+					areaSlug: "review-ready-work",
+					areaName: "Review-ready work",
+					availability: "AVAILABLE",
+					automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+				},
+				{
+					slug: practices[0].slug,
+					name: practices[0].name,
+					artifactKind: practices[0].artifactKind,
+					areaSlug: practices[0].areaSlug,
+					areaName: areas[0].name,
+					availability: "ADOPTED",
+					automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+				},
+			],
+		},
 	},
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "Practice library" })).toBeVisible();

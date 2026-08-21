@@ -27,11 +27,11 @@ import {
 	reorderCuratedAreas,
 	reorderCuratedPractices,
 } from "@/components/admin/curated-catalog/curated-catalog-cache";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
@@ -264,9 +264,7 @@ function AdminCuratedCatalogPage() {
 			/>
 
 			{catalogQuery.isPending ? (
-				<div className="flex h-64 items-center justify-center">
-					<Spinner className="size-8" />
-				</div>
+				<LoadingBlock size="lg" label="Loading the practice library" />
 			) : catalogQuery.isError ? (
 				<QueryErrorAlert
 					error={catalogQuery.error}

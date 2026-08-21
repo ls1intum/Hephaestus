@@ -16,8 +16,8 @@ import {
 	PRACTICE_SEARCH_PARAMS,
 	practiceSearchSchema,
 } from "@/components/admin/practices/practice-search";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { Spinner } from "@/components/ui/spinner";
 import {
 	patchPractice,
 	practiceCatalogStructureScope,
@@ -104,9 +104,7 @@ function EditPracticeContainer() {
 	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
-				<div className="flex h-64 max-w-3xl items-center justify-center">
-					<Spinner className="size-8" />
-				</div>
+				<LoadingBlock size="lg" label="Loading this practice" />
 			</PracticeFormShell>
 		);
 	}

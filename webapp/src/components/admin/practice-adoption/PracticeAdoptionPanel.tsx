@@ -5,6 +5,7 @@ import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { PracticeAutomatedReviewValidationBadge } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { DetailRow } from "@/components/common/DetailRow";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
@@ -29,7 +30,6 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
-import { Spinner } from "@/components/ui/spinner";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 
@@ -192,10 +192,7 @@ function PracticeAdoptionPlaceholder({
 			</DetailDrawerHeader>
 			<DrawerBody>
 				{state.status === "loading" ? (
-					<div className="flex min-h-32 items-center justify-center" role="status">
-						<Spinner />
-						<span className="sr-only">Loading adoption preview</span>
-					</div>
+					<LoadingBlock size="sm" label="Loading adoption preview" />
 				) : (
 					<QueryErrorAlert
 						error={state.error}

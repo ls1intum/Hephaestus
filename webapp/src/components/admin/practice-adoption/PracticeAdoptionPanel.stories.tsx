@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 import type { CatalogPracticePreview } from "@/api/types.gen";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import {
@@ -100,7 +100,10 @@ export const DismissReturnsToThePage: Story = {
 		// The top level returns to the page, so it closes rather than stepping back one drawer.
 		await userEvent.click(screen.getByRole("button", { name: "Close" }));
 		await expect(await screen.findByRole("heading", { name: "Practice setup" })).toBeVisible();
-		await expect(screen.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
+		// `waitFor`: the panel leaves by animating out, so it outlives the click by the transition.
+		await waitFor(() =>
+			expect(screen.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument(),
+		);
 	},
 };
 
@@ -170,7 +173,9 @@ export const UnassignedAndOff: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Loading adoption preview"));
+		await expectSettledVisible(
+			await screen.findByRole("status", { name: "Loading adoption preview" }),
+		);
 	},
 };
 

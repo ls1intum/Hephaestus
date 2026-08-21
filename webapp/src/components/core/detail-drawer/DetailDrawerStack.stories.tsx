@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, waitFor } from "storybook/test";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { Button } from "@/components/ui/button";
 import { DrawerBody, DrawerDescription, DrawerFooter, DrawerTitle } from "@/components/ui/drawer";
@@ -81,6 +81,62 @@ export const OneLevel: Story = {
 	},
 };
 
+export const DismissedLevelSlidesOut: Story = {
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
+		const [popup] = popups();
+		await userEvent.click(screen.getByRole("button", { name: "Close" }));
+		// Still mounted and still carrying its own content, now animating out. Dropping it from the
+		// tree on the URL change is what used to make a dismissed drawer vanish in one frame.
+		await expect(popup).toHaveAttribute("data-ending-style");
+		await expect(popup.textContent).toContain("practice · describe-what-and-why");
+		// ...and gone once the transition has finished.
+		await waitFor(() => expect(popups()).toHaveLength(0));
+	},
+};
+
+/**
+ * The render prop is handed a `depth`, and the real caller uses it to index per-level data sized
+ * from the same stack. A level that outlives the URL therefore indexes past the end — which is why
+ * this stack holds the navigation until the animation is done rather than rendering a level the
+ * caller no longer has data for. Without that, every dismissal throws.
+ */
+export const PerLevelDataSurvivesDismissal: Story = {
+	render: (args) => (
+		<Stateful initial={args.stack}>
+			{(stack, setStack) => {
+				const perLevel = stack.map((entry) => ({ heading: entry.id }));
+				return (
+					<DetailDrawerStack
+						stack={stack}
+						onClose={(depth) => {
+							args.onClose(depth);
+							setStack(stack.slice(0, depth));
+						}}
+					>
+						{(_entry, level) => (
+							<>
+								<DetailDrawerHeader nested={level.nested}>
+									<DrawerTitle>{perLevel[level.depth].heading}</DrawerTitle>
+								</DetailDrawerHeader>
+								<DrawerBody>
+									<p className="text-sm text-muted-foreground">Level content.</p>
+								</DrawerBody>
+							</>
+						)}
+					</DetailDrawerStack>
+				);
+			}}
+		</Stateful>
+	),
+	play: async ({ args }) => {
+		await expectSettledVisible(await screen.findByText("describe-what-and-why"));
+		await userEvent.click(screen.getByRole("button", { name: "Close" }));
+		await waitFor(() => expect(popups()).toHaveLength(0));
+		await expect(args.onClose).toHaveBeenCalledWith(0);
+	},
+};
+
 export const PressingThePageDismisses: Story = {
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
@@ -91,8 +147,10 @@ export const PressingThePageDismisses: Story = {
 			coords: { clientX: 20, clientY: 200 },
 			keys: "[MouseLeft]",
 		});
+		// Both `waitFor`: the level animates out first and the URL follows, so neither the popup
+		// leaving nor the callback firing happens on the click itself.
+		await waitFor(() => expect(popups()).toHaveLength(0));
 		await expect(args.onClose).toHaveBeenCalledWith(0);
-		await expect(popups()).toHaveLength(0);
 	},
 };
 
@@ -119,7 +177,7 @@ export const TwoLevels: Story = {
 		await expect(getComputedStyle(frontmost).getPropertyValue("--nested-drawers").trim()).toBe("0");
 		const back = screen.getByRole("button", { name: "Back" });
 		await userEvent.click(back);
-		await expect(args.onClose).toHaveBeenCalledWith(1);
+		await waitFor(() => expect(args.onClose).toHaveBeenCalledWith(1));
 		// One level popped, not the whole stack.
 		await expect(await screen.findByText("area · review-ready-work")).toBeVisible();
 	},
