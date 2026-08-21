@@ -174,6 +174,71 @@ export const ReviewsPaused: Story = {
 	args: { workspace: { ...workspace, enabled: false } },
 };
 
+/**
+ * The shape a real pilot has: a handful of repositories, some of them limited to a branch, and the
+ * people whose work is in scope. Every earlier story held one of each, which is the one size at
+ * which a list and a stack of fields look the same.
+ */
+export const PilotPopulation: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: {
+				...settings,
+				coverageSummary: {
+					...settings.coverageSummary,
+					monitoredRepositories: 12,
+					eligiblePeople: 24,
+				},
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [
+						{ nameWithOwner: "acme/widgets", baseBranches: ["main"] },
+						{ nameWithOwner: "acme/gadgets", baseBranches: [] },
+						{ nameWithOwner: "acme/sprockets", baseBranches: ["main", "release/2026.1"] },
+						{ nameWithOwner: "acme/retired-service", baseBranches: [] },
+					],
+					personUserIds: [7, 8, 9, 10, 11],
+				},
+			},
+		},
+		coverage: {
+			...coverage,
+			repositories: {
+				options: ["acme/widgets", "acme/gadgets", "acme/sprockets"].map((value) => ({
+					value,
+					label: value,
+				})),
+				isLoading: false,
+				isError: false,
+			},
+			people: {
+				options: [
+					{ value: 7, label: "Ada Lovelace", description: "@ada" },
+					{ value: 8, label: "Grace Hopper", description: "@grace" },
+					{ value: 9, label: "Katherine Johnson", description: "@katherine" },
+					{ value: 10, label: "Barbara Liskov", description: "@barbara" },
+					{ value: 11, label: "Margaret Hamilton", description: "@margaret" },
+				],
+				isLoading: false,
+				isError: false,
+			},
+		},
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 1440] },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("4 of 12 monitored")).toBeVisible();
+		await expect(canvas.getByText("5 of 24 linked")).toBeVisible();
+		// A repository that has left the monitored set is still named in the scope and covers nothing.
+		await expect(canvas.getByText("Not monitored")).toBeVisible();
+		await expectNoPageOverflow();
+	},
+};
+
 export const ReviewScopeNarrowed: Story = {
 	args: {
 		policy: {
@@ -221,8 +286,9 @@ export const AddingATargetBranch: Story = {
 		},
 	},
 	play: async ({ args, canvas }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
 		await userEvent.type(
-			canvas.getByLabelText("Base branches for acme/widgets"),
+			canvas.getByLabelText("Only these base branches for acme/widgets"),
 			"  release/2026.1  ",
 		);
 		await userEvent.click(
@@ -259,7 +325,8 @@ export const RefusingADuplicate: Story = {
 		},
 	},
 	play: async ({ args, canvas }) => {
-		const input = canvas.getByLabelText("Base branches for acme/widgets");
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		const input = canvas.getByLabelText("Only these base branches for acme/widgets");
 		await userEvent.type(input, "main");
 
 		await expect(input).toBeInvalid();
@@ -291,6 +358,24 @@ export const SelectedEmptyMeansNobody: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("No repositories are covered.")).toBeVisible();
 		await expect(canvas.getByText("No people are covered.")).toBeVisible();
+		// Two empty lists are one consequence, and it is the consequence — not the two lists — that
+		// tells an admin why a pilot they thought they had configured is silent.
+		await expect(canvas.getByText("Nothing is being reviewed")).toBeVisible();
+	},
+};
+
+/**
+ * Pausing is the control somebody reaches for when feedback is going out that should not be. It says
+ * what it did, because "sending is off" and "what was ready while it was off is now lost" are
+ * different facts and only the second one is surprising.
+ */
+export const SendingPaused: Story = {
+	args: {
+		policy: { ...policy, settings: { ...settings, deliveryStatus: "PAUSED" } },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Sending is paused")).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: /Send feedback/ })).not.toBeChecked();
 	},
 };
 

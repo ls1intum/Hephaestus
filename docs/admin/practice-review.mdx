@@ -24,7 +24,7 @@ Use this short path before tuning campaigns, scopes, or per-practice overrides:
 2. Under **AI models**, assign a ready model to practice reviews.
 3. On the practice **Review** screen, start practice reviews.
 4. Under **Autonomy**, choose **Review before sending** for the first test. Keep coverage at **All
-   monitored repositories** and **All eligible linked members**.
+   monitored repositories** and **Everyone who has signed in**.
 5. Open a small pull or merge request, then follow it in **Review activity**. The trace distinguishes
    ingestion, admission, observation, composition, withholding, and delivery; do not use the presence of
    a provider comment as the success test.
@@ -144,9 +144,10 @@ Three independent controls answer different questions; confusing them is the mos
   eligible linked members. Selected-empty means nobody. Exact base branches can narrow each selected
   repository independently; exact names only, no patterns. An issue has no base branch, so a selected
   repository's branch restriction is relevant only to pull and merge requests.
-- **Delivery active/paused** controls whether newly admitted feedback may leave the review pipeline. Pausing
-  does not stop measurement and does not discard configuration. Paused feedback is terminally withheld;
-  resuming applies only to work admitted under the new rollout revision and never flushes old work.
+- **Send feedback**, under **Sending feedback**, controls whether newly admitted feedback may leave the
+  review pipeline. Pausing does not stop measurement and does not discard configuration. Paused feedback is
+  terminally withheld; resuming applies only to work admitted under the new rollout revision and never
+  flushes old work.
 
 Coverage, delivery changes, and autonomy promotions are prospective. Widening or removing and re-adding a
 target creates a new rollout revision, so a result admitted under the former configuration cannot be

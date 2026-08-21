@@ -75,8 +75,8 @@ describe("PracticeReviewSettings", () => {
 	it("names both coverage mode groups", async () => {
 		await renderSettings();
 
-		expect(await screen.findByRole("radiogroup", { name: "Repositories covered" })).not.toBeNull();
-		expect(screen.getByRole("radiogroup", { name: "People covered" })).not.toBeNull();
+		expect(await screen.findByRole("radiogroup", { name: "Repositories" })).not.toBeNull();
+		expect(screen.getByRole("radiogroup", { name: "People" })).not.toBeNull();
 	});
 
 	it("keeps persisted targets visible when they are no longer available", async () => {
@@ -96,10 +96,12 @@ describe("PracticeReviewSettings", () => {
 			},
 		});
 
-		fireEvent.click(await screen.findByLabelText("Choose repositories"));
-		expect(await screen.findByText("acme/archived (unavailable)")).not.toBeNull();
-		fireEvent.click(screen.getByLabelText("Choose members"));
-		expect(await screen.findByText("Member 99 (unavailable)")).not.toBeNull();
+		// Both readouts, without opening either picker: a target nobody can see is a target nobody
+		// corrects, and a repository that has left the monitored set covers nothing while still
+		// looking like coverage.
+		expect(await screen.findByText("acme/archived")).not.toBeNull();
+		expect(screen.getByText("Not monitored")).not.toBeNull();
+		expect(screen.getByTitle("Member 99 (unavailable)")).not.toBeNull();
 	});
 
 	it("points at the page that owns the binding without restating the page banner", async () => {
