@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { CircleAlert, Copy, ShieldCheck } from "lucide-react";
 import { useId } from "react";
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
@@ -8,6 +7,7 @@ import { PracticeAutomatedReviewValidationBadge } from "@/components/admin/pract
 import { DetailRow } from "@/components/common/DetailRow";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
@@ -50,7 +50,6 @@ export type PracticeAdoptionState =
 	  };
 
 export interface PracticeAdoptionPanelProps {
-	workspaceSlug: string;
 	state: PracticeAdoptionState;
 	onAdopt: () => void;
 	nested?: boolean;
@@ -61,12 +60,7 @@ export interface PracticeAdoptionPanelProps {
  * for it, then the action. The outcome leads because "what will this change" is the question being
  * answered — the definition is why the answer is trustworthy.
  */
-export function PracticeAdoptionPanel({
-	workspaceSlug,
-	state,
-	onAdopt,
-	nested,
-}: PracticeAdoptionPanelProps) {
+export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdoptionPanelProps) {
 	// Two levels of the stack can show a practice at once, so nothing here may hold a fixed DOM id.
 	const idPrefix = useId();
 	if (state.status !== "ready") {
@@ -164,14 +158,12 @@ export function PracticeAdoptionPanel({
 
 			<DrawerFooter>
 				{unavailable ? (
-					<Link
-						to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-						params={{ workspaceSlug, practiceSlug: preview.slug }}
-						search={{}}
+					<DetailStackLink
+						entry={{ kind: "practice", id: preview.slug }}
 						className={cn(buttonVariants(), "w-full sm:w-auto")}
 					>
 						Open workspace practice
-					</Link>
+					</DetailStackLink>
 				) : (
 					<Button onClick={onAdopt} disabled={action === "adding"} className="w-full sm:w-auto">
 						<ShieldCheck /> {action === "adding" ? "Adding…" : "Add practice"}

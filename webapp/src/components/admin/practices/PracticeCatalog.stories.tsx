@@ -5,7 +5,6 @@ import {
 	mockPracticeDefinitionOptions,
 } from "@/mocks/fixtures/practice";
 import { StatefulPatch } from "@/stories/stateful";
-import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeCatalog } from "./PracticeCatalog";
 import {
@@ -209,10 +208,12 @@ export const AtScale: Story = {
 };
 
 /**
- * A locally written practice usually carries no prose, and a popup that appears empty under the
- * pointer is worse than no popup.
+ * A practice name opens the practice, read-only, over this tree. It used to link straight to the
+ * edit form — so "what does this say?" and "change this" were the same act — softened by a hover
+ * card that never opened on touch. Both are gone: the name is a plain link to a `detail` level, which
+ * works on every input device and leaves the tree exactly where it was.
  */
-export const PracticeDetailOnHover: Story = {
+export const PracticeNameOpensTheDetailLevel: Story = {
 	args: {
 		practices: [
 			{ ...mockPractices[0], areaSlug: areas[0].slug, displayOrder: 0 },
@@ -220,20 +221,13 @@ export const PracticeDetailOnHover: Story = {
 		],
 	},
 	parameters: { chromatic: { disableSnapshot: true } },
-	play: async ({ canvas, userEvent }) => {
-		await expect(screen.queryByText(/reverse-engineering the diff/)).not.toBeInTheDocument();
-
-		// Asserted on the element rather than by hovering and waiting for nothing, which would pass just
-		// as well if the card were merely slow.
+	play: async ({ canvas }) => {
+		const link = canvas.getByRole("link", { name: mockPractices[0].name });
+		// Not a hover trigger: nothing about opening a practice may require a pointer.
+		await expect(link).not.toHaveAttribute("data-slot", "hover-card-trigger");
 		await expect(
-			canvas.getByRole("link", { name: mockUnassignedPractice.name }),
-		).not.toHaveAttribute("data-slot", "hover-card-trigger");
-
-		const trigger = canvas.getByRole("link", { name: mockPractices[0].name });
-		await expect(trigger).toHaveAttribute("data-slot", "hover-card-trigger");
-		await userEvent.hover(trigger);
-		await expectSettledVisible(await screen.findByText(/reverse-engineering the diff/));
-		await expect(screen.getByText(/lists the exact steps a reviewer ran/)).toBeVisible();
+			new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
+		).toContain(`practice:${mockPractices[0].slug}`);
 	},
 };
 

@@ -40,7 +40,7 @@ const preview: CatalogPracticePreview = {
 
 /** A one-level stack survives the readable URL form as well as the encoded array form. */
 const LIBRARY = "/w/acme/admin/practices?library=true";
-const REVIEWING = `${LIBRARY}&detail=practice:${preview.slug}`;
+const REVIEWING = `${LIBRARY}&detail=catalog-practice:${preview.slug}`;
 
 describe("catalog adoption over practice setup", () => {
 	beforeEach(() => {
@@ -145,7 +145,38 @@ describe("catalog adoption over practice setup", () => {
 		await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);
 		// The library is still the page; only the drawer stack changed.
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
-		expect(router.state.location.search.detail).toEqual([`practice:${preview.slug}`]);
+		expect(router.state.location.search.detail).toEqual([`catalog-practice:${preview.slug}`]);
+	});
+
+	it("opens a workspace practice read-only over the tree instead of in the edit form", async () => {
+		const workspacePractice = {
+			...mockPractices[0],
+			slug: "already-mine",
+			name: "Already mine",
+			areaSlug: undefined,
+		};
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practices", () =>
+				HttpResponse.json([workspacePractice]),
+			),
+			// Declared before the `:practiceSlug` handler below, which would otherwise match this path
+			// with `practiceSlug === "definition-options"`. MSW takes the first match in order.
+			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
+				HttpResponse.json(mockPracticeDefinitionOptions),
+			),
+			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug", () =>
+				HttpResponse.json(workspacePractice),
+			),
+		);
+
+		const { router } = renderRouteAtWithRouter("/w/acme/admin/practices");
+		fireEvent.click(await screen.findByRole("link", { name: "Already mine" }, ROUTE_RENDER_WAIT));
+
+		// The definition is readable, and editing is a separate, explicit act that IS a route.
+		const edit = await screen.findByRole("link", { name: "Edit practice" }, ROUTE_RENDER_WAIT);
+		expect(edit.getAttribute("href")).toBe("/w/acme/admin/practices/already-mine");
+		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
+		expect(router.state.location.search.detail).toEqual(["practice:already-mine"]);
 	});
 
 	it("pins adoption to the reviewed ETag and returns to the library", async () => {

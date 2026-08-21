@@ -7,6 +7,7 @@ import {
 	adoptAreaMutation,
 	adoptPracticeMutation,
 	getPracticeDefinitionOptionsOptions,
+	getPracticeOptions,
 	listAdoptablePracticesOptions,
 	listAreasOptions,
 	listPracticesOptions,
@@ -27,6 +28,7 @@ import {
 	PRACTICE_SEARCH_PARAMS,
 	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
+import { WorkspacePracticePanel } from "@/components/admin/practices/WorkspacePracticePanel";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { detailStackKey, parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
@@ -56,8 +58,13 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 	component: PracticeCatalogRoute,
 });
 
-/** The levels this surface can render. Anything else in the URL is dropped rather than mounted. */
-const ADOPTION_LEVEL_KINDS = ["area", "practice"] as const;
+/**
+ * The levels this surface can render. Anything else in the URL is dropped rather than mounted.
+ *
+ * `practice` is the workspace's own copy, read-only; the `catalog-` kinds are what the library is
+ * still offering. Both open as drawer levels, so inspecting anything never leaves the tree.
+ */
+const DETAIL_LEVEL_KINDS = ["catalog-area", "catalog-practice", "practice"] as const;
 
 function PracticeCatalogRoute() {
 	const { workspaceSlug } = Route.useParams();
@@ -71,7 +78,7 @@ function PracticeCatalogRoute() {
 
 	// Every open level owns its own preview query, keyed by that level's slug. Sharing one query per
 	// kind would let `?detail=practice:a&detail=practice:b` show a's definition while adding b.
-	const detailStack = parseDetailStack(detail, ADOPTION_LEVEL_KINDS);
+	const detailStack = parseDetailStack(detail, DETAIL_LEVEL_KINDS);
 	const stackControls = useDetailStack(detailStack);
 
 	const areasQuery = useQuery({
@@ -88,11 +95,15 @@ function PracticeCatalogRoute() {
 		enabled: library === true,
 	});
 	const levelQueries = useQueries({
-		queries: detailStack.map((entry) =>
-			entry.kind === "area"
-				? previewAreaAdoptionOptions({ path: { workspaceSlug, slug: entry.id } })
-				: previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
-		),
+		queries: detailStack.map((entry) => {
+			if (entry.kind === "catalog-area") {
+				return previewAreaAdoptionOptions({ path: { workspaceSlug, slug: entry.id } });
+			}
+			if (entry.kind === "catalog-practice") {
+				return previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } });
+			}
+			return getPracticeOptions({ path: { workspaceSlug, practiceSlug: entry.id } });
+		}),
 	});
 
 	const refreshCatalog = () =>
@@ -102,7 +113,7 @@ function PracticeCatalogRoute() {
 			catalogQuery.refetch(),
 			// A practice added from inside an area drawer changes what the area behind it would do.
 			...levelQueries
-				.filter((_query, index) => detailStack[index]?.kind === "area")
+				.filter((_query, index) => detailStack[index]?.kind === "catalog-area")
 				.map((q) => q.refetch()),
 		]);
 	const adoptCatalogArea = useMutation({
@@ -281,7 +292,7 @@ function PracticeCatalogRoute() {
 			<DetailDrawerStack stack={detailStack} onClose={stackControls.close}>
 				{(entry, level) => {
 					const query = levelQueries[level.depth];
-					if (entry.kind === "area") {
+					if (entry.kind === "catalog-area") {
 						return (
 							<AreaAdoptionPanel
 								nested={level.nested}
@@ -297,7 +308,7 @@ function PracticeCatalogRoute() {
 												}
 								}
 								onOpenPractice={(catalogSlug) =>
-									stackControls.open({ kind: "practice", id: catalogSlug })
+									stackControls.open({ kind: "catalog-practice", id: catalogSlug })
 								}
 								onConfirm={() => {
 									const preview = query.data as CatalogAreaAdoptionPreview | undefined;
@@ -310,9 +321,37 @@ function PracticeCatalogRoute() {
 							/>
 						);
 					}
+					if (entry.kind === "practice") {
+						return (
+							<WorkspacePracticePanel
+								workspaceSlug={workspaceSlug}
+								nested={level.nested}
+								state={
+									query.isPending || definitionOptionsQuery.isPending
+										? { status: "loading" }
+										: query.isError || definitionOptionsQuery.isError
+											? {
+													status: "error",
+													error: query.error ?? definitionOptionsQuery.error,
+													onRetry: () => {
+														query.refetch();
+														definitionOptionsQuery.refetch();
+													},
+												}
+											: {
+													status: "ready",
+													practice: query.data as Practice,
+													definitionOptions: definitionOptionsQuery.data,
+													areaName: areasQuery.data?.find(
+														(area) => area.slug === (query.data as Practice).areaSlug,
+													)?.name,
+												}
+								}
+							/>
+						);
+					}
 					return (
 						<PracticeAdoptionPanel
-							workspaceSlug={workspaceSlug}
 							nested={level.nested}
 							state={
 								query.isPending || definitionOptionsQuery.isPending

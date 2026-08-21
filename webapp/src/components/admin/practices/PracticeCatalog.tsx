@@ -11,13 +11,13 @@ import { AvailablePracticeList } from "@/components/admin/practice-adoption/Avai
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
-import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -172,7 +172,6 @@ export function PracticeCatalog({
 						</div>
 					) : visibleCatalogPractices ? (
 						<AvailablePracticeList
-							workspaceSlug={workspaceSlug}
 							practices={visibleCatalogPractices}
 							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
 						/>
@@ -235,15 +234,15 @@ export function PracticeCatalog({
 						supportedModes={supportedModesFor(practice)}
 						inheritedFrom={inheritedFromFor(practice)}
 						title={
-							<PracticeDetailHoverCard practice={practice}>
-								<Link
-									to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-									params={{ workspaceSlug, practiceSlug: practice.slug }}
-									className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-								>
-									{practice.name}
-								</Link>
-							</PracticeDetailHoverCard>
+							// Opens the practice read-only over this tree. It used to link straight to the
+							// edit form, which made "what does this say?" and "change this" the same act —
+							// and the hover card that softened that never opened on touch.
+							<DetailStackLink
+								entry={{ kind: "practice", id: practice.slug }}
+								className="break-words rounded-sm hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+							>
+								{practice.name}
+							</DetailStackLink>
 						}
 					/>
 				)}

@@ -61,7 +61,6 @@ const meta = {
 	parameters: { layout: "fullscreen" },
 	decorators: [withPageBehind],
 	args: {
-		workspaceSlug: "demo",
 		state: ready(),
 		onAdopt: fn(),
 	},
@@ -122,7 +121,11 @@ export const AlreadyAdded: Story = {
 		const open = await screen.findByRole("link", { name: "Open workspace practice" });
 		await expectSettledVisible(open);
 		await expect(screen.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
-		await expect(open).toHaveAttribute("href", "/w/demo/admin/practices/describe-what-and-why");
+		// The workspace copy opens as another level rather than a page, so the reader never leaves
+		// the library to look at what is already in it.
+		await expect(
+			new URL(open.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
+		).toContain("practice:describe-what-and-why");
 	},
 };
 

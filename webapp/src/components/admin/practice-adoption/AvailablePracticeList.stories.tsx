@@ -49,7 +49,7 @@ const meta = {
 	title: "Workspace admin/Practice adoption/Available practices",
 	component: AvailablePracticeList,
 	parameters: { layout: "padded" },
-	args: { workspaceSlug: "demo", practices, existingAreaSlugs: new Set(["review-ready-work"]) },
+	args: { practices, existingAreaSlugs: new Set(["review-ready-work"]) },
 	argTypes: { existingAreaSlugs: { control: false } },
 	tags: ["autodocs"],
 } satisfies Meta<typeof AvailablePracticeList>;
@@ -68,9 +68,9 @@ export const Default: Story = {
 		// it open a drawer instead of replacing the page.
 		await expect(
 			detailParamOf(canvas.getByRole("link", { name: /Describe what changed and why/ })),
-		).toBe('["practice:describe-what-and-why"]');
+		).toBe('["catalog-practice:describe-what-and-why"]');
 		await expect(detailParamOf(canvas.getByRole("link", { name: /Review 1 practice/ }))).toBe(
-			'["area:review-ready-work"]',
+			'["catalog-area:review-ready-work"]',
 		);
 	},
 };
@@ -81,10 +81,11 @@ export const DeletedAreaStillHasSomethingToAdd: Story = {
 		// The area is gone, so its adopted practice is listed again — but one entry is still available,
 		// so the area is offered as a review rather than a pure restore.
 		await expect(canvas.getByRole("link", { name: /Review area · 1 practice/ })).toBeVisible();
-		await expect(canvas.getByRole("link", { name: /Keep pull requests focused/ })).toHaveAttribute(
-			"href",
-			"/w/demo/admin/practices/review-scope",
-		);
+		// An added practice opens the workspace copy as a drawer level too, so nothing in the library
+		// navigates away from the library.
+		await expect(
+			detailParamOf(canvas.getByRole("link", { name: /Keep pull requests focused/ })),
+		).toBe('["practice:review-scope"]');
 	},
 };
 

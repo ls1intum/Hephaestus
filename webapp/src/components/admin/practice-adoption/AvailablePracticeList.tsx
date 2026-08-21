@@ -1,4 +1,3 @@
-import { Link } from "@tanstack/react-router";
 import { ChevronRight, Library } from "lucide-react";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
@@ -25,7 +24,6 @@ import {
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 
 export interface AvailablePracticeListProps {
-	workspaceSlug: string;
 	practices: CatalogPracticeSummary[];
 	/**
 	 * The areas the workspace already has. An area missing from this set is one the library can
@@ -40,7 +38,6 @@ export interface AvailablePracticeListProps {
  * whose area was deleted stays, because the area is what the library can put back.
  */
 export function AvailablePracticeList({
-	workspaceSlug,
 	practices,
 	existingAreaSlugs,
 }: AvailablePracticeListProps) {
@@ -94,7 +91,7 @@ export function AvailablePracticeList({
 							</h3>
 							{areaSlug && (available > 0 || (areaMissing && restorable > 0)) ? (
 								<DetailStackLink
-									entry={{ kind: "area", id: areaSlug }}
+									entry={{ kind: "catalog-area", id: areaSlug }}
 									className={buttonVariants({ size: "sm", variant: "outline" })}
 								>
 									{areaMissing && available === 0
@@ -110,7 +107,7 @@ export function AvailablePracticeList({
 						<ItemGroup>
 							{entries.map((practice) => (
 								<div key={practice.slug} role="listitem">
-									<PracticeRow workspaceSlug={workspaceSlug} practice={practice} />
+									<PracticeRow practice={practice} />
 								</div>
 							))}
 						</ItemGroup>
@@ -125,24 +122,15 @@ function countLabel(count: number): string {
 	return `${count} ${count === 1 ? "practice" : "practices"}`;
 }
 
-function PracticeRow({
-	workspaceSlug,
-	practice,
-}: {
-	workspaceSlug: string;
-	practice: CatalogPracticeSummary;
-}) {
+function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 	const def = CATALOG_AVAILABILITY_DEFS[practice.availability];
-	// An added practice leaves the library for its workspace copy; everything else opens over it.
+	// An added practice opens the workspace copy, everything else the catalog preview — but both
+	// open as a drawer level, so the library never has to be left to look at something in it.
 	const link =
 		practice.availability === "ADOPTED" ? (
-			<Link
-				to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-				params={{ workspaceSlug, practiceSlug: practice.slug }}
-				search={{}}
-			/>
-		) : (
 			<DetailStackLink entry={{ kind: "practice", id: practice.slug }} />
+		) : (
+			<DetailStackLink entry={{ kind: "catalog-practice", id: practice.slug }} />
 		);
 
 	return (

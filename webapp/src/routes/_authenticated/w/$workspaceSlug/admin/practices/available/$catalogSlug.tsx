@@ -11,7 +11,7 @@ export const Route = createFileRoute(
 		throw redirect({
 			to: "/w/$workspaceSlug/admin/practices",
 			params: { workspaceSlug },
-			search: { library: true, detail: [`practice:${catalogSlug}`] },
+			search: { library: true, detail: [`catalog-practice:${catalogSlug}`] },
 		});
 	},
 });
