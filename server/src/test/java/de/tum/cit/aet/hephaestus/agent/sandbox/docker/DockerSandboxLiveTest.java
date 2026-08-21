@@ -80,7 +80,7 @@ class DockerSandboxLiveTest {
 
         dockerOps = new DockerClientOperations(dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
-        containerManager = new SandboxContainerManager(dockerOps, properties, dockerWaitExecutor);
+        containerManager = new SandboxContainerManager(dockerOps, image -> {}, properties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, properties);
         workspaceManager = new SandboxWorkspaceManager(dockerOps);
         ContainerSecurityPolicy securityPolicy = new ContainerSecurityPolicy(properties, null);
