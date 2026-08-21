@@ -2,7 +2,7 @@
 	"name": "hephaestus",
 	"version": "0.73.2",
 	"private": true,
-	"packageManager": "pnpm@11.1.2",
+	"packageManager": "pnpm@11.22.0",
 	"scripts": {
 		"changeset:version": "changeset version && node scripts/sync-selfhost-version.mjs",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
@@ -14,7 +14,7 @@
 		"format:java:check": "node --import tsx scripts/run-quiet.ts prettier --check \"server/src/**/*.java\" --config-precedence prefer-file --config server/.prettierrc.yaml --ignore-path server/.prettierignore",
 		"lint:java": "node --import tsx scripts/run-mvnw.ts pmd:check -q",
 		"lint:java:report": "node --import tsx scripts/run-mvnw.ts pmd:pmd && echo 'Report: server/target/site/pmd.html'",
-		"pre-push": "run-s format:check check",
+		"pre-push": "pnpm run check",
 		"format:webapp": "pnpm --filter webapp run format",
 		"format:webapp:check": "pnpm --filter webapp run format:check",
 		"lint:webapp": "pnpm --filter webapp run lint",
@@ -27,9 +27,9 @@
 		"build:webapp": "pnpm --filter webapp run build",
 		"nats:extract-examples": "node --import tsx scripts/nats-extract-examples.ts",
 		"typecheck:scripts": "tsc -p scripts/tsconfig.json --noEmit",
-		"format:server": "run-s format:java",
-		"format:server:check": "run-s format:java:check",
-		"lint:server": "run-s format:java:check lint:java",
+		"format:server": "pnpm run format:java",
+		"format:server:check": "pnpm run format:java:check",
+		"lint:server": "pnpm run lint:java",
 		"check:server": "pnpm run format:server:check && pnpm run lint:server",
 		"check:contracts": "node scripts/validate-artifact-source-contracts.mjs && node scripts/check-artifact-source-contract-immutability.mjs && node --test scripts/check-artifact-source-contract-immutability.test.mjs",
 		"format:client": "pnpm run format:webapp",
@@ -65,7 +65,7 @@
 		"check:env": "node scripts/check-env-defaults.mjs"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "2.4.15",
+		"@biomejs/biome": "2.5.9",
 		"@changesets/cli": "2.31.1",
 		"@commitlint/cli": "21.0.1",
 		"@commitlint/config-conventional": "21.0.1",
@@ -88,7 +88,7 @@
 		"prettier": "3.8.3",
 		"prettier-plugin-java": "2.8.1",
 		"tsx": "4.22.1",
-		"typescript": "6.0.3"
+		"typescript": "7.0.2"
 	},
 	"engines": {
 		"node": ">=24.0"

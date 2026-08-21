@@ -6,15 +6,15 @@ ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
 WORKDIR /repo
 
-# Enable Corepack-managed pnpm and bake the pinned version into the image so the
-# first `pnpm install` does not need network access to resolve packageManager.
-# Version explicit (not `--activate` alone) because package.json is COPYed later.
-RUN corepack enable && corepack prepare pnpm@11.1.2 --activate
-
 # Copy the workspace manifests first to maximize layer caching
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json .npmrc /repo/
 COPY webapp/package.json /repo/webapp/
 COPY docs/package.json /repo/docs/
+
+# Bake the pnpm named by package.json#packageManager into the image, so the first
+# `pnpm install` needs no network access to resolve it. Reading the manifest rather than
+# naming a version here is what stops the image drifting from the repo.
+RUN corepack enable && corepack prepare --activate
 
 # Install webapp deps (no internal workspace deps, so no `...` needed)
 RUN --mount=type=cache,target=/pnpm/store,sharing=locked \

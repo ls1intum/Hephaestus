@@ -2,40 +2,32 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { storybookTest } from "@storybook/addon-vitest/vitest-plugin";
-import babel from "@rolldown/plugin-babel";
-import tailwindcss from "@tailwindcss/vite";
-import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
-import { defineConfig } from "vitest/config";
 import { playwright } from "@vitest/browser-playwright";
+import { defineConfig } from "vitest/config";
 import pkg from "./package.json" with { type: "json" };
+import { appSourcePlugins } from "./vite.shared.ts";
 
 const dirname =
-	typeof __dirname !== "undefined"
-		? __dirname
-		: path.dirname(fileURLToPath(import.meta.url));
-
-const reactCompiler = await babel({ presets: [reactCompilerPreset()] });
+	typeof __dirname !== "undefined" ? __dirname : path.dirname(fileURLToPath(import.meta.url));
 
 const runtimeDeps = Object.keys(pkg.dependencies);
 
 export default defineConfig({
 	plugins: [
-		viteReact(),
-		reactCompiler,
-		tailwindcss(),
+		...appSourcePlugins(),
 		storybookTest({
 			configDir: path.join(dirname, ".storybook"),
-			storybookScript: "pnpm run storybook -- --ci"
-		})
+			storybookScript: "pnpm run storybook -- --ci",
+		}),
 	],
 	resolve: {
 		alias: [
 			{
 				find: "@monaco-editor/react",
-				replacement: path.resolve(dirname, "./src/test/monaco-editor-react.mock.tsx")
+				replacement: path.resolve(dirname, "./src/test/monaco-editor-react.mock.tsx"),
 			},
-			{ find: "@", replacement: path.resolve(dirname, "./src") }
-		]
+			{ find: "@", replacement: path.resolve(dirname, "./src") },
+		],
 	},
 	optimizeDeps: {
 		noDiscovery: true,
@@ -43,8 +35,8 @@ export default defineConfig({
 			...runtimeDeps.filter((dependency) => dependency !== "@monaco-editor/react"),
 			"posthog-js/react",
 			"use-sync-external-store/shim",
-			"use-sync-external-store/shim/with-selector"
-		]
+			"use-sync-external-store/shim/with-selector",
+		],
 	},
 	test: {
 		name: "storybook",
@@ -52,15 +44,19 @@ export default defineConfig({
 		browser: {
 			enabled: true,
 			headless: true,
+			// Stories read the real window through useIsMobile(), so the width decides which branch
+			// they render. Matches the Chromatic viewport in .storybook/preview.ts, so a play
+			// function and its snapshot are asserting about the same layout.
+			viewport: { width: 1440, height: 900 },
 			provider: playwright({
-				contextOptions: { reducedMotion: "reduce" }
+				contextOptions: { reducedMotion: "reduce" },
 			}),
-			instances: [{ browser: "chromium" }]
+			instances: [{ browser: "chromium" }],
 		},
 		setupFiles: [".storybook/vitest.setup.ts"],
 		reporters: ["verbose", "junit"],
 		outputFile: {
-			junit: "./test-results/junit-storybook.xml"
-		}
-	}
+			junit: "./test-results/junit-storybook.xml",
+		},
+	},
 });

@@ -6,16 +6,12 @@ import { isAppAdmin, safeReturnTo } from "./guard";
 // accept/reject matrix below is exhaustive on the interesting branches.
 describe("safeReturnTo", () => {
 	describe("accepts same-origin absolute paths", () => {
-		it.each([
-			"/",
-			"/dashboard",
-			"/w/acme/overview",
-			"/a/b?x=1&y=2",
-			"/path#frag",
-			"/with-dash_x",
-		])("returns %s unchanged", (input) => {
-			expect(safeReturnTo(input)).toBe(input);
-		});
+		it.each(["/", "/dashboard", "/w/acme/overview", "/a/b?x=1&y=2", "/path#frag", "/with-dash_x"])(
+			"returns %s unchanged",
+			(input) => {
+				expect(safeReturnTo(input)).toBe(input);
+			},
+		);
 	});
 
 	describe("falls back to / for unsafe or absent values", () => {
