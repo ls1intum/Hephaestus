@@ -7,6 +7,7 @@ import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
+	type ActionTriggerRef,
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
@@ -164,10 +165,11 @@ export function PracticeCatalog({
 						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</>
 				)}
-				renderAreaActions={(area, move) => (
+				renderAreaActions={(area, move, actionTriggerRef) => (
 					<AreaActions
 						area={area}
 						move={move}
+						actionTriggerRef={actionTriggerRef}
 						pending={pending.areaSlugs.has(area.slug)}
 						structurePending={pending.areaStructure}
 						onRename={() => setRenamingArea(area)}
@@ -193,12 +195,13 @@ export function PracticeCatalog({
 						}
 					/>
 				)}
-				renderEntryActions={(practice, move) => (
+				renderEntryActions={(practice, move, actionTriggerRef) => (
 					<PracticeActions
 						practice={practice}
 						workspaceSlug={workspaceSlug}
 						areas={areas}
 						move={move}
+						actionTriggerRef={actionTriggerRef}
 						pending={pending.practiceSlugs.has(practice.slug)}
 						onDelete={onDeletePractice}
 					/>
@@ -326,6 +329,7 @@ function CatalogToolbar({
 function AreaActions({
 	area,
 	move,
+	actionTriggerRef,
 	pending,
 	structurePending,
 	onRename,
@@ -334,6 +338,7 @@ function AreaActions({
 }: {
 	area: PracticeArea;
 	move: CatalogMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	structurePending: boolean;
 	onRename: () => void;
@@ -355,7 +360,7 @@ function AreaActions({
 				<DropdownMenuTrigger
 					render={
 						<Button
-							ref={move.actionTriggerRef}
+							ref={actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
 							aria-label={`More actions for ${area.name}`}
@@ -406,6 +411,7 @@ function PracticeActions({
 	workspaceSlug,
 	areas,
 	move,
+	actionTriggerRef,
 	pending,
 	onDelete,
 }: {
@@ -413,6 +419,7 @@ function PracticeActions({
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	onDelete: (practice: Practice) => void;
 }) {
@@ -421,7 +428,7 @@ function PracticeActions({
 			<DropdownMenuTrigger
 				render={
 					<Button
-						ref={move.actionTriggerRef}
+						ref={actionTriggerRef}
 						variant="ghost"
 						size="icon-sm"
 						aria-label={`More actions for ${practice.name}`}

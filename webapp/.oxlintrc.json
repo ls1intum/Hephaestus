@@ -89,6 +89,16 @@
 		// mutation these rules exist to catch cannot happen at any of them.
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-array-reverse": "off",
+		// Wants a type parameter on every `vi.fn()`. It buys nothing here: `toHaveBeenCalledWith` is not
+		// type-narrowed by this Vitest/TS setup — a deliberately wrong argument against a
+		// `vi.fn<(open: boolean) => void>()` type-checks clean — so the parameter would be ceremony on
+		// all 122 call assertions and on every `onChange={vi.fn()}` prop.
+		"vitest/require-mock-type-parameters": "off",
+		// Flags `const Icon = iconFor(kind)` as creating a component during render. Those helpers return
+		// one of a fixed set of module-level icons, so the identity it warns about is already stable —
+		// it just cannot prove that. `react/no-unstable-nested-components` (on, above) catches the case
+		// this is actually for: a component literally defined inside another's body.
+		"react/static-components": "off",
 		// A handler defined next to the JSX that uses it is the point. Some findings are genuinely
 		// hoistable helpers; the rule cannot tell the two apart.
 		"unicorn/consistent-function-scoping": "off",

@@ -7,13 +7,18 @@ import { cn } from "@/lib/utils";
  * `render` prop, but these settings pages are navigated by heading, so each section title has to be a
  * real `<h2>` under the page `<h1>`. Mirrors `CardTitle`'s styling so the two look identical.
  */
-export function IntegrationCardHeading({ className, ...props }: React.ComponentProps<"h2">) {
+export function IntegrationCardHeading({
+	className,
+	children,
+	...props
+}: React.ComponentProps<"h2">) {
 	return (
-		// oxlint-disable-next-line jsx-a11y/heading-has-content -- the content arrives through `{...props}`
 		<h2
 			data-slot="card-title"
 			className={cn("text-base leading-snug font-medium", className)}
 			{...props}
-		/>
+		>
+			{children}
+		</h2>
 	);
 }

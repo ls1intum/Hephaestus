@@ -52,8 +52,15 @@ export interface SortableCatalogEntry {
 	slug: string;
 }
 
+/**
+ * Reorder state for one row. Deliberately free of refs: the focus-restoring callback travels beside
+ * this object rather than inside it, so a consumer reading `canMoveUp` during render is not reading
+ * through a ref.
+ */
+/** Restores focus to the row's action trigger after a reorder moves it. */
+export type ActionTriggerRef = (node: HTMLButtonElement | null) => void;
+
 export interface CatalogMoveActions {
-	actionTriggerRef: (node: HTMLButtonElement | null) => void;
 	canMoveDown: boolean;
 	canMoveUp: boolean;
 	moveDown: () => void;
@@ -84,9 +91,17 @@ export interface SortableCatalogTreeProps<
 	onPlaceEntry: (entrySlug: string, areaSlug: string | null, position: number) => void;
 	renderAreaLeading?: (area: TArea) => ReactNode;
 	renderAreaMeta?: (area: TArea) => ReactNode;
-	renderAreaActions: (area: TArea, actions: CatalogMoveActions) => ReactNode;
+	renderAreaActions: (
+		area: TArea,
+		actions: CatalogMoveActions,
+		actionTriggerRef: ActionTriggerRef,
+	) => ReactNode;
 	renderEntryContent: (entry: TEntry) => ReactNode;
-	renderEntryActions: (entry: TEntry, actions: CatalogEntryMoveActions) => ReactNode;
+	renderEntryActions: (
+		entry: TEntry,
+		actions: CatalogEntryMoveActions,
+		actionTriggerRef: ActionTriggerRef,
+	) => ReactNode;
 	renderEntryPreview?: (entry: TEntry) => ReactNode;
 	getEmptyLabel: (areaSlug: string | null, total: number) => ReactNode;
 	unassignedLabel?: string;
@@ -334,7 +349,6 @@ export function SortableCatalogTree<
 			);
 		};
 		return {
-			actionTriggerRef: registerActionTrigger(focusKey),
 			canMoveUp: !disabled && index > 0,
 			canMoveDown: !disabled && index < sortedAreas.length - 1,
 			moveUp: () => move(-1),
@@ -357,7 +371,6 @@ export function SortableCatalogTree<
 			onPlaceEntry(entry.slug, currentAreaSlug, position);
 		};
 		return {
-			actionTriggerRef: registerActionTrigger(focusKey),
 			canMoveUp: !reorderDisabled && index > 0,
 			canMoveDown: !reorderDisabled && index >= 0 && index < ordered.length - 1,
 			moveUp: () => moveToPosition(index - 1),
@@ -440,11 +453,19 @@ export function SortableCatalogTree<
 							renderLeading={renderAreaLeading}
 							renderMeta={renderAreaMeta}
 							renderActions={(candidate) =>
-								renderAreaActions(candidate, areaMoveActions(candidate))
+								renderAreaActions(
+									candidate,
+									areaMoveActions(candidate),
+									registerActionTrigger(areaDndId(candidate.slug)),
+								)
 							}
 							renderEntryContent={renderEntryContent}
 							renderEntryActions={(candidate) =>
-								renderEntryActions(candidate, entryMoveActions(candidate))
+								renderEntryActions(
+									candidate,
+									entryMoveActions(candidate),
+									registerActionTrigger(entryDndId(candidate.slug)),
+								)
 							}
 							emptyLabel={getEmptyLabel(area.slug, totalByArea.get(area.slug) ?? 0)}
 						/>
@@ -469,7 +490,13 @@ export function SortableCatalogTree<
 							dropTarget={dropTarget}
 							showEntryReorderHandles={showEntryReorderHandles}
 							renderContent={renderEntryContent}
-							renderActions={(entry) => renderEntryActions(entry, entryMoveActions(entry))}
+							renderActions={(entry) =>
+								renderEntryActions(
+									entry,
+									entryMoveActions(entry),
+									registerActionTrigger(entryDndId(entry.slug)),
+								)
+							}
 							emptyLabel={getEmptyLabel(null, totalByArea.get(UNASSIGNED_CATALOG_BUCKET) ?? 0)}
 						/>
 					</div>

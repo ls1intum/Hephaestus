@@ -111,11 +111,11 @@ function CatalogTreeHarness({
 			showEntryReorderHandles
 			onReorderAreas={onReorderAreas}
 			onPlaceEntry={place}
-			renderAreaActions={(area, move) => (
+			renderAreaActions={(area, move, actionTriggerRef) => (
 				<Button
 					variant="outline"
 					size="sm"
-					ref={move.actionTriggerRef}
+					ref={actionTriggerRef}
 					aria-disabled={!move.canMoveDown}
 					aria-label={`Move ${area.name} down`}
 					onClick={move.moveDown}
@@ -124,12 +124,12 @@ function CatalogTreeHarness({
 				</Button>
 			)}
 			renderEntryContent={(entry) => <span className="min-w-0 truncate">{entry.name}</span>}
-			renderEntryActions={(entry, move) => (
+			renderEntryActions={(entry, move, actionTriggerRef) => (
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
 							<Button
-								ref={move.actionTriggerRef}
+								ref={actionTriggerRef}
 								variant="ghost"
 								size="sm"
 								aria-label={`More actions for ${entry.name}`}

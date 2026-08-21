@@ -128,8 +128,7 @@ export function safeReturnTo(value: string | undefined): string {
 	const decoded = fullyDecode(value);
 	// Whitespace (incl. space/tab) and control chars (NUL, newline, DEL, …) can defeat downstream
 	// parsers or hide an escape — reject outright on the decoded value.
-	// oxlint-disable-next-line no-control-regex -- rejecting control chars is the point
-	if (/[\s\x00-\x1f\x7f]/.test(decoded)) return "/";
+	if (/[\s\p{Cc}]/u.test(decoded)) return "/";
 	// Must be a rooted path and not a protocol-relative `//host` escape.
 	if (!decoded.startsWith("/") || decoded.startsWith("//")) return "/";
 	// Reject a leading-segment that smuggles a scheme ("/javascript:"), a backslash escape

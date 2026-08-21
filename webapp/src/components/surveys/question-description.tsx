@@ -19,7 +19,7 @@ export function QuestionDescription({
 		return (
 			<FieldDescription
 				className={className}
-				// oxlint-disable-next-line react/no-danger -- HTML content comes from PostHog
+				// oxlint-disable-next-line react/no-danger -- survey HTML is authored in PostHog by an admin of this instance, not by a respondent
 				dangerouslySetInnerHTML={{ __html: description }}
 			/>
 		);

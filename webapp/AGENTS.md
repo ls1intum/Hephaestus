@@ -60,8 +60,9 @@ carries the reason beside it — read that before switching one back on.
   `jsPlugins` names a module it cannot load, or if `rules` names a rule no loaded plugin defines. That
   is what makes the house rules impossible to drop silently (oxc-project/oxc#25203), so keep them
   named in `rules`.
-- **`oxlint-suppressions.json` is the pre-existing debt** for rules the tree does not pass yet. They
-  are `error` for new code; the file only excuses what was already there. Clear a file's entries, then
+- **`oxlint-suppressions.json` is the pre-existing debt**, almost all of it `react/set-state-in-effect`
+  — the pattern § Seeding a form from props already bans. Those rules are `error` for new code; the
+  file only excuses what was already there. Clear a file's entries, then
   `pnpm exec oxlint --prune-suppressions`. **It records a count per file per rule, not a line**, so
   fixing one violation and adding another in the same file nets to zero and CI stays green. Never run
   `--suppress-all` to make a finding go away; if a count in a diff went up, that is a new bug.

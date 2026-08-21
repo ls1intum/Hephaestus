@@ -13,7 +13,7 @@ function Table({
 		<div
 			data-slot="table-container"
 			className={cn("relative w-full overflow-x-auto", containerClassName)}
-			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- horizontal overflow must remain keyboard-scrollable
+			// oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- axe's scrollable-region-focusable requires this, and the a11y addon runs axe at error
 			tabIndex={0}
 		>
 			<table
