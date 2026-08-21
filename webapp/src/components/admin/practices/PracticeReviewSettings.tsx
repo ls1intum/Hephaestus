@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, ChevronDownIcon, FolderGitIcon, UsersIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import type {
 	AgentBinding,
@@ -21,7 +21,17 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import {
+	Empty,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import {
 	Field,
 	FieldContent,
@@ -30,7 +40,20 @@ import {
 	FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Item, ItemActions, ItemContent, ItemTitle } from "@/components/ui/item";
+import {
+	InputGroup,
+	InputGroupAddon,
+	InputGroupButton,
+	InputGroupInput,
+} from "@/components/ui/input-group";
+import {
+	Item,
+	ItemActions,
+	ItemContent,
+	ItemDescription,
+	ItemGroup,
+	ItemTitle,
+} from "@/components/ui/item";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
@@ -79,6 +102,11 @@ export interface PracticeReviewSettingsProps {
  * Sections rather than cards, and no rules between them: hierarchy is carried by the heading and the
  * spacing, so the only borders left on this surface are the row lists — the boxes the reader is meant
  * to count. The sweep schedule below renders as one more section of the same shape.
+ *
+ * <p>Four sections for four questions an operator asks separately: may a review start, what starts
+ * one, whose work it may open, and whether the result may leave. Coverage and delivery were one
+ * section until pausing — the control reached for when something is going wrong — ended up as the
+ * second-to-last switch on the page, indistinguishable from a preference.
  */
 export function PracticeReviewSettings({
 	workspaceSlug,
@@ -92,6 +120,7 @@ export function PracticeReviewSettings({
 			<ReviewStatusSection workspaceSlug={workspaceSlug} model={model} workspace={workspace} />
 			<ReviewTimingSection workspace={workspace} policy={policy} />
 			<ReviewedWorkSection policy={policy} coverage={coverage} />
+			<FeedbackDeliverySection policy={policy} />
 		</div>
 	);
 }
@@ -328,9 +357,9 @@ function CooldownField({
 }
 
 /**
- * Who the work belongs to, where it lives, and whether feedback still lands once it merges — one
- * section, because every one of them answers the same question, and three headings over four fields
- * made the reader look for a difference that was not there.
+ * The two halves of one population: where the work lives and whose it is. Both must admit a piece of
+ * work before a review opens, which is the fact the page has to carry — two lists side by side read
+ * as "either" to everybody who has not seen the resolver.
  *
  * <p>Matches are exact: a wildcard language here would be a promise the gate cannot keep, since it
  * holds the pull request row and not the diff.
@@ -378,6 +407,27 @@ function ReviewedWorkSection({
 	};
 	const summary = settings.coverageSummary;
 	const preview = coverage.preview.data;
+	const coversNobody =
+		(scope.repositoryMode === "SELECTED" && scope.repositories.length === 0) ||
+		(scope.personMode === "SELECTED" && scope.personUserIds.length === 0);
+	// Counted from the scope on screen rather than read off the saved summary: the summary is a
+	// server read that lands after the write, so trusting it puts "3 of 3 covered" above a list
+	// holding one repository. Only the totals and the volume come from the server, and neither of
+	// those moves when the selection does.
+	const coveredRepositories =
+		scope.repositoryMode === "ALL_MONITORED"
+			? summary.monitoredRepositories
+			: scope.repositories.length;
+	const coveredPeople =
+		scope.personMode === "ALL_ELIGIBLE" ? summary.eligiblePeople : scope.personUserIds.length;
+	// A repository can leave the monitored set while it is still named here, and then it quietly
+	// covers nothing. Only claimed once the list is actually known: a failed or pending load holds
+	// no repositories either, and every row saying "not monitored" over a dropped request is worse
+	// than saying nothing.
+	const monitoredNow = (nameWithOwner: string) =>
+		coverage.repositories.isLoading ||
+		coverage.repositories.isError ||
+		coverage.repositories.options.some((option) => option.value === nameWithOwner);
 
 	return (
 		<section className="space-y-6" aria-labelledby="reviewed-work-heading">
@@ -386,26 +436,33 @@ function ReviewedWorkSection({
 					What gets reviewed
 				</h2>
 				<p className="text-muted-foreground text-sm">
-					Which work a review may open, and whether feedback still lands once that work has merged.
+					A review opens only for work that is in one of these repositories <strong>and</strong>{" "}
+					written by one of these people. About {summary.recentReviewVolume} ran in the last{" "}
+					{summary.estimateWindowDays} days.
 				</p>
 			</div>
 
-			<Alert>
-				<AlertTitle>Effective coverage</AlertTitle>
-				<AlertDescription>
-					Hephaestus currently reviews work in {summary.coveredRepositories} of{" "}
-					{summary.monitoredRepositories} monitored repositories, authored by{" "}
-					{summary.coveredPeople} of {summary.eligiblePeople} eligible linked members. This
-					population produced approximately {summary.recentReviewVolume} reviews in the last{" "}
-					{summary.estimateWindowDays} days.
-				</AlertDescription>
-			</Alert>
+			{/* One consequence, said once, rather than the same grey sentence under each of the two
+			    lists — an empty selection on either axis stops everything, not half of it. */}
+			{coversNobody ? (
+				<Alert variant="warning" role="status">
+					<AlertCircle />
+					<AlertTitle>Nothing is being reviewed</AlertTitle>
+					<AlertDescription>
+						A selected list is empty, and an empty list covers nobody. Pick at least one repository
+						and one person, or go back to covering all of them.
+					</AlertDescription>
+				</Alert>
+			) : null}
 
 			<Field>
-				<FieldLabel id="repositories-covered-label">Repositories covered</FieldLabel>
-				<FieldDescription>
-					Choose all monitored repositories or an exact selected set.
-				</FieldDescription>
+				<CoverageLabel
+					id="repositories-covered-label"
+					label="Repositories"
+					covered={coveredRepositories}
+					total={summary.monitoredRepositories}
+					noun="monitored"
+				/>
 				<RadioGroup
 					aria-labelledby="repositories-covered-label"
 					value={scope.repositoryMode}
@@ -425,7 +482,7 @@ function ReviewedWorkSection({
 					</label>
 				</RadioGroup>
 				{scope.repositoryMode === "SELECTED" ? (
-					<div className="space-y-4">
+					<div className="space-y-3">
 						<FacetMultiSelect
 							id="covered-repositories"
 							title="Choose repositories"
@@ -440,38 +497,58 @@ function ReviewedWorkSection({
 									: "No monitored repositories"
 							}
 						/>
-						{scope.repositories.map((repository) => (
-							<ScopeList
-								key={repository.nameWithOwner}
-								id={`branches-${repository.nameWithOwner.replaceAll("/", "-")}`}
-								label={`Base branches for ${repository.nameWithOwner}`}
-								description="Leave empty for every base branch in this repository. Names are exact."
-								placeholder="main"
-								values={repository.baseBranches}
-								disabled={policy.isSaving}
-								onChange={(baseBranches) => {
-									const next = {
-										...scope,
-										repositories: scope.repositories.map((entry) =>
-											entry.nameWithOwner === repository.nameWithOwner
-												? { ...entry, baseBranches }
-												: entry,
-										),
-									};
-									requestScope(next, baseBranches.length < repository.baseBranches.length);
-								}}
-							/>
-						))}
 						{scope.repositories.length === 0 ? (
-							<p className="text-muted-foreground text-sm">No repositories are covered.</p>
-						) : null}
+							<Empty className="border py-6">
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<FolderGitIcon />
+									</EmptyMedia>
+									<EmptyTitle>No repositories are covered.</EmptyTitle>
+									<EmptyDescription>
+										Pick the repositories this workspace should review.
+									</EmptyDescription>
+								</EmptyHeader>
+							</Empty>
+						) : (
+							<ItemGroup>
+								{scope.repositories.map((repository) => (
+									<RepositoryScopeRow
+										key={repository.nameWithOwner}
+										nameWithOwner={repository.nameWithOwner}
+										baseBranches={repository.baseBranches}
+										monitored={monitoredNow(repository.nameWithOwner)}
+										disabled={policy.isSaving}
+										onChange={(baseBranches) => {
+											const next = {
+												...scope,
+												repositories: scope.repositories.map((entry) =>
+													entry.nameWithOwner === repository.nameWithOwner
+														? { ...entry, baseBranches }
+														: entry,
+												),
+											};
+											requestScope(next, baseBranches.length < repository.baseBranches.length);
+										}}
+									/>
+								))}
+							</ItemGroup>
+						)}
 					</div>
 				) : null}
 			</Field>
 
 			<Field>
-				<FieldLabel id="people-covered-label">People covered</FieldLabel>
-				<FieldDescription>Only linked human workspace members are eligible.</FieldDescription>
+				<CoverageLabel
+					id="people-covered-label"
+					label="People"
+					covered={coveredPeople}
+					total={summary.eligiblePeople}
+					noun="linked"
+				/>
+				<FieldDescription>
+					Somebody has to have signed in to Hephaestus at least once before their work can be
+					reviewed.
+				</FieldDescription>
 				<RadioGroup
 					aria-labelledby="people-covered-label"
 					value={scope.personMode}
@@ -483,18 +560,18 @@ function ReviewedWorkSection({
 				>
 					<label className="flex items-center gap-2" htmlFor="people-all">
 						<RadioGroupItem id="people-all" value="ALL_ELIGIBLE" />
-						All eligible linked members
+						Everyone who has signed in
 					</label>
 					<label className="flex items-center gap-2" htmlFor="people-selected">
 						<RadioGroupItem id="people-selected" value="SELECTED" />
-						Selected members
+						Selected people
 					</label>
 				</RadioGroup>
 				{scope.personMode === "SELECTED" ? (
-					<div className="space-y-2">
+					<div className="space-y-3">
 						<FacetMultiSelect
 							id="covered-people"
-							title="Choose members"
+							title="Choose people"
 							variant="field"
 							options={personOptions}
 							selected={scope.personUserIds}
@@ -508,50 +585,47 @@ function ReviewedWorkSection({
 							emptyLabel={coverage.people.isError ? "Members unavailable" : "No linked members"}
 						/>
 						{scope.personUserIds.length === 0 ? (
-							<p className="text-muted-foreground text-sm">No people are covered.</p>
-						) : null}
+							<Empty className="border py-6">
+								<EmptyHeader>
+									<EmptyMedia variant="icon">
+										<UsersIcon />
+									</EmptyMedia>
+									<EmptyTitle>No people are covered.</EmptyTitle>
+									<EmptyDescription>Pick whose work this workspace should review.</EmptyDescription>
+								</EmptyHeader>
+							</Empty>
+						) : (
+							// Chips rather than the combobox trigger's "+3": during a pilot the roster is the
+							// thing being checked, and a popover you have to open to read is not a roster.
+							<ul className="flex flex-wrap gap-2">
+								{scope.personUserIds.map((userId) => (
+									<li key={userId}>
+										<RemovableToken
+											label={
+												personOptions.find((option) => option.value === userId)?.label ??
+												`Member ${userId}`
+											}
+											removeLabel={`Remove ${
+												personOptions.find((option) => option.value === userId)?.label ??
+												`member ${userId}`
+											} from covered people`}
+											disabled={policy.isSaving}
+											onRemove={() =>
+												requestScope(
+													{
+														...scope,
+														personUserIds: scope.personUserIds.filter((id) => id !== userId),
+													},
+													false,
+												)
+											}
+										/>
+									</li>
+								))}
+							</ul>
+						)}
 					</div>
 				) : null}
-			</Field>
-
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel htmlFor="policy-delivery-active">Delivery active</FieldLabel>
-					<FieldDescription>
-						Pausing keeps review running but terminally withholds new external feedback. Resuming
-						never sends older work.
-					</FieldDescription>
-				</FieldContent>
-				<Switch
-					id="policy-delivery-active"
-					checked={settings.deliveryStatus === "ACTIVE"}
-					disabled={policy.isSaving}
-					onCheckedChange={(checked) =>
-						policy.onUpdate({ deliveryStatus: checked ? "ACTIVE" : "PAUSED" })
-					}
-				/>
-			</Field>
-
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel htmlFor="policy-deliver-merged">Post feedback after merge</FieldLabel>
-					<FieldDescription>
-						A review that finishes after the work merged still posts its feedback.
-					</FieldDescription>
-					<InheritedSettingHint
-						label="Post feedback after merge"
-						overridden={settings.deliverToMergedOverride != null}
-						field="DELIVER_TO_MERGED"
-						inheritedValue={settings.deliverToMerged ? "On" : "Off"}
-						policy={policy}
-					/>
-				</FieldContent>
-				<Switch
-					id="policy-deliver-merged"
-					checked={settings.deliverToMerged}
-					disabled={policy.isSaving}
-					onCheckedChange={(checked) => policy.onUpdate({ deliverToMerged: checked })}
-				/>
 			</Field>
 
 			<AlertDialog
@@ -623,19 +697,181 @@ function ReviewedWorkSection({
 	);
 }
 
-function ScopeList({
+/**
+ * Whether the already-composed feedback may leave Hephaestus — its own section, because it is the
+ * control an operator reaches for when something is going wrong, and it answers a different question
+ * from the two lists above it.
+ */
+function FeedbackDeliverySection({ policy }: Pick<PracticeReviewSettingsProps, "policy">) {
+	const settings = policy.settings;
+	const paused = settings.deliveryStatus === "PAUSED";
+
+	return (
+		<section className="space-y-4" aria-labelledby="feedback-delivery-heading">
+			<div className="space-y-1">
+				<h2 id="feedback-delivery-heading" className="font-semibold text-lg">
+					Sending feedback
+				</h2>
+				<p className="text-muted-foreground text-sm">
+					Whether finished feedback may leave Hephaestus and reach the people it is about.
+				</p>
+			</div>
+			{/* Paused is a state somebody has to be able to notice weeks later, when the question is
+			    "why has nobody heard anything" — a switch left of centre does not answer that. */}
+			{paused ? (
+				<Alert variant="warning" role="status">
+					<AlertCircle />
+					<AlertTitle>Sending is paused</AlertTitle>
+					<AlertDescription>
+						Reviews still run and you can still read them here. Nothing prepared while this is
+						paused is sent when you resume — only work reviewed afterwards.
+					</AlertDescription>
+				</Alert>
+			) : null}
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="policy-delivery-active">
+						Send feedback
+						<Badge variant={paused ? "warning" : "success"}>{paused ? "Paused" : "Active"}</Badge>
+					</FieldLabel>
+					<FieldDescription>
+						Turning this off stops every message and comment at once. Coverage and practice settings
+						are kept.
+					</FieldDescription>
+				</FieldContent>
+				<Switch
+					id="policy-delivery-active"
+					checked={!paused}
+					disabled={policy.isSaving}
+					onCheckedChange={(checked) =>
+						policy.onUpdate({ deliveryStatus: checked ? "ACTIVE" : "PAUSED" })
+					}
+				/>
+			</Field>
+			<Field orientation="horizontal">
+				<FieldContent>
+					<FieldLabel htmlFor="policy-deliver-merged">Post feedback after merge</FieldLabel>
+					<FieldDescription>
+						A review that finishes after the work merged still posts its feedback.
+					</FieldDescription>
+					<InheritedSettingHint
+						label="Post feedback after merge"
+						overridden={settings.deliverToMergedOverride != null}
+						field="DELIVER_TO_MERGED"
+						inheritedValue={settings.deliverToMerged ? "On" : "Off"}
+						policy={policy}
+					/>
+				</FieldContent>
+				<Switch
+					id="policy-deliver-merged"
+					checked={settings.deliverToMerged}
+					disabled={policy.isSaving}
+					onCheckedChange={(checked) => policy.onUpdate({ deliverToMerged: checked })}
+				/>
+			</Field>
+		</section>
+	);
+}
+
+/** The label of a coverage list, carrying how much of the available population it currently admits. */
+function CoverageLabel({
 	id,
 	label,
-	description,
-	placeholder,
+	covered,
+	total,
+	noun,
+}: {
+	id: string;
+	label: string;
+	covered: number;
+	total: number;
+	noun: string;
+}) {
+	return (
+		<div className="flex items-baseline justify-between gap-3">
+			<FieldLabel id={id}>{label}</FieldLabel>
+			<span className="text-muted-foreground text-sm">
+				{covered} of {total} {noun}
+			</span>
+		</div>
+	);
+}
+
+/**
+ * One covered repository. Its branch restriction is the row's own subtitle rather than a field
+ * beside it: the restriction belongs to this repository, and a stack of sibling branch editors made
+ * a five-repository pilot longer than the rest of the page put together.
+ */
+function RepositoryScopeRow({
+	nameWithOwner,
+	baseBranches,
+	monitored,
+	disabled,
+	onChange,
+}: {
+	nameWithOwner: string;
+	baseBranches: string[];
+	monitored: boolean;
+	disabled: boolean;
+	onChange: (next: string[]) => void;
+}) {
+	const editorId = `branches-${nameWithOwner.replaceAll("/", "-")}`;
+
+	return (
+		<Collapsible>
+			<Item variant="outline" size="sm" role="listitem" className="flex-wrap">
+				<ItemContent>
+					<ItemTitle className="min-w-0 gap-2">
+						<span className="truncate font-mono" title={nameWithOwner}>
+							{nameWithOwner}
+						</span>
+						{monitored ? null : <Badge variant="warning">Not monitored</Badge>}
+					</ItemTitle>
+					<ItemDescription>
+						{monitored
+							? baseBranches.length === 0
+								? "Every base branch"
+								: `Only ${baseBranches.join(", ")}`
+							: "This workspace no longer syncs this repository, so nothing in it is reviewed."}
+					</ItemDescription>
+				</ItemContent>
+				<ItemActions>
+					<CollapsibleTrigger
+						render={
+							<Button variant="outline" size="sm" disabled={disabled} className="group/branches">
+								Base branches
+								<span className="sr-only"> for {nameWithOwner}</span>
+								<ChevronDownIcon
+									aria-hidden
+									className="transition-transform group-aria-expanded/branches:rotate-180"
+								/>
+							</Button>
+						}
+					/>
+				</ItemActions>
+				<CollapsibleContent className="w-full">
+					<BaseBranchEditor
+						id={editorId}
+						nameWithOwner={nameWithOwner}
+						values={baseBranches}
+						disabled={disabled}
+						onChange={onChange}
+					/>
+				</CollapsibleContent>
+			</Item>
+		</Collapsible>
+	);
+}
+
+function BaseBranchEditor({
+	id,
+	nameWithOwner,
 	values,
 	disabled,
 	onChange,
 }: {
 	id: string;
-	label: string;
-	description: string;
-	placeholder: string;
+	nameWithOwner: string;
 	values: string[];
 	disabled: boolean;
 	onChange: (next: string[]) => void;
@@ -653,14 +889,22 @@ function ScopeList({
 	};
 
 	return (
-		<Field data-invalid={duplicate || undefined}>
-			<FieldLabel htmlFor={id}>{label}</FieldLabel>
-			<FieldDescription id={descriptionId}>{description}</FieldDescription>
-			<div className="flex gap-2">
-				<Input
+		<Field data-invalid={duplicate || undefined} className="border-t pt-3">
+			{/* The repository is already the row's title, so the visible label does not repeat it — but a
+			    screen reader listing the form's fields sees one of these per covered repository, and
+			    "Only these base branches" three times over names nothing. */}
+			<FieldLabel htmlFor={id}>
+				Only these base branches
+				<span className="sr-only"> for {nameWithOwner}</span>
+			</FieldLabel>
+			<FieldDescription id={descriptionId}>
+				Every base branch, unless you name some here. A name has to match the branch exactly.
+			</FieldDescription>
+			<InputGroup data-invalid={duplicate || undefined}>
+				<InputGroupInput
 					id={id}
 					value={draft}
-					placeholder={placeholder}
+					placeholder="main"
 					disabled={disabled}
 					aria-invalid={duplicate || undefined}
 					aria-describedby={duplicate ? `${descriptionId} ${errorId}` : descriptionId}
@@ -672,17 +916,19 @@ function ScopeList({
 						}
 					}}
 				/>
-				<Button
-					variant="outline"
-					disabled={disabled || trimmed.length === 0 || duplicate}
-					onClick={add}
-				>
-					{/* Two lists, so two buttons that would otherwise both answer to "Add"; the visible word
-					    still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
-					Add
-					<span className="sr-only"> to {label.toLowerCase()}</span>
-				</Button>
-			</div>
+				<InputGroupAddon align="inline-end">
+					<InputGroupButton
+						variant="outline"
+						disabled={disabled || trimmed.length === 0 || duplicate}
+						onClick={add}
+					>
+						{/* One editor per repository, so every Add would otherwise answer to the same name; the
+						    visible word still opens the name a voice-control user says (WCAG 2.2 SC 2.5.3). */}
+						Add
+						<span className="sr-only"> to base branches for {nameWithOwner}</span>
+					</InputGroupButton>
+				</InputGroupAddon>
+			</InputGroup>
 			{/* The live region is mounted empty: a region inserted together with its message is not
 			    reliably announced, and the only other sign of a duplicate is Add greying out. */}
 			<div aria-live="polite" aria-atomic="true">
@@ -693,28 +939,56 @@ function ScopeList({
 				) : null}
 			</div>
 			{values.length > 0 ? (
-				<div className="space-y-2">
+				<ul className="flex flex-wrap gap-2">
 					{values.map((value) => (
-						<Item key={value} variant="outline" size="sm">
-							<ItemContent>
-								<ItemTitle className="font-mono">{value}</ItemTitle>
-							</ItemContent>
-							<ItemActions>
-								<Button
-									variant="ghost"
-									size="sm"
-									aria-label={`Remove ${value}`}
-									disabled={disabled}
-									onClick={() => onChange(values.filter((entry) => entry !== value))}
-								>
-									Remove
-								</Button>
-							</ItemActions>
-						</Item>
+						<li key={value}>
+							<RemovableToken
+								label={value}
+								mono
+								removeLabel={`Remove ${value} from base branches for ${nameWithOwner}`}
+								disabled={disabled}
+								onRemove={() => onChange(values.filter((entry) => entry !== value))}
+							/>
+						</li>
 					))}
-				</div>
+				</ul>
 			) : null}
 		</Field>
+	);
+}
+
+/** A chosen value and the way back out of it, sized to sit in a wrapping row of its siblings. */
+function RemovableToken({
+	label,
+	mono = false,
+	removeLabel,
+	disabled,
+	onRemove,
+}: {
+	label: string;
+	mono?: boolean;
+	removeLabel: string;
+	disabled: boolean;
+	onRemove: () => void;
+}) {
+	return (
+		<ButtonGroup>
+			<ButtonGroupText className={cn("h-8 min-w-0 max-w-[60vw] sm:max-w-xs", mono && "font-mono")}>
+				<span className="truncate" title={label}>
+					{label}
+				</span>
+			</ButtonGroupText>
+			<Button
+				variant="outline"
+				size="sm"
+				className="h-8"
+				aria-label={removeLabel}
+				disabled={disabled}
+				onClick={onRemove}
+			>
+				<XIcon aria-hidden />
+			</Button>
+		</ButtonGroup>
 	);
 }
 
