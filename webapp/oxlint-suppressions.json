@@ -1,0 +1,325 @@
+{
+  "src/components/admin/AdminDangerZoneSettings.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/AdminSettingsPage.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/ai/AgentBindingsPage.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "src/components/admin/ai/ModelPicker.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "src/components/admin/ai/WorkspaceLlmConnectionFormDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "src/components/admin/ai/WorkspaceLlmModelFormDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 9
+    }
+  },
+  "src/components/admin/curated-catalog/CuratedCatalogTree.tsx": {
+    "react/refs": {
+      "count": 12
+    }
+  },
+  "src/components/admin/curated-catalog/CuratedPracticeForm.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 13
+    }
+  },
+  "src/components/admin/integrations/AdminSlackChannelsSettings.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 7
+    }
+  },
+  "src/components/admin/integrations/AdminSlackNotificationSettings.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/components/admin/integrations/OutlineIntegration.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/integrations/slack-channels/AddChannelDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "src/components/admin/integrations/slack-channels/ChannelHistorySheet.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/components/admin/integrations/slack-channels/RemoveChannelAlertDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/llm/AdminLlmConnectionFormDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 15
+    }
+  },
+  "src/components/admin/llm/AdminLlmConnectionsTable.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 12
+    }
+  },
+  "src/components/admin/llm/AdminLlmModelAccessDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 10
+    }
+  },
+  "src/components/admin/llm/AdminLlmModelFormDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "src/components/admin/llm/AdminLlmModelsSection.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 8
+    }
+  },
+  "src/components/admin/llm/InstanceLlmSettingsCard.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/llm/PriceModeEditor.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/login-providers/LoginProviderFormDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 12
+    }
+  },
+  "src/components/admin/login-providers/LoginProviderFormDialog.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/admin/login-providers/LoginProvidersTable.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-catalog/PracticeBindingsEditor.tsx": {
+    "react/static-components": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-catalog/PracticeMentoringSupportEditor.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-reviews/ReviewArtifact.tsx": {
+    "react/static-components": {
+      "count": 2
+    }
+  },
+  "src/components/admin/practices/PracticeCatalog.tsx": {
+    "react/refs": {
+      "count": 12
+    }
+  },
+  "src/components/admin/practices/PracticeReviewSettings.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 8
+    }
+  },
+  "src/components/admin/usage/AdminInstanceLlmUsageTable.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/components/admin/usage/AdminLlmUsagePage.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/admin/usage/BudgetAmountDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "src/components/admin/usage/MonthNavigator.tsx": {
+    "react/refs": {
+      "count": 1
+    }
+  },
+  "src/components/auth/SignInButtons.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 3
+    }
+  },
+  "src/components/common/ConfirmDialog.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "src/components/consent/CookieConsentBanner.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/core/sidebar/NavAdmin.tsx": {
+    "react/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/info/LegalPage.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/leaderboard/LeaderboardOverview.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/leaderboard/TimeframeFilter.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 2
+    },
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/practice-trace/TraceHeader.tsx": {
+    "react/static-components": {
+      "count": 1
+    }
+  },
+  "src/components/practice-trace/TraceListPage.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 2
+    }
+  },
+  "src/components/practice-trace/TracedArtifactRow.tsx": {
+    "react/static-components": {
+      "count": 1
+    }
+  },
+  "src/components/profile/ProfileTimeframePicker.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/settings/DangerZoneSection.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "src/components/settings/SlackPreferencesSection.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 6
+    }
+  },
+  "src/components/surveys/posthog-survey-widget.tsx": {
+    "react/set-state-in-effect": {
+      "count": 2
+    }
+  },
+  "src/components/surveys/questions/question-multiple-choice.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/surveys/questions/question-single-choice.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/surveys/survey-container.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/surveys/survey-notification-button.stories.tsx": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/RedirectToWorkspace.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 5
+    }
+  },
+  "src/hooks/use-active-workspace.ts": {
+    "react-hooks/exhaustive-deps": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-mentor-chat.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 13
+    }
+  },
+  "src/hooks/use-mentor-chat.ts": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-mobile.ts": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-practice-catalog-mutations.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "src/hooks/use-sync-events.ts": {
+    "react/set-state-in-effect": {
+      "count": 1
+    }
+  },
+  "src/hooks/use-update-workspace-features.test.tsx": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/integrations/auth/session-expiry.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/integrations/auth/session-refresh.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/integrations/consent/index.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  },
+  "src/lib/admin-llm-model-save.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 4
+    }
+  },
+  "src/lib/legal.test.ts": {
+    "vitest/require-mock-type-parameters": {
+      "count": 1
+    }
+  }
+}

@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 
 type ButtonSize = ComponentPropsWithoutRef<typeof Button>["size"];
 
-interface LandingSignInCTAProps {
+interface LandingSignInCtaProps {
 	isSignedIn: boolean;
 	onSignIn: (idpHint: string) => void;
 	onGoToDashboard?: () => void;
@@ -20,13 +20,13 @@ interface LandingSignInCTAProps {
  * One call-to-action instead of a wall of provider buttons repeated across every section: `/login`
  * stays the single place a provider is chosen, so a visitor never picks one twice.
  */
-export function LandingSignInCTA({
+export function LandingSignInCta({
 	isSignedIn,
 	onSignIn,
 	onGoToDashboard,
 	size = "lg",
 	className,
-}: LandingSignInCTAProps) {
+}: LandingSignInCtaProps) {
 	const navigate = useNavigate();
 	const { data: providers } = useQuery(listIdentityProvidersOptions());
 

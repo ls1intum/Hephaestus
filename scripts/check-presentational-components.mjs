@@ -11,11 +11,11 @@
  * siblings' Docs page while every isolated story, and therefore every test and every snapshot, stays
  * green. R3 keeps that page correct for whatever MSW stories remain.
  *
- * Biome cannot carry this: its plugins register globally over `files.includes` while this rule is
- * path-scoped (routes and hooks *must* import the query layer), and the repo has already recorded
- * GritQL silently degrading a plugin to an advisory `info` that exits 0. Vitest cannot carry it
- * either — scanning the tree inside a worker starves the route tests sharing it. Same reasoning, and
- * the same vacuous-pass guard, as `check-story-prose.mjs`.
+ * This could be an oxlint rule now — `overrides[].files` gives the path scoping the GritQL plugins
+ * it predates could not. What keeps it here is the allowlist below: a linter reports per file and has
+ * nowhere to hold a repo-wide census, so it cannot fail the build when an entry scans clean. Vitest
+ * cannot carry it either — scanning the tree inside a worker starves the route tests sharing it.
+ * Same reasoning, and the same vacuous-pass guard, as `check-story-prose.mjs`.
  *
  * The allowlist is shrink-only: an entry that scans clean fails the build, so it cannot go stale.
  */
@@ -62,7 +62,7 @@ const ALLOWLIST = {
 		"webapp/src/components/admin/integrations/outline/AddCollectionDialog.tsx",
 		"webapp/src/components/admin/integrations/slack-channels/ChannelHistorySheet.tsx",
 		"webapp/src/components/auth/ImpersonationBanner.tsx",
-		"webapp/src/components/auth/LandingSignInCTA.tsx",
+		"webapp/src/components/auth/LandingSignInCta.tsx",
 		"webapp/src/components/auth/SignInButtons.tsx",
 		"webapp/src/components/settings/DangerZoneSection.tsx",
 		"webapp/src/components/settings/SessionsSection.tsx",

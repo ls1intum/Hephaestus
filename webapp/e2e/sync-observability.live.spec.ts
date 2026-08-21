@@ -15,8 +15,8 @@ test.describe("live integration operations", () => {
 
 	test("GitHub catalog is workspace-specific and opens the live event stream", async ({ page }) => {
 		await loginAsDevAdmin(page, USERNAME);
-		const streamResponse = page.waitForResponse(
-			(response) => response.url().endsWith(`/workspaces/${GITHUB_WORKSPACE}/sync/events`),
+		const streamResponse = page.waitForResponse((response) =>
+			response.url().endsWith(`/workspaces/${GITHUB_WORKSPACE}/sync/events`),
 		);
 
 		await page.goto(`/w/${GITHUB_WORKSPACE}/admin/integrations`);
@@ -30,7 +30,10 @@ test.describe("live integration operations", () => {
 	});
 
 	test("manual GitLab sync is accepted and reflected without a reload", async ({ page }) => {
-		test.skip(!MUTATIONS_ENABLED, "set E2E_MUTATE_LIVE_INTEGRATIONS=true to run provider mutations");
+		test.skip(
+			!MUTATIONS_ENABLED,
+			"set E2E_MUTATE_LIVE_INTEGRATIONS=true to run provider mutations",
+		);
 		await loginAsDevAdmin(page, USERNAME);
 		await page.goto(`/w/${GITLAB_WORKSPACE}/admin/integrations/scm`);
 

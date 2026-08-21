@@ -31,7 +31,7 @@ const faqItems = [
 	},
 ];
 
-export function LandingFAQSection() {
+export function LandingFaqSection() {
 	return (
 		<section id="faq" className="w-full py-8 md:py-16 bg-gradient-to-b from-background to-muted/30">
 			<div className="mx-auto w-full max-w-7xl px-4 md:px-6">

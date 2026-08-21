@@ -186,10 +186,15 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 			);
 		};
 
+		/**
+		 * Detaching has to be per-connection, not per-hook: a stream that failed is torn down while its
+		 * replacement is already opening, and aborting the shared controller would deafen the new one.
+		 */
+		const controllers = new WeakMap<EventSource, AbortController>();
+
 		const detach = (target: EventSource) => {
-			target.removeEventListener("sync", handleHint);
-			target.onopen = null;
-			target.onerror = null;
+			controllers.get(target)?.abort();
+			controllers.delete(target);
 			target.close();
 		};
 
@@ -199,49 +204,60 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 				{ withCredentials: true },
 			);
 			source = current;
+			const controller = new AbortController();
+			controllers.set(current, controller);
+			const { signal } = controller;
 
-			current.onopen = () => {
-				consecutiveFailures = 0;
-				setLivePushUnavailable(false);
+			current.addEventListener(
+				"open",
+				() => {
+					consecutiveFailures = 0;
+					setLivePushUnavailable(false);
 
-				const now = Date.now();
-				// The first open races the page's own mount fetches, which are already loading this
-				// data — resyncing here would cancel and restart them. Record the timestamp anyway so
-				// an immediate re-open is throttled against the mount.
-				const isFirstOpen = !hasEverOpened;
-				hasEverOpened = true;
-				if (isFirstOpen || now - lastResyncAt < RESYNC_THROTTLE_MS) {
-					if (isFirstOpen) lastResyncAt = now;
-					return;
-				}
-				lastResyncAt = now;
-				resyncIntegrationQueries();
-			};
+					const now = Date.now();
+					// The first open races the page's own mount fetches, which are already loading this
+					// data — resyncing here would cancel and restart them. Record the timestamp anyway so
+					// an immediate re-open is throttled against the mount.
+					const isFirstOpen = !hasEverOpened;
+					hasEverOpened = true;
+					if (isFirstOpen || now - lastResyncAt < RESYNC_THROTTLE_MS) {
+						if (isFirstOpen) lastResyncAt = now;
+						return;
+					}
+					lastResyncAt = now;
+					resyncIntegrationQueries();
+				},
+				{ signal },
+			);
 
-			current.addEventListener("sync", handleHint);
+			current.addEventListener("sync", handleHint, { signal });
 
-			current.onerror = () => {
-				// Only act on CLOSED. CONNECTING means the browser is already auto-retrying a network
-				// error (the HTML spec makes that automatic), so stay out of it. CLOSED means the
-				// connection failed — the spec reaches it for any non-200 or wrong Content-Type — and
-				// the browser never retries that: one 502 during a deploy or one 401 on an expired
-				// session ends live updates for the session unless we reconnect ourselves.
-				if (current.readyState !== EventSource.CLOSED) return;
+			current.addEventListener(
+				"error",
+				() => {
+					// Only act on CLOSED. CONNECTING means the browser is already auto-retrying a network
+					// error (the HTML spec makes that automatic), so stay out of it. CLOSED means the
+					// connection failed — the spec reaches it for any non-200 or wrong Content-Type — and
+					// the browser never retries that: one 502 during a deploy or one 401 on an expired
+					// session ends live updates for the session unless we reconnect ourselves.
+					if (current.readyState !== EventSource.CLOSED) return;
 
-				consecutiveFailures += 1;
-				if (consecutiveFailures >= FAILURES_BEFORE_DEGRADED) setLivePushUnavailable(true);
+					consecutiveFailures += 1;
+					if (consecutiveFailures >= FAILURES_BEFORE_DEGRADED) setLivePushUnavailable(true);
 
-				detach(current);
-				if (disposed) return;
+					detach(current);
+					if (disposed) return;
 
-				const backoff = Math.min(
-					RECONNECT_CAP_MS,
-					RECONNECT_BASE_MS * 2 ** (consecutiveFailures - 1),
-				);
-				// Jitter keeps every admin tab from re-storming the server on the same tick after a
-				// shared outage.
-				reconnectTimer = setTimeout(connect, backoff * (0.5 + Math.random() * 0.5));
-			};
+					const backoff = Math.min(
+						RECONNECT_CAP_MS,
+						RECONNECT_BASE_MS * 2 ** (consecutiveFailures - 1),
+					);
+					// Jitter keeps every admin tab from re-storming the server on the same tick after a
+					// shared outage.
+					reconnectTimer = setTimeout(connect, backoff * (0.5 + Math.random() * 0.5));
+				},
+				{ signal },
+			);
 		};
 
 		connect();

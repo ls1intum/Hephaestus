@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
  */
 export function IntegrationCardHeading({ className, ...props }: React.ComponentProps<"h2">) {
 	return (
+		// oxlint-disable-next-line jsx-a11y/heading-has-content -- the content arrives through `{...props}`
 		<h2
 			data-slot="card-title"
 			className={cn("text-base leading-snug font-medium", className)}

@@ -58,7 +58,6 @@ export function useActiveWorkspaceSlug() {
 	// Reset redirect tracking when location or workspaces change meaningfully
 	// Also reset when workspaces list changes (e.g., after server restart or query refetch)
 	const workspaceSlugs = workspaces.map((ws) => ws.workspaceSlug).join(",");
-	// biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger re-run to reset flag
 	useEffect(() => {
 		hasAttemptedRedirect.current = false;
 	}, [slugFromPath, workspaceSlugs]);

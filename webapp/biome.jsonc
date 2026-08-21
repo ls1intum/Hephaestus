@@ -1,0 +1,68 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+	"files": {
+		"ignoreUnknown": false,
+		// Formatting covers what oxlint lints, so a file is never one tool's business and not the
+		// other's. Check a new directory against `.oxlintrc.json`'s `ignorePatterns`.
+		"includes": [
+			"**/src/**/*",
+			"**/tools/**/*",
+			"**/scripts/**/*",
+			"**/e2e/**/*",
+			"**/public/**/*",
+			"**/.storybook/**/*",
+			"**/.vscode/**/*",
+			"**/index.html",
+			// `*.config.*.ts` catches `vitest.config.storybook.ts`, which `*.config.ts` does not.
+			"**/*.config.ts",
+			"**/*.config.*.ts",
+			"**/*.d.ts",
+			"**/vite.shared.ts",
+			"!**/src/routeTree.gen.ts",
+			"!**/src/api/**/*.ts",
+			"!**/public/mockServiceWorker.js",
+			"!**/*.css"
+		]
+	},
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 100,
+		"lineEnding": "lf"
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	// oxlint lints — see `.oxlintrc.json`. Two linters over one tree is two sources of truth for every
+	// rule and two suppression syntaxes, so this one is off outright rather than narrowed.
+	"linter": { "enabled": false },
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"trailingCommas": "all",
+			"semicolons": "always"
+		}
+	},
+	"css": {
+		"parser": {
+			"cssModules": true,
+			"tailwindDirectives": true
+		},
+		"linter": {
+			"enabled": false
+		},
+		"formatter": {
+			"enabled": false
+		}
+	}
+}

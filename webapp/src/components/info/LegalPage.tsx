@@ -65,10 +65,10 @@ export function LegalPage({
 		setError(null);
 		setResolved(null);
 		resolver(page, { signal: controller.signal, profile })
-			.then((next) => {
+			.then((content) => {
 				if (controller.signal.aborted) return;
-				setResolved(next);
-				if (next.source === "disclaimer" && !warnedDisclaimer.has(page)) {
+				setResolved(content);
+				if (content.source === "disclaimer" && !warnedDisclaimer.has(page)) {
 					warnedDisclaimer.add(page);
 					console.warn(
 						`[legal] Disclaimer fallback served for page=${page}. Configure LEGAL_PROFILE or mount /legal-overrides/. See docs/admin/legal-pages.`,

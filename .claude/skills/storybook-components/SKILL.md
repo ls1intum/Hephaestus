@@ -33,10 +33,12 @@ records what this repo decided, and what it has already been burned by.
 These fail `pnpm run check`. Treat a violation as a build error, not a style opinion, and do not
 write a guideline that repeats one.
 
-- `webapp/.biome/typed-story-meta.grit` — a `meta` naming a `component` must be
-  `satisfies Meta<typeof X>`; a gallery meta naming no component may be bare `Meta`.
-- `webapp/.biome/no-redundant-in-the-document.grit` — `expect(getBy…).toBeInTheDocument()` and
-  bare `await expect(getBy…)`.
+- `hephaestus/typed-story-meta` (`webapp/tools/oxlint/rules/typed-story-meta.ts`) — a `meta` naming a
+  `component` must be `satisfies Meta<typeof X>`; a gallery meta naming no component may be bare `Meta`.
+- `hephaestus/no-redundant-in-the-document` — `expect(getBy…).toBeInTheDocument()`. A bare
+  `await expect(getBy…)` is `vitest/valid-expect`, which catches it for every subject.
+- `hephaestus/no-within-canvas-element` — `within(canvasElement)` when the play function was handed
+  `canvas`.
 - `scripts/check-story-prose.mjs` (`check:stories`) — `<p>` in a comment Storybook publishes.
 - `scripts/check-presentational-components.mjs` (`check:components`) — a component importing the
   query layer, and a story installing MSW handlers. Its allowlist is shrink-only.

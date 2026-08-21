@@ -311,7 +311,7 @@ jobs:
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
               echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
               echo "| TypeScript errors | \`pnpm run typecheck:webapp\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Biome lint errors | \`pnpm run lint:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
               echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY

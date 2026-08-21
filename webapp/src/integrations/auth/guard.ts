@@ -128,13 +128,14 @@ export function safeReturnTo(value: string | undefined): string {
 	const decoded = fullyDecode(value);
 	// Whitespace (incl. space/tab) and control chars (NUL, newline, DEL, …) can defeat downstream
 	// parsers or hide an escape — reject outright on the decoded value.
-	// biome-ignore lint/suspicious/noControlCharactersInRegex: rejecting control chars is the point
+	// oxlint-disable-next-line no-control-regex -- rejecting control chars is the point
 	if (/[\s\x00-\x1f\x7f]/.test(decoded)) return "/";
 	// Must be a rooted path and not a protocol-relative `//host` escape.
 	if (!decoded.startsWith("/") || decoded.startsWith("//")) return "/";
 	// Reject a leading-segment that smuggles a scheme ("/javascript:"), a backslash escape
 	// ("/\evil", which browsers normalise to "//evil"), or a userinfo `@` host trick ("/@evil").
-	if (/^\/[\\]/.test(decoded) || /^\/+[a-z]+:/i.test(decoded) || /^\/@/.test(decoded)) return "/";
+	if (/^\/[\\]/.test(decoded) || /^\/+[a-z]+:/i.test(decoded) || decoded.startsWith("/@"))
+		return "/";
 	// Validation ran on the fully-decoded value; return the ORIGINAL so legitimate encoded
 	// segments (e.g. a `%26` in a query string) are preserved exactly as the caller intended.
 	return value;

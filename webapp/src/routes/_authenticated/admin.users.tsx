@@ -66,16 +66,12 @@ function AdminUsersPage() {
 
 	const allUsers: AdminAccountView[] = listQuery.data?.pages.flat() ?? [];
 
+	const { hasNextPage, isFetchingNextPage, fetchNextPage } = listQuery;
 	useEffect(() => {
-		if (deferredSearch.trim() && listQuery.hasNextPage && !listQuery.isFetchingNextPage) {
-			listQuery.fetchNextPage();
+		if (deferredSearch.trim() && hasNextPage && !isFetchingNextPage) {
+			fetchNextPage();
 		}
-	}, [
-		deferredSearch,
-		listQuery.hasNextPage,
-		listQuery.isFetchingNextPage,
-		listQuery.fetchNextPage,
-	]);
+	}, [deferredSearch, hasNextPage, isFetchingNextPage, fetchNextPage]);
 
 	const term = deferredSearch.trim().toLowerCase();
 	const filteredUsers = term

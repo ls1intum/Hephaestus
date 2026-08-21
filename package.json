@@ -22,7 +22,6 @@
 		"check:webapp": "pnpm --filter webapp run check",
 		"check:webapp:fix": "pnpm --filter webapp run check:fix",
 		"typecheck:webapp": "pnpm --filter webapp run typecheck",
-		"ci:webapp": "pnpm --filter webapp run ci",
 		"test:webapp": "pnpm --filter webapp run test",
 		"build:webapp": "pnpm --filter webapp run build",
 		"nats:extract-examples": "node --import tsx scripts/nats-extract-examples.ts",

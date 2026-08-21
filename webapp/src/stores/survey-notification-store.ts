@@ -45,10 +45,12 @@ export const useSurveyNotificationStore = create<SurveyNotificationState>()(
 		{
 			name: "hephaestus-survey-notification",
 			onRehydrateStorage: () => (state) => {
-				if (state?.pendingSurvey && state.dismissedAt) {
-					if (Date.now() - state.dismissedAt > EXPIRY_MS) {
-						state.clearPendingSurvey();
-					}
+				if (
+					state?.pendingSurvey &&
+					state.dismissedAt &&
+					Date.now() - state.dismissedAt > EXPIRY_MS
+				) {
+					state.clearPendingSurvey();
 				}
 			},
 		},

@@ -8,7 +8,7 @@ import {
 	Lightbulb,
 } from "lucide-react";
 import { motion, useReducedMotion } from "motion/react";
-import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
+import { LandingSignInCta } from "@/components/auth/LandingSignInCta";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
 import { Button } from "@/components/ui/button";
@@ -322,7 +322,7 @@ export function LandingHeroSection({
 						}}
 						className="mt-6 flex w-full flex-col items-center gap-3 sm:mt-8 sm:w-auto sm:flex-row lg:items-start"
 					>
-						<LandingSignInCTA
+						<LandingSignInCta
 							isSignedIn={isSignedIn}
 							onSignIn={onSignIn}
 							onGoToDashboard={onGoToDashboard}

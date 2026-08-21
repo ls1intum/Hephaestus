@@ -65,7 +65,9 @@ export function useMentorChat({
 			hasWorkspace
 				? (queryClient.getQueryData(threadQueryKey) as ChatThreadDetail | undefined)
 				: undefined,
-		initialDataUpdatedAt: Date.now(),
+		// A function, not a call: `Date.now()` here would run on every render, and React Compiler
+		// treats an impure call during render as a bailout.
+		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
 		refetchOnWindowFocus: false,
@@ -83,7 +85,7 @@ export function useMentorChat({
 			hasWorkspace
 				? (queryClient.getQueryData(threadsKey) as ChatThreadSummary[] | undefined)
 				: undefined,
-		initialDataUpdatedAt: Date.now(),
+		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
 		refetchOnWindowFocus: false,

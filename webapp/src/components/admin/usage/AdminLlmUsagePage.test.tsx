@@ -292,29 +292,29 @@ describe("AdminLlmUsagePage", () => {
 			},
 		];
 
-		it.each<[string, WorkspaceLlmUsageReport["byDay"], number, string | null]>([
-			["only the table footers convert", twoDaysWithATotalRow, 12.4, "≈ €10.90"],
-			["nothing on the page converted", [], 0, null],
-		])("discloses the rate when %s", async (_name, byDay, instanceTotalCostUsd, footerText) => {
-			await renderPage({
-				...baseReport,
-				instanceMonthlyBudgetUsd: 0,
-				ownProviderMonthlyBudgetUsd: undefined,
-				instanceTotalCostUsd,
-				ownProviderTotalCostUsd: 0,
-				unpricedEventCount: 0,
-				byJobType: [],
-				byDay,
-				fx: eur,
-			});
+		/** No caps anywhere, so the day table's footer is the only thing that can convert. */
+		const uncapped: WorkspaceLlmUsageReport = {
+			...baseReport,
+			instanceMonthlyBudgetUsd: 0,
+			ownProviderMonthlyBudgetUsd: undefined,
+			ownProviderTotalCostUsd: 0,
+			unpricedEventCount: 0,
+			byJobType: [],
+			fx: eur,
+		};
 
-			if (footerText == null) {
-				expect(screen.queryByText(/reference rate published on/)).toBeNull();
-				return;
-			}
+		it("discloses the rate when only the table footers convert", async () => {
+			await renderPage({ ...uncapped, byDay: twoDaysWithATotalRow, instanceTotalCostUsd: 12.4 });
+
 			const table = screen.getByRole("table", { name: "AI spend by day" });
-			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain(footerText);
+			expect(within(table).getByRole("row", { name: /^Total/ }).textContent).toContain("≈ €10.90");
 			screen.getByText(/reference rate published on/);
+		});
+
+		it("says nothing about the rate when nothing on the page converted", async () => {
+			await renderPage({ ...uncapped, byDay: [], instanceTotalCostUsd: 0 });
+
+			expect(screen.queryByText(/reference rate published on/)).toBeNull();
 		});
 
 		it("stays silent under a cap that is set but converted nowhere on the page", async () => {

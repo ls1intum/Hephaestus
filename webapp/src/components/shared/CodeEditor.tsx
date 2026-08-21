@@ -1,4 +1,4 @@
-import Editor, { type EditorProps } from "@monaco-editor/react";
+import MonacoEditor, { type EditorProps } from "@monaco-editor/react";
 import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 
@@ -25,7 +25,7 @@ export function CodeEditor({
 
 	return (
 		<div className={cn("rounded-md border overflow-hidden", className)}>
-			<Editor
+			<MonacoEditor
 				value={value}
 				onChange={handleChange}
 				language={language}

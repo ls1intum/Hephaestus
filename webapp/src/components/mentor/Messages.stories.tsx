@@ -294,7 +294,7 @@ The key is to include all values from component scope that are used inside the e
 				}, 20);
 
 				return () => clearInterval(interval);
-			}, []);
+			}, [fullResponse]);
 
 			const messages: ChatMessage[] = [
 				...args.messages,

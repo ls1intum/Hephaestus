@@ -148,6 +148,7 @@ export function AdminAchievementsTable({
 		[],
 	);
 
+	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency, and React Compiler opts this component out entirely
 	const table = useReactTable({
 		data: users,
 		columns,

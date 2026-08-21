@@ -1,6 +1,6 @@
 import { useRef } from "react";
-import { LandingCTASection } from "./LandingCTASection";
-import { LandingFAQSection } from "./LandingFAQSection";
+import { LandingCtaSection } from "./LandingCtaSection";
+import { LandingFaqSection } from "./LandingFaqSection";
 import { LandingFeaturesSection } from "./LandingFeaturesSection";
 import { LandingHeroSection } from "./LandingHeroSection";
 import { LandingWhyChooseSection } from "./LandingWhyChooseSection";
@@ -33,8 +33,8 @@ export function LandingPage({ onSignIn, onGoToDashboard, isSignedIn = false }: L
 				<LandingFeaturesSection />
 			</div>
 			<LandingWhyChooseSection />
-			<LandingFAQSection />
-			<LandingCTASection
+			<LandingFaqSection />
+			<LandingCtaSection
 				onSignIn={onSignIn}
 				onGoToDashboard={onGoToDashboard}
 				isSignedIn={isSignedIn}

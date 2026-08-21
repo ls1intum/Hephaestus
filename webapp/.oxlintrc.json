@@ -1,0 +1,177 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+
+	// oxlint lints this package; Biome formats it and sorts imports (`biome.jsonc`).
+	"plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y", "vitest", "promise"],
+	"jsPlugins": ["./tools/oxlint/index.ts"],
+
+	// No warn tier, deliberately: oxlint exits 0 on warnings unless `--deny-warnings` is passed, so a
+	// warn-level rule is a rule nobody ever fails on. Every entry below is `error` or `off`.
+	//
+	// `perf` is off as a category with one rule taken from it by name. React Compiler runs at build
+	// time and this repo bans hand-written `useMemo`/`useCallback` (`AGENTS.md`), so the rest of `perf`
+	// asks for the memoisation the compiler exists to remove — as does the whole `react-perf` plugin,
+	// which is left out of `plugins` for the same reason.
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"perf": "off",
+		"pedantic": "off",
+		"style": "off",
+		"restriction": "off"
+	},
+
+	// A suppression that has stopped suppressing anything fails the build rather than outliving the
+	// problem it named. Root config only — oxlint rejects `options` in an override.
+	//
+	// Type-aware linting is off, and the `correctness` rules that need type information —
+	// `typescript/no-floating-promises` and `await-thenable` among two dozen — therefore do nothing at
+	// all, and do it silently, with no hint in the output that they were skipped. Check whether a rule
+	// is type-aware before trusting this config to enforce it. Turning it on is #1476.
+	"options": { "reportUnusedDisableDirectives": "error" },
+
+	// Read by `no-undef` alone, which is off — so this is forward-looking. Kept in step with
+	// `tsconfig.json`'s `lib`; turning `no-undef` on would also need `node` and the Vitest globals.
+	"env": { "browser": true, "es2022": true },
+	"settings": { "react": { "version": "19.2" } },
+
+	"ignorePatterns": [
+		// Generated: the hey-api client and the TanStack Router tree.
+		"src/api",
+		"src/routeTree.gen.ts",
+		// Written by `msw init`; a rule it trips is an msw upgrade blocked for no reason.
+		"public/mockServiceWorker.js",
+		// Build output. oxlint honours `.gitignore` on its own; these two are not in it.
+		"playwright-report",
+		"coverage"
+	],
+
+	"rules": {
+		// -- On, despite their category being off ---------------------------------------------------
+		"no-else-return": "error",
+		"prefer-const": "error",
+		"prefer-template": "error",
+		"operator-assignment": "error",
+		"typescript/prefer-for-of": "error",
+		"typescript/no-explicit-any": "error",
+		"unicorn/prefer-node-protocol": "error",
+		"oxc/no-accumulating-spread": "error",
+		"react/no-danger": "error",
+		// `null == x` is the idiomatic "null or undefined" check and stays allowed.
+		"eqeqeq": ["error", "always", { "null": "ignore" }],
+		// A directive naming no rule disables every rule on that line.
+		"unicorn/no-abusive-eslint-disable": "error",
+
+		// -- Off. Every reason below was read off this rule's own findings; re-derive with
+		// `pnpm exec oxlint -D <rule>` before trusting or changing one -------------------------------
+		// React 19's automatic JSX runtime.
+		"react/react-in-jsx-scope": "off",
+		// React Compiler's own effect check. Two of its three findings are effects whose whole point is
+		// to re-run on the dependency it calls extra, and clearing those changes when they fire.
+		// `react-hooks/exhaustive-deps` covers the extra-dependency half; the missing-dependency half
+		// (`mentor/Copilot.tsx`) is on review.
+		"react/exhaustive-effect-dependencies": "off",
+		// shadcn primitives over Base UI set `role` themselves.
+		"jsx-a11y/prefer-tag-over-role": "off",
+		// Base UI passes the control through `render=` and keeps the label in the wrapper's children,
+		// where no jsx-a11y rule can see it. Expect this from any rule that inspects children.
+		"jsx-a11y/control-has-associated-label": "off",
+		// Same shape, plus the `renderPageLink` prop pattern: every site is an `<a>` whose content is
+		// supplied by whoever renders it.
+		"jsx-a11y/anchor-has-content": "off",
+		// Placeholder rows and decorative layers have no identity but their position
+		// (`Array.from({ length: n })`), and even a composite `${id}:${index}` key still trips it.
+		"react/no-array-index-key": "off",
+		// `rows.length ? … : …` on a value that is only ever an array reads fine.
+		"unicorn/explicit-length-check": "off",
+		// Both want ES2023 `toSorted`/`toReversed`, which `tsconfig.json`'s `lib` does not declare. Every
+		// site already copies first — `[...x].sort(…)`, `.filter(…).sort(…)`, `.slice().sort(…)` — so the
+		// mutation these rules exist to catch cannot happen at any of them.
+		"unicorn/no-array-sort": "off",
+		"unicorn/no-array-reverse": "off",
+		// A handler defined next to the JSX that uses it is the point. Some findings are genuinely
+		// hoistable helpers; the rule cannot tell the two apart.
+		"unicorn/consistent-function-scoping": "off",
+		// Shadowing a `workspace`/`practice` inside a callback reads fine. The dangerous case this
+		// forfeits is shadowing an import, which the rule has no option to isolate.
+		"no-shadow": "off",
+		// Server field names (`_id`), test hooks (`__resetSessionRecoveryForTests`), the runtime config
+		// global (`__ENV__`) and exhaustiveness bindings (`_exhaustive`) all read better with the prefix.
+		"no-underscore-dangle": "off",
+
+		// -- Options, not exemptions: each teaches a rule something true about this codebase ----------
+		// Whether a component's `autoFocus` prop reaches a DOM `autofocus` is not knowable from the JSX,
+		// so `ignoreNonDOM` trades away the component-level sites for a rule that does not guess.
+		"jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
+		// TanStack Table column defs are `cell: ({ row }) => <Badge …/>` — a component passed as a prop,
+		// which is what `allowAsProps` exists for.
+		"react/no-unstable-nested-components": ["error", { "allowAsProps": true }],
+		// `void somePromise.then(sideEffect)` is fire-and-forget; only a chain's interior needs a return.
+		"promise/always-return": ["error", { "ignoreLastCallback": true }],
+		// Vitest's `expect(actual, message)` takes a second argument; the rule is ported from Jest,
+		// where it does not.
+		"vitest/valid-expect": ["error", { "maxArgs": 2 }],
+		// CSS side effects and module augmentation are the only unassigned imports this repo writes.
+		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router"] }],
+		// A Testing Library query IS the assertion — `getBy*`/`getAllBy*` throw when they find nothing,
+		// which is what `hephaestus/no-redundant-in-the-document` exists to say. Supplying this option
+		// replaces oxlint's defaults rather than extending them, so the first four are its list, restated.
+		"vitest/expect-expect": [
+			"error",
+			{
+				"assertFunctionNames": [
+					"expect",
+					"expectTypeOf",
+					"assert",
+					"assertType",
+					"getBy*",
+					"**.getBy*",
+					"getAllBy*",
+					"**.getAllBy*",
+					"findBy*",
+					"**.findBy*",
+					"findAllBy*",
+					"**.findAllBy*"
+				]
+			}
+		],
+		// `catch (_error)` is this repo's spelling for a deliberately ignored binding. tsc's
+		// `noUnusedLocals`/`noUnusedParameters` is the other half of this gate.
+		"no-unused-vars": [
+			"error",
+			{
+				"argsIgnorePattern": "^_",
+				"varsIgnorePattern": "^_",
+				"caughtErrorsIgnorePattern": "^_"
+			}
+		],
+
+		// -- House rules. `tools/oxlint/` is where each of these decisions is written down ------------
+		"hephaestus/no-redundant-in-the-document": "error",
+		"hephaestus/no-within-canvas-element": "error",
+		"hephaestus/typed-story-meta": "error"
+	},
+
+	"overrides": [
+		{
+			// The directories this repo writes by hand. `AGENTS.md` § File naming is the rule itself.
+			"files": ["src/components/**", "src/lib/**", "src/hooks/**", "src/integrations/**"],
+			"rules": {
+				"unicorn/filename-case": ["error", { "cases": { "kebabCase": true, "pascalCase": true } }]
+			}
+		},
+		{
+			// Vendored shadcn primitives, edited only to fit Base UI. Add a line here only for a finding
+			// you have seen; each of these is one site.
+			"files": ["src/components/ui/**"],
+			"rules": {
+				"jsx-a11y/label-has-associated-control": "off",
+				// Both fire on the same `<div role="group">` in `input-group.tsx`.
+				"jsx-a11y/no-noninteractive-element-interactions": "off",
+				"jsx-a11y/click-events-have-key-events": "off",
+				// `sidebar.tsx` persists its open state in a cookie so the shell does not flash on reload.
+				"unicorn/no-document-cookie": "off"
+			}
+		}
+	]
+}

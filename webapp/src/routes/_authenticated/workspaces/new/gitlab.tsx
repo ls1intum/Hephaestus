@@ -228,7 +228,7 @@ function GitLabWizardPage() {
 			workspaceSlug: state.workspaceSlug,
 		}).success;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state.step is an intentional trigger to refocus heading on step change
+	// `state.step` is an intentional trigger: the heading refocuses on every step change.
 	useEffect(() => {
 		headingRef.current?.focus();
 	}, [state.step]);

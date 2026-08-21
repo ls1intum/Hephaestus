@@ -1,9 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn } from "storybook/test";
-import { LandingFAQSection } from "./LandingFAQSection";
+import { LandingFaqSection } from "./LandingFaqSection";
 
 const meta = {
-	component: LandingFAQSection,
+	component: LandingFaqSection,
 	parameters: {
 		layout: "padded",
 		docs: {
@@ -27,7 +27,7 @@ const meta = {
 	args: {
 		onSignIn: fn(),
 	},
-} satisfies Meta<typeof LandingFAQSection>;
+} satisfies Meta<typeof LandingFaqSection>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;

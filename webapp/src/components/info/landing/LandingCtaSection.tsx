@@ -1,19 +1,19 @@
-import { LandingSignInCTA } from "@/components/auth/LandingSignInCTA";
+import { LandingSignInCta } from "@/components/auth/LandingSignInCta";
 import { buttonVariants } from "@/components/ui/button";
 import { useTheme } from "@/integrations/theme";
 import { cn } from "@/lib/utils";
 
-interface LandingCTASectionProps {
+interface LandingCtaSectionProps {
 	onSignIn: (idpHint: string) => void;
 	onGoToDashboard?: () => void;
 	isSignedIn: boolean;
 }
 
-export function LandingCTASection({
+export function LandingCtaSection({
 	onSignIn,
 	onGoToDashboard,
 	isSignedIn,
-}: LandingCTASectionProps) {
+}: LandingCtaSectionProps) {
 	const { theme } = useTheme();
 	return (
 		<section
@@ -30,7 +30,7 @@ export function LandingCTASection({
 							: "Sign in to open your workspace and see the features your admin has enabled."}
 					</p>
 					<div className="flex w-full flex-col gap-4 sm:w-auto sm:flex-row">
-						<LandingSignInCTA
+						<LandingSignInCta
 							isSignedIn={isSignedIn}
 							onSignIn={onSignIn}
 							onGoToDashboard={onGoToDashboard}

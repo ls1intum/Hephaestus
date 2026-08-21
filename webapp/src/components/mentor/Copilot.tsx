@@ -79,7 +79,7 @@ export function Copilot({
 		body.style.touchAction = prev.touchAction;
 		prevBodyStylesRef.current = null;
 	};
-	// biome-ignore lint/correctness/useExhaustiveDependencies: unlockBodyScroll stability handled by React Compiler
+	// `unlockBodyScroll` keeps a stable identity because React Compiler memoises it.
 	useEffect(() => {
 		if (!isOpen) unlockBodyScroll();
 		return () => unlockBodyScroll();

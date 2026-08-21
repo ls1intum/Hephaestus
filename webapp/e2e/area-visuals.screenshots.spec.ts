@@ -49,7 +49,7 @@ test("capture practices admin", async ({ page }) => {
 
 	// 4) Practice detail page — the spine (standard + reserved observations/feedback section).
 	await page
-		.locator('a:has(span.hover\\:underline)')
+		.locator("a:has(span.hover\\:underline)")
 		.first()
 		.click()
 		.catch(() => {});

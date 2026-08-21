@@ -1,8 +1,8 @@
 # Webapp
 
 React 19 SPA on TanStack Router/Query, Tailwind 4, shadcn primitives over **Base UI**
-(`@base-ui/react`) — not Radix. Vitest + Storybook 10 for tests, Biome for lint and format, Vite for
-the build. React Compiler runs at build time.
+(`@base-ui/react`) — not Radix. Vitest + Storybook 10 for tests, oxlint for lint and Biome for
+format, Vite for the build. React Compiler runs at build time.
 
 This file is the gotchas. Conventions that a look at the tree already tells you are not here.
 
@@ -33,7 +33,8 @@ Two cases, and which one a file gets is decided by what it exports:
 
 - **`PascalCase.tsx`** — a file whose export is a React component. The filename is the component
   name, so `AdminLlmUsagePage.tsx` exports `AdminLlmUsagePage`. Its `.test.tsx` and `.stories.tsx`
-  siblings inherit the name.
+  siblings inherit the name. An acronym is a word, not a run of capitals: `LandingFaqSection`, not
+  `LandingFAQSection`.
 - **`kebab-case.ts`** — everything else: helpers, schemas, formatters, hooks, fixtures. `usageUtils.ts`
   is `usage-utils.ts`, `jobUtils.tsx` is `job-utils.tsx` (a `.tsx` that exports a small helper
   component alongside its formatters is still a helper module).
@@ -41,11 +42,34 @@ Two cases, and which one a file gets is decided by what it exports:
 Colocation does not change the rule: a helper next to the component that uses it is named the same
 way as one in `src/lib/`.
 
-Biome enforces the casing (`style/useFilenamingConvention`) over `src/components/**`, `src/lib/**`,
+oxlint enforces the casing (`unicorn/filename-case`) over `src/components/**`, `src/lib/**`,
 `src/hooks/**` and `src/integrations/**` — every directory this repo writes by hand. `src/routes/**`
 is exempt: TanStack Router derives URL segments from the filenames there, so the router owns that
 naming (`$workspaceSlug.tsx`, `-route.test.ts`). `src/api/**` and `routeTree.gen.ts` are generated and
-excluded from Biome entirely.
+excluded from linting entirely.
+
+## Linting
+
+**oxlint lints, Biome formats.** `.oxlintrc.json` is the whole rule set, and every rule it turns off
+carries the reason beside it — read that before switching one back on.
+
+- **Suppress with `// oxlint-disable-next-line <rule> -- <why>`**, above the line the diagnostic
+  points at, spelling the rule the way oxlint printed it. A directive that stops suppressing anything
+  fails the build, so a suppression cannot outlive its reason.
+- **A rule that cannot resolve is a hard config error, not a silent skip.** oxlint refuses to start if
+  `jsPlugins` names a module it cannot load, or if `rules` names a rule no loaded plugin defines. That
+  is what makes the house rules impossible to drop silently (oxc-project/oxc#25203), so keep them
+  named in `rules`.
+- **`oxlint-suppressions.json` is the pre-existing debt** for rules the tree does not pass yet. They
+  are `error` for new code; the file only excuses what was already there. Clear a file's entries, then
+  `pnpm exec oxlint --prune-suppressions`. **It records a count per file per rule, not a line**, so
+  fixing one violation and adding another in the same file nets to zero and CI stays green. Never run
+  `--suppress-all` to make a finding go away; if a count in a diff went up, that is a new bug.
+- **House rules live in `tools/oxlint/`**, in TypeScript, so `pnpm run typecheck` covers them, with a
+  `RuleTester` suite beside each (`oxlint/plugins-dev`).
+- **These have no linter behind them and are on review**: an inline `<svg>` needs a `<title>`, an
+  `aria-label` or `aria-hidden`; ARIA roles that duplicate an element's implicit role; `autoFocus` on a
+  component rather than a DOM element; non-ASCII filenames.
 
 ## Which admin console a component belongs to
 

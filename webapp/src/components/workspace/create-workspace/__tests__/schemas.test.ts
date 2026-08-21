@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { connectionSchema, workspaceDetailsSchema } from "../schemas";
 
 describe("connectionSchema", () => {
@@ -36,10 +36,8 @@ describe("connectionSchema", () => {
 			serverUrl: "  https://gitlab.com  ",
 			personalAccessToken: "token",
 		});
-		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.data.serverUrl).toBe("https://gitlab.com");
-		}
+		assert(result.success);
+		expect(result.data.serverUrl).toBe("https://gitlab.com");
 	});
 
 	it("rejects non-URL string", () => {
@@ -185,10 +183,8 @@ describe("workspaceDetailsSchema", () => {
 			displayName: "  My Workspace  ",
 			workspaceSlug: "my-workspace",
 		});
-		expect(result.success).toBe(true);
-		if (result.success) {
-			expect(result.data.displayName).toBe("My Workspace");
-		}
+		assert(result.success);
+		expect(result.data.displayName).toBe("My Workspace");
 	});
 
 	it("rejects whitespace-only display name", () => {
@@ -252,10 +248,8 @@ describe("workspaceDetailsSchema", () => {
 			displayName: "Test",
 			workspaceSlug: "-abc",
 		});
-		expect(result.success).toBe(false);
-		if (!result.success) {
-			const slugErrors = result.error.issues.filter((i) => i.path[0] === "workspaceSlug");
-			expect(slugErrors.some((e) => e.message.includes("start with"))).toBe(true);
-		}
+		assert(!result.success);
+		const slugErrors = result.error.issues.filter((i) => i.path[0] === "workspaceSlug");
+		expect(slugErrors.some((e) => e.message.includes("start with"))).toBe(true);
 	});
 });

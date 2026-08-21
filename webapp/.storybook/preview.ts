@@ -1,11 +1,7 @@
 import { withThemeByClassName, withThemeFromJSXProvider } from "@storybook/addon-themes";
 import type { Decorator, Preview } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-	createRootRoute,
-	createRouter,
-	RouterProvider,
-} from "@tanstack/react-router";
+import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
@@ -212,10 +208,7 @@ const preview: Preview = {
 			},
 			defaultTheme: "light",
 			Provider: ({ theme, children }) =>
-				React.createElement(StorybookThemeProvider, {
-					theme: theme.name,
-					children,
-				}),
+				React.createElement(StorybookThemeProvider, { theme: theme.name }, children),
 		}),
 	],
 };
