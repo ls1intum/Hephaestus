@@ -27,7 +27,7 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
-                null,
+                Duration.ZERO,
                 null
             );
 
@@ -48,7 +48,7 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
-                null,
+                Duration.ZERO,
                 custom
             );
 
@@ -104,6 +104,31 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                     assertThat(props.poison().baseDelay()).isEqualTo(Duration.ofSeconds(4));
                     assertThat(props.poison().maxDelay()).isEqualTo(Duration.ofMinutes(1));
                 });
+        }
+
+        @Test
+        void shouldDisableReapingWhenInactiveThresholdIsUnset() {
+            runner().run(context ->
+                assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isZero()
+            );
+        }
+
+        @Test
+        void shouldReadBareInactiveThresholdAsHours() {
+            runner()
+                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=72")
+                .run(context ->
+                    assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isEqualTo(
+                        Duration.ofHours(72)
+                    )
+                );
+        }
+
+        @Test
+        void shouldRejectNegativeInactiveThreshold() {
+            runner()
+                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=-1h")
+                .run(context -> assertThat(context).hasFailed());
         }
     }
 }

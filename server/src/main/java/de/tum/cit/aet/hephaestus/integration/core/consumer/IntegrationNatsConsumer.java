@@ -32,6 +32,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -672,17 +673,28 @@ public class IntegrationNatsConsumer {
                 ConsumerConfiguration config = existing.getConsumerInfo().getConsumerConfiguration();
                 Set<String> existingSubjects = new HashSet<>(config.getFilterSubjects());
                 Set<String> desiredSubjects = new HashSet<>(Arrays.asList(subjects));
-                if (existingSubjects.equals(desiredSubjects)) {
+                Duration desiredThreshold = consumerProperties.inactiveThreshold();
+                // A consumer created before the threshold was configured keeps its old lifetime
+                // until something rewrites it, so reconcile it here rather than only on create.
+                boolean thresholdMatches = Objects.equals(
+                    Objects.requireNonNullElse(config.getInactiveThreshold(), Duration.ZERO),
+                    desiredThreshold
+                );
+                if (existingSubjects.equals(desiredSubjects) && thresholdMatches) {
                     return existing;
                 }
                 log.info(
-                    "Updating durable consumer filter subjects: consumerName={}, oldCount={}, newCount={}",
+                    "Updating durable consumer: consumerName={}, oldSubjectCount={}, newSubjectCount={}, inactiveThreshold={}",
                     consumerName,
                     existingSubjects.size(),
-                    desiredSubjects.size()
+                    desiredSubjects.size(),
+                    desiredThreshold
                 );
                 return streamContext.createOrUpdateConsumer(
-                    ConsumerConfiguration.builder(config).filterSubjects(subjects).build()
+                    ConsumerConfiguration.builder(config)
+                        .filterSubjects(subjects)
+                        .inactiveThreshold(desiredThreshold)
+                        .build()
                 );
             } catch (JetStreamApiException e) {
                 // 10014 = consumer not found: expected on first start / after cleanup, fall through
@@ -726,15 +738,10 @@ public class IntegrationNatsConsumer {
             // means a JetStream-side observability tool (`nats stream info`) cannot see
             // the policy. Mirrors the value the poison handler uses to ACK-terminate.
             .maxDeliver(consumerProperties.poison().maxRedeliver());
-        // Server-side reaping for deployments that are deleted rather than shut down. A PR preview
-        // never gets to clean up after itself, so its durables would otherwise pile up on the
-        // shared stream one generation per closed PR. Unset for long-lived deployments, where a
-        // reaped durable would silently resume at DeliverPolicy.New and skip an outage's backlog.
-        if (consumerProperties.inactiveThreshold() != null) {
-            builder.inactiveThreshold(consumerProperties.inactiveThreshold());
-        }
         if (!isBlank(durableName)) {
-            builder.durable(durableName);
+            // Only a durable is worth reaping: JetStream already deletes an ephemeral seconds after
+            // its last pull, so a threshold here would lengthen that rather than bound it.
+            builder.durable(durableName).inactiveThreshold(consumerProperties.inactiveThreshold());
         }
         return builder.build();
     }

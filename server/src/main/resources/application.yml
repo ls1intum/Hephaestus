@@ -599,6 +599,11 @@ hephaestus:
     # pure helper/subject classes may still load because they do no external work.
     # Flip `enabled` to `true` once credentials and redirect URLs are configured.
     integration:
+        consumer:
+            # Lets JetStream delete a durable nothing has pulled from for this long. 0 disables it;
+            # set it only where the deployment is deleted rather than shut down, and so never gets
+            # to delete its own durables. A bare number is hours.
+            inactive-threshold: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:0s}
         # ─── GitHub authentication (GitHubProperties) ───
         # Can be any OAuth token, such as the PAT.
         github:

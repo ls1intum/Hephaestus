@@ -35,13 +35,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        properties = new NatsConsumerProperties(
-            Duration.ofMinutes(5),
-            500,
-            Duration.ofSeconds(2),
-            null,
-            new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
-        );
+        properties = NatsConsumerPropertiesFixture.defaults();
         handler = new IntegrationPoisonHandler(properties, meterRegistry);
     }
 

@@ -65,13 +65,7 @@ class IntegrationNatsConsumerTest {
         NatsSubscriptionProvider subscriptions = mock(NatsSubscriptionProvider.class);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
             new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
-            new NatsConsumerProperties(
-                Duration.ofMinutes(5),
-                500,
-                Duration.ofSeconds(2),
-                null,
-                new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
-            ),
+            NatsConsumerPropertiesFixture.defaults(),
             subscriptions,
             mock(IntegrationMessageDispatcher.class),
             mock(IntegrationPoisonHandler.class),
@@ -93,13 +87,7 @@ class IntegrationNatsConsumerTest {
         CountDownLatch restarted = new CountDownLatch(1);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
             new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
-            new NatsConsumerProperties(
-                Duration.ofMinutes(5),
-                500,
-                Duration.ofSeconds(2),
-                null,
-                new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
-            ),
+            NatsConsumerPropertiesFixture.defaults(),
             scopeId -> Optional.empty(),
             mock(IntegrationMessageDispatcher.class),
             mock(IntegrationPoisonHandler.class),
@@ -132,13 +120,7 @@ class IntegrationNatsConsumerTest {
 
     @Test
     void newConsumerStartsAtNewMessagesInsteadOfReplayingStreamHistory() {
-        NatsConsumerProperties properties = new NatsConsumerProperties(
-            Duration.ofMinutes(5),
-            500,
-            Duration.ofSeconds(2),
-            null,
-            new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
-        );
+        NatsConsumerProperties properties = NatsConsumerPropertiesFixture.defaults();
 
         var config = IntegrationNatsConsumer.newConsumerConfiguration(
             new String[] { "slack.>" },
@@ -148,27 +130,28 @@ class IntegrationNatsConsumerTest {
 
         assertThat(config.getDeliverPolicy()).isEqualTo(DeliverPolicy.New);
         assertThat(config.getDurable()).isEqualTo("heph-slack");
-        assertThat(config.getInactiveThreshold()).isNull();
     }
 
     @Test
-    void disposableDeploymentLetsJetStreamReapItsDurableWhenTheStackIsDeleted() {
-        NatsConsumerProperties properties = new NatsConsumerProperties(
-            Duration.ofMinutes(5),
-            500,
-            Duration.ofSeconds(2),
-            Duration.ofHours(72),
-            new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
-        );
-
+    void shouldReapDurableWhenInactiveThresholdIsConfigured() {
         var config = IntegrationNatsConsumer.newConsumerConfiguration(
             new String[] { "github.>" },
-            properties,
-            "appserver-pr-1443-consumer"
+            NatsConsumerPropertiesFixture.withInactiveThreshold(Duration.ofHours(72)),
+            "heph-github"
         );
 
         assertThat(config.getInactiveThreshold()).isEqualTo(Duration.ofHours(72));
-        assertThat(config.getDurable()).isEqualTo("appserver-pr-1443-consumer");
+    }
+
+    @Test
+    void shouldLeaveEphemeralLifetimeAloneWhenInactiveThresholdIsConfigured() {
+        var config = IntegrationNatsConsumer.newConsumerConfiguration(
+            new String[] { "github.>" },
+            NatsConsumerPropertiesFixture.withInactiveThreshold(Duration.ofHours(72)),
+            null
+        );
+
+        assertThat(config.getInactiveThreshold()).isNull();
     }
 
     @Nested
@@ -229,13 +212,7 @@ class IntegrationNatsConsumerTest {
             when(message.getSubject()).thenReturn("github.acme.repo.issues");
             return new IntegrationNatsConsumer(
                 new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
-                new NatsConsumerProperties(
-                    Duration.ofMinutes(5),
-                    500,
-                    Duration.ofSeconds(2),
-                    null,
-                    new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
-                ),
+                NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
                 scopeId -> Optional.empty(),
                 dispatcher,
                 mock(IntegrationPoisonHandler.class),
@@ -371,13 +348,7 @@ class IntegrationNatsConsumerTest {
             FakeFleet(Set<String> failingStreams) {
                 super(
                     new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
-                    new NatsConsumerProperties(
-                        Duration.ofMinutes(5),
-                        500,
-                        Duration.ofSeconds(2),
-                        null,
-                        new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
-                    ),
+                    NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
                     scopeId ->
                         Optional.of(
                             new NatsSubscriptionInfo(
