@@ -26,6 +26,11 @@ on:
         type: string
         default: "true"
 
+    outputs:
+      application-server-published:
+        description: "Whether an application-server image exists at this commit"
+        value: ${{ jobs.application-server-build.result == 'success' }}
+
 jobs:
   webapp-build:
     name: "Webapp"
