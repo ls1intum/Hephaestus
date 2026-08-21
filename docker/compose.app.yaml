@@ -356,6 +356,10 @@ services:
       # Agent job queue (practice review). The queue runs on PostgreSQL — this pod needs no NATS at
       # all (it runs no sync/webhook role), so no NATS_SERVER is set here.
       AGENT_ENABLED: ${AGENT_ENABLED:-false}
+      # PracticeReviewHealthIndicator runs in this role and reports OUT_OF_SERVICE with
+      # GIT_CHECKOUT_DISABLED when the checkout is off, so the worker needs the same flag the
+      # application server gets — the agent bind-mounts a repository it cannot otherwise obtain.
+      GIT_CHECKOUT_ENABLED: ${GIT_CHECKOUT_ENABLED:-false}
       HEPHAESTUS_FABRIC_ROOT: /data/git-repos
       HEPHAESTUS_FABRIC_GC_RETENTION_DAYS: ${HEPHAESTUS_FABRIC_GC_RETENTION_DAYS:-30}
       SANDBOX_DOCKER_HOST: ${SANDBOX_DOCKER_HOST:-unix:///var/run/docker.sock}
