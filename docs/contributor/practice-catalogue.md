@@ -24,20 +24,20 @@ it propagates:
 | Review frame — contract version, review mode, known limitations                | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
 | Included in new workspaces                                                     | default is included                                                                     | instance administrator can include or exclude           | not applicable after installation                                                           |
 | Practice autonomy                                                              | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
-| Review scope                                                                   | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator sets it once for the whole workspace                                |
+| Review coverage and delivery status                                            | not repository settings                                                                 | not curated-catalog settings                            | workspace administrator sets them once for the whole workspace                              |
 | Area and order                                                                 | JSON array order                                                                        | inherited or changed with drag-and-drop or move actions | copied, then independently managed                                                          |
 
 This is a one-way lifecycle: a repository update can update an uncustomized instance definition, and
 an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
 definition or an existing workspace.
 
-| Stakeholder                | Primary task                                                                                                               | Deliberately not their task                      |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| Practice author            | Define the habit, guidance, and responsible mentoring support                                                              | Authorize collection or certify review accuracy  |
-| Instance administrator     | Curate the defaults offered to new workspaces                                                                              | Rewrite existing workspace practices             |
-| Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
-| Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                          | Decide that connected evidence proves a practice |
-| Developer, peer, or mentor | Use observations and available human context in a review                                                                   | Supply hidden context to Hephaestus implicitly   |
+| Stakeholder                | Primary task                                                                           | Deliberately not their task                      |
+| -------------------------- | -------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| Practice author            | Define the habit, guidance, and responsible mentoring support                          | Authorize collection or certify review accuracy  |
+| Instance administrator     | Curate the defaults offered to new workspaces                                          | Rewrite existing workspace practices             |
+| Workspace administrator    | Adapt practices, set workspace coverage and delivery, and configure inherited autonomy | Authorize a new data source for the instance     |
+| Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                      | Decide that connected evidence proves a practice |
+| Developer, peer, or mentor | Use observations and available human context in a review                               | Supply hidden context to Hephaestus implicitly   |
 
 ## Authoring experience
 
@@ -201,7 +201,7 @@ is a declaration and nothing more — the product validates no policy independen
 policy carries the single status `AUTHOR_DECLARED` to say so. Requirements also say nothing about whether
 a developer, peer, or human mentor can review the practice outside the governed integrations.
 
-The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its _inputs_ change rather
+The review-rule fingerprint uses an explicit scheme prefix, bumped whenever its *inputs* change rather
 than the rules, so a stored fingerprint is never compared against one computed from a different set of
 facts. Each scheme retains its original meaning, so two schemes never compare equal by accident. Bump the
 prefix in the same change that alters the input set.

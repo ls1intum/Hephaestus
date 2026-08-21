@@ -27,7 +27,10 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision;
+import de.tum.cit.aet.hephaestus.practices.review.GateDecision.Detect;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
@@ -198,7 +201,17 @@ public class AgentJobService {
         JobSubmissionRequest request,
         @Nullable SignalKey signalKey
     ) {
-        return Optional.ofNullable(submitWithOutcome(workspaceId, jobType, request, signalKey).job());
+        return submit(workspaceId, jobType, request, signalKey, null);
+    }
+
+    public Optional<AgentJob> submit(
+        Long workspaceId,
+        AgentJobType jobType,
+        JobSubmissionRequest request,
+        @Nullable SignalKey signalKey,
+        @Nullable Detect admission
+    ) {
+        return Optional.ofNullable(submitWithOutcome(workspaceId, jobType, request, signalKey, admission).job());
     }
 
     /**
@@ -210,6 +223,16 @@ public class AgentJobService {
         AgentJobType jobType,
         JobSubmissionRequest request,
         @Nullable SignalKey signalKey
+    ) {
+        return submitWithOutcome(workspaceId, jobType, request, signalKey, null);
+    }
+
+    SubmissionOutcome submitWithOutcome(
+        Long workspaceId,
+        AgentJobType jobType,
+        JobSubmissionRequest request,
+        @Nullable SignalKey signalKey,
+        @Nullable Detect admission
     ) {
         Workspace workspace = workspaceRepository
             .findById(workspaceId)
@@ -234,7 +257,14 @@ public class AgentJobService {
         JobTypeHandler handler = handlerRegistry.getHandler(jobType);
         JobSubmission submission = handler.createSubmission(request);
 
-        return submitForBinding(workspace, jobType, artifactKindFor(jobType, request), submission, signalKey);
+        return submitForBinding(
+            workspace,
+            jobType,
+            artifactKindFor(jobType, request),
+            submission,
+            signalKey,
+            admission
+        );
     }
 
     /**
@@ -258,7 +288,8 @@ public class AgentJobService {
         AgentJobType jobType,
         ArtifactKind artifactKind,
         JobSubmission submission,
-        @Nullable SignalKey signalKey
+        @Nullable SignalKey signalKey,
+        @Nullable Detect admission
     ) {
         String detectionKey = submission.idempotencyKey() + ":detection";
 
@@ -280,6 +311,12 @@ public class AgentJobService {
                     workspace.getId()
                 );
                 return refuseInTransaction(signalKey, SignalStateReason.PRACTICES_DISABLED);
+            }
+            if (
+                admission != null &&
+                admission.rolloutRevision() != currentWorkspace.getReviewSettings().getRolloutRevision()
+            ) {
+                return refuseInTransaction(signalKey, SignalStateReason.STALE_ROLLOUT_REVISION);
             }
             // Resolved, not filtered in SQL: a practice that inherits its autonomy stores NULL, and
             // `autonomy <> 'OFF'` answers UNKNOWN for it, which would refuse review for every
@@ -351,6 +388,9 @@ public class AgentJobService {
             job.setPurpose(AgentPurpose.PRACTICE_REVIEW);
             job.setJobType(jobType);
             job.setArtifactKind(artifactKind);
+            job.setPracticeRolloutRevision(currentWorkspace.getReviewSettings().getRolloutRevision());
+            job.setPracticeTriggerMode(admission == null ? TriggerMode.MANUAL : admission.triggerMode());
+            job.setExternalDeliveryAllowed(admission == null || admission.externalDeliveryAllowed());
             job.setMetadata(submission.metadata());
             job.setIdempotencyKey(detectionKey);
             try {

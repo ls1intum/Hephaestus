@@ -65,6 +65,26 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 Practice reviews now run only on work whose author is a linked workspace member
+
+**Affected**: every workspace with practice reviews turned on. Check who is covered under
+**Practices → Review → When and where**: the coverage summary counts the eligible linked members and
+the monitored repositories in scope.
+
+**Before**: a review ran on any pull request or issue in a monitored repository, whoever wrote it.
+
+**After**: coverage is two dimensions, repositories and people, and both must admit the work. Under
+**All eligible members** that means every linked member of the workspace — an author who has never
+signed in to Hephaestus is not one of them, so their work is not reviewed and no feedback is prepared
+about them. Where the author cannot be resolved at all, or resolves to a bot, the review does not run
+either. This is deliberate: feedback that reaches nobody costs a model run and widens the privacy
+radius for a person who never opted in.
+
+**Migration**: nothing to change before upgrading. Afterwards, a contributor whose work should be
+reviewed signs in to Hephaestus once, which links their account; existing members are unaffected. To
+roll out more narrowly than "everyone linked", switch either dimension to **Selected** and choose the
+repositories, base branches and people yourself — an empty selection covers nobody, never everybody.
+
 #### 🟡 Reviewer-side practices keep the old wording until you update them
 
 **Affected**: workspaces created before this release that use the shipped practices

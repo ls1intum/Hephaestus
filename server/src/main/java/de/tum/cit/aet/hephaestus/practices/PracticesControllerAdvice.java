@@ -4,6 +4,9 @@ import de.tum.cit.aet.hephaestus.core.LoggingUtils;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedCatalogConflictException;
 import de.tum.cit.aet.hephaestus.practices.curated.CuratedPreconditionRequiredException;
 import de.tum.cit.aet.hephaestus.practices.curated.StaleCuratedEntryException;
+import de.tum.cit.aet.hephaestus.practices.review.InvalidReviewCoverageException;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewPreconditionRequiredException;
+import de.tum.cit.aet.hephaestus.practices.review.StalePracticeReviewSettingsException;
 import java.util.Optional;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
@@ -43,6 +46,25 @@ public class PracticesControllerAdvice {
     @ExceptionHandler(CuratedPreconditionRequiredException.class)
     ProblemDetail handleCuratedPreconditionRequired(CuratedPreconditionRequiredException exception) {
         return problem(HttpStatus.PRECONDITION_REQUIRED, "Practice catalog version required", exception.getMessage());
+    }
+
+    @ExceptionHandler(StalePracticeReviewSettingsException.class)
+    ProblemDetail handleStaleReviewSettings(StalePracticeReviewSettingsException exception) {
+        return problem(HttpStatus.PRECONDITION_FAILED, "Practice review settings changed", exception.getMessage());
+    }
+
+    @ExceptionHandler(PracticeReviewPreconditionRequiredException.class)
+    ProblemDetail handleReviewPreconditionRequired(PracticeReviewPreconditionRequiredException exception) {
+        return problem(
+            HttpStatus.PRECONDITION_REQUIRED,
+            "Practice review settings version required",
+            exception.getMessage()
+        );
+    }
+
+    @ExceptionHandler(InvalidReviewCoverageException.class)
+    ProblemDetail handleInvalidReviewCoverage(InvalidReviewCoverageException exception) {
+        return problem(HttpStatus.BAD_REQUEST, "Invalid practice review coverage", exception.getMessage());
     }
 
     private ProblemDetail problem(HttpStatus status, String title, String detail) {

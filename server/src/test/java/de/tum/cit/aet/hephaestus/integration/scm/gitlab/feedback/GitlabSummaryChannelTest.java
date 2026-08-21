@@ -77,6 +77,7 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
         assertThat(handle).isNotNull();
         assertThat(handle.externalId()).isEqualTo("gid://gitlab/Note/789");
+        verify(spec).variable("body", "hello\n\nmarker");
     }
 
     @Test
@@ -287,8 +288,8 @@ class GitlabSummaryChannelTest extends BaseUnitTest {
 
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
         assertThat(outcome.handle().externalId()).isEqualTo("gid://gitlab/Note/789");
-        // No MR/issue resolution — the note id addresses the comment directly.
         verify(spec).variable(eq("id"), eq("gid://gitlab/Note/789"));
+        verify(spec).variable(eq("body"), eq("updated body\n\nmarker"));
     }
 
     @Test

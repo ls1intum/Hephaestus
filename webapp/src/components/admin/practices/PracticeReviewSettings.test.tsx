@@ -6,6 +6,7 @@ import type {
 } from "@/api/types.gen";
 import { renderWithRouter } from "@/test/router-harness";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
+import { mockReviewSettings } from "./story-mock-data";
 
 const readyBinding: AgentBinding = {
 	purpose: "PRACTICE_REVIEW",
@@ -14,12 +15,10 @@ const readyBinding: AgentBinding = {
 	instanceModelId: 20,
 };
 
-const settings: PracticeReviewSettingsData = {
+const settings: PracticeReviewSettingsData = mockReviewSettings({
 	deliverToMerged: false,
 	cooldownMinutes: 15,
-	reviewScope: { targetBranches: [], repositories: [] },
-	defaultAutonomy: "AUTOMATIC",
-};
+});
 
 function renderSettings(props: Partial<React.ComponentProps<typeof PracticeReviewSettings>> = {}) {
 	return renderWithRouter(
@@ -44,6 +43,28 @@ function renderSettings(props: Partial<React.ComponentProps<typeof PracticeRevie
 				onUpdate: vi.fn(),
 				onReset: vi.fn(),
 			}}
+			coverage={{
+				preview: {
+					data: {
+						current: settings.coverageSummary,
+						proposed: settings.coverageSummary,
+						widens: true,
+					},
+					isPending: false,
+					isError: false,
+					onPreview: vi.fn(),
+				},
+				repositories: {
+					options: [{ value: "acme/widgets", label: "acme/widgets" }],
+					isLoading: false,
+					isError: false,
+				},
+				people: {
+					options: [{ value: 7, label: "Ada" }],
+					isLoading: false,
+					isError: false,
+				},
+			}}
 			{...props}
 		/>,
 		"/w/acme/admin/practices",
@@ -51,6 +72,38 @@ function renderSettings(props: Partial<React.ComponentProps<typeof PracticeRevie
 }
 
 describe("PracticeReviewSettings", () => {
+	it("names both coverage mode groups", async () => {
+		await renderSettings();
+
+		expect(await screen.findByRole("radiogroup", { name: "Repositories" })).not.toBeNull();
+		expect(screen.getByRole("radiogroup", { name: "People" })).not.toBeNull();
+	});
+
+	it("keeps persisted targets visible when they are no longer available", async () => {
+		await renderSettings({
+			policy: {
+				settings: mockReviewSettings({
+					reviewScope: {
+						repositoryMode: "SELECTED",
+						personMode: "SELECTED",
+						repositories: [{ nameWithOwner: "acme/archived", baseBranches: ["main"] }],
+						personUserIds: [99],
+					},
+				}),
+				isSaving: false,
+				onUpdate: vi.fn(),
+				onReset: vi.fn(),
+			},
+		});
+
+		// Both readouts, without opening either picker: a target nobody can see is a target nobody
+		// corrects, and a repository that has left the monitored set covers nothing while still
+		// looking like coverage.
+		expect(await screen.findByText("acme/archived")).not.toBeNull();
+		expect(screen.getByText("Not monitored")).not.toBeNull();
+		expect(screen.getByTitle("Member 99 (unavailable)")).not.toBeNull();
+	});
+
 	it("points at the page that owns the binding without restating the page banner", async () => {
 		await renderSettings();
 

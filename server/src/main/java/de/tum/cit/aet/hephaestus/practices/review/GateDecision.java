@@ -26,7 +26,13 @@ public sealed interface GateDecision permits GateDecision.Detect, GateDecision.S
      * @param workspace         the resolved workspace for this PR's repository
      * @param matchedPractices practices bound to the observed signal and above {@code OFF}
      */
-    record Detect(Workspace workspace, List<Practice> matchedPractices) implements GateDecision {
+    record Detect(
+        Workspace workspace,
+        List<Practice> matchedPractices,
+        long rolloutRevision,
+        TriggerMode triggerMode,
+        boolean externalDeliveryAllowed
+    ) implements GateDecision {
         public Detect {
             Objects.requireNonNull(workspace, "workspace must not be null");
             matchedPractices = List.copyOf(matchedPractices);

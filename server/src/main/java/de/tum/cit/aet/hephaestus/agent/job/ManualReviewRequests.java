@@ -233,7 +233,8 @@ public class ManualReviewRequests {
             workspace.getId(),
             jobType,
             submission.get(),
-            key
+            key,
+            (GateDecision.Detect) decision
         );
         if (outcome.job() == null) {
             return ManualReviewOutcome.refused(outcome.requireRefusal());

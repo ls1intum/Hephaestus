@@ -100,23 +100,27 @@ class IssueReviewHandlerTest extends BaseUnitTest {
             objectMapper,
             workspaceContextBuilder,
             new TaskEnvelopeWriter(objectMapper),
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults()
+            ),
             new PracticeDetectionResultParser(objectMapper),
             new de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser(),
             deliveryService,
             // Real gate over the same mocked catalogue: with no practice rows, every slug is unknown and
             // therefore admitted, so these tests exercise delivery rather than the autonomy.
-            new InContextDeliveryGate(
+            InContextDeliveryGateFixtures.gate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                feedbackLedgerRecorder,
-                workspaceDefaults()
+                feedbackLedgerRecorder
             ),
             commentPoster,
             feedbackLedgerRecorder,
             mock(PracticeFeedbackDeliveryPolicy.class),
             mock(PracticeFeedbackCommentFormatter.class),
-            mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
+            mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
+            mock(PracticeFeedbackDispatchService.class)
         );
         lenient()
             .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(1L, "owner/repo"))
@@ -222,9 +226,4 @@ class IssueReviewHandlerTest extends BaseUnitTest {
     private record WrongRequest() implements de.tum.cit.aet.hephaestus.agent.handler.spi.JobSubmissionRequest {}
 
     /** Resolves every workspace to the unset defaults — HUMAN_APPROVAL autonomy, reach on the work. */
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
-    }
 }

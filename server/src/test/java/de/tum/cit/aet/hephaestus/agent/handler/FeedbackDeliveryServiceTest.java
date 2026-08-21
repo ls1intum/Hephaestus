@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -19,17 +20,23 @@ import de.tum.cit.aet.hephaestus.core.auth.spi.AccountPreferencesQuery;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackAnchor;
 import de.tum.cit.aet.hephaestus.integration.core.spi.InlineFeedbackChannel;
+import de.tum.cit.aet.hephaestus.integration.core.spi.ReviewSubject;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.Issue;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.issue.IssueRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequest;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.pullrequest.PullRequestRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
+import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRecorder;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.Practice;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.TrendDelta;
+import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewCoverageService;
 import de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.RepositoryToMonitorRepository;
@@ -38,6 +45,7 @@ import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -79,6 +87,18 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
     @Mock
     private de.tum.cit.aet.hephaestus.practices.observation.ObservationTrendService observationTrendService;
 
+    @Mock
+    private PracticeReviewCoverageService coverageService;
+
+    @Mock
+    private DeliveryPolicyEvaluationRecorder evaluationRecorder;
+
+    @Mock
+    private PracticeRepository practiceRepository;
+
+    @Mock
+    private PracticeFeedbackDispatchService dispatchService;
+
     private FeedbackDeliveryService service;
 
     private static final Long WORKSPACE_ID = 99L;
@@ -109,12 +129,16 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 workspaceRepository,
                 accountPreferencesQuery,
                 reviewProperties,
-                () -> silentModeEngaged
+                () -> silentModeEngaged,
+                coverageService,
+                evaluationRecorder,
+                practiceRepository
             ),
             reviewProperties,
             feedbackLedgerRecorder,
             observationTrendService,
-            commentFormatter
+            commentFormatter,
+            dispatchService
         );
         org.mockito.Mockito.lenient()
             .when(
@@ -128,11 +152,41 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             .when(repositoryToMonitorRepository.existsByWorkspaceIdAndNameWithOwner(WORKSPACE_ID, "owner/repo"))
             .thenReturn(true);
         org.mockito.Mockito.lenient()
+            .when(coverageService.assess(any(), any(), any(), any(), anyBoolean()))
+            .thenReturn(
+                new PracticeReviewCoverageService.CoverageAssessment(
+                    de.tum.cit.aet.hephaestus.workspace.settings.ReviewRepositoryMode.ALL_MONITORED,
+                    de.tum.cit.aet.hephaestus.workspace.settings.ReviewPersonMode.ALL_ELIGIBLE,
+                    PracticeReviewCoverageService.SubjectStatus.RESOLVED_LINKED_HUMAN,
+                    true,
+                    true,
+                    true,
+                    true
+                )
+            );
+        Practice automaticPractice = new Practice();
+        automaticPractice.setSlug("practice");
+        automaticPractice.setAutonomy(PracticeAutonomy.AUTOMATIC);
+        org.mockito.Mockito.lenient()
+            .when(practiceRepository.findByWorkspaceIdAndSlugIn(eq(WORKSPACE_ID), any()))
+            .thenReturn(List.of(automaticPractice));
+        org.mockito.Mockito.lenient()
             .when(workspaceRepository.findById(WORKSPACE_ID))
             .thenReturn(Optional.of(activePracticeWorkspace()));
         org.mockito.Mockito.lenient()
             .when(accountPreferencesQuery.preferencesForUserId(AUTHOR_ID))
             .thenReturn(Optional.of(new AccountPreferencesQuery.PreferencesView(false, true)));
+        org.mockito.Mockito.lenient()
+            .when(
+                coverageService.admits(
+                    any(Workspace.class),
+                    nullable(String.class),
+                    nullable(String.class),
+                    nullable(ReviewSubject.class)
+                )
+            )
+            .thenReturn(true);
+        stubSummaryDispatch();
     }
 
     private Workspace activePracticeWorkspace() {
@@ -194,7 +248,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var diffNotes = List.of(new DiffNote("src/Foo.java", 10, null, "Fix this"));
             var delivery = new DeliveryContent("Fix the tests.", diffNotes, List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
@@ -213,7 +267,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             service.deliverFeedback(
                 job,
-                new DeliveryContent("Re-reviewed: still fix the tests.", List.of(), List.of())
+                new DeliveryContent("Re-reviewed: still fix the tests.", List.of(), List.of()),
+                null,
+                Set.of("practice")
             );
 
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
@@ -232,7 +288,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_new");
 
-            service.deliverFeedback(job, new DeliveryContent("Fresh summary.", List.of(), List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Fresh summary.", List.of(), List.of()),
+                null,
+                Set.of("practice")
+            );
 
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), any(String.class));
             verify(commentPoster).postFormattedBody(eq(job), any(String.class));
@@ -249,7 +310,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new PullRequestCommentPoster.UpdateResult(PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT, null)
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Re-reviewed.", List.of(), List.of()),
+                null,
+                Set.of("practice")
+            );
 
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_prior");
@@ -284,7 +350,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
             DeliveryContent delivery = new DeliveryContent("Re-reviewed.", List.of(note), List.of());
 
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(commentPoster, never()).postFormattedBody(eq(job), any(String.class));
             verify(feedbackLedgerRecorder).record(
@@ -302,7 +368,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
 
             var delivery = new DeliveryContent("This should not be posted.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
         }
@@ -322,7 +388,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 observationTrendService.computeForTarget(ArtifactKinds.PULL_REQUEST, PULL_REQUEST_ID, WORKSPACE_ID)
             ).thenReturn(Optional.of(resolvedTrend()));
 
-            footerService.deliverFeedback(job, new DeliveryContent("Re-reviewed.", List.of(), List.of()));
+            footerService.deliverFeedback(
+                job,
+                new DeliveryContent("Re-reviewed.", List.of(), List.of()),
+                null,
+                Set.of("practice")
+            );
 
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_prior"), body.capture());
@@ -350,7 +421,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -366,7 +437,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             AgentJob job = createJob();
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -386,7 +457,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
             );
 
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
                 job,
@@ -410,7 +481,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
             );
 
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
@@ -445,7 +516,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new JobDeliverySuppressedException("Silent Mode engaged", new IllegalStateException())
             );
 
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
                 job,
@@ -487,7 +558,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNotePoster.DiffNoteResult(1, 0, List.of(signal), true, List.of("key-2"))
             );
 
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder).recordWithoutConversation(
                 job,
@@ -513,7 +584,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -535,7 +606,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(ws));
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_comment789");
 
-            service.deliverFeedback(job, new DeliveryContent("Fix stuff.", List.of(), List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Fix stuff.", List.of(), List.of()),
+                null,
+                Set.of("practice")
+            );
 
             var body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).postFormattedBody(eq(job), body.capture());
@@ -554,7 +630,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_draft123");
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
             var body = ArgumentCaptor.forClass(String.class);
@@ -571,7 +647,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -589,7 +665,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(accountPreferencesQuery);
@@ -608,7 +684,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(accountPreferencesQuery);
@@ -628,7 +704,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             ).thenReturn(false);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(accountPreferencesQuery);
@@ -649,7 +725,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
 
-            assertThatThrownBy(() -> service.deliverFeedback(job, delivery))
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery, null, Set.of("practice")))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("db down");
             verifyNoInteractions(commentPoster);
@@ -666,7 +742,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
 
-            assertThatThrownBy(() -> service.deliverFeedback(job, delivery))
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery, null, Set.of("practice")))
                 .isInstanceOf(RuntimeException.class)
                 .hasMessageContaining("db down");
             verifyNoInteractions(commentPoster);
@@ -681,7 +757,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace));
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(pullRequestRepository, commentPoster, accountPreferencesQuery);
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -697,7 +773,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.empty());
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -713,7 +789,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
 
             var delivery = new DeliveryContent("", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(commentPoster, never()).postFormattedBody(any(), any());
             verify(feedbackLedgerRecorder).recordSuppressedUnit(
@@ -748,7 +824,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             );
 
             var delivery = new DeliveryContent("", List.of(note), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder).record(
                 eq(job),
@@ -769,7 +845,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
 
             var delivery = new DeliveryContent("A real, non-blank summary body.", List.of(), List.of());
 
-            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery, null, Set.of("practice"))).isInstanceOf(
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isNull();
@@ -790,7 +866,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 List.of(new DiffNote("src/Foo.java", 3, null, "x")),
                 List.of()
             );
-            assertThatThrownBy(() -> service.deliverFeedback(job, delivery)).isInstanceOf(
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery, null, Set.of("practice"))).isInstanceOf(
                 de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
             );
             assertThat(job.getDeliveryCommentId()).isEqualTo("IC_summary_1");
@@ -804,7 +880,9 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(any(), any())).thenThrow(new RuntimeException("GraphQL timeout"));
 
             var delivery = new DeliveryContent("Summary.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            assertThatThrownBy(() -> service.deliverFeedback(job, delivery, null, Set.of("practice"))).isInstanceOf(
+                de.tum.cit.aet.hephaestus.agent.handler.spi.JobDeliveryException.class
+            );
 
             assertThat(job.getDeliveryCommentId()).isNull();
             assertThat(job.getDeliveryStatus()).isNull();
@@ -837,7 +915,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNote("src/Bar.java", 20, null, "And this", "ck-bar")
             );
             var delivery = new DeliveryContent(null, diffNotes, List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(diffNotes));
             verify(feedbackLedgerRecorder).record(
@@ -857,7 +935,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             DeliveryContent delivery = new DeliveryContent(null, List.of(), List.of());
 
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verify(feedbackLedgerRecorder, never()).recordSuppressedUnit(any(), any(), any());
             verify(feedbackLedgerRecorder, never()).record(any(), any(), any(), any(), anyBoolean(), anyBoolean());
@@ -869,7 +947,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             stubOpenPr();
             when(commentPoster.postFormattedBody(any(), any())).thenReturn("IC_comment789");
 
-            service.deliverFeedback(job, new DeliveryContent("Summary only, nothing inline.", List.of(), List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Summary only, nothing inline.", List.of(), List.of()),
+                null,
+                Set.of("practice")
+            );
 
             verify(diffNotePoster).reconcileInlineNotes(eq(job), eq(List.of()));
         }
@@ -881,7 +964,12 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             pr.setState(Issue.State.CLOSED);
             when(pullRequestRepository.findByIdWithAuthorAndRepository(PULL_REQUEST_ID)).thenReturn(Optional.of(pr));
 
-            service.deliverFeedback(job, new DeliveryContent("Summary.", List.of(), List.of()));
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Summary.", List.of(), List.of()),
+                null,
+                Set.of("practice")
+            );
 
             verify(diffNotePoster, never()).reconcileInlineNotes(any(), any());
         }
@@ -892,7 +980,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             job.setMetadata(null);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
         }
@@ -906,7 +994,7 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             job.setMetadata(metadata);
 
             var delivery = new DeliveryContent("Fix stuff.", List.of(), List.of());
-            service.deliverFeedback(job, delivery);
+            service.deliverFeedback(job, delivery, null, Set.of("practice"));
 
             verifyNoInteractions(commentPoster);
             verifyNoInteractions(pullRequestRepository);
@@ -947,10 +1035,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 List.of(new DiffNote("src/Foo.java", 10, null, "x")),
                 List.of()
             );
-            service.deliverFeedback(job, delivery, deliveredKeys -> {
-                assertThat(deliveredKeys).containsExactly("corr-1");
-                return "Demoted summary body.";
-            });
+            service.deliverFeedback(
+                job,
+                delivery,
+                deliveredKeys -> {
+                    assertThat(deliveredKeys).containsExactly("corr-1");
+                    return "Demoted summary body.";
+                },
+                Set.of("practice")
+            );
 
             ArgumentCaptor<String> body = ArgumentCaptor.forClass(String.class);
             verify(commentPoster).updateFormattedBody(eq(job), eq("IC_summary"), body.capture());
@@ -965,10 +1058,15 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
             when(commentPoster.postFormattedBody(eq(job), any(String.class))).thenReturn("IC_summary");
             boolean[] recomposed = { false };
 
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys -> {
-                recomposed[0] = true;
-                return "should-not-be-used";
-            });
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Full-line summary.", List.of(), List.of()),
+                keys -> {
+                    recomposed[0] = true;
+                    return "should-not-be-used";
+                },
+                Set.of("practice")
+            );
 
             assertThat(recomposed[0]).isFalse();
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
@@ -991,8 +1089,11 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 new DiffNotePoster.DiffNoteResult(0, 1, List.of(failed))
             );
 
-            service.deliverFeedback(job, new DeliveryContent("Full-line summary.", List.of(), List.of()), keys ->
-                "demoted"
+            service.deliverFeedback(
+                job,
+                new DeliveryContent("Full-line summary.", List.of(), List.of()),
+                keys -> "demoted",
+                Set.of("practice")
             );
 
             verify(commentPoster, never()).updateFormattedBody(eq(job), any(String.class), any(String.class));
@@ -1011,13 +1112,52 @@ class FeedbackDeliveryServiceTest extends BaseUnitTest {
                 workspaceRepository,
                 accountPreferencesQuery,
                 props,
-                () -> silentModeEngaged
+                () -> silentModeEngaged,
+                coverageService,
+                evaluationRecorder,
+                practiceRepository
             ),
             props,
             feedbackLedgerRecorder,
             observationTrendService,
-            commentFormatter
+            commentFormatter,
+            dispatchService
         );
+    }
+
+    private void stubSummaryDispatch() {
+        org.mockito.Mockito.lenient()
+            .when(dispatchService.dispatchAutomaticSummary(any(), any(String.class), nullable(String.class), any()))
+            .thenAnswer(invocation -> {
+                AgentJob job = invocation.getArgument(0);
+                String body = invocation.getArgument(1);
+                String prior = invocation.getArgument(2);
+                try {
+                    if (prior != null) {
+                        PullRequestCommentPoster.UpdateResult update = commentPoster.updateFormattedBody(
+                            job,
+                            prior,
+                            body
+                        );
+                        if (update.kind() == PullRequestCommentPoster.UpdateResult.Kind.EDITED) {
+                            return PracticeFeedbackDispatchService.Result.sent(update.externalId());
+                        }
+                        if (update.kind() == PullRequestCommentPoster.UpdateResult.Kind.TRANSIENT) {
+                            return PracticeFeedbackDispatchService.Result.uncertain();
+                        }
+                    }
+                    String externalRef = commentPoster.postFormattedBody(job, body);
+                    return externalRef == null
+                        ? PracticeFeedbackDispatchService.Result.uncertain()
+                        : PracticeFeedbackDispatchService.Result.sent(externalRef);
+                } catch (JobDeliverySuppressedException exception) {
+                    return PracticeFeedbackDispatchService.Result.suppressed(
+                        FeedbackSuppressionReason.INSTANCE_SILENCED
+                    );
+                } catch (RuntimeException exception) {
+                    return PracticeFeedbackDispatchService.Result.uncertain();
+                }
+            });
     }
 
     private static PracticeReviewProperties reviewProperties(boolean progressFooter) {

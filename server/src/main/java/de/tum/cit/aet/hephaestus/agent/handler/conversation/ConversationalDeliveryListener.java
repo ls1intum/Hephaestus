@@ -1,12 +1,14 @@
 package de.tum.cit.aet.hephaestus.agent.handler.conversation;
 
 import de.tum.cit.aet.hephaestus.agent.AgentJobType;
+import de.tum.cit.aet.hephaestus.agent.handler.PracticeFeedbackDeliveryPolicy;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJob;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.config.FeedbackLaneExecutor;
 import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressGuard;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicySurface;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
@@ -45,6 +47,7 @@ public class ConversationalDeliveryListener {
     private final OutboundEgressGuard egressGuard;
     private final AgentJobRepository agentJobRepository;
     private final FeedbackCompositionResultParser resultParser;
+    private final PracticeFeedbackDeliveryPolicy deliveryPolicy;
 
     public ConversationalDeliveryListener(
         ObservationRepository observationRepository,
@@ -52,7 +55,8 @@ public class ConversationalDeliveryListener {
         ConversationalFeedbackPreparer preparer,
         OutboundEgressGuard egressGuard,
         AgentJobRepository agentJobRepository,
-        FeedbackCompositionResultParser resultParser
+        FeedbackCompositionResultParser resultParser,
+        PracticeFeedbackDeliveryPolicy deliveryPolicy
     ) {
         this.observationRepository = observationRepository;
         this.router = router;
@@ -60,6 +64,7 @@ public class ConversationalDeliveryListener {
         this.egressGuard = egressGuard;
         this.agentJobRepository = agentJobRepository;
         this.resultParser = resultParser;
+        this.deliveryPolicy = deliveryPolicy;
     }
 
     @Async(FeedbackLaneExecutor.BEAN_NAME)
@@ -108,6 +113,10 @@ public class ConversationalDeliveryListener {
     private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {
         if (!egressGuard.deliveryAllowed("prepare-conversational-feedback")) {
             log.debug("Conversational preparation suppressed: jobId={}", agentJobId);
+            return 0;
+        }
+        AgentJob sourceJob = agentJobRepository.findById(agentJobId).orElse(null);
+        if (sourceJob == null || !deliveryPolicy.allowsComposition(sourceJob, DeliveryPolicySurface.CONVERSATION)) {
             return 0;
         }
         List<Observation> observations = observationRepository.findByAgentJobId(agentJobId);

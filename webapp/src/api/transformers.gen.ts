@@ -1026,6 +1026,11 @@ export const listTracedArtifactsResponseTransformer = async (data: any): Promise
     return data;
 };
 
+const deliveryPolicyTraceSchemaResponseTransformer = (data: any) => {
+    data.evaluatedAt = new Date(data.evaluatedAt);
+    return data;
+};
+
 const practiceTraceEntrySchemaResponseTransformer = (data: any) => {
     if (data.decidedAt) {
         data.decidedAt = new Date(data.decidedAt);
@@ -1039,6 +1044,7 @@ const tracedSignalSchemaResponseTransformer = (data: any) => {
 };
 
 const artifactTraceSchemaResponseTransformer = (data: any) => {
+    data.deliveryPolicy = data.deliveryPolicy.map((item: any) => deliveryPolicyTraceSchemaResponseTransformer(item));
     data.practices = data.practices.map((item: any) => practiceTraceEntrySchemaResponseTransformer(item));
     data.signals = data.signals.map((item: any) => tracedSignalSchemaResponseTransformer(item));
     return data;

@@ -13,6 +13,10 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ArtifactIdentity;
 import de.tum.cit.aet.hephaestus.integration.core.spi.Signal;
 import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyCheck;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyCheckStatus;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyEvaluationRepository;
+import de.tum.cit.aet.hephaestus.practices.feedback.DeliveryPolicyFactsSnapshot;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository.ArtifactFeedbackRow;
@@ -31,6 +35,8 @@ import de.tum.cit.aet.hephaestus.practices.trace.TraceInputs.PracticeOutput;
 import de.tum.cit.aet.hephaestus.practices.trace.TraceInputs.SignalOccurrence;
 import de.tum.cit.aet.hephaestus.practices.trace.TraceInputs.TracedPractice;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.ArtifactTraceDTO;
+import de.tum.cit.aet.hephaestus.practices.trace.dto.DeliveryPolicyTraceCheckDTO;
+import de.tum.cit.aet.hephaestus.practices.trace.dto.DeliveryPolicyTraceDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.PracticeTraceEntryDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.TracedArtifactDTO;
 import de.tum.cit.aet.hephaestus.practices.trace.dto.TracedSignalDTO;
@@ -51,6 +57,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * Assembles the trace: the signal ledger crossed with the workspace's practices, the runs those
@@ -77,6 +84,8 @@ class ArtifactTraceQueryService {
     private final ReviewOutcomeLookup reviews;
     private final ArtifactCatalog artifacts;
     private final ArtifactIdentities identities;
+    private final DeliveryPolicyEvaluationRepository policyEvaluations;
+    private final ObjectMapper objectMapper;
 
     @Transactional(readOnly = true)
     ArtifactTraceDTO trace(Long workspaceId, ArtifactKind artifactKind, Long artifactId) {
@@ -125,8 +134,39 @@ class ArtifactTraceQueryService {
             identity.container(),
             identity.url(),
             tracedSignals,
+            policyEvaluations(workspaceId, reviewIds),
             entries
         );
+    }
+
+    private List<DeliveryPolicyTraceDTO> policyEvaluations(Long workspaceId, Set<UUID> reviewIds) {
+        if (reviewIds.isEmpty()) return List.of();
+        return policyEvaluations
+            .findByWorkspaceIdAndAgentJobIdInOrderByEvaluatedAtAsc(workspaceId, reviewIds)
+            .stream()
+            .map(evaluation ->
+                new DeliveryPolicyTraceDTO(
+                    evaluation.getAgentJobId(),
+                    evaluation.getAdmittedRevision(),
+                    evaluation.getEvaluatedRevision(),
+                    evaluation.getResolverVersion(),
+                    evaluation.getSurface(),
+                    evaluation.getStage(),
+                    evaluation.getAllowed(),
+                    evaluation.getDecisiveReason(),
+                    java.util.stream.StreamSupport.stream(evaluation.getChecks().spliterator(), false)
+                        .map(check ->
+                            new DeliveryPolicyTraceCheckDTO(
+                                DeliveryPolicyCheck.valueOf(check.path("check").asString()),
+                                DeliveryPolicyCheckStatus.valueOf(check.path("status").asString())
+                            )
+                        )
+                        .toList(),
+                    objectMapper.treeToValue(evaluation.getFacts(), DeliveryPolicyFactsSnapshot.class),
+                    evaluation.getEvaluatedAt()
+                )
+            )
+            .toList();
     }
 
     @Transactional(readOnly = true)

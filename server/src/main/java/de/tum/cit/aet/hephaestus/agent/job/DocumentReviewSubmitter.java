@@ -136,7 +136,8 @@ public class DocumentReviewSubmitter implements DocumentReviewTrigger, PendingSi
                     key.revision(),
                     SignalOrigins.observationOriginOf(discoveredVia)
                 ),
-                key
+                key,
+                detect
             );
         }
     }

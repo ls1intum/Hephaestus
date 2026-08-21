@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, userEvent } from "storybook/test";
+import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
+import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeReviewSettings } from "./PracticeReviewSettings";
 import { mockReviewSettings } from "./story-mock-data";
@@ -36,6 +37,32 @@ const policy = {
 	onReset: fn(),
 };
 
+const coverage = {
+	preview: {
+		data: {
+			current: settings.coverageSummary,
+			proposed: { ...settings.coverageSummary, coveredRepositories: 3 },
+			widens: true,
+		},
+		isPending: false,
+		isError: false,
+		onPreview: fn(),
+	},
+	repositories: {
+		options: ["acme/widgets", "acme/gadgets"].map((value) => ({ value, label: value })),
+		isLoading: false,
+		isError: false,
+	},
+	people: {
+		options: [
+			{ value: 7, label: "Ada Lovelace", description: "@ada" },
+			{ value: 8, label: "Grace Hopper", description: "@grace" },
+		],
+		isLoading: false,
+		isError: false,
+	},
+};
+
 const meta = {
 	title: "Workspace admin/Practices/Review/When and where",
 	component: PracticeReviewSettings,
@@ -49,6 +76,7 @@ const meta = {
 		model,
 		workspace,
 		policy,
+		coverage,
 	},
 	decorators: [
 		(Story) => (
@@ -62,34 +90,13 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-/**
- * A switch row stays a row: the control sits after its label and description, on the same line. This
- * is measured rather than believed because the reflow fix below it could have been bought by letting
- * the row stack instead, which is not the layout this surface wants at any width.
- */
-async function expectSwitchSitsBesideItsLabel(control: HTMLElement) {
-	const field = control.closest<HTMLElement>('[data-slot="field"]');
-	const content = field?.querySelector<HTMLElement>('[data-slot="field-content"]');
-	await expect(content, "The switch is not in a Field with a FieldContent.").not.toBeNull();
-
-	const controlBox = control.getBoundingClientRect();
-	const contentBox = (content as HTMLElement).getBoundingClientRect();
-	await expect(controlBox.left).toBeGreaterThanOrEqual(contentBox.right);
-	await expect(controlBox.top).toBeGreaterThanOrEqual(contentBox.top);
-	await expect(controlBox.top).toBeLessThan(contentBox.bottom);
-}
-
 export const Configured: Story = {
 	parameters: {
 		viewport: { defaultViewport: "reflow" },
 		chromatic: { viewports: [320, 1440] },
 	},
-	play: async ({ canvas }) => {
+	play: async () => {
 		await expectNoPageOverflow();
-		// Fitting at 320px is not the same as fitting by stacking: the row survives the narrow width.
-		await expectSwitchSitsBesideItsLabel(
-			canvas.getByRole("switch", { name: "Start practice reviews" }),
-		);
 	},
 };
 
@@ -142,27 +149,73 @@ export const TriggersOff: Story = {
 	},
 };
 
-export const RequestedReviewsNamesEveryDoor: Story = {
-	play: async ({ canvas }) => {
-		const requested = canvas.getByRole("switch", { name: "Reviews somebody asks for" });
-		await expect(requested).toBeVisible();
-
-		// This story runs at the default viewport; the width is asserted so the row check below cannot
-		// pass by being measured at a narrow one.
-		await expect(window.innerWidth).toBeGreaterThanOrEqual(640);
-		await expectSwitchSitsBesideItsLabel(requested);
-
-		const description = canvas.getByText(/Turning this off stops every one of them/i);
-		await expect(description).toHaveTextContent("Review this now");
-		await expect(description).toHaveTextContent("backfill of past work");
-		await expect(description).toHaveTextContent("recurring check");
-		// Only GitLab publishes the comment event, so the copy must not promise it everywhere.
-		await expect(description).toHaveTextContent("GitLab merge request comment");
-	},
-};
-
 export const ReviewsPaused: Story = {
 	args: { workspace: { ...workspace, enabled: false } },
+};
+
+/**
+ * The shape a real pilot has: a handful of repositories, some of them limited to a branch, and the
+ * people whose work is in scope. Every earlier story held one of each, which is the one size at
+ * which a list and a stack of fields look the same.
+ */
+export const PilotPopulation: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: {
+				...settings,
+				coverageSummary: {
+					...settings.coverageSummary,
+					monitoredRepositories: 12,
+					eligiblePeople: 24,
+				},
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [
+						{ nameWithOwner: "acme/widgets", baseBranches: ["main"] },
+						{ nameWithOwner: "acme/gadgets", baseBranches: [] },
+						{ nameWithOwner: "acme/sprockets", baseBranches: ["main", "release/2026.1"] },
+						{ nameWithOwner: "acme/retired-service", baseBranches: [] },
+					],
+					personUserIds: [7, 8, 9, 10, 11],
+				},
+			},
+		},
+		coverage: {
+			...coverage,
+			repositories: {
+				options: ["acme/widgets", "acme/gadgets", "acme/sprockets"].map((value) => ({
+					value,
+					label: value,
+				})),
+				isLoading: false,
+				isError: false,
+			},
+			people: {
+				options: [
+					{ value: 7, label: "Ada Lovelace", description: "@ada" },
+					{ value: 8, label: "Grace Hopper", description: "@grace" },
+					{ value: 9, label: "Katherine Johnson", description: "@katherine" },
+					{ value: 10, label: "Barbara Liskov", description: "@barbara" },
+					{ value: 11, label: "Margaret Hamilton", description: "@margaret" },
+				],
+				isLoading: false,
+				isError: false,
+			},
+		},
+	},
+	parameters: {
+		viewport: { defaultViewport: "reflow" },
+		chromatic: { viewports: [320, 1440] },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("4 of 12 monitored")).toBeVisible();
+		await expect(canvas.getByText("5 of 24 linked")).toBeVisible();
+		// A repository that has left the monitored set is still named in the scope and covers nothing.
+		await expect(canvas.getByText("Not monitored")).toBeVisible();
+		await expectNoPageOverflow();
+	},
 };
 
 export const ReviewScopeNarrowed: Story = {
@@ -172,8 +225,12 @@ export const ReviewScopeNarrowed: Story = {
 			settings: {
 				...settings,
 				reviewScope: {
-					targetBranches: ["main", "release/2026.1"],
-					repositories: ["acme/widgets", "acme/gadgets"],
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [
+						{ nameWithOwner: "acme/widgets", baseBranches: ["main", "release/2026.1"] },
+					],
+					personUserIds: [7],
 				},
 			},
 		},
@@ -198,28 +255,33 @@ export const AddingATargetBranch: Story = {
 			onUpdate: fn(),
 			settings: {
 				...settings,
-				reviewScope: { targetBranches: [], repositories: ["acme/widgets"] },
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+					personUserIds: [],
+				},
 			},
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.type(canvas.getByLabelText("Target branches"), "  release/2026.1  ");
-		await userEvent.click(canvas.getByRole("button", { name: "Add to target branches" }));
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		await userEvent.type(
+			canvas.getByLabelText("Only these base branches for acme/widgets"),
+			"  release/2026.1  ",
+		);
+		await userEvent.click(
+			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
+		);
 
 		// Trimmed on the way out: a name with a stray space matches no branch the gate ever sees.
 		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: ["release/2026.1"], repositories: ["acme/widgets"] },
-		});
-	},
-};
-
-export const EnterAddsTheEntry: Story = {
-	args: { policy: { ...policy, onUpdate: fn() } },
-	play: async ({ args, canvas }) => {
-		await userEvent.type(canvas.getByLabelText("Repositories"), "acme/gadgets{Enter}");
-
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: [], repositories: ["acme/gadgets"] },
+			reviewScope: {
+				repositoryMode: "SELECTED",
+				personMode: "ALL_ELIGIBLE",
+				repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["release/2026.1"] }],
+				personUserIds: [],
+			},
 		});
 	},
 };
@@ -230,59 +292,137 @@ export const RefusingADuplicate: Story = {
 		policy: {
 			...policy,
 			onUpdate: fn(),
-			settings: { ...settings, reviewScope: { targetBranches: ["main"], repositories: [] } },
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: ["main"] }],
+					personUserIds: [],
+				},
+			},
 		},
 	},
 	play: async ({ args, canvas }) => {
-		const input = canvas.getByLabelText("Target branches");
+		await userEvent.click(canvas.getByRole("button", { name: "Base branches for acme/widgets" }));
+		const input = canvas.getByLabelText("Only these base branches for acme/widgets");
 		await userEvent.type(input, "main");
 
 		await expect(input).toBeInvalid();
 		await expect(input).toHaveAccessibleDescription(/main is already listed\./);
-		await expect(canvas.getByRole("button", { name: "Add to target branches" })).toBeDisabled();
+		await expect(
+			canvas.getByRole("button", { name: "Add to base branches for acme/widgets" }),
+		).toBeDisabled();
 
 		await userEvent.type(input, "{Enter}");
 		await expect(args.policy.onUpdate).not.toHaveBeenCalled();
 	},
 };
 
-export const RemovingATargetBranch: Story = {
+export const SelectedEmptyMeansNobody: Story = {
+	args: {
+		policy: {
+			...policy,
+			settings: {
+				...settings,
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "SELECTED",
+					repositories: [],
+					personUserIds: [],
+				},
+			},
+		},
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("No repositories are covered.")).toBeVisible();
+		await expect(canvas.getByText("No people are covered.")).toBeVisible();
+		// Two empty lists are one consequence, and it is the consequence — not the two lists — that
+		// tells an admin why a pilot they thought they had configured is silent.
+		await expect(canvas.getByText("Nothing is being reviewed")).toBeVisible();
+	},
+};
+
+/**
+ * Pausing is the control somebody reaches for when feedback is going out that should not be. It says
+ * what it did, because "sending is off" and "what was ready while it was off is now lost" are
+ * different facts and only the second one is surprising.
+ */
+export const SendingPaused: Story = {
+	args: {
+		policy: { ...policy, settings: { ...settings, deliveryStatus: "PAUSED" } },
+	},
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Sending is paused")).toBeVisible();
+		await expect(canvas.getByRole("switch", { name: /Send feedback/ })).not.toBeChecked();
+	},
+};
+
+export const WideningRequiresConfirmation: Story = {
 	args: {
 		policy: {
 			...policy,
 			onUpdate: fn(),
 			settings: {
 				...settings,
-				reviewScope: { targetBranches: ["main", "release/2026.1"], repositories: [] },
+				reviewScope: {
+					repositoryMode: "SELECTED",
+					personMode: "ALL_ELIGIBLE",
+					repositories: [{ nameWithOwner: "acme/widgets", baseBranches: [] }],
+					personUserIds: [],
+				},
 			},
 		},
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getByRole("button", { name: "Remove release/2026.1" }));
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
-		await expect(args.policy.onUpdate).toHaveBeenCalledWith({
-			reviewScope: { targetBranches: ["main"], repositories: [] },
-		});
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expect(dialog.getByText(/Monitored repositories covered:/)).toHaveTextContent("3");
+		await expect(dialog.getByText(/Workspace-wide context:/)).toHaveTextContent(
+			"not just this proposed population",
+		);
+		await expect(args.coverage.preview.onPreview).toHaveBeenCalled();
+
+		await userEvent.click(dialog.getByRole("button", { name: "Widen coverage" }));
+		await expect(args.policy.onUpdate).toHaveBeenCalled();
 	},
 };
 
-/** Widening back to everything is a reset rather than an empty save. */
-export const WideningTheScopeAgain: Story = {
+export const CoveragePreviewLoading: Story = {
 	args: {
-		policy: {
-			...policy,
-			onReset: fn(),
-			settings: {
-				...settings,
-				reviewScope: { targetBranches: ["main"], repositories: [] },
-			},
+		...WideningRequiresConfirmation.args,
+		coverage: {
+			...coverage,
+			preview: { data: undefined, isPending: true, isError: false, onPreview: fn() },
+		},
+	},
+	play: async ({ canvas }) => {
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
+
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectSettledVisible(dialog.getByText("Calculating the proposed coverage…"));
+		await expect(dialog.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+	},
+};
+
+export const CoveragePreviewUnavailable: Story = {
+	args: {
+		...WideningRequiresConfirmation.args,
+		coverage: {
+			...coverage,
+			preview: { data: undefined, isPending: false, isError: true, onPreview: fn() },
 		},
 	},
 	play: async ({ args, canvas }) => {
-		const reset = canvas.getByRole("button", { name: /^Review everything again/ });
-		await userEvent.click(reset);
+		await userEvent.click(canvas.getByRole("radio", { name: "All monitored repositories" }));
 
-		await expect(args.policy.onReset).toHaveBeenCalledWith("REVIEW_SCOPE");
+		const dialog = within(await screen.findByRole("alertdialog"));
+		await expectSettledVisible(dialog.getByText("Couldn't preview this change"));
+		await expect(dialog.getByRole("button", { name: "Widen coverage" })).toBeDisabled();
+
+		await userEvent.click(dialog.getByRole("button", { name: "Retry" }));
+		await expect(args.coverage.preview.onPreview).toHaveBeenCalledTimes(2);
 	},
 };
 

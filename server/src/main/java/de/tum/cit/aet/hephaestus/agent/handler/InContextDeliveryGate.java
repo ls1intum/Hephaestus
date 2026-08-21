@@ -14,10 +14,12 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
+import de.tum.cit.aet.hephaestus.workspace.WorkspaceRepository;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -54,17 +56,20 @@ class InContextDeliveryGate {
     private final ObservationRepository observationRepository;
     private final FeedbackLedgerRecorder feedbackLedgerRecorder;
     private final WorkspaceReviewDefaultsProvider workspaceDefaults;
+    private final WorkspaceRepository workspaceRepository;
 
     InContextDeliveryGate(
         PracticeRepository practiceRepository,
         ObservationRepository observationRepository,
         FeedbackLedgerRecorder feedbackLedgerRecorder,
-        WorkspaceReviewDefaultsProvider workspaceDefaults
+        WorkspaceReviewDefaultsProvider workspaceDefaults,
+        WorkspaceRepository workspaceRepository
     ) {
         this.practiceRepository = practiceRepository;
         this.observationRepository = observationRepository;
         this.feedbackLedgerRecorder = feedbackLedgerRecorder;
         this.workspaceDefaults = workspaceDefaults;
+        this.workspaceRepository = workspaceRepository;
     }
 
     /** The subset of {@code observations} that may be placed on the artifact, in the order given. */
@@ -72,6 +77,11 @@ class InContextDeliveryGate {
     List<ValidatedObservation> admitInContext(AgentJob job, List<ValidatedObservation> observations) {
         if (observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null) {
             return observations;
+        }
+        FeedbackSuppressionReason rolloutRefusal = rolloutRefusal(job);
+        if (rolloutRefusal != null) {
+            recordWithheld(job, observations, rolloutRefusal);
+            return List.of();
         }
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) {
@@ -129,6 +139,7 @@ class InContextDeliveryGate {
         if (
             observations.isEmpty() || job.getWorkspace() == null || job.getWorkspace().getId() == null
         ) return List.of();
+        if (rolloutRefusal(job) != null) return List.of();
         ObservationOrigin origin = PracticeDetectionDeliveryService.originOf(job.getMetadata());
         if (!origin.delivers(FeedbackChannel.IN_CONTEXT)) return List.of();
         WorkspaceReviewDefaults defaults = workspaceDefaults.forWorkspace(job.getWorkspace().getId());
@@ -176,5 +187,28 @@ class InContextDeliveryGate {
                 log.warn("Withheld-feedback ledger write failed (delivery unaffected): jobId={}", job.getId(), e);
             }
         }
+    }
+
+    /**
+     * The job carries the rollout revision it was admitted under; anything else in force now means the
+     * operator has changed the rollout since, and this run belongs to the old one.
+     *
+     * <p>The current revision is read by workspace id rather than through {@code job.getWorkspace()}: the
+     * job arrives from the transaction that loaded it, so its workspace is a detached proxy here. A
+     * workspace that has since disappeared has no revision to match, which withholds rather than delivers.
+     */
+    private @Nullable FeedbackSuppressionReason rolloutRefusal(AgentJob job) {
+        if (!job.isExternalDeliveryAllowed()) {
+            return FeedbackSuppressionReason.ADMINISTRATIVE_INTERNAL_ONLY;
+        }
+        Long admitted = job.getPracticeRolloutRevision();
+        Long current = workspaceRepository
+            .findById(job.getWorkspace().getId())
+            .map(workspace -> workspace.getReviewSettings().getRolloutRevision())
+            .orElse(null);
+        if (admitted == null || current == null || admitted.longValue() != current.longValue()) {
+            return FeedbackSuppressionReason.STALE_ROLLOUT_REVISION;
+        }
+        return null;
     }
 }

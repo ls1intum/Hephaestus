@@ -10,8 +10,10 @@ import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import de.tum.cit.aet.hephaestus.workspace.WorkspaceMembership.WorkspaceRole;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 
@@ -79,14 +81,9 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
     @WithAdminUser
     void overridesAndResetsPracticeReviewPolicy() {
         Workspace workspace = setupWorkspace("ai-reset");
+        String slug = workspace.getWorkspaceSlug();
 
-        webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("deliverToMerged", true))
-            .exchange()
+        patch(slug, currentEtag(slug), Map.of("deliverToMerged", true))
             .expectStatus()
             .isOk()
             .expectBody()
@@ -96,13 +93,7 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .isEqualTo(true);
 
         // Reset to inherit — the fleet default for deliverToMerged is false.
-        webTestClient
-            .patch()
-            .uri("/workspaces/{slug}/practices/review-settings", workspace.getWorkspaceSlug())
-            .headers(TestAuthUtils.withCurrentUser())
-            .contentType(MediaType.APPLICATION_JSON)
-            .bodyValue(Map.of("reset", List.of("DELIVER_TO_MERGED")))
-            .exchange()
+        patch(slug, currentEtag(slug), Map.of("reset", List.of("DELIVER_TO_MERGED")))
             .expectStatus()
             .isOk()
             .expectBody()
@@ -110,6 +101,43 @@ class PracticeReviewSettingsControllerIntegrationTest extends AbstractWorkspaceI
             .doesNotExist()
             .jsonPath("$.deliverToMerged")
             .isEqualTo(false);
+    }
+
+    /** A change made without saying which version it is built on is refused rather than guessed at. */
+    @Test
+    @WithAdminUser
+    void refusesAPolicyChangeThatNamesNoVersion() {
+        Workspace workspace = setupWorkspace("ai-unconditional");
+
+        patch(workspace.getWorkspaceSlug(), null, Map.of("deliverToMerged", true))
+            .expectStatus()
+            .isEqualTo(HttpStatus.PRECONDITION_REQUIRED);
+    }
+
+    private String currentEtag(String slug) {
+        return webTestClient
+            .get()
+            .uri("/workspaces/{slug}/practices/review-settings", slug)
+            .headers(TestAuthUtils.withCurrentUser())
+            .exchange()
+            .expectStatus()
+            .isOk()
+            .returnResult(PracticeReviewSettingsDTO.class)
+            .getResponseHeaders()
+            .getETag();
+    }
+
+    private WebTestClient.ResponseSpec patch(String slug, @Nullable String ifMatch, Map<String, Object> body) {
+        return webTestClient
+            .patch()
+            .uri("/workspaces/{slug}/practices/review-settings", slug)
+            .headers(headers -> {
+                TestAuthUtils.withCurrentUser().accept(headers);
+                if (ifMatch != null) headers.setIfMatch(ifMatch);
+            })
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(body)
+            .exchange();
     }
 
     @Test

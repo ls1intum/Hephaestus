@@ -35,6 +35,8 @@ public enum SignalStateReason {
      */
     OUT_OF_REVIEW_SCOPE(SignalState.SUPPRESSED),
 
+    STALE_ROLLOUT_REVISION(SignalState.SUPPRESSED),
+
     WORKSPACE_INACTIVE(SignalState.PENDING),
 
     PRACTICES_DISABLED(SignalState.PENDING),
@@ -92,6 +94,7 @@ public enum SignalStateReason {
             case REQUESTER_QUOTA_EXHAUSTED -> "You have asked for as many reviews as an hour allows; the allowance refills.";
             case CONCURRENT_DUPLICATE -> "Another submission for the same work carries this review.";
             case OUT_OF_REVIEW_SCOPE -> "This artifact is outside the branches and repositories this workspace reviews.";
+            case STALE_ROLLOUT_REVISION -> "The review rollout changed after this work was admitted; it is not replayed under the new configuration.";
             case WORKSPACE_INACTIVE -> "The workspace was not active; it is re-offered when the workspace is.";
             case PRACTICES_DISABLED -> "Practice review is switched off for this workspace; it is re-offered when it is switched on.";
             case NO_ACTIVE_PRACTICE -> "No practice was bound to this occurrence when it was recorded.";

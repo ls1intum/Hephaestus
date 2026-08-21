@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.agent.config.AgentPurpose;
 import de.tum.cit.aet.hephaestus.core.security.EncryptedStringConverter;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
+import de.tum.cit.aet.hephaestus.practices.review.TriggerMode;
 import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
@@ -55,7 +56,10 @@ import tools.jackson.databind.JsonNode;
             columnList = "workspace_id, purpose, created_at DESC, id DESC"
         ),
     },
-    uniqueConstraints = @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" })
+    uniqueConstraints = {
+        @UniqueConstraint(name = "uk_agent_job_token", columnNames = { "job_token" }),
+        @UniqueConstraint(name = "uk_agent_job_workspace_id", columnNames = { "workspace_id", "id" }),
+    }
 )
 @Getter
 @Setter
@@ -106,6 +110,20 @@ public class AgentJob {
     @Column(name = "artifact_kind", length = ArtifactKind.MAX_LENGTH)
     @Nullable
     private ArtifactKind artifactKind;
+
+    @ColumnDefault("0")
+    @Column(name = "practice_rollout_revision", nullable = false)
+    private Long practiceRolloutRevision = 0L;
+
+    @Enumerated(EnumType.STRING)
+    @ColumnDefault("'MANUAL'")
+    @Column(name = "practice_trigger_mode", nullable = false, length = 24)
+    private TriggerMode practiceTriggerMode = TriggerMode.MANUAL;
+
+    /** Administrative evaluations set this false. */
+    @ColumnDefault("true")
+    @Column(name = "external_delivery_allowed", nullable = false)
+    private boolean externalDeliveryAllowed = true;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "metadata", columnDefinition = "jsonb")

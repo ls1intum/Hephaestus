@@ -88,7 +88,8 @@ public class IssueSignalResubmitter implements PendingSignalResubmitter {
                     // that still remembers which population this review was meant to measure.
                     SignalOrigins.observationOriginOf(signal.getDiscoveredVia())
                 ),
-                key
+                key,
+                detect
             );
         }
     }

@@ -8,7 +8,7 @@ import {
 	updatePracticeReviewSettingsMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { PracticeReviewSettings, UpdatePracticeReviewSettingsRequest } from "@/api/types.gen";
-import { problemDetailOf } from "@/lib/problem-detail";
+import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export type PracticeReviewSettingsField = NonNullable<
 	UpdatePracticeReviewSettingsRequest["reset"]
@@ -35,9 +35,7 @@ export function usePracticeReviewSettingsMutation(
 		onMutate: async (variables) => {
 			await queryClient.cancelQueries({ queryKey: settingsQueryKey });
 			const previous = queryClient.getQueryData<PracticeReviewSettings>(settingsQueryKey);
-			if (previous && !variables.body.reset?.length) {
-				queryClient.setQueryData(settingsQueryKey, patchReviewSettings(previous, variables.body));
-			}
+			if (previous) variables.headers = { "If-Match": previous.etag };
 			return { previous };
 		},
 		onSuccess: (updated) => {
@@ -46,6 +44,13 @@ export function usePracticeReviewSettingsMutation(
 		},
 		onError: (error, _variables, context) => {
 			if (context?.previous) queryClient.setQueryData(settingsQueryKey, context.previous);
+			if (problemStatusOf(error) === 412) {
+				toast.error("Review settings changed elsewhere", {
+					description: "The latest settings were reloaded. Review your change and try again.",
+				});
+				void queryClient.invalidateQueries({ queryKey: settingsQueryKey });
+				return;
+			}
 			toast.error(messages.error, { description: problemDetailOf(error) });
 		},
 		onSettled: () => {
@@ -62,41 +67,4 @@ export function usePracticeReviewSettingsMutation(
 			});
 		},
 	});
-}
-
-/**
- * The optimistic echo of a PATCH: every field the request set becomes both the effective value and the
- * raw override.
- *
- * Resets are not echoed — clearing an override resolves against the fleet default, which only the
- * server knows, so the caller skips this entirely when `reset` is non-empty.
- */
-export function patchReviewSettings(
-	settings: PracticeReviewSettings,
-	patch: UpdatePracticeReviewSettingsRequest,
-): PracticeReviewSettings {
-	return {
-		...settings,
-		...(patch.deliverToMerged === undefined
-			? {}
-			: {
-					deliverToMerged: patch.deliverToMerged,
-					deliverToMergedOverride: patch.deliverToMerged,
-				}),
-		...(patch.cooldownMinutes === undefined
-			? {}
-			: {
-					cooldownMinutes: patch.cooldownMinutes,
-					cooldownMinutesOverride: patch.cooldownMinutes,
-				}),
-		...(patch.defaultAutonomy === undefined
-			? {}
-			: {
-					defaultAutonomy: patch.defaultAutonomy,
-					defaultAutonomyOverride: patch.defaultAutonomy,
-				}),
-		// The scope has no separate "override" key: it replaces wholesale and an empty scope already
-		// means "unrestricted", so the effective value is the only value there is.
-		...(patch.reviewScope === undefined ? {} : { reviewScope: patch.reviewScope }),
-	};
 }

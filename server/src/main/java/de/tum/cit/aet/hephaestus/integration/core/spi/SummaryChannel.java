@@ -59,7 +59,13 @@ public interface SummaryChannel {
 
     record FeedbackTarget(IntegrationRef ref, String subjectExternalId, String resourceUrl) {}
 
-    record FeedbackContent(String body, String marker) {}
+    record FeedbackContent(String body, String marker) {
+        public String externalBody() {
+            return marker == null || marker.isBlank()
+                ? body
+                : body.replace(marker, "").stripTrailing() + "\n\n" + marker;
+        }
+    }
 
     /** Vendor-side post identifier recorded on {@code FeedbackPlacement.external_ref} for edit-in-place (ADR 0021). */
     record SummaryHandle(String externalId) {}

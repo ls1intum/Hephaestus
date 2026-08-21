@@ -77,10 +77,11 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         ClientGraphQlResponse response = mockGraphQlResponse("addComment.commentEdge.node.id", "IC_comment456");
         when(spec.execute()).thenReturn(Mono.just(response));
 
-        SummaryHandle handle = channel.postSummary(target, new FeedbackContent("body", "marker"));
+        SummaryHandle handle = channel.postSummary(target, new FeedbackContent("body\n\nmarker", "marker"));
 
         assertThat(handle).isNotNull();
         assertThat(handle.externalId()).isEqualTo("IC_comment456");
+        verify(spec).variable("body", "body\n\nmarker");
     }
 
     @Test
@@ -190,6 +191,7 @@ class GithubSummaryChannelTest extends BaseUnitTest {
         assertThat(outcome.kind()).isEqualTo(SummaryChannel.UpdateOutcome.Kind.EDITED);
         assertThat(outcome.handle().externalId()).isEqualTo("IC_edited");
         verify(spec).variable("id", "IC_prior");
+        verify(spec).variable("body", "new body\n\nmarker");
     }
 
     @Test

@@ -305,7 +305,7 @@ public class AgentJobEventListener {
 
         try {
             agentJobService
-                .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey)
+                .submit(detect.workspace().getId(), AgentJobType.PULL_REQUEST_REVIEW, request, signalKey, detect)
                 .ifPresent(job ->
                     log.info(
                         "Agent job submitted: jobId={}, prNumber={}, repoName={}, signal={}, matchedPractices={}",

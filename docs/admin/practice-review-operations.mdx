@@ -39,7 +39,7 @@ sources each purpose may use; integrations only determine which authorized sourc
 
 ## Workspace controls
 
-Workspace administrators configure model readiness under **AI models**, review scope and autonomy under
+Workspace administrators configure model readiness under **AI models**, review coverage, delivery status, and autonomy under
 **Practices**, and spend under **AI usage**. **Review activity** explains what happened to an individual
 piece of work. These product-level destinations are intentionally broader than a click-by-click path so the
 guide survives navigation changes; [Practice review](./practice-review.mdx) gives the task sequence.
@@ -64,6 +64,9 @@ The job queue exposes its own signals — alert off these rather than reading ap
 - **`llm.budget.exhausted`** / **`llm.budget.blocked`** — a cap crossed, and work refused at a cap.
 - **`practice.review.refused`** — refused reviews, tagged by `phase` (`submission` or `execution`) and
   `reason`.
+- **`practice.feedback.dispatch`** — durable-dispatch outcomes, tagged by bounded `destination` and
+  `state`. Alert on sustained `UNCERTAIN` or `FAILED` outcomes. `UNCERTAIN` means delivery is not yet
+  confirmed; `FAILED` is terminal after the retry limit or an unrecoverable dispatch record.
 
 Query `/actuator/health/readiness` for aggregate readiness. An authorized response includes the
 **`practiceReview`** component. An enabled review worker reports `OUT_OF_SERVICE` with
@@ -76,7 +79,20 @@ Metric names in the instrumented code are the source of truth for dashboards and
 
 **Retention.** Terminal job payloads are stripped before their rows are deleted. Row retention must not be
 shorter than payload retention. Set both against the approved retention policy, verify them in the effective
-application configuration, and treat the fabric root as sensitive storage.
+application configuration, and treat the fabric root as sensitive storage. Delivery-policy evaluations and
+dispatch intents are deleted with their owning job or workspace; selected coverage targets are deleted with
+their workspace membership or monitored repository.
+
+**Dispatch recovery.** Automatic summaries and approved artifact comments first persist an immutable
+destination and body, then claim it in a short transaction. Immediately before provider I/O, the dispatcher
+persists `write_started`. Recovery always checks the deterministic provider marker first. If the marker is
+found, it records the existing comment as sent. If lookup is inconclusive—or lookup reports no marker after
+a write began—it does not post again; it retries reconciliation until the bounded attempt limit ends in the
+terminal `FAILED` state. A dispatch with no prior write may post after a definitive not-found result. Provider
+I/O runs without a database lock.
+
+Do not mutate dispatch rows manually. The state, write fence, attempt count, next-attempt time, and lease
+owner jointly prevent an uncertain provider outcome from becoming a duplicate write.
 
 ## Limits you should know about
 
