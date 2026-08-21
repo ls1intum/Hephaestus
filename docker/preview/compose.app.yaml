@@ -115,49 +115,18 @@ services:
           -U hephaestus -d hephaestus \
           --exit-on-error --no-owner --no-privileges < /tmp/seed.dump
 
-        echo "Applying preview silence policy"
-        docker exec -i "$$PREVIEW_PG" psql -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus <<'SQL'
-        UPDATE workspace
-           SET practice_review_auto_trigger_enabled = FALSE,
-               practice_review_manual_trigger_enabled = FALSE;
-
-        UPDATE workspace_agent_binding
-           SET enabled = FALSE,
-               updated_at = NOW()
-         WHERE purpose = 'PRACTICE_REVIEW';
-
-        UPDATE review_sweep_schedule
-           SET enabled = FALSE,
-               updated_at = NOW();
-
-        UPDATE agent_job
-           SET status = 'CANCELLED',
-               completed_at = COALESCE(completed_at, NOW()),
-               worker_id = NULL,
-               error_message = 'Cancelled when staging data was cloned into a preview.',
-               cancellation_reason = NULL
-         WHERE status IN ('QUEUED', 'RUNNING');
-
-        UPDATE agent_job
-           SET delivery_status = 'FAILED',
-               error_message = CONCAT_WS(E'\n', NULLIF(error_message, ''),
-                   'Delivery paused when staging data was cloned into a preview.')
-         WHERE status = 'COMPLETED'
-           AND delivery_status = 'PENDING';
-
-        UPDATE sync_job
-           SET status = 'CANCELLED',
-               cancel_requested = TRUE,
-               finished_at = COALESCE(finished_at, NOW()),
-               heartbeat_at = NULL,
-               error_summary = 'Cancelled when staging data was cloned into a preview.'
-         WHERE status IN ('PENDING', 'RUNNING');
-        SQL
+        echo "Applying the preview policy"
+        test -s /preview/sanitize.sql
+        docker exec -i "$$PREVIEW_PG" psql \
+          -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus < /preview/sanitize.sql
 
         docker exec "$$PREVIEW_PG" touch /var/lib/postgresql/data/.hephaestus-preview-seeded
-        echo "Seed loaded; every cloned workspace starts with practice reviews paused"
+        echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+      # The policy this preview is held to, kept next to the stack it applies to rather than inline
+      # in a shell heredoc where it cannot be read, reviewed or diffed as SQL.
+      - ./sanitize.sql:/preview/sanitize.sql:ro
     restart: "no"
     deploy:
       resources:

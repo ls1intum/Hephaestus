@@ -22,9 +22,13 @@ Before the first restore, the seeder recreates only the uniquely resolved previe
 both succeed. A failed or partial first attempt can therefore retry cleanly, while redeploying an
 already seeded PR preserves changes made while testing. A new preview volume gets a fresh staging clone.
 
-## Silence policy
+## Preview policy
 
-Before the application server starts, `seed-loader`:
+`seed-loader` applies [`sanitize.sql`](./sanitize.sql) to the restored clone before the application
+server starts. A clone is another instance's live database, so the policy answers two questions, and
+the file is organised by them.
+
+### Silence — a clone must not act
 
 1. disables automatic and manual practice-review triggers for every workspace;
 2. disables each `PRACTICE_REVIEW` model binding while preserving its selected model;
@@ -37,6 +41,29 @@ visible in the UI. To test reviews for one workspace, enable its practice-review
 enable the desired manual or automatic trigger in that workspace's practice-review settings. Those
 changes persist for the lifetime of the PR preview.
 
+### Re-home — a clone must not keep the source instance's identity
+
+A preview runs with the **source instance's** `HEPHAESTUS_SECURITY_ENCRYPTION_KEY`, because that is the
+only key the cloned rows can be read with. Without it the preview boots and then fails every request
+that touches a credential, with `AEADBadTagException: Tag mismatch` in the log. That key also unseals
+the source's JWT signing key and decrypts its OAuth client secrets, so three tables are emptied and
+rebuilt from this deployment's own configuration:
+
+| Table | Why it cannot be inherited |
+|---|---|
+| `login_provider` | The source's OAuth apps are registered against the source's hostname, so the provider rejects every sign-in that starts from a preview host |
+| `jwt_signing_key` | The preview would otherwise mint its own tokens signed with the source instance's production signing key |
+| `issued_jwt` | Cloned sessions belong to the source instance's users |
+
+`LoginProviderService` seeds `login_provider` from the environment whenever a registration id is
+absent, so emptying the table hands the preview its own login apps on the next boot — which is why the
+preview stack needs `GITHUB_OAUTH_*` (and any other provider it should offer) pointed at an OAuth app
+whose callback covers the preview hostnames. A provider with no credentials in the preview environment
+is simply not offered; Slack, being link-only, is normally absent for that reason.
+
+Accounts survive all of this: `identity_link` keys on `identity_provider`, not on `login_provider`, so
+a cloned user signs in through the preview's own OAuth app and lands on the same account.
+
 ## One-time server and Coolify setup
 
 1. Keep staging's `nats-server` attached to the external Docker network `shared-network`.
@@ -45,11 +72,14 @@ changes persist for the lifetime of the PR preview.
    joins `shared-network` as a second network.
 4. Set `PREVIEW_SEED_SOURCE_CONTAINER=app-postgres-1` if the staging Compose project/container name
    ever changes. The source user defaults to `root` and database to `hephaestus`.
-5. Assign the web and API services sibling wildcard domains. With the current template these are
+5. Set `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` to the **seed source instance's** key, and point
+   `GITHUB_OAUTH_CLIENT_ID`/`_SECRET` at an OAuth app whose callback covers the preview hostnames —
+   see the re-home policy above for both.
+6. Assign the web and API services sibling wildcard domains. With the current template these are
    `pr<id>.hephaestus.felixdietrich.com` and `pr<id>.api.hephaestus.felixdietrich.com`.
-6. Leave the preview `IMAGE_TAG` unset. Coolify injects `SOURCE_COMMIT`, and CI publishes the matching
+7. Leave the preview `IMAGE_TAG` unset. Coolify injects `SOURCE_COMMIT`, and CI publishes the matching
    application-server image before the preview update is requested.
-7. Put every preview-safe value in the application's **base** environment variables, not in Coolify's
+8. Put every preview-safe value in the application's **base** environment variables, not in Coolify's
    separate preview-variable scope. See below.
 
 ## Why the safe values live in Coolify's base scope
@@ -73,6 +103,15 @@ effective value and is not.
 | `MONITORING_RUN_ON_STARTUP`, `MONITORING_SYNC_CRON` | `false`, `-` | The clone starts a full lifecycle sync on boot |
 
 `-` is Spring's disabled-cron value; an empty string fails the boot instead of disabling the schedule.
+
+## This file only takes effect once it reaches `main`
+
+Coolify parses the Compose file from the branch configured on the application — `main` — and stores it
+on the application record. A preview deployment builds the pull request's images but runs that stored
+definition, so a change to `compose.app.yaml` or [`sanitize.sql`](./sanitize.sql) is **not** exercised
+by the preview of the pull request that makes it. Reviewing a change here means reading it; the first
+preview that actually runs it is the next one created after the change is merged and Coolify has
+re-read `main`.
 
 The Docker socket mount is privileged access to the host Docker daemon even though it is mounted
 read-only. It is intentionally confined to the trusted preview application and used only for
