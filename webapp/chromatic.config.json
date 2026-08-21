@@ -7,7 +7,7 @@
   "webapp/**/*.scss",
   "webapp/**/*.sass",
   "webapp/tailwind.config.*",
-  "webapp/vite.config.*",
+  "webapp/vite.*",
   "webapp/biome.json",
   "webapp/components.json"
   ],

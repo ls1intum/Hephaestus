@@ -53,7 +53,7 @@ These rules reference Next.js-specific APIs or SSR patterns that don't exist in 
 
 ### React Compiler Note
 
-This codebase has React Compiler enabled (`babel-plugin-react-compiler`).
+This codebase has React Compiler enabled.
 **Do NOT add manual memoization** (`useMemo`, `useCallback`, `React.memo`) for new code.
 The compiler handles memoization automatically.
 

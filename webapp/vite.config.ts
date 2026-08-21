@@ -1,37 +1,28 @@
+import * as fs from "node:fs";
 import path, { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import babel from "@rolldown/plugin-babel";
-import tailwindcss from "@tailwindcss/vite";
 import { tanstackRouter } from "@tanstack/router-plugin/vite";
-import viteReact, { reactCompilerPreset } from "@vitejs/plugin-react";
-import { defineConfig, type PluginOption, type ViteDevServer } from "vite";
-import { configDefaults } from "vitest/config";
+import { defineConfig, type ViteDevServer } from "vite";
 import Terminal from "vite-plugin-terminal";
-import * as fs from "node:fs";
+import { configDefaults } from "vitest/config";
+import { appSourcePlugins } from "./vite.shared.ts";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
-
-// React Compiler runs through @rolldown/plugin-babel using the preset's
-// pre-baked Rolldown filters (default compilationMode "infer" compiles every
-// PascalCase function using JSX/hooks; no "use memo" opt-ins are used).
-const reactCompiler = await babel({ presets: [reactCompilerPreset()] });
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => {
 	const isDevelopment = command !== "build";
 
 	return {
-		plugins: ([
+		plugins: [
 			tanstackRouter({ autoCodeSplitting: true }),
-			viteReact(),
-			reactCompiler,
-			tailwindcss(),
+			...appSourcePlugins(),
 			isDevelopment &&
-			Terminal({
-				output: ["terminal", "console"],
-			}),
+				Terminal({
+					output: ["terminal", "console"],
+				}),
 			// Dev only plugin to serialize the achievement node layout from the dev mode into a json file for consistency
-			isDevelopment && ({
+			isDevelopment && {
 				name: "save-achievement-layout",
 				apply: "serve" as const,
 				configureServer(server: ViteDevServer) {
@@ -50,20 +41,22 @@ export default defineConfig(({ command }) => {
 						req.on("end", () => {
 							try {
 								JSON.parse(body);
-								const filePath = path.resolve(__dirname, "src/components/achievements/coordinates.json");
+								const filePath = path.resolve(
+									__dirname,
+									"src/components/achievements/coordinates.json",
+								);
 								fs.writeFileSync(filePath, body);
 								res.statusCode = 200;
 								res.end("Layout saved successfully");
-							} catch (e) {
+							} catch {
 								res.statusCode = 400;
 								res.end("Invalid JSON");
 							}
-						})
-						;
+						});
 					});
 				},
-			}),
-		].filter(Boolean) as unknown as PluginOption[]),
+			},
+		],
 		build: {
 			sourcemap: false,
 		},

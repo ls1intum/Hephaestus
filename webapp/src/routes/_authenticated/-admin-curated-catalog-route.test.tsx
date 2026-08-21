@@ -2,6 +2,7 @@ import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { delay, HttpResponse, http } from "msw";
 import { describe, expect, it, vi } from "vitest";
+import type { CuratedPracticeRequest } from "@/api/types.gen";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
@@ -640,41 +641,44 @@ describe("instance catalog routes", () => {
 			mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
 			["chat.conversation_thread.settled"],
 		],
-	] as const)("%s artifact sends the visible review rule", async (_label, changeArtifact, expectedPolicy, expectedSignals) => {
-		mockCatalog();
-		let requestBody: Record<string, unknown> | undefined;
-		server.use(
-			http.get("*/admin/practice-catalog/practices/:slug", () =>
-				HttpResponse.json({
-					slug: "describe-what-and-why",
-					definition: practiceDefinition,
-					status: status(),
+	] as const)(
+		"%s artifact sends the visible review rule",
+		async (_label, changeArtifact, expectedPolicy, expectedSignals) => {
+			mockCatalog();
+			let requestBody: CuratedPracticeRequest | undefined;
+			server.use(
+				http.get("*/admin/practice-catalog/practices/:slug", () =>
+					HttpResponse.json({
+						slug: "describe-what-and-why",
+						definition: practiceDefinition,
+						status: status(),
+					}),
+				),
+				http.put("*/admin/practice-catalog/practices/:slug", async ({ request }) => {
+					requestBody = (await request.json()) as CuratedPracticeRequest;
+					return HttpResponse.json({
+						slug: "describe-what-and-why",
+						definition: practiceDefinition,
+						status: status({ etag: "tag-2" }),
+					});
 				}),
-			),
-			http.put("*/admin/practice-catalog/practices/:slug", async ({ request }) => {
-				requestBody = (await request.json()) as Record<string, unknown>;
-				return HttpResponse.json({
-					slug: "describe-what-and-why",
-					definition: practiceDefinition,
-					status: status({ etag: "tag-2" }),
-				});
-			}),
-		);
-		renderRouteAt("/admin/catalog/practices/describe-what-and-why");
+			);
+			renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 
-		await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
-		if (changeArtifact) {
-			const user = userEvent.setup();
-			await user.click(screen.getByRole("radio", { name: /Conversation/ }));
-		}
-		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+			await screen.findByRole("button", { name: "Save changes" }, ROUTE_RENDER_WAIT);
+			if (changeArtifact) {
+				const user = userEvent.setup();
+				await user.click(screen.getByRole("radio", { name: /Conversation/ }));
+			}
+			fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 
-		await waitFor(() => expect(requestBody).toBeDefined());
-		expect(requestBody?.automatedReviewPolicy).toEqual(expectedPolicy);
-		// The kind of work is read off the signals, so switching it has to rewrite the occasions
-		// rather than send a kind alongside bindings that still name the old one.
-		expect(
-			(requestBody?.bindings as Array<{ signals: string[] }>).map((binding) => binding.signals),
-		).toEqual([[...expectedSignals]]);
-	});
+			await waitFor(() => expect(requestBody).toBeDefined());
+			expect(requestBody?.automatedReviewPolicy).toEqual(expectedPolicy);
+			// The kind of work is read off the signals, so switching it has to rewrite the occasions
+			// rather than send a kind alongside bindings that still name the old one.
+			expect(requestBody?.bindings.map((binding) => binding.signals)).toEqual([
+				[...expectedSignals],
+			]);
+		},
+	);
 });

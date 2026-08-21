@@ -145,19 +145,22 @@ describe("AdminLlmUsagePage", () => {
 				"2 shared-model runs have no price, so the budget can't be checked and shared models are paused. Only your host can price them.",
 				null,
 			],
-		])("explains %s, and links to the fix only where the reader can apply it", async (_name, patch, title, body, href) => {
-			await renderPage({ ...baseReport, ...patch });
+		])(
+			"explains %s, and links to the fix only where the reader can apply it",
+			async (_name, patch, title, body, href) => {
+				await renderPage({ ...baseReport, ...patch });
 
-			const banner = screen.getByText(title).closest("[role='alert']");
-			if (!(banner instanceof HTMLElement)) {
-				throw new Error(`Pause banner "${title}" not found`);
-			}
-			within(banner).getByText(body);
-			expect(
-				within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
-					null,
-			).toBe(href);
-		});
+				const banner = screen.getByText(title).closest("[role='alert']");
+				if (!(banner instanceof HTMLElement)) {
+					throw new Error(`Pause banner "${title}" not found`);
+				}
+				within(banner).getByText(body);
+				expect(
+					within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
+						null,
+				).toBe(href);
+			},
+		);
 
 		it("puts the cap editor in the banner as a button, not a link away to another owner", async () => {
 			const onEditOwnProviderCap = vi.fn();
@@ -248,17 +251,20 @@ describe("AdminLlmUsagePage", () => {
 		it.each<[string, Partial<WorkspaceLlmUsageReport>, string]>([
 			["a cap in force", {}, "Change cap"],
 			["no cap yet", { ownProviderMonthlyBudgetUsd: undefined }, "Set cap"],
-		])("withdraws the editor on a closed month and says where to change it, with %s", async (_name, patch, label) => {
-			await renderPage(
-				{ ...baseReport, month: "2026-06", ...patch },
-				{ month: "2026-06", isCurrentMonth: false },
-			);
+		])(
+			"withdraws the editor on a closed month and says where to change it, with %s",
+			async (_name, patch, label) => {
+				await renderPage(
+					{ ...baseReport, month: "2026-06", ...patch },
+					{ month: "2026-06", isCurrentMonth: false },
+				);
 
-			expect(screen.queryByRole("button", { name: label })).toBeNull();
-			screen.getByText(
-				"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
-			);
-		});
+				expect(screen.queryByRole("button", { name: label })).toBeNull();
+				screen.getByText(
+					"A cap applies from the moment it is saved, not to the month you are reading. Step forward to this month to change it.",
+				);
+			},
+		);
 	});
 
 	describe("display currency", () => {

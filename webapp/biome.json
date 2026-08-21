@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.4.15/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
 	"plugins": [
 		"./.biome/no-redundant-in-the-document.grit",
 		"./.biome/no-within-canvas-element.grit",
@@ -17,7 +17,8 @@
 			"**/src/**/*",
 			"**/.vscode/**/*",
 			"**/index.html",
-			"**/vite.config.js",
+			"**/*.config.ts",
+			"**/vite.shared.ts",
 			"!**/src/routeTree.gen.ts",
 			"!**/src/api/**/*.ts",
 			"!**/*.css"
@@ -39,7 +40,7 @@
 	"linter": {
 		"enabled": true,
 		"rules": {
-			"recommended": true,
+			"preset": "recommended",
 			"correctness": {
 				"noUnusedImports": "error",
 				"noUnusedVariables": "error"
