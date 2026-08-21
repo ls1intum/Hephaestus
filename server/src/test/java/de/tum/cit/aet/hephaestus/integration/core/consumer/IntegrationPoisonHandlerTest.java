@@ -39,6 +39,7 @@ class IntegrationPoisonHandlerTest extends BaseUnitTest {
             Duration.ofMinutes(5),
             500,
             Duration.ofSeconds(2),
+            null,
             new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
         );
         handler = new IntegrationPoisonHandler(properties, meterRegistry);

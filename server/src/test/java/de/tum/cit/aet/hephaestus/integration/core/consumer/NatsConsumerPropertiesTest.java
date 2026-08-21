@@ -27,6 +27,7 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
+                null,
                 null
             );
 
@@ -47,6 +48,7 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
+                null,
                 custom
             );
 

@@ -69,6 +69,7 @@ class IntegrationNatsConsumerTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
+                null,
                 new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
             ),
             subscriptions,
@@ -96,6 +97,7 @@ class IntegrationNatsConsumerTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
+                null,
                 new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
             ),
             scopeId -> Optional.empty(),
@@ -134,6 +136,7 @@ class IntegrationNatsConsumerTest {
             Duration.ofMinutes(5),
             500,
             Duration.ofSeconds(2),
+            null,
             new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
         );
 
@@ -145,6 +148,27 @@ class IntegrationNatsConsumerTest {
 
         assertThat(config.getDeliverPolicy()).isEqualTo(DeliverPolicy.New);
         assertThat(config.getDurable()).isEqualTo("heph-slack");
+        assertThat(config.getInactiveThreshold()).isNull();
+    }
+
+    @Test
+    void disposableDeploymentLetsJetStreamReapItsDurableWhenTheStackIsDeleted() {
+        NatsConsumerProperties properties = new NatsConsumerProperties(
+            Duration.ofMinutes(5),
+            500,
+            Duration.ofSeconds(2),
+            Duration.ofHours(72),
+            new NatsConsumerProperties.PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5))
+        );
+
+        var config = IntegrationNatsConsumer.newConsumerConfiguration(
+            new String[] { "github.>" },
+            properties,
+            "appserver-pr-1443-consumer"
+        );
+
+        assertThat(config.getInactiveThreshold()).isEqualTo(Duration.ofHours(72));
+        assertThat(config.getDurable()).isEqualTo("appserver-pr-1443-consumer");
     }
 
     @Nested
@@ -209,6 +233,7 @@ class IntegrationNatsConsumerTest {
                     Duration.ofMinutes(5),
                     500,
                     Duration.ofSeconds(2),
+                    null,
                     new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
                 ),
                 scopeId -> Optional.empty(),
@@ -350,6 +375,7 @@ class IntegrationNatsConsumerTest {
                         Duration.ofMinutes(5),
                         500,
                         Duration.ofSeconds(2),
+                        null,
                         new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
                     ),
                     scopeId ->

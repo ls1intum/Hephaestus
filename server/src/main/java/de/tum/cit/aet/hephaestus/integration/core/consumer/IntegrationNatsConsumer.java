@@ -726,6 +726,13 @@ public class IntegrationNatsConsumer {
             // means a JetStream-side observability tool (`nats stream info`) cannot see
             // the policy. Mirrors the value the poison handler uses to ACK-terminate.
             .maxDeliver(consumerProperties.poison().maxRedeliver());
+        // Server-side reaping for deployments that are deleted rather than shut down. A PR preview
+        // never gets to clean up after itself, so its durables would otherwise pile up on the
+        // shared stream one generation per closed PR. Unset for long-lived deployments, where a
+        // reaped durable would silently resume at DeliverPolicy.New and skip an outage's backlog.
+        if (consumerProperties.inactiveThreshold() != null) {
+            builder.inactiveThreshold(consumerProperties.inactiveThreshold());
+        }
         if (!isBlank(durableName)) {
             builder.durable(durableName);
         }
