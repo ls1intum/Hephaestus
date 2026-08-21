@@ -86,6 +86,26 @@ services:
         max-size: "50m"
         max-file: "5"
 
+  # A new named volume is created root-owned, and one created by an earlier image keeps that image's
+  # uid. The buildpack image runs as `cnb` (1002:1001), so nothing under /data/git-repos is writable
+  # until the ownership matches — and that surfaces when an agent job first writes there, not at
+  # startup. -h so a symlink inside a checkout is retargeted rather than followed out of the volume.
+  volume-init:
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
+    command:
+      - sh
+      - -c
+      - "chown -Rh 1002:1001 /data/git-repos && chmod 0755 /data/git-repos"
+    volumes:
+      - git-repos:/data/git-repos
+    restart: "no"
+    network_mode: none
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
   # See docs/admin/agent-image-digests.md.
   release-pin-fetcher:
     image: "ghcr.io/ls1intum/hephaestus/release-pin-fetcher:${IMAGE_TAG}"
@@ -279,11 +299,11 @@ services:
         condition: service_started
       release-pin-fetcher:
         condition: service_completed_successfully
+      volume-init:
+        condition: service_completed_successfully
     restart: unless-stopped
-    # The image runs unprivileged (the buildpack's `cnb` user) while /var/run/docker.sock is
-    # root:docker 0660, so the sandbox runtime cannot reach the daemon without joining the host's
-    # docker group. There is no portable value: read the host's with
-    # `getent group docker | cut -d: -f3` and set DOCKER_GROUP_ID to it.
+    # Joins the host's docker group so the unprivileged image can reach root:docker 0660
+    # /var/run/docker.sock. Host-specific — see DOCKER_GROUP_ID in .env.example.
     group_add:
       - "${DOCKER_GROUP_ID:-999}"
     volumes:
@@ -414,11 +434,11 @@ services:
         condition: service_started
       release-pin-fetcher:
         condition: service_completed_successfully
+      volume-init:
+        condition: service_completed_successfully
     restart: unless-stopped
-    # The image runs unprivileged (the buildpack's `cnb` user) while /var/run/docker.sock is
-    # root:docker 0660, so the sandbox runtime cannot reach the daemon without joining the host's
-    # docker group. There is no portable value: read the host's with
-    # `getent group docker | cut -d: -f3` and set DOCKER_GROUP_ID to it.
+    # Joins the host's docker group so the unprivileged image can reach root:docker 0660
+    # /var/run/docker.sock. Host-specific — see DOCKER_GROUP_ID in .env.example.
     group_add:
       - "${DOCKER_GROUP_ID:-999}"
     volumes:
