@@ -86,6 +86,22 @@ services:
         max-size: "50m"
         max-file: "5"
 
+  # A named volume is created root-owned, and one created by an earlier image keeps that image's
+  # uid. The buildpack image runs as `cnb` (1002:1001), so anything it must write under
+  # /data/git-repos — the git checkouts and the agent's content-addressed store — is unwritable
+  # until the ownership matches. That surfaces as AccessDeniedException on the first practice
+  # review rather than at startup, because nothing writes there until an agent job runs. Only
+  # entries with the wrong owner are touched, so an already-correct volume costs a metadata walk.
+  volume-init:
+    image: alpine:3
+    command:
+      - sh
+      - -c
+      - "find /data/git-repos ! -user 1002 -exec chown -h 1002:1001 {} + && chmod 0755 /data/git-repos"
+    volumes:
+      - git-repos:/data/git-repos
+    restart: "no"
+
   # See docs/admin/agent-image-digests.md.
   release-pin-fetcher:
     image: "ghcr.io/ls1intum/hephaestus/release-pin-fetcher:${IMAGE_TAG}"
@@ -279,6 +295,8 @@ services:
         condition: service_started
       release-pin-fetcher:
         condition: service_completed_successfully
+      volume-init:
+        condition: service_completed_successfully
     restart: unless-stopped
     # The image runs unprivileged (the buildpack's `cnb` user) while /var/run/docker.sock is
     # root:docker 0660, so the sandbox runtime cannot reach the daemon without joining the host's
@@ -413,6 +431,8 @@ services:
       application-server:
         condition: service_started
       release-pin-fetcher:
+        condition: service_completed_successfully
+      volume-init:
         condition: service_completed_successfully
     restart: unless-stopped
     # The image runs unprivileged (the buildpack's `cnb` user) while /var/run/docker.sock is
