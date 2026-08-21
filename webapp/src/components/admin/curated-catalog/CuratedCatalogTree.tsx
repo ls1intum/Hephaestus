@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
-import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
@@ -26,7 +26,6 @@ import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/i
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { cn } from "@/lib/utils";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
 
 type TreeArea = CuratedArea & { displayOrder: number; name: string };
@@ -139,19 +138,13 @@ export function CuratedCatalogTree({
 }
 
 function AreaIcon({ area }: { area: TreeArea }) {
-	const { Icon, pill } = getAreaVisual(
-		area.slug,
-		area.definition.name,
-		area.definition.icon,
-		area.definition.color,
-	);
 	return (
-		<span
-			className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", pill)}
-			aria-hidden
-		>
-			<Icon className="size-4" />
-		</span>
+		<AreaPill
+			slug={area.slug}
+			name={area.definition.name}
+			icon={area.definition.icon}
+			color={area.definition.color}
+		/>
 	);
 }
 

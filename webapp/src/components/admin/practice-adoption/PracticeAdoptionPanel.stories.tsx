@@ -8,9 +8,11 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { withPageBehind } from "@/stories/decorators";
+import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
-import { PracticeAdoptionPanel } from "./PracticeAdoptionPanel";
+import { PracticeAdoptionPanel, type PracticeAdoptionState } from "./PracticeAdoptionPanel";
 
 const preview: CatalogPracticePreview = {
 	slug: "describe-what-and-why",
@@ -37,26 +39,44 @@ const preview: CatalogPracticePreview = {
 	},
 };
 
+type ReadyState = Extract<PracticeAdoptionState, { status: "ready" }>;
+
+const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
+	status: "ready",
+	preview,
+	definitionOptions: mockPracticeDefinitionOptions,
+	action: "idle",
+	...over,
+});
+
 /**
- * The panel only renders inside a drawer level, so every story mounts one. That is also what the
- * product does: this surface has no page of its own, and the route it used to occupy now redirects
- * here with the drawer already open.
+ * The panel has no page of its own — the route it used to occupy redirects here with the drawer
+ * already open — so every story mounts a real drawer over a real page. That is also what makes the
+ * dismiss testable: the stack is stateful, so Escape, an outside press and the header control all
+ * actually close it instead of firing an inert spy.
  */
 const meta = {
 	title: "Workspace admin/Practice adoption/Practice panel",
 	component: PracticeAdoptionPanel,
-	parameters: { layout: "fullscreen", chromatic: { viewports: [320, 1440] } },
+	parameters: { layout: "fullscreen" },
+	decorators: [withPageBehind],
 	args: {
 		workspaceSlug: "demo",
-		preview,
-		definitionOptions: mockPracticeDefinitionOptions,
+		state: ready(),
 		onAdopt: fn(),
-		isPending: false,
+	},
+	argTypes: {
+		// A discriminated union renders as a free-text box, which cannot produce a valid value.
+		state: { control: false },
 	},
 	render: (args) => (
-		<DetailDrawerStack stack={[{ kind: "practice", id: args.preview.slug }]} onClose={() => {}}>
-			{() => <PracticeAdoptionPanel {...args} />}
-		</DetailDrawerStack>
+		<Stateful initial={[{ kind: "practice", id: preview.slug }]}>
+			{(stack, setStack) => (
+				<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
+					{(_entry, level) => <PracticeAdoptionPanel {...args} nested={level.nested} />}
+				</DetailDrawerStack>
+			)}
+		</Stateful>
 	),
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeAdoptionPanel>;
@@ -69,25 +89,35 @@ export const Available: Story = {
 		const adopt = await screen.findByRole("button", { name: "Add practice" });
 		await expectSettledVisible(adopt);
 		await expect(screen.getByText("Review before sending")).toBeVisible();
-		await expect(screen.getByText("Creates “Review-ready work”")).toBeVisible();
-		// The top level dismisses the whole stack, so it closes rather than going back one drawer.
-		await expect(screen.getByRole("button", { name: "Close" })).toBeEnabled();
+		await expect(screen.getByText("Create “Review-ready work”")).toBeVisible();
 		await userEvent.click(adopt);
 		await expect(args.onAdopt).toHaveBeenCalledOnce();
 	},
 };
 
+export const DismissReturnsToThePage: Story = {
+	play: async () => {
+		await expectSettledVisible(await screen.findByRole("button", { name: "Add practice" }));
+		// The top level returns to the page, so it closes rather than stepping back one drawer.
+		await userEvent.click(screen.getByRole("button", { name: "Close" }));
+		await expect(await screen.findByRole("heading", { name: "Practice setup" })).toBeVisible();
+		await expect(screen.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
+	},
+};
+
 export const ReusesExistingArea: Story = {
 	args: {
-		preview: { ...preview, area: { ...preview.area, disposition: "REUSE_EXISTING_AREA" } },
+		state: ready({
+			preview: { ...preview, area: { ...preview.area, disposition: "REUSE_EXISTING_AREA" } },
+		}),
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Uses “Review-ready work”"));
+		await expectSettledVisible(await screen.findByText("Join “Review-ready work”"));
 	},
 };
 
 export const AlreadyAdded: Story = {
-	args: { preview: { ...preview, availability: "ADOPTED" } },
+	args: { state: ready({ preview: { ...preview, availability: "ADOPTED" } }) },
 	play: async () => {
 		const open = await screen.findByRole("link", { name: "Open workspace practice" });
 		await expectSettledVisible(open);
@@ -97,22 +127,24 @@ export const AlreadyAdded: Story = {
 };
 
 export const NameUnavailable: Story = {
-	args: { preview: { ...preview, availability: "SLUG_CONFLICT" } },
+	args: { state: ready({ preview: { ...preview, availability: "SLUG_CONFLICT" } }) },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Name unavailable"));
+		// Words, colour and icon all come from one registry entry, so the alert and the chip agree.
+		await expectSettledVisible(await screen.findByRole("alert"));
+		await expect(screen.getAllByText("Name unavailable")).toHaveLength(2);
 		await expect(screen.queryByRole("button", { name: "Add practice" })).not.toBeInTheDocument();
 	},
 };
 
 export const Adding: Story = {
-	args: { isPending: true },
+	args: { state: ready({ action: "adding" }) },
 	play: async () => {
 		await expectGenuinelyDisabled(await screen.findByRole("button", { name: "Adding…" }));
 	},
 };
 
 export const PreviewWentStale: Story = {
-	args: { isStale: true },
+	args: { state: ready({ action: "stale" }) },
 	play: async () => {
 		await expectSettledVisible(
 			await screen.findByText("The library changed while you were reading"),
@@ -121,24 +153,52 @@ export const PreviewWentStale: Story = {
 };
 
 export const UnassignedAndOff: Story = {
-	args: { preview: { ...preview, initialAutonomy: "OFF", area: { disposition: "UNASSIGNED" } } },
+	args: {
+		state: ready({
+			preview: { ...preview, initialAutonomy: "OFF", area: { disposition: "UNASSIGNED" } },
+		}),
+	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("No area"));
+		await expectSettledVisible(await screen.findByText("Belong to no area"));
 		await expect(screen.getByText("Off")).toBeVisible();
 	},
 };
 
-export const LongContentInDarkMode: Story = {
-	args: {
-		preview: {
-			...preview,
-			definition: {
-				...preview.definition,
-				criteria:
-					"Confirm that the pull request explains the behavior change, the operational constraints that shaped it, the alternatives considered, and the evidence used to verify the result. Stay silent when the change is generated automatically and no meaningful author decision exists.",
-			},
-		},
+export const Loading: Story = {
+	args: { state: { status: "loading" } },
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("Loading adoption preview"));
 	},
-	globals: { theme: "dark" },
+};
+
+export const FailedToLoad: Story = {
+	args: {
+		state: { status: "error", error: new Error("offline"), onRetry: fn() },
+	},
+	play: async () => {
+		await expectSettledVisible(await screen.findByRole("button", { name: "Retry" }));
+	},
+};
+
+export const LongContent: Story = {
+	args: {
+		state: ready({
+			preview: {
+				...preview,
+				definition: {
+					...preview.definition,
+					criteria:
+						"Confirm that the pull request explains the behavior change, the operational constraints that shaped it, the alternatives considered, and the evidence used to verify the result. Stay silent when the change is generated automatically and no meaningful author decision exists.",
+				},
+			},
+		}),
+	},
+};
+
+export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+};
+
+export const DarkMode: Story = {
+	globals: { theme: "dark" },
 };

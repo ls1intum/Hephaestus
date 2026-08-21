@@ -67,8 +67,10 @@ function DrawerOverlay({ className, ...props }: DrawerPrimitive.Backdrop.Props) 
 	return (
 		<DrawerPrimitive.Backdrop
 			data-slot="drawer-overlay"
+			// Dimmed but never blurred. A side panel earns its place over a page transition because
+			// the page behind stays legible; blurring it removes the only advantage.
 			className={cn(
-				"fixed inset-0 z-50 min-h-dvh bg-black/20 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none supports-backdrop-filter:backdrop-blur-xs data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute",
+				"fixed inset-0 z-50 min-h-dvh bg-black/25 opacity-[max(var(--drawer-overlay-min-opacity,0),calc(1-var(--drawer-swipe-progress)))] transition-opacity duration-450 ease-[cubic-bezier(0.32,0.72,0,1)] select-none data-ending-style:pointer-events-none data-ending-style:opacity-0 data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-snap-points:[--drawer-overlay-min-opacity:0.5] data-starting-style:opacity-0 data-swiping:duration-0 supports-[-webkit-touch-callout:none]:absolute",
 				className,
 			)}
 			{...props}
@@ -95,8 +97,18 @@ function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<"div">)
 /**
  * The drawer panel. Width and height come from `--drawer-content-width` / `--drawer-height`, so a
  * caller resizes a drawer by setting those rather than by fighting the positioning classes.
+ *
+ * `dimWhenNested` is the one deliberate departure from the upstream shadcn drawer, which fades a
+ * covered drawer's content to nothing. That reads correctly for a bottom sheet, where only a sliver
+ * of the parent shows; a wide side panel leaves a real column of the parent on screen, and an empty
+ * column is worse than a readable one. Side stacks pass `false`.
  */
-function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.Props) {
+function DrawerContent({
+	className,
+	children,
+	dimWhenNested = true,
+	...props
+}: DrawerPrimitive.Popup.Props & { dimWhenNested?: boolean }) {
 	const { hasSnapPoints, modal, showSwipeHandle, swipeDirection } = useDrawer();
 	const swipeAxis = swipeDirection === "down" || swipeDirection === "up" ? "y" : "x";
 
@@ -146,7 +158,11 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
 					{showSwipeHandle && <DrawerSwipeHandle />}
 					<DrawerPrimitive.Content
 						data-slot="drawer-content"
-						className="flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain rounded-[inherit] transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)] select-text group-data-nested-drawer-open/drawer-popup:opacity-0 group-data-nested-drawer-swiping/drawer-popup:opacity-100 group-data-swiping/drawer-popup:select-none"
+						className={cn(
+							"flex min-h-0 flex-1 flex-col overflow-hidden overscroll-contain rounded-[inherit] transition-opacity duration-300 ease-[cubic-bezier(0.45,1.005,0,1.005)] select-text group-data-swiping/drawer-popup:select-none",
+							dimWhenNested &&
+								"group-data-nested-drawer-open/drawer-popup:opacity-0 group-data-nested-drawer-swiping/drawer-popup:opacity-100",
+						)}
 					>
 						{children}
 					</DrawerPrimitive.Content>
@@ -159,9 +175,11 @@ function DrawerContent({ className, children, ...props }: DrawerPrimitive.Popup.
 function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		// `shrink-0`: `DrawerBody` is `flex-1` off a zero basis, so the header is what would be squashed.
+		// No rule under it — the gap to the body already separates them, and a panel this wide does not
+		// need a line to say where its title ends.
 		<div
 			data-slot="drawer-header"
-			className={cn("flex shrink-0 flex-col gap-1 border-b p-4", className)}
+			className={cn("flex shrink-0 flex-col gap-1 px-6 pt-5 pb-4", className)}
 			{...props}
 		/>
 	);
@@ -175,7 +193,7 @@ function DrawerBody({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		<div
 			data-slot="drawer-body"
-			className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain p-4", className)}
+			className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6", className)}
 			{...props}
 		/>
 	);
@@ -183,10 +201,12 @@ function DrawerBody({ className, ...props }: React.ComponentProps<"div">) {
 
 function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
 	return (
+		// A rule here, unlike the header: this is pinned over content that scrolls under it, so
+		// without one the last line of the body touches the action.
 		<div
 			data-slot="drawer-footer"
 			className={cn(
-				"mt-auto flex shrink-0 flex-col-reverse gap-2 border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+				"mt-auto flex shrink-0 flex-col-reverse gap-2 border-t px-6 py-4 sm:flex-row sm:justify-end",
 				className,
 			)}
 			{...props}

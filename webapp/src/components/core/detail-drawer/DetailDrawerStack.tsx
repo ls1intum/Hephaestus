@@ -1,37 +1,33 @@
-import { createContext, type ReactNode, use, useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { Drawer, DrawerContent } from "@/components/ui/drawer";
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
 /**
  * Detail drawers are deliberately much wider than {@link import("@/components/ui/sheet").Sheet}:
- * they replace a full page, so they have to hold what that page held. Full width below `sm` because
+ * they replace a full page, so they have to hold what that page held. Full width below `sm`, because
  * a partial cover on a phone is unreadable.
  *
- * Marked important because the primitive sets its own default behind a `data-swipe-axis` selector,
- * which a plain utility loses to on specificity rather than on source order.
+ * `--peek` is well above the primitive's default so a covered panel keeps a column on screen rather
+ * than a hairline — that column is the whole reason to stack instead of replace. Marked important
+ * because the primitive sets both behind a `data-swipe-axis` selector, which a plain utility loses
+ * to on specificity rather than on source order.
  */
-const DETAIL_DRAWER_WIDTH =
-	"[--drawer-content-width:100%]! sm:[--drawer-content-width:min(44rem,92vw)]! xl:[--drawer-content-width:min(62rem,75vw)]!";
+const DETAIL_DRAWER_CLASS =
+	"[--peek:2.5rem]! [--drawer-content-width:100%]! sm:[--drawer-content-width:min(44rem,92vw)]! xl:[--drawer-content-width:min(62rem,75vw)]!";
 
-interface DetailDrawerLevel {
+/** What a level knows about its own position in the stack. */
+export interface DetailDrawerLevel {
 	depth: number;
-	close: () => void;
+	/** Whether a level is covering another, which is what decides "back" against "close". */
+	nested: boolean;
 }
 
-const DetailDrawerLevelContext = createContext<DetailDrawerLevel | null>(null);
-
-export function useDetailDrawerLevel(): DetailDrawerLevel {
-	const level = use(DetailDrawerLevelContext);
-	if (!level) throw new Error("useDetailDrawerLevel must be used inside a DetailDrawerStack.");
-	return level;
-}
-
-export interface DetailDrawerStackProps {
+export interface DetailDrawerStackProps<TKind extends string = string> {
 	/** The open levels, outermost first. An empty stack renders nothing. */
-	stack: DetailStackEntry[];
+	stack: DetailStackEntry<TKind>[];
 	/** Called with the depth to close down to — `close(0)` dismisses the whole stack. */
 	onClose: (depth: number) => void;
-	children: (entry: DetailStackEntry, depth: number) => ReactNode;
+	children: (entry: DetailStackEntry<TKind>, level: DetailDrawerLevel) => ReactNode;
 }
 
 /**
@@ -39,23 +35,27 @@ export interface DetailDrawerStackProps {
  *
  * Base UI decides whether a drawer is nested from the React tree rather than the DOM, so each level
  * renders the next as its own child and inherits the stacking for free: the drawers behind the
- * frontmost one step back and dim, and Escape or a rightward swipe pops exactly one level.
+ * frontmost step back, and Escape, a rightward swipe or a press on the page all pop one level.
  */
-export function DetailDrawerStack({ stack, onClose, children }: DetailDrawerStackProps) {
-	// Levels mount one frame apart. Base UI hides everything outside the topmost popup when a drawer
-	// opens, and two levels opening in the same commit each hide the other — leaving a stack that is
-	// on screen but absent from the accessibility tree. That only happens on a deep link into a
-	// multi-level stack, which is exactly the case a shared URL produces.
-	const [mountedDepth, setMountedDepth] = useState(Math.min(stack.length, 1));
-	const openDepth = Math.min(mountedDepth, stack.length);
+export function DetailDrawerStack<TKind extends string>({
+	stack,
+	onClose,
+	children,
+}: DetailDrawerStackProps<TKind>) {
+	// Levels appear one frame apart. Base UI hides everything outside the frontmost popup when a
+	// drawer opens, and two levels opening in the same commit each hide the other — leaving a stack
+	// that is on screen but absent from the accessibility tree. Only a deep link into a multi-level
+	// stack can mount two at once, but the same one-at-a-time reveal also keeps a hand-opened level
+	// from animating on top of a parent that has not settled, so it is not special-cased.
+	// `DetailDrawerStack.stories.tsx` § Two levels fails without this.
+	const [revealedDepth, setRevealedDepth] = useState(Math.min(stack.length, 1));
+	const openDepth = Math.min(revealedDepth, stack.length);
 
 	useEffect(() => {
-		if (mountedDepth === stack.length) return;
-		const frame = requestAnimationFrame(() =>
-			setMountedDepth(mountedDepth < stack.length ? mountedDepth + 1 : stack.length),
-		);
+		if (revealedDepth >= stack.length) return;
+		const frame = requestAnimationFrame(() => setRevealedDepth(revealedDepth + 1));
 		return () => cancelAnimationFrame(frame);
-	}, [mountedDepth, stack.length]);
+	}, [revealedDepth, stack.length]);
 
 	function renderLevel(depth: number): ReactNode {
 		const entry = stack[depth];
@@ -69,10 +69,8 @@ export function DetailDrawerStack({ stack, onClose, children }: DetailDrawerStac
 					if (!open) onClose(depth);
 				}}
 			>
-				<DrawerContent className={DETAIL_DRAWER_WIDTH}>
-					<DetailDrawerLevelContext value={{ depth, close: () => onClose(depth) }}>
-						{children(entry, depth)}
-					</DetailDrawerLevelContext>
+				<DrawerContent className={DETAIL_DRAWER_CLASS} dimWhenNested={false}>
+					{children(entry, { depth, nested: depth > 0 })}
 				</DrawerContent>
 				{renderLevel(depth + 1)}
 			</Drawer>

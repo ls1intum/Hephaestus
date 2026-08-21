@@ -1,0 +1,64 @@
+import { cva, type VariantProps } from "class-variance-authority";
+import { CircleDashed } from "lucide-react";
+import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { cn } from "@/lib/utils";
+
+const areaPillVariants = cva("flex shrink-0 items-center justify-center", {
+	variants: {
+		size: {
+			/** Inline beside a practice name, where it is the only thing carrying the area. */
+			sm: "size-4 rounded-sm [&_svg]:size-2.5",
+			/** A list row's leading element. */
+			md: "size-8 rounded-md [&_svg]:size-4",
+			/** A detail surface's heading. */
+			lg: "size-9 rounded-md [&_svg]:size-4",
+		},
+	},
+	defaultVariants: { size: "md" },
+});
+
+export interface AreaPillProps extends VariantProps<typeof areaPillVariants> {
+	/** Absent for a practice that belongs to no area, which gets the neutral mark rather than a colour. */
+	slug?: string;
+	name?: string;
+	icon?: string;
+	color?: string;
+	/**
+	 * Announce the area's name from the pill itself. Only for the places where no visible text
+	 * repeats it — elsewhere the pill is decorative and naming it twice is noise.
+	 */
+	srLabel?: boolean;
+	className?: string;
+}
+
+/**
+ * A practice area's identity as one mark. Colour and icon come from the shared registry, so the
+ * same area looks the same in a workspace tree, an instance tree, a review row and a detail header
+ * — which is the point, because the colour is what an administrator learns to scan by.
+ */
+export function AreaPill({
+	slug,
+	name,
+	icon,
+	color,
+	srLabel = false,
+	size,
+	className,
+}: AreaPillProps) {
+	const visual = slug
+		? getAreaVisual(slug, name ?? slug, icon, color)
+		: { Icon: CircleDashed, pill: "bg-muted text-muted-foreground" };
+	const { Icon, pill } = visual;
+	const label = name ?? "Unassigned";
+
+	return (
+		<span
+			className={cn(areaPillVariants({ size }), pill, className)}
+			aria-hidden={srLabel ? undefined : true}
+			title={srLabel ? label : undefined}
+		>
+			<Icon aria-hidden />
+			{srLabel && <span className="sr-only">{label}: </span>}
+		</span>
+	);
+}

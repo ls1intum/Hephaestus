@@ -19,7 +19,7 @@ const practices: CatalogPracticeSummary[] = [
 		artifactKind: "scm.pull_request",
 		areaSlug: "review-ready-work",
 		areaName: "Review-ready work",
-		availability: "AVAILABLE" as const,
+		availability: "AVAILABLE",
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	},
 	{
@@ -28,95 +28,89 @@ const practices: CatalogPracticeSummary[] = [
 		artifactKind: "scm.pull_request",
 		areaSlug: "review-ready-work",
 		areaName: "Review-ready work",
-		availability: "ADOPTED" as const,
+		availability: "ADOPTED",
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	},
 	{
 		slug: "issue-context",
 		name: "Include enough issue context",
 		artifactKind: "scm.issue",
-		availability: "SLUG_CONFLICT" as const,
+		availability: "SLUG_CONFLICT",
 		automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 	},
 ];
 
+/**
+ * Grouping is not optional and adopted entries are not shown twice, so the list has no display
+ * flags: the one caller would have typed both as literals, which is the shape a flag argument takes
+ * just before it stops being one.
+ */
 const meta = {
 	title: "Workspace admin/Practice adoption/Available practices",
 	component: AvailablePracticeList,
-	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
-	args: { workspaceSlug: "demo", practices },
+	parameters: { layout: "padded" },
+	args: { workspaceSlug: "demo", practices, existingAreaSlugs: new Set(["review-ready-work"]) },
+	argTypes: { existingAreaSlugs: { control: false } },
 	tags: ["autodocs"],
 } satisfies Meta<typeof AvailablePracticeList>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const CatalogStates: Story = {
+export const Default: Story = {
 	play: async ({ canvas }) => {
+		// The ordinary case carries no chip, so the two exceptions are the only colour in the list.
 		await expect(canvas.queryByText("Available")).not.toBeInTheDocument();
-		await expect(canvas.getByText("Added")).toBeVisible();
 		await expect(canvas.getByText("Name unavailable")).toBeVisible();
-		// An adoptable row stays on the current route and only pushes a `detail` level, which is what
-		// makes it open a drawer instead of replacing the page.
+		// An adopted practice inside an area the workspace still has is not offered again.
+		await expect(canvas.queryByText("Keep pull requests focused")).not.toBeInTheDocument();
+		// An adoptable row stays on the route and only pushes a `detail` level, which is what makes
+		// it open a drawer instead of replacing the page.
 		await expect(
-			detailParamOf(
-				canvas.getByRole("link", { name: "Describe what changed and why, review for adoption" }),
-			),
+			detailParamOf(canvas.getByRole("link", { name: /Describe what changed and why/ })),
 		).toBe('["practice:describe-what-and-why"]');
-		await expect(
-			canvas.getByRole("link", {
-				name: "Keep pull requests focused, open workspace practice, added",
-			}),
-		).toHaveAttribute("href", "/w/demo/admin/practices/review-scope");
-	},
-};
-
-export const Empty: Story = {
-	args: { practices: [] },
-};
-
-export const GroupedLibrary: Story = {
-	args: {
-		groupByArea: true,
-		hideAdopted: true,
-		existingAreaSlugs: new Set(["review-ready-work"]),
-	},
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("heading", { name: "Review-ready work" })).toBeVisible();
-		await expect(canvas.queryByText("Added")).not.toBeInTheDocument();
-		await expect(detailParamOf(canvas.getByRole("link", { name: "Review 1 practice" }))).toBe(
+		await expect(detailParamOf(canvas.getByRole("link", { name: /Review 1 practice/ }))).toBe(
 			'["area:review-ready-work"]',
 		);
-		await expect(canvas.queryByRole("link", { name: /0 practices/ })).not.toBeInTheDocument();
+	},
+};
+
+export const DeletedAreaStillHasSomethingToAdd: Story = {
+	args: { existingAreaSlugs: new Set() },
+	play: async ({ canvas }) => {
+		// The area is gone, so its adopted practice is listed again — but one entry is still available,
+		// so the area is offered as a review rather than a pure restore.
+		await expect(canvas.getByRole("link", { name: /Review area · 1 practice/ })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: /Keep pull requests focused/ })).toHaveAttribute(
+			"href",
+			"/w/demo/admin/practices/review-scope",
+		);
+	},
+};
+
+export const DeletedAreaCanOnlyBeRestored: Story = {
+	args: { practices: [practices[1]], existingAreaSlugs: new Set() },
+	play: async ({ canvas }) => {
+		// Nothing left to add, so putting the area back is the only thing on offer.
+		await expect(canvas.getByRole("link", { name: /Restore area · 1 practice/ })).toBeVisible();
 	},
 };
 
 export const EverythingAdded: Story = {
-	args: {
-		practices: [practices[1]],
-		groupByArea: true,
-		hideAdopted: true,
-		existingAreaSlugs: new Set(["review-ready-work"]),
-	},
+	args: { practices: [practices[1]] },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Everything is already added")).toBeVisible();
 	},
 };
 
-export const RestoreDeletedArea: Story = {
-	args: {
-		practices: [practices[1]],
-		groupByArea: true,
-		hideAdopted: true,
-		existingAreaSlugs: new Set(),
-	},
+export const NothingOffered: Story = {
+	args: { practices: [] },
 	play: async ({ canvas }) => {
-		// A deleted area keeps its adopted practices visible so it can be offered back.
-		await expect(canvas.getByRole("link", { name: "Restore area · 1 practice" })).toBeVisible();
+		await expect(canvas.getByText("Nothing to add")).toBeVisible();
 	},
 };
 
-export const LongContentInDarkMode: Story = {
+export const LongContent: Story = {
 	args: {
 		practices: [
 			{
@@ -126,5 +120,12 @@ export const LongContentInDarkMode: Story = {
 			},
 		],
 	},
+};
+
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+};
+
+export const DarkMode: Story = {
 	globals: { theme: "dark" },
 };

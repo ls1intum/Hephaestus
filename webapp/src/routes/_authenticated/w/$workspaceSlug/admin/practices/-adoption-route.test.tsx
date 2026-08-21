@@ -93,8 +93,8 @@ describe("catalog adoption over practice setup", () => {
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
 					},
 					{
-						slug: "local-collision",
-						name: "Local collision",
+						slug: "issue-context",
+						name: "Include enough issue context",
 						artifactKind: "scm.issue",
 						availability: "SLUG_CONFLICT",
 						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
@@ -108,11 +108,13 @@ describe("catalog adoption over practice setup", () => {
 		await screen.findByRole("heading", { name: "Practice library" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByText("Available")).toBeNull();
 		expect(await screen.findByText("Name unavailable")).not.toBeNull();
+		// The row's accessible name is its own visible text plus the registry's action phrase, not an
+		// `aria-label` that would have replaced the work type and area for a screen reader.
+		expect(screen.getByRole("link", { name: /Describe what changed and why/ })).not.toBeNull();
 		expect(
-			screen.getByRole("link", { name: `${preview.definition.name}, review for adoption` }),
-		).not.toBeNull();
-		expect(
-			screen.getByRole("link", { name: "Local collision, view details, name unavailable" }),
+			screen.getByRole("link", {
+				name: /Include enough issue context, see why it cannot be added/,
+			}),
 		).not.toBeNull();
 	});
 
@@ -137,11 +139,7 @@ describe("catalog adoption over practice setup", () => {
 
 		const { router } = renderRouteAtWithRouter(LIBRARY);
 		fireEvent.click(
-			await screen.findByRole(
-				"link",
-				{ name: `${preview.definition.name}, review for adoption` },
-				ROUTE_RENDER_WAIT,
-			),
+			await screen.findByRole("link", { name: /Describe what changed and why/ }, ROUTE_RENDER_WAIT),
 		);
 
 		await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);

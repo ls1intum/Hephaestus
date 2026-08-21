@@ -7,9 +7,11 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { withPageBehind } from "@/stories/decorators";
+import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
-import { AreaAdoptionPanel } from "./AreaAdoptionPanel";
+import { AreaAdoptionPanel, type AreaAdoptionState } from "./AreaAdoptionPanel";
 
 const practice = {
 	slug: "describe-what-and-why",
@@ -59,28 +61,36 @@ const preview: CatalogAreaAdoptionPreview = {
 	],
 };
 
+const ready = (over: Partial<CatalogAreaAdoptionPreview> = {}, adding = false) =>
+	({ status: "ready", preview: { ...preview, ...over }, adding }) as const;
+
 /**
  * An area states each practice's outcome on the practice's own row, so the panel needs no prose
- * explaining which of four lists a name ended up in — and no embedded copy of the definition,
- * which opens as its own level on top instead.
+ * explaining which of four lists a name ended up in — and no embedded copy of the definition, which
+ * opens as its own level on top instead.
  */
 const meta = {
 	title: "Workspace admin/Practice adoption/Area panel",
 	component: AreaAdoptionPanel,
-	parameters: { layout: "fullscreen", chromatic: { viewports: [320, 1440] } },
+	parameters: { layout: "fullscreen" },
+	decorators: [withPageBehind],
 	args: {
-		preview,
-		isLoading: false,
-		isError: false,
-		isPending: false,
-		onRetry: fn(),
+		state: ready(),
 		onConfirm: fn(),
 		onOpenPractice: fn(),
 	},
+	argTypes: {
+		// A discriminated union renders as a free-text box, which cannot produce a valid value.
+		state: { control: false },
+	},
 	render: (args) => (
-		<DetailDrawerStack stack={[{ kind: "area", id: "review-ready-work" }]} onClose={() => {}}>
-			{() => <AreaAdoptionPanel {...args} />}
-		</DetailDrawerStack>
+		<Stateful initial={[{ kind: "area", id: preview.slug }]}>
+			{(stack, setStack) => (
+				<DetailDrawerStack stack={stack} onClose={(depth) => setStack(stack.slice(0, depth))}>
+					{(_entry, level) => <AreaAdoptionPanel {...args} nested={level.nested} />}
+				</DetailDrawerStack>
+			)}
+		</Stateful>
 	),
 	tags: ["autodocs"],
 } satisfies Meta<typeof AreaAdoptionPanel>;
@@ -96,24 +106,29 @@ export const MixedOutcomes: Story = {
 		await expect(screen.getByText("Adds")).toBeVisible();
 		await expect(screen.getByText("Already here")).toBeVisible();
 		await expect(screen.getByText("Blocked")).toBeVisible();
-		await userEvent.click(
-			screen.getByRole("button", { name: "Describe what changed and why, adds" }),
-		);
+		await userEvent.click(screen.getByRole("button", { name: /Describe what changed and why/ }));
 		await expect(args.onOpenPractice).toHaveBeenCalledWith("describe-what-and-why");
+	},
+};
+
+export const DismissReturnsToThePage: Story = {
+	play: async () => {
+		await expectSettledVisible(await screen.findByRole("button", { name: "Add 1 practice" }));
+		await userEvent.click(screen.getByRole("button", { name: "Close" }));
+		await expect(await screen.findByRole("heading", { name: "Practice setup" })).toBeVisible();
 	},
 };
 
 export const RestoreDeletedArea: Story = {
 	args: {
-		preview: {
-			...preview,
+		state: ready({
 			disposition: "REUSE_EXISTING_AREA",
 			actions: [
 				{ slug: "describe-what-and-why", action: "MOVE_TO_AREA" },
 				{ slug: "focused-changes", action: "MOVE_TO_AREA" },
 				{ slug: "clear-context", action: "KEEP" },
 			],
-		},
+		}),
 	},
 	play: async () => {
 		// Nothing is created, so the action is a restore rather than an add.
@@ -124,10 +139,9 @@ export const RestoreDeletedArea: Story = {
 
 export const NothingToChange: Story = {
 	args: {
-		preview: {
-			...preview,
+		state: ready({
 			actions: preview.actions.map(({ slug }) => ({ slug, action: "KEEP" as const })),
-		},
+		}),
 	},
 	play: async () => {
 		await expectGenuinelyDisabled(await screen.findByRole("button", { name: "Add 0 practices" }));
@@ -135,40 +149,49 @@ export const NothingToChange: Story = {
 };
 
 export const Loading: Story = {
-	args: { preview: undefined, isLoading: true },
+	args: { state: { status: "loading" } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("Loading area preview"));
+		// The header cannot invent an area colour for a slug that has not loaded.
+		await expect(screen.getByRole("heading", { name: "Practice area" })).toBeVisible();
 	},
 };
 
 export const FailedToLoad: Story = {
-	args: { preview: undefined, isLoading: false, isError: true, error: new Error("offline") },
+	args: { state: { status: "error", error: new Error("offline"), onRetry: fn() } },
 	play: async ({ args }) => {
 		const retry = await screen.findByRole("button", { name: "Retry" });
 		await expectSettledVisible(retry);
 		await userEvent.click(retry);
-		await expect(args.onRetry).toHaveBeenCalledOnce();
+		await expect(
+			(args.state as Extract<AreaAdoptionState, { status: "error" }>).onRetry,
+		).toHaveBeenCalledOnce();
 	},
 };
 
 export const Adding: Story = {
-	args: { isPending: true },
+	args: { state: ready({}, true) },
 	play: async () => {
 		await expectGenuinelyDisabled(await screen.findByRole("button", { name: "Adding…" }));
 	},
 };
 
-export const LongContentInDarkMode: Story = {
+export const LongContent: Story = {
 	args: {
-		preview: {
-			...preview,
+		state: ready({
 			definition: {
 				name: "Decisions, documentation, and long-lived operational knowledge",
 				description:
 					"Practices covering how a team records the reasoning behind a change, keeps operational runbooks current, and makes the resulting knowledge findable long after the original authors have moved on.",
 			},
-		},
+		}),
 	},
-	globals: { theme: "dark" },
+};
+
+export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+};
+
+export const DarkMode: Story = {
+	globals: { theme: "dark" },
 };

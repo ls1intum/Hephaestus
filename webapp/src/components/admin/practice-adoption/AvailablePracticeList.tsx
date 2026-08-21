@@ -1,9 +1,10 @@
 import { Link } from "@tanstack/react-router";
-import { Check, ChevronRight, CircleAlert, CircleDashed, Library } from "lucide-react";
+import { ChevronRight, Library } from "lucide-react";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
-import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
-import { Badge } from "@/components/ui/badge";
+import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
 import {
 	Empty,
@@ -22,128 +23,117 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { cn } from "@/lib/utils";
 
 export interface AvailablePracticeListProps {
 	workspaceSlug: string;
 	practices: CatalogPracticeSummary[];
-	groupByArea?: boolean;
-	hideAdopted?: boolean;
-	existingAreaSlugs?: ReadonlySet<string>;
+	/**
+	 * The areas the workspace already has. An area missing from this set is one the library can
+	 * offer back, which is why its practices stay listed even after they have been added.
+	 */
+	existingAreaSlugs: ReadonlySet<string>;
 }
 
+/**
+ * What the instance catalog still has to offer this workspace, grouped by the area each entry would
+ * land in. A practice already added into an area the workspace still has is not offered again; one
+ * whose area was deleted stays, because the area is what the library can put back.
+ */
 export function AvailablePracticeList({
 	workspaceSlug,
 	practices,
-	groupByArea = false,
-	hideAdopted = false,
-	existingAreaSlugs = new Set(),
+	existingAreaSlugs,
 }: AvailablePracticeListProps) {
-	const visiblePractices = hideAdopted
-		? practices.filter(
-				(practice) =>
-					practice.availability !== "ADOPTED" ||
-					(practice.areaSlug !== undefined && !existingAreaSlugs.has(practice.areaSlug)),
-			)
-		: practices;
-	if (visiblePractices.length === 0) {
-		const allAdded = hideAdopted && practices.length > 0;
+	const offered = practices.filter(
+		(practice) =>
+			practice.availability !== "ADOPTED" ||
+			(practice.areaSlug !== undefined && !existingAreaSlugs.has(practice.areaSlug)),
+	);
+
+	if (offered.length === 0) {
+		const allAdded = practices.length > 0;
 		return (
 			<Empty className="border">
 				<EmptyHeader>
 					<EmptyMedia variant="icon">
 						<Library />
 					</EmptyMedia>
-					<EmptyTitle>
-						{allAdded ? "Everything is already added" : "No practices available"}
-					</EmptyTitle>
+					<EmptyTitle>{allAdded ? "Everything is already added" : "Nothing to add"}</EmptyTitle>
 					<EmptyDescription>
 						{allAdded
-							? "This workspace already has every practice currently offered in the library."
+							? "This workspace already has every practice the library currently offers."
 							: "The instance catalog does not currently offer any practices to this workspace."}
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
 		);
 	}
-	if (groupByArea) {
-		const groups = new Map<string, CatalogPracticeSummary[]>();
-		for (const practice of visiblePractices) {
-			const areaKey = practice.areaSlug ?? "__unassigned__";
-			groups.set(areaKey, [...(groups.get(areaKey) ?? []), practice]);
-		}
-		return (
-			<div className="space-y-4">
-				{Array.from(groups, ([areaKey, entries]) => {
-					const areaName = entries[0]?.areaName ?? "Unassigned";
-					const areaSlug = entries[0]?.areaSlug;
-					const availableCount = entries.filter(
-						(entry) => entry.availability === "AVAILABLE",
-					).length;
-					const restoreCount = entries.filter((entry) => entry.availability === "ADOPTED").length;
-					const areaMissing = areaSlug !== undefined && !existingAreaSlugs.has(areaSlug);
-					return (
-						<section
-							key={areaKey}
-							className="space-y-2"
-							aria-labelledby={`library-${entries[0].areaSlug ?? "unassigned"}`}
-						>
-							<div className="flex flex-wrap items-center justify-between gap-3">
-								<h3 id={`library-${entries[0].areaSlug ?? "unassigned"}`} className="font-medium">
-									{areaName}
-								</h3>
-								{areaSlug && (availableCount > 0 || (areaMissing && restoreCount > 0)) ? (
-									<DetailStackLink
-										entry={{ kind: "area", id: areaSlug }}
-										className={buttonVariants({ size: "sm", variant: "outline" })}
-									>
-										{areaMissing && availableCount === 0
-											? `Restore area · ${restoreCount} ${restoreCount === 1 ? "practice" : "practices"}`
-											: existingAreaSlugs.has(areaSlug)
-												? `Review ${availableCount} ${availableCount === 1 ? "practice" : "practices"}`
-												: `Review area · ${availableCount} ${availableCount === 1 ? "practice" : "practices"}`}
-									</DetailStackLink>
-								) : (
-									<span className="text-xs text-muted-foreground">
-										{entries.length} {entries.length === 1 ? "practice" : "practices"}
-									</span>
-								)}
-							</div>
-							<PracticeItems workspaceSlug={workspaceSlug} practices={entries} />
-						</section>
-					);
-				})}
-			</div>
-		);
-	}
-	return <PracticeItems workspaceSlug={workspaceSlug} practices={visiblePractices} />;
-}
 
-function PracticeItems({ workspaceSlug, practices }: AvailablePracticeListProps) {
+	const groups = new Map<string, CatalogPracticeSummary[]>();
+	for (const practice of offered) {
+		const key = practice.areaSlug ?? "__unassigned__";
+		groups.set(key, [...(groups.get(key) ?? []), practice]);
+	}
+
 	return (
-		<ItemGroup>
-			{practices.map((practice) => (
-				<div key={practice.slug} role="listitem">
-					<PracticeItem workspaceSlug={workspaceSlug} practice={practice} />
-				</div>
-			))}
-		</ItemGroup>
+		<div className="space-y-5">
+			{Array.from(groups, ([key, entries]) => {
+				const first = entries[0];
+				const areaSlug = first.areaSlug;
+				const headingId = `library-${key}`;
+				const available = entries.filter(({ availability }) => availability === "AVAILABLE").length;
+				const restorable = entries.filter(({ availability }) => availability === "ADOPTED").length;
+				const areaMissing = areaSlug !== undefined && !existingAreaSlugs.has(areaSlug);
+
+				return (
+					<section key={key} className="space-y-2" aria-labelledby={headingId}>
+						<div className="flex flex-wrap items-center justify-between gap-3">
+							<h3 id={headingId} className="flex items-center gap-2 text-sm font-medium">
+								<AreaPill size="sm" slug={areaSlug} name={first.areaName} />
+								{first.areaName ?? "No area"}
+							</h3>
+							{areaSlug && (available > 0 || (areaMissing && restorable > 0)) ? (
+								<DetailStackLink
+									entry={{ kind: "area", id: areaSlug }}
+									className={buttonVariants({ size: "sm", variant: "outline" })}
+								>
+									{areaMissing && available === 0
+										? `Restore area · ${countLabel(restorable)}`
+										: existingAreaSlugs.has(areaSlug)
+											? `Review ${countLabel(available)}`
+											: `Review area · ${countLabel(available)}`}
+								</DetailStackLink>
+							) : (
+								<span className="text-xs text-muted-foreground">{countLabel(entries.length)}</span>
+							)}
+						</div>
+						<ItemGroup>
+							{entries.map((practice) => (
+								<div key={practice.slug} role="listitem">
+									<PracticeRow workspaceSlug={workspaceSlug} practice={practice} />
+								</div>
+							))}
+						</ItemGroup>
+					</section>
+				);
+			})}
+		</div>
 	);
 }
 
-function PracticeItem({
+function countLabel(count: number): string {
+	return `${count} ${count === 1 ? "practice" : "practices"}`;
+}
+
+function PracticeRow({
 	workspaceSlug,
 	practice,
 }: {
 	workspaceSlug: string;
 	practice: CatalogPracticeSummary;
 }) {
-	const areaName = practice.areaName ?? "Unassigned";
-	const areaVisual = practice.areaSlug
-		? getAreaVisual(practice.areaSlug, areaName)
-		: { Icon: CircleDashed, pill: "bg-muted text-muted-foreground" };
-	const { Icon, pill } = areaVisual;
-	// An adopted practice leaves the library for its workspace copy; everything else opens over it.
+	const def = CATALOG_AVAILABILITY_DEFS[practice.availability];
+	// An added practice leaves the library for its workspace copy; everything else opens over it.
 	const link =
 		practice.availability === "ADOPTED" ? (
 			<Link
@@ -156,50 +146,27 @@ function PracticeItem({
 		);
 
 	return (
-		<Item variant="outline" render={link} aria-label={`${practice.name}, ${actionLabel(practice)}`}>
-			<ItemMedia className={cn("size-9 rounded-md", pill)} aria-hidden="true">
-				<Icon className="size-4" />
+		// No `aria-label` on the row: one would replace everything below for a screen reader, taking
+		// the work type and the area with it. The visible text is the accessible name, and the
+		// registry's second grammatical form is appended for the part a sighted reader gets from
+		// the chevron.
+		<Item variant="outline" render={link}>
+			<ItemMedia variant="icon" className="bg-transparent">
+				<AreaPill size="md" slug={practice.areaSlug} name={practice.areaName} />
 			</ItemMedia>
 			<ItemContent className="min-w-0">
-				<ItemTitle className="line-clamp-none break-words">{practice.name}</ItemTitle>
-				<ItemDescription className="flex flex-wrap items-center gap-x-2 gap-y-1 line-clamp-none">
-					<span>{artifactKindLabel(practice.artifactKind)}</span>
-					<span aria-hidden="true">·</span>
-					<span>{areaName}</span>
+				<ItemTitle className="line-clamp-none break-words">
+					{practice.name}
+					<span className="sr-only">, {def.action}</span>
+				</ItemTitle>
+				<ItemDescription className="line-clamp-none">
+					{artifactKindLabel(practice.artifactKind)}
 				</ItemDescription>
 			</ItemContent>
 			<ItemActions>
-				<AvailabilityBadge availability={practice.availability} />
+				{def.badged && <StatusBadge def={def} />}
 				<ChevronRight className="size-4 text-muted-foreground" aria-hidden="true" />
 			</ItemActions>
 		</Item>
 	);
-}
-
-function actionLabel(practice: CatalogPracticeSummary): string {
-	if (practice.availability === "ADOPTED") return "open workspace practice, added";
-	if (practice.availability === "SLUG_CONFLICT") return "view details, name unavailable";
-	return "review for adoption";
-}
-
-function AvailabilityBadge({
-	availability,
-}: {
-	availability: CatalogPracticeSummary["availability"];
-}) {
-	if (availability === "ADOPTED") {
-		return (
-			<Badge variant="secondary">
-				<Check /> Added
-			</Badge>
-		);
-	}
-	if (availability === "SLUG_CONFLICT") {
-		return (
-			<Badge variant="outline">
-				<CircleAlert /> Name unavailable
-			</Badge>
-		);
-	}
-	return null;
 }

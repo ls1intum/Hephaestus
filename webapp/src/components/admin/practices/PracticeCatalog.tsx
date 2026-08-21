@@ -174,8 +174,6 @@ export function PracticeCatalog({
 						<AvailablePracticeList
 							workspaceSlug={workspaceSlug}
 							practices={visibleCatalogPractices}
-							groupByArea
-							hideAdopted
 							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
 						/>
 					) : (

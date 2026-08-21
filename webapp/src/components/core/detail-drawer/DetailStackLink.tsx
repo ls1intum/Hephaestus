@@ -9,9 +9,9 @@ export interface DetailStackLinkProps extends Omit<LinkComponentProps<"a">, "to"
  * Opens `entry` as the next level of the detail-drawer stack.
  *
  * It is a real link to the current route with one more `detail` param, which is what makes the
- * whole pattern shallow routing rather than hidden state: the row can be opened in a new tab,
- * copied, and reloaded, and Back closes exactly the drawer it opened. Appending to `previous`
- * rather than to a captured stack means the same component works at every depth.
+ * pattern shallow routing rather than hidden state: the row can be opened in a new tab, copied and
+ * reloaded, and Back closes exactly the drawer it opened. Appending to `previous` rather than to a
+ * captured stack is what lets the same component work at every depth.
  */
 export function DetailStackLink({ entry, ...props }: DetailStackLinkProps) {
 	return (
@@ -21,6 +21,9 @@ export function DetailStackLink({ entry, ...props }: DetailStackLinkProps) {
 				...previous,
 				detail: [...toStack(previous.detail), detailStackKey(entry)],
 			})}
+			// Marks the history entry as one this visit created, so a dismiss can go back to what was
+			// behind it rather than forward to a shorter URL. See `useDetailStack`.
+			state={(previous) => ({ ...previous, detailPush: true }) as never}
 			{...props}
 		/>
 	);
