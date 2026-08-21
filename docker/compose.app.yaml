@@ -275,6 +275,12 @@ services:
       release-pin-fetcher:
         condition: service_completed_successfully
     restart: unless-stopped
+    # The image runs unprivileged (the buildpack's `cnb` user) while /var/run/docker.sock is
+    # root:docker 0660, so the sandbox runtime cannot reach the daemon without joining the host's
+    # docker group. There is no portable value: read the host's with
+    # `getent group docker | cut -d: -f3` and set DOCKER_GROUP_ID to it.
+    group_add:
+      - "${DOCKER_GROUP_ID:-999}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
@@ -404,6 +410,12 @@ services:
       release-pin-fetcher:
         condition: service_completed_successfully
     restart: unless-stopped
+    # The image runs unprivileged (the buildpack's `cnb` user) while /var/run/docker.sock is
+    # root:docker 0660, so the sandbox runtime cannot reach the daemon without joining the host's
+    # docker group. There is no portable value: read the host's with
+    # `getent group docker | cut -d: -f3` and set DOCKER_GROUP_ID to it.
+    group_add:
+      - "${DOCKER_GROUP_ID:-999}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos
