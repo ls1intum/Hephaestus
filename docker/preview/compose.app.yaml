@@ -265,9 +265,8 @@ services:
       # competing for one and stealing each other's messages.
       NATS_DURABLE_CONSUMER_NAME: ${SERVICE_NAME_APPSERVER:-appserver}-consumer
       # A preview is deleted, not shut down, so it never removes the durables it created on the
-      # shared stream. JetStream reaps them once nothing has been bound for this long — one closed
-      # PR would otherwise leave its cursors, and their backlogs, behind for good. Long enough that
-      # a redeploy or a paused review session resumes on its own cursor rather than skipping ahead.
+      # shared stream. Long enough that a redeploy, or a testing session paused overnight, resumes
+      # on its own cursor instead of skipping ahead to the head of the stream.
       HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:-72h}
       # Issuer is this deploy's own origin, so a preview's tokens validate against the deploy that
       # issued them (Hephaestus-native auth, ADR 0017).

@@ -12,7 +12,7 @@ copy of the staging database.
 | Seed data | One live `pg_dump` from `app-postgres-1` on first deploy | Realistic data without touching the staging data volume |
 | NATS | Shared staging `nats-server:4222` on `shared-network` | Previews see the same integration events as staging |
 | NATS consumer | `${SERVICE_NAME_APPSERVER}-consumer` | Every preview has an independent JetStream cursor |
-| Consumer lifetime | JetStream reaps the durable after 72h unbound | A deleted preview cannot delete its own cursors |
+| Consumer lifetime | JetStream reaps the durable after `HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD` with no pulls | A deleted preview cannot delete its own cursors |
 | App image | Immutable `${SOURCE_COMMIT}` tag from CI | The API and SPA both reflect the PR without a shared mutable tag |
 | Agent runtime | Enabled, one sandbox at a time | A selected workspace can run real reviews without exhausting the host |
 | Review automation | Paused in every cloned workspace | A clone cannot post reviews until an admin explicitly opts it in |

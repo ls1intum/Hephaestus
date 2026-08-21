@@ -7,7 +7,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
-import org.jspecify.annotations.Nullable;
+import org.hibernate.validator.constraints.time.DurationMin;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 import org.springframework.boot.convert.DurationUnit;
@@ -17,11 +17,10 @@ import org.springframework.validation.annotation.Validated;
  * NATS consumer tuning bound to {@code hephaestus.integration.consumer}. Read by every
  * consumer-side collaborator under {@code integration.consumer}.
  *
- * <p>{@code inactive-threshold} is unset by default, which is what a long-lived deployment wants:
- * a durable that outlives an outage resumes at its own cursor instead of skipping whatever arrived
- * while the pod was down. Set it only where the deployment itself is disposable — a PR preview
- * leaves its durables behind when the stack is deleted, and without a threshold those cursors
- * accumulate on the shared stream forever.
+ * <p>{@code inactive-threshold} lets JetStream delete a durable nothing has pulled from for that
+ * long; zero disables it. Set it only where the deployment is deleted rather than shut down, and so
+ * never deletes its own durables — elsewhere a reaped durable is recreated at
+ * {@link io.nats.client.api.DeliverPolicy#New} and loses whatever arrived during the outage.
  */
 @Validated
 @ConfigurationProperties(prefix = "hephaestus.integration.consumer")
@@ -38,13 +37,14 @@ public record NatsConsumerProperties(
     @DefaultValue("2s")
     @NotNull(message = "reconnect-delay must not be null")
     Duration reconnectDelay,
-    @DurationUnit(ChronoUnit.HOURS) @Nullable Duration inactiveThreshold,
+    @DurationUnit(ChronoUnit.HOURS)
+    @DefaultValue("0s")
+    @NotNull(message = "inactive-threshold must not be null")
+    @DurationMin(message = "inactive-threshold must not be negative")
+    Duration inactiveThreshold,
     @Valid PoisonProperties poison
 ) {
     public NatsConsumerProperties {
-        if (inactiveThreshold != null && (inactiveThreshold.isZero() || inactiveThreshold.isNegative())) {
-            throw new IllegalStateException("inactive-threshold must be positive when set");
-        }
         if (poison == null) {
             poison = new PoisonProperties(10, Duration.ofSeconds(2), Duration.ofMinutes(5));
         }
