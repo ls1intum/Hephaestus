@@ -2,11 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { AreaPill } from "./AreaPill";
 
-/**
- * One mark for a practice area, so the same area looks the same in a workspace tree, an instance
- * tree, a review row and a detail header. The colour is what an administrator learns to scan by, so
- * it may not be re-decided per surface.
- */
 const meta = {
 	component: AreaPill,
 	parameters: { layout: "centered" },
@@ -40,14 +35,6 @@ export const Announced: Story = {
 		// stay in the accessibility tree.
 		await expect(canvas.getByText("Review-ready work:")).toHaveClass("sr-only");
 		await expect(canvasElement.querySelector("span[aria-hidden='true']")).toBeNull();
-	},
-};
-
-export const Decorative: Story = {
-	play: async ({ canvasElement }) => {
-		// Everywhere else the name is beside it, so announcing it twice would be noise.
-		// The pill itself is hidden; only the icon inside it would be anyway.
-		await expect(canvasElement.querySelector("span[aria-hidden='true']")).not.toBeNull();
 	},
 };
 

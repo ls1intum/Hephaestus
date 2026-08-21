@@ -1,13 +1,19 @@
+import { useId, useState } from "react";
 import type { PracticeArea } from "@/api/types.gen";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
+	DialogBody,
+	DialogClose,
 	DialogContent,
 	DialogFooter,
+	DialogForm,
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { Spinner } from "@/components/ui/spinner";
 
 export interface AreaNameDialogProps {
 	/** The area being renamed, or `null` when the dialog is naming a new one. */
@@ -15,24 +21,18 @@ export interface AreaNameDialogProps {
 	open: boolean;
 	pending: boolean;
 	onOpenChange: (open: boolean) => void;
-	/** Resolve `true` to close the dialog; `false` leaves it open with the typed name intact. */
+	/** Resolve `true` to close; `false` leaves the dialog open with the typed name intact. */
 	onSubmit: (name: string) => Promise<boolean>;
 }
 
 /**
  * Naming a practice area, whether it exists yet or not.
  *
- * These were two surfaces for one task: creating an area happened in a `Popover` and renaming one in
- * a `Dialog`, side by side on the same page. Same weight of decision, same single field, two
- * containers — the kind of difference a reader notices without being able to say why the page feels
- * untidy.
+ * Which of the two it is comes from `area` rather than a second `mode` prop, so the title, the
+ * button and the request cannot disagree.
  *
- * Whether it is creating or renaming is read off `area` rather than carried in a second `mode` prop,
- * so the two can never disagree.
- *
- * No unsaved-changes guard, deliberately. A name is a few seconds to retype, which is the line the
- * drawer rule in `webapp/AGENTS.md` draws: a surface whose dismissal would need permission is a
- * route, and this is not one.
+ * No unsaved-changes guard: a name is seconds to retype, which is the line the drawer rule in
+ * `webapp/AGENTS.md` draws between a dismissible surface and a route.
  */
 export function AreaNameDialog({
 	area,
@@ -41,58 +41,74 @@ export function AreaNameDialog({
 	onOpenChange,
 	onSubmit,
 }: AreaNameDialogProps) {
-	const renaming = area !== null;
-
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-sm">
+				{/* Keyed so the field starts from this area's name. The state lives in the child because
+				    that is what `DialogContent` unmounts on close; the dialog itself stays mounted. */}
+				<AreaNameForm
+					key={area?.slug ?? "new"}
+					area={area}
+					pending={pending}
+					onOpenChange={onOpenChange}
+					onSubmit={onSubmit}
+				/>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+function AreaNameForm({
+	area,
+	pending,
+	onOpenChange,
+	onSubmit,
+}: Omit<AreaNameDialogProps, "open">) {
+	const fieldId = useId();
+	const renaming = area !== null;
+	const [name, setName] = useState(area?.name ?? "");
+	const trimmed = name.trim();
+
+	return (
+		<>
+			<DialogForm
+				onSubmit={async (event) => {
+					event.preventDefault();
+					// Re-submitting an unchanged name is a deliberate "never mind".
+					if (trimmed === area?.name) return onOpenChange(false);
+					if (await onSubmit(trimmed)) onOpenChange(false);
+				}}
+			>
 				<DialogHeader>
 					<DialogTitle>{renaming ? "Rename area" : "Create area"}</DialogTitle>
 				</DialogHeader>
-				<form
-					onSubmit={async (event) => {
-						event.preventDefault();
-						// `namedItem` answers with a RadioNodeList when a name is shared, so narrow rather
-						// than cast.
-						const input = event.currentTarget.elements.namedItem("areaName");
-						if (!(input instanceof HTMLInputElement)) return;
-						const name = input.value.trim();
-						// An empty name is nothing to do in either mode, but it must not look like a
-						// decision: closing on it would discard a create the reader had started. Renaming
-						// to the same name *is* a decision, and the decision is "never mind".
-						if (!name) return;
-						if (name === area?.name) {
-							onOpenChange(false);
-							return;
-						}
-						if (await onSubmit(name)) onOpenChange(false);
-					}}
-					className="space-y-4"
-				>
-					<Input
-						name="areaName"
-						required
-						defaultValue={area?.name ?? ""}
-						placeholder={renaming ? undefined : "New area name…"}
-						aria-label={renaming ? "Area name" : "New area name"}
-						autoComplete="off"
-						disabled={pending}
-					/>
-					<DialogFooter>
-						<Button
-							type="button"
-							variant="outline"
-							onClick={() => onOpenChange(false)}
-							disabled={pending}
-						>
-							Cancel
-						</Button>
-						<Button type="submit" className="min-w-20" disabled={pending}>
-							{pending ? (renaming ? "Saving…" : "Creating…") : renaming ? "Save" : "Create"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
+				<DialogBody className="py-1">
+					<FieldGroup>
+						<Field>
+							<FieldLabel htmlFor={fieldId}>Name</FieldLabel>
+							<Input
+								id={fieldId}
+								value={name}
+								onChange={(event) => setName(event.target.value)}
+								placeholder={renaming ? undefined : "New area name…"}
+								autoComplete="off"
+								disabled={pending}
+								autoFocus
+							/>
+						</Field>
+					</FieldGroup>
+				</DialogBody>
+				<DialogFooter>
+					<DialogClose render={<Button type="button" variant="outline" disabled={pending} />}>
+						Cancel
+					</DialogClose>
+					{/* Disabled rather than validated on submit: one required field needs no error message. */}
+					<Button type="submit" className="min-w-20" disabled={pending || trimmed.length === 0}>
+						{pending && <Spinner className="size-4" aria-hidden />}
+						{pending ? (renaming ? "Saving…" : "Creating…") : renaming ? "Save" : "Create"}
+					</Button>
+				</DialogFooter>
+			</DialogForm>
+		</>
 	);
 }

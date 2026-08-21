@@ -46,6 +46,7 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { inheritedAutonomySourceSentence } from "@/lib/practice-autonomy";
@@ -85,10 +86,6 @@ export interface PracticeCatalogProps {
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
-	/**
-	 * The library's state as one value. Four parallel props could describe a loaded-and-failed
-	 * region, and `onRetry` sat outside the branch that can use it.
-	 */
 	library?: LibraryState;
 	showLibrary?: boolean;
 	onShowLibraryChange?: (show: boolean) => void;
@@ -361,20 +358,20 @@ function CatalogToolbar({
 				))}
 			</ToggleGroup>
 			<div className="grid gap-2 sm:flex">
-				<Button
+				<Toggle
 					variant="outline"
-					aria-pressed={showLibrary}
-					onClick={() => onShowLibraryChange?.(!showLibrary)}
+					pressed={showLibrary}
+					onPressedChange={(pressed) => onShowLibraryChange?.(pressed)}
 				>
-					<Library className="mr-1.5 size-4" />
-					{showLibrary ? "Hide library" : "Show library"}
-				</Button>
+					<Library />
+					Show library
+				</Toggle>
 				<Button
 					variant="outline"
 					onClick={onCreateArea}
 					disabled={areaStructurePending && !creatingArea}
 				>
-					<Plus className="mr-1.5 size-4" />
+					<Plus />
 					Create area
 				</Button>
 				<Link
@@ -382,7 +379,7 @@ function CatalogToolbar({
 					params={{ workspaceSlug }}
 					className={cn(buttonVariants(), "w-full sm:w-auto")}
 				>
-					<Plus className="mr-1.5 size-4" />
+					<Plus />
 					Create practice
 				</Link>
 			</div>

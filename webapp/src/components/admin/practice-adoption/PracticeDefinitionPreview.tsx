@@ -1,6 +1,7 @@
 import { CircleCheck, Lightbulb } from "lucide-react";
 import type { CuratedPracticeDefinition, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { Section } from "@/components/core/Section";
 import {
 	Accordion,
 	AccordionContent,
@@ -13,48 +14,60 @@ import { artifactKindLabel } from "@/lib/artifact-kinds";
 export interface PracticeDefinitionPreviewProps {
 	definition: CuratedPracticeDefinition;
 	options: PracticeDefinitionOptions;
-	idPrefix?: string;
 }
 
-export function PracticeDefinitionPreview({
-	definition,
-	options,
-	idPrefix = "practice",
-}: PracticeDefinitionPreviewProps) {
+export function PracticeDefinitionPreview({ definition, options }: PracticeDefinitionPreviewProps) {
 	const workType = options.workTypes?.find(
 		(candidate) => candidate.artifactKind === definition.artifactKind,
 	);
 
 	return (
 		<div className="space-y-8">
-			<section aria-labelledby={`${idPrefix}-checks-heading`} className="space-y-3">
-				<h2 id={`${idPrefix}-checks-heading`} className="text-sm font-medium">
-					What this practice checks
-				</h2>
+			<Section size="sm" title="What this practice checks">
 				<p className="whitespace-pre-wrap text-xl font-semibold tracking-tight">
 					{definition.criteria}
 				</p>
-			</section>
+			</Section>
 
 			{(definition.whyItMatters || definition.whatGoodLooksLike) && (
 				<div className="grid gap-4 sm:grid-cols-2">
 					{definition.whyItMatters && (
-						<section className="rounded-xl bg-muted/50 p-4">
-							<Lightbulb className="mb-3 size-5 text-muted-foreground" aria-hidden="true" />
-							<h2 className="font-medium">Why it matters</h2>
-							<p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+						<Section
+							size="sm"
+							className="rounded-xl bg-muted/50 p-4"
+							title={
+								<>
+									<Lightbulb
+										className="mb-3 block size-5 text-muted-foreground"
+										aria-hidden="true"
+									/>
+									Why it matters
+								</>
+							}
+						>
+							<p className="whitespace-pre-wrap text-sm text-muted-foreground">
 								{definition.whyItMatters}
 							</p>
-						</section>
+						</Section>
 					)}
 					{definition.whatGoodLooksLike && (
-						<section className="rounded-xl bg-muted/50 p-4">
-							<CircleCheck className="mb-3 size-5 text-muted-foreground" aria-hidden="true" />
-							<h2 className="font-medium">What good looks like</h2>
-							<p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">
+						<Section
+							size="sm"
+							className="rounded-xl bg-muted/50 p-4"
+							title={
+								<>
+									<CircleCheck
+										className="mb-3 block size-5 text-muted-foreground"
+										aria-hidden="true"
+									/>
+									What good looks like
+								</>
+							}
+						>
+							<p className="whitespace-pre-wrap text-sm text-muted-foreground">
 								{definition.whatGoodLooksLike}
 							</p>
-						</section>
+						</Section>
 					)}
 				</div>
 			)}

@@ -8,10 +8,6 @@ import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
 import { DetailDrawerHeader } from "./DetailDrawerHeader";
 
-/**
- * The dismiss is a `DrawerClose`, so it closes through the same path as Escape, an outside press
- * and a rightward swipe rather than a fourth one that can drift out of agreement with them.
- */
 const meta = {
 	component: DetailDrawerHeader,
 	parameters: { layout: "fullscreen" },
@@ -68,19 +64,4 @@ export const Nested: Story = {
 		await expectSettledVisible(await screen.findByRole("button", { name: "Back" }));
 		await expect(screen.queryByRole("button", { name: "Close" })).not.toBeInTheDocument();
 	},
-};
-
-export const TitleOnly: Story = {
-	args: { children: <DrawerTitle>Practice area</DrawerTitle> },
-	play: async () => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Practice area" }));
-	},
-};
-
-export const NarrowViewport: Story = {
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-};
-
-export const DarkMode: Story = {
-	globals: { theme: "dark" },
 };

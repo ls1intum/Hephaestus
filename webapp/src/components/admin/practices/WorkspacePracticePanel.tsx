@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import { Pencil } from "lucide-react";
-import { useId } from "react";
 import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
@@ -36,25 +35,18 @@ export interface WorkspacePracticePanelProps {
 }
 
 /**
- * A workspace practice, read-only.
+ * A workspace practice, read-only, so that opening one is not the same act as editing it.
  *
- * This exists so that opening a practice is not the same act as editing one. Before it, every route
- * into a practice landed on a 762-line form with a live unsaved-changes guard, which made "what does
- * this practice say?" a question you could only answer by entering a surface you then had to escape
- * from.
- *
- * It renders the **same** {@link PracticeDefinitionPreview} the catalog adoption drawer uses —
- * `Practice` is structurally a `CuratedPracticeDefinition` — so a practice reads identically whether
- * you met it in the library or in your own tree. Editing is one explicit action away, and it is a
- * route, because a form that must ask before discarding your work is not a dismissible surface.
+ * Renders the same {@link PracticeDefinitionPreview} the catalog drawer uses — `Practice` is
+ * structurally a `CuratedPracticeDefinition` — so a practice reads identically whether it was met in
+ * the library or in the workspace's own tree. Editing stays a route: a form that must ask before
+ * discarding work is not a dismissible surface.
  */
 export function WorkspacePracticePanel({
 	workspaceSlug,
 	state,
 	nested,
 }: WorkspacePracticePanelProps) {
-	// Two levels of the stack can show a practice at once, so nothing here may hold a fixed DOM id.
-	const idPrefix = useId();
 	if (state.status !== "ready") {
 		return (
 			<>
@@ -107,11 +99,7 @@ export function WorkspacePracticePanel({
 
 				<Separator />
 
-				<PracticeDefinitionPreview
-					definition={practice}
-					options={definitionOptions}
-					idPrefix={idPrefix}
-				/>
+				<PracticeDefinitionPreview definition={practice} options={definitionOptions} />
 			</DrawerBody>
 
 			<DrawerFooter>

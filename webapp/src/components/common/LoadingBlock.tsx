@@ -15,33 +15,21 @@ const loadingBlockVariants = cva("flex items-center justify-center", {
 });
 
 export interface LoadingBlockProps extends VariantProps<typeof loadingBlockVariants> {
-	/**
-	 * What is loading, announced to assistive tech. Required, because "Loading" on its own tells a
-	 * screen-reader user nothing about which of the three regions on the page is busy.
-	 */
+	/** What is loading. Required: "Loading" alone does not say which region of a page is busy. */
 	label: string;
 	className?: string;
 }
 
 /**
- * A centred spinner with a name.
+ * The `Spinner` is muted and the status role sits on the wrapper: the primitive carries its own
+ * `role="status"` and a generic "Loading", and leaving both announces twice.
  *
- * The repo grew twelve spellings of this — `h-64`/`h-96`/`min-h-64`/`min-h-32`/`h-40`/`py-6`, with
- * `size-8` and `h-8 w-8` both in use — and several announced only the primitive's generic "Loading",
- * which tells a screen-reader user nothing about which of three regions on the page is busy.
- *
- * The status role lives on the wrapper and the `Spinner` is muted with `aria-hidden`, rather than
- * the other way round: the primitive carries its own `role="status"` and a generic "Loading" label,
- * and leaving both in place announces the same thing twice under two different names.
- *
- * The label is carried twice on purpose, and neither one is redundant: `aria-label` names the region
- * (`status` does not take its name from its content, so hidden text alone leaves it unnamed), and the
- * `sr-only` text is what a polite live region actually announces when it appears (an `aria-label` on
- * the container is not).
+ * The label is content, not an `aria-label`. A live region announces its content, and a name would
+ * be read *before* it — so naming it as well says the same words twice.
  */
 export function LoadingBlock({ label, size, className }: LoadingBlockProps) {
 	return (
-		<div role="status" aria-label={label} className={cn(loadingBlockVariants({ size }), className)}>
+		<div role="status" className={cn(loadingBlockVariants({ size }), className)}>
 			<Spinner aria-hidden />
 			<span className="sr-only">{label}</span>
 		</div>

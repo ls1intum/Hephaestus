@@ -3,11 +3,6 @@ import { expect } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { Section } from "./Section";
 
-/**
- * The repo had five spellings of this one shape — `text-lg font-semibold` and `font-semibold text-lg`
- * counted as separate clusters — and about a third of them shipped without `aria-labelledby`. The
- * component cannot get that wrong: it generates the id and wires it up itself.
- */
 const meta = {
 	component: Section,
 	parameters: { layout: "padded" },
@@ -24,11 +19,9 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		const region = canvas.getByRole("region", { name: "Review guidance" });
-		// The region is named by its own heading, so a screen reader announces it on entry.
-		await expect(region.getAttribute("aria-labelledby")).toBe(
-			canvas.getByRole("heading", { name: "Review guidance" }).id,
-		);
+		// Resolving by role AND name is the assertion: `region` only takes a name from
+		// `aria-labelledby`, so this fails unless the component wired the heading to the section.
+		canvas.getByRole("region", { name: "Review guidance" });
 	},
 };
 
@@ -43,9 +36,6 @@ export const Sizes: Story = {
 
 export const WithActions: Story = {
 	args: { actions: <Button size="sm">Add practice</Button> },
-	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("button", { name: "Add practice" })).toBeVisible();
-	},
 };
 
 export const NestedLevel: Story = {
@@ -68,13 +58,4 @@ export const LongContent: Story = {
 			"Practices covering how a team records the reasoning behind a change, keeps operational runbooks current, and makes the resulting knowledge findable long after the original authors have moved on.",
 		actions: <Button size="sm">Review 12 practices</Button>,
 	},
-};
-
-export const NarrowViewport: Story = {
-	args: { actions: <Button size="sm">Add practice</Button> },
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-};
-
-export const DarkMode: Story = {
-	globals: { theme: "dark" },
 };

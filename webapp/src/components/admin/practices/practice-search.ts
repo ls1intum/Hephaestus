@@ -9,8 +9,13 @@ export const practiceSearchSchema = z.object({
 	library: z.boolean().optional().catch(undefined),
 });
 
+/** The levels Practice setup can render. Anything else in the URL is dropped by the schema. */
+export const DETAIL_LEVEL_KINDS = ["catalog-area", "catalog-practice", "practice"] as const;
+
 /**
  * Practice setup additionally owns the detail-drawer stack. `detail` is deliberately absent from
  * {@link PRACTICE_SEARCH_PARAMS}: retaining it would drag an open drawer onto the practice form.
  */
-export const practiceSetupSearchSchema = practiceSearchSchema.extend(detailStackSchema.shape);
+export const practiceSetupSearchSchema = practiceSearchSchema.extend(
+	detailStackSchema(DETAIL_LEVEL_KINDS).shape,
+);

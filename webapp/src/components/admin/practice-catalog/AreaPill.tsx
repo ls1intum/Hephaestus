@@ -32,9 +32,8 @@ export interface AreaPillProps extends VariantProps<typeof areaPillVariants> {
 }
 
 /**
- * A practice area's identity as one mark. Colour and icon come from the shared registry, so the
- * same area looks the same in a workspace tree, an instance tree, a review row and a detail header
- * — which is the point, because the colour is what an administrator learns to scan by.
+ * Colour and icon come from the shared registry, so an area looks the same in every tree, row and
+ * header — the colour is what an administrator learns to scan by, so no surface re-decides it.
  */
 export function AreaPill({
 	slug,

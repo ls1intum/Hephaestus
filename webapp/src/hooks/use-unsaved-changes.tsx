@@ -36,20 +36,13 @@ export interface UseUnsavedChangesOptions {
 }
 
 /**
- * One unsaved-changes guard for every form in the app.
+ * The latch is the subtle part: `isPending` drops before the caller navigates, so releasing on it
+ * alone races the post-save navigation and asks the reader to discard work they just saved.
  *
- * There were two, and they had drifted: one compared with `fast-deep-equal` and the other with
- * `JSON.stringify` (which reports a difference for two equal objects whose keys were inserted in a
- * different order), and only one had the latch that keeps the guard down across a save. Both shipped
- * their own copy of the dialog.
- *
- * The latch is the subtle part. `isPending` drops before the caller navigates, so releasing on it
- * alone races the post-save navigation and prompts the reader to discard the work they just saved.
- *
- * Note what this guard assumes: that a blocked navigation would unmount the form. That is true of a
- * form which owns its route and false of one inside a search-param-driven overlay, where
- * `shouldBlockFn` would fire for navigations that leave the form mounted — offering to discard work
- * that then is not discarded. See the drawer rule in `webapp/AGENTS.md`.
+ * Assumes a blocked navigation would unmount the form. True of a form that owns its route, false of
+ * one inside a search-param overlay, where `shouldBlockFn` fires for navigations that leave the form
+ * mounted — offering to discard work that then is not discarded. See the drawer rule in
+ * `webapp/AGENTS.md`.
  */
 export function useUnsavedChanges({
 	isDirty,

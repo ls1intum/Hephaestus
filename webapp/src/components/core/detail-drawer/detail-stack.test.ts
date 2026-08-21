@@ -1,60 +1,53 @@
 import { describe, expect, it } from "vitest";
-import {
-	DETAIL_STACK_MAX_DEPTH,
-	type DetailStackEntry,
-	encodeDetailStack,
-	parseDetailStack,
-} from "./detail-stack";
+import { detailStackSchema, encodeDetailStack, parseDetailStack } from "./detail-stack";
 
 const KINDS = ["area", "practice"] as const;
+const parse = (detail: unknown) => detailStackSchema(KINDS).parse({ detail }).detail;
 
-describe("parseDetailStack", () => {
-	it("reads kind and id, splitting at the first colon so an id may contain one", () => {
-		expect(parseDetailStack(["practice:scm:pull-request"], KINDS)).toEqual([
+describe("detailStackSchema", () => {
+	it("coerces the single-value form a hand-written URL produces", () => {
+		expect(parse("area:code-review")).toEqual(["area:code-review"]);
+	});
+
+	it("keeps an id containing a colon, splitting only at the first one", () => {
+		expect(parseDetailStack(parse("practice:scm:pull-request"))).toEqual([
 			{ kind: "practice", id: "scm:pull-request" },
 		]);
 	});
 
-	it("accepts the single-value form a hand-written URL produces", () => {
-		expect(parseDetailStack(["area:code-review"], KINDS)).toEqual([
-			{ kind: "area", id: "code-review" },
-		]);
-	});
-
 	it("drops kinds the surface cannot render, rather than passing them on", () => {
-		expect(parseDetailStack(["practice:a", "sabotage:b", "area:c"], KINDS)).toEqual([
-			{ kind: "practice", id: "a" },
-			{ kind: "area", id: "c" },
-		]);
+		expect(parse(["practice:a", "sabotage:b", "area:c"])).toEqual(["practice:a", "area:c"]);
 	});
 
 	it.each([[":x"], ["x:"], ["nocolon"], [""]])("drops the malformed entry %j", (value) => {
-		expect(parseDetailStack([value], KINDS)).toEqual([]);
+		expect(parse([value])).toEqual([]);
 	});
 
 	it("drops a repeat, because the same thing twice is never a stack", () => {
-		expect(parseDetailStack(["practice:a", "practice:a"], KINDS)).toEqual([
-			{ kind: "practice", id: "a" },
-		]);
+		expect(parse(["practice:a", "practice:a"])).toEqual(["practice:a"]);
 	});
 
 	it("caps depth so a hand-written URL cannot mount an unbounded number of drawers", () => {
 		const long = Array.from({ length: 50 }, (_, index) => `practice:p${index}`);
-		expect(parseDetailStack(long, KINDS)).toHaveLength(DETAIL_STACK_MAX_DEPTH);
+		expect(parse(long)).toHaveLength(4);
 	});
 
 	it("reads an absent param as a closed stack", () => {
-		expect(parseDetailStack(undefined, KINDS)).toEqual([]);
+		expect(parseDetailStack(parse(undefined))).toEqual([]);
 	});
 });
 
 describe("encodeDetailStack", () => {
-	it("round-trips through parseDetailStack", () => {
-		const stack: DetailStackEntry[] = [
+	it("writes the wire form the schema reads back", () => {
+		const stack = [
 			{ kind: "area", id: "code-review" },
 			{ kind: "practice", id: "describe-what-and-why" },
 		];
-		expect(parseDetailStack(encodeDetailStack(stack), KINDS)).toEqual(stack);
+		expect(encodeDetailStack(stack)).toEqual([
+			"area:code-review",
+			"practice:describe-what-and-why",
+		]);
+		expect(parseDetailStack(parse(encodeDetailStack(stack)))).toEqual(stack);
 	});
 
 	it("omits the param entirely when nothing is open, so a closed stack leaves no URL trace", () => {

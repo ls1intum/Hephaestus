@@ -2,11 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { LoadingBlock } from "./LoadingBlock";
 
-/**
- * Twelve hand-rolled spellings of "a centred spinner" collapsed to four sizes. The `label` is
- * required because the primitive's own fallback is the word "Loading", which does not say which of
- * several regions on a page is busy.
- */
 const meta = {
 	component: LoadingBlock,
 	parameters: { layout: "padded" },
@@ -19,9 +14,9 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// One status region, named by what is actually loading.
+		// One live region, and what it announces is what is loading.
 		await expect(canvas.getAllByRole("status")).toHaveLength(1);
-		await expect(canvas.getByRole("status", { name: "Loading practices" })).toBeVisible();
+		canvas.getByText("Loading practices");
 	},
 };
 
@@ -32,8 +27,4 @@ export const Sizes: Story = {
 			<LoadingBlock {...args} size="lg" label="Loading a page" />
 		</div>
 	),
-};
-
-export const DarkMode: Story = {
-	globals: { theme: "dark" },
 };

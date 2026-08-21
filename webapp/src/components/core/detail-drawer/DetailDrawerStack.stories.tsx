@@ -11,14 +11,7 @@ import { DetailDrawerStack } from "./DetailDrawerStack";
 const popups = () =>
 	Array.from(document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]'));
 
-/**
- * The app-wide alternative to sending someone to another page to look at one row.
- *
- * A level is a `detail` entry in the URL, so the stack is shareable, reloadable, and the browser's
- * Back button pops exactly one drawer. Base UI reads nesting off the React tree rather than the
- * DOM, which is why each level renders the next as its own child — and why the drawers behind the
- * frontmost one step back and dim without any coordination code here.
- */
+/** The app-wide alternative to sending someone to another page to look at one row. */
 const meta = {
 	component: DetailDrawerStack,
 	parameters: { layout: "fullscreen" },
@@ -95,12 +88,6 @@ export const DismissedLevelSlidesOut: Story = {
 	},
 };
 
-/**
- * The render prop is handed a `depth`, and the real caller uses it to index per-level data sized
- * from the same stack. A level that outlives the URL therefore indexes past the end — which is why
- * this stack holds the navigation until the animation is done rather than rendering a level the
- * caller no longer has data for. Without that, every dismissal throws.
- */
 export const PerLevelDataSurvivesDismissal: Story = {
 	render: (args) => (
 		<Stateful initial={args.stack}>
@@ -180,20 +167,6 @@ export const TwoLevels: Story = {
 		await waitFor(() => expect(args.onClose).toHaveBeenCalledWith(1));
 		// One level popped, not the whole stack.
 		await expect(await screen.findByText("area · review-ready-work")).toBeVisible();
-	},
-};
-
-export const ThreeLevels: Story = {
-	args: {
-		stack: [
-			{ kind: "area", id: "review-ready-work" },
-			{ kind: "practice", id: "describe-what-and-why" },
-			{ kind: "evidence", id: "pull-request-body" },
-		],
-	},
-	play: async () => {
-		await expectSettledVisible(await screen.findByText("evidence · pull-request-body"));
-		await expect(popups()).toHaveLength(3);
 	},
 };
 

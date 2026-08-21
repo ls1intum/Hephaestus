@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { multiValue } from "@/lib/search-params";
 
 /**
  * One level of a detail-drawer stack, encoded in the URL as `kind:id` — so `?detail=area:code-review`
@@ -11,45 +12,39 @@ export interface DetailStackEntry<TKind extends string = string> {
 }
 
 /**
- * Levels beyond this are dropped. The URL is the input, and it is shareable by design, so the depth
- * a hand-written link can reach has to be bounded: each level mounts a drawer, a portal and a focus
- * trap, and no surface has a reason to stack more than a handful.
+ * Each level mounts a drawer, a portal and a focus trap, and the URL is untrusted input by design —
+ * it is meant to be shared and hand-edited. No surface stacks this deep.
  */
 export const DETAIL_STACK_MAX_DEPTH = 4;
 
-const detailParam = z
-	.union([z.string().transform((value) => [value]), z.array(z.string())])
-	.optional()
-	.catch(undefined);
-
-export const detailStackSchema = z.object({ detail: detailParam });
-
 /**
- * Reads the stack a route's `detail` param describes, keeping only levels the surface knows how to
- * render. An unrecognised kind is dropped rather than passed on, because a surface that receives one
- * has no component for it and would otherwise render a level that can never resolve.
- *
- * Repeats are dropped too: the same entry twice is never a meaningful stack, and appending is one
+ * Validated against the kinds a route can render, so a surface never receives a level it has no
+ * component for. `multiValue` dedupes: the same entry twice is never a stack, and appending is one
  * double-click away from producing it.
  */
+export function detailStackSchema<TKind extends string>(kinds: readonly TKind[]) {
+	const known = new Set<string>(kinds);
+	return z.object({
+		detail: multiValue.transform((values) =>
+			values
+				?.filter((value) => {
+					const separator = value.indexOf(":");
+					return (
+						separator > 0 && separator < value.length - 1 && known.has(value.slice(0, separator))
+					);
+				})
+				.slice(0, DETAIL_STACK_MAX_DEPTH),
+		),
+	});
+}
+
 export function parseDetailStack<TKind extends string>(
 	raw: string[] | undefined,
-	kinds: readonly TKind[],
 ): DetailStackEntry<TKind>[] {
-	if (!raw) return [];
-	const entries: DetailStackEntry<TKind>[] = [];
-	const seen = new Set<string>();
-	for (const value of raw) {
-		if (entries.length === DETAIL_STACK_MAX_DEPTH) break;
+	return (raw ?? []).map((value) => {
 		const separator = value.indexOf(":");
-		if (separator <= 0 || separator === value.length - 1) continue;
-		const kind = value.slice(0, separator);
-		if (!(kinds as readonly string[]).includes(kind)) continue;
-		if (seen.has(value)) continue;
-		seen.add(value);
-		entries.push({ kind: kind as TKind, id: value.slice(separator + 1) });
-	}
-	return entries;
+		return { kind: value.slice(0, separator) as TKind, id: value.slice(separator + 1) };
+	});
 }
 
 export function encodeDetailStack(entries: DetailStackEntry[]): string[] | undefined {

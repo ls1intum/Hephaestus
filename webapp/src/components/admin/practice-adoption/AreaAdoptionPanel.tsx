@@ -21,11 +21,6 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 
-/**
- * The panel's body is one of three things, never a combination, so it is one union rather than
- * parallel `isLoading` / `isError` / `preview` a caller could set together. `onRetry` lives inside
- * the branch that can use it.
- */
 export type AreaAdoptionState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
@@ -50,9 +45,7 @@ export function AreaAdoptionPanel({
 	onOpenPractice,
 	nested,
 }: AreaAdoptionPanelProps) {
-	// The header is derived from the preview, so until there is one it names the level and nothing
-	// else — inventing an area colour for a slug that has not loaded would be a lie the reader
-	// cannot see through.
+	// No area colour before the preview loads: an invented one is indistinguishable from the real one.
 	const preview = state.status === "ready" ? state.preview : undefined;
 	const changes =
 		preview?.actions.filter(({ action }) => CATALOG_AREA_CHANGE_ACTIONS.includes(action)) ?? [];

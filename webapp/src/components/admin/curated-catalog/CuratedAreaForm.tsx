@@ -93,7 +93,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const [form, setForm] = useState<FormState>(() => initialState(initialData));
-	const [submitted, setSubmitted] = useState(false);
+	const [refusals, setRefusals] = useState(0);
 	const formDisabled = isPending || isResetPending || isKeepPending;
 	// `deepEqual`, not `JSON.stringify`: the latter reports a difference between two equal objects
 	// whose keys happen to have been inserted in a different order, which armed the guard for edits
@@ -112,9 +112,9 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	};
 
 	const nameError =
-		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters." : undefined;
+		refusals > 0 && form.name.trim().length < 3 ? "Name must be at least 3 characters." : undefined;
 	const slugError =
-		submitted && mode === "create" && !isValidSlug(form.slug)
+		refusals > 0 && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers and single hyphens."
 			: undefined;
 	const errorSummary: FormError[] = [
@@ -134,8 +134,8 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 
 	const submit = (event: React.FormEvent) => {
 		event.preventDefault();
-		setSubmitted(true);
 		if (!valid) {
+			setRefusals((count) => count + 1);
 			requestAnimationFrame(() => document.getElementById(errorSummary[0].fieldId)?.focus());
 			return;
 		}
@@ -176,7 +176,11 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			</AlertDialog>
 
 			{unsavedChanges.dialog}
-			<FormErrorSummary errors={submitted ? errorSummary : []} className="max-w-3xl" />
+			<FormErrorSummary
+				key={refusals}
+				errors={refusals > 0 ? errorSummary : []}
+				className="max-w-3xl"
+			/>
 
 			<Link
 				from="/admin/catalog"

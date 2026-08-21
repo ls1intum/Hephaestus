@@ -224,7 +224,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
-	const [submitted, setSubmitted] = useState(false);
+	// Counts refused submits, not "has submitted": it re-keys the summary so a second refusal
+	// focuses it again.
+	const [refusals, setRefusals] = useState(0);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const workTypes = orderedWorkTypes(definitionOptions);
 	const areaItems = [
@@ -334,13 +336,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	};
 
 	const nameError =
-		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
+		refusals > 0 && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
 	const slugError =
-		submitted && mode === "create" && !isValidSlug(form.slug)
+		refusals > 0 && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers, and single hyphens."
 			: undefined;
 	const criteriaError =
-		submitted && form.criteria.trim().length < 3
+		refusals > 0 && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
 	const policyError = practicePolicyError(form.automatedReviewPolicy);
@@ -378,11 +380,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
-		setSubmitted(true);
 		if (!valid) {
-			const firstInvalidId = errorSummary[0].fieldId;
-			if (firstInvalidId === "practice-slug") setShowAdvanced(true);
-			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
+			setRefusals((count) => count + 1);
+			const first = errorSummary[0];
+			first.reveal?.();
+			requestAnimationFrame(() => document.getElementById(first.fieldId)?.focus());
 			return;
 		}
 
@@ -409,7 +411,11 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
 			{unsavedChanges.dialog}
-			<FormErrorSummary errors={submitted ? errorSummary : []} className="max-w-3xl" />
+			<FormErrorSummary
+				key={refusals}
+				errors={refusals > 0 ? errorSummary : []}
+				className="max-w-3xl"
+			/>
 			<fieldset disabled={formDisabled} className="contents">
 				<div className="max-w-3xl space-y-10">
 					<p className="text-sm text-muted-foreground">
@@ -548,7 +554,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						supportedAutomatedReviewModes={selectedWorkType?.supportedAutomatedReviewModes ?? []}
 						disabled={formDisabled}
 						onChange={updatePolicy}
-						error={submitted ? policyError : undefined}
+						error={refusals > 0 ? policyError : undefined}
 					/>
 
 					<Separator />
@@ -606,8 +612,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								mode={occasionMode}
 								outcome={workTypeUnchanged ? evidenceOutcome : undefined}
 								disabled={formDisabled}
-								error={submitted ? bindingsError?.message : undefined}
-								errorFocusId={submitted ? bindingsError?.focusId : undefined}
+								error={refusals > 0 ? bindingsError?.message : undefined}
+								errorFocusId={refusals > 0 ? bindingsError?.focusId : undefined}
 								onChange={(binding) =>
 									setForm((previous) => ({ ...previous, bindings: [binding] }))
 								}

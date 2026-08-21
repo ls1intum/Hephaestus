@@ -26,17 +26,8 @@ export interface SectionProps
 }
 
 /**
- * A titled region of a page or a panel.
- *
- * It exists because this repo had five spellings of the same thing — `text-lg font-semibold` and
- * `font-semibold text-lg` were separate clusters — and because roughly a third of the hand-rolled
- * ones had no `aria-labelledby`, which a component can simply not get wrong: the id is generated
- * here and wired to the region without the caller thinking about it.
- *
- * Configured rather than composed on purpose. The three holes are a title, a description and an
- * actions slot, every call site fills them with the same kinds of thing, and a compound API would
- * publish three ReactNode rows no Storybook control can drive — for a frame with no variants worth
- * exploring.
+ * Configured rather than composed: the three holes always take the same kinds of thing, and a
+ * compound API would publish three ReactNode rows no Storybook control can drive.
  */
 export function Section({
 	title,

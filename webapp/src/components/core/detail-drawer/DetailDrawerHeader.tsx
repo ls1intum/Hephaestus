@@ -13,16 +13,12 @@ export interface DetailDrawerHeaderProps {
 }
 
 /**
- * The one piece of chrome every detail drawer shares: a dismiss control, then whatever names the
- * level. Everything else a panel needs — `DrawerBody`, `DrawerFooter`, `DrawerTitle` — is the
- * primitive's own, so a panel composes rather than fills in a fixed set of holes.
+ * A dismiss control, then whatever names the level. Everything else a panel needs is the primitive's
+ * own, so a panel composes rather than filling a fixed set of holes — and the only prop worth a
+ * Storybook control is `nested`, so the compound shape costs nothing there.
  *
- * Storybook cost of the compound shape is close to zero here: the only prop with an explorable
- * control is `nested`, and the alternative — `title`/`description`/`media`/`footer` props — would
- * have published three ReactNode rows that no control can drive.
- *
- * The dismiss is a `DrawerClose`, not a `Button` wired to a callback, so it closes through the same
- * path as Escape, an outside press and a rightward swipe instead of a fourth one that can drift.
+ * The dismiss is a `DrawerClose`, so it closes through the same path as Escape, an outside press and
+ * a swipe rather than a fourth one that can drift.
  */
 export function DetailDrawerHeader({
 	nested = false,

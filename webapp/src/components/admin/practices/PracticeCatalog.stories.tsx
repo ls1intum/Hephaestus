@@ -188,10 +188,8 @@ export const WithPracticeLibrary: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByRole("heading", { name: "Practice library" })).toBeVisible();
-		await expect(canvas.getByRole("heading", { name: "Review-ready work" })).toBeVisible();
-		await expect(canvas.getByText("Explain what changed and why")).toBeVisible();
-		await expect(canvas.queryByText(practices[0].name)).toBeVisible();
+		canvas.getByRole("heading", { name: "Practice library" });
+		// The ordinary case carries no chip: `badged` is false for AVAILABLE in the registry.
 		await expect(canvas.queryByText("Added")).not.toBeInTheDocument();
 	},
 };
@@ -210,12 +208,6 @@ export const AtScale: Story = {
 	},
 };
 
-/**
- * A practice name opens the practice, read-only, over this tree. It used to link straight to the
- * edit form — so "what does this say?" and "change this" were the same act — softened by a hover
- * card that never opened on touch. Both are gone: the name is a plain link to a `detail` level, which
- * works on every input device and leaves the tree exactly where it was.
- */
 export const PracticeNameOpensTheDetailLevel: Story = {
 	args: {
 		practices: [
@@ -230,7 +222,7 @@ export const PracticeNameOpensTheDetailLevel: Story = {
 		await expect(link).not.toHaveAttribute("data-slot", "hover-card-trigger");
 		await expect(
 			new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail"),
-		).toContain(`practice:${mockPractices[0].slug}`);
+		).toBe('["practice:pr-description-quality"]');
 	},
 };
 

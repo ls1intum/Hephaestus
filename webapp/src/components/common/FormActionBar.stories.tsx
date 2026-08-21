@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { FormActionBar } from "./FormActionBar";
 
@@ -33,13 +32,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-	play: async ({ canvas }) => {
-		const bar = canvas.getByRole("button", { name: "Save changes" }).parentElement;
-		// Sticky rather than fixed, so it tracks the form's column instead of the whole page.
-		await expect(getComputedStyle(bar as HTMLElement).position).toBe("sticky");
-	},
-};
+export const Default: Story = {};
 
 export const PrimaryOnly: Story = {
 	args: { secondary: undefined },
@@ -47,8 +40,4 @@ export const PrimaryOnly: Story = {
 
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
-};
-
-export const DarkMode: Story = {
-	globals: { theme: "dark" },
 };

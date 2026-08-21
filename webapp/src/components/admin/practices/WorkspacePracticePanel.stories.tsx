@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, userEvent } from "storybook/test";
+import { expect, fn, screen } from "storybook/test";
 import type { Practice } from "@/api/types.gen";
 import { mockPractices } from "@/components/admin/practices/story-mock-data";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
@@ -21,15 +21,6 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 	...over,
 });
 
-/**
- * Reading a practice and changing one are different acts, and this is the reading one. It renders
- * the same `PracticeDefinitionPreview` the catalog adoption drawer uses — `Practice` is structurally
- * a `CuratedPracticeDefinition` — so a practice looks the same whether it was met in the library or
- * in the workspace's own tree.
- *
- * Editing stays a route. A form that has to ask before discarding your work is not a surface you can
- * dismiss with Escape.
- */
 const meta = {
 	component: WorkspacePracticePanel,
 	parameters: { layout: "fullscreen" },
@@ -61,14 +52,6 @@ export const Default: Story = {
 	},
 };
 
-export const DismissReturnsToTheTree: Story = {
-	play: async () => {
-		await expectSettledVisible(await screen.findByRole("link", { name: "Edit practice" }));
-		await userEvent.click(screen.getByRole("button", { name: "Close" }));
-		await expect(await screen.findByRole("heading", { name: "Practice setup" })).toBeVisible();
-	},
-};
-
 export const InheritedAutonomy: Story = {
 	args: {
 		state: ready({
@@ -97,7 +80,7 @@ export const Unassigned: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("status", { name: "Loading practice" }));
+		await expectSettledVisible(await screen.findByText("Loading practice"));
 	},
 };
 

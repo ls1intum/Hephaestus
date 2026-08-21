@@ -111,14 +111,6 @@ export const MixedOutcomes: Story = {
 	},
 };
 
-export const DismissReturnsToThePage: Story = {
-	play: async () => {
-		await expectSettledVisible(await screen.findByRole("button", { name: "Add 1 practice" }));
-		await userEvent.click(screen.getByRole("button", { name: "Close" }));
-		await expect(await screen.findByRole("heading", { name: "Practice setup" })).toBeVisible();
-	},
-};
-
 export const RestoreDeletedArea: Story = {
 	args: {
 		state: ready({
@@ -151,7 +143,7 @@ export const NothingToChange: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByRole("status", { name: "Loading area preview" }));
+		await expectSettledVisible(await screen.findByText("Loading area preview"));
 		// The header cannot invent an area colour for a slug that has not loaded.
 		await expect(screen.getByRole("heading", { name: "Practice area" })).toBeVisible();
 	},

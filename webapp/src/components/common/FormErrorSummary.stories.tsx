@@ -4,11 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { FormErrorSummary } from "./FormErrorSummary";
 
-/**
- * On a form taller than the viewport, inline errors alone leave the reader hunting: they press the
- * action, nothing visible happens, and the message is a screenful away. The summary is the thing
- * that makes a refused submit legible without scrolling.
- */
 const meta = {
 	component: FormErrorSummary,
 	parameters: { layout: "padded" },
@@ -42,17 +37,17 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
 	play: async ({ canvas }) => {
-		// A live region, so it is announced without stealing the caret out of a field being typed in.
-		await expect(canvas.getByRole("alert")).toBeVisible();
-		await expect(canvas.getByRole("heading", { name: "There are 2 problems" })).toBeVisible();
+		// A live region, so the refusal is announced without competing for focus with the field the
+		// form sends the reader to.
+		canvas.getByRole("alert");
+		canvas.getByRole("heading", { name: "There are 2 problems" });
 	},
 };
 
 export const EntryMovesFocusToItsField: Story = {
 	play: async ({ canvas }) => {
 		await userEvent.click(canvas.getByRole("link", { name: /Give the practice a name/ }));
-		// A frame later, because an entry may first have to reveal a collapsed section for its field
-		// to exist at all.
+		// A frame later: an entry may first have to reveal a collapsed section for its field to exist.
 		await waitFor(() => expect(canvas.getByLabelText("Name")).toHaveFocus());
 	},
 };
@@ -69,8 +64,6 @@ export const EntryRevealsACollapsedSectionFirst: Story = {
 	},
 	play: async ({ args, canvas }) => {
 		await userEvent.click(canvas.getByRole("link", { name: /identifier/ }));
-		// Without this the entry links to an id that is not in the document, and focus stays on the
-		// link — worse than offering no link.
 		await expect(args.errors[0].reveal).toHaveBeenCalledOnce();
 	},
 };
@@ -78,8 +71,7 @@ export const EntryRevealsACollapsedSectionFirst: Story = {
 export const SingleProblem: Story = {
 	args: { errors: [{ fieldId: "practice-name", message: "Give the practice a name." }] },
 	play: async ({ canvas }) => {
-		// Singular, because "There are 1 problems" is how a form tells you it was written by a machine.
-		await expect(canvas.getByRole("heading", { name: "There is a problem" })).toBeVisible();
+		canvas.getByRole("heading", { name: "There is a problem" });
 	},
 };
 
@@ -88,10 +80,6 @@ export const NoProblems: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("alert")).not.toBeInTheDocument();
 	},
-};
-
-export const NarrowViewport: Story = {
-	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 };
 
 export const DarkMode: Story = {

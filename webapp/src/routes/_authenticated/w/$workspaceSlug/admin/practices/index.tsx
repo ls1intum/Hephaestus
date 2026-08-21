@@ -25,6 +25,7 @@ import { PracticeAdoptionPanel } from "@/components/admin/practice-adoption/Prac
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import {
+	type DETAIL_LEVEL_KINDS,
 	PRACTICE_SEARCH_PARAMS,
 	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
@@ -58,14 +59,6 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 	component: PracticeCatalogRoute,
 });
 
-/**
- * The levels this surface can render. Anything else in the URL is dropped rather than mounted.
- *
- * `practice` is the workspace's own copy, read-only; the `catalog-` kinds are what the library is
- * still offering. Both open as drawer levels, so inspecting anything never leaves the tree.
- */
-const DETAIL_LEVEL_KINDS = ["catalog-area", "catalog-practice", "practice"] as const;
-
 function PracticeCatalogRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const { focus, library, detail } = Route.useSearch();
@@ -78,7 +71,7 @@ function PracticeCatalogRoute() {
 
 	// Every open level owns its own preview query, keyed by that level's slug. Sharing one query per
 	// kind would let `?detail=practice:a&detail=practice:b` show a's definition while adding b.
-	const detailStack = parseDetailStack(detail, DETAIL_LEVEL_KINDS);
+	const detailStack = parseDetailStack<(typeof DETAIL_LEVEL_KINDS)[number]>(detail);
 	const stackControls = useDetailStack(detailStack);
 
 	const areasQuery = useQuery({

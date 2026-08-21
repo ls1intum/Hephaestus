@@ -22,9 +22,8 @@ function useDrawer() {
 }
 
 /**
- * Groups every part of one drawer. A `Drawer` rendered anywhere inside another `Drawer` is detected
- * through React context, not the DOM, so a nested drawer may sit beside `DrawerContent` rather than
- * inside it — which is what lets a stack be rendered by recursion.
+ * Nesting is detected through React context, not the DOM, so a nested `Drawer` may sit beside
+ * `DrawerContent` rather than inside it — which is what lets a stack be rendered by recursion.
  */
 function Drawer({
 	modal = true,
@@ -175,8 +174,6 @@ function DrawerContent({
 function DrawerHeader({ className, ...props }: React.ComponentProps<"div">) {
 	return (
 		// `shrink-0`: `DrawerBody` is `flex-1` off a zero basis, so the header is what would be squashed.
-		// No rule under it — the gap to the body already separates them, and a panel this wide does not
-		// need a line to say where its title ends.
 		<div
 			data-slot="drawer-header"
 			className={cn("flex shrink-0 flex-col gap-1 px-6 pt-5 pb-4", className)}
@@ -201,8 +198,7 @@ function DrawerBody({ className, ...props }: React.ComponentProps<"div">) {
 
 function DrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
 	return (
-		// A rule here, unlike the header: this is pinned over content that scrolls under it, so
-		// without one the last line of the body touches the action.
+		// Bordered, unlike the header: body content scrolls under it.
 		<div
 			data-slot="drawer-footer"
 			className={cn(

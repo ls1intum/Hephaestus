@@ -2,6 +2,7 @@ import { ChevronRight, Library } from "lucide-react";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
+import { Section } from "@/components/core/Section";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { buttonVariants } from "@/components/ui/button";
@@ -77,19 +78,23 @@ export function AvailablePracticeList({
 			{Array.from(groups, ([key, entries]) => {
 				const first = entries[0];
 				const areaSlug = first.areaSlug;
-				const headingId = `library-${key}`;
 				const available = entries.filter(({ availability }) => availability === "AVAILABLE").length;
 				const restorable = entries.filter(({ availability }) => availability === "ADOPTED").length;
 				const areaMissing = areaSlug !== undefined && !existingAreaSlugs.has(areaSlug);
 
 				return (
-					<section key={key} className="space-y-2" aria-labelledby={headingId}>
-						<div className="flex flex-wrap items-center justify-between gap-3">
-							<h3 id={headingId} className="flex items-center gap-2 text-sm font-medium">
+					<Section
+						key={key}
+						size="sm"
+						level={3}
+						title={
+							<span className="flex items-center gap-2">
 								<AreaPill size="sm" slug={areaSlug} name={first.areaName} />
 								{first.areaName ?? "No area"}
-							</h3>
-							{areaSlug && (available > 0 || (areaMissing && restorable > 0)) ? (
+							</span>
+						}
+						actions={
+							areaSlug && (available > 0 || (areaMissing && restorable > 0)) ? (
 								<DetailStackLink
 									entry={{ kind: "catalog-area", id: areaSlug }}
 									className={buttonVariants({ size: "sm", variant: "outline" })}
@@ -102,8 +107,9 @@ export function AvailablePracticeList({
 								</DetailStackLink>
 							) : (
 								<span className="text-xs text-muted-foreground">{countLabel(entries.length)}</span>
-							)}
-						</div>
+							)
+						}
+					>
 						<ItemGroup>
 							{entries.map((practice) => (
 								<div key={practice.slug} role="listitem">
@@ -111,7 +117,7 @@ export function AvailablePracticeList({
 								</div>
 							))}
 						</ItemGroup>
-					</section>
+					</Section>
 				);
 			})}
 		</div>

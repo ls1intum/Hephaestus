@@ -1,5 +1,4 @@
 import { CircleAlert, Copy, ShieldCheck } from "lucide-react";
-import { useId } from "react";
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
@@ -9,6 +8,7 @@ import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
+import { Section } from "@/components/core/Section";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
@@ -33,11 +33,6 @@ import { Separator } from "@/components/ui/separator";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 
-/**
- * The panel's body is one of three things, never a combination, so it is one union rather than
- * parallel `isLoading` / `isError` / `preview` a caller could set together. `onRetry` lives inside
- * the branch that can use it, and the three ways a loaded panel can be busy are one axis.
- */
 export type PracticeAdoptionState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
@@ -56,13 +51,10 @@ export interface PracticeAdoptionPanelProps {
 }
 
 /**
- * One catalog practice: what it will do to this workspace, then the definition that is the evidence
- * for it, then the action. The outcome leads because "what will this change" is the question being
- * answered — the definition is why the answer is trustworthy.
+ * The outcome leads: "what will this change" is the question, and the definition below it is the
+ * evidence for the answer.
  */
 export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdoptionPanelProps) {
-	// Two levels of the stack can show a practice at once, so nothing here may hold a fixed DOM id.
-	const idPrefix = useId();
 	if (state.status !== "ready") {
 		return <PracticeAdoptionPlaceholder state={state} nested={nested} />;
 	}
@@ -108,10 +100,7 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 				)}
 
 				{!unavailable && (
-					<section aria-labelledby={`${idPrefix}-outcome`} className="space-y-3">
-						<h3 id={`${idPrefix}-outcome`} className="text-sm font-medium">
-							Adding this practice will
-						</h3>
+					<Section size="sm" title="Adding this practice will">
 						<ItemGroup className="gap-2">
 							<Item variant="muted" size="sm" role="listitem">
 								<ItemMedia variant="icon">
@@ -128,16 +117,12 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 						<PracticeAutomatedReviewValidationBadge
 							validation={preview.definition.automatedReviewValidation}
 						/>
-					</section>
+					</Section>
 				)}
 
 				<Separator />
 
-				<PracticeDefinitionPreview
-					definition={preview.definition}
-					options={definitionOptions}
-					idPrefix={idPrefix}
-				/>
+				<PracticeDefinitionPreview definition={preview.definition} options={definitionOptions} />
 
 				<Accordion aria-label="Catalog provenance">
 					<AccordionItem value="catalog-details">
