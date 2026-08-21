@@ -18,6 +18,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     private static final List<String> SIDECARS = List.of(
         "pi-observation-normalize.mjs",
         "pi-runner-usage.mjs",
+        "pi-runner-timings.mjs",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 
