@@ -115,10 +115,8 @@ services:
           -U hephaestus -d hephaestus \
           --exit-on-error --no-owner --no-privileges < /tmp/seed.dump
 
-        # The policy is inline rather than a mounted .sql file: Coolify materialises a relative bind
-        # mount as an empty managed directory, and `psql < <directory>` reads nothing and exits 0 —
-        # a clone that silently kept every trigger, binding and credential of the instance it came
-        # from. The verification below is what actually holds the line; see README.md.
+        # Inline rather than a mounted .sql file: Coolify materialises a relative bind mount as an
+        # empty managed directory, which `psql <` reads as zero bytes and exits 0 on.
         echo "Applying the preview policy"
         docker exec -i "$$PREVIEW_PG" psql -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus <<'SQL'
         -- 1. Silence: a clone must not act.
@@ -158,18 +156,16 @@ services:
                error_summary = 'Cancelled when staging data was cloned into a preview.'
          WHERE status IN ('PENDING', 'RUNNING');
 
-        -- 2. Re-home: a clone must not keep the source instance's identity. Each table is rebuilt
-        -- from this deployment's own configuration on boot. identity_link keys on identity_provider,
-        -- not on login_provider, so accounts survive.
+        -- 2. Re-home: a clone must not keep the source instance's identity. login_provider and
+        -- jwt_signing_key are reseeded from this deployment's own config on boot; issued_jwt is
+        -- simply dropped. Accounts survive — identity_link keys on identity_provider.
         DELETE FROM issued_jwt;
         DELETE FROM jwt_signing_key;
         DELETE FROM login_provider;
         SQL
 
-        # The marker is a promise that the policy is in force, so it is written only against the
-        # database's own answer. Anything that leaves a live trigger, binding, job or inherited
-        # identity behind fails the deployment instead of starting an application server on a clone
-        # that can act as the instance it was copied from.
+        # The marker promises the policy is in force, so verify against the database rather than
+        # against psql's exit code — see the bind-mount note above for why those differ.
         echo "Verifying the preview policy took effect"
         LIVE=$$(docker exec "$$PREVIEW_PG" psql -tAX -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus -c "
           SELECT (SELECT count(*) FROM workspace
@@ -177,6 +173,8 @@ services:
                + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
                + (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
                + (SELECT count(*) FROM agent_job WHERE status IN ('QUEUED', 'RUNNING'))
+               + (SELECT count(*) FROM agent_job
+                   WHERE status = 'COMPLETED' AND delivery_status = 'PENDING')
                + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
                + (SELECT count(*) FROM login_provider)
                + (SELECT count(*) FROM jwt_signing_key)

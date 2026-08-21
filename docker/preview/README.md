@@ -28,11 +28,10 @@ already seeded PR preserves changes made while testing. A new preview volume get
 verifies it took effect and only then writes the seed marker. A clone is another instance's live
 database, so the policy answers two questions, and it is organised by them.
 
-The SQL is inline in `compose.app.yaml` rather than a mounted `.sql` file. Coolify materialises a
-relative bind mount as an empty managed *directory*, and `psql < <directory>` reads nothing and exits
-0 — which once let a preview start on a clone that had kept every trigger, binding and credential of
-the instance it came from, behind a seed marker claiming otherwise. The marker is now written only
-against the database's own answer: any live trigger, binding, job, or inherited identity fails the
+The SQL is inline in `compose.app.yaml` rather than a mounted `.sql` file: Coolify materialises a
+relative bind mount as an empty managed *directory*, which `psql <` reads as zero bytes and exits 0
+on. The seed marker is therefore written against the database's own answer rather than against an
+exit code — any live trigger, binding, job, pending delivery, or inherited identity fails the
 deployment.
 
 ### Silence — a clone must not act
@@ -64,7 +63,8 @@ rebuilt from this deployment's own configuration:
 
 `LoginProviderService` seeds `login_provider` from the environment whenever a registration id is
 absent, so emptying the table hands the preview its own login apps on the next boot — which is why the
-preview stack needs `GITHUB_OAUTH_*` (and any other provider it should offer) pointed at an OAuth app
+preview stack needs `GH_OAUTH_CLIENT_ID`/`GH_OAUTH_CLIENT_SECRET` (and any other provider it should
+offer) pointed at an OAuth app
 whose callback covers the preview hostnames. A provider with no credentials in the preview environment
 is simply not offered; Slack, being link-only, is normally absent for that reason.
 
@@ -80,8 +80,9 @@ a cloned user signs in through the preview's own OAuth app and lands on the same
 4. Set `PREVIEW_SEED_SOURCE_CONTAINER=app-postgres-1` if the staging Compose project/container name
    ever changes. The source user defaults to `root` and database to `hephaestus`.
 5. Set `HEPHAESTUS_SECURITY_ENCRYPTION_KEY` to the **seed source instance's** key, and point
-   `GITHUB_OAUTH_CLIENT_ID`/`_SECRET` at an OAuth app whose callback covers the preview hostnames —
-   see the re-home policy above for both.
+   `GH_OAUTH_CLIENT_ID`/`GH_OAUTH_CLIENT_SECRET` at an OAuth app whose callback covers the preview
+   hostnames — see the re-home policy above for both. The `GH_` prefix is deliberate: GitHub Actions
+   reserves `GITHUB_`, and the Compose file maps these onto the application's `GITHUB_OAUTH_*` inputs.
 6. Assign the web and API services sibling wildcard domains. With the current template these are
    `pr<id>.hephaestus.felixdietrich.com` and `pr<id>.api.hephaestus.felixdietrich.com`.
 7. Leave the preview `IMAGE_TAG` unset. Coolify injects `SOURCE_COMMIT`, and CI publishes the matching
@@ -120,11 +121,16 @@ that makes it. Reviewing a change here means reading it; the first
 preview that actually runs it is the next one created after the change is merged and Coolify has
 re-read `main`.
 
-The Docker socket mount is privileged access to the host Docker daemon even though it is mounted
-read-only. It is intentionally confined to the trusted preview application and used only for
-`pg_dump`, restore, and sandbox execution. Coolify's `SERVICE_NAME_POSTGRES` is a network alias, so
-the seeder resolves the physical target container only when exactly one container has both its own
-Compose project label and that service label.
+## Host access
+
+Both the seeder and the application server mount `/var/run/docker.sock`. The seeder's `:ro` is a
+filesystem flag on a socket inode — it prevents unlinking, not any daemon command — so treat every
+one of these mounts as root on the host, confined to the trusted preview application and used only
+for `pg_dump`, restore, and sandbox execution.
+
+Coolify's `SERVICE_NAME_POSTGRES` is a network alias, so the seeder resolves the physical target
+container only when exactly one container carries both its own Compose project label and that
+service label.
 
 ## Failure behavior
 
