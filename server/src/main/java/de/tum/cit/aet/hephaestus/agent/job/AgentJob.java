@@ -118,7 +118,7 @@ public class AgentJob {
     @Enumerated(EnumType.STRING)
     @ColumnDefault("'MANUAL'")
     @Column(name = "practice_trigger_mode", nullable = false, length = 24)
-    private TriggerMode practiceTriggerMode;
+    private TriggerMode practiceTriggerMode = TriggerMode.MANUAL;
 
     /** Administrative evaluations set this false. */
     @ColumnDefault("true")

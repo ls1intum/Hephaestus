@@ -95,7 +95,11 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
         handler = new PullRequestReviewHandler(
             objectMapper,
             cas,
-            new PracticeCatalogInjector(objectMapper, practiceRepository, workspaceDefaults()),
+            new PracticeCatalogInjector(
+                objectMapper,
+                practiceRepository,
+                InContextDeliveryGateFixtures.workspaceDefaults()
+            ),
             workspaceContextBuilder,
             taskEnvelopeWriter,
             resultParser,
@@ -111,11 +115,10 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 new de.tum.cit.aet.hephaestus.practices.review.PracticeReviewProperties(false, 15, 5, false, false)
             ),
-            new InContextDeliveryGate(
+            InContextDeliveryGateFixtures.gate(
                 practiceRepository,
                 org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class),
-                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
-                workspaceDefaults()
+                org.mockito.Mockito.mock(FeedbackLedgerRecorder.class)
             ),
             org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
@@ -652,11 +655,5 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 "b2b88104bf5c02259227480b0eabe2f9b7d63501e03e788b7b82a499b818e12a"
             );
         }
-    }
-
-    private static WorkspaceReviewDefaultsProvider workspaceDefaults() {
-        WorkspaceReviewDefaultsProvider provider = mock(WorkspaceReviewDefaultsProvider.class);
-        lenient().when(provider.forWorkspace(anyLong())).thenReturn(WorkspaceReviewDefaults.UNSET);
-        return provider;
     }
 }
