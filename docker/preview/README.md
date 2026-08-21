@@ -24,9 +24,16 @@ already seeded PR preserves changes made while testing. A new preview volume get
 
 ## Preview policy
 
-`seed-loader` applies [`sanitize.sql`](./sanitize.sql) to the restored clone before the application
-server starts. A clone is another instance's live database, so the policy answers two questions, and
-the file is organised by them.
+`seed-loader` applies a policy to the restored clone before the application server starts, then
+verifies it took effect and only then writes the seed marker. A clone is another instance's live
+database, so the policy answers two questions, and it is organised by them.
+
+The SQL is inline in `compose.app.yaml` rather than a mounted `.sql` file. Coolify materialises a
+relative bind mount as an empty managed *directory*, and `psql < <directory>` reads nothing and exits
+0 — which once let a preview start on a clone that had kept every trigger, binding and credential of
+the instance it came from, behind a seed marker claiming otherwise. The marker is now written only
+against the database's own answer: any live trigger, binding, job, or inherited identity fails the
+deployment.
 
 ### Silence — a clone must not act
 
@@ -108,8 +115,8 @@ effective value and is not.
 
 Coolify parses the Compose file from the branch configured on the application — `main` — and stores it
 on the application record. A preview deployment builds the pull request's images but runs that stored
-definition, so a change to `compose.app.yaml` or [`sanitize.sql`](./sanitize.sql) is **not** exercised
-by the preview of the pull request that makes it. Reviewing a change here means reading it; the first
+definition, so a change to `compose.app.yaml` is **not** exercised by the preview of the pull request
+that makes it. Reviewing a change here means reading it; the first
 preview that actually runs it is the next one created after the change is merged and Coolify has
 re-read `main`.
 
