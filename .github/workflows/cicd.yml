@@ -113,7 +113,7 @@ jobs:
         env:
           COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
           PR_NUMBER: ${{ github.event.pull_request.number }}
-          DOCKER_RESULT: ${{ needs.Docker.result }}
+          APP_SERVER_PUBLISHED: ${{ needs.Docker.outputs.application-server-published }}
         run: |
           set -euo pipefail
 
@@ -122,10 +122,10 @@ jobs:
             exit 0
           fi
 
-          # No image workflow, no SOURCE_COMMIT tag. Requesting the deployment anyway would only
-          # queue one that fails on `manifest unknown`, under a green check.
-          if [ "${DOCKER_RESULT}" != 'success' ]; then
-            echo "::notice::No application-server image was published for this commit (Docker: ${DOCKER_RESULT}); skipping preview update."
+          # Coolify pins the preview to SOURCE_COMMIT, so without that tag the deployment can only
+          # fail on `manifest unknown` — under a green check, since queueing one always succeeds.
+          if [ "${APP_SERVER_PUBLISHED}" != 'true' ]; then
+            echo "::notice::No application-server image for this commit; skipping preview update."
             exit 0
           fi
 
@@ -195,18 +195,15 @@ jobs:
   Docker:
     uses: ./.github/workflows/ci-docker-build.yml
     needs: [detect-changes]
-    # Coolify gives every same-repository pull request a preview and pins it to SOURCE_COMMIT, so
-    # every such pull request needs an application-server tag at its head commit — including one that
-    # touches only the preview stack or documentation. Without it the preview deployment fails with
-    # `manifest unknown` for an image that will never be published. application-server-build is a
-    # cached rebuild when server code did not change; the webapp and agent images stay gated by their
-    # own inputs, so this costs one cached build, not the whole matrix.
+    # Every same-repository pull request gets a Coolify preview pinned to SOURCE_COMMIT, so it needs
+    # an application-server tag at its head commit even when it touches only docs or the preview
+    # stack. The path filters below therefore gate fork pull requests only — forks get no preview.
     if: |
       needs.detect-changes.outputs.should_skip != 'true' && (
-        needs.detect-changes.outputs.any-code == 'true' ||
-        needs.detect-changes.outputs.ci-config == 'true' ||
         github.event_name != 'pull_request' ||
-        github.event.pull_request.head.repo.full_name == github.repository
+        github.event.pull_request.head.repo.full_name == github.repository ||
+        needs.detect-changes.outputs.any-code == 'true' ||
+        needs.detect-changes.outputs.ci-config == 'true'
       )
     secrets: inherit
     with:
