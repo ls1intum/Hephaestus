@@ -124,7 +124,10 @@ jobs:
 
           case "${{ matrix.test-type }}" in
             "webapp-unit")
-              pnpm run test
+              # Bound runner deadlocks without coupling CI to the current suite duration, as the
+              # storybook leg below already does. Without it a hung suite burns the whole job
+              # timeout and GitHub retains no log for the step.
+              timeout --kill-after=30s 10m pnpm run test
               ;;
             "webapp-storybook")
               # Install Playwright browsers (cached in ~/.cache/ms-playwright by setup-caches)
