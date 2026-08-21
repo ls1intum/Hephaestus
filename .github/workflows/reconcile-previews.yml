@@ -1,0 +1,108 @@
+name: Preview reconcile
+
+# `cleanup-preview.yml` deletes a preview when its pull request closes, and that is the fast path.
+# It is also the only path: it exits without doing anything when COOLIFY_API_TOKEN is unset, it never
+# runs for a fork, and it cannot reach Coolify if Coolify is down at that moment. Nothing afterwards
+# notices, so a preview that outlives its pull request keeps a cloned database and a git checkout —
+# roughly 4 GB — until someone goes looking. This asks the opposite question on a schedule: of the
+# pull requests that closed recently, does any still have a preview?
+#
+# Deleting a preview for a closed pull request is idempotent, so a preview that was already cleaned
+# up answers 404 and costs one request. Open pull requests are never touched.
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      days:
+        description: "How far back to look for closed pull requests"
+        type: number
+        default: 45
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: preview-reconcile
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    name: "Preview / Reconcile orphans"
+    runs-on: ubuntu-latest
+    if: vars.COOLIFY_URL != '' && vars.COOLIFY_APP_UUID != ''
+    timeout-minutes: 10
+    env:
+      COOLIFY_URL: ${{ vars.COOLIFY_URL }}
+      COOLIFY_APP_UUID: ${{ vars.COOLIFY_APP_UUID }}
+      COOLIFY_TOKEN: ${{ secrets.COOLIFY_API_TOKEN }}
+      GH_TOKEN: ${{ github.token }}
+      DAYS: ${{ inputs.days || 45 }}
+    steps:
+      - name: Reclaim previews whose pull request has closed
+        run: |
+          set -euo pipefail
+
+          if [ -z "${COOLIFY_TOKEN}" ]; then
+            echo "::notice::COOLIFY_API_TOKEN is not configured; nothing to reconcile against."
+            exit 0
+          fi
+
+          cutoff=$(date -u -d "-${DAYS} days" +%s)
+          closed=$(gh pr list --repo "${GITHUB_REPOSITORY}" --state closed \
+            --limit 200 --json number,closedAt \
+            --jq "[.[] | select(.closedAt != null)] | sort_by(.number) | reverse | .[] | \"\(.number) \(.closedAt)\"")
+
+          reclaimed=0
+          checked=0
+          failed=0
+          {
+            echo "| PR | Result |"
+            echo "|---:|---|"
+          } > /tmp/summary.md
+
+          while read -r number closed_at; do
+            [ -n "${number:-}" ] || continue
+            [ "$(date -u -d "${closed_at}" +%s)" -ge "${cutoff}" ] || continue
+            checked=$((checked + 1))
+
+            body=$(mktemp)
+            status=$(curl -sS -o "${body}" -w '%{http_code}' -X DELETE \
+              -H "Authorization: Bearer ${COOLIFY_TOKEN}" \
+              -H 'Accept: application/json' \
+              --retry 3 --retry-connrefused --max-time 60 \
+              "${COOLIFY_URL}/api/v1/applications/${COOLIFY_APP_UUID}/previews/${number}") || status=000
+
+            case "${status}" in
+              404)
+                : # already clean, which is the expected answer for almost every pull request
+                ;;
+              2*)
+                reclaimed=$((reclaimed + 1))
+                echo "| #${number} | reclaimed — preview outlived its closed pull request |" >> /tmp/summary.md
+                echo "::warning::Reclaimed an orphaned preview for closed PR #${number}. Its cleanup on close did not run or did not reach Coolify."
+                ;;
+              *)
+                failed=$((failed + 1))
+                echo "| #${number} | FAILED — HTTP ${status} |" >> /tmp/summary.md
+                echo "::error::Coolify returned HTTP ${status} for PR #${number}: $(head -c 200 "${body}")"
+                ;;
+            esac
+          done <<< "${closed}"
+
+          {
+            echo "## Preview reconcile"
+            echo
+            echo "Checked **${checked}** pull requests closed in the last ${DAYS} days."
+            echo
+            if [ "${reclaimed}" -eq 0 ] && [ "${failed}" -eq 0 ]; then
+              echo "No orphaned previews. Cleanup on close is keeping up."
+            else
+              cat /tmp/summary.md
+            fi
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+          echo "checked=${checked} reclaimed=${reclaimed} failed=${failed}"
+          [ "${failed}" -eq 0 ]
