@@ -89,7 +89,6 @@ export interface PracticeCatalogProps {
 	onRetryCatalog?: () => void;
 	showLibrary?: boolean;
 	onShowLibraryChange?: (show: boolean) => void;
-	onReviewCatalogArea?: (areaSlug: string) => void;
 }
 
 export function PracticeCatalog({
@@ -113,7 +112,6 @@ export function PracticeCatalog({
 	onRetryCatalog,
 	showLibrary = false,
 	onShowLibraryChange,
-	onReviewCatalogArea,
 }: PracticeCatalogProps) {
 	const [renamingArea, setRenamingArea] = useState<PracticeArea | null>(null);
 	const visiblePracticeSlugs = new Set(
@@ -178,7 +176,6 @@ export function PracticeCatalog({
 							practices={visibleCatalogPractices}
 							groupByArea
 							hideAdopted
-							onReviewArea={onReviewCatalogArea}
 							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
 						/>
 					) : (
@@ -314,7 +311,6 @@ function CatalogToolbar({
 	areaStructurePending: boolean;
 	showLibrary: boolean;
 	onShowLibraryChange?: (show: boolean) => void;
-	onReviewCatalogArea?: (areaSlug: string) => void;
 }) {
 	return (
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

@@ -1,8 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn } from "storybook/test";
+import { expect } from "storybook/test";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
 import { AvailablePracticeList } from "./AvailablePracticeList";
+
+/**
+ * The `detail` param a row would push. Read back off the href rather than compared as a whole URL,
+ * because a stack link preserves whatever search the surrounding route already had — in Storybook
+ * that is the preview iframe's own `sessionId`.
+ */
+const detailParamOf = (link: HTMLElement) =>
+	new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail");
 
 const practices: CatalogPracticeSummary[] = [
 	{
@@ -48,11 +56,13 @@ export const CatalogStates: Story = {
 		await expect(canvas.queryByText("Available")).not.toBeInTheDocument();
 		await expect(canvas.getByText("Added")).toBeVisible();
 		await expect(canvas.getByText("Name unavailable")).toBeVisible();
+		// An adoptable row stays on the current route and only pushes a `detail` level, which is what
+		// makes it open a drawer instead of replacing the page.
 		await expect(
-			canvas.getByRole("link", {
-				name: "Describe what changed and why, review for adoption",
-			}),
-		).toHaveAttribute("href", "/w/demo/admin/practices/available/describe-what-and-why");
+			detailParamOf(
+				canvas.getByRole("link", { name: "Describe what changed and why, review for adoption" }),
+			),
+		).toBe('["practice:describe-what-and-why"]');
 		await expect(
 			canvas.getByRole("link", {
 				name: "Keep pull requests focused, open workspace practice, added",
@@ -69,15 +79,15 @@ export const GroupedLibrary: Story = {
 	args: {
 		groupByArea: true,
 		hideAdopted: true,
-		onReviewArea: fn(),
 		existingAreaSlugs: new Set(["review-ready-work"]),
 	},
-	play: async ({ args, canvas }) => {
+	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("heading", { name: "Review-ready work" })).toBeVisible();
 		await expect(canvas.queryByText("Added")).not.toBeInTheDocument();
-		await canvas.getByRole("button", { name: "Review 1 practice" }).click();
-		await expect(args.onReviewArea).toHaveBeenCalledWith("review-ready-work");
-		await expect(canvas.queryByRole("button", { name: /0 practices/ })).not.toBeInTheDocument();
+		await expect(detailParamOf(canvas.getByRole("link", { name: "Review 1 practice" }))).toBe(
+			'["area:review-ready-work"]',
+		);
+		await expect(canvas.queryByRole("link", { name: /0 practices/ })).not.toBeInTheDocument();
 	},
 };
 
@@ -99,11 +109,10 @@ export const RestoreDeletedArea: Story = {
 		groupByArea: true,
 		hideAdopted: true,
 		existingAreaSlugs: new Set(),
-		onReviewArea: fn(),
 	},
-	play: async ({ args, canvas }) => {
-		await canvas.getByRole("button", { name: "Restore area · 1 practice" }).click();
-		await expect(args.onReviewArea).toHaveBeenCalledWith("review-ready-work");
+	play: async ({ canvas }) => {
+		// A deleted area keeps its adopted practices visible so it can be offered back.
+		await expect(canvas.getByRole("link", { name: "Restore area · 1 practice" })).toBeVisible();
 	},
 };
 

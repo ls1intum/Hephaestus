@@ -1,48 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
-import { Library } from "lucide-react";
-import { listAdoptablePracticesOptions } from "@/api/@tanstack/react-query.gen";
-import { AvailablePracticeList } from "@/components/admin/practice-adoption/AvailablePracticeList";
-import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
-import { PageHeader } from "@/components/core/PageHeader";
-import { PageLayout } from "@/components/core/PageLayout";
-import { Spinner } from "@/components/ui/spinner";
-import { workspaceAdminHead } from "@/lib/page-title";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 
+/** Retired. The library is a section of Practice setup, not a page of its own. */
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/available/")(
 	{
-		head: workspaceAdminHead("Available practices"),
-		component: AvailablePracticesRoute,
+		beforeLoad: ({ params }) => {
+			throw redirect({
+				to: "/w/$workspaceSlug/admin/practices",
+				params,
+				search: { library: true },
+			});
+		},
 	},
 );
-
-function AvailablePracticesRoute() {
-	const { workspaceSlug } = Route.useParams();
-	const practicesQuery = useQuery({
-		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
-	});
-
-	return (
-		<PageLayout>
-			<PageHeader
-				icon={<Library />}
-				title="Available practices"
-				description="Review and adopt practices offered by the instance catalog."
-			/>
-			{practicesQuery.isPending ? (
-				<div className="flex h-64 items-center justify-center gap-3" role="status">
-					<Spinner className="size-8" />
-					<span className="sr-only">Loading available practices</span>
-				</div>
-			) : practicesQuery.isError ? (
-				<QueryErrorAlert
-					error={practicesQuery.error}
-					title="Couldn't load available practices"
-					onRetry={() => practicesQuery.refetch()}
-				/>
-			) : (
-				<AvailablePracticeList workspaceSlug={workspaceSlug} practices={practicesQuery.data} />
-			)}
-		</PageLayout>
-	);
-}

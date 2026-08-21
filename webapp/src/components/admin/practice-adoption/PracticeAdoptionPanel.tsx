@@ -4,6 +4,7 @@ import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/ty
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
 import { PracticeAutomatedReviewValidationBadge } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { DetailDrawerPanel } from "@/components/core/detail-drawer/DetailDrawerPanel";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import {
@@ -15,14 +16,6 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
-	Card,
-	CardContent,
-	CardDescription,
-	CardFooter,
-	CardHeader,
-	CardTitle,
-} from "@/components/ui/card";
-import {
 	Item,
 	ItemContent,
 	ItemDescription,
@@ -30,83 +23,104 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@/components/ui/item";
+import { Separator } from "@/components/ui/separator";
+import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 
-export interface PracticeAdoptionReviewProps {
+export interface PracticeAdoptionPanelProps {
 	workspaceSlug: string;
 	preview: CatalogPracticePreview;
 	definitionOptions: PracticeDefinitionOptions;
 	onAdopt: () => void;
 	isPending: boolean;
+	/** Set after a failed conditional add refreshed the preview, so the reader re-reads before retrying. */
+	isStale?: boolean;
 }
 
-export function PracticeAdoptionReview({
+/**
+ * One catalog practice, everything an administrator needs to decide, and the action — in the shape
+ * every other detail drawer uses. The outcome summary sits above the definition because "what will
+ * this do to my workspace" is the question being answered; the definition is the evidence for it.
+ */
+export function PracticeAdoptionPanel({
 	workspaceSlug,
 	preview,
 	definitionOptions,
 	onAdopt,
 	isPending,
-}: PracticeAdoptionReviewProps) {
+	isStale = false,
+}: PracticeAdoptionPanelProps) {
 	const unavailable = preview.availability !== "AVAILABLE";
+	const { Icon, pill } = areaVisualOf(preview);
 
 	return (
-		<div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_20rem]">
-			<div className="min-w-0 space-y-8">
-				<PracticeDefinitionPreview definition={preview.definition} options={definitionOptions} />
-				<CatalogDetails preview={preview} />
-			</div>
+		<DetailDrawerPanel
+			title={preview.definition.name}
+			// Not the destination area: that is one of the outcome rows below, where it has an icon
+			// and a consequence attached to it.
+			description={artifactKindLabel(preview.definition.artifactKind)}
+			media={
+				<ItemMedia className={cn("size-9 rounded-md", pill)} aria-hidden="true">
+					<Icon className="size-4" />
+				</ItemMedia>
+			}
+			footer={
+				unavailable ? (
+					<Link
+						to="/w/$workspaceSlug/admin/practices/$practiceSlug"
+						params={{ workspaceSlug, practiceSlug: preview.slug }}
+						search={{}}
+						className={cn(buttonVariants(), "w-full sm:w-auto")}
+					>
+						Open workspace practice
+					</Link>
+				) : (
+					<Button onClick={onAdopt} disabled={isPending} className="w-full sm:w-auto">
+						<ShieldCheck /> {isPending ? "Adding…" : "Add practice"}
+					</Button>
+				)
+			}
+		>
+			{isStale && (
+				<Alert variant="warning">
+					<CircleAlert />
+					<AlertTitle>The library changed while you were reading</AlertTitle>
+					<AlertDescription>
+						This is the current definition and outcome. Nothing was added.
+					</AlertDescription>
+				</Alert>
+			)}
+			{unavailable && <UnavailableNotice preview={preview} />}
 
-			<aside className="space-y-4 lg:sticky lg:top-6">
-				{unavailable && <UnavailableNotice preview={preview} />}
-				<Card>
-					<CardHeader>
-						<CardTitle>{unavailable ? "Workspace status" : "Add to workspace"}</CardTitle>
-						<CardDescription>
-							{unavailable
-								? preview.availability === "ADOPTED"
-									? "This workspace owns an editable copy."
-									: "This catalog practice cannot be added while its name is in use."
-								: "Creates an editable copy owned by this workspace."}
-						</CardDescription>
-					</CardHeader>
-					<CardContent>
-						<ItemGroup className="gap-2">
-							<CopyOutcome />
-							<AreaOutcome preview={preview} />
-							<AutonomyOutcome preview={preview} />
-						</ItemGroup>
-						<div className="mt-4">
-							<PracticeAutomatedReviewValidationBadge
-								validation={preview.definition.automatedReviewValidation}
-							/>
-						</div>
-					</CardContent>
-					<CardFooter className="flex-col gap-2">
-						{unavailable ? (
-							<Link
-								to="/w/$workspaceSlug/admin/practices/$practiceSlug"
-								params={{ workspaceSlug, practiceSlug: preview.slug }}
-								className={cn(buttonVariants(), "w-full")}
-							>
-								Open workspace practice
-							</Link>
-						) : (
-							<Button onClick={onAdopt} disabled={isPending} className="w-full">
-								<ShieldCheck /> {isPending ? "Adding…" : "Add practice"}
-							</Button>
-						)}
-						<Link
-							to="/w/$workspaceSlug/admin/practices"
-							params={{ workspaceSlug }}
-							search={{ library: true }}
-							className={cn(buttonVariants({ variant: "ghost" }), "w-full")}
-						>
-							Back to practice setup
-						</Link>
-					</CardFooter>
-				</Card>
-			</aside>
-		</div>
+			<section aria-labelledby="adoption-outcome" className="space-y-3">
+				<h2 id="adoption-outcome" className="text-sm font-medium">
+					{unavailable ? "Workspace status" : "Adding this practice will"}
+				</h2>
+				<ItemGroup className="gap-2">
+					<CopyOutcome />
+					<AreaOutcome preview={preview} />
+					<AutonomyOutcome preview={preview} />
+				</ItemGroup>
+				<PracticeAutomatedReviewValidationBadge
+					validation={preview.definition.automatedReviewValidation}
+				/>
+			</section>
+
+			<Separator />
+
+			<PracticeDefinitionPreview definition={preview.definition} options={definitionOptions} />
+			<CatalogDetails preview={preview} />
+		</DetailDrawerPanel>
+	);
+}
+
+function areaVisualOf(preview: CatalogPracticePreview) {
+	if (!preview.area.slug) return { Icon: CircleDashed, pill: "bg-muted text-muted-foreground" };
+	return getAreaVisual(
+		preview.area.slug,
+		preview.area.definition?.name ?? preview.area.slug,
+		preview.area.definition?.icon,
+		preview.area.definition?.color,
 	);
 }
 
@@ -117,7 +131,7 @@ function CopyOutcome() {
 				<Copy />
 			</ItemMedia>
 			<ItemContent>
-				<ItemTitle>Independent copy</ItemTitle>
+				<ItemTitle>Create an independent copy</ItemTitle>
 				<ItemDescription>Edit it without changing the catalog.</ItemDescription>
 			</ItemContent>
 		</Item>
@@ -125,16 +139,7 @@ function CopyOutcome() {
 }
 
 function AreaOutcome({ preview }: { preview: CatalogPracticePreview }) {
-	const name = preview.area.definition?.name ?? preview.area.slug ?? "Unassigned";
-	const areaVisual = preview.area.slug
-		? getAreaVisual(
-				preview.area.slug,
-				name,
-				preview.area.definition?.icon,
-				preview.area.definition?.color,
-			)
-		: { Icon: CircleDashed, pill: "bg-muted text-muted-foreground" };
-	const { Icon, pill } = areaVisual;
+	const { Icon, pill } = areaVisualOf(preview);
 	return (
 		<Item variant="muted" size="sm" role="listitem">
 			<ItemMedia className={cn("size-7 rounded-md", pill)} aria-hidden="true">
@@ -162,7 +167,7 @@ function AutonomyOutcome({ preview }: { preview: CatalogPracticePreview }) {
 			</ItemMedia>
 			<ItemContent>
 				<ItemTitle>
-					<AutonomyBadge autonomy={preview.initialAutonomy} />
+					Start at <AutonomyBadge autonomy={preview.initialAutonomy} />
 				</ItemTitle>
 				<ItemDescription className="line-clamp-none">{autonomy.description}</ItemDescription>
 			</ItemContent>

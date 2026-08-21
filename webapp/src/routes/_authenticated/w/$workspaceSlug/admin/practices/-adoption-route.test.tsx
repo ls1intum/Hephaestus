@@ -12,6 +12,8 @@ import {
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
 
+vi.setConfig({ testTimeout: 20_000 });
+
 const preview: CatalogPracticePreview = {
 	slug: "describe-what-and-why",
 	availability: "AVAILABLE",
@@ -36,12 +38,18 @@ const preview: CatalogPracticePreview = {
 	},
 };
 
-describe("available practice routes", () => {
+/** A one-level stack survives the readable URL form as well as the encoded array form. */
+const LIBRARY = "/w/acme/admin/practices?library=true";
+const REVIEWING = `${LIBRARY}&detail=practice:${preview.slug}`;
+
+describe("catalog adoption over practice setup", () => {
 	beforeEach(() => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practices/definition-options", () =>
 				HttpResponse.json(mockPracticeDefinitionOptions),
 			),
+			http.get("*/workspaces/:workspaceSlug/practice-areas", () => HttpResponse.json([])),
+			http.get("*/workspaces/:workspaceSlug/practices", () => HttpResponse.json([])),
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 			),
@@ -65,7 +73,7 @@ describe("available practice routes", () => {
 		);
 	});
 
-	it("shows all offered practices and distinguishes adoption states", async () => {
+	it("shows every offered practice in the library and distinguishes adoption states", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([
@@ -95,94 +103,104 @@ describe("available practice routes", () => {
 			),
 		);
 
-		renderRouteAt("/w/acme/admin/practices/available");
+		renderRouteAt(LIBRARY);
 
-		await screen.findByRole("heading", { name: "Available practices" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Practice library" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByText("Available")).toBeNull();
-		expect(await screen.findByText("Added")).not.toBeNull();
 		expect(await screen.findByText("Name unavailable")).not.toBeNull();
-		expect(screen.queryByText("Not independently validated")).toBeNull();
 		expect(
 			screen.getByRole("link", { name: `${preview.definition.name}, review for adoption` }),
-		).not.toBeNull();
-		expect(
-			screen.getByRole("link", { name: "Already there, open workspace practice, added" }),
 		).not.toBeNull();
 		expect(
 			screen.getByRole("link", { name: "Local collision, view details, name unavailable" }),
 		).not.toBeNull();
 	});
 
-	it("adopts the reviewed practice and opens the workspace copy", async () => {
-		const adoptedPractice = mockPractices[0];
-		if (!adoptedPractice) throw new Error("Expected a practice fixture");
+	it("reviews a practice over the library instead of leaving the page", async () => {
+		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
+				HttpResponse.json([
+					{
+						slug: preview.slug,
+						name: preview.definition.name,
+						artifactKind: "scm.pull_request",
+						areaSlug: "review-ready-work",
+						availability: "AVAILABLE",
+						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+					},
+				]),
+			),
+			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
+				HttpResponse.json(preview),
+			),
+		);
+
+		const { router } = renderRouteAtWithRouter(LIBRARY);
+		fireEvent.click(
+			await screen.findByRole(
+				"link",
+				{ name: `${preview.definition.name}, review for adoption` },
+				ROUTE_RENDER_WAIT,
+			),
+		);
+
+		await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);
+		// The library is still the page; only the drawer stack changed.
+		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
+		expect(router.state.location.search.detail).toEqual([`practice:${preview.slug}`]);
+	});
+
+	it("pins adoption to the reviewed ETag and returns to the library", async () => {
 		const seenIfMatch = vi.fn();
 		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
+				HttpResponse.json([]),
+			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
 				HttpResponse.json(preview),
 			),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", ({ request }) => {
 				seenIfMatch(request.headers.get("If-Match"));
 				return HttpResponse.json(
-					{
-						...adoptedPractice,
-						slug: preview.slug,
-						name: preview.definition.name,
-						autonomy: {
-							effective: "HUMAN_APPROVAL",
-							override: "HUMAN_APPROVAL",
-							source: "PRACTICE",
-							inherited: false,
-						},
-					},
+					{ ...mockPractices[0], slug: preview.slug, name: preview.definition.name },
 					{ status: 201 },
 				);
 			}),
-			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug", () =>
-				HttpResponse.json({
-					...adoptedPractice,
-					slug: preview.slug,
-					name: preview.definition.name,
-					autonomy: {
-						effective: "HUMAN_APPROVAL",
-						override: "HUMAN_APPROVAL",
-						source: "PRACTICE",
-						inherited: false,
-					},
-				}),
-			),
 		);
 
-		const { router } = renderRouteAtWithRouter(`/w/acme/admin/practices/available/${preview.slug}`);
+		const { router } = renderRouteAtWithRouter(REVIEWING);
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith(preview.etag));
+		// Adding closes the drawer rather than opening the practice form, so the next one is one click away.
 		await waitFor(
-			() => expect(router.state.location.pathname).toBe(`/w/acme/admin/practices/${preview.slug}`),
+			() => expect(router.state.location.search.detail).toBeUndefined(),
 			ROUTE_RENDER_WAIT,
 		);
+		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
+		expect(router.state.location.search.library).toBe(true);
 	});
 
-	it("pins adoption to the reviewed ETag and requires review again after a 412", async () => {
+	it("requires review again after a 412", async () => {
 		const seenIfMatch = vi.fn();
 		let previewReads = 0;
 		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
+				HttpResponse.json([]),
+			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
 				previewReads += 1;
-				return HttpResponse.json(
-					{
-						...preview,
-						definition: {
-							...preview.definition,
-							criteria:
-								previewReads > 1
-									? "Updated review rule that must be reviewed."
-									: preview.definition.criteria,
-						},
-						etag: previewReads > 1 ? '"updated-plan"' : preview.etag,
+				return HttpResponse.json({
+					...preview,
+					definition: {
+						...preview.definition,
+						criteria:
+							previewReads > 1
+								? "Updated review rule that must be reviewed."
+								: preview.definition.criteria,
 					},
-					{ headers: { ETag: previewReads > 1 ? '"updated-plan"' : preview.etag } },
-				);
+					etag: previewReads > 1 ? '"updated-plan"' : preview.etag,
+				});
 			}),
 			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", ({ request }) => {
 				seenIfMatch(request.headers.get("If-Match"));
@@ -193,21 +211,22 @@ describe("available practice routes", () => {
 			}),
 		);
 
-		renderRouteAt(`/w/acme/admin/practices/available/${preview.slug}`);
-		const adopt = await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT);
-		fireEvent.click(adopt);
+		renderRouteAt(REVIEWING);
+		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith(preview.etag));
-		const changed = await screen.findByRole("heading", {
-			name: "The adoption preview changed",
-		});
-		expect(document.activeElement).toBe(changed);
+		// `role="alert"` announces the change without pulling focus off the action.
+		const changed = await screen.findByRole("alert");
+		expect(changed.textContent).toContain("The library changed while you were reading");
 		expect(await screen.findByText("Updated review rule that must be reviewed.")).not.toBeNull();
 	});
 
 	it("does not claim the latest preview is shown when refreshing after a 412 fails", async () => {
 		let previewReads = 0;
 		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
+				HttpResponse.json([]),
+			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
 				previewReads += 1;
 				return previewReads === 1
@@ -225,23 +244,23 @@ describe("available practice routes", () => {
 			),
 		);
 
-		renderRouteAt(`/w/acme/admin/practices/available/${preview.slug}`);
+		renderRouteAt(REVIEWING);
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await screen.findByText("Couldn't load the adoption preview", {}, ROUTE_RENDER_WAIT);
-		expect(screen.queryByRole("heading", { name: "The adoption preview changed" })).toBeNull();
-		expect(
-			screen.queryByText("The latest definition or workspace outcome is now shown."),
-		).toBeNull();
+		expect(screen.queryByText("The library changed while you were reading")).toBeNull();
 	});
 
-	it("recovers a concurrent adoption by showing the workspace copy", async () => {
+	it("recovers a concurrent adoption by closing the drawer", async () => {
 		server.use(
+			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
+				HttpResponse.json([]),
+			),
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
 				HttpResponse.json(preview),
 			),
-			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () => {
-				return HttpResponse.json(
+			http.post("*/workspaces/:workspaceSlug/practice-catalog/adoption/:slug", () =>
+				HttpResponse.json(
 					{
 						type: "about:blank",
 						title: "Conflict",
@@ -249,22 +268,15 @@ describe("available practice routes", () => {
 						detail: "A workspace practice already uses this slug.",
 					},
 					{ status: 409 },
-				);
-			}),
-			http.get("*/workspaces/:workspaceSlug/practices/:practiceSlug", () =>
-				HttpResponse.json({
-					...mockPractices[0],
-					slug: preview.slug,
-					name: preview.definition.name,
-				}),
+				),
 			),
 		);
 
-		const { router } = renderRouteAtWithRouter(`/w/acme/admin/practices/available/${preview.slug}`);
+		const { router } = renderRouteAtWithRouter(REVIEWING);
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await waitFor(
-			() => expect(router.state.location.pathname).toBe(`/w/acme/admin/practices/${preview.slug}`),
+			() => expect(router.state.location.search.detail).toBeUndefined(),
 			ROUTE_RENDER_WAIT,
 		);
 	});

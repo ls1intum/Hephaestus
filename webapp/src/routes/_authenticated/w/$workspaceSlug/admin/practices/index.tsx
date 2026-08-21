@@ -5,21 +5,28 @@ import { useState } from "react";
 import { toast } from "sonner";
 import {
 	adoptAreaMutation,
+	adoptPracticeMutation,
 	getPracticeDefinitionOptionsOptions,
 	listAdoptablePracticesOptions,
 	listAreasOptions,
 	listPracticesOptions,
 	previewAreaAdoptionOptions,
+	previewPracticeAdoptionOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, PracticeArea } from "@/api/types.gen";
-import { CatalogAreaAdoptionDialog } from "@/components/admin/practice-adoption/CatalogAreaAdoptionDialog";
+import { AreaAdoptionPanel } from "@/components/admin/practice-adoption/AreaAdoptionPanel";
+import { PracticeAdoptionPanel } from "@/components/admin/practice-adoption/PracticeAdoptionPanel";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
 import {
 	PRACTICE_SEARCH_PARAMS,
-	practiceSearchSchema,
+	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
+import { DetailDrawerPanel } from "@/components/core/detail-drawer/DetailDrawerPanel";
+import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
+import { parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
+import { useDetailStack } from "@/components/core/detail-drawer/use-detail-stack";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import {
@@ -33,26 +40,34 @@ import {
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practices"),
-	validateSearch: practiceSearchSchema,
+	validateSearch: practiceSetupSearchSchema,
 	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
 	component: PracticeCatalogRoute,
 });
 
 function PracticeCatalogRoute() {
 	const { workspaceSlug } = Route.useParams();
-	const { focus, library } = Route.useSearch();
+	const { focus, library, detail } = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	const [deletingArea, setDeletingArea] = useState<PracticeArea | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
-	const [reviewingAreaSlug, setReviewingAreaSlug] = useState<string | null>(null);
+	const [stalePracticeSlug, setStalePracticeSlug] = useState<string | null>(null);
 	const catalog = usePracticeCatalogMutations(workspaceSlug);
+
+	// The drawer stack lives in the URL, so at most one area and one practice can be open. Their
+	// previews are fetched here rather than inside the panels, which stay presentational.
+	const detailStack = parseDetailStack(detail);
+	const stackControls = useDetailStack(detailStack);
+	const reviewingAreaSlug = detailStack.find((entry) => entry.kind === "area")?.id ?? null;
+	const reviewingPracticeSlug = detailStack.find((entry) => entry.kind === "practice")?.id ?? null;
 
 	const areasQuery = useQuery({
 		...listAreasOptions({ path: { workspaceSlug } }),
@@ -71,11 +86,25 @@ function PracticeCatalogRoute() {
 		...previewAreaAdoptionOptions({ path: { workspaceSlug, slug: reviewingAreaSlug ?? "" } }),
 		enabled: reviewingAreaSlug !== null,
 	});
+	const practicePreviewQuery = useQuery({
+		...previewPracticeAdoptionOptions({
+			path: { workspaceSlug, slug: reviewingPracticeSlug ?? "" },
+		}),
+		enabled: reviewingPracticeSlug !== null,
+	});
+	const refreshCatalog = () =>
+		Promise.all([
+			areasQuery.refetch(),
+			practicesQuery.refetch(),
+			catalogQuery.refetch(),
+			// A practice added from inside an area drawer changes what the area behind it would do.
+			reviewingAreaSlug ? areaPreviewQuery.refetch() : undefined,
+		]);
 	const adoptCatalogArea = useMutation({
 		...adoptAreaMutation(),
 		onSuccess: async (result) => {
-			setReviewingAreaSlug(null);
-			await Promise.all([areasQuery.refetch(), practicesQuery.refetch(), catalogQuery.refetch()]);
+			stackControls.close(0);
+			await refreshCatalog();
 			const changes = [
 				result.added.length > 0 && `${result.added.length} added`,
 				result.moved.length > 0 && `${result.moved.length} moved`,
@@ -91,6 +120,42 @@ function PracticeCatalogRoute() {
 			);
 		},
 	});
+	const adoptCatalogPractice = useMutation({
+		...adoptPracticeMutation(),
+		scope: practiceCatalogStructureScope(workspaceSlug),
+	});
+
+	// Adding closes only the practice level, so an administrator lands back in the library they were
+	// working through rather than in an edit form they did not ask for.
+	const adoptReviewedPractice = async (catalogSlug: string, depth: number) => {
+		const preview = practicePreviewQuery.data;
+		if (!preview) return;
+		setStalePracticeSlug(null);
+		try {
+			await adoptCatalogPractice.mutateAsync({
+				path: { workspaceSlug, slug: catalogSlug },
+				headers: { "If-Match": preview.etag },
+			});
+			stackControls.close(depth);
+			await refreshCatalog();
+			toast.success("Practice added", { description: preview.definition.name });
+		} catch (error) {
+			const status = problemStatusOf(error);
+			if (status === 409) {
+				await refreshCatalog();
+				toast.info("This practice is already in the workspace");
+				stackControls.close(depth);
+				return;
+			}
+			if (status === 412) {
+				const refreshed = await practicePreviewQuery.refetch();
+				if (refreshed.isSuccess) setStalePracticeSlug(catalogSlug);
+				else toast.error("The adoption preview changed but couldn't be refreshed");
+				return;
+			}
+			toast.error("Couldn't add the practice");
+		}
+	};
 
 	return (
 		<PageLayout>
@@ -147,7 +212,6 @@ function PracticeCatalogRoute() {
 					catalogUnavailable={catalogQuery.isError}
 					onRetryCatalog={() => catalogQuery.refetch()}
 					showLibrary={library === true}
-					onReviewCatalogArea={setReviewingAreaSlug}
 					onShowLibraryChange={(showLibrary) =>
 						navigate({
 							search: (previous) => ({ ...previous, library: showLibrary || undefined }),
@@ -208,27 +272,57 @@ function PracticeCatalogRoute() {
 				/>
 			)}
 
-			<CatalogAreaAdoptionDialog
-				definitionOptions={
-					definitionOptionsQuery.data ?? { sourceContractVersion: "", workTypes: [] }
+			<DetailDrawerStack stack={detailStack} onClose={stackControls.close}>
+				{(entry, depth) =>
+					entry.kind === "area" ? (
+						<AreaAdoptionPanel
+							preview={areaPreviewQuery.data}
+							isLoading={areaPreviewQuery.isPending}
+							isError={areaPreviewQuery.isError}
+							error={areaPreviewQuery.error}
+							isPending={adoptCatalogArea.isPending}
+							onRetry={() => areaPreviewQuery.refetch()}
+							onOpenPractice={(catalogSlug) =>
+								stackControls.open({ kind: "practice", id: catalogSlug })
+							}
+							onConfirm={() => {
+								if (!areaPreviewQuery.data) return;
+								adoptCatalogArea.mutate({
+									path: { workspaceSlug, slug: entry.id },
+									headers: { "If-Match": areaPreviewQuery.data.etag },
+								});
+							}}
+						/>
+					) : practicePreviewQuery.isPending || definitionOptionsQuery.isPending ? (
+						<DetailDrawerPanel title="Loading practice">
+							<div className="flex min-h-32 items-center justify-center" role="status">
+								<Spinner />
+								<span className="sr-only">Loading adoption preview</span>
+							</div>
+						</DetailDrawerPanel>
+					) : practicePreviewQuery.isError || definitionOptionsQuery.isError ? (
+						<DetailDrawerPanel title="Practice">
+							<QueryErrorAlert
+								error={practicePreviewQuery.error ?? definitionOptionsQuery.error}
+								title="Couldn't load the adoption preview"
+								onRetry={() => {
+									practicePreviewQuery.refetch();
+									definitionOptionsQuery.refetch();
+								}}
+							/>
+						</DetailDrawerPanel>
+					) : (
+						<PracticeAdoptionPanel
+							workspaceSlug={workspaceSlug}
+							preview={practicePreviewQuery.data}
+							definitionOptions={definitionOptionsQuery.data}
+							isStale={stalePracticeSlug === entry.id}
+							isPending={adoptCatalogPractice.isPending}
+							onAdopt={() => adoptReviewedPractice(entry.id, depth)}
+						/>
+					)
 				}
-				open={reviewingAreaSlug !== null}
-				preview={areaPreviewQuery.data}
-				isLoading={areaPreviewQuery.isPending}
-				isError={areaPreviewQuery.isError}
-				isPending={adoptCatalogArea.isPending}
-				onOpenChange={(open) => {
-					if (!open) setReviewingAreaSlug(null);
-				}}
-				onRetry={() => areaPreviewQuery.refetch()}
-				onConfirm={() => {
-					if (!reviewingAreaSlug || !areaPreviewQuery.data) return;
-					adoptCatalogArea.mutate({
-						path: { workspaceSlug, slug: reviewingAreaSlug },
-						headers: { "If-Match": areaPreviewQuery.data.etag },
-					});
-				}}
-			/>
+			</DetailDrawerStack>
 
 			<AlertDialog
 				open={deletingArea !== null}

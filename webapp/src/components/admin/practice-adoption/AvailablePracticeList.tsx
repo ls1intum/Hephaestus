@@ -2,8 +2,9 @@ import { Link } from "@tanstack/react-router";
 import { Check, ChevronRight, CircleAlert, CircleDashed, Library } from "lucide-react";
 import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button";
 import {
 	Empty,
 	EmptyDescription,
@@ -28,7 +29,6 @@ export interface AvailablePracticeListProps {
 	practices: CatalogPracticeSummary[];
 	groupByArea?: boolean;
 	hideAdopted?: boolean;
-	onReviewArea?: (areaSlug: string) => void;
 	existingAreaSlugs?: ReadonlySet<string>;
 }
 
@@ -37,7 +37,6 @@ export function AvailablePracticeList({
 	practices,
 	groupByArea = false,
 	hideAdopted = false,
-	onReviewArea,
 	existingAreaSlugs = new Set(),
 }: AvailablePracticeListProps) {
 	const visiblePractices = hideAdopted
@@ -93,22 +92,17 @@ export function AvailablePracticeList({
 								<h3 id={`library-${entries[0].areaSlug ?? "unassigned"}`} className="font-medium">
 									{areaName}
 								</h3>
-								{areaSlug &&
-								(availableCount > 0 || (areaMissing && restoreCount > 0)) &&
-								onReviewArea ? (
-									<Button
-										size="sm"
-										variant="outline"
-										onClick={() => {
-											onReviewArea(areaSlug);
-										}}
+								{areaSlug && (availableCount > 0 || (areaMissing && restoreCount > 0)) ? (
+									<DetailStackLink
+										entry={{ kind: "area", id: areaSlug }}
+										className={buttonVariants({ size: "sm", variant: "outline" })}
 									>
 										{areaMissing && availableCount === 0
 											? `Restore area · ${restoreCount} ${restoreCount === 1 ? "practice" : "practices"}`
 											: existingAreaSlugs.has(areaSlug)
 												? `Review ${availableCount} ${availableCount === 1 ? "practice" : "practices"}`
 												: `Review area · ${availableCount} ${availableCount === 1 ? "practice" : "practices"}`}
-									</Button>
+									</DetailStackLink>
 								) : (
 									<span className="text-xs text-muted-foreground">
 										{entries.length} {entries.length === 1 ? "practice" : "practices"}
@@ -149,17 +143,16 @@ function PracticeItem({
 		? getAreaVisual(practice.areaSlug, areaName)
 		: { Icon: CircleDashed, pill: "bg-muted text-muted-foreground" };
 	const { Icon, pill } = areaVisual;
+	// An adopted practice leaves the library for its workspace copy; everything else opens over it.
 	const link =
 		practice.availability === "ADOPTED" ? (
 			<Link
 				to="/w/$workspaceSlug/admin/practices/$practiceSlug"
 				params={{ workspaceSlug, practiceSlug: practice.slug }}
+				search={{}}
 			/>
 		) : (
-			<Link
-				to="/w/$workspaceSlug/admin/practices/available/$catalogSlug"
-				params={{ workspaceSlug, catalogSlug: practice.slug }}
-			/>
+			<DetailStackLink entry={{ kind: "practice", id: practice.slug }} />
 		);
 
 	return (
