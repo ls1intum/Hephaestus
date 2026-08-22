@@ -168,7 +168,10 @@ export function PracticeCatalog({
 					size="sm"
 					title="Instance catalog"
 					description="Practices this instance offers. Adding one gives you a copy you own — later catalog changes never reach it."
-					className="rounded-lg border bg-muted/20 p-4"
+					// Arrives rather than appears: the toggle is above it, so a section that simply exists
+					// on the next frame gives no clue where it came from. Short, and off under
+					// `prefers-reduced-motion`, where the arrival is the information and the travel is not.
+					className="rounded-lg border bg-muted/20 p-4 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-2 motion-safe:duration-200"
 				>
 					{library.state.status === "error" ? (
 						<QueryErrorAlert
