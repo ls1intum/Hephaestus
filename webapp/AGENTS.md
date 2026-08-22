@@ -354,3 +354,32 @@ how a *setting* came to look identical to a *provenance state*.
 
 A registry entry that would be identical for every value is not information. Say what to do about it
 in a sentence instead.
+
+## Field orientation
+
+`Field` ships three orientations and the choice is about **the control's width**, not about taste:
+
+| Control | Orientation |
+|---|---|
+| Switch, checkbox, radio — a fixed ~32px box | `horizontal`. It fits beside its label at 320px. |
+| Select, input, anything with a `w-*` — a real column | `responsive`, inside a `FieldGroup`, and size it `w-full @md/field-group:w-56` |
+| Textarea, editor, anything full-bleed | the default vertical |
+
+`responsive` reads `@md/field-group`, and **only `FieldGroup` opens that container** — a `responsive`
+field with no `FieldGroup` ancestor is stacked at every width, which looks fine on a phone and wrong
+on a desktop. A `horizontal` field with a 14rem control is the opposite mistake: at 320px it leaves
+the label about 60px and the row squashes.
+
+Fixed widths on a control inside a responsive field must be breakpoint-scoped for the same reason —
+`w-56` alone cannot stack.
+
+## Drawer or route, continued
+
+The measurement, so the next person does not have to redo it: `PracticeDefinitionForm` renders
+**3,019px on a 1200×900 desktop and 4,062px at 320×568** — seven viewport-heights — with 43 controls.
+It fails criterion 2 by nearly 5×, and at 320px a drawer is full-width, so the context column that
+justifies the pattern does not exist there at all.
+
+What a route must still do is keep the reader's place: the practice editor carries the `detail` stack
+in its search params (`PRACTICE_SETUP_SEARCH_PARAMS`) even though it renders no drawer, so returning
+lands on the panel it was opened from rather than a bare list.

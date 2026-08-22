@@ -6,6 +6,7 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeEvidenceSummary } from "./PracticeEvidenceSummary";
 
 const meta = {
@@ -52,4 +53,12 @@ export const OneOccasion: Story = {
 
 export const NoOccasion: Story = {
 	args: { bindings: [] },
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
+	},
 };

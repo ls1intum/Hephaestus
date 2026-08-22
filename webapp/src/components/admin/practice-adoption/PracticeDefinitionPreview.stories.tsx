@@ -8,6 +8,7 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { realPracticeDefinition } from "@/mocks/fixtures/practice-catalog";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeDefinitionPreview } from "./PracticeDefinitionPreview";
 
 const definition: CuratedPracticeDefinition = {
@@ -145,5 +146,13 @@ export const UnknownWorkType: Story = {
 	play: async ({ canvas, userEvent }) => {
 		await userEvent.click(canvas.getByRole("button", { name: "What it reads" }));
 		await expect(await canvas.findByRole("button", { name: "How it decides" })).toBeVisible();
+	},
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

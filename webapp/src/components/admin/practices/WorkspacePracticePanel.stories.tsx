@@ -49,7 +49,8 @@ export const Default: Story = {
 		const edit = await screen.findByRole("link", { name: "Edit practice" });
 		await expectSettledVisible(edit);
 		// Editing is a route, not another drawer level, so the link is a real path.
-		await expect(edit).toHaveAttribute("href", `/w/demo/admin/practices/${practice.slug}`);
+		// The stack rides along so returning from the editor lands on this panel, not a bare list.
+		await expect(edit.getAttribute("href")).toContain(`/w/demo/admin/practices/${practice.slug}`);
 		// Level 2 is the panel's own title; criteria headings render below it at level 4.
 		await expect(screen.getByRole("heading", { name: practice.name, level: 2 })).toBeVisible();
 	},

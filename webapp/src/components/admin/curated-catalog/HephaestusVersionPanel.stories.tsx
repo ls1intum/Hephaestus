@@ -7,6 +7,7 @@ import {
 	mockPracticeDefinitionOptions,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
@@ -145,5 +146,13 @@ export const KeepingSavedVersion: Story = {
 		status: status({ state: "UPDATE_WAITING", changeKind: "DETECTION" }),
 		shipped,
 		isKeepPending: true,
+	},
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

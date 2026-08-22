@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { Stateful } from "@/stories/stateful";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { PracticeMentoringSupportEditor } from "./PracticeMentoringSupportEditor";
 
 const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
@@ -106,5 +107,13 @@ export const Invalid: Story = {
 		await expect(
 			canvas.getByText("Say what a person can see here that the connected work cannot show."),
 		).toBeVisible();
+	},
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

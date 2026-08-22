@@ -108,7 +108,9 @@ export function WorkspacePracticePanel({
 				<Link
 					to="/w/$workspaceSlug/admin/practices/$practiceSlug"
 					params={{ workspaceSlug, practiceSlug: practice.slug }}
-					search={{}}
+					// Keeps the stack: editing is a route because the form is seven viewport-heights at
+					// 320px, but leaving for it must not cost the reader their place.
+					search={(previous) => previous}
 					className={cn(buttonVariants(), "w-full sm:w-auto")}
 				>
 					<Pencil /> Edit practice

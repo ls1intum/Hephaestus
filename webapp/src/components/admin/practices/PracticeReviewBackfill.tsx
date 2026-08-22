@@ -12,7 +12,13 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Field, FieldContent, FieldDescription, FieldLabel } from "@/components/ui/field";
+import {
+	Field,
+	FieldContent,
+	FieldDescription,
+	FieldGroup,
+	FieldLabel,
+} from "@/components/ui/field";
 import { Item, ItemActions, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import { Progress } from "@/components/ui/progress";
 import {
@@ -170,53 +176,57 @@ function EstimateSection({
 					up has never been measured. A backfill measures it once, as it stands today.
 				</p>
 			</div>
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel htmlFor="backfill-kind">Kind of work</FieldLabel>
-					<FieldDescription>
-						One kind per backfill, so the estimate means one thing.
-					</FieldDescription>
-				</FieldContent>
-				<Select
-					items={WORK_KIND_ITEMS}
-					value={artifactKind}
-					onValueChange={(value) => {
-						if (value) {
-							setArtifactKind(value as CreateReviewBackfillRunRequest["artifactKind"]);
-						}
-					}}
-				>
-					<SelectTrigger id="backfill-kind" className="w-56">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						{WORK_KIND_ITEMS.map((kind) => (
-							<SelectItem key={kind.value} value={kind.value}>
-								{kind.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</Field>
+			<FieldGroup>
+				<Field orientation="responsive">
+					<FieldContent>
+						<FieldLabel htmlFor="backfill-kind">Kind of work</FieldLabel>
+						<FieldDescription>
+							One kind per backfill, so the estimate means one thing.
+						</FieldDescription>
+					</FieldContent>
+					<Select
+						items={WORK_KIND_ITEMS}
+						value={artifactKind}
+						onValueChange={(value) => {
+							if (value) {
+								setArtifactKind(value as CreateReviewBackfillRunRequest["artifactKind"]);
+							}
+						}}
+					>
+						<SelectTrigger id="backfill-kind" className="w-full @md/field-group:w-56">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{WORK_KIND_ITEMS.map((kind) => (
+								<SelectItem key={kind.value} value={kind.value}>
+									{kind.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
+			</FieldGroup>
 
-			<Field orientation="horizontal">
-				<FieldContent>
-					<FieldLabel htmlFor="backfill-window">How far back</FieldLabel>
-					<FieldDescription>Counted from when the work was opened.</FieldDescription>
-				</FieldContent>
-				<Select items={WINDOWS} value={days} onValueChange={(value) => setDays(value ?? days)}>
-					<SelectTrigger id="backfill-window" className="w-56">
-						<SelectValue />
-					</SelectTrigger>
-					<SelectContent>
-						{WINDOWS.map((window) => (
-							<SelectItem key={window.value} value={window.value}>
-								{window.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-			</Field>
+			<FieldGroup>
+				<Field orientation="responsive">
+					<FieldContent>
+						<FieldLabel htmlFor="backfill-window">How far back</FieldLabel>
+						<FieldDescription>Counted from when the work was opened.</FieldDescription>
+					</FieldContent>
+					<Select items={WINDOWS} value={days} onValueChange={(value) => setDays(value ?? days)}>
+						<SelectTrigger id="backfill-window" className="w-full @md/field-group:w-56">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							{WINDOWS.map((window) => (
+								<SelectItem key={window.value} value={window.value}>
+									{window.label}
+								</SelectItem>
+							))}
+						</SelectContent>
+					</Select>
+				</Field>
+			</FieldGroup>
 
 			<div className="flex items-center gap-3">
 				<Button onClick={estimate} disabled={isEstimating || isLoading}>

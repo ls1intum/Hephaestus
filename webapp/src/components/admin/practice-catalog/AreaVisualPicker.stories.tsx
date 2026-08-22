@@ -4,6 +4,7 @@ import { expect, fn, screen, userEvent } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { AreaVisualPicker, type AreaVisualPickerProps } from "./AreaVisualPicker";
 
 const meta = {
@@ -80,5 +81,13 @@ export const DisabledWhileOpen: Story = {
 		// Counted, not merely absent: nothing in this play could reach a swatch, so a bare
 		// "never called" would pass even if disabling did nothing.
 		await expect(args.onChange).toHaveBeenCalledTimes(1);
+	},
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

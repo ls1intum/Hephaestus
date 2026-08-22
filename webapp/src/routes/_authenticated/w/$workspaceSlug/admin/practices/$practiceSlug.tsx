@@ -14,8 +14,8 @@ import type { Practice, UpdatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm, PracticeFormShell } from "@/components/admin/practices/PracticeForm";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import {
-	PRACTICE_SEARCH_PARAMS,
-	practiceSearchSchema,
+	PRACTICE_SETUP_SEARCH_PARAMS,
+	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
@@ -29,8 +29,8 @@ export const Route = createFileRoute(
 	"/_authenticated/w/$workspaceSlug/admin/practices/$practiceSlug",
 )({
 	head: workspaceAdminHead("Edit practice"),
-	validateSearch: practiceSearchSchema,
-	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
+	validateSearch: practiceSetupSearchSchema,
+	search: { middlewares: [retainSearchParams(PRACTICE_SETUP_SEARCH_PARAMS)] },
 	component: EditPracticeContainer,
 });
 
@@ -98,7 +98,7 @@ function EditPracticeContainer() {
 		void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 		void queryClient.invalidateQueries({ queryKey: listQueryKey });
 		toast.success("Practice saved");
-		navigate({ to: ".." });
+		navigate({ to: "..", search: (previous) => previous });
 	};
 
 	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {

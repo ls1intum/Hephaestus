@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { CuratedCatalogSummary } from "./CuratedCatalogSummary";
 
 const meta = {
@@ -73,5 +74,13 @@ export const ReviewingChanges: Story = {
 	args: { ...UpdatesWaiting.args, reviewing: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByRole("button", { name: "Review changes" })).not.toBeInTheDocument();
+	},
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

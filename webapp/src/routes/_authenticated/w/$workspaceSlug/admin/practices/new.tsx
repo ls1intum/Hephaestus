@@ -11,8 +11,8 @@ import type { CreatePracticeRequest, Practice } from "@/api/types.gen";
 import { PracticeForm, PracticeFormShell } from "@/components/admin/practices/PracticeForm";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import {
-	PRACTICE_SEARCH_PARAMS,
-	practiceSearchSchema,
+	PRACTICE_SETUP_SEARCH_PARAMS,
+	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-catalog-cache";
@@ -21,8 +21,8 @@ import { problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/new")({
 	head: workspaceAdminHead("Create practice"),
-	validateSearch: practiceSearchSchema,
-	search: { middlewares: [retainSearchParams(PRACTICE_SEARCH_PARAMS)] },
+	validateSearch: practiceSetupSearchSchema,
+	search: { middlewares: [retainSearchParams(PRACTICE_SETUP_SEARCH_PARAMS)] },
 	component: CreatePracticeContainer,
 });
 
@@ -70,7 +70,7 @@ function CreatePracticeContainer() {
 			queryKey: practicesQueryKey,
 		});
 		toast.success("Practice created");
-		navigate({ to: ".." });
+		navigate({ to: "..", search: (previous) => previous });
 	};
 
 	if (areasQuery.isPending || definitionOptionsQuery.isPending) {

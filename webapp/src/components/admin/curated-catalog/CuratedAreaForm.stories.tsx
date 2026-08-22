@@ -2,6 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
 import type { CatalogEntryStatus } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
+import { expectNoOverflowingElement } from "@/test/reflow";
 import { CuratedAreaForm } from "./CuratedAreaForm";
 
 const status = (overrides: Partial<CatalogEntryStatus> = {}): CatalogEntryStatus => ({
@@ -56,5 +57,14 @@ export const Submitting: Story = {
 	args: { mode: "edit", initialData, isPending: true },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByRole("textbox", { name: /Name/ })).toBeDisabled();
+	},
+};
+
+/** Everything here has to fit the WCAG 1.4.10 reference width without a sideways drag. */
+export const NarrowViewport: Story = {
+	args: { mode: "create" },
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async ({ canvasElement }) => {
+		await expectNoOverflowingElement(canvasElement);
 	},
 };

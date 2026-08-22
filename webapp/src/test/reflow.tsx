@@ -107,6 +107,24 @@ export async function expectNoPanelOverflow(panel: HTMLElement) {
 	await expect(body.scrollWidth).toBeLessThanOrEqual(body.clientWidth + LAYOUT_SLACK_PX);
 }
 
+/**
+ * Nothing in the story reaches past the viewport, and the failure names the element that did.
+ *
+ * `expectNoPageOverflow` compares two numbers and tells you only that one is bigger, which on a
+ * component with a hundred nodes is the start of a search rather than the end of one.
+ */
+export async function expectNoOverflowingElement(root: HTMLElement = document.body) {
+	const limit = window.innerWidth + LAYOUT_SLACK_PX;
+	const offenders = Array.from(root.querySelectorAll<HTMLElement>("*"))
+		.map((element) => ({ element, rect: element.getBoundingClientRect() }))
+		.filter(({ rect }) => rect.width > 0 && (rect.right > limit || rect.left < -LAYOUT_SLACK_PX))
+		.map(
+			({ element, rect }) =>
+				`${element.tagName.toLowerCase()}.${String(element.className).split(" ").slice(0, 3).join(".")} [${Math.round(rect.left)}…${Math.round(rect.right)}]`,
+		);
+	await expect(offenders, `Reaches past the ${window.innerWidth}px viewport`).toEqual([]);
+}
+
 export async function expectTargetSize(control: HTMLElement) {
 	const rect = control.getBoundingClientRect();
 	await expect(rect.width).toBeGreaterThanOrEqual(MIN_TARGET_PX);

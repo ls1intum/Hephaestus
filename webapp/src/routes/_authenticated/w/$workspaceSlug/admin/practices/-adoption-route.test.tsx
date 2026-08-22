@@ -174,7 +174,11 @@ describe("catalog adoption over practice setup", () => {
 
 		// The definition is readable, and editing is a separate, explicit act that IS a route.
 		const edit = await screen.findByRole("link", { name: "Edit practice" }, ROUTE_RENDER_WAIT);
-		expect(edit.getAttribute("href")).toBe("/w/acme/admin/practices/already-mine");
+		// The stack rides along: editing is a route because the form is seven viewport-heights at
+		// 320px, but coming back must land on the panel it was opened from.
+		expect(edit.getAttribute("href")).toBe(
+			`/w/acme/admin/practices/already-mine?detail=${encodeURIComponent('["practice:already-mine"]')}`,
+		);
 		expect(router.state.location.pathname).toBe("/w/acme/admin/practices");
 		expect(router.state.location.search.detail).toEqual(["practice:already-mine"]);
 	});
