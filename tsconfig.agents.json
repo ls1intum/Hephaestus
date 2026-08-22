@@ -11,6 +11,8 @@
 		// Regex captures and split() results are the dominant shape here; without this they read as
 		// always-present and an unmatched group becomes a runtime undefined instead of a build error.
 		"noUncheckedIndexedAccess": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": true,
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
 		"forceConsistentCasingInFileNames": true,

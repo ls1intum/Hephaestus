@@ -14,7 +14,7 @@ feedback to the developer in-context, in a reflection page, or in conversation.
 - `docs/` — contributor docs published to GitHub Pages, including the generated ERD.
 
 Node is pinned in `.node-version` and drives the repo's own tooling; the repo is pnpm 11 workspaces.
-`webapp` is the TypeScript package. The agent sandbox runs no Node at all: the runner
+`webapp` is the main TypeScript package; `docs` is a second, with its own tooling. The agent sandbox runs no Node at all: the runner
 (`server/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
 the per-practice precompute scripts (`server/src/main/resources/practices/precompute/`) are
 TypeScript executed directly by Bun, whose version the agent image pins in
@@ -48,7 +48,8 @@ reflect the final state. Document any skipped gate in the PR description.
 | `mvn test -P'!quick'` | Server unit tests — see `server/AGENTS.md` for the four tiers and why `!quick` is mandatory |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them.
+comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
+scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
 ### Lint and format scopes
 

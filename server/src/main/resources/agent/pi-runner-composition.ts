@@ -1,9 +1,17 @@
 // Coherence rules the composed-feedback envelope must satisfy for the server to deliver what it
 // carries. Kept apart from pi-runner.ts so they can be exercised without starting a review.
 
+/** The lanes feedback can land on. Widening this fails to compile until every lane is bounded. */
+export const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"] as const;
+export type Channel = (typeof CHANNELS)[number];
+
+export const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"] as const;
+export type FeedbackAction = (typeof ACTIONS)[number];
+
+/** A unit carries more than this; the tool schema in pi-runner.ts is the definition of the rest. */
 export interface ComposedFeedbackUnit {
-	action?: string;
-	channel?: string;
+	action?: FeedbackAction;
+	channel?: Channel;
 	practiceSlug?: string;
 	supersedesThreadKey?: string;
 	[key: string]: unknown;
@@ -28,7 +36,9 @@ export function undeliverableUnits(
 	envelope?: ComposedFeedbackEnvelope | null,
 ): ComposedFeedbackUnit[] {
 	const prepared = new Set(envelope?.preparedThreadKeys ?? []);
-	return (envelope?.units ?? []).filter(
-		(unit) => unit?.action === "SUPERSEDE" && !prepared.has(unit?.supersedesThreadKey as string),
-	);
+	return (envelope?.units ?? []).filter((unit) => {
+		if (unit?.action !== "SUPERSEDE") return false;
+		const target = unit.supersedesThreadKey;
+		return target === undefined || !prepared.has(target);
+	});
 }
