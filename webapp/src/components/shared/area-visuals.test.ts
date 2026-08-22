@@ -1,9 +1,47 @@
 import { Folder, Package, Rocket, ShieldCheck } from "lucide-react";
 import { describe, expect, it } from "vitest";
-import { getAreaVisual, ICON_NAMES, iconLabel, iconSearchText, PILL } from "./area-visuals";
+import {
+	getAreaVisual,
+	ICON_NAMES,
+	iconLabel,
+	iconSearchText,
+	PILL,
+	SEEDED_AREA_SLUGS,
+} from "./area-visuals";
+
+/**
+ * The 11 seeded practice-area slugs (mirror of default-catalog.json). If a slug is renamed in the
+ * catalogue without updating the seed map, the area silently loses its icon/colour — this guard fails
+ * loudly instead.
+ */
+const EXPECTED_SLUGS = [
+	"review-ready-work",
+	"acting-on-review-feedback",
+	"actionable-issue-authoring",
+	"constructive-code-review",
+	"testing-discipline",
+	"code-craftsmanship",
+	"robust-error-handling",
+	"secure-by-default-changes",
+	"decisions-and-documentation",
+	"delivery-and-version-control-discipline",
+	"issue-traceability-and-lifecycle",
+];
 
 describe("areaVisuals", () => {
-	it("lets an admin-set icon and color override the seeded default", () => {
+	it("has a seed for every seeded area slug", () => {
+		expect([...SEEDED_AREA_SLUGS].sort()).toEqual([...EXPECTED_SLUGS].sort());
+	});
+
+	it("resolves every seeded slug to a curated (non-fallback) icon and a real colour pill", () => {
+		for (const slug of SEEDED_AREA_SLUGS) {
+			const visual = getAreaVisual(slug);
+			expect(visual.Icon).not.toBe(Folder);
+			expect(visual.pill).toMatch(/^bg-/);
+		}
+	});
+
+	it("lets an admin-set icon and colour override the seeded default", () => {
 		const visual = getAreaVisual(
 			"review-ready-work",
 			"Packaging work for review",
@@ -14,14 +52,14 @@ describe("areaVisuals", () => {
 		expect(visual.pill).toBe(PILL.fuchsia);
 	});
 
-	it("ignores an unknown icon name or color key and falls back to the seed", () => {
+	it("ignores an unknown icon name / colour key and falls back to the seed", () => {
 		const visual = getAreaVisual(
 			"review-ready-work",
 			"Packaging work for review",
 			"NotAnIcon",
 			"chartreuse",
 		);
-		expect(visual.Icon).toBe(Package);
+		expect(visual.Icon).toBe(Package); // the seeded icon for review-ready-work
 		expect(visual.pill).toBe(PILL.sky);
 	});
 
