@@ -1,10 +1,7 @@
 import { useNavigate, useRouter } from "@tanstack/react-router";
 import { type DetailStackEntry, encodeDetailStack } from "./detail-stack";
 
-/**
- * Cast rather than a `HistoryState` module augmentation: the interface lives in `@tanstack/history`,
- * a transitive package this workspace cannot name in a `declare module`. Asserted here only.
- */
+/** `HistoryState` lives in `@tanstack/history`, which this workspace cannot name in a `declare module`. */
 interface DetailHistoryState {
 	detailPush?: boolean;
 }
@@ -12,7 +9,6 @@ interface DetailHistoryState {
 export interface DetailStackControls {
 	/** Prefer {@link import("./DetailStackLink").DetailStackLink}; this is for openers that cannot be links. */
 	open: (entry: DetailStackEntry) => void;
-	/** Closes the drawer at `depth`, leaving `depth` levels open. `close(0)` closes all of them. */
 	close: (depth: number) => void;
 }
 
@@ -33,15 +29,14 @@ export function useDetailStack(stack: DetailStackEntry[]): DetailStackControls {
 				...previous,
 				detail: encodeDetailStack(next),
 			}),
-			state: (previous) => ({ ...previous, detailPush }) as never,
+			state: (previous) => ({ ...previous, detailPush }),
 		});
 	};
 
 	return {
 		open: (entry) => goToStack([...stack, entry], true),
 		close: (depth) => {
-			// Only the top level can go back: the entries below it are not known to be ours, so
-			// closing several at once has to move forward to be safe.
+			// Only the top level: the entries below it are not known to be ours.
 			const current = router.state.location.state as DetailHistoryState;
 			if (current.detailPush === true && depth === stack.length - 1) {
 				router.history.back();

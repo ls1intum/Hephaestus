@@ -79,11 +79,10 @@ export const DismissedLevelSlidesOut: Story = {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
 		const [popup] = popups();
 		await userEvent.click(screen.getByRole("button", { name: "Close" }));
-		// Still mounted and still carrying its own content, now animating out. Dropping it from the
-		// tree on the URL change is what used to make a dismissed drawer vanish in one frame.
+		// Still mounted and still carrying its content, animating out. Dropping it on the URL change
+		// makes a dismissal vanish in one frame instead.
 		await expect(popup).toHaveAttribute("data-ending-style");
 		await expect(popup.textContent).toContain("practice · describe-what-and-why");
-		// ...and gone once the transition has finished.
 		await waitFor(() => expect(popups()).toHaveLength(0));
 	},
 };
@@ -165,7 +164,6 @@ export const TwoLevels: Story = {
 		const back = screen.getByRole("button", { name: "Back" });
 		await userEvent.click(back);
 		await waitFor(() => expect(args.onClose).toHaveBeenCalledWith(1));
-		// One level popped, not the whole stack.
 		await expect(await screen.findByText("area · review-ready-work")).toBeVisible();
 	},
 };
@@ -180,7 +178,6 @@ export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
 	play: async () => {
 		await expectSettledVisible(await screen.findByText("practice · describe-what-and-why"));
-		// A partial cover is unreadable on a phone, so a detail drawer takes the whole width there.
 		const [, frontmost] = popups();
 		await expect(frontmost.getBoundingClientRect().width).toBe(window.innerWidth);
 	},

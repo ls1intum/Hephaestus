@@ -44,8 +44,8 @@ export function AreaNameDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-sm">
-				{/* Keyed so the field starts from this area's name. The state lives in the child because
-				    that is what `DialogContent` unmounts on close; the dialog itself stays mounted. */}
+				{/* Reopening inside the close animation reuses the still-mounted child, so the key is
+				    what actually resets the field to this area's name. */}
 				<AreaNameForm
 					key={area?.slug ?? "new"}
 					area={area}

@@ -1,6 +1,7 @@
 "use client";
 
 import { Drawer as DrawerPrimitive } from "@base-ui/react/drawer";
+import { cva, type VariantProps } from "class-variance-authority";
 import * as React from "react";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +22,6 @@ function useDrawer() {
 	return context;
 }
 
-/**
- * Nesting is detected through React context, not the DOM, so a nested `Drawer` may sit beside
- * `DrawerContent` rather than inside it — which is what lets a stack be rendered by recursion.
- */
 function Drawer({
 	modal = true,
 	showSwipeHandle = false,
@@ -93,21 +90,37 @@ function DrawerSwipeHandle({ className, ...props }: React.ComponentProps<"div">)
 	);
 }
 
+const drawerContentVariants = cva("", {
+	variants: {
+		size: {
+			default:
+				"data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
+			/**
+			 * A panel that replaces a page, so it has to hold what that page held. Full width below
+			 * `sm`, where a partial cover is unreadable. `--peek` is far above the default: the column
+			 * a covered panel keeps on screen is the reason to stack rather than replace.
+			 */
+			detail:
+				"[--peek:2.5rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:min(44rem,92vw)] data-[swipe-axis=x]:xl:[--drawer-content-width:min(62rem,75vw)]",
+		},
+	},
+	defaultVariants: { size: "default" },
+});
+
 /**
- * The drawer panel. Width and height come from `--drawer-content-width` / `--drawer-height`, so a
- * caller resizes a drawer by setting those rather than by fighting the positioning classes.
- *
  * `dimWhenNested` is the one deliberate departure from the upstream shadcn drawer, which fades a
  * covered drawer's content to nothing. That reads correctly for a bottom sheet, where only a sliver
  * of the parent shows; a wide side panel leaves a real column of the parent on screen, and an empty
- * column is worse than a readable one. Side stacks pass `false`.
+ * column is worse than a readable one.
  */
 function DrawerContent({
 	className,
 	children,
 	dimWhenNested = true,
+	size,
 	...props
-}: DrawerPrimitive.Popup.Props & { dimWhenNested?: boolean }) {
+}: DrawerPrimitive.Popup.Props &
+	VariantProps<typeof drawerContentVariants> & { dimWhenNested?: boolean }) {
 	const { hasSnapPoints, modal, showSwipeHandle, swipeDirection } = useDrawer();
 	const swipeAxis = swipeDirection === "down" || swipeDirection === "up" ? "y" : "x";
 
@@ -133,7 +146,8 @@ function DrawerContent({
 						// Bleed — paints past the anchored edge so an overscrolled drawer shows no gap.
 						"after:pointer-events-none after:absolute after:bg-(--drawer-bleed-background,var(--color-popover)) data-[swipe-axis=x]:after:inset-y-0 data-[swipe-axis=x]:after:w-(--bleed) data-[swipe-axis=y]:after:inset-x-0 data-[swipe-axis=y]:after:h-(--bleed) data-[swipe-direction=down]:after:top-full data-[swipe-direction=left]:after:right-full data-[swipe-direction=right]:after:left-full data-[swipe-direction=up]:after:bottom-full",
 						// Sizing.
-						"[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=x]:[--drawer-content-width:75%] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh] data-[swipe-axis=x]:sm:[--drawer-content-width:24rem]",
+						"[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh]",
+						drawerContentVariants({ size }),
 						// Stack — each nested drawer steps the ones behind it back by `--stack-step`.
 						"[--bleed:3rem] [--peek:1rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]",
 						// Transitions.

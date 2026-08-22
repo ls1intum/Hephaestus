@@ -1,11 +1,7 @@
 import { z } from "zod";
 import { multiValue } from "@/lib/search-params";
 
-/**
- * One level of a detail-drawer stack, encoded in the URL as `kind:id` — so `?detail=area:code-review`
- * is a one-level stack and `?detail=area:code-review&detail=practice:describe-what` is a two-level
- * one over the same page.
- */
+/** Encoded in the URL as `kind:id`; repeated for depth, as `?detail=area:code-review&detail=practice:x`. */
 export interface DetailStackEntry<TKind extends string = string> {
 	kind: TKind;
 	id: string;
@@ -18,8 +14,7 @@ export interface DetailStackEntry<TKind extends string = string> {
 export const DETAIL_STACK_MAX_DEPTH = 4;
 
 /**
- * Validated against the kinds a route can render, so a surface never receives a level it has no
- * component for. `multiValue` dedupes: the same entry twice is never a stack, and appending is one
+ * `multiValue` is what dedupes: the same entry twice is never a stack, and appending is one
  * double-click away from producing it.
  */
 export function detailStackSchema<TKind extends string>(kinds: readonly TKind[]) {

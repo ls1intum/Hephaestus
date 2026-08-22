@@ -39,10 +39,9 @@ export interface UseUnsavedChangesOptions {
  * The latch is the subtle part: `isPending` drops before the caller navigates, so releasing on it
  * alone races the post-save navigation and asks the reader to discard work they just saved.
  *
- * Assumes a blocked navigation would unmount the form. True of a form that owns its route, false of
- * one inside a search-param overlay, where `shouldBlockFn` fires for navigations that leave the form
- * mounted — offering to discard work that then is not discarded. See the drawer rule in
- * `webapp/AGENTS.md`.
+ * Blocks every navigation, which is right only while the form owns its route. Inside a
+ * search-param overlay it would offer to discard work that then stays on screen; narrowing it needs
+ * both `routeId` and `params`, since two practices share one route.
  */
 export function useUnsavedChanges({
 	isDirty,
