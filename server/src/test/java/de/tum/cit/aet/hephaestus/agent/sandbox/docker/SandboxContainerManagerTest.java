@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -247,7 +248,7 @@ class SandboxContainerManagerTest extends BaseUnitTest {
         @Test
         void shouldListByManagedLabel() {
             when(containerOps.listContainersByLabel("hephaestus.managed", "true")).thenReturn(
-                List.of(new DockerOperations.ContainerInfo("c1", "/test", Map.of(), "running"))
+                List.of(new DockerOperations.ContainerInfo("c1", "/test", Map.of(), "running", Instant.EPOCH))
             );
 
             var containers = manager.listManagedContainers();

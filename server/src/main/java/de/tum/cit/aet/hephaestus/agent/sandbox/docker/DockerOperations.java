@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Shared value types for Docker sandbox operations.
@@ -48,7 +50,14 @@ public final class DockerOperations {
 
     public record WaitResult(int exitCode) {}
 
-    public record ContainerInfo(String id, String name, Map<String, String> labels, String state) {}
+    /** {@code createdAt} is null when the daemon reported none — an unknown age counts as young. */
+    public record ContainerInfo(
+        String id,
+        String name,
+        Map<String, String> labels,
+        String state,
+        @Nullable Instant createdAt
+    ) {}
 
     public record NetworkInfo(String id, String name) {}
 }
