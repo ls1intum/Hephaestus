@@ -19,7 +19,8 @@ Node is pinned in `.node-version` and drives the repo's own tooling; the repo is
 the per-practice precompute scripts (`server/src/main/resources/practices/precompute/`) are
 TypeScript executed directly by Bun, whose version the agent image pins in
 `docker/agents/pi/Dockerfile`. They are type-checked as one project via `tsconfig.agents.json` and
-linted and formatted via the root `biome.jsonc`. JDK 21, and Docker for the database helpers.
+linted by the root `.oxlintrc.json` and formatted by the root `biome.jsonc`. JDK 21, and Docker
+for the database helpers.
 
 ## Skills
 
@@ -53,19 +54,27 @@ scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
 ### Lint and format scopes
 
-Two TypeScript trees, and **the linter is not the same in both**:
+**oxlint lints every TypeScript tree in the repo; Biome formats and sorts imports.**
 
-| Tree | Lints | Formats | Scripts |
+| Tree | oxlint config | Formatted by | Scripts |
 |---|---|---|---|
-| the SPA (`webapp/`) | oxlint (`webapp/.oxlintrc.json`) | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| the Bun agent runtime, its specs, both precompute trees, `scripts/**` | Biome (`biome.jsonc`) | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
+| the SPA (`webapp/`) | `webapp/.oxlintrc.json` | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
+| the docs site (`docs/`) | `docs/.oxlintrc.json` | its own tooling | `docs:lint` |
+| the Bun agent runtime and specs, both precompute trees, `scripts/**`, and the repo-root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
 
-Both Biome configs run the pinned `@biomejs/biome` from the root `package.json`; `biome.jsonc` is the
-monorepo root config and `webapp/biome.jsonc` declares `"root": false`, so each tree keeps its own
-rules. Each config carries the reasoning for its own deltas — read it before switching a rule either
-way. `check:agents` also runs `typecheck:agents` and `typecheck:scripts`; `check:webapp` does **not** run
-`typecheck:webapp`, which is a separate leg. `check:webapp:fix` and `check:agents:fix` apply every
-safe fix.
+A nested config **replaces** the root's rules for the files under it rather than merging, so each
+tree states its rule set in full. `options` — including `typeAware` — is root-only and governs every
+config in the repo. Each config carries the reasoning for its own deltas; read it before switching a
+rule either way.
+
+The two Biome configs run the pinned `@biomejs/biome` from the root `package.json`, and
+`webapp/biome.jsonc` declares `"root": false`. `check:agents` also runs `typecheck:agents` and
+`typecheck:scripts`; `check:webapp` does **not** run `typecheck:webapp`, which is a separate leg.
+`check:webapp:fix` and `check:agents:fix` apply every safe fix.
+
+Type-aware rules need a project, and oxlint finds one by looking for a file named exactly
+`tsconfig.json`. The root stub exists only so the Bun trees — configured by `tsconfig.agents.json` —
+have one; without it every ambient global resolves to an error type there.
 
 The SPA's house lint rules are oxlint JS plugins in `webapp/tools/oxlint/rules/`, each with a
 `RuleTester` suite beside it — `webapp/AGENTS.md` § Linting.

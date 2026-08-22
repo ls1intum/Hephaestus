@@ -102,7 +102,7 @@ async function main(): Promise<void> {
 
 	// Validate Content-Type header
 	// GitHub returns application/octet-stream for the schema file download
-	const contentType = response.headers.get("content-type") || "";
+	const contentType = response.headers.get("content-type") ?? "";
 	const acceptableContentTypes = [
 		"text/",
 		"application/graphql",
@@ -129,7 +129,7 @@ async function main(): Promise<void> {
 	const tempFile = `${SCHEMA_FILE}.tmp`;
 
 	try {
-		writeFileSync(tempFile, content, "utf-8");
+		writeFileSync(tempFile, content, "utf8");
 
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);

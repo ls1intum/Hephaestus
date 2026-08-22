@@ -44,7 +44,7 @@ const meta = {
 			</ReactFlowProvider>
 		),
 	],
-} as Meta<typeof SynthwaveEdge>;
+} satisfies Meta<typeof SynthwaveEdge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -74,10 +74,11 @@ export const Default: Story = {
  * Comparison of Disabled (Muted Wire) vs Default (Neon Waves) vs Rarity themed states.
  */
 export const States: Story = {
-	render: () => (
+	args: createEdgeProps("disabled", 20, { isEnabled: false }),
+	render: (args) => (
 		<>
 			{/* Disabled State */}
-			<SynthwaveEdge {...createEdgeProps("disabled", 20, { isEnabled: false })} />
+			<SynthwaveEdge {...args} />
 			<text
 				x="40"
 				y="10"

@@ -29,19 +29,30 @@ const SPRING = /\$\{([A-Z0-9_]+):([^}$]*)\}/g;
 /** `${VAR:-default}` — Compose's syntax for the same idea. */
 const COMPOSE = /\$\{([A-Z0-9_]+):-([^}$]*)\}/g;
 
-const collect = (text, pattern) => new Map([...text.matchAll(pattern)].map((m) => [m[1], m[2]]));
+const collect = (text: string, pattern: RegExp): Map<string, string> => {
+	const defaults = new Map<string, string>();
+	for (const [, name, fallback] of text.matchAll(pattern)) {
+		if (name !== undefined && fallback !== undefined) defaults.set(name, fallback);
+	}
+	return defaults;
+};
+
+/** A Compose file absent from this checkout is not a disagreement, so it is skipped rather than failed. */
+const readIfPresent = async (file: string): Promise<string | undefined> => {
+	try {
+		return await readFile(join(REPO_ROOT, file), "utf8");
+	} catch {
+		return undefined;
+	}
+};
 
 const application = collect(await readFile(join(REPO_ROOT, APPLICATION_YML), "utf8"), SPRING);
 
 let failed = false;
-const forwarded = new Set();
+const forwarded = new Set<string>();
 for (const file of COMPOSE_FILES) {
-	let text;
-	try {
-		text = await readFile(join(REPO_ROOT, file), "utf8");
-	} catch {
-		continue;
-	}
+	const text = await readIfPresent(file);
+	if (text === undefined) continue;
 	for (const [name, fallback] of collect(text, COMPOSE)) {
 		forwarded.add(name);
 		const expected = application.get(name);
@@ -62,12 +73,8 @@ if (failed) {
 }
 
 for (const file of DELIBERATE_OVERRIDES) {
-	let text;
-	try {
-		text = await readFile(join(REPO_ROOT, file), "utf8");
-	} catch {
-		continue;
-	}
+	const text = await readIfPresent(file);
+	if (text === undefined) continue;
 	for (const [name, fallback] of collect(text, COMPOSE)) {
 		const expected = application.get(name);
 		if (expected !== undefined && expected !== fallback) {

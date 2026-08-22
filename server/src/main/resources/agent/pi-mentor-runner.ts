@@ -30,6 +30,7 @@ import {
 	JSONRPC_VERSION,
 	type JsonRpcId,
 	MENTOR_PROTOCOL_VERSION,
+	type MentorErrorCode,
 	type MentorMethod,
 	type MentorOutboundFrame,
 	type MentorResult,
@@ -142,6 +143,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
+ * The text of a field that arrived as parsed JSON, and "" for anything with no text of its own.
+ *
+ * <p>Every field below is read through this. An object or an array coerces to "[object Object]" or to
+ * its elements run together, and each of those is a non-empty string that would then pass a required-
+ * field check and reach an allow-list, a path join or the model as if the caller had sent text.
+ */
+function jsonText(value: unknown): string {
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+		return String(value);
+	}
+	return "";
+}
+
+/**
  * JSON-RPC 2.0 §4 restricts an id to String, Number or Null. Anything else is malformed; treating
  * it as absent means the frame is handled as a notification and draws no response, which is what
  * Java already observes today — `MentorRunnerClient` coerces a response id with `asLong()` and
@@ -162,7 +178,7 @@ function createLineSplitter(onLine: (line: string) => void): (chunk: Buffer) => 
 	const MAX_LINE_BYTES = 8 * 1024 * 1024; // 8 MiB hard cap; context JSONs are tiny but be safe
 	return (chunk: Buffer) => {
 		buffer = buffer.length === 0 ? chunk : Buffer.concat([buffer, chunk]);
-		while (true) {
+		for (;;) {
 			const nl = buffer.indexOf(0x0a);
 			if (nl === -1) {
 				if (buffer.length > MAX_LINE_BYTES) {
@@ -201,7 +217,12 @@ function sendResult(id: JsonRpcId | undefined, result: MentorResult) {
 	writeFrame({ jsonrpc: JSONRPC_VERSION, id, result });
 }
 
-function sendError(id: JsonRpcId | undefined, code: number, message: string, data?: unknown) {
+function sendError(
+	id: JsonRpcId | undefined,
+	code: MentorErrorCode,
+	message: string,
+	data?: unknown,
+) {
 	// Same rule as sendResult: only skip when id is genuinely absent (notification). `null`
 	// is a valid id and JSON-RPC §6 explicitly requires it for batch-error / parse-error
 	// responses where the server cannot determine which request id was at fault.
@@ -230,16 +251,16 @@ function sendEvent(threadId: string | null, event: MentorWireEvent) {
  * signature change fails the build rather than the container.
  */
 interface MentorAgentSession {
-	subscribe(listener: (event: AgentSessionEvent) => void): () => void;
-	prompt(text: string): Promise<void>;
-	steer(text: string): Promise<void>;
-	abort(): Promise<void>;
+	subscribe: (listener: (event: AgentSessionEvent) => void) => () => void;
+	prompt: (text: string) => Promise<void>;
+	steer: (text: string) => Promise<void>;
+	abort: () => Promise<void>;
 }
 
 interface MentorRuntime {
 	readonly session: MentorAgentSession;
-	switchSession(sessionPath: string): Promise<{ cancelled: boolean }>;
-	dispose(): Promise<void>;
+	switchSession: (sessionPath: string) => Promise<{ cancelled: boolean }>;
+	dispose: () => Promise<void>;
 }
 
 /** Structured details attached to a `fetch_context` tool result, for logs and UI rendering. */
@@ -294,18 +315,20 @@ let dispatchQueue = Promise.resolve();
 // every task is fire-and-forget and its failure is already logged below — and handing one out
 // invites an `await` that would deadlock a task queued from inside another task.
 function enqueue(fn: () => unknown): void {
-	dispatchQueue = dispatchQueue
-		.then(async () => {
-			// Pause for stdout drain before running the next task if writes are backing up.
-			// Awaiting here naturally pauses the inbound pipe (since stdin frames also queue
-			// through enqueue), which is the correct backpressure target: don't accept more
-			// Pi events than we can ship to Java.
-			if (process.stdout.writableLength > STDOUT_BACKPRESSURE_THRESHOLD_BYTES) {
-				await new Promise<void>((resolve) => process.stdout.once("drain", () => resolve()));
-			}
-			await fn();
-		})
-		.catch((e: unknown) => log("dispatch queue swallowed:", errorText(e)));
+	const previous = dispatchQueue;
+	dispatchQueue = (async () => {
+		await previous;
+		// Pause for stdout drain before running the next task if writes are backing up.
+		// Awaiting here naturally pauses the inbound pipe (since stdin frames also queue
+		// through enqueue), which is the correct backpressure target: don't accept more
+		// Pi events than we can ship to Java.
+		if (process.stdout.writableLength > STDOUT_BACKPRESSURE_THRESHOLD_BYTES) {
+			await new Promise<void>((resolve) => {
+				process.stdout.once("drain", () => resolve());
+			});
+		}
+		await fn();
+	})().catch((e: unknown) => log("dispatch queue swallowed:", errorText(e)));
 }
 
 // System prompt is optional in v1 — the Java caller may inject it later. If the resource exists we
@@ -438,9 +461,7 @@ function defineFetchContextTool(sdk: PiSdk) {
 		label: "Fetch Context",
 		description:
 			"Fetch a Hephaestus mentor context JSON resource from the server. Use the exact canonical path, " +
-			"for example inputs/context/recent_authored_work.json. Allowed paths: " +
-			[...FETCH_CONTEXT_ALLOWED].join(", ") +
-			".",
+			`for example inputs/context/recent_authored_work.json. Allowed paths: ${[...FETCH_CONTEXT_ALLOWED].join(", ")}.`,
 		parameters: {
 			type: "object",
 			additionalProperties: false,
@@ -452,7 +473,7 @@ function defineFetchContextTool(sdk: PiSdk) {
 		execute: async (_toolCallId, params): Promise<FetchContextToolResult> => {
 			// NOT `path` — that's the imported `node:path` module; shadowing it here is a
 			// future footgun if anyone adds `path.join(...)`.
-			const contextKey = String(params?.path ?? "").trim();
+			const contextKey = jsonText(params.path).trim();
 			// Pi treats THROWN errors as the tool's failure signal — a returned `isError:true`
 			// is ignored by the runtime, so throw to flag the call as failed.
 			if (!FETCH_CONTEXT_ALLOWED.has(contextKey)) {
@@ -506,24 +527,26 @@ function defineLinkObservationTool(sdk: PiSdk) {
 				observationId: { type: "string", minLength: 1 },
 			},
 		},
-		execute: async (_toolCallId, params): Promise<AgentToolResult<{ observationId: string }>> => {
-			const observationId = String(params?.observationId ?? "").trim();
+		// Nothing here waits on anything. Pi reads a rejection as the tool's failure, which is what a
+		// missing observationId owes the model.
+		execute: (_toolCallId, params): Promise<AgentToolResult<{ observationId: string }>> => {
+			const observationId = jsonText(params.observationId).trim();
 			if (!observationId) {
-				throw new Error("link_observation: observationId is required");
+				return Promise.reject(new Error("link_observation: observationId is required"));
 			}
 			// Emit a synthetic event the Java translator maps to a `data-observation` UI chunk.
 			if (activeThreadId) {
 				sendEvent(activeThreadId, { type: "link_observation", observationId });
 			}
-			return {
+			return Promise.resolve({
 				content: [{ type: "text", text: `Linked observation ${observationId}` }],
 				details: { observationId },
-			};
+			});
 		},
 	});
 }
 
-async function handleHello(id: JsonRpcId | undefined /*, params */) {
+function handleHello(id: JsonRpcId | undefined /*, params */) {
 	// Java validates `protocolVersion` AND `protocolOnly` (MentorChatService#verifyProtocol);
 	// shipping the latter on hello lets Java fail-closed if MENTOR_RUNNER_PROTOCOL_ONLY=1
 	// leaks into a real deploy, instead of every user receiving stubbed answers.
@@ -545,12 +568,13 @@ async function handleHello(id: JsonRpcId | undefined /*, params */) {
 type MentorParams = Record<string, unknown>;
 
 /**
- * One dispatch entry. Handlers that ignore `params` simply declare fewer parameters.
+ * One dispatch entry. Handlers that ignore `params` simply declare fewer parameters, and the ones
+ * that settle a request without waiting on the runtime return nothing at all.
  *
  * `id` is `undefined` for a JSON-RPC notification (§4: no response may be sent) and `null` for a
  * request whose id could not be determined (§6), which still gets one.
  */
-type MethodHandler = (id: JsonRpcId | undefined, params: MentorParams) => Promise<void>;
+type MethodHandler = (id: JsonRpcId | undefined, params: MentorParams) => void | Promise<void>;
 
 // Canonical lowercase UUID, the only shape Java ever sends. Validating defensively at the
 // runner boundary means a future caller that bypasses Java (dev bridge, mis-routed message)
@@ -563,9 +587,7 @@ const THREAD_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9
 // threat model THREAD_ID_PATTERN guards) must be normalised identically on prompt/steer/abort/
 // close or `threads.get()` misses and returns a spurious THREAD_NOT_OPEN.
 function normalizeThreadId(params: MentorParams) {
-	return String(params?.threadId ?? "")
-		.trim()
-		.toLowerCase();
+	return jsonText(params.threadId).trim().toLowerCase();
 }
 
 async function handleOpenThread(id: JsonRpcId | undefined, params: MentorParams) {
@@ -642,11 +664,11 @@ async function bindThread(state: ThreadState): Promise<MentorRuntime> {
 function forwardEvent(state: ThreadState, event: AgentSessionEvent) {
 	// Emit session_persisted BEFORE agent_end so TranslatorState captures the bytes before
 	// finalise runs. Watchdog-synthesised agent_end frames bypass this path.
-	if (event?.type === "agent_end") {
+	if (event.type === "agent_end") {
 		emitSessionPersisted(state);
 	}
 	sendEvent(state.threadId, event);
-	if (event?.type === "agent_end") {
+	if (event.type === "agent_end") {
 		clearTurnWatchdog(state);
 		state.inFlight = false;
 		maybePostTurnGc();
@@ -696,7 +718,7 @@ function maybePostTurnGc() {
 
 async function handlePrompt(id: JsonRpcId | undefined, params: MentorParams) {
 	const threadId = normalizeThreadId(params);
-	const text = String(params?.text ?? "");
+	const text = jsonText(params.text);
 	if (!threadId || !text) {
 		return sendError(id, ERR.INVALID_REQUEST, "threadId and text are required");
 	}
@@ -743,7 +765,7 @@ async function handlePrompt(id: JsonRpcId | undefined, params: MentorParams) {
 
 async function handleSteer(id: JsonRpcId | undefined, params: MentorParams) {
 	const threadId = normalizeThreadId(params);
-	const text = String(params?.text ?? "");
+	const text = jsonText(params.text);
 	if (!threadId || !text) {
 		return sendError(id, ERR.INVALID_REQUEST, "threadId and text are required");
 	}
@@ -782,7 +804,7 @@ async function handleAbort(id: JsonRpcId | undefined, params: MentorParams) {
 	}
 }
 
-async function handleCloseThread(id: JsonRpcId | undefined, params: MentorParams) {
+function handleCloseThread(id: JsonRpcId | undefined, params: MentorParams) {
 	const threadId = normalizeThreadId(params);
 	if (!threadId) {
 		return sendError(id, ERR.INVALID_REQUEST, "threadId is required");
@@ -871,7 +893,7 @@ class FetchContextServerError extends Error {
 
 // fetch_context responses (Java → runner)
 function handleFetchContextResponse(frame: Record<string, unknown>) {
-	const callbackId = String(frame?.id ?? "");
+	const callbackId = jsonText(frame.id);
 	if (!callbackId) {
 		log("fetch_context response missing id; dropping");
 		return;
@@ -946,7 +968,11 @@ async function runWatchdogRebind(state: ThreadState) {
 	// The real `agent_end` raced ahead of us through the queue and cleared `inFlight`. Without
 	// this guard we'd emit a SECOND synthetic `agent_end`, and Java's translator would Finish
 	// the assistant message twice (or worse, finalise on a turn that already finalised).
-	if (!state.inFlight) {
+	//
+	// Sampled here rather than read once for the whole function: everything below can clear the flag
+	// while this awaits, which is why the finally block asks again.
+	const turnInFlight = state.inFlight;
+	if (!turnInFlight) {
 		log(`watchdog rebind skipped: thread=${state.threadId} turn already completed`);
 		return;
 	}
@@ -1153,7 +1179,9 @@ function createStubRuntime(): MentorRuntime {
 			isStreaming = true;
 			const delay = Number(process.env.MENTOR_RUNNER_STUB_DELAY_MS) || 5;
 			emit({ type: "agent_start" });
-			await new Promise((r) => setTimeout(r, delay));
+			await new Promise((resolve) => {
+				setTimeout(resolve, delay);
+			});
 			const delta = `stub: ${text}`;
 			emit({
 				type: "message_update",
@@ -1165,26 +1193,31 @@ function createStubRuntime(): MentorRuntime {
 					partial: stubAssistantMessage(delta),
 				},
 			});
-			await new Promise((r) => setTimeout(r, delay));
+			await new Promise((resolve) => {
+				setTimeout(resolve, delay);
+			});
 			emit({ type: "agent_end", messages: [] });
 			isStreaming = false;
 		},
-		async steer(_text) {
-			/* no-op */
+		steer() {
+			return Promise.resolve();
 		},
-		async abort() {
+		abort() {
 			if (isStreaming) {
 				emit({ type: "agent_end", messages: [] });
 				isStreaming = false;
 			}
+			return Promise.resolve();
 		},
 	};
 	return {
 		session: stubSession,
-		async switchSession(_sessionPath) {
-			return { cancelled: false };
+		switchSession() {
+			return Promise.resolve({ cancelled: false });
 		},
-		async dispose() {},
+		dispose() {
+			return Promise.resolve();
+		},
 	};
 }
 

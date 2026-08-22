@@ -274,7 +274,7 @@ function collectMavenDeps(df: DiffFile, side: "added" | "removed"): Map<string, 
 	return out;
 }
 
-export default async function (
+export default function changesDependenciesDeliberately(
 	repoPath: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,
@@ -295,7 +295,7 @@ export default async function (
 	const repoLockfilesPresent = new Set<string>();
 	// findFiles needs an extension; scan the basenames we care about via their extensions.
 	for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {
-		for (const f of await findFiles(repoPath, ext)) {
+		for (const f of findFiles(repoPath, ext)) {
 			const base = basenameLower(f);
 			if (allLockfileNames.has(base)) repoLockfilesPresent.add(base);
 		}

@@ -14,15 +14,22 @@
  * the dependency without the schema URLs now fails here instead of in someone's diff.
  */
 import { readFileSync } from "node:fs";
+import { asRecord, asString, isRecord, parseJson } from "./lib/json.ts";
 
 const PIN_PATH = "package.json";
+const INSTALLED_PATH = "node_modules/@biomejs/biome/package.json";
 const CONFIGS = ["biome.jsonc", "webapp/biome.jsonc"];
 const SCHEMA_RE = /"\$schema"\s*:\s*"https:\/\/biomejs\.dev\/schemas\/([^/]+)\/schema\.json"/;
 
-const pinned = JSON.parse(readFileSync(PIN_PATH, "utf8")).devDependencies?.["@biomejs/biome"];
-const problems = [];
+const devDependencies = asRecord(
+	parseJson(readFileSync(PIN_PATH, "utf8")),
+	PIN_PATH,
+).devDependencies;
+const declared = isRecord(devDependencies) ? devDependencies["@biomejs/biome"] : undefined;
+const pinned = typeof declared === "string" ? declared : "";
+const problems: string[] = [];
 
-if (!pinned) {
+if (pinned === "") {
 	problems.push(`${PIN_PATH}: @biomejs/biome is not a devDependency.`);
 } else if (!/^\d+\.\d+\.\d+$/.test(pinned)) {
 	problems.push(
@@ -42,13 +49,20 @@ for (const config of CONFIGS) {
 // Read what pnpm actually put on disk rather than shelling out, so the check does not depend on
 // node_modules/.bin being on PATH. An install that predates a pin bump formats to the old
 // release's rules — drift the $schema comparison alone cannot see.
-let installed;
+let installedManifest: string | undefined;
 try {
-	installed = JSON.parse(readFileSync("node_modules/@biomejs/biome/package.json", "utf8")).version;
+	installedManifest = readFileSync(INSTALLED_PATH, "utf8");
 } catch {
 	problems.push("@biomejs/biome is not installed — run `pnpm install` before this check.");
 }
-if (installed && installed !== pinned) {
+const installed =
+	installedManifest === undefined
+		? undefined
+		: asString(
+				asRecord(parseJson(installedManifest), INSTALLED_PATH).version,
+				`${INSTALLED_PATH} version`,
+			);
+if (installed !== undefined && installed !== pinned) {
 	problems.push(
 		`installed biome is ${installed} but package.json pins ${pinned}; run \`pnpm install\`.`,
 	);

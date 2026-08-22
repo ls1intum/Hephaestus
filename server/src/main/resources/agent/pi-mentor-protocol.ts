@@ -135,7 +135,8 @@ export interface MentorResultPayloads {
 export type MentorResult = MentorResultPayloads[MentorMethod];
 
 export interface JsonRpcError {
-	code: MentorErrorCode | number;
+	/** One of {@link MENTOR_ERROR_CODES}: a code Java has no mapping for is a code it cannot act on. */
+	code: MentorErrorCode;
 	message: string;
 	/** Neither side populates this today; JSON-RPC 2.0 §5.1 allows it and Java carries it through. */
 	data?: unknown;

@@ -19,7 +19,8 @@ const baseRef =
 	process.env.CONTRACT_BASE_REF ??
 	(process.env.GITHUB_BASE_REF ? `origin/${process.env.GITHUB_BASE_REF}` : "origin/main");
 
-const git = (...args) => execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", env });
+const git = (...args: string[]): string =>
+	execFileSync("git", args, { cwd: repoRoot, encoding: "utf8", env });
 
 const base = git("merge-base", "HEAD", baseRef).trim();
 

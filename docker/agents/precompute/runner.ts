@@ -42,11 +42,11 @@ if (!values.repo) {
 
 const globalStart = Date.now();
 const repoPath = values.repo;
-const outputDir = values.output ?? DEFAULT_OUTPUT_DIR;
+const outputDir = values.output;
 // A non-numeric or non-positive --timeout would make every race timer fire immediately and time out
 // every practice on the spot, so an unusable value falls back to the default instead of silently
 // disabling precompute.
-const requestedTimeoutMs = Number.parseInt(values.timeout ?? "", 10);
+const requestedTimeoutMs = Number.parseInt(values.timeout, 10);
 const timeoutIsUsable = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0;
 if (!timeoutIsUsable) {
 	console.error(`Ignoring unusable --timeout ${values.timeout}; using ${DEFAULT_TIMEOUT_MS}ms`);
@@ -66,7 +66,7 @@ if (values.diff) {
 		diffFiles = parseDiff(diffContent);
 		console.error(`Parsed diff: ${diffFiles.size} files`);
 	} catch (e) {
-		console.error(`Could not parse diff: ${e}`);
+		console.error(`Could not parse diff: ${String(e)}`);
 	}
 }
 
@@ -81,7 +81,7 @@ if (values.metadata) {
 			console.error(`Metadata ${values.metadata} is not a JSON object; scripts will see {}`);
 		}
 	} catch (e) {
-		console.error(`Could not load metadata: ${e}`);
+		console.error(`Could not load metadata: ${String(e)}`);
 	}
 }
 
@@ -122,6 +122,25 @@ function messageOf(error: unknown): string {
 }
 
 /**
+ * Cap how long one practice script may run. The timer is cleared once the race settles: Bun keeps the
+ * process alive until every pending timer has fired, so an uncleared one would hold the whole runner
+ * open for the remainder of the timeout after the last practice had already produced its result.
+ */
+async function withTimeout<T>(work: T | Promise<T>): Promise<T> {
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	try {
+		return await Promise.race([
+			work,
+			new Promise<never>((_, reject) => {
+				timer = setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
+}
+
+/**
  * Validate that a script return value has the expected PracticeFindings shape.
  * Throws on invalid shape so the caller can catch and produce an error result.
  */
@@ -146,12 +165,9 @@ const results = await Promise.allSettled(
 			if (!isPracticeModule(mod)) {
 				throw new Error(`Script ${slug} must export a default function`);
 			}
-			const rawResult: unknown = await Promise.race([
+			const rawResult: unknown = await withTimeout(
 				mod.default(repoPath, diffFiles, metadata, contextDir),
-				new Promise<never>((_, reject) =>
-					setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs),
-				),
-			]);
+			);
 			const result = validateResult(rawResult, slug);
 			const elapsed = Date.now() - start;
 			console.error(`  ok ${slug}: ${result.hints.length} hints (${elapsed}ms)`);

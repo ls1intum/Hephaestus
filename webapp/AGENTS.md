@@ -59,14 +59,16 @@ carries the reason beside it — read that before switching one back on.
 - **Everything about the config is validated up front, and a failure is a hard error, not a silent
   skip.** oxlint refuses to start when `jsPlugins` names a module it cannot load, or when `rules` —
   in the root or in an override — names a rule no loaded plugin defines. That is what makes the house
-  rules impossible to drop silently (oxc-project/oxc#25203), so keep them named in `rules`.
+  rules impossible to drop silently (oxc-project/oxc#25203), so keep every one of them named — in
+  `rules`, or in the `overrides` entry that scopes it to the files it is about.
 - **Re-derive an off rule's findings with `pnpm exec oxlint -D <rule>`** before trusting or changing
   the reason written beside it.
 - **House rules live in `tools/oxlint/`**, in TypeScript, so `pnpm run typecheck` covers them, with a
   `RuleTester` suite beside each (`oxlint/plugins-dev`).
 - **These have no linter behind them and are on review**: an inline `<svg>` needs a `<title>`, an
-  `aria-label` or `aria-hidden`; ARIA roles that duplicate an element's implicit role; `autoFocus` on a
-  component rather than a DOM element; non-ASCII filenames.
+  `aria-label` or `aria-hidden`; `autoFocus` anywhere but a field in an overlay the user just opened —
+  `jsx-a11y/no-autofocus` runs with `ignoreNonDOM: true`, and every use here is spelled on a component
+  (`<Input autoFocus/>`), which that option makes invisible; non-ASCII filenames.
 
 ## Which admin console a component belongs to
 
@@ -96,7 +98,7 @@ The prefix answers it, and it also shows up in imports and in the Storybook side
 - **Components** (`src/components/**`): presentational, with no exception for a "cohesive section".
   They take their data as props and never import the query layer.
 
-`node scripts/check-presentational-components.mjs` enforces it, and `pnpm run check` runs it. Two
+`node scripts/check-presentational-components.ts` enforces it, and `pnpm run check` runs it. Two
 halves, because they fail differently:
 
 - **A component under `src/components/**` may not import `@/api/@tanstack/react-query.gen`,

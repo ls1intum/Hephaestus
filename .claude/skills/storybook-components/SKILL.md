@@ -39,10 +39,10 @@ write a guideline that repeats one.
   `await expect(getBy…)` is `vitest/valid-expect`, which catches it for every subject.
 - `hephaestus/no-within-canvas-element` — `within(canvasElement)` when the play function was handed
   `canvas`.
-- `scripts/check-story-prose.mjs` (`check:stories`) — `<p>` in a comment Storybook publishes.
-- `scripts/check-presentational-components.mjs` (`check:components`) — a component importing the
+- `scripts/check-story-prose.ts` (`check:stories`) — `<p>` in a comment Storybook publishes.
+- `scripts/check-presentational-components.ts` (`check:components`) — a component importing the
   query layer, and a story installing MSW handlers. Its allowlist is shrink-only.
-- `.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide, with zero per-story
+- `.storybook/preview.ts` sets `a11y: { test: "error" }` project-wide, with zero per-story
   overrides across the whole tree. Adding one is a finding, not a fix.
 
 ## Not here

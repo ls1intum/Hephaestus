@@ -27,6 +27,16 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
+import {
+	asArray,
+	asRecord,
+	asString,
+	asStringArray,
+	at,
+	isRecord,
+	parseJson,
+	readJsonFile,
+} from "./lib/json.ts";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const contractsRoot = path.join(root, "server/src/main/resources/contracts/artifact-source");
@@ -35,14 +45,36 @@ const contractVersions = (await readdir(contractsRoot, { withFileTypes: true }))
 	.map((entry) => entry.name)
 	.sort();
 if (contractVersions.length === 0) throw new Error("No artifact-source contract versions found");
-const readJson = async (file) => JSON.parse(await readFile(file, "utf8"));
-const schemaId = (version, file) =>
+const schemaId = (version: string, file: string): string =>
 	`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/${file}`;
 
-const requireDescription = (value, label) => {
-	if (typeof value?.description !== "string" || value.description.trim() === "") {
+/** The one shape this file reads out of a catalog; Ajv checks the rest against the published schema. */
+interface CatalogSource {
+	readonly kind: string;
+	readonly artifactKinds: readonly string[];
+}
+
+const toCatalogSources = (value: unknown, label: string): readonly CatalogSource[] =>
+	asArray(asRecord(value, label).sources, `${label} sources`).map((source, index) => {
+		const entry = `${label} sources[${index}]`;
+		const record = asRecord(source, entry);
+		return {
+			kind: asString(record.kind, `${entry}.kind`),
+			artifactKinds: asStringArray(record.artifactKinds, `${entry}.artifactKinds`),
+		};
+	});
+
+const requireDescription = (value: unknown, label: string): void => {
+	const description = isRecord(value) ? value.description : undefined;
+	if (typeof description !== "string" || description.trim() === "") {
 		throw new Error(`${label} needs a description`);
 	}
+};
+
+/** A schema's `properties`, or nothing when it declares none. */
+const propertyEntries = (value: unknown): [string, unknown][] => {
+	const properties = isRecord(value) ? value.properties : undefined;
+	return isRecord(properties) ? Object.entries(properties) : [];
 };
 
 /**
@@ -52,17 +84,19 @@ const requireDescription = (value, label) => {
  * field still means what it says. An undocumented property is the first step of the rot this whole
  * contract exists to prevent.
  */
-const validateSchemaDocumentation = (schema, label) => {
-	if (typeof schema.title !== "string" || schema.title.trim() === "") {
+const validateSchemaDocumentation = (schema: Record<string, unknown>, label: string): void => {
+	const title = schema.title;
+	if (typeof title !== "string" || title.trim() === "") {
 		throw new Error(`${label} needs a title`);
 	}
 	requireDescription(schema, label);
-	for (const [name, property] of Object.entries(schema.properties ?? {})) {
+	for (const [name, property] of propertyEntries(schema)) {
 		requireDescription(property, `${label} property '${name}'`);
 	}
-	for (const [name, definition] of Object.entries(schema.$defs ?? {})) {
+	const defs = schema.$defs;
+	for (const [name, definition] of isRecord(defs) ? Object.entries(defs) : []) {
 		requireDescription(definition, `${label} definition '${name}'`);
-		for (const [propertyName, property] of Object.entries(definition.properties ?? {})) {
+		for (const [propertyName, property] of propertyEntries(definition)) {
 			requireDescription(property, `${label} definition '${name}.${propertyName}'`);
 		}
 	}
@@ -71,12 +105,16 @@ const validateSchemaDocumentation = (schema, label) => {
 const ajv = new Ajv2020({ allErrors: true, strict: true });
 addFormats(ajv);
 
+const readSchema = async (file: string, label: string): Promise<Record<string, unknown>> =>
+	asRecord(await readJsonFile(file), label);
+
 for (const version of contractVersions) {
 	const versionDir = path.join(contractsRoot, version);
 	for (const file of await readdir(versionDir)) {
 		if (file.endsWith(".schema.json")) {
-			const schema = await readJson(path.join(versionDir, file));
-			validateSchemaDocumentation(schema, `${version}/${file}`);
+			const label = `${version}/${file}`;
+			const schema = await readSchema(path.join(versionDir, file), label);
+			validateSchemaDocumentation(schema, label);
 			ajv.addSchema(schema);
 		}
 	}
@@ -86,29 +124,32 @@ const defaultCatalogSchemaPath = path.join(
 	root,
 	"server/src/main/resources/practices/default-catalog.schema.json",
 );
-const defaultCatalogSchema = await readJson(defaultCatalogSchemaPath);
+const defaultCatalogSchema = await readSchema(
+	defaultCatalogSchemaPath,
+	"practices/default-catalog.schema.json",
+);
 validateSchemaDocumentation(defaultCatalogSchema, "practices/default-catalog.schema.json");
 ajv.addSchema(defaultCatalogSchema);
 
-const validate = (id, value, label) => {
+const validate = (id: string, value: unknown, label: string): void => {
 	if (!ajv.validate(id, value)) {
 		throw new Error(`${label} violates ${id}: ${ajv.errorsText(ajv.errors)}`);
 	}
 };
 
-const rejectDuplicateProperty = (values, property, label) => {
-	const seen = new Set();
+const rejectDuplicates = (values: readonly string[], label: string): void => {
+	const seen = new Set<string>();
 	for (const value of values) {
-		if (seen.has(value[property])) throw new Error(`${label} duplicates '${value[property]}'`);
-		seen.add(value[property]);
+		if (seen.has(value)) throw new Error(`${label} duplicates '${value}'`);
+		seen.add(value);
 	}
 };
 
-const expectRejection = (id, value, label) => {
-	if (ajv.validate(id, value)) throw new Error(`${label}`);
+const expectRejection = (id: string, value: unknown, label: string): void => {
+	if (ajv.validate(id, value)) throw new Error(label);
 };
 
-const sameSet = (actual, expected) => {
+const sameSet = (actual: readonly string[], expected: readonly string[]): boolean => {
 	const left = [...new Set(actual)].sort();
 	const right = [...new Set(expected)].sort();
 	return left.length === right.length && left.every((value, index) => value === right[index]);
@@ -121,81 +162,96 @@ const sameSet = (actual, expected) => {
  * is a source the runtime can capture and the manifest schema rejects, which surfaces as a failed run
  * long after the commit that caused it.
  */
-const validateSchemasTrackTheCatalog = async (version, catalog) => {
-	const sourceKinds = catalog.sources.map((source) => source.kind);
-	const artifactKinds = [...new Set(catalog.sources.flatMap((source) => source.artifactKinds))];
-	const sourcesFor = (artifactKind) =>
-		catalog.sources
+const validateSchemasTrackTheCatalog = async (
+	version: string,
+	sources: readonly CatalogSource[],
+	digest: string,
+): Promise<void> => {
+	const sourceKinds = sources.map((source) => source.kind);
+	const artifactKinds = [...new Set(sources.flatMap((source) => source.artifactKinds))];
+	const sourcesFor = (artifactKind: string): string[] =>
+		sources
 			.filter((source) => source.artifactKinds.includes(artifactKind))
 			.map((source) => source.kind);
 
-	const catalogSchema = await readJson(
+	const catalogSchemaLabel = `${version}/artifact-source-catalog.schema.json`;
+	const catalogSchema = await readSchema(
 		path.join(contractsRoot, version, "artifact-source-catalog.schema.json"),
+		catalogSchemaLabel,
 	);
 	// A kind the schema lets a source claim but no source supplies is a kind a practice can be authored
 	// against and no review can ever read evidence for.
-	const declarable = catalogSchema.$defs.source.properties.artifactKinds.items.enum;
+	const declarablePath = ["$defs", "source", "properties", "artifactKinds", "items", "enum"];
+	const declarable = asStringArray(
+		at(catalogSchema, declarablePath, catalogSchemaLabel),
+		`${catalogSchemaLabel} ${declarablePath.join(".")}`,
+	);
 	if (!sameSet(declarable, artifactKinds)) {
 		throw new Error(
 			`${version} catalog schema allows artifact kinds no source supplies: ${declarable.filter((kind) => !artifactKinds.includes(kind)).join(", ") || "(none)"}`,
 		);
 	}
 
-	for (const [file, artifactKindPath] of [
-		["artifact-source-manifest.schema.json", (schema) => schema.properties.artifactKind.enum],
-		[
-			"automated-review-readiness-report.schema.json",
-			(schema) => schema.properties.artifactKind.enum,
-		],
+	// Both records name the artifact kind they describe, out of the same list the catalog supplies.
+	for (const file of [
+		"artifact-source-manifest.schema.json",
+		"automated-review-readiness-report.schema.json",
 	]) {
-		const schema = await readJson(path.join(contractsRoot, version, file));
-		if (!sameSet(artifactKindPath(schema), artifactKinds)) {
-			throw new Error(`${version}/${file} does not list exactly the catalog's artifact kinds`);
+		const label = `${version}/${file}`;
+		const schema = await readSchema(path.join(contractsRoot, version, file), label);
+		const listed = asStringArray(
+			at(schema, ["properties", "artifactKind", "enum"], label),
+			`${label} properties.artifactKind.enum`,
+		);
+		if (!sameSet(listed, artifactKinds)) {
+			throw new Error(`${label} does not list exactly the catalog's artifact kinds`);
 		}
 	}
 
 	// Checked through Ajv rather than by walking the schema, so a restructured conditional that still
 	// enforces the same allow-list keeps passing and one that quietly stops enforcing it does not.
-	const digest = catalogDigests.get(version);
 	const manifestId = schemaId(version, "artifact-source-manifest.schema.json");
 	const readinessId = schemaId(version, "automated-review-readiness-report.schema.json");
 	const capturedAt = "2026-08-03T00:00:00Z";
 	const absent = { availability: "NOT_COLLECTED", reasonCode: "GOVERNANCE_NOT_EFFECTIVE" };
-	const manifestOf = (artifactKind, kinds) => ({
+	const captureOf = (kind: string) => ({ kind, state: absent, artifacts: [] });
+	const manifestOf = (artifactKind: string, kinds: readonly string[]) => ({
 		contractVersion: version,
 		catalogDigest: digest,
 		artifactKind,
 		capturedAt,
-		sources: kinds.map((kind) => ({ kind, state: absent, artifacts: [] })),
+		sources: kinds.map(captureOf),
 	});
-	const readinessOf = (artifactKind, kind) => ({
+	const sourceCheckOf = (kind: string) => ({
+		sourceKind: kind,
+		sourceContractVersion: version,
+		checkedAt: capturedAt,
+		temporalAnchor: capturedAt,
+		meetsRequirements: true,
+		reasonCodes: [],
+	});
+	const decisionOf = (kind: string) => ({
+		practiceSlug: "example",
+		decidedAt: capturedAt,
+		ready: true,
+		reasonCodes: [],
+		sourceChecks: [sourceCheckOf(kind)],
+	});
+	const readinessOf = (artifactKind: string, kind: string) => ({
 		contractVersion: version,
 		catalogDigest: digest,
 		artifactKind,
 		manifestCapturedAt: capturedAt,
 		decidedAt: capturedAt,
-		decisions: [
-			{
-				practiceSlug: "example",
-				decidedAt: capturedAt,
-				ready: true,
-				reasonCodes: [],
-				sourceChecks: [
-					{
-						sourceKind: kind,
-						sourceContractVersion: version,
-						checkedAt: capturedAt,
-						temporalAnchor: capturedAt,
-						meetsRequirements: true,
-						reasonCodes: [],
-					},
-				],
-			},
-		],
+		decisions: [decisionOf(kind)],
 	});
 
 	for (const artifactKind of artifactKinds) {
-		const applicable = sourcesFor(artifactKind);
+		const [required, ...rest] = sourcesFor(artifactKind);
+		if (required === undefined) {
+			throw new Error(`${version} catalog supplies no source for ${artifactKind}`);
+		}
+		const applicable = [required, ...rest];
 		validate(
 			manifestId,
 			manifestOf(artifactKind, applicable),
@@ -205,15 +261,15 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		// collect. Dropping one is how "we chose not to look" becomes indistinguishable from silence.
 		expectRejection(
 			manifestId,
-			manifestOf(artifactKind, applicable.slice(1)),
-			`${version}/artifact-source-manifest.schema.json accepted a ${artifactKind} manifest missing '${applicable[0]}'`,
+			manifestOf(artifactKind, rest),
+			`${version}/artifact-source-manifest.schema.json accepted a ${artifactKind} manifest missing '${required}'`,
 		);
 		for (const kind of sourceKinds) {
 			const applies = applicable.includes(kind);
 			if (!applies) {
 				expectRejection(
 					manifestId,
-					manifestOf(artifactKind, [kind, ...applicable.slice(1)]),
+					manifestOf(artifactKind, [kind, ...rest]),
 					`${version}/artifact-source-manifest.schema.json accepted '${kind}' for ${artifactKind}`,
 				);
 			}
@@ -233,7 +289,13 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 	// The rejection paths that are not about the allow-list, exercised against the same fixtures.
 	const pullRequestKind =
 		artifactKinds.find((kind) => sourcesFor(kind).length > 1) ?? artifactKinds[0];
+	if (pullRequestKind === undefined)
+		throw new Error(`${version} catalog supplies no artifact kind`);
 	const applicable = sourcesFor(pullRequestKind);
+	const [firstKind] = applicable;
+	if (firstKind === undefined) {
+		throw new Error(`${version} catalog supplies no source for ${pullRequestKind}`);
+	}
 	const manifest = manifestOf(pullRequestKind, applicable);
 	const available = {
 		availability: "AVAILABLE",
@@ -247,16 +309,16 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		sha256: "b".repeat(64),
 		bytes: 1,
 	};
-	const withFirstSource = (state, artifacts) => ({
+	const withFirstSource = (state: object, artifacts: object[]) => ({
 		...manifest,
-		sources: [{ kind: applicable[0], state, artifacts }, ...manifest.sources.slice(1)],
+		sources: [{ kind: firstKind, state, artifacts }, ...manifest.sources.slice(1)],
 	});
 	validate(
 		manifestId,
 		withFirstSource(available, [artifact]),
 		`${version} available-source manifest`,
 	);
-	for (const [label, invalid] of [
+	const invalidManifests: readonly (readonly [string, unknown])[] = [
 		["an empty source list", { ...manifest, sources: [] }],
 		[
 			"an unknown source kind",
@@ -264,7 +326,7 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		],
 		[
 			"a duplicate source capture",
-			{ ...manifest, sources: [...manifest.sources, { ...manifest.sources[0] }] },
+			{ ...manifest, sources: [...manifest.sources, captureOf(firstKind)] },
 		],
 		["a wrong catalog digest", { ...manifest, catalogDigest: "a".repeat(64) }],
 		["an absent source carrying artifacts", withFirstSource(absent, [artifact])],
@@ -273,7 +335,8 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 			"a non-canonical artifact path",
 			withFirstSource(available, [{ ...artifact, path: "./context.json" }]),
 		],
-	]) {
+	];
+	for (const [label, invalid] of invalidManifests) {
 		expectRejection(
 			manifestId,
 			invalid,
@@ -281,10 +344,10 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		);
 	}
 
-	const readiness = readinessOf(pullRequestKind, applicable[0]);
-	const decision = readiness.decisions[0];
-	const check = decision.sourceChecks[0];
-	const withDecision = (overrides) => ({
+	const readiness = readinessOf(pullRequestKind, firstKind);
+	const decision = decisionOf(firstKind);
+	const check = sourceCheckOf(firstKind);
+	const withDecision = (overrides: Record<string, unknown>) => ({
 		...readiness,
 		decisions: [{ ...decision, ...overrides }],
 	});
@@ -296,9 +359,9 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		withDecision({ ready: false, reasonCodes: ["NO_AUTOMATED_REVIEW"], sourceChecks: [] }),
 		`${version} skipped-practice readiness`,
 	);
-	for (const [label, overrides] of [
+	const invalidDecisions: readonly (readonly [string, Record<string, unknown>])[] = [
 		["a ready decision with no source check", { sourceChecks: [] }],
-		["a duplicate source check", { sourceChecks: [check, { ...check }] }],
+		["a duplicate source check", { sourceChecks: [check, sourceCheckOf(firstKind)] }],
 		[
 			"a ready decision over a failed source check",
 			{
@@ -316,7 +379,8 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 			"a passing source check carrying a reason",
 			{ sourceChecks: [{ ...check, reasonCodes: ["SOURCE_INCOMPLETE"] }] },
 		],
-	]) {
+	];
+	for (const [label, overrides] of invalidDecisions) {
 		expectRejection(
 			readinessId,
 			withDecision(overrides),
@@ -330,7 +394,7 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
  * on disk exercises it. These fixtures are what keeps it honest; `PracticeAutomatedReviewPolicySchemaTest`
  * is what keeps it in step with the record it describes.
  */
-const validatePolicySchema = (version) => {
+const validatePolicySchema = (version: string): void => {
 	const id = schemaId(version, "practice-automated-review-policy.schema.json");
 	const reviewed = {
 		sourceContractVersion: version,
@@ -372,7 +436,7 @@ const validatePolicySchema = (version) => {
 		},
 		`${version} human-only policy`,
 	);
-	for (const [label, invalid] of [
+	const invalid: readonly (readonly [string, unknown])[] = [
 		[
 			"a review mode with no sufficiency verdict",
 			{ ...reviewed, automatedReview: { mode: "LANGUAGE_MODEL", evidenceSufficiency: "NONE" } },
@@ -412,21 +476,20 @@ const validatePolicySchema = (version) => {
 			{ ...reviewed, needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }] },
 		],
 		["a limitation with no code", { ...reviewed, knownLimitations: [{ description: "…" }] }],
-	]) {
+	];
+	for (const [label, value] of invalid) {
 		expectRejection(
 			id,
-			invalid,
+			value,
 			`${version}/practice-automated-review-policy.schema.json accepted ${label}`,
 		);
 	}
 };
 
-const catalogDigests = new Map();
-
-const validateContractVersion = async (version) => {
+const validateContractVersion = async (version: string): Promise<void> => {
 	const versionDir = path.join(contractsRoot, version);
 	const catalogBytes = await readFile(path.join(versionDir, "catalog.json"));
-	const catalog = JSON.parse(catalogBytes);
+	const parsedCatalog = parseJson(catalogBytes.toString("utf8"));
 	const catalogDigest = createHash("sha256").update(catalogBytes).digest("hex");
 	// Both runtime records name the catalog they were interpreted under by digest, so a catalog edit
 	// that leaves them behind must fail here rather than produce records nobody can interpret.
@@ -434,40 +497,74 @@ const validateContractVersion = async (version) => {
 		"artifact-source-manifest.schema.json",
 		"automated-review-readiness-report.schema.json",
 	]) {
-		const schema = await readJson(path.join(versionDir, schemaFile));
-		if (schema.properties.catalogDigest.const !== catalogDigest) {
-			throw new Error(
-				`${version}/${schemaFile} pins ${schema.properties.catalogDigest.const} but the catalog hashes to ${catalogDigest}`,
-			);
+		const label = `${version}/${schemaFile}`;
+		const schema = await readSchema(path.join(versionDir, schemaFile), label);
+		const pinned = asString(
+			at(schema, ["properties", "catalogDigest", "const"], label),
+			`${label} properties.catalogDigest.const`,
+		);
+		if (pinned !== catalogDigest) {
+			throw new Error(`${label} pins ${pinned} but the catalog hashes to ${catalogDigest}`);
 		}
 	}
-	catalogDigests.set(version, catalogDigest);
 
 	validate(
 		schemaId(version, "artifact-source-catalog.schema.json"),
-		catalog,
+		parsedCatalog,
 		`${version}/catalog.json`,
 	);
-	rejectDuplicateProperty(catalog.sources, "kind", `${version} source kind`);
+	const sources = toCatalogSources(parsedCatalog, `${version}/catalog.json`);
+	rejectDuplicates(
+		sources.map((source) => source.kind),
+		`${version} source kind`,
+	);
 	validate(
 		schemaId(version, "source-use-decisions.schema.json"),
-		await readJson(path.join(versionDir, "source-use-decisions.json")),
+		await readJsonFile(path.join(versionDir, "source-use-decisions.json")),
 		`${version}/source-use-decisions.json`,
 	);
 
-	await validateSchemasTrackTheCatalog(version, catalog);
+	await validateSchemasTrackTheCatalog(version, sources, catalogDigest);
 	validatePolicySchema(version);
-	return catalog;
 };
 
 for (const version of contractVersions) await validateContractVersion(version);
 
-const practiceCatalogPath = path.join(
-	root,
-	"server/src/main/resources/practices/default-catalog.json",
+const PRACTICE_CATALOG = "practices/default-catalog.json";
+const practiceCatalogPath = path.join(root, "server/src/main/resources", PRACTICE_CATALOG);
+const parsedPracticeCatalog = await readJsonFile(practiceCatalogPath);
+validate(
+	asString(defaultCatalogSchema.$id, "default-catalog.schema.json $id"),
+	parsedPracticeCatalog,
+	PRACTICE_CATALOG,
 );
-const practiceCatalog = await readJson(practiceCatalogPath);
-validate(defaultCatalogSchema.$id, practiceCatalog, "practices/default-catalog.json");
+
+/** A bundled practice, as far as the script/practice pairing below is concerned. */
+interface BundledPractice {
+	readonly slug: string;
+	readonly precomputeScript: string | undefined;
+}
+
+const bundledPractices = (value: unknown, label: string): BundledPractice[] =>
+	asArray(asRecord(value, label).areas, `${label} areas`).flatMap((area, areaIndex) => {
+		const areaLabel = `${label} areas[${areaIndex}]`;
+		return asArray(asRecord(area, areaLabel).practices, `${areaLabel} practices`).map(
+			(practice, index) => {
+				const entry = `${areaLabel} practices[${index}]`;
+				const record = asRecord(practice, entry);
+				const script = record.precomputeScript;
+				return {
+					slug: asString(record.slug, `${entry}.slug`),
+					precomputeScript:
+						script === undefined || script === null
+							? undefined
+							: asString(script, `${entry}.precomputeScript`),
+				};
+			},
+		);
+	});
+
+const practices = bundledPractices(parsedPracticeCatalog, PRACTICE_CATALOG);
 
 const precomputeResourcePrefix = "practices/precompute/";
 const precomputeScripts = new Set(
@@ -475,25 +572,23 @@ const precomputeScripts = new Set(
 		.filter((file) => file.endsWith(".ts"))
 		.map((file) => precomputeResourcePrefix + file),
 );
-const referencedPrecomputeScripts = new Set();
-for (const area of practiceCatalog.areas) {
-	for (const practice of area.practices) {
-		if (!practice.precomputeScript) continue;
-		// The loader checks the script exists. Nothing checks it belongs to the practice that names it,
-		// and a script named after a slug is the only thing that keeps the pair findable from either side.
-		const expected = `${precomputeResourcePrefix}${practice.slug}.ts`;
-		if (practice.precomputeScript !== expected) {
-			throw new Error(
-				`default-catalog.json practice '${practice.slug}' must name its precompute script '${expected}'`,
-			);
-		}
-		if (!precomputeScripts.has(expected)) {
-			throw new Error(
-				`default-catalog.json practice '${practice.slug}' names a missing precompute script`,
-			);
-		}
-		referencedPrecomputeScripts.add(expected);
+const referencedPrecomputeScripts = new Set<string>();
+for (const practice of practices) {
+	if (practice.precomputeScript === undefined) continue;
+	// The loader checks the script exists. Nothing checks it belongs to the practice that names it,
+	// and a script named after a slug is the only thing that keeps the pair findable from either side.
+	const expected = `${precomputeResourcePrefix}${practice.slug}.ts`;
+	if (practice.precomputeScript !== expected) {
+		throw new Error(
+			`default-catalog.json practice '${practice.slug}' must name its precompute script '${expected}'`,
+		);
 	}
+	if (!precomputeScripts.has(expected)) {
+		throw new Error(
+			`default-catalog.json practice '${practice.slug}' names a missing precompute script`,
+		);
+	}
+	referencedPrecomputeScripts.add(expected);
 }
 for (const script of precomputeScripts) {
 	if (!referencedPrecomputeScripts.has(script)) {
@@ -502,5 +597,5 @@ for (const script of precomputeScripts) {
 }
 
 console.log(
-	`Artifact-source contracts: ${contractVersions.length} version(s) validated (${contractVersions.join(", ")}); ${practiceCatalog.areas.flatMap((area) => area.practices).length} bundled practices satisfy their schema.`,
+	`Artifact-source contracts: ${contractVersions.length} version(s) validated (${contractVersions.join(", ")}); ${practices.length} bundled practices satisfy their schema.`,
 );

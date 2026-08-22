@@ -12,7 +12,11 @@ interface IssueMeta {
 	state?: string;
 }
 
-export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
+export default function triagesTheIssueWithLabelsAndOwnership(
+	_repo: string,
+	_diff: Map<string, unknown>,
+	m: IssueMeta,
+) {
 	const labels = m.labels ?? [];
 	// Prefer a non-empty plural array, then fall back to the singular owner — a producer that always emits
 	// `assignees: []` plus a separate `assignee` would otherwise under-report ownership (`??` only fires on

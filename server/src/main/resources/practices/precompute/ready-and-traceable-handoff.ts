@@ -14,7 +14,7 @@ const BARE_REF = /#(\d+)(?![\w.])/g;
 /** Issue id at the start of a branch-slug segment, e.g. `1313-foo` or `feat/1313-foo`. */
 const BRANCH_REF = /(?:^|\/)(\d{1,7})-/g;
 
-export default async function (
+export default function readyAndTraceableHandoff(
 	repoPath: string,
 	_d: Map<string, DiffFile>,
 	m: PullRequestMetadata,
@@ -23,7 +23,7 @@ export default async function (
 
 	// --- Traceability: does the handoff reference a motivating issue at all? ---
 	const body = `${m.body ?? ""}\n${(m.commits ?? []).map((c) => c.message ?? "").join("\n")}`;
-	const branch = m.source_branch ?? "";
+	const branch = m.source_branch;
 	const bodyRefs = new Set<string>();
 	for (const mt of body.matchAll(BARE_REF)) bodyRefs.add(`#${mt[1]}`);
 	const branchRefs = new Set<string>();
@@ -31,9 +31,7 @@ export default async function (
 	const allRefs = new Set<string>([...bodyRefs, ...branchRefs]);
 	if (allRefs.size > 0) {
 		directions.push(
-			`Traceability fact: a motivating-issue reference IS present — ${[...allRefs].join(", ")}` +
-				(branchRefs.size ? ` (branch '${branch}' encodes ${[...branchRefs].join(", ")})` : "") +
-				`. Traceability does NOT require a closing keyword: 'Refs #N', a bare '#N', or an issue-number branch prefix all establish the link, so do not read a closingRefCount of 0 as "untraceable".`,
+			`Traceability fact: a motivating-issue reference IS present — ${[...allRefs].join(", ")}${branchRefs.size ? ` (branch '${branch}' encodes ${[...branchRefs].join(", ")})` : ""}. Traceability does NOT require a closing keyword: 'Refs #N', a bare '#N', or an issue-number branch prefix all establish the link, so do not read a closingRefCount of 0 as "untraceable".`,
 		);
 	} else {
 		directions.push(
@@ -65,7 +63,7 @@ export default async function (
 		"h",
 		"hpp",
 	]) {
-		const all = await findFiles(repoPath, ext);
+		const all = findFiles(repoPath, ext);
 		repoCodeFileCount += all.length;
 		repoTestFileCount += all.filter(isTest).length;
 	}

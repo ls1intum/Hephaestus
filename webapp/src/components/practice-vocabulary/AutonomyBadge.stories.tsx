@@ -3,7 +3,7 @@ import { expect } from "storybook/test";
 import { AutonomyBadge } from "./AutonomyBadge";
 
 const meta = {
-	title: "Practice vocabulary/Autonomy badge",
+	title: "Shared/Practice vocabulary/Autonomy badge",
 	component: AutonomyBadge,
 	parameters: { layout: "centered" },
 	tags: ["autodocs"],

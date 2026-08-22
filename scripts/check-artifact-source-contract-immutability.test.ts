@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const CHECKER = join(
 	dirname(fileURLToPath(import.meta.url)),
-	"check-artifact-source-contract-immutability.mjs",
+	"check-artifact-source-contract-immutability.ts",
 );
 
 /**
@@ -16,14 +16,16 @@ const CHECKER = join(
  * repository being pushed instead of at the fixture. Strip them so the fixtures are self-contained
  * however these tests are invoked.
  */
-const cleanGitEnv = () =>
+const cleanGitEnv = (): NodeJS.ProcessEnv =>
 	Object.fromEntries(Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")));
 const CONTRACTS = "server/src/main/resources/contracts/artifact-source";
 
+type Git = (...args: string[]) => string;
+
 /** A throwaway repo with one published contract version on `main`, and a branch checked out. */
-function repoWithPublishedContract() {
+function repoWithPublishedContract(): { repo: string; git: Git } {
 	const repo = mkdtempSync(join(tmpdir(), "contract-immutability-"));
-	const git = (...args) =>
+	const git: Git = (...args) =>
 		execFileSync("git", args, {
 			cwd: repo,
 			encoding: "utf8",
@@ -41,7 +43,7 @@ function repoWithPublishedContract() {
 	return { repo, git };
 }
 
-function runChecker(repo) {
+function runChecker(repo: string): string {
 	// Two of these tests expect the checker to throw; without capturing stderr its stack trace
 	// prints on every successful run.
 	return execFileSync(process.execPath, [CHECKER], {
@@ -52,7 +54,7 @@ function runChecker(repo) {
 	});
 }
 
-test("passes and says what it verified when published contracts are untouched", (t) => {
+await test("passes and says what it verified when published contracts are untouched", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	writeFileSync(join(repo, "unrelated.txt"), "change something else\n");
@@ -62,7 +64,7 @@ test("passes and says what it verified when published contracts are untouched", 
 	assert.match(runChecker(repo), /1 published version\(s\) unchanged/);
 });
 
-test("fails when a published contract file is edited", (t) => {
+await test("fails when a published contract file is edited", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	writeFileSync(
@@ -75,7 +77,7 @@ test("fails when a published contract file is edited", (t) => {
 	assert.throws(() => runChecker(repo), /1\.0\.0 is immutable/);
 });
 
-test("fails when a published contract version is deleted", (t) => {
+await test("fails when a published contract version is deleted", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	git("rm", "--quiet", "-r", join(CONTRACTS, "1.0.0"));
@@ -84,7 +86,7 @@ test("fails when a published contract version is deleted", (t) => {
 	assert.throws(() => runChecker(repo), /1\.0\.0 is immutable/);
 });
 
-test("adding a new version alongside a published one is allowed", (t) => {
+await test("adding a new version alongside a published one is allowed", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	mkdirSync(join(repo, CONTRACTS, "1.1.0"), { recursive: true });
@@ -95,10 +97,10 @@ test("adding a new version alongside a published one is allowed", (t) => {
 	assert.match(runChecker(repo), /1 published version\(s\) unchanged/);
 });
 
-test("reports honestly when nothing is published at the merge base", (t) => {
+await test("reports honestly when nothing is published at the merge base", (t) => {
 	const repo = mkdtempSync(join(tmpdir(), "contract-immutability-empty-"));
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
-	const git = (...args) =>
+	const git: Git = (...args) =>
 		execFileSync("git", args, {
 			cwd: repo,
 			encoding: "utf8",
@@ -122,7 +124,7 @@ test("reports honestly when nothing is published at the merge base", (t) => {
 	assert.match(runChecker(repo), /no version is published/);
 });
 
-test("runs from a subdirectory", (t) => {
+await test("runs from a subdirectory", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
 	writeFileSync(

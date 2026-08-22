@@ -32,6 +32,57 @@ export const PROVIDER_CONFIG_FILENAME = "pi-provider.json";
 export const DEFAULT_WORKSPACE_ROOT = "/workspace";
 
 /**
+ * A model as the registry really takes one.
+ *
+ * <p>`ProviderModelConfig` declares `contextWindow` and `maxTokens` required. The registry validates
+ * each only when it is present and stores whatever it is handed, and PiRuntimeFactory omits them
+ * whenever the model catalogue does not know them. Registering without them is the behaviour that has
+ * always shipped; inventing a window here would silently change when a session compacts.
+ */
+type RegisterableModel = Omit<ProviderModelConfig, "contextWindow" | "maxTokens"> &
+	Partial<Pick<ProviderModelConfig, "contextWindow" | "maxTokens">>;
+
+/** The registry's own registration shape, reached through the one method this helper calls. */
+type SdkProviderConfig = Parameters<ModelRegistry["registerProvider"]>[1];
+
+/**
+ * What this helper needs of a Pi ModelRegistry: that one method, taking the model above. Everything
+ * except `models` stays the SDK's own type, so this states exactly one difference from it and a rename
+ * anywhere else still fails the build. The SDK's own ModelRegistry satisfies it.
+ */
+declare class ModelRegistryPort {
+	registerProvider(
+		providerName: string,
+		config: Omit<SdkProviderConfig, "models"> & { models?: RegisterableModel[] },
+	): void;
+}
+
+/**
+ * The narrowing this file starts from, declared rather than imported: pi-provider.ts is staged into
+ * both runner sandboxes and may only depend on what both of them stage.
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null;
+}
+
+/**
+ * pi-provider.json's fields, as the file actually carries them. The server writes it, but it reaches
+ * here as parsed JSON with no guarantees, and a field of the wrong type reads as absent — which is
+ * what {@link registerHephaestusProvider} already declines to register on.
+ */
+function asProviderConfig(parsed: unknown): ProviderConfig | null {
+	if (!isRecord(parsed)) return null;
+	const numberOrUndefined = (value: unknown) => (typeof value === "number" ? value : undefined);
+	return {
+		apiProtocol: typeof parsed.apiProtocol === "string" ? parsed.apiProtocol : undefined,
+		modelId: typeof parsed.modelId === "string" ? parsed.modelId : undefined,
+		supportsReasoning: parsed.supportsReasoning === true,
+		contextWindow: numberOrUndefined(parsed.contextWindow),
+		maxOutputTokens: numberOrUndefined(parsed.maxOutputTokens),
+	};
+}
+
+/**
  * Load pi-provider.json from `${cwd}/pi-provider.json`. `cwd` defaults to the production workspace
  * root but is overridable — pi-mentor-runner.ts's live tests spawn the runner against a temp
  * directory (see MENTOR_RUNNER_CWD) rather than a real `/workspace` mount.
@@ -42,7 +93,8 @@ export function loadProviderConfig(cwd = DEFAULT_WORKSPACE_ROOT): ProviderConfig
 	const path = `${cwd}/${PROVIDER_CONFIG_FILENAME}`;
 	if (!existsSync(path)) return null;
 	try {
-		return JSON.parse(readFileSync(path, "utf-8"));
+		const parsed: unknown = JSON.parse(readFileSync(path, "utf8"));
+		return asProviderConfig(parsed);
 	} catch (e) {
 		console.error(`[pi-provider] failed to parse ${path}: ${errorText(e)}`);
 		return null;
@@ -56,7 +108,7 @@ export function loadProviderConfig(cwd = DEFAULT_WORKSPACE_ROOT): ProviderConfig
  * PI_HEPHAESTUS_BASE_URL-presence check).
  */
 export function registerHephaestusProvider(
-	modelRegistry: ModelRegistry,
+	modelRegistry: ModelRegistryPort,
 	config: ProviderConfig | null,
 	env: Record<string, string | undefined> = process.env,
 ): boolean {
@@ -66,7 +118,7 @@ export function registerHephaestusProvider(
 		return false;
 	}
 
-	const model: Partial<ProviderModelConfig> = {
+	const model: RegisterableModel = {
 		id: config.modelId,
 		name: config.modelId,
 		reasoning: Boolean(config.supportsReasoning),
@@ -79,10 +131,6 @@ export function registerHephaestusProvider(
 	if (Number.isFinite(config.maxOutputTokens)) {
 		model.maxTokens = config.maxOutputTokens;
 	}
-	// The SDK types contextWindow and maxTokens as required, but the gateway only knows them when the
-	// model catalogue does, and PiRuntimeFactory omits them when it does not. Registering without them
-	// is the behaviour that has always shipped; inventing a window here would silently change when a
-	// session compacts.
 	modelRegistry.registerProvider("hephaestus", {
 		name: "Hephaestus Gateway",
 		baseUrl,
@@ -91,7 +139,7 @@ export function registerHephaestusProvider(
 		apiKey: "LLM_PROXY_TOKEN",
 		authHeader: true,
 		api: config.apiProtocol,
-		models: [model as ProviderModelConfig],
+		models: [model],
 	});
 	return true;
 }

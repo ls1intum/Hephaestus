@@ -261,19 +261,16 @@ async function run(tool: string, args: string[]): Promise<number> {
 }
 
 async function main(): Promise<void> {
-	const args = process.argv.slice(2);
+	const [tool, ...toolArgs] = process.argv.slice(2);
 
-	if (args.length === 0) {
+	if (tool === undefined) {
 		console.error("Usage: run-quiet.ts <tool> [args...]");
 		console.error("Supported tools: prettier, openapi-gen");
 		process.exitCode = 1;
 		return;
 	}
 
-	const [tool, ...toolArgs] = args;
-	// tool is guaranteed to be defined since args.length > 0
-	const exitCode = await run(tool as string, toolArgs);
-	process.exitCode = exitCode;
+	process.exitCode = await run(tool, toolArgs);
 }
 
 main().catch((error: unknown) => {

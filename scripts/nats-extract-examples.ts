@@ -3,17 +3,22 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import type { ConsumerConfig, ConsumerMessages, JsMsg } from "@nats-io/jetstream";
 import {
 	AckPolicy,
+	type ConsumerConfig,
+	type ConsumerMessages,
 	DeliverPolicy,
+	type JsMsg,
 	jetstream,
 	jetstreamManager,
 	ReplayPolicy,
 } from "@nats-io/jetstream";
-import type { NatsConnection } from "@nats-io/transport-node";
-import { connect } from "@nats-io/transport-node";
+import { connect, type NatsConnection } from "@nats-io/transport-node";
 import { Command, InvalidArgumentError, Option } from "commander";
+import { isRecord, parseJson } from "./lib/json.ts";
+
+const messageOf = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error);
 
 type LogLevel = "debug" | "info" | "silent";
 
@@ -166,7 +171,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 				`Stream info: ${streamInfo.state.messages} total messages in ${options.natsStream}`,
 			);
 		} catch (error) {
-			logger.info(`Could not get stream info: ${(error as Error).message}`);
+			logger.info(`Could not get stream info: ${messageOf(error)}`);
 		}
 
 		const deliverPolicy = options.startWithNew
@@ -201,7 +206,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 
 		logger.info(`Consumer created: ${consumerName}`);
 
-		while (true) {
+		for (;;) {
 			let msgs: ConsumerMessages;
 			try {
 				msgs = await consumer.fetch({
@@ -209,8 +214,9 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 					expires: options.fetchTimeoutMs,
 				});
 			} catch (error) {
-				const err = error as Error & { code?: string; name?: string };
-				if (err.name === "TimeoutError" || err.code === "TIMEOUT") {
+				const name = error instanceof Error ? error.name : undefined;
+				const code = isRecord(error) ? error.code : undefined;
+				if (name === "TimeoutError" || code === "TIMEOUT") {
 					logger.info("No more messages available (timeout)");
 					break;
 				}
@@ -225,7 +231,9 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 
 					let payload: Record<string, unknown>;
 					try {
-						payload = JSON.parse(decoder.decode(msg.data)) as Record<string, unknown>;
+						const parsed = parseJson(decoder.decode(msg.data));
+						if (!isRecord(parsed)) throw new TypeError("payload is not a JSON object");
+						payload = parsed;
 					} catch {
 						logger.info("Skipping invalid JSON message");
 						msg.ack();
@@ -246,7 +254,10 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 						continue;
 					}
 					const normalizedEventType = eventType.toLowerCase();
-					const action = payload.action ? String(payload.action) : undefined;
+					const action =
+						typeof payload.action === "string" && payload.action !== ""
+							? payload.action
+							: undefined;
 
 					if (options.eventFilters.size > 0) {
 						const allowedActions = options.eventFilters.get(normalizedEventType);
@@ -300,7 +311,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 					msg.ack();
 				}
 			} catch (error) {
-				logger.error(`Error fetching messages: ${(error as Error).message}`);
+				logger.error(`Error fetching messages: ${messageOf(error)}`);
 				break;
 			}
 

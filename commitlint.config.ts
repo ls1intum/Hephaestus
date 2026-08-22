@@ -57,10 +57,19 @@ const SCOPES = [
   "workspace",
 ];
 
+/** The slice of commitlint's parsed header these two rules read. */
+interface ParsedCommit {
+  readonly type?: string | null;
+  readonly scope?: string | null;
+}
+
+/** What a commitlint rule answers: whether the header passes, and what to say when it does not. */
+type RuleOutcome = [valid: boolean, message?: string];
+
 // Custom plugin to provide helpful error messages
 const helpfulErrorsPlugin = {
   rules: {
-    "type-enum-helpful": (parsed, _when, _value) => {
+    "type-enum-helpful": (parsed: ParsedCommit): RuleOutcome => {
       const { type } = parsed;
       if (!type) return [true];
       const valid = TYPES.includes(type);
@@ -75,7 +84,7 @@ const helpfulErrorsPlugin = {
             `Example: feat(webapp): add user profile page`,
       ];
     },
-    "scope-enum-helpful": (parsed, _when, _value) => {
+    "scope-enum-helpful": (parsed: ParsedCommit): RuleOutcome => {
       const { scope } = parsed;
       if (!scope) return [true]; // Scope is optional
       const valid = SCOPES.includes(scope);
@@ -98,7 +107,7 @@ const helpfulErrorsPlugin = {
   },
 };
 
-export default {
+const configuration = {
   extends: ["@commitlint/config-conventional"],
   plugins: [helpfulErrorsPlugin],
   helpUrl: "https://github.com/ls1intum/Hephaestus/blob/main/CONTRIBUTING.md",
@@ -128,3 +137,5 @@ export default {
     "header-max-length": [2, "always", 100],
   },
 };
+
+export default configuration;

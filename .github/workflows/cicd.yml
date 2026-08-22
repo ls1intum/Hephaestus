@@ -58,13 +58,21 @@ jobs:
               # the Bun they run on is read from the agent image.
               - 'docker/agents/**'
               - 'tsconfig.agents.json'
-              # The lint/format gate for every non-webapp TypeScript tree. Its rules live in
-              # biome.jsonc, the `:agents` scripts that invoke it live in the root package.json,
-              # and the Biome binary it runs is resolved from the lockfile — a change to any of
-              # the three changes the gate's verdict, so each has to be able to trigger it.
+              # The lint/format gate for every non-webapp TypeScript tree. oxlint's rules live in
+              # .oxlintrc.json and Biome's in biome.jsonc, the `:agents` scripts that invoke them
+              # live in the root package.json, the binaries are resolved from the lockfile, and the
+              # root tsconfig is what gives the Bun trees a project for the type-aware rules — a
+              # change to any of them changes the gate's verdict, so each has to be able to trigger it.
+              - '.oxlintrc.json'
               - 'biome.jsonc'
+              - 'tsconfig.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
+              # Linted by the same leg, and its own oxlint config decides that verdict.
+              - 'docs/**'
+              - '.changeset/*.cjs'
+              - 'commitlint.config.ts'
+              - '.github/scripts/**'
               # check:biome-pin compares this file's $schema against the pinned version.
               - 'webapp/biome.jsonc'
             agent-images:
@@ -325,7 +333,7 @@ jobs:
               echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
               echo "| TypeScript errors | \`pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Lint errors (agent runtime + scripts) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (outside webapp) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
               echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY

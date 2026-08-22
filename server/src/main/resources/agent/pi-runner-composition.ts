@@ -35,9 +35,9 @@ export interface ComposedFeedbackEnvelope {
 export function undeliverableUnits(
 	envelope?: ComposedFeedbackEnvelope | null,
 ): ComposedFeedbackUnit[] {
-	const prepared = new Set(envelope?.preparedThreadKeys ?? []);
+	const prepared = new Set(envelope?.preparedThreadKeys);
 	return (envelope?.units ?? []).filter((unit) => {
-		if (unit?.action !== "SUPERSEDE") return false;
+		if (unit.action !== "SUPERSEDE") return false;
 		const target = unit.supersedesThreadKey;
 		return target === undefined || !prepared.has(target);
 	});

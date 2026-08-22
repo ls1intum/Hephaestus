@@ -39,8 +39,8 @@ ours. Do not open that as work.
 **The swallowed spy.** A hand-rolled stateful wrapper that *overrides* a callback from `args` makes the
 `fn()` in `meta.args` unreachable: it can never be asserted and the Actions panel is permanently empty,
 while the file looks well instrumented. To find it: for each `fn()` in `meta.args`, grep the file for a
-JSX attribute of the same name that is **not** `{...args}`. Live instance:
-`admin/practice-catalog/OccasionLifecycle.stories.tsx:18-33`.
+JSX attribute of the same name that is **not** `{...args}`. `OccasionLifecycle.stories.tsx` shows the
+shape that stays instrumented: it spreads `{...args}` and patches only the props it holds state for.
 
 ## `argTypes` where a prop is explorable, and nowhere else
 

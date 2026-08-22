@@ -205,15 +205,16 @@ export async function readFileLines(path: string): Promise<Map<number, string>> 
 		});
 		return lines;
 	} catch (err) {
-		console.error(`[precompute] readFileLines failed for ${path}: ${err}`);
+		console.error(`[precompute] readFileLines failed for ${path}: ${String(err)}`);
 		return new Map();
 	}
 }
 
 /**
- * Find all files matching a given extension in a directory.
+ * Find all files matching a given extension in a directory. The walk is synchronous, so a caller that
+ * scans several extensions pays for them in sequence; awaiting the result is harmless and still works.
  */
-export async function findFiles(dir: string, extension: string): Promise<string[]> {
+export function findFiles(dir: string, extension: string): string[] {
 	const pattern = `**/*.${extension}`;
 	const matcher = new Bun.Glob(pattern);
 	return [...matcher.scanSync(dir)]
@@ -221,6 +222,6 @@ export async function findFiles(dir: string, extension: string): Promise<string[
 		.map((path) => join(dir, path));
 }
 
-export function findSwiftFiles(dir: string): Promise<string[]> {
+export function findSwiftFiles(dir: string): string[] {
 	return findFiles(dir, "swift");
 }

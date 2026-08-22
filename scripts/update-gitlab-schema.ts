@@ -16,6 +16,7 @@ import {
 	type IntrospectionQuery,
 	printSchema,
 } from "graphql";
+import { isRecord, parseJson } from "./lib/json.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -36,8 +37,15 @@ const HAS_QUERY = /^type\s+Query\s*\{/m;
 
 interface IntrospectionResponse {
 	data?: IntrospectionQuery;
-	errors?: Array<{ message: string; locations?: unknown }>;
+	errors?: { message: string; locations?: unknown }[];
 }
+
+/**
+ * An introspection payload is a whole GraphQL schema, far too large to check field by field. This
+ * establishes only that a JSON object came back; `buildClientSchema` below is what rejects a payload
+ * that is not really a schema, and the caller reports that.
+ */
+const isIntrospectionResponse = (value: unknown): value is IntrospectionResponse => isRecord(value);
 
 function parseArgs(): { url: string; token?: string } {
 	const args = process.argv.slice(2);
@@ -57,7 +65,9 @@ Options:
 	}
 
 	let url = DEFAULT_GITLAB_URL;
-	let token: string | undefined = process.env.GITLAB_TOKEN?.trim() || undefined;
+	const environmentToken = process.env.GITLAB_TOKEN?.trim();
+	// An empty GITLAB_TOKEN reads as "not set" rather than as a token that will be rejected.
+	let token: string | undefined = environmentToken === "" ? undefined : environmentToken;
 
 	for (let i = 0; i < args.length; i++) {
 		const nextArg = args[i + 1];
@@ -156,14 +166,20 @@ async function main(): Promise<void> {
 	}
 
 	const responseText = await response.text();
-	let result: IntrospectionResponse;
+	let parsed: unknown;
 	try {
-		result = JSON.parse(responseText) as IntrospectionResponse;
+		parsed = parseJson(responseText);
 	} catch {
 		console.error("Failed to parse response as JSON");
 		console.error(`Response preview: ${responseText.substring(0, 200)}`);
 		process.exit(1);
 	}
+	if (!isIntrospectionResponse(parsed)) {
+		console.error("Invalid response: expected a JSON object");
+		console.error(`Response preview: ${responseText.substring(0, 200)}`);
+		process.exit(1);
+	}
+	const result = parsed;
 
 	if (result.errors) {
 		console.error("GraphQL errors:", JSON.stringify(result.errors, null, 2));
@@ -197,7 +213,7 @@ async function main(): Promise<void> {
 
 	const tempFile = `${SCHEMA_FILE}.tmp`;
 	try {
-		writeFileSync(tempFile, sdlContent, "utf-8");
+		writeFileSync(tempFile, sdlContent, "utf8");
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);
 		renameSync(tempFile, SCHEMA_FILE);

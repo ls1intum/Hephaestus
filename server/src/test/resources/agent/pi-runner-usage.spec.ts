@@ -13,14 +13,12 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import type {
-	AssistantMessage,
-	SessionMessage,
-} from "../../../main/resources/agent/pi-runner-usage.ts";
 import {
+	type AssistantMessage,
 	addAssistantUsage,
 	extractUsageFromSession,
 	newUsageLedger,
+	type SessionMessage,
 } from "../../../main/resources/agent/pi-runner-usage.ts";
 
 /**
@@ -60,14 +58,16 @@ function sessionOf(...messages: SessionMessage[]) {
 	return { messages };
 }
 
-test("a ledger with nothing in it reports nothing", () => {
+// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
+// would register the next test only after the previous had finished.
+void test("a ledger with nothing in it reports nothing", () => {
 	const ledger = newUsageLedger();
 
 	assert.equal(ledger.totalCalls, 0);
 	assert.equal(ledger.inputTokens, 0);
 });
 
-test("every bucket of an assistant message lands on the ledger", () => {
+void test("every bucket of an assistant message lands on the ledger", () => {
 	const ledger = newUsageLedger();
 
 	addAssistantUsage(
@@ -84,20 +84,22 @@ test("every bucket of an assistant message lands on the ledger", () => {
 	assert.equal(ledger.model, "gpt-5");
 });
 
-test("only assistant messages that carry usage are billable", () => {
+void test("only assistant messages that carry usage are billable", () => {
 	const ledger = newUsageLedger();
-	// AssistantMessage declares `usage` required, so the only way to express the case the guard exists
-	// for — a turn that failed before the provider answered — is to build one the declared type forbids.
-	const { usage: _unused, ...withoutUsage } = assistant("a");
-	const assistantWithoutUsage = withoutUsage as AssistantMessage;
+	// AssistantMessage declares `usage` required; ReportedMessage is the shape the ledger is actually
+	// handed, which is what makes the case the guard exists for — a turn that failed before the
+	// provider answered — expressible at all.
+	const { usage: _unused, ...assistantWithoutUsage } = assistant("a");
 
-	// A guard that checked only for a usage block, ignoring role, would bill this one.
-	addAssistantUsage(ledger, {
-		role: "user",
-		content: "not a bill",
-		timestamp: 0,
-		usage: { input: 999, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 999, cost: 0 },
-	} as unknown as AssistantMessage);
+	// A guard that checked only for a usage block, ignoring role, would bill this one. Built by
+	// assignment rather than as one literal, because a usage block is not part of a user message.
+	const userMessage: SessionMessage = { role: "user", content: "not a bill", timestamp: 0 };
+	addAssistantUsage(
+		ledger,
+		Object.assign(userMessage, {
+			usage: { input: 999, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 999, cost: 0 },
+		}),
+	);
 	addAssistantUsage(ledger, assistantWithoutUsage);
 	addAssistantUsage(ledger, null);
 	addAssistantUsage(ledger, undefined);
@@ -108,7 +110,7 @@ test("only assistant messages that carry usage are billable", () => {
 
 // Over-billing is the one error the maximum-taking on the server side could introduce, so the source
 // that feeds it must not be able to count the same call twice.
-test("the same message counted twice is billed once", () => {
+void test("the same message counted twice is billed once", () => {
 	const ledger = newUsageLedger();
 	const message = assistant("a", { input: 100 });
 
@@ -121,7 +123,7 @@ test("the same message counted twice is billed once", () => {
 
 // THE regression. The ledger was fed at message_end, so the call is on it before compaction can drop
 // the message; a walk of what compaction left behind sees only the survivor.
-test("a call compaction removed from the session is still billed", () => {
+void test("a call compaction removed from the session is still billed", () => {
 	const ledger = newUsageLedger();
 	const compacted = assistant("dropped", { input: 4_000_000, output: 300_000 });
 	const survivor = assistant("kept", { input: 900_000, output: 60_000 });
@@ -147,7 +149,7 @@ test("a call compaction removed from the session is still billed", () => {
 
 // The stream ledger assumes the SDK puts a usage block on the message_end event. If it ever stops
 // doing so the ledger goes empty, and the report must fall back to the walk rather than to zero.
-test("an empty stream ledger never makes the report smaller than the message walk", () => {
+void test("an empty stream ledger never makes the report smaller than the message walk", () => {
 	const messages = [assistant("a", { input: 100 }), assistant("b", { input: 250, output: 30 })];
 
 	const reported = extractUsageFromSession(sessionOf(...messages), newUsageLedger());
@@ -157,7 +159,7 @@ test("an empty stream ledger never makes the report smaller than the message wal
 	assert.equal(reported.outputTokens, 30);
 });
 
-test("with no ledger at all the report is exactly the message walk", () => {
+void test("with no ledger at all the report is exactly the message walk", () => {
 	const reported = extractUsageFromSession(sessionOf(assistant("a", { input: 100, output: 5 })));
 
 	assert.equal(reported.totalCalls, 1);
@@ -165,7 +167,7 @@ test("with no ledger at all the report is exactly the message walk", () => {
 	assert.equal(reported.outputTokens, 5);
 });
 
-test("every bucket is taken from whichever view saw more, independently", () => {
+void test("every bucket is taken from whichever view saw more, independently", () => {
 	const walked = assistant("kept", { input: 10, output: 9_000, cacheWrite: 40 });
 	const ledger = newUsageLedger();
 	addAssistantUsage(ledger, assistant("dropped", { input: 5_000, cacheRead: 70 }));
@@ -178,7 +180,7 @@ test("every bucket is taken from whichever view saw more, independently", () => 
 	assert.equal(reported.cacheWriteTokens, 40);
 });
 
-test("a session that never ran reports zero rather than throwing", () => {
+void test("a session that never ran reports zero rather than throwing", () => {
 	const reported = extractUsageFromSession({}, newUsageLedger());
 
 	assert.equal(reported.totalCalls, 0);

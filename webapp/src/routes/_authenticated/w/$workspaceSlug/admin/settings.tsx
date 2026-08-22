@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { Settings2 } from "lucide-react";
 import {
+	computeUserLeagueStatsQueryKey,
+	getLeaderboardQueryKey,
 	getWorkspaceOptions,
 	resetAndRecalculateLeaguesMutation,
 } from "@/api/@tanstack/react-query.gen";
@@ -14,7 +16,33 @@ import { Spinner } from "@/components/ui/spinner";
 import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useUpdateWorkspaceFeatures } from "@/hooks/use-update-workspace-features";
+import { isRecord } from "@/lib/is-record";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { queryOperationId } from "@/lib/query-operation-id";
+
+/**
+ * The reads a league reset moves: the board itself, and the standing computed per user beside it.
+ * Read off the generated helpers, which ignore the arguments passed here, so a renamed operation
+ * breaks the build rather than silently stopping the invalidation.
+ */
+const RESET_QUERY_FAMILY_IDS: ReadonlySet<string> = new Set(
+	[
+		getLeaderboardQueryKey({
+			path: { workspaceSlug: "" },
+			query: {
+				after: new Date(0),
+				before: new Date(0),
+				team: "",
+				sort: "SCORE",
+				mode: "INDIVIDUAL",
+			},
+		}),
+		computeUserLeagueStatsQueryKey({
+			path: { workspaceSlug: "", login: "" },
+			query: { after: new Date(0), before: new Date(0) },
+		}),
+	].map(([key]) => key._id),
+);
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/settings")({
 	head: workspaceAdminHead("Workspace settings"),
@@ -37,8 +65,15 @@ function AdminSettings() {
 		...resetAndRecalculateLeaguesMutation(),
 		onSuccess: (_data, variables) => {
 			const resetSlug = variables.path.workspaceSlug;
+			// Every cached read of those families for this workspace, whatever timeframe, team, sort or
+			// user it carries — a generated key pins all of those, so the match is on the operation.
 			void queryClient.invalidateQueries({
-				queryKey: [{ tags: ["Leaderboard"], path: { workspaceSlug: resetSlug } }],
+				predicate: ({ queryKey }) => {
+					const id = queryOperationId(queryKey);
+					if (id === undefined || !RESET_QUERY_FAMILY_IDS.has(id)) return false;
+					const [key] = queryKey;
+					return isRecord(key) && isRecord(key.path) && key.path.workspaceSlug === resetSlug;
+				},
 			});
 		},
 	});

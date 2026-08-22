@@ -19,7 +19,7 @@ Preferred Order:
 // turbo
 1. Run the achievement formatter script:
 ```bash
-node scripts/format-achievements.mjs
+node scripts/format-achievements.ts
 ```
 
 2. Review the changes in `achievements.yml`.

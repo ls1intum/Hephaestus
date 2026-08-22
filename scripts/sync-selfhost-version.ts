@@ -4,8 +4,12 @@
 // `VERSION=` example in the install guide always match the release being cut —
 // no manual bump, no drift. CI (ci-compose-validate) fails if they diverge.
 import { readFileSync, writeFileSync } from "node:fs";
+import { asRecord, asString, parseJson } from "./lib/json.ts";
 
-const version = JSON.parse(readFileSync("package.json", "utf8")).version;
+const version = asString(
+	asRecord(parseJson(readFileSync("package.json", "utf8")), "package.json").version,
+	"package.json version",
+);
 
 const edits = [
 	{
@@ -20,13 +24,18 @@ const edits = [
 	},
 ];
 
-for (const { file, re, line } of edits) {
-	let text;
+/** The file may not exist in every checkout; skip quietly when it does not. */
+const readIfPresent = (file: string): string | undefined => {
 	try {
-		text = readFileSync(file, "utf8");
+		return readFileSync(file, "utf8");
 	} catch {
-		continue; // file may not exist in every checkout; skip quietly
+		return undefined;
 	}
+};
+
+for (const { file, re, line } of edits) {
+	const text = readIfPresent(file);
+	if (text === undefined) continue;
 	if (!re.test(text)) {
 		throw new Error(`sync-selfhost-version: no version literal matched in ${file}`);
 	}

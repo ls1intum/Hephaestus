@@ -14,7 +14,7 @@ interface IssueMeta {
 	sub_issues_completed?: number;
 }
 
-export default async function (
+export default async function issueScopedToSingleConcern(
 	_repo: string,
 	_diff: Map<string, unknown>,
 	m: IssueMeta,

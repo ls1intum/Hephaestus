@@ -71,7 +71,7 @@ Before any release, code must pass:
 | Java formatting | Prettier (`prettier-plugin-java`) | Code style |
 | Java lint       | PMD         | Static analysis      |
 | Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
-| Agent + scripts TypeScript | Biome (`biome.jsonc`) + tsc | Lint + format + typecheck for the Bun runtime, its specs, both precompute trees and `scripts/**` |
+| Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | Lint + format + typecheck for the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files |
 | Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships — CI reads `ARG BUN_VERSION` out of `docker/agents/pi/Dockerfile` rather than hard-coding it, and fails closed if that line is missing |
 
 ## 🔒 Security
@@ -184,9 +184,10 @@ would otherwise skip the workflow that runs it. `docker/agents/**` appears twice
 — it builds the agent images, and `test:agents` and `typecheck:agents` cover the precompute tree
 inside it, so a PR editing only a precompute script must still run those gates.
 
-`biome.jsonc`, `package.json` and `pnpm-lock.yaml` are listed because they decide the verdict of the
-App Server leg's Biome step: the rule set, the `:agents` scripts that invoke it, and the Biome binary
-version respectively. A gate whose own configuration can change without re-running it is not a gate.
+`.oxlintrc.json`, `biome.jsonc`, `tsconfig.json`, `package.json` and `pnpm-lock.yaml` are listed
+because they decide the verdict of the App Server leg's lint and format step: the two rule sets, the
+project the type-aware rules resolve against, the `:agents` scripts that invoke them, and the binary
+versions. A gate whose own configuration can change without re-running it is not a gate.
 
 **Benefits:**
 
@@ -257,7 +258,7 @@ cd server && ./mvnw test -P'!quick'  # Unit tests — see the testing guide for 
 
 # Agent runtime (Bun) — the Pi runner and the practice precompute scripts
 pnpm run test:agents           # Runner + precompute specs
-pnpm run check:agents          # Biome lint + format + import order, then both typechecks
+pnpm run check:agents          # Biome format, then oxlint, then both typechecks
 pnpm run check:agents:fix      # Same, applying every safe fix
 pnpm run typecheck:agents      # Agent + precompute TypeScript
 ```

@@ -33,7 +33,7 @@ single global worker — so the last story's handlers serve every story on that 
 silently breaks its siblings' Docs page while every isolated story, and therefore every test and every
 snapshot, stays green. That is not hypothetical: it is what made a screen's Docs page read
 "Couldn't load this feedback". A story file installs no handlers at all;
-`scripts/check-presentational-components.mjs` enforces it.
+`scripts/check-presentational-components.ts` enforces it.
 
 ## 5. `test:storybook` does not run the README-export check — CI does, right after
 

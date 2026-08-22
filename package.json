@@ -3,8 +3,9 @@
 	"version": "0.73.2",
 	"private": true,
 	"packageManager": "pnpm@11.22.0",
+	"type": "module",
 	"scripts": {
-		"changeset:version": "changeset version && node scripts/sync-selfhost-version.mjs",
+		"changeset:version": "changeset version && node scripts/sync-selfhost-version.ts",
 		"generate:api:application-server:clean": "node -e \"import('node:fs/promises').then(fs => fs.rm('webapp/src/api', {recursive: true, force: true}))\"",
 		"generate:api:application-server:specs": "cd server && sh -c 'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then ./mvnw verify -DskipTests=true -Dapp.profiles=specs; else SPRING_DOCKER_COMPOSE_ENABLED=false ./mvnw verify -DskipTests=true -Dapp.profiles=specs; fi'",
 		"generate:api:application-server:client": "pnpm run generate:api:application-server:clean && pnpm --filter webapp run openapi-ts",
@@ -30,16 +31,16 @@
 		"test:agents": "bun test server/src/test/resources/agent docker/agents/precompute",
 		"format:agents": "biome format --write server docker scripts",
 		"format:agents:check": "biome format server docker scripts",
-		"lint:agents": "biome lint server docker scripts",
-		"lint:agents:fix": "biome lint --write server docker scripts",
-		"check:agents": "biome check server docker scripts && pnpm run typecheck:agents && pnpm run typecheck:scripts",
-		"check:agents:fix": "biome check --write server docker scripts",
-		"ci:agents": "biome ci --reporter=github server docker scripts",
+		"lint:agents": "oxlint server docker scripts docs .changeset .github commitlint.config.ts",
+		"lint:agents:fix": "oxlint --fix server docker scripts docs .changeset .github commitlint.config.ts",
+		"check:agents": "biome format server docker scripts && pnpm run lint:agents && pnpm run typecheck:agents && pnpm run typecheck:scripts",
+		"check:agents:fix": "biome format --write server docker scripts && oxlint --fix server docker scripts docs .changeset .github commitlint.config.ts",
+		"ci:agents": "biome ci --reporter=github server docker scripts && oxlint -f github server docker scripts docs .changeset .github commitlint.config.ts",
 		"format:server": "pnpm run format:java",
 		"format:server:check": "pnpm run format:java:check",
 		"lint:server": "pnpm run lint:java",
 		"check:server": "pnpm run format:server:check && pnpm run lint:server",
-		"check:contracts": "node scripts/validate-artifact-source-contracts.mjs && node scripts/check-artifact-source-contract-immutability.mjs && node --test scripts/check-artifact-source-contract-immutability.test.mjs",
+		"check:contracts": "node scripts/validate-artifact-source-contracts.ts && node scripts/check-artifact-source-contract-immutability.ts && node --test scripts/check-artifact-source-contract-immutability.test.ts",
 		"format:client": "pnpm run format:webapp",
 		"format:client:check": "pnpm run format:webapp:check",
 		"lint:client": "run-s -c check:webapp typecheck:webapp",
@@ -67,11 +68,11 @@
 		"dev:server:e2e": "pnpm dev:compose && cd server && ./mvnw spring-boot:run -Dapp.profiles=local,e2e",
 		"dev:webapp": "pnpm --filter webapp run dev",
 		"dev": "mprocs",
-		"check:stories": "node scripts/check-story-prose.mjs",
-		"check:components": "node scripts/check-presentational-components.mjs",
-		"check:diagrams": "node scripts/check-mermaid-diagrams.mjs",
-		"check:env": "node scripts/check-env-defaults.mjs",
-		"check:biome-pin": "node scripts/check-biome-pin.mjs"
+		"check:stories": "node scripts/check-story-prose.ts",
+		"check:components": "node scripts/check-presentational-components.ts",
+		"check:diagrams": "node scripts/check-mermaid-diagrams.ts",
+		"check:env": "node scripts/check-env-defaults.ts",
+		"check:biome-pin": "node scripts/check-biome-pin.ts"
 	},
 	"devDependencies": {
 		"@biomejs/biome": "2.5.9",
@@ -94,6 +95,8 @@
 		"mermaid": "11.16.1",
 		"mprocs": "0.9.3",
 		"npm-run-all2": "8.0.4",
+		"oxlint": "1.79.0",
+		"oxlint-tsgolint": "7.0.2001",
 		"patch-package": "8.0.1",
 		"pg": "8.20.0",
 		"prettier": "3.8.3",
@@ -105,6 +108,6 @@
 		"node": ">=24.0"
 	},
 	"pnpm": {
-		"//": "overrides + peerDependencyRules live in pnpm-workspace.yaml — pnpm 11's documented location."
+		"//": "overrides + peerDependencyRules live in pnpm-workspace.yaml \u2014 pnpm 11's documented location."
 	}
 }

@@ -10,7 +10,11 @@ interface IssueMeta {
 	labels?: string[];
 }
 
-export default async function (_repo: string, _diff: Map<string, unknown>, m: IssueMeta) {
+export default function issueHasCheckableOutcome(
+	_repo: string,
+	_diff: Map<string, unknown>,
+	m: IssueMeta,
+) {
 	const body = (m.body ?? "").trim();
 	const title = (m.title ?? "").trim();
 	const labels = (m.labels ?? []).map((l) => l.toLowerCase());

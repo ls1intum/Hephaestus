@@ -12,6 +12,10 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 		"const meta: Meta<typeof Button> = { component: Button };",
 		"const meta: Meta = { title: 'Icons/Brand' };",
 		"const meta: StoryObj = { component: Button };",
+		// An untyped object that is not a `meta` belongs to whoever declared it.
+		"const preset = { component: Button };",
+		"const meta = { title: 'Icons/Brand' };",
+		"const widths = [40, 80] as const;",
 	],
 	invalid: [
 		{
@@ -25,6 +29,27 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 		{
 			code: "const meta: Meta = { title: 'Button', component: Button };",
 			errors: [{ messageId: "untyped" }],
+		},
+		{
+			code: "const meta = { component: Button } as Meta<typeof Button>;",
+			errors: [{ messageId: "asserted", line: 1, column: 39, endColumn: 58 }],
+		},
+		{
+			// Even without a `component`, the assertion is what stops the check.
+			code: "const meta = { title: 'Icons/Brand' } as Meta;",
+			errors: [{ messageId: "asserted" }],
+		},
+		{
+			code: "const meta = { component: Button };",
+			errors: [{ messageId: "unchecked", line: 1, column: 14, endColumn: 35 }],
+		},
+		{
+			code: "const meta = { component: Button } satisfies Meta<any>;",
+			errors: [{ messageId: "anyArgument", line: 1, column: 46, endColumn: 55 }],
+		},
+		{
+			code: "const meta: Meta<any> = { component: Button };",
+			errors: [{ messageId: "anyArgument" }],
 		},
 	],
 });

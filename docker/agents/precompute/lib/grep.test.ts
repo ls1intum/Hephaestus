@@ -95,7 +95,7 @@ describe("grep", () => {
 		await Bun.write(join(dir, "node_modules", "pkg", "dep.swift"), "struct Dep {}\n");
 		await Bun.write(join(dir, ".build", "generated.swift"), "struct Generated {}\n");
 
-		const files = await findFiles(dir, "swift");
+		const files = findFiles(dir, "swift");
 
 		expect(files).toHaveLength(1);
 		expect(files[0]).toBe(join(dir, "src", "nested", "match.swift"));

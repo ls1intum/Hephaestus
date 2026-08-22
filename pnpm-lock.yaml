@@ -78,6 +78,12 @@ importers:
       npm-run-all2:
         specifier: 8.0.4
         version: 8.0.4
+      oxlint:
+        specifier: 1.79.0
+        version: 1.79.0(oxlint-tsgolint@7.0.2001)
+      oxlint-tsgolint:
+        specifier: 7.0.2001
+        version: 7.0.2001
       patch-package:
         specifier: 8.0.1
         version: 8.0.1

@@ -1,5 +1,3 @@
-import type { FC } from "react";
-
 export interface FormattedTitleProps {
 	title: string;
 	className?: string;
@@ -11,7 +9,7 @@ export interface FormattedTitleProps {
  * It parses text wrapped in backticks (`) and renders them as <code> elements,
  * making it easy to highlight code snippets within regular text.
  */
-export const FormattedTitle: FC<FormattedTitleProps> = ({ title, className = "" }) => {
+export function FormattedTitle({ title, className = "" }: FormattedTitleProps) {
 	// Parse title with code highlighting by splitting on backticks
 	// and converting the code segments into proper elements
 	const titleParts = title
@@ -36,4 +34,4 @@ export const FormattedTitle: FC<FormattedTitleProps> = ({ title, className = "" 
 		});
 
 	return <span className={className}>{titleParts}</span>;
-};
+}

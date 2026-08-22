@@ -71,6 +71,16 @@ type GeneratorOptions = {
 
 const DEFAULT_OUTPUT_PATH = "docs/contributor/erd/schema.mmd";
 
+/** Rendered in the order they appear, each heading its own section of the diagram. */
+const CARDINALITY_NAMES = [
+	["||--||", "One-to-One"],
+	["||--o{", "One-to-Many"],
+	["}o--o{", "Many-to-Many"],
+] as const satisfies readonly (readonly [RelationshipCardinality, string])[];
+
+const messageOf = (error: unknown): string =>
+	error instanceof Error ? error.message : String(error);
+
 class MermaidErdGenerator {
 	private readonly client: Client;
 	private readonly schema: string;
@@ -95,7 +105,7 @@ class MermaidErdGenerator {
 			await this.client.connect();
 			this.logger.info(`Connected to database: ${this.client.database}`);
 		} catch (error) {
-			const message = `Failed to connect to database: ${(error as Error).message}`;
+			const message = `Failed to connect to database: ${messageOf(error)}`;
 			throw new DatabaseConnectionError(message);
 		}
 	}
@@ -105,7 +115,7 @@ class MermaidErdGenerator {
 			await this.client.end();
 			this.logger.debug("Database connection closed.");
 		} catch (error) {
-			this.logger.error(`Failed to close database connection: ${(error as Error).message}`);
+			this.logger.error(`Failed to close database connection: ${messageOf(error)}`);
 		}
 	}
 
@@ -462,19 +472,19 @@ class MermaidErdGenerator {
 		tableData: Map<string, ColumnInfo[]>,
 		relationships: RelationshipInfo[],
 	): string {
-		const lines: string[] = [];
-
-		lines.push("---");
-		lines.push("config:");
-		lines.push("    layout: elk");
-		lines.push("---");
-		lines.push("erDiagram");
-		lines.push("    %% Generated automatically from PostgreSQL database schema");
-		lines.push("    %% using scripts/generate-mermaid-erd.ts");
-		lines.push("    %% To regenerate: pnpm run db:generate-erd-docs");
-		lines.push("");
-		lines.push("    direction LR");
-		lines.push("");
+		const lines: string[] = [
+			"---",
+			"config:",
+			"    layout: elk",
+			"---",
+			"erDiagram",
+			"    %% Generated automatically from PostgreSQL database schema",
+			"    %% using scripts/generate-mermaid-erd.ts",
+			"    %% To regenerate: pnpm run db:generate-erd-docs",
+			"",
+			"    direction LR",
+			"",
+		];
 
 		for (const [tableName, columns] of tableData.entries()) {
 			const entityName = this.toEntityName(tableName);
@@ -491,8 +501,7 @@ class MermaidErdGenerator {
 				lines.push(`        ${typeAndName}`);
 			}
 
-			lines.push("    }");
-			lines.push("");
+			lines.push("    }", "");
 		}
 
 		lines.push("    %% Relationships");
@@ -518,15 +527,11 @@ class MermaidErdGenerator {
 			lineCounts.set(renderedLine(rel), (lineCounts.get(renderedLine(rel)) ?? 0) + 1);
 		}
 
-		for (const [cardinality, rels] of Object.entries(relationshipGroups)) {
+		for (const [cardinality, cardinalityName] of CARDINALITY_NAMES) {
+			const rels = relationshipGroups[cardinality];
 			if (rels.length === 0) {
 				continue;
 			}
-			const cardinalityName = {
-				"||--||": "One-to-One",
-				"||--o{": "One-to-Many",
-				"}o--o{": "Many-to-Many",
-			}[cardinality as RelationshipCardinality];
 			lines.push(`    %% ${cardinalityName} relationships`);
 
 			for (const rel of rels) {
@@ -539,11 +544,13 @@ class MermaidErdGenerator {
 			lines.push("");
 		}
 
-		lines.push("    %% Styling");
-		lines.push("    classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px");
-		lines.push("    classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px");
-		lines.push("    classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px");
-		lines.push("");
+		lines.push(
+			"    %% Styling",
+			"    classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px",
+			"    classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px",
+			"    classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px",
+			"",
+		);
 
 		for (const tableName of tableData.keys()) {
 			const entityName = this.toEntityName(tableName);
@@ -709,7 +716,7 @@ async function main() {
 	program.parse(process.argv);
 
 	const options = program.opts<CliOptions>();
-	const args = program.args as string[];
+	const args = program.args;
 	const jdbcUrl = options.jdbcUrl ?? args[0] ?? process.env.HEPHAESTUS_DB_JDBC_URL;
 	const username = options.username ?? args[1] ?? process.env.POSTGRES_USER;
 	const password = options.password ?? args[2] ?? process.env.POSTGRES_PASSWORD;

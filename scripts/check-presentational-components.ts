@@ -73,7 +73,7 @@ const BARE_IMPORT = /^import\s+["']([^"']+)["']/gm;
 /** Inside a story's own JSX a hook name in prose is documentation, not a call. */
 const COMMENT_LINE = /^\s*(\/\/|\/\*|\*)/;
 
-const listFiles = async (directory, suffixes) => {
+const listFiles = async (directory: string, suffixes: readonly string[]): Promise<string[]> => {
 	const entries = await readdir(join(REPO_ROOT, directory), {
 		recursive: true,
 		withFileTypes: true,
@@ -84,13 +84,13 @@ const listFiles = async (directory, suffixes) => {
 		.sort();
 };
 
-const readSource = async (path) => await readFile(join(REPO_ROOT, path), "utf8");
+const readSource = async (path: string): Promise<string> => readFile(join(REPO_ROOT, path), "utf8");
 
 /** A statement is type-only when it says so, or when every specifier it names does. */
-const isTypeOnly = (typeKeyword, clause) => {
+const isTypeOnly = (typeKeyword: string | undefined, clause: string): boolean => {
 	if (typeKeyword) return true;
-	const named = clause.match(/\{([\s\S]*)\}/);
-	if (!named || clause.replace(/\{[\s\S]*\}/, "").trim().length > 0) return false;
+	const named = /\{([\s\S]*)\}/.exec(clause);
+	if (!named?.[1] || clause.replace(/\{[\s\S]*\}/, "").trim().length > 0) return false;
 	return named[1]
 		.split(",")
 		.map((specifier) => specifier.trim())
@@ -98,22 +98,26 @@ const isTypeOnly = (typeKeyword, clause) => {
 		.every((specifier) => specifier.startsWith("type "));
 };
 
-const runtimeImports = (source) => {
-	const modules = [];
+const runtimeImports = (source: string): string[] => {
+	const modules: string[] = [];
 	for (const [, typeKeyword, clause, module] of source.matchAll(IMPORT)) {
-		if (!isTypeOnly(typeKeyword, clause)) modules.push(module);
+		if (clause !== undefined && module !== undefined && !isTypeOnly(typeKeyword, clause)) {
+			modules.push(module);
+		}
 	}
-	for (const [, module] of source.matchAll(BARE_IMPORT)) modules.push(module);
+	for (const [, module] of source.matchAll(BARE_IMPORT)) {
+		if (module !== undefined) modules.push(module);
+	}
 	return modules;
 };
 
-const importsAny = (source, modules) =>
+const importsAny = (source: string, modules: readonly string[]): string[] =>
 	runtimeImports(source).filter((module) =>
 		modules.some((candidate) => module === candidate || module.startsWith(`${candidate}/`)),
 	);
 
-const calledQueryHooks = (source) => {
-	const called = new Set();
+const calledQueryHooks = (source: string): string[] => {
+	const called = new Set<string>();
 	for (const line of source.split("\n")) {
 		if (COMMENT_LINE.test(line)) continue;
 		for (const hook of QUERY_HOOKS) {
@@ -123,9 +127,9 @@ const calledQueryHooks = (source) => {
 	return [...called];
 };
 
-const fetchingFailures = [];
-const docsFailures = [];
-const stale = [];
+const fetchingFailures: string[] = [];
+const docsFailures: string[] = [];
+const stale: string[] = [];
 
 /** R1 — components take data as props. */
 const componentFiles = (await listFiles(COMPONENTS, [".ts", ".tsx"])).filter(
@@ -179,7 +183,7 @@ for (const path of allStories) {
 	docsFailures.push(path);
 }
 
-for (const [message, entries] of [
+const reports: readonly (readonly [string, readonly string[]])[] = [
 	[
 		"Components take their data as props; fetching belongs in the route file or a src/hooks module.",
 		fetchingFailures,
@@ -192,7 +196,8 @@ for (const [message, entries] of [
 		"These are no longer violations. Delete them from ALLOWLIST in this script — it only shrinks.",
 		stale,
 	],
-]) {
+];
+for (const [message, entries] of reports) {
 	if (entries.length === 0) continue;
 	console.error(message);
 	for (const entry of entries) console.error(`  ${entry}`);

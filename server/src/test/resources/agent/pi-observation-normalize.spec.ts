@@ -1,11 +1,5 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import type {
-	NormalizedCitation,
-	Presence,
-	RecordedInapplicability,
-	RecordedSearch,
-} from "../../../main/resources/agent/pi-observation-normalize.ts";
 // Imported statically rather than through `await import(path)`: a dynamic specifier types every export
 // as `any`, which is how a spec covering a vocabulary contract came to be checked against nothing.
 import {
@@ -15,9 +9,13 @@ import {
 	citationMatchesArtifact,
 	dedupeKeyForObservation,
 	describeVocabulary,
+	type NormalizedCitation,
 	normalizeObservation as normalizeFinalObservation,
 	PRESENCE_DESCRIPTIONS,
 	PRESENCE_VALUES,
+	type Presence,
+	type RecordedInapplicability,
+	type RecordedSearch,
 	SEVERITY_DESCRIPTIONS,
 	SEVERITY_VALUES,
 	validateEvidenceSources,
@@ -34,11 +32,14 @@ import {
 interface ObservationOverrides {
 	practiceSlug?: unknown;
 	title?: unknown;
-	presence?: unknown;
-	assessment?: unknown;
-	severity?: unknown;
+	// The three words the fixture up-cases and folds into an `outcome`. A test that needs a value
+	// outside the vocabulary sets `outcome` on the fixture it gets back, which is the field the wire
+	// actually carries.
+	presence?: string;
+	assessment?: string;
+	severity?: string;
 	reasoning?: unknown;
-	evidence?: Record<string, unknown>;
+	evidence?: EvidenceOverrides;
 	[key: string]: unknown;
 }
 
@@ -47,6 +48,9 @@ interface ObservationOverrides {
  * one and delete a field, and the warrant branches ride the index signature.
  */
 type EvidenceFixture = { citations: Record<string, unknown>[] } & Record<string, unknown>;
+
+/** The same block as a test hands it in, where every part of it is optional. */
+type EvidenceOverrides = Partial<EvidenceFixture> & Record<string, unknown>;
 
 /** An observation in the shape the model sends one, as the fixture assembles it. */
 interface RawObservationFixture {
@@ -59,10 +63,10 @@ interface RawObservationFixture {
 }
 
 function baseObservation(overrides: ObservationOverrides = {}): RawObservationFixture {
-	const presence = String(overrides.presence ?? "PRESENT").toUpperCase();
-	const assessment = String(overrides.assessment ?? "BAD").toUpperCase();
-	const severity = String(overrides.severity ?? "MAJOR").toUpperCase();
-	const rawEvidence: Record<string, unknown> = overrides.evidence ?? {};
+	const presence = (overrides.presence ?? "PRESENT").toUpperCase();
+	const assessment = (overrides.assessment ?? "BAD").toUpperCase();
+	const severity = (overrides.severity ?? "MAJOR").toUpperCase();
+	const rawEvidence: EvidenceOverrides = overrides.evidence ?? {};
 	const citations: Record<string, unknown>[] = Array.isArray(rawEvidence.citations)
 		? rawEvidence.citations
 		: [
@@ -121,12 +125,11 @@ function baseObservation(overrides: ObservationOverrides = {}): RawObservationFi
 
 function normalizeObservation(input: ObservationOverrides) {
 	if (
-		input &&
-		("presence" in input ||
-			"assessment" in input ||
-			"severity" in input ||
-			"title" in input ||
-			"reasoning" in input)
+		"presence" in input ||
+		"assessment" in input ||
+		"severity" in input ||
+		"title" in input ||
+		"reasoning" in input
 	) {
 		return normalizeFinalObservation(baseObservation(input));
 	}
@@ -168,7 +171,9 @@ const UNDECIDABLE = {
 	wouldSettleIt: "The body of the issue the description defers to",
 };
 
-test("lowercase enums + underscored slug normalize and are accepted (not dropped)", () => {
+// `void`: node:test's own runner owns the promise each test hands back, and awaiting one here
+// would register the next test only after the previous had finished.
+void test("lowercase enums + underscored slug normalize and are accepted (not dropped)", () => {
 	const out = normalizeObservation(baseObservation());
 	assert.equal(out.practiceSlug, "writes-focused-pull-requests");
 	assert.equal(out.presence, "PRESENT");
@@ -176,7 +181,7 @@ test("lowercase enums + underscored slug normalize and are accepted (not dropped
 	assert.equal(out.severity, "MAJOR");
 });
 
-test("mixed-case enums up-case", () => {
+void test("mixed-case enums up-case", () => {
 	const out = normalizeObservation(
 		baseObservation({ presence: "Present", assessment: "Good", severity: "Minor" }),
 	);
@@ -191,7 +196,7 @@ test("mixed-case enums up-case", () => {
 // ranking on noise. It is gone from the final schema, so emitting it is a contract error rather than a
 // silently accepted alternate payload.
 
-test("an observation carries no confidence, and one offered is rejected", () => {
+void test("an observation carries no confidence, and one offered is rejected", () => {
 	const out = normalizeObservation(baseObservation());
 	assert.equal("confidence" in out, false);
 	for (const confidence of [-1, 4200, "very", null]) {
@@ -202,7 +207,7 @@ test("an observation carries no confidence, and one offered is rejected", () => 
 	}
 });
 
-test("NOT_APPLICABLE (lowercase) nulls assessment", () => {
+void test("NOT_APPLICABLE (lowercase) nulls assessment", () => {
 	const out = normalizeObservation(
 		notApplicableObservation(goodInapplicability, {
 			presence: "not_applicable",
@@ -213,7 +218,7 @@ test("NOT_APPLICABLE (lowercase) nulls assessment", () => {
 	assert.equal(out.assessment, undefined);
 });
 
-test("dedupe key uses the normalized hyphenated slug", () => {
+void test("dedupe key uses the normalized hyphenated slug", () => {
 	const a = dedupeKeyForObservation(
 		normalizeObservation(baseObservation({ practiceSlug: "writes_focused_pull_requests" })),
 	);
@@ -223,20 +228,20 @@ test("dedupe key uses the normalized hyphenated slug", () => {
 	assert.equal(a, b, "underscored and upper-hyphenated slugs must dedupe to the same key");
 });
 
-test("genuinely invalid enum still rejected after normalization", () => {
+void test("genuinely invalid enum still rejected after normalization", () => {
 	const invalid = baseObservation();
 	invalid.outcome = "MAYBE";
 	assert.throws(() => normalizeObservation(invalid), /invalid outcome/);
 });
 
-test("missing evidence-source attribution is rejected", () => {
+void test("missing evidence-source attribution is rejected", () => {
 	assert.throws(
 		() => normalizeObservation(baseObservation({ evidence: { citations: [] } })),
 		/citations are required/,
 	);
 });
 
-test("citation requires an exact artifact path and quote", () => {
+void test("citation requires an exact artifact path and quote", () => {
 	const missingPath = baseObservation();
 	delete onlyCitation(missingPath.evidence.citations).artifactPath;
 	assert.throws(() => normalizeObservation(missingPath), /artifactPath is required/);
@@ -246,7 +251,7 @@ test("citation requires an exact artifact path and quote", () => {
 	assert.throws(() => normalizeObservation(missingQuote), /quote is required/);
 });
 
-test("citation side is present exactly for pull-request diffs", () => {
+void test("citation side is present exactly for pull-request diffs", () => {
 	const missingDiffSide = baseObservation();
 	delete onlyCitation(missingDiffSide.evidence.citations).side;
 	assert.throws(() => normalizeObservation(missingDiffSide), /side must be OLD or NEW/);
@@ -256,7 +261,7 @@ test("citation side is present exactly for pull-request diffs", () => {
 	assert.throws(() => normalizeObservation(nonDiffSide), /must not specify side/);
 });
 
-test("a citation must name a source this run staged, and the artifact that source produced", () => {
+void test("a citation must name a source this run staged, and the artifact that source produced", () => {
 	const observation = normalizeObservation(baseObservation());
 	assert.doesNotThrow(() =>
 		validateEvidenceSources(
@@ -289,7 +294,7 @@ test("a citation must name a source this run staged, and the artifact that sourc
 	);
 });
 
-test("diff citations bind the quote to the claimed file and line", () => {
+void test("diff citations bind the quote to the claimed file and line", () => {
 	const citation = onlyCitation(normalizeObservation(baseObservation()).evidence.citations);
 	const diff =
 		"diff --git a/src/Auth.java b/src/Auth.java\n+++ b/src/Auth.java\n@@ -10 +10 @@\n[L10] + insecure();\n";
@@ -299,7 +304,7 @@ test("diff citations bind the quote to the claimed file and line", () => {
 	assert.equal(citationMatchesArtifact({ ...citation, endLine: 12 }, diff), false);
 });
 
-test("removed-line citations use old-side coordinates", () => {
+void test("removed-line citations use old-side coordinates", () => {
 	const citation: NormalizedCitation = {
 		...onlyCitation(normalizeObservation(baseObservation()).evidence.citations),
 		side: "OLD",
@@ -318,7 +323,7 @@ test("removed-line citations use old-side coordinates", () => {
 // that obeyed got an error back and refiled the observation as NOT_APPLICABLE — writing "nothing to
 // see here" into a person's record on a change where there was something to see.
 
-test("INCONCLUSIVE is accepted and carries no assessment", () => {
+void test("INCONCLUSIVE is accepted and carries no assessment", () => {
 	const out = normalizeObservation({
 		...baseObservation(),
 		presence: "INCONCLUSIVE",
@@ -329,7 +334,7 @@ test("INCONCLUSIVE is accepted and carries no assessment", () => {
 	assert.equal("assessment" in out, false);
 });
 
-test("an assessment attached to a valence-free presence is dropped, not rejected", () => {
+void test("an assessment attached to a valence-free presence is dropped, not rejected", () => {
 	const observation = (presence: Presence) =>
 		presence === "NOT_APPLICABLE"
 			? notApplicableObservation(goodInapplicability, { assessment: "GOOD" })
@@ -346,7 +351,7 @@ test("an assessment attached to a valence-free presence is dropped, not rejected
 	}
 });
 
-test("carriesValence agrees with the presence/assessment coupling", () => {
+void test("carriesValence agrees with the presence/assessment coupling", () => {
 	assert.equal(carriesValence("PRESENT"), true);
 	assert.equal(carriesValence("ABSENT"), true);
 	assert.equal(carriesValence("NOT_APPLICABLE"), false);
@@ -378,7 +383,7 @@ const goodSearch = {
 	boundary: "only threads on this pull request; nothing in chat",
 };
 
-test("an ABSENT observation must record where it searched", () => {
+void test("an ABSENT observation must record where it searched", () => {
 	assert.throws(
 		() => normalizeObservation(absentObservation(undefined)),
 		/exactly exhaustiveSearch/,
@@ -400,7 +405,7 @@ test("an ABSENT observation must record where it searched", () => {
 	assert.deepEqual(out.evidence.search?.consulted, ["scm.review-threads"]);
 });
 
-test("a non-ABSENT observation rejects an exhaustive-search branch", () => {
+void test("a non-ABSENT observation rejects an exhaustive-search branch", () => {
 	assert.doesNotThrow(() => normalizeObservation(baseObservation()));
 	assert.equal("search" in normalizeObservation(baseObservation()).evidence, false);
 	assert.throws(
@@ -413,7 +418,7 @@ test("a non-ABSENT observation rejects an exhaustive-search branch", () => {
 	);
 });
 
-test("ABSENT is refused unless the search covered every source the practice asserts absence over", () => {
+void test("ABSENT is refused unless the search covered every source the practice asserts absence over", () => {
 	const observation = normalizeObservation(absentObservation(goodSearch));
 	const available = new Set(["scm.review-threads", "scm.linked-work-items"]);
 
@@ -448,7 +453,7 @@ test("ABSENT is refused unless the search covered every source the practice asse
 // existing search-scope rule already measures. So the gate is not new machinery: an ABSENT+GOOD is
 // admitted on the same evidence an ABSENT+BAD is, plus the requirement that a corpus was declared at all.
 
-test("ABSENT + GOOD needs a practice that bounded its corpus; ABSENT + BAD does not", () => {
+void test("ABSENT + GOOD needs a practice that bounded its corpus; ABSENT + BAD does not", () => {
 	const strength = normalizeObservation(
 		absentObservation(goodSearch, { assessment: "GOOD", severity: undefined }),
 	);
@@ -466,7 +471,7 @@ test("ABSENT + GOOD needs a practice that bounded its corpus; ABSENT + BAD does 
 	assert.doesNotThrow(() => validateSearchScope(gap, new Set(), available));
 });
 
-test("a bounded corpus does not excuse a partial search, in either direction", () => {
+void test("a bounded corpus does not excuse a partial search, in either direction", () => {
 	const strength = normalizeObservation(
 		absentObservation(goodSearch, { assessment: "GOOD", severity: undefined }),
 	);
@@ -482,14 +487,14 @@ test("a bounded corpus does not excuse a partial search, in either direction", (
 	);
 });
 
-test("the search scope rule applies to ABSENT only", () => {
+void test("the search scope rule applies to ABSENT only", () => {
 	const present = normalizeObservation(baseObservation());
 	assert.doesNotThrow(() =>
 		validateSearchScope(present, new Set(["scm.review-threads"]), new Set()),
 	);
 });
 
-test("a claim about an earlier review is bound to the staged history like any other citation", () => {
+void test("a claim about an earlier review is bound to the staged history like any other citation", () => {
 	// The history is staged for every review without any binding declaring it, as every source now is.
 	// The point of declaring it as a source rather than dropping it in as loose context is exactly this:
 	// "we raised this before" becomes a quote that has to match staged bytes, instead of a plausible
@@ -528,7 +533,7 @@ test("a claim about an earlier review is bound to the staged history like any ot
 	);
 });
 
-test("the history is never an exhaustive source, so it can never carry an absence", () => {
+void test("the history is never an exhaustive source, so it can never carry an absence", () => {
 	// It is a bounded window over a growing record: it can show that something recurred and can never
 	// show that something never happened. No practice may hold it EXHAUSTIVE, so an ABSENT claim can
 	// cite it as one place it looked but can never rest on it.
@@ -577,7 +582,7 @@ const goodInapplicability = {
 	ruledOutBy: "the change touches only Markdown documentation and makes no network calls",
 };
 
-test("a NOT_APPLICABLE observation must say what rules the practice out", () => {
+void test("a NOT_APPLICABLE observation must say what rules the practice out", () => {
 	assert.throws(
 		() => normalizeObservation(notApplicableObservation(undefined)),
 		/exactly exclusion/,
@@ -597,11 +602,13 @@ test("a NOT_APPLICABLE observation must say what rules the practice out", () => 
 	);
 
 	const out = normalizeObservation(notApplicableObservation(goodInapplicability));
-	assert.deepEqual(out.evidence.inapplicability?.consulted, ["scm.pull-request.diff"]);
-	assert.equal(out.evidence.inapplicability?.subject, goodInapplicability.subject);
+	const { inapplicability } = out.evidence;
+	assert.ok(inapplicability, "a NOT_APPLICABLE observation must come back carrying its ground");
+	assert.deepEqual(inapplicability.consulted, ["scm.pull-request.diff"]);
+	assert.equal(inapplicability.subject, goodInapplicability.subject);
 });
 
-test("the refusal points at INCONCLUSIVE, because that is the answer it is asking for", () => {
+void test("the refusal points at INCONCLUSIVE, because that is the answer it is asking for", () => {
 	// The whole point of the rule: a model that cannot name the ground has not found an inapplicable
 	// practice, it has found one it could not call. If the error did not say so it would just teach the
 	// model to invent a ruledOutBy.
@@ -613,7 +620,7 @@ test("the refusal points at INCONCLUSIVE, because that is the answer it is askin
 	);
 });
 
-test("INCONCLUSIVE needs no inapplicability block — it is not claiming anything about the work", () => {
+void test("INCONCLUSIVE needs no inapplicability block — it is not claiming anything about the work", () => {
 	const out = normalizeObservation({
 		...baseObservation(),
 		presence: "INCONCLUSIVE",
@@ -623,7 +630,7 @@ test("INCONCLUSIVE needs no inapplicability block — it is not claiming anythin
 	assert.equal("inapplicability" in out.evidence, false);
 });
 
-test("a NOT_APPLICABLE claim may only rest on sources this run staged", () => {
+void test("a NOT_APPLICABLE claim may only rest on sources this run staged", () => {
 	const observation = normalizeObservation(notApplicableObservation(goodInapplicability));
 	assert.doesNotThrow(() =>
 		validateInapplicabilityScope(observation, new Set(["scm.pull-request.diff"])),
@@ -638,7 +645,7 @@ test("a NOT_APPLICABLE claim may only rest on sources this run staged", () => {
 	assert.doesNotThrow(() => validateInapplicabilityScope(present, new Set()));
 });
 
-test("removed measurement fields are rejected rather than silently accepted", () => {
+void test("removed measurement fields are rejected rather than silently accepted", () => {
 	assert.throws(
 		() => normalizeObservation(baseObservation({ guidance: "Split into two PRs." })),
 		/unknown observation field.*guidance/,
@@ -649,7 +656,7 @@ test("removed measurement fields are rejected rather than silently accepted", ()
 	);
 });
 
-test("final discriminated outcomes map to the persisted vocabulary", () => {
+void test("final discriminated outcomes map to the persisted vocabulary", () => {
 	const assessed = baseObservation();
 	assert.deepEqual(
 		{
@@ -668,7 +675,7 @@ test("final discriminated outcomes map to the persisted vocabulary", () => {
 	assert.equal(normalized.assessment, undefined);
 });
 
-test("outcome is one exact semantic value rather than nullable peer fields", () => {
+void test("outcome is one exact semantic value rather than nullable peer fields", () => {
 	const objectOutcome = baseObservation();
 	objectOutcome.outcome = { kind: "ASSESSED", occurrence: "PRESENT", assessment: "GOOD" };
 	assert.throws(() => normalizeFinalObservation(objectOutcome), /invalid outcome/);
@@ -684,7 +691,7 @@ test("outcome is one exact semantic value rather than nullable peer fields", () 
 // INCONCLUSIVE not once. The parity test pins the vocabularies against Java; this pins the meanings
 // against the vocabularies.
 
-test("every vocabulary value carries a description", () => {
+void test("every vocabulary value carries a description", () => {
 	const vocabularies: { values: readonly string[]; descriptions: object; label: string }[] = [
 		{ values: PRESENCE_VALUES, descriptions: PRESENCE_DESCRIPTIONS, label: "presence" },
 		{ values: ASSESSMENT_VALUES, descriptions: ASSESSMENT_DESCRIPTIONS, label: "assessment" },
@@ -699,7 +706,7 @@ test("every vocabulary value carries a description", () => {
 	}
 });
 
-test("describeVocabulary refuses a value it cannot describe", () => {
+void test("describeVocabulary refuses a value it cannot describe", () => {
 	// The guard that makes the coverage above structural: adding a presence without describing it fails
 	// when the schema is built, rather than shipping a word the model has no way to choose.
 	// A description map that makes no promise about which vocabulary it covers is what lets this call
@@ -712,7 +719,7 @@ test("describeVocabulary refuses a value it cannot describe", () => {
 	);
 });
 
-test("each presence description discriminates it from its nearest neighbour", () => {
+void test("each presence description discriminates it from its nearest neighbour", () => {
 	// Not prose-checking: the failure mode is a description that defines a value in isolation, which is
 	// no help at the only moment it is read — when two values both look defensible.
 	const rendered = describeVocabulary(PRESENCE_VALUES, PRESENCE_DESCRIPTIONS);
@@ -730,7 +737,7 @@ test("each presence description discriminates it from its nearest neighbour", ()
 // `Resolve "Connect data between screens"` verbatim, it returned curly quotes in 6 of 6 runs across
 // three tool-schema shapes. The transcription was faithful; only the glyphs moved. Before this fold
 // the citation failed `includes`, report_observation threw, and the observation was lost.
-test("a citation survives the typographic substitutions a model makes while transcribing", () => {
+void test("a citation survives the typographic substitutions a model makes while transcribing", () => {
 	const content = 'Resolve "Connect data between screens" — see the plan';
 	const cite = (quote: string): NormalizedCitation => ({
 		sourceKind: "scm.pull-request.core",
@@ -752,7 +759,7 @@ test("a citation survives the typographic substitutions a model makes while tran
 	assert.equal(citationMatchesArtifact(cite("see the plan"), content), true);
 });
 
-test("folding glyphs never makes a quote the artifact does not contain match", () => {
+void test("folding glyphs never makes a quote the artifact does not contain match", () => {
 	const content = 'Resolve "Connect data between screens"';
 	const cite = (quote: string): NormalizedCitation => ({
 		sourceKind: "scm.pull-request.core",
@@ -774,7 +781,7 @@ test("folding glyphs never makes a quote the artifact does not contain match", (
 // directions: it made the value cheap to write, and — because it appeared in no schema — hard to find.
 // Moving evidence ahead of the verdict dropped it from 6/6 of the undecidable cases to 1/6; adding this
 // block restored 6/6.
-test("an INCONCLUSIVE observation must say what it could not settle", () => {
+void test("an INCONCLUSIVE observation must say what it could not settle", () => {
 	const base = {
 		practiceSlug: "describe-what-and-why",
 		title: "Rationale lives somewhere this review cannot read",

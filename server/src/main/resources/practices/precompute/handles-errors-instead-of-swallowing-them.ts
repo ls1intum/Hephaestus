@@ -113,7 +113,7 @@ function consecutiveWindows(added: Map<number, string>): Array<{ start: number; 
 	return windows;
 }
 
-export default async function (
+export default function handlesErrorsInsteadOfSwallowingThem(
 	_repo: string,
 	diffFiles: Map<string, DiffFile>,
 	_m: PullRequestMetadata,

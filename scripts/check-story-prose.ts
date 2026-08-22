@@ -28,7 +28,7 @@ if (files.length === 0) {
 	process.exit(1);
 }
 
-const offenders = [];
+const offenders: string[] = [];
 for (const file of files) {
 	const path = join(STORIES, file);
 	const lines = (await readFile(path, "utf8")).split("\n");

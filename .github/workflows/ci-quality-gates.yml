@@ -113,24 +113,24 @@ jobs:
           pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
-          FMT_OK=true; BIOME_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true
+          FMT_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
           # Runs before the Biome step so a version skew is reported as a version skew rather than
           # as a wall of formatting diffs from the wrong release.
           pnpm run check:biome-pin \
             || { PIN_OK=false; ISSUES_FOUND+=("Biome version skew between package.json, node_modules and the \$schema URLs."); }
-          # Lint + format + import order for every TypeScript tree outside the webapp: the Bun agent
-          # runtime, its specs, both precompute trees and scripts/. Path roots and the rule set live
-          # in biome.jsonc, so a new tree is covered by editing that file alone. `ci:agents` emits
-          # GitHub annotations, so findings land on the diff rather than only in this log.
+          # Every TypeScript tree outside the webapp: the Bun agent runtime, its specs, both
+          # precompute trees, scripts/, docs/ and the repo-root config files. oxlint lints
+          # (.oxlintrc.json) and Biome formats (biome.jsonc). Both emit GitHub annotations, so
+          # findings land on the diff rather than only in this log.
           pnpm run ci:agents \
-            || { BIOME_OK=false; ISSUES_FOUND+=("Agent/scripts lint or formatting failed. Run: pnpm run check:agents:fix"); }
+            || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed outside the webapp. Run: pnpm run check:agents:fix"); }
           # Directory arguments, not a file list: a new spec is picked up without editing this file.
           pnpm run test:agents \
             || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: pnpm run test:agents"); }
           # Both typecheck legs run here because both trees are behind this job's path filter, and
-          # `&&` inside check:agents would hide the second one behind a Biome failure.
+          # `&&` inside check:agents would hide the second one behind a lint failure.
           pnpm run typecheck:agents \
             || { TYPES_OK=false; ISSUES_FOUND+=("Agent TypeScript errors. Run: pnpm run typecheck:agents"); }
           pnpm run typecheck:scripts \
@@ -143,7 +143,7 @@ jobs:
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$PIN_OK" == "false" ]] && echo "| Biome version pin | :x: Failed | \`pnpm run check:biome-pin\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$BIOME_OK" == "false" ]] && echo "| Biome (agent runtime + scripts) | :x: Failed | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (outside webapp) | :x: Failed | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TESTS_OK" == "false" ]] && echo "| Agent runtime tests | :x: Failed | \`pnpm run test:agents\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TYPES_OK" == "false" ]] && echo "| Agent typecheck | :x: Failed | \`pnpm run typecheck:agents\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$SCRIPT_TYPES_OK" == "false" ]] && echo "| scripts/ typecheck | :x: Failed | \`pnpm run typecheck:scripts\` |" >> $GITHUB_STEP_SUMMARY
@@ -170,8 +170,8 @@ jobs:
 
           pnpm run check || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed. Run: cd webapp && pnpm run check:fix"); }
           pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
-          node ../scripts/check-presentational-components.mjs || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
-          node ../scripts/check-story-prose.mjs || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
+          node ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
+          node ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY

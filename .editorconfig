@@ -16,7 +16,7 @@ indent_size = 4
 max_line_length = 120
 
 # TypeScript/JavaScript - tabs (matches Biome config)
-# .mjs is included because scripts/**/*.mjs is formatted by the root biome.jsonc.
+# .cjs is included for the changesets changelog plugin, which changesets loads by `require`.
 [*.{ts,tsx,js,jsx,mjs,cjs}]
 indent_style = tab
 indent_size = 2

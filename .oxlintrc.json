@@ -1,0 +1,292 @@
+{
+	"$schema": "./node_modules/oxlint/configuration_schema.json",
+
+	// Everything outside `webapp/` and `docs/`, both of which carry their own config. A nested config
+	// REPLACES this one for the files under it rather than merging, so each tree states its rules in full.
+	"plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
+
+	// Root-only, and global: `typeAware` governs every config in the repo, nested ones included. It
+	// needs `oxlint-tsgolint`, and without it every type-aware rule reads as enabled and checks nothing.
+	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true },
+
+	"categories": {
+		"correctness": "error",
+		"suspicious": "error",
+		"perf": "off",
+		"pedantic": "off",
+		"style": "off",
+		"restriction": "off"
+	},
+
+	"env": { "node": true, "es2023": true },
+
+	"rules": {
+		"no-else-return": "error",
+		"prefer-const": "error",
+		"prefer-template": "error",
+		"operator-assignment": "error",
+		"typescript/prefer-for-of": "error",
+		"typescript/no-explicit-any": "error",
+		"typescript/require-await": "error",
+		"typescript/no-unsafe-call": "error",
+		"typescript/no-unsafe-assignment": "error",
+		"typescript/no-unsafe-argument": "error",
+		"typescript/no-unsafe-return": "error",
+		"typescript/no-unsafe-member-access": "error",
+		"typescript/no-non-null-assertion": "error",
+		"unicorn/prefer-node-protocol": "error",
+		"oxc/no-accumulating-spread": "error",
+		"eqeqeq": [
+		"error",
+		"always",
+		{
+		"null": "ignore"
+		}
+		],
+		"unicorn/no-abusive-eslint-disable": "error",
+		"no-fallthrough": "error",
+		"no-case-declarations": "error",
+		"no-inner-declarations": "error",
+		"no-prototype-builtins": "error",
+		"no-self-compare": "error",
+		"no-shadow": "error",
+		"no-throw-literal": "error",
+		"no-constructor-return": "error",
+		"no-promise-executor-return": "error",
+		"no-loop-func": "error",
+		"no-new-wrappers": "error",
+		"no-object-constructor": "error",
+		"no-array-constructor": "error",
+		"no-useless-call": "error",
+		"prefer-promise-reject-errors": "error",
+		"array-callback-return": "error",
+		"accessor-pairs": "error",
+		"radix": "error",
+		"symbol-description": "error",
+		"typescript/no-unsafe-function-type": "error",
+		"typescript/prefer-enum-initializers": "error",
+		"typescript/no-mixed-enums": "error",
+		"unicorn/new-for-builtins": "error",
+		"unicorn/no-instanceof-array": "error",
+		"unicorn/no-immediate-mutation": "error",
+		"unicorn/no-this-assignment": "error",
+		"unicorn/no-static-only-class": "error",
+		"unicorn/no-unreadable-iife": "error",
+		"unicorn/no-negation-in-equality-check": "error",
+		"unicorn/no-useless-promise-resolve-reject": "error",
+		"unicorn/no-unnecessary-array-flat-depth": "error",
+		"unicorn/no-unnecessary-array-splice-count": "error",
+		"unicorn/no-unnecessary-slice-end": "error",
+		"unicorn/consistent-assert": "error",
+		"unicorn/consistent-empty-array-spread": "error",
+		"unicorn/prefer-array-find": "error",
+		"unicorn/prefer-array-flat": "error",
+		"unicorn/prefer-array-flat-map": "error",
+		"unicorn/prefer-array-some": "error",
+		"unicorn/prefer-date-now": "error",
+		"unicorn/prefer-dom-node-remove": "error",
+		"unicorn/prefer-math-min-max": "error",
+		"unicorn/prefer-prototype-methods": "error",
+		"unicorn/prefer-regexp-test": "error",
+		"unicorn/prefer-single-call": "error",
+		"unicorn/prefer-blob-reading-methods": "error",
+		"unicorn/require-number-to-fixed-digits-argument": "error",
+		"no-proto": "error",
+		"no-script-url": "error",
+		"no-var": "error",
+		"no-empty": "error",
+		"typescript/no-namespace": "error",
+		"typescript/ban-ts-comment": "error",
+		"unicorn/prefer-number-properties": "error",
+		"unicorn/prefer-array-index-of": "error",
+		"no-alert": "error",
+		"no-sequences": "error",
+		"no-implicit-globals": "error",
+		"no-regex-spaces": "error",
+		"no-div-regex": "error",
+		"unicode-bom": "error",
+		"typescript/no-require-imports": "error",
+		"typescript/no-var-requires": "error",
+		"typescript/no-empty-object-type": "error",
+		"typescript/no-import-type-side-effects": "error",
+		"typescript/no-non-null-asserted-nullish-coalescing": "error",
+		"typescript/prefer-literal-enum-member": "error",
+		"import/no-commonjs": "error",
+		"import/no-amd": "error",
+		"import/no-dynamic-require": "error",
+		"import/no-webpack-loader-syntax": "error",
+		"unicorn/no-anonymous-default-export": "error",
+		"unicorn/no-process-exit": "error",
+		"unicorn/no-length-as-slice-end": "error",
+		"unicorn/no-magic-array-flat-depth": "error",
+		"unicorn/no-useless-error-capture-stack-trace": "error",
+		"oxc/no-const-enum": "error",
+		"oxc/bad-bitwise-operator": "error",
+		"promise/catch-or-return": "error",
+		"no-template-curly-in-string": "error",
+		"no-new-func": "error",
+		"no-return-assign": "error",
+		"no-multi-assign": "error",
+		"no-lone-blocks": "error",
+		"no-labels": "error",
+		"no-label-var": "error",
+		"no-extra-label": "error",
+		"no-multi-str": "error",
+		"no-useless-computed-key": "error",
+		"no-lonely-if": "error",
+		"default-case-last": "error",
+		"default-param-last": "error",
+		"grouped-accessor-pairs": "error",
+		"func-name-matching": "error",
+		"prefer-regex-literals": "error",
+		"prefer-object-has-own": "error",
+		"prefer-object-spread": "error",
+		"prefer-spread": "error",
+		"prefer-rest-params": "error",
+		"prefer-numeric-literals": "error",
+		"prefer-exponentiation-operator": "error",
+		"prefer-arrow-callback": "error",
+		"import/no-duplicates": "error",
+		"no-duplicate-imports": "error",
+		"import/no-mutable-exports": "error",
+		"import/no-named-default": "error",
+		"import/no-anonymous-default-export": "error",
+		"promise/no-nesting": "error",
+		"promise/no-return-wrap": "error",
+		"promise/prefer-catch": "error",
+		"typescript/adjacent-overload-signatures": "error",
+		"typescript/ban-tslint-comment": "error",
+		"typescript/no-empty-interface": "error",
+		"typescript/no-inferrable-types": "error",
+		"typescript/no-unnecessary-qualifier": "error",
+		"typescript/prefer-function-type": "error",
+		"typescript/unified-signatures": "error",
+		"typescript/consistent-type-assertions": "error",
+		"import/export": "error",
+		"import/named": "error",
+		"no-unreachable-loop": "error",
+		"promise/no-return-in-finally": "error",
+		"promise/spec-only": "error",
+		"typescript/no-invalid-void-type": "error",
+		"typescript/prefer-find": "error",
+		"typescript/consistent-type-exports": "error",
+		"typescript/related-getter-setter-pairs": "error",
+		"typescript/prefer-reduce-type-parameter": "error",
+		"typescript/prefer-return-this-type": "error",
+		"typescript/restrict-plus-operands": "error",
+		"typescript/prefer-readonly": "error",
+		"typescript/method-signature-style": "error",
+		"typescript/prefer-ts-expect-error": "error",
+		"unicorn/no-useless-switch-case": "error",
+		"unicorn/no-useless-iterator-to-array": "error",
+		"unicorn/prefer-event-target": "error",
+		"unicorn/prefer-type-error": "error",
+		"unicorn/prefer-classlist-toggle": "error",
+		"unicorn/prefer-reflect-apply": "error",
+		"unicorn/prefer-response-static-json": "error",
+		"unicorn/prefer-bigint-literals": "error",
+		"unicorn/require-module-attributes": "error",
+		"oxc/no-barrel-file": "error",
+		"typescript/no-misused-promises": "error",
+		"typescript/no-deprecated": "error",
+		"typescript/no-misused-spread": "error",
+		"typescript/prefer-nullish-coalescing": "error",
+		"typescript/require-array-sort-compare": "error",
+		"typescript/prefer-promise-reject-errors": "error",
+		"typescript/no-meaningless-void-operator": "error",
+		"typescript/no-unnecessary-template-expression": "error",
+		"typescript/no-unnecessary-condition": "error",
+		"typescript/switch-exhaustiveness-check": [
+		"error",
+		{
+		"considerDefaultExhaustiveForUnions": true
+		}
+		],
+		"typescript/only-throw-error": [
+		"error",
+		{
+		"allow": [
+		{
+		"from": "package",
+		"package": "@tanstack/router-core",
+		"name": "Redirect"
+		},
+		{
+		"from": "package",
+		"package": "@tanstack/router-core",
+		"name": "NotFoundError"
+		}
+		]
+		}
+		],
+		"unicorn/error-message": "error",
+		"unicorn/throw-new-error": "error",
+		"unicorn/no-array-method-this-argument": "error",
+		"unicorn/no-unreadable-array-destructuring": "error",
+		"unicorn/consistent-date-clone": "error",
+		"unicorn/prefer-keyboard-event-key": "error",
+		"unicorn/require-array-join-separator": "error",
+		"unicorn/no-useless-collection-argument": "error",
+		"unicorn/explicit-timer-delay": "error",
+		"unicorn/prefer-structured-clone": "error",
+		"unicorn/prefer-dom-node-text-content": "error",
+		"unicorn/prefer-modern-dom-apis": "error",
+		"unicorn/switch-case-break-position": "error",
+		"unicorn/prefer-object-from-entries": "error",
+		"unicorn/prefer-includes": "error",
+		"unicorn/prefer-logical-operator-over-ternary": "error",
+		"unicorn/prefer-string-trim-start-end": "error",
+		"unicorn/consistent-template-literal-escape": "error",
+		"unicorn/text-encoding-identifier-case": "error",
+		"unicorn/explicit-length-check": "off",
+		"unicorn/no-array-sort": "off",
+		"unicorn/no-array-reverse": "off",
+		"typescript/consistent-return": "off",
+		"unicorn/consistent-function-scoping": "off",
+		"no-underscore-dangle": "off",
+		"promise/always-return": [
+		"error",
+		{
+		"ignoreLastCallback": true
+		}
+		],
+		"import/no-unassigned-import": [
+		"error",
+		{
+		"allow": [
+		"**/*.css",
+		"@tanstack/react-router",
+		"react"
+		]
+		}
+		],
+		"no-unused-vars": [
+		"error",
+		{
+		"argsIgnorePattern": "^_",
+		"varsIgnorePattern": "^_",
+		"caughtErrorsIgnorePattern": "^_"
+		}
+		]
+	},
+
+	"overrides": [
+		{
+			// The runner and the precompute scripts execute on Bun inside the agent sandbox, and a CLI
+			// entry point ends the process rather than returning a status nobody reads.
+			"files": [
+				"server/src/main/resources/agent/**",
+				"server/src/test/resources/agent/**",
+				"server/src/main/resources/practices/precompute/**",
+				"docker/agents/precompute/**",
+				"scripts/**"
+			],
+			"rules": { "unicorn/no-process-exit": "off" }
+		},
+		{
+			// A changesets changelog plugin is loaded by `require`, so CommonJS is the format it must be in.
+			"files": [".changeset/*.cjs"],
+			"rules": { "import/no-commonjs": "off" }
+		}
+	]
+}

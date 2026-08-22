@@ -81,7 +81,7 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
-	const contentType = response.headers.get("content-type") || "";
+	const contentType = response.headers.get("content-type") ?? "";
 	const acceptable = ["text/", "application/octet-stream", "application/yaml"];
 	if (!acceptable.some((type) => contentType.includes(type))) {
 		console.error(`Unexpected Content-Type: ${contentType}`);
@@ -100,7 +100,7 @@ async function main(): Promise<void> {
 
 	const tempFile = `${SPEC_FILE}.tmp`;
 	try {
-		writeFileSync(tempFile, content, "utf-8");
+		writeFileSync(tempFile, content, "utf8");
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1024)}KB`);
 		renameSync(tempFile, SPEC_FILE);

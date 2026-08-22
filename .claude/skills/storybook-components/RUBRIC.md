@@ -90,8 +90,9 @@ Snapshot: 44 arg-ignoring `render`s, 46 `render: (args`, 242/256 `satisfies Meta
 
 **Anti-criterion — the swallowed spy.** A stateful wrapper that *overrides* a callback from `args` makes
 the `fn()` in `meta.args` unreachable: never assertable, Actions panel permanently empty, file looks well
-instrumented. Live instance: `admin/practice-catalog/OccasionLifecycle.stories.tsx:18-33`. Detection: for
-each `fn()` in `meta.args`, grep for a JSX attribute of the same name that is **not** `{...args}`.
+instrumented. Detection: for each `fn()` in `meta.args`, grep for a JSX attribute of the same name that
+is **not** `{...args}`. `OccasionLifecycle.stories.tsx` is the shape that survives: spread `{...args}`,
+patch only the props the wrapper holds state for.
 
 ## Dimension 5 — Which states does the file actually show?
 
@@ -101,7 +102,7 @@ each `fn()` in `meta.args`, grep for a JSX attribute of the same name that is **
 - **B** — C plus every branch of the component's own state union, plus the two content edges the layout
   can lose to: longest realistic string and empty collection.
 - **A** — B plus the 320px reflow viewport where the component has a horizontal axis (72 stories set one;
-  `.storybook/preview.tsx` defines `reflow` and `mobile`).
+  `.storybook/preview.ts` defines `reflow` and `mobile`).
 - **A+** — B/A plus **dark**. Nothing currently renders dark under test: `withThemeByClassName` defaults
   to `light`, Chromatic captures `viewports: [1440]` with no `modes`, and no story sets a dark global.
   Contrast in dark is un-asserted by construction.
@@ -151,7 +152,7 @@ presentational badge is theatre. **Grade the component, not the file.**
   genuinely out of the tab order, or that an error field's `aria-describedby` points at the element
   carrying the message.
 
-**Confirmation, not a finding: this is at ceiling.** `.storybook/preview.tsx` sets `a11y: { test: "error" }`
+**Confirmation, not a finding: this is at ceiling.** `.storybook/preview.ts` sets `a11y: { test: "error" }`
 project-wide; across 256 story files there are **zero** per-story or per-meta `todo`/`off` overrides and
 zero disabled rules. The single global exclusion (`[data-base-ui-focus-guard]`) cites the upstream bug.
 Protect this; do not propose work here.
@@ -175,7 +176,7 @@ the component's documentation page.
 - **A+** — A file with no `autodocs` says in its meta why it opted out (`SortableCatalogTree.stories.tsx` —
   the stories render a harness).
 
-`node scripts/check-story-prose.mjs` gates `<p>` only. For the D band there is no gate — it is a review
+`node scripts/check-story-prose.ts` gates `<p>` only. For the D band there is no gate — it is a review
 question: *delete this block; is anything lost?* Snapshot: 106/256 files have a meta JSDoc; 657/1494 stories
 have one.
 
@@ -188,7 +189,7 @@ have one.
 - **A** — B, and the gate's own comment explains the two neighbouring shapes it deliberately does *not*
   match, so nobody widens it into a nuisance (all three house rules do this).
 - **A+** — The gate is shrink-only: an allowlist entry that scans clean fails the build, so it cannot go
-  stale (`scripts/check-presentational-components.mjs`).
+  stale (`scripts/check-presentational-components.ts`).
 
 For each rule in a guidelines diff, `grep` for the thing it forbids across `webapp/src`. **A rule with a 0%
 adoption rate is not a rule** — the `value`/`onValueChange` mandate was deleted for this reason. A rule with

@@ -6,9 +6,10 @@
  * value crossing that boundary — the imported module, what it returns, the JSON already written to
  * disk — is therefore `unknown` until one of the guards below has checked it.
  *
- * These validators throw with a `source`-prefixed message instead of returning a partial value: the
- * runner turns that throw into a per-practice `status: "error"` result, so one off-contract script
- * degrades to "the agent must analyse this practice manually" and never corrupts the run.
+ * Every violation these validators report is a value of the wrong type, so each throws a `TypeError`
+ * carrying a `source`-prefixed message rather than returning a partial value: the runner turns that
+ * throw into a per-practice `status: "error"` result, so one off-contract script degrades to "the
+ * agent must analyse this practice manually" and never corrupts the run.
  */
 
 import type { Hint, HintFlag, PracticeFindings, PracticeResult, PracticeScript } from "./types";
@@ -56,20 +57,20 @@ function isHint(value: unknown): value is Hint {
 /** Validate a script's return value against the PracticeFindings contract. */
 export function parseFindings(value: unknown, source: string): PracticeFindings {
 	if (!isJsonObject(value)) {
-		throw new Error(`${source} must return an object`);
+		throw new TypeError(`${source} must return an object`);
 	}
 
 	const { hints, metrics, directions } = value;
 	if (!Array.isArray(hints) || !hints.every(isHint)) {
-		throw new Error(
+		throw new TypeError(
 			`${source}: hints must be an array of {file, line, pattern, context, inDiff, flags}`,
 		);
 	}
 	if (!Array.isArray(directions) || !directions.every(isString)) {
-		throw new Error(`${source}: directions must be an array of strings`);
+		throw new TypeError(`${source}: directions must be an array of strings`);
 	}
 	if (!isJsonObject(metrics)) {
-		throw new Error(`${source}: metrics must be an object`);
+		throw new TypeError(`${source}: metrics must be an object`);
 	}
 
 	const numericMetrics: Record<string, number> = {};
@@ -77,7 +78,7 @@ export function parseFindings(value: unknown, source: string): PracticeFindings 
 		if (typeof metric !== "number" || !Number.isFinite(metric)) {
 			// JSON.stringify writes NaN/Infinity as `null`, so an unchecked metric silently becomes a
 			// hole in {slug}.json. Naming the key here makes the script's bug findable.
-			throw new Error(`${source}: metrics.${key} must be a finite number`);
+			throw new TypeError(`${source}: metrics.${key} must be a finite number`);
 		}
 		numericMetrics[key] = metric;
 	}
@@ -88,15 +89,15 @@ export function parseFindings(value: unknown, source: string): PracticeFindings 
 /** Validate an already-written `{slug}.json` against the full PracticeResult contract. */
 export function parsePracticeResult(value: unknown, source: string): PracticeResult {
 	if (!isJsonObject(value)) {
-		throw new Error(`${source} must be an object`);
+		throw new TypeError(`${source} must be an object`);
 	}
 
 	const { practice, status } = value;
 	if (typeof practice !== "string" || practice.length === 0) {
-		throw new Error(`${source}: practice must be a non-empty string`);
+		throw new TypeError(`${source}: practice must be a non-empty string`);
 	}
 	if (status !== "ok" && status !== "error" && status !== "timeout") {
-		throw new Error(`${source}: status must be one of ok, error, timeout`);
+		throw new TypeError(`${source}: status must be one of ok, error, timeout`);
 	}
 
 	return { practice, status, ...parseFindings(value, source) };

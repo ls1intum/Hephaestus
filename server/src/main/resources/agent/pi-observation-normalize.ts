@@ -197,13 +197,29 @@ export function carriesValence(presence: string): presence is ValencedPresence {
 }
 
 /**
+ * The trimmed text of a value the model sent, and "" for anything that has no text of its own.
+ *
+ * <p>An object or an array has none. Coercing one yields "[object Object]", or its elements run
+ * together, and either is a non-empty string — so a required-field check downstream reads a field the
+ * model filled in with the wrong kind of value as one it filled in correctly. Here that value reads as
+ * absent instead, which is the case those checks already answer.
+ */
+function trimmedText(value: unknown): string {
+	if (typeof value === "string") return value.trim();
+	if (typeof value === "number" || typeof value === "boolean" || typeof value === "bigint") {
+		return String(value);
+	}
+	return "";
+}
+
+/**
  * The non-empty trimmed strings in a value the model sent as a list, and [] for anything that is not
  * one. Both warrants below name the sources they consulted this way, and neither may assume the model
  * sent an array of strings just because the tool schema asked for one.
  */
 function trimmedStrings(value: unknown): string[] {
 	return Array.isArray(value)
-		? value.map((entry: unknown) => String(entry ?? "").trim()).filter(Boolean)
+		? value.map((entry: unknown) => trimmedText(entry)).filter(Boolean)
 		: [];
 }
 
@@ -216,8 +232,8 @@ function trimmedStrings(value: unknown): string[] {
 export function normalizeSearch(search: unknown): RecordedSearch {
 	if (!isRecord(search)) throw new Error("search is required");
 	const consulted = trimmedStrings(search.consulted);
-	const lookedFor = String(search.lookedFor ?? "").trim();
-	const boundary = String(search.boundary ?? "").trim();
+	const lookedFor = trimmedText(search.lookedFor);
+	const boundary = trimmedText(search.boundary);
 	if (consulted.length === 0)
 		throw new Error("search.consulted must name at least one source you searched");
 	if (!lookedFor) throw new Error("search.lookedFor is required");
@@ -243,8 +259,8 @@ export function normalizeSearch(search: unknown): RecordedSearch {
 export function normalizeInapplicability(inapplicability: unknown): RecordedInapplicability {
 	if (!isRecord(inapplicability)) throw new Error("inapplicability is required");
 	const consulted = trimmedStrings(inapplicability.consulted);
-	const subject = String(inapplicability.subject ?? "").trim();
-	const ruledOutBy = String(inapplicability.ruledOutBy ?? "").trim();
+	const subject = trimmedText(inapplicability.subject);
+	const ruledOutBy = trimmedText(inapplicability.ruledOutBy);
 	if (consulted.length === 0)
 		throw new Error(
 			"inapplicability.consulted must name at least one source you read to conclude this",
@@ -266,13 +282,13 @@ export function normalizeEvidence(evidence: unknown, presence: Presence): Normal
 		// A citation that is not an object reads as one with every field missing, which is what the
 		// required-field checks below already reject by name.
 		const fields: Record<string, unknown> = isRecord(citation) ? citation : {};
-		const sourceKind = String(fields.sourceKind ?? "").trim();
-		const artifactPath = String(fields.artifactPath ?? "").trim();
-		const path = String(fields.path ?? "").trim();
-		const declaredSide = fields.side == null ? null : String(fields.side).trim().toUpperCase();
+		const sourceKind = trimmedText(fields.sourceKind);
+		const artifactPath = trimmedText(fields.artifactPath);
+		const path = trimmedText(fields.path);
+		const declaredSide = fields.side == null ? null : trimmedText(fields.side).toUpperCase();
 		const startLine = Number(fields.startLine);
 		const endLine = fields.endLine == null ? startLine : Number(fields.endLine);
-		const quote = String(fields.quote ?? "").trim();
+		const quote = trimmedText(fields.quote);
 		if (!sourceKind) throw new Error("evidence citation sourceKind is required");
 		if (!artifactPath) throw new Error("evidence citation artifactPath is required");
 		if (!path) throw new Error("evidence citation path is required");
@@ -345,8 +361,8 @@ export function normalizeEvidence(evidence: unknown, presence: Presence): Normal
  */
 export function normalizeUndecidability(undecidability: unknown): RecordedUndecidability {
 	if (!isRecord(undecidability)) throw new Error("undecidability is required");
-	const openQuestion = String(undecidability.openQuestion ?? "").trim();
-	const wouldSettleIt = String(undecidability.wouldSettleIt ?? "").trim();
+	const openQuestion = trimmedText(undecidability.openQuestion);
+	const wouldSettleIt = trimmedText(undecidability.wouldSettleIt);
 	if (!openQuestion) throw new Error("undecidability.openQuestion is required");
 	if (!wouldSettleIt) throw new Error("undecidability.wouldSettleIt is required");
 	return { openQuestion, wouldSettleIt };
@@ -411,15 +427,10 @@ export function normalizeObservation(observation: unknown): NormalizedObservatio
 	const unknownFields = Object.keys(observation).filter((key) => !allowed.has(key));
 	if (unknownFields.length)
 		throw new Error(`unknown observation field(s): ${unknownFields.join(", ")}`);
-	const practiceSlug = String(observation.practiceSlug ?? "")
-		.trim()
-		.toLowerCase()
-		.replace(/_/g, "-");
-	const title = String(observation.summary ?? "").trim();
-	const reasoning = String(observation.evidenceRationale ?? "").trim();
-	const outcome = String(observation.outcome ?? "")
-		.trim()
-		.toUpperCase();
+	const practiceSlug = trimmedText(observation.practiceSlug).toLowerCase().replace(/_/g, "-");
+	const title = trimmedText(observation.summary);
+	const reasoning = trimmedText(observation.evidenceRationale);
+	const outcome = trimmedText(observation.outcome).toUpperCase();
 	const { presence, assessment, severity } = parseOutcome(outcome);
 	if (!practiceSlug) throw new Error("practiceSlug is required");
 	if (!title) throw new Error("summary is required");

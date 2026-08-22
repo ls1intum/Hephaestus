@@ -41,7 +41,7 @@ const meta = {
 			</ReactFlowProvider>
 		),
 	],
-} as Meta<typeof AchievementEdge>;
+} satisfies Meta<typeof AchievementEdge>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
@@ -68,12 +68,10 @@ const hermesEdgeAnimated = createEdgeProps("hermes-animated", 140, { isEnabled: 
 
 /** Active - animated edge to demonstrate particle motion */
 export const Active: Story = {
-	render: () => <AchievementEdge {...hermesEdgeAnimated} />,
-	name: "Active",
+	args: hermesEdgeAnimated,
 };
 
 /** Disabled (Default state) - inactive edge (no glow or particle) */
 export const Disabled: Story = {
-	render: () => <AchievementEdge {...zeusEdgeDisabled} />,
-	name: "Disabled",
+	args: zeusEdgeDisabled,
 };

@@ -21,6 +21,7 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { JSDOM } from "jsdom";
+import { asRecord, asString, readJsonFile } from "./lib/json.ts";
 
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -29,18 +30,27 @@ const ROOTS = [join(REPO_ROOT, "docs")];
 const dom = new JSDOM("<!DOCTYPE html><body></body>", {
 	pretendToBeVisual: true,
 });
-globalThis.window = dom.window;
-globalThis.document = dom.window.document;
+// Mermaid reads both off the global scope, and this process has neither.
+Object.assign(globalThis, { window: dom.window, document: dom.window.document });
 
-const require = createRequire(import.meta.url);
-const { version } = require("mermaid/package.json");
+const manifest = createRequire(import.meta.url).resolve("mermaid/package.json");
+const version = asString(
+	asRecord(await readJsonFile(manifest), manifest).version,
+	`${manifest} version`,
+);
 const { default: mermaid } = await import("mermaid");
 
 /** ```mermaid … ``` inside a Markdown or MDX page. Non-greedy, so two blocks on one page stay two. */
 const FENCED = /```mermaid[^\n]*\n([\s\S]*?)```/g;
 
-/** Each entry is `{ label, source }`, so a failure names the page and which block on it. */
-const diagrams = [];
+interface Diagram {
+	/** Names the page and, for a fenced block, which block on it. */
+	readonly label: string;
+	readonly source: string;
+	readonly requiresAccessibleName: boolean;
+}
+
+const diagrams: Diagram[] = [];
 for (const root of ROOTS) {
 	for (const entry of await readdir(root, { recursive: true })) {
 		// Dependency READMEs are neither committed documentation nor rendered by Docusaurus. pnpm may
@@ -58,11 +68,12 @@ for (const root of ROOTS) {
 		if (!entry.endsWith(".md") && !entry.endsWith(".mdx")) continue;
 		const text = await readFile(path, "utf8");
 		let block = 0;
-		for (const match of text.matchAll(FENCED)) {
+		for (const [, source] of text.matchAll(FENCED)) {
 			block += 1;
+			if (source === undefined) continue;
 			diagrams.push({
 				label: `${path} (mermaid block ${block})`,
-				source: match[1],
+				source,
 				requiresAccessibleName: true,
 			});
 		}
@@ -89,8 +100,8 @@ for (const { label, source, requiresAccessibleName } of diagrams) {
 		await mermaid.parse(source);
 	} catch (error) {
 		failed = true;
-		const detail = String(error?.message ?? error).split("\n")[0];
-		console.error(`${label}\n  ${detail}\n`);
+		const message = error instanceof Error ? error.message : String(error);
+		console.error(`${label}\n  ${message.split("\n")[0]}\n`);
 	}
 }
 

@@ -25,7 +25,7 @@ Two conventions live side by side, and which one applies is a property of the co
 
 - **A leaf and a folder must not share a name.** If `Foo` gains children, the leaf becomes `Foo/Overview`.
 
-- **Every top-level segment must appear in `storySort.order` in `.storybook/preview.tsx`.** One that is
+- **Every top-level segment must appear in `storySort.order` in `.storybook/preview.ts`.** One that is
   missing sorts alphabetically after every named one, which silently buries it. This applies to derived
   titles too — `integrations` is the auto-title of two feature-flag stories, and was missing.
 
