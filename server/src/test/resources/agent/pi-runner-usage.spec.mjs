@@ -9,7 +9,7 @@
 // budget cap was computed from it.
 //
 // Run locally with:
-//   node --test server/src/test/resources/agent/pi-runner-usage.spec.mjs
+//   pnpm run test:agents
 
 import test from "node:test";
 import assert from "node:assert/strict";

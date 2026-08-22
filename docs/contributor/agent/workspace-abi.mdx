@@ -33,7 +33,7 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 │   │                                #   ALWAYS present, empty on a first-ever review.
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
-│   ├── precompute/                  #   Per-practice precompute scripts injected by the server.
+│   ├── precompute/                  #   Per-practice precompute scripts (TypeScript, run on Bun).
 │   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
 │   └── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,

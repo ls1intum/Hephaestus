@@ -1,0 +1,20 @@
+{
+	"compilerOptions": {
+		"target": "ES2023",
+		"module": "Preserve",
+		"moduleResolution": "Bundler",
+		"lib": ["ES2023"],
+		"types": ["bun"],
+		"strict": true,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"forceConsistentCasingInFileNames": true,
+		"skipLibCheck": true,
+		"noEmit": true,
+		"rootDirs": ["server/src/main/resources/practices", "docker/agents/precompute"]
+	},
+	"include": [
+		"server/src/main/resources/practices/precompute/**/*.ts",
+		"docker/agents/precompute/**/*.ts"
+	]
+}

@@ -54,6 +54,10 @@ jobs:
               # The contract validator and the immutability guard live here; a PR that edits only a
               # guard would otherwise skip the workflow that runs it.
               - 'scripts/**'
+              # test:agents and typecheck:agents cover the precompute tree and are configured here;
+              # the Bun they run on is read from the agent image.
+              - 'docker/agents/**'
+              - 'tsconfig.agents.json'
             agent-images:
               - 'docker/agents/**'
             docs:
