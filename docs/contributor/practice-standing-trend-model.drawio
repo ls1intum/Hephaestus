@@ -1,0 +1,439 @@
+<mxfile host="app.diagrams.net" agent="Hephaestus">
+  <diagram name="Standing &amp; Trend" id="standing-trend-model">
+    <mxGraphModel dx="1233" dy="909" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="2200" pageHeight="1700" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="laneA" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;fontStyle=1;fontSize=13;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;" value="1 · CATALOGUE — what is looked at" vertex="1">
+          <mxGeometry height="560" width="480" x="40" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="laneB" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;fontStyle=1;fontSize=13;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;" value="2 · MEASUREMENT — what a review recorded" vertex="1">
+          <mxGeometry height="560" width="520" x="560" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="laneC" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;fontStyle=1;fontSize=13;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;" value="3 · SAMPLE — the unit both surfaces count" vertex="1">
+          <mxGeometry height="560" width="520" x="1120" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="laneD" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;fontStyle=1;fontSize=13;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;" value="4 · VERDICTS — where you stand, where you are heading" vertex="1">
+          <mxGeometry height="560" width="480" x="1680" y="40" as="geometry" />
+        </mxCell>
+        <mxCell id="area" parent="1" style="swimlane;html=1;startSize=44;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="PracticeArea&#xa;«entity»" vertex="1">
+          <mxGeometry height="146" width="240" x="80" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="area1" parent="area" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- id: Long" vertex="1">
+          <mxGeometry height="20" width="240" y="44" as="geometry" />
+        </mxCell>
+        <mxCell id="area2" parent="area" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- slug: String" vertex="1">
+          <mxGeometry height="20" width="240" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="area3" parent="area" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- name: String" vertex="1">
+          <mxGeometry height="20" width="240" y="84" as="geometry" />
+        </mxCell>
+        <mxCell id="area4" parent="area" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- icon / color: String" vertex="1">
+          <mxGeometry height="20" width="240" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="area5" parent="area" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- visibleInPracticeDashboards" vertex="1">
+          <mxGeometry height="22" width="240" y="124" as="geometry" />
+        </mxCell>
+        <mxCell id="practice" parent="1" style="swimlane;html=1;startSize=44;fillColor=#dae8fc;strokeColor=#6c8ebf;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="Practice&#xa;«entity»" vertex="1">
+          <mxGeometry height="186" width="240" x="80" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- slug / name: String" vertex="1">
+          <mxGeometry height="20" width="240" y="44" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- artifactKind: ArtifactKind" vertex="1">
+          <mxGeometry height="20" width="240" y="64" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="&lt;b&gt;- areaWeight: double = 1.0&lt;/b&gt;" vertex="1">
+          <mxGeometry height="20" width="240" y="84" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontColor=#7f7f7f;" value="- criteria: String  (never shown)" vertex="1">
+          <mxGeometry height="20" width="240" y="104" as="geometry" />
+        </mxCell>
+        <mxCell id="p5" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- whyItMatters / whatGoodLooksLike" vertex="1">
+          <mxGeometry height="20" width="240" y="124" as="geometry" />
+        </mxCell>
+        <mxCell id="p6" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="+ isDefectDetector(): boolean" vertex="1">
+          <mxGeometry height="20" width="240" y="144" as="geometry" />
+        </mxCell>
+        <mxCell id="p7" parent="practice" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontColor=#b85450;fontSize=10;fontStyle=2" value="&#xa;exactly ONE artifactKind per practice" vertex="1">
+          <mxGeometry height="22" width="240" y="164" as="geometry" />
+        </mxCell>
+        <mxCell id="areaHasPractice" edge="1" parent="1" source="area" style="endArrow=none;html=1;startArrow=diamondThin;startFill=1;startSize=10;endFill=0;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=11;" target="practice" value="0..*">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="areaHasPracticeLbl" connectable="0" parent="areaHasPractice" style="edgeLabel;html=1;fontSize=10;fontColor=#666666;" value="groups" vertex="1">
+          <mxGeometry relative="1" x="-0.4" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="observation" parent="1" style="swimlane;html=1;startSize=52;fillColor=#d5e8d4;strokeColor=#82b366;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="Observation&#xa;«entity» — one finding of one review run" vertex="1">
+          <mxGeometry height="232" width="290" x="600" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="o1" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- id: UUID" vertex="1">
+          <mxGeometry height="20" width="290" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="o2" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- agentJobId: UUID          « the run »" vertex="1">
+          <mxGeometry height="20" width="290" y="72" as="geometry" />
+        </mxCell>
+        <mxCell id="o3" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- artifactKind + artifactId  « the work »" vertex="1">
+          <mxGeometry height="20" width="290" y="92" as="geometry" />
+        </mxCell>
+        <mxCell id="o4" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- aboutUserId: Long        « the person »" vertex="1">
+          <mxGeometry height="20" width="290" y="112" as="geometry" />
+        </mxCell>
+        <mxCell id="o5" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="&lt;b&gt;- presence: Presence&lt;/b&gt;" vertex="1">
+          <mxGeometry height="20" width="290" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="o6" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="&lt;b&gt;- assessment: Assessment (nullable)&lt;/b&gt;" vertex="1">
+          <mxGeometry height="20" width="290" y="152" as="geometry" />
+        </mxCell>
+        <mxCell id="o7" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontColor=#7f7f7f;" value="- severity: Severity — display order only" vertex="1">
+          <mxGeometry height="20" width="290" y="172" as="geometry" />
+        </mxCell>
+        <mxCell id="o8" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontColor=#7f7f7f;" value="- observedAt: Instant — provenance only" vertex="1">
+          <mxGeometry height="20" width="290" y="192" as="geometry" />
+        </mxCell>
+        <mxCell id="o9" parent="observation" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="- origin: LIVE | BACKFILL" vertex="1">
+          <mxGeometry height="20" width="290" y="212" as="geometry" />
+        </mxCell>
+        <mxCell id="practiceObs" edge="1" parent="1" source="practice" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.25;entryX=0;entryY=0.25;fontSize=11;dashed=1;" target="observation" value="0..*">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="practiceObsLbl" connectable="0" parent="practiceObs" style="edgeLabel;html=1;fontSize=10;fontColor=#666666;" value="measured against" vertex="1">
+          <mxGeometry relative="1" x="-0.2" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="presence" parent="1" style="swimlane;html=1;startSize=26;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;fontSize=11;" value="«enum» Presence" vertex="1">
+          <mxGeometry height="106" width="130" x="600" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="pr1" parent="presence" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=11;" value="PRESENT" vertex="1">
+          <mxGeometry height="20" width="130" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="pr2" parent="presence" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=11;" value="ABSENT" vertex="1">
+          <mxGeometry height="20" width="130" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="pr3" parent="presence" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=11;" value="NOT_APPLICABLE" vertex="1">
+          <mxGeometry height="20" width="130" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="pr4" parent="presence" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=11;" value="INCONCLUSIVE" vertex="1">
+          <mxGeometry height="20" width="130" y="86" as="geometry" />
+        </mxCell>
+        <mxCell id="assessment" parent="1" style="swimlane;html=1;startSize=26;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;fontSize=11;" value="«enum» Assessment" vertex="1">
+          <mxGeometry height="66" width="130" x="760" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="as1" parent="assessment" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=11;" value="GOOD" vertex="1">
+          <mxGeometry height="20" width="130" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="as2" parent="assessment" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=11;" value="BAD" vertex="1">
+          <mxGeometry height="20" width="130" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="outcome" parent="1" style="swimlane;html=1;startSize=42;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;fontSize=11;" value="«enum» ObservationOutcome&#xa;presence × assessment → one value" vertex="1">
+          <mxGeometry height="150" width="290" x="600" y="500" as="geometry" />
+        </mxCell>
+        <mxCell id="oc1" parent="outcome" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#2d7600;" value="DEMONSTRATED_STRENGTH   PRESENT+GOOD  ✓" vertex="1">
+          <mxGeometry height="20" width="290" y="42" as="geometry" />
+        </mxCell>
+        <mxCell id="oc2" parent="outcome" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#2d7600;" value="SAFE_AVOIDANCE          ABSENT+GOOD   ✓" vertex="1">
+          <mxGeometry height="20" width="290" y="62" as="geometry" />
+        </mxCell>
+        <mxCell id="oc3" parent="outcome" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#b85450;" value="COMMISSION_PROBLEM      PRESENT+BAD   ✗" vertex="1">
+          <mxGeometry height="20" width="290" y="82" as="geometry" />
+        </mxCell>
+        <mxCell id="oc4" parent="outcome" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#b85450;" value="OMISSION_GAP            ABSENT+BAD    ✗" vertex="1">
+          <mxGeometry height="20" width="290" y="102" as="geometry" />
+        </mxCell>
+        <mxCell id="oc5" parent="outcome" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#7f7f7f;" value="NOT_APPLICABLE          no verdict    ▫" vertex="1">
+          <mxGeometry height="28" width="290" y="122" as="geometry" />
+        </mxCell>
+        <mxCell id="obsPresence" edge="1" parent="1" source="observation" style="endArrow=open;endSize=8;html=1;dashed=1;exitX=0.25;exitY=1;entryX=0.5;entryY=0;strokeColor=#999999;" target="presence">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="obsAssessment" edge="1" parent="1" source="observation" style="endArrow=open;endSize=8;html=1;dashed=1;exitX=0.75;exitY=1;entryX=0.5;entryY=0;strokeColor=#999999;" target="assessment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="toOutcome" edge="1" parent="1" source="assessment" style="endArrow=open;endSize=10;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;fontSize=10;fontColor=#666666;strokeWidth=2;" target="outcome" value="ObservationOutcome.of(presence, assessment)">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="825" y="470" as="sourcePoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="bundler" parent="1" style="swimlane;html=1;startSize=46;fillColor=#f8cecc;strokeColor=#b85450;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="OpportunityBundler&#xa;«package-private, called PER PRACTICE»" vertex="1">
+          <mxGeometry height="152" width="440" x="1160" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="b1" parent="bundler" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="bundle(practiceSlug, observations, cutoff, bundleSize)" vertex="1">
+          <mxGeometry height="20" width="440" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" parent="bundler" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=16;fontSize=10;" value="1 · group by (artifactKind, artifactId)" vertex="1">
+          <mxGeometry height="20" width="440" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" parent="bundler" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=16;fontSize=10;" value="2 · keep only the LATEST run that judged it" vertex="1">
+          <mxGeometry height="20" width="440" y="86" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" parent="bundler" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=16;fontSize=10;" value="3 · sum that run&#39;s findings into ONE OutcomeVector" vertex="1">
+          <mxGeometry height="20" width="440" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="b5" parent="bundler" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=16;fontSize=10;" value="4 · newest first → CURRENT [4] · PREVIOUS [4] · OLDER" vertex="1">
+          <mxGeometry height="26" width="440" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="obsToBundler" edge="1" parent="1" source="observation" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.4;entryX=0;entryY=0.3;fontSize=10;fontColor=#666666;strokeWidth=2;" target="bundler" value="raw findings, one practice at a time">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eo" parent="1" style="swimlane;html=1;startSize=56;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="EvidenceOpportunity&#xa;«record» THE SAMPLE — one reviewed work item, seen by one practice" vertex="1">
+          <mxGeometry height="196" width="440" x="1160" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="e1" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="&lt;b&gt;practiceSlug: String&lt;/b&gt;         ┐" vertex="1">
+          <mxGeometry height="20" width="440" y="56" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="&lt;b&gt;artifactKind: ArtifactKind&lt;/b&gt;   ├ identity" vertex="1">
+          <mxGeometry height="20" width="440" y="76" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="&lt;b&gt;artifactId: long&lt;/b&gt;             ┘" vertex="1">
+          <mxGeometry height="20" width="440" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="e4" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontColor=#7f7f7f;" value="occurredAt: Instant — provenance, never an axis" vertex="1">
+          <mxGeometry height="20" width="440" y="116" as="geometry" />
+        </mxCell>
+        <mxCell id="e5" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="outcomes: OutcomeVector" vertex="1">
+          <mxGeometry height="20" width="440" y="136" as="geometry" />
+        </mxCell>
+        <mxCell id="e6" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;" value="bundle: TrendBundle" vertex="1">
+          <mxGeometry height="20" width="440" y="156" as="geometry" />
+        </mxCell>
+        <mxCell id="e7" parent="eo" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=2;fontColor=#9673a6;" value="the practice is part of the KEY — a PR is a different&#xa;opportunity for every practice that spoke about it" vertex="1">
+          <mxGeometry height="20" width="440" y="176" as="geometry" />
+        </mxCell>
+        <mxCell id="bundlerToEo" edge="1" parent="1" source="bundler" style="endArrow=open;endSize=10;html=1;exitX=0.3;exitY=1;entryX=0.3;entryY=0;fontSize=10;fontColor=#666666;strokeWidth=2;" target="eo" value="creates">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="ov" parent="1" style="swimlane;html=1;startSize=42;fillColor=#e1d5e7;strokeColor=#9673a6;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;fontSize=11;" value="OutcomeVector&#xa;«record» five counters" vertex="1">
+          <mxGeometry height="162" width="200" x="1160" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="v1" parent="ov" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="demonstratedStrengths" vertex="1">
+          <mxGeometry height="18" width="200" y="42" as="geometry" />
+        </mxCell>
+        <mxCell id="v2" parent="ov" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="safeAvoidances" vertex="1">
+          <mxGeometry height="18" width="200" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="v3" parent="ov" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="commissionProblems" vertex="1">
+          <mxGeometry height="18" width="200" y="78" as="geometry" />
+        </mxCell>
+        <mxCell id="v4" parent="ov" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="omissionGaps" vertex="1">
+          <mxGeometry height="18" width="200" y="96" as="geometry" />
+        </mxCell>
+        <mxCell id="v5" parent="ov" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="notApplicable" vertex="1">
+          <mxGeometry height="18" width="200" y="114" as="geometry" />
+        </mxCell>
+        <mxCell id="v6" parent="ov" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=1" value="+ positiveShare(): double  ∈ [0,1]" vertex="1">
+          <mxGeometry height="30" width="200" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="bundle" parent="1" style="swimlane;html=1;startSize=26;fillColor=#ffe6cc;strokeColor=#d79b00;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;fontSize=11;" value="«enum» TrendBundle" vertex="1">
+          <mxGeometry height="106" width="200" x="1400" y="530" as="geometry" />
+        </mxCell>
+        <mxCell id="tb1" parent="bundle" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="CURRENT   newest 4" vertex="1">
+          <mxGeometry height="20" width="200" y="26" as="geometry" />
+        </mxCell>
+        <mxCell id="tb2" parent="bundle" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="PREVIOUS  the 4 before" vertex="1">
+          <mxGeometry height="20" width="200" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="tb3" parent="bundle" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="OLDER     the rest (display)" vertex="1">
+          <mxGeometry height="20" width="200" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="tb4" parent="bundle" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;fontStyle=2;fontColor=#d79b00;" value="a LABEL — size lives in TrendProperties" vertex="1">
+          <mxGeometry height="20" width="200" y="86" as="geometry" />
+        </mxCell>
+        <mxCell id="eoOv" edge="1" parent="1" source="eo" style="endArrow=open;endSize=8;html=1;exitX=0.25;exitY=1;entryX=0.5;entryY=0;strokeColor=#9673a6;" target="ov">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eoBundle" edge="1" parent="1" source="eo" style="endArrow=open;endSize=8;html=1;dashed=1;exitX=0.75;exitY=1;entryX=0.5;entryY=0;strokeColor=#999999;" target="bundle">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="outcomeOv" edge="1" parent="1" source="outcome" style="endArrow=open;endSize=8;html=1;exitX=1;exitY=0.7;entryX=0;entryY=0.5;fontSize=10;fontColor=#666666;dashed=1;" target="ov" value="of(outcome)">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="standingRule" parent="1" style="swimlane;html=1;startSize=48;fillColor=#d4e1f5;strokeColor=#3d6ea5;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="STANDING — where do I stand?&#xa;PracticeTrend.recentPositiveShare(4, 0.4)" vertex="1">
+          <mxGeometry height="128" width="400" x="1720" y="100" as="geometry" />
+        </mxCell>
+        <mxCell id="s1" parent="standingRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="newest 4 applicable opportunities" vertex="1">
+          <mxGeometry height="20" width="400" y="48" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" parent="standingRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="weights 1 · 0,4 · 0,16 · 0,064   (decay 0,4)" vertex="1">
+          <mxGeometry height="20" width="400" y="68" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" parent="standingRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=1" value="share = Σ(w · positiveShare) / Σw" vertex="1">
+          <mxGeometry height="20" width="400" y="88" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" parent="standingRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;fontStyle=2;fontColor=#3d6ea5;" value="newest carries 61,6 % — a fix and a slip show equally fast" vertex="1">
+          <mxGeometry height="20" width="400" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="scale" parent="1" style="swimlane;html=1;startSize=32;fillColor=#fff2cc;strokeColor=#d6b656;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="StandingScale — ONE scale, BOTH levels" vertex="1">
+          <mxGeometry height="112" width="400" x="1720" y="264" as="geometry" />
+        </mxCell>
+        <mxCell id="sc1" parent="scale" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#2d7600;" value="share &gt; 0,80   →  STRENGTH      two clean in a row" vertex="1">
+          <mxGeometry height="20" width="400" y="32" as="geometry" />
+        </mxCell>
+        <mxCell id="sc2" parent="scale" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#996600;" value="share ≥ 0,37   →  MIXED         one setback" vertex="1">
+          <mxGeometry height="20" width="400" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="sc3" parent="scale" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#b85450;" value="otherwise      →  DEVELOPING    two problems in a row" vertex="1">
+          <mxGeometry height="20" width="400" y="72" as="geometry" />
+        </mxCell>
+        <mxCell id="sc4" parent="scale" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;fontStyle=2;fontColor=#996600;" value="a single event moves it — only a pattern settles it" vertex="1">
+          <mxGeometry height="20" width="400" y="92" as="geometry" />
+        </mxCell>
+        <mxCell id="trendRule" parent="1" style="swimlane;html=1;startSize=48;fillColor=#d4e1f5;strokeColor=#3d6ea5;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="TREND — where am I heading?&#xa;BetaPosterior + TrendDirectionRule" vertex="1">
+          <mxGeometry height="148" width="400" x="1720" y="412" as="geometry" />
+        </mxCell>
+        <mxCell id="t1" parent="trendRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="Beta(½+Σshare, ½+n−Σshare) per bundle" vertex="1">
+          <mxGeometry height="20" width="400" y="48" as="geometry" />
+        </mxCell>
+        <mxCell id="t2" parent="trendRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="difference on a 256-point grid (no closed form)" vertex="1">
+          <mxGeometry height="20" width="400" y="68" as="geometry" />
+        </mxCell>
+        <mxCell id="t3" parent="trendRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#2d7600;" value="P(Δ &gt; +0,15) ≥ 0,90  →  IMPROVING" vertex="1">
+          <mxGeometry height="20" width="400" y="88" as="geometry" />
+        </mxCell>
+        <mxCell id="t4" parent="trendRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#b85450;" value="P(Δ &lt; −0,15) ≥ 0,90  →  DECLINING" vertex="1">
+          <mxGeometry height="20" width="400" y="108" as="geometry" />
+        </mxCell>
+        <mxCell id="t5" parent="trendRule" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#7f7f7f;" value="otherwise UNCERTAIN · &lt;8 opps INSUFFICIENT_EVIDENCE" vertex="1">
+          <mxGeometry height="20" width="400" y="128" as="geometry" />
+        </mxCell>
+        <mxCell id="eoStanding" edge="1" parent="1" source="eo" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.2;entryX=0;entryY=0.5;fontSize=10;fontColor=#3d6ea5;strokeWidth=2;strokeColor=#3d6ea5;" target="standingRule" value="same list, two questions">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="eoTrend" edge="1" parent="1" source="eo" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.8;entryX=0;entryY=0.4;strokeWidth=2;strokeColor=#3d6ea5;" target="trendRule">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="standingScale" edge="1" parent="1" source="standingRule" style="endArrow=open;endSize=10;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;" target="scale">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="laneE" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#b3b3b3;fontStyle=1;fontSize=13;verticalAlign=top;align=left;spacingLeft=10;spacingTop=6;" value="5 · READ MODELS — what the learner sees" vertex="1">
+          <mxGeometry height="420" width="2120" x="40" y="650" as="geometry" />
+        </mxCell>
+        <mxCell id="reflSvc" parent="1" style="swimlane;html=1;startSize=46;fillColor=#f8cecc;strokeColor=#b85450;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="PracticeReflectionService&#xa;builds one card per practice" vertex="1">
+          <mxGeometry height="146" width="380" x="90" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="r1" parent="reflSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="90-day window (LOOKBACK_DAYS)" vertex="1">
+          <mxGeometry height="20" width="380" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" parent="reflSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="ObservationVisibilityPolicy gates first" vertex="1">
+          <mxGeometry height="20" width="380" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" parent="reflSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="STANDING_WINDOW = 4 · STANDING_DECAY = 0,4" vertex="1">
+          <mxGeometry height="20" width="380" y="86" as="geometry" />
+        </mxCell>
+        <mxCell id="r4" parent="reflSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=1" value="→ ReflectionSnapshot" vertex="1">
+          <mxGeometry height="20" width="380" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="r5" parent="reflSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;fontColor=#666666;" value="   cards · standingShareByPractice · areaWeightByPractice" vertex="1">
+          <mxGeometry height="20" width="380" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="card" parent="1" style="swimlane;html=1;startSize=52;fillColor=#d5e8d4;strokeColor=#82b366;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="ReflectionPracticeDTO&#xa;«record» the practice card — NOT a scoreboard" vertex="1">
+          <mxGeometry height="212" width="380" x="560" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="c1" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="slug · name · areaSlug · areaName" vertex="1">
+          <mxGeometry height="20" width="380" y="52" as="geometry" />
+        </mxCell>
+        <mxCell id="c2" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="whyItMatters · whatGoodLooksLike" vertex="1">
+          <mxGeometry height="20" width="380" y="72" as="geometry" />
+        </mxCell>
+        <mxCell id="c3" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="&lt;b&gt;standing: Standing&lt;/b&gt;" vertex="1">
+          <mxGeometry height="20" width="380" y="92" as="geometry" />
+        </mxCell>
+        <mxCell id="c4" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="toWorkOn / strengths: List&lt;ReflectionItemDTO&gt;" vertex="1">
+          <mxGeometry height="20" width="380" y="112" as="geometry" />
+        </mxCell>
+        <mxCell id="c5" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="trajectory: TrendDirection · trendSupport" vertex="1">
+          <mxGeometry height="20" width="380" y="132" as="geometry" />
+        </mxCell>
+        <mxCell id="c6" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;fontStyle=2;fontColor=#82b366;" value="no raw score · no criteria · no observation enums" vertex="1">
+          <mxGeometry height="20" width="380" y="152" as="geometry" />
+        </mxCell>
+        <mxCell id="c7" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=1" value="«enum» Standing" vertex="1">
+          <mxGeometry height="20" width="380" y="172" as="geometry" />
+        </mxCell>
+        <mxCell id="c8" parent="card" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;" value="DEVELOPING · MIXED · STRENGTH · NOT_OBSERVED · NO_OPPORTUNITY" vertex="1">
+          <mxGeometry height="20" width="380" y="192" as="geometry" />
+        </mxCell>
+        <mxCell id="areaSvc" parent="1" style="swimlane;html=1;startSize=46;fillColor=#f8cecc;strokeColor=#b85450;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="PracticeAreaStatusService&#xa;rolls the practices up, once" vertex="1">
+          <mxGeometry height="166" width="420" x="1030" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="a1" parent="areaSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=1" value="reads the CONTINUOUS share, not the label" vertex="1">
+          <mxGeometry height="20" width="420" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" parent="areaSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="areaShare = Σ(areaWeight · share) / Σ areaWeight" vertex="1">
+          <mxGeometry height="20" width="420" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" parent="areaSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="→ StandingScale.classify(areaShare)" vertex="1">
+          <mxGeometry height="20" width="420" y="86" as="geometry" />
+        </mxCell>
+        <mxCell id="a4" parent="areaSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="only practices WITH a verdict count" vertex="1">
+          <mxGeometry height="20" width="420" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="a5" parent="areaSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#7f7f7f;" value="none → NO_OPPORTUNITY | NOT_OBSERVED" vertex="1">
+          <mxGeometry height="20" width="420" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="a6" parent="areaSvc" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;fontStyle=2;fontColor=#b85450;" value="one quantisation, at the end — 0,79 and 0,51 stay apart" vertex="1">
+          <mxGeometry height="20" width="420" y="146" as="geometry" />
+        </mxCell>
+        <mxCell id="areaDto" parent="1" style="swimlane;html=1;startSize=46;fillColor=#d5e8d4;strokeColor=#82b366;align=center;fontStyle=1;childLayout=stackLayout;horizontal=1;horizontalStack=0;resizeParent=0;collapsible=0;marginBottom=0;" value="PracticeAreaStatusDTO&#xa;«record» the area summary" vertex="1">
+          <mxGeometry height="186" width="380" x="1540" y="710" as="geometry" />
+        </mxCell>
+        <mxCell id="ad1" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="areaSlug · areaName" vertex="1">
+          <mxGeometry height="20" width="380" y="46" as="geometry" />
+        </mxCell>
+        <mxCell id="ad2" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="&lt;b&gt;status: AreaStatus&lt;/b&gt;" vertex="1">
+          <mxGeometry height="20" width="380" y="66" as="geometry" />
+        </mxCell>
+        <mxCell id="ad3" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="guidance + guidanceSource (RULE_BASED | AI)" vertex="1">
+          <mxGeometry height="20" width="380" y="86" as="geometry" />
+        </mxCell>
+        <mxCell id="ad4" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;" value="direction · trendSupport" vertex="1">
+          <mxGeometry height="20" width="380" y="106" as="geometry" />
+        </mxCell>
+        <mxCell id="ad5" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontColor=#7f7f7f;" value="items · sources · feedbackSpanDays (provenance)" vertex="1">
+          <mxGeometry height="20" width="380" y="126" as="geometry" />
+        </mxCell>
+        <mxCell id="ad6" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=10;fontStyle=1" value="«enum» AreaStatus — same five as Standing" vertex="1">
+          <mxGeometry height="20" width="380" y="146" as="geometry" />
+        </mxCell>
+        <mxCell id="ad7" parent="areaDto" style="text;html=1;strokeColor=none;fillColor=none;align=left;spacingLeft=6;fontSize=9;" value="DEVELOPING · MIXED · STRENGTH · NOT_OBSERVED · NO_OPPORTUNITY" vertex="1">
+          <mxGeometry height="20" width="380" y="166" as="geometry" />
+        </mxCell>
+        <mxCell id="svcCard" edge="1" parent="1" source="reflSvc" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;fontSize=10;fontColor=#666666;strokeWidth=2;" target="card" value="produces">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="cardArea" edge="1" parent="1" source="card" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.4;entryX=0;entryY=0.4;fontSize=10;fontColor=#666666;strokeWidth=2;" target="areaSvc" value="area reads the practices">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="areaSvcDto" edge="1" parent="1" source="areaSvc" style="endArrow=open;endSize=10;html=1;exitX=1;exitY=0.4;entryX=0;entryY=0.4;fontSize=10;fontColor=#666666;strokeWidth=2;" target="areaDto" value="produces">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scaleUse1" edge="1" parent="1" source="scale" style="endArrow=open;endSize=8;html=1;dashed=1;exitX=0.15;exitY=1;entryX=0.9;entryY=0;fontSize=10;fontColor=#d6b656;strokeColor=#d6b656;strokeWidth=2;" target="areaDto" value="classify()">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="scaleUse2" edge="1" parent="1" source="scale" style="endArrow=open;endSize=8;html=1;dashed=1;exitX=0;exitY=0.6;entryX=1;entryY=0.05;fontSize=10;fontColor=#d6b656;strokeColor=#d6b656;strokeWidth=2;" target="card" value="classify()">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1660" y="330" />
+              <mxPoint x="1660" y="680" />
+              <mxPoint x="960" y="680" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="note1" parent="1" style="shape=note;whiteSpace=wrap;html=1;size=16;fillColor=#fff2cc;strokeColor=#d6b656;align=left;spacingLeft=10;fontSize=11;verticalAlign=top;spacingTop=6;" value="THE ONE IDEA&#xa;&#xa;The unit of analysis is an evidence opportunity —&#xa;one reviewed work item — never a unit of clock time.&#xa;&#xa;Repository activity is bursty, so a calendar bin gives&#xa;unequal and partly empty samples. Timestamps survive&#xa;as provenance only: never a bin, an axis, or a boundary." vertex="1">
+          <mxGeometry height="140" width="380" x="90" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="note2" parent="1" style="shape=note;whiteSpace=wrap;html=1;size=16;fillColor=#e1d5e7;strokeColor=#9673a6;align=left;spacingLeft=10;fontSize=11;verticalAlign=top;spacingTop=6;" value="WHY BUNDLING IS PER PRACTICE&#xa;&#xa;The practice is part of an opportunity&#39;s KEY. PR #104 is&#xa;a different opportunity for every practice that judged it,&#xa;and none at all for a practice that stayed silent.&#xa;&#xa;Bundling globally would fill &quot;the newest four&quot; with work&#xa;items a given practice never spoke about — the bundle&#xa;would count activity instead of evidence." vertex="1">
+          <mxGeometry height="150" width="420" x="1030" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="note3" parent="1" style="shape=note;whiteSpace=wrap;html=1;size=16;fillColor=#d4e1f5;strokeColor=#3d6ea5;align=left;spacingLeft=10;fontSize=11;verticalAlign=top;spacingTop=6;" value="STANDING vs TREND&#xa;&#xa;Same opportunities, two questions, no influence either way.&#xa;A DECLINING trend never lowers a standing; a STRENGTH&#xa;standing never lifts a trend.&#xa;&#xa;Standing describes the latest work and may move with every&#xa;item. A trend asserts a CHANGE and must be evidenced —&#xa;which is why it says UNCERTAIN most of the time." vertex="1">
+          <mxGeometry height="150" width="380" x="1540" y="900" as="geometry" />
+        </mxCell>
+        <mxCell id="note4" parent="1" style="shape=note;whiteSpace=wrap;html=1;size=16;fillColor=#dae8fc;strokeColor=#6c8ebf;align=left;spacingLeft=10;fontSize=11;verticalAlign=top;spacingTop=6;" value="areaWeight applies ONLY at area level, and to BOTH halves:&#xa;· area standing — weighted mean of the practice shares&#xa;· area trend — weight ÷ variance, so certainty counts too&#xa;A practice is never judged more harshly for being weighted;&#xa;weight 0 withdraws its vote while it stays fully reviewed." vertex="1">
+          <mxGeometry height="100" width="420" x="560" y="940" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

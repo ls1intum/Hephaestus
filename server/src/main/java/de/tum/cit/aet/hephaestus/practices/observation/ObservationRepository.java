@@ -284,33 +284,197 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * {@code about_user_id} subject the observation is filed against (ADR 0022).
      * Uses a separate {@code countQuery} because {@code JOIN FETCH} is incompatible
      * with count projections in Hibernate.
+     *
+     * <p>The area join is a LEFT JOIN on purpose: an implicit {@code p.area.slug} path would
+     * inner-join and silently drop observations of area-less practices even when no area filter
+     * is set. {@code displayableOnly} drops NOT_APPLICABLE rows — the activity-feed surface shows
+     * what the reviewer actually observed, not the practices that did not apply to an artifact.
+     *
+     * <p>{@code hasArtifactKinds} guards the artifact-kind filter separately because JPQL cannot
+     * test a collection parameter for null, and {@code IN} over an empty list is invalid SQL —
+     * callers pass {@code false} plus any non-empty placeholder collection to disable the filter.
      */
     @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         value = """
         SELECT f FROM Observation f
         JOIN FETCH f.practice p
+        LEFT JOIN p.area a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
         AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
         """,
         countQuery = """
         SELECT COUNT(f) FROM Observation f
         JOIN f.practice p
+        LEFT JOIN p.area a
         WHERE f.aboutUserId = :aboutUserId
         AND p.workspace.id = :workspaceId
         AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
         AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
         """
     )
     Page<Observation> findByAboutUserAndWorkspace(
         @Param("aboutUserId") Long aboutUserId,
         @Param("workspaceId") Long workspaceId,
         @Param("practiceSlug") @Nullable String practiceSlug,
+        @Param("areaSlug") @Nullable String areaSlug,
         @Param("presence") @Nullable Presence presence,
+        @Param("hasArtifactKinds") boolean hasArtifactKinds,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
+        @Param("hasSeverities") boolean hasSeverities,
+        @Param("severities") Collection<Severity> severities,
+        @Param("displayableOnly") boolean displayableOnly,
         Pageable pageable
     );
+
+    /**
+     * Same filter set as {@link #findByAboutUserAndWorkspace}, ordered by severity. The severity rank
+     * is a fixed CASE (CRITICAL &gt; MAJOR &gt; MINOR &gt; INFO, severity-less strengths last, ties
+     * broken newest-first) because a {@code Pageable} sort on the enum column would order
+     * alphabetically; {@code severitySign} {@code +1} puts the most severe first, {@code -1} the
+     * least severe (then strengths lead). Callers pass an UNSORTED pageable.
+     */
+    @Query(
+        value = """
+        SELECT f FROM Observation f
+        JOIN FETCH f.practice p
+        LEFT JOIN p.area a
+        WHERE f.aboutUserId = :aboutUserId
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
+        AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
+        ORDER BY (CASE
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.CRITICAL THEN 0
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.MAJOR THEN 1
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.MINOR THEN 2
+            WHEN f.severity = de.tum.cit.aet.hephaestus.practices.model.Severity.INFO THEN 3
+            ELSE 4
+        END) * :severitySign, f.observedAt DESC
+        """,
+        countQuery = """
+        SELECT COUNT(f) FROM Observation f
+        JOIN f.practice p
+        LEFT JOIN p.area a
+        WHERE f.aboutUserId = :aboutUserId
+        AND p.workspace.id = :workspaceId
+        AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+        AND (:areaSlug IS NULL OR a.slug = :areaSlug)
+        AND (:presence IS NULL OR f.presence = :presence)
+        AND (:hasArtifactKinds = FALSE OR f.artifactKind IN :artifactKinds)
+        AND (:hasSeverities = FALSE OR f.severity IS NULL OR f.severity IN :severities)
+        AND (:displayableOnly = FALSE OR f.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE)
+        """
+    )
+    Page<Observation> findByAboutUserAndWorkspaceSeverityFirst(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("areaSlug") String areaSlug,
+        @Param("presence") Presence presence,
+        @Param("hasArtifactKinds") boolean hasArtifactKinds,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
+        @Param("hasSeverities") boolean hasSeverities,
+        @Param("severities") Collection<Severity> severities,
+        @Param("displayableOnly") boolean displayableOnly,
+        @Param("severitySign") int severitySign,
+        Pageable pageable
+    );
+
+    /**
+     * Review-history page at the run grain. Paging observations directly can split one review across pages,
+     * which leaves the learner with an incomplete explanation of what the reviewer saw. This projection first
+     * selects complete agent-job runs; {@link #findReviewHistoryObservationsByJobs} loads their findings next.
+     */
+    @Query(
+        value = """
+        SELECT o.agent_job_id AS "jobId",
+               MAX(o.observed_at) AS "reviewedAt"
+        FROM observation o
+        JOIN practice p ON p.id = o.practice_id
+        JOIN practice_area a ON a.id = p.practice_area_id
+        WHERE o.about_user_id = :aboutUserId
+          AND p.workspace_id = :workspaceId
+          AND a.slug = :areaSlug
+          AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+          AND (:hasArtifactKinds = FALSE OR o.artifact_kind IN (:artifactKinds))
+          AND (:hasSeverities = FALSE OR o.severity IS NULL OR o.severity IN (:severities))
+          AND o.presence <> 'NOT_APPLICABLE'
+        GROUP BY o.agent_job_id
+        ORDER BY MAX(o.observed_at) DESC, o.agent_job_id DESC
+        """,
+        countQuery = """
+        SELECT COUNT(DISTINCT o.agent_job_id)
+        FROM observation o
+        JOIN practice p ON p.id = o.practice_id
+        JOIN practice_area a ON a.id = p.practice_area_id
+        WHERE o.about_user_id = :aboutUserId
+          AND p.workspace_id = :workspaceId
+          AND a.slug = :areaSlug
+          AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+          AND (:hasArtifactKinds = FALSE OR o.artifact_kind IN (:artifactKinds))
+          AND (:hasSeverities = FALSE OR o.severity IS NULL OR o.severity IN (:severities))
+          AND o.presence <> 'NOT_APPLICABLE'
+        """,
+        nativeQuery = true
+    )
+    Page<ReviewHistoryRunRow> findReviewHistoryRuns(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("areaSlug") String areaSlug,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("hasArtifactKinds") boolean hasArtifactKinds,
+        @Param("artifactKinds") Collection<String> artifactKinds,
+        @Param("hasSeverities") boolean hasSeverities,
+        @Param("severities") Collection<String> severities,
+        Pageable pageable
+    );
+
+    @Query(
+        """
+        SELECT o FROM Observation o
+        JOIN FETCH o.practice p
+        JOIN p.area a
+        WHERE o.agentJobId IN :jobIds
+          AND o.aboutUserId = :aboutUserId
+          AND p.workspace.id = :workspaceId
+          AND a.slug = :areaSlug
+          AND (:practiceSlug IS NULL OR p.slug = :practiceSlug)
+          AND (:hasArtifactKinds = FALSE OR o.artifactKind IN :artifactKinds)
+          AND (:hasSeverities = FALSE OR o.severity IS NULL OR o.severity IN :severities)
+          AND o.presence <> de.tum.cit.aet.hephaestus.practices.model.Presence.NOT_APPLICABLE
+        ORDER BY o.observedAt DESC, o.id ASC
+        """
+    )
+    List<Observation> findReviewHistoryObservationsByJobs(
+        @Param("jobIds") Collection<UUID> jobIds,
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("areaSlug") String areaSlug,
+        @Param("practiceSlug") String practiceSlug,
+        @Param("hasArtifactKinds") boolean hasArtifactKinds,
+        @Param("artifactKinds") Collection<ArtifactKind> artifactKinds,
+        @Param("hasSeverities") boolean hasSeverities,
+        @Param("severities") Collection<Severity> severities
+    );
+
+    interface ReviewHistoryRunRow {
+        UUID getJobId();
+        Instant getReviewedAt();
+    }
 
     /**
      * Per-practice aggregation for the developer dashboard: present/good and bad counts, and last observation date.

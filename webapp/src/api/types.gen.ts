@@ -1419,6 +1419,38 @@ export type TriggerSyncJobRequest = {
     type: 'INITIAL' | 'RECONCILIATION' | 'BACKFILL';
 };
 
+export type TrendSupport = {
+    bundleSize: number;
+    calendarSpanDays?: number;
+    comparablePractices?: number;
+    credibilityThreshold: number;
+    currentOpportunities: number;
+    eligiblePractices?: number;
+    firstOpportunityAt?: Date;
+    lastOpportunityAt?: Date;
+    level: 'WELL_SUPPORTED' | 'TENTATIVE' | 'NONE';
+    opportunitiesUntilComparable: number;
+    previousOpportunities: number;
+    ropeHalfWidth: number;
+};
+
+export type TrendOpportunity = {
+    artifactId: number;
+    artifactKind: string;
+    bundle: 'PREVIOUS' | 'CURRENT' | 'OLDER';
+    index: number;
+    occurredAt: Date;
+    outcomes: OutcomeVector;
+};
+
+export type OutcomeVector = {
+    commissionProblems: number;
+    demonstratedStrengths: number;
+    notApplicable: number;
+    omissionGaps: number;
+    safeAvoidances: number;
+};
+
 /**
  * One thing that happened to this artifact, and what the system did about it
  */
@@ -2547,6 +2579,14 @@ export type ReflectionPractice = {
      */
     toWorkOn: Array<ReflectionItem>;
     /**
+     * Opportunity-indexed direction of this practice's recent evidence
+     */
+    trajectory?: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    /**
+     * Evidence support and provenance for the trajectory
+     */
+    trendSupport?: TrendSupport;
+    /**
      * A concrete picture of doing this well
      */
     whatGoodLooksLike?: string;
@@ -3048,6 +3088,16 @@ export type PracticeEvidenceSourceOption = {
     supportsExhaustiveEvidence: boolean;
 };
 
+export type PracticeTrend = {
+    currentOutcomes?: OutcomeVector;
+    direction: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    opportunities: Array<TrendOpportunity>;
+    previousOutcomes?: OutcomeVector;
+    scope: 'AREA' | 'PRACTICE';
+    slug: string;
+    support: TrendSupport;
+};
+
 /**
  * What became of one practice on this artifact, and whether anyone heard about it
  */
@@ -3202,6 +3252,115 @@ export type PracticeAutomatedReviewValidation = {
      * Validation lifecycle; authors cannot mark their own review policy as independently validated
      */
     status: 'AUTHOR_DECLARED';
+};
+
+export type PracticeAreaTrend = {
+    area: PracticeTrend;
+    practices: Array<PracticeTrend>;
+};
+
+/**
+ * A developer's derived qualitative standing for one practice area
+ */
+export type PracticeAreaStatus = {
+    /**
+     * Area name
+     */
+    areaName: string;
+    /**
+     * Area slug
+     */
+    areaSlug: string;
+    /**
+     * Oldest contributing observation, for provenance only (null without a verdict)
+     */
+    feedbackSince?: Date;
+    /**
+     * Calendar span covered by the feedback, for provenance only; never a trend-analysis unit
+     */
+    feedbackSpanDays?: number;
+    /**
+     * Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). The deterministic summary combines standing, next focus, and learner-facing catalog guidance; the same field carries AI-aggregated guidance when a provider supplies it.
+     */
+    guidance?: string;
+    /**
+     * How the guidance text was produced (null when there is no guidance)
+     */
+    guidanceSource?: 'RULE_BASED' | 'AI_AGGREGATED';
+    /**
+     * Supporting feedback the status derives from (problems first); empty without a verdict
+     */
+    items: Array<ReflectionItem>;
+    /**
+     * Distinct work artifacts the feedback comes from, per kind (provenance, not a score); empty without a verdict
+     */
+    sources: Array<FeedbackSourceCount>;
+    /**
+     * Derived qualitative status across the area's practices
+     */
+    status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
+    /**
+     * Evidence-weighted, opportunity-indexed direction across the area's practices
+     */
+    trajectory?: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
+    /**
+     * Evidence support and provenance for the trajectory
+     */
+    trendSupport?: TrendSupport;
+};
+
+/**
+ * Distinct work artifacts of one kind that contributed feedback
+ */
+export type FeedbackSourceCount = {
+    /**
+     * Distinct artifacts of this kind in the window
+     */
+    count: number;
+    /**
+     * The kind of work the feedback came from
+     */
+    source: string;
+};
+
+/**
+ * A complete review run in a learner's practice-area history
+ */
+export type PracticeAreaReviewMoment = {
+    artifact: PracticeAreaReviewArtifact;
+    findings: Array<PracticeAreaReviewFinding>;
+    reviewId: string;
+    reviewedAt: Date;
+};
+
+/**
+ * One concrete, evidence-backed result inside a review moment
+ */
+export type PracticeAreaReviewFinding = {
+    assessment: 'GOOD' | 'BAD';
+    feedbackId?: string;
+    helpful?: boolean;
+    observationId: string;
+    practiceName: string;
+    practiceSlug: string;
+    presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
+    recurrenceKey?: string;
+    severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
+    title: string;
+};
+
+/**
+ * The work artifact assessed in a learner-facing review moment
+ */
+export type PracticeAreaReviewArtifact = {
+    channelName?: string;
+    id: number;
+    number?: number;
+    provider?: 'GITHUB' | 'GITLAB' | 'SLACK' | 'OUTLINE';
+    repositoryName?: string;
+    title: string;
+    type: string;
+    url?: string;
 };
 
 /**
@@ -3395,6 +3554,11 @@ export type PagedModelReviewObservation = {
 
 export type PagedModelReviewFeedback = {
     content?: Array<ReviewFeedback>;
+    page?: PageMetadata;
+};
+
+export type PagedModelPracticeAreaReviewMoment = {
+    content?: Array<PracticeAreaReviewMoment>;
     page?: PageMetadata;
 };
 
@@ -3857,6 +4021,10 @@ export type ObservationDetail = {
      * Artifact type (e.g. PULL_REQUEST)
      */
     artifactKind: string;
+    /**
+     * Link to the reviewed artifact on its platform (null when it cannot be resolved)
+     */
+    artifactUrl?: string;
     /**
      * Assessment: GOOD or BAD; null when the presence carries no direction (NOT_APPLICABLE, INCONCLUSIVE)
      */
@@ -4500,6 +4668,25 @@ export type GitLabGroup = {
      * Group web URL
      */
     webUrl?: string;
+};
+
+/**
+ * Rate whether delivered practice feedback was helpful
+ */
+export type FeedbackHelpfulnessVoteRequest = {
+    /**
+     * true when the feedback was helpful, false when it was not
+     */
+    helpful: boolean;
+};
+
+/**
+ * Current usefulness rating for a delivered feedback unit
+ */
+export type FeedbackHelpfulnessVote = {
+    feedbackId: string;
+    helpful?: boolean;
+    updatedAt: Date;
 };
 
 export type FeedbackApproval = {
@@ -5334,52 +5521,6 @@ export type ChatMessageVote = {
     isUpvoted?: boolean;
     messageId?: string;
     updatedAt?: Date;
-};
-
-export type CatalogPracticeSummary = {
-    areaName?: string;
-    areaSlug?: string;
-    artifactKind: string;
-    automatedReviewValidation: PracticeAutomatedReviewValidation;
-    availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
-    name: string;
-    slug: string;
-    whyItMatters?: string;
-};
-
-export type CatalogPracticePreview = {
-    area: CatalogAdoptionArea;
-    availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
-    definition: CuratedPracticeDefinition;
-    etag: string;
-    initialAutonomy: 'OFF' | 'HUMAN_APPROVAL' | 'AUTOMATIC';
-    slug: string;
-    sourceReviewRuleFingerprint: string;
-};
-
-export type CatalogAdoptionArea = {
-    definition?: CuratedAreaRequest;
-    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
-    slug?: string;
-};
-
-export type CatalogAreaPracticeAction = {
-    action: 'ADD' | 'MOVE_TO_AREA' | 'KEEP' | 'BLOCKED';
-    slug: string;
-};
-
-export type CatalogAreaAdoptionResult = {
-    added: Array<Practice>;
-    moved: Array<Practice>;
-};
-
-export type CatalogAreaAdoptionPreview = {
-    actions: Array<CatalogAreaPracticeAction>;
-    definition: CuratedAreaRequest;
-    disposition: 'UNASSIGNED' | 'REUSE_EXISTING_AREA' | 'CREATE_CATALOG_AREA';
-    etag: string;
-    practices: Array<CatalogPracticePreview>;
-    slug: string;
 };
 
 /**
@@ -9052,6 +9193,27 @@ export type ReorderAreasResponses = {
 
 export type ReorderAreasResponse = ReorderAreasResponses[keyof ReorderAreasResponses];
 
+export type GetPracticeAreaStatusesData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practice-areas/status';
+};
+
+export type GetPracticeAreaStatusesResponses = {
+    /**
+     * Active-area statuses returned
+     */
+    200: Array<PracticeAreaStatus>;
+};
+
+export type GetPracticeAreaStatusesResponse = GetPracticeAreaStatusesResponses[keyof GetPracticeAreaStatusesResponses];
+
 export type DeleteAreaData = {
     body?: never;
     path: {
@@ -9061,9 +9223,7 @@ export type DeleteAreaData = {
         workspaceSlug: string;
         areaSlug: string;
     };
-    query?: {
-        deletePractices?: boolean;
-    };
+    query?: never;
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}';
 };
 
@@ -9170,163 +9330,75 @@ export type SetAreaAutonomyResponses = {
 
 export type SetAreaAutonomyResponse = SetAreaAutonomyResponses[keyof SetAreaAutonomyResponses];
 
-export type ListAdoptablePracticesData = {
+export type ListPracticeAreaReviewHistoryData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
+        areaSlug: string;
     };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption';
+    query?: {
+        practiceSlug?: string;
+        artifactKinds?: Array<string>;
+        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        page?: number;
+        size?: number;
+    };
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history';
 };
 
-export type ListAdoptablePracticesErrors = {
+export type ListPracticeAreaReviewHistoryErrors = {
     /**
-     * Workspace administrator access is required
+     * Invalid filter or pagination
      */
-    403: ProblemDetail;
-};
-
-export type ListAdoptablePracticesError = ListAdoptablePracticesErrors[keyof ListAdoptablePracticesErrors];
-
-export type ListAdoptablePracticesResponses = {
+    400: ProblemDetail;
     /**
-     * Available practices returned
+     * Practice area not found
      */
-    200: Array<CatalogPracticeSummary>;
+    404: unknown;
 };
 
-export type ListAdoptablePracticesResponse = ListAdoptablePracticesResponses[keyof ListAdoptablePracticesResponses];
+export type ListPracticeAreaReviewHistoryError = ListPracticeAreaReviewHistoryErrors[keyof ListPracticeAreaReviewHistoryErrors];
 
-export type PreviewAreaAdoptionData = {
+export type ListPracticeAreaReviewHistoryResponses = {
+    /**
+     * Paginated review moments returned
+     */
+    200: PagedModelPracticeAreaReviewMoment;
+};
+
+export type ListPracticeAreaReviewHistoryResponse = ListPracticeAreaReviewHistoryResponses[keyof ListPracticeAreaReviewHistoryResponses];
+
+export type ListPracticeAreaTrendData = {
     body?: never;
     path: {
         /**
          * Workspace slug
          */
         workspaceSlug: string;
-        slug: string;
+        areaSlug: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+    url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/trend';
 };
 
-export type PreviewAreaAdoptionResponses = {
+export type ListPracticeAreaTrendErrors = {
     /**
-     * OK
+     * Practice area not found
      */
-    200: CatalogAreaAdoptionPreview;
+    404: unknown;
 };
 
-export type PreviewAreaAdoptionResponse = PreviewAreaAdoptionResponses[keyof PreviewAreaAdoptionResponses];
-
-export type AdoptAreaData = {
-    body?: never;
-    headers?: {
-        'If-Match'?: string;
-    };
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/areas/{slug}';
+export type ListPracticeAreaTrendResponses = {
+    /**
+     * Practice-area trend returned
+     */
+    200: PracticeAreaTrend;
 };
 
-export type AdoptAreaResponses = {
-    /**
-     * OK
-     */
-    200: CatalogAreaAdoptionResult;
-};
-
-export type AdoptAreaResponse = AdoptAreaResponses[keyof AdoptAreaResponses];
-
-export type PreviewPracticeAdoptionData = {
-    body?: never;
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}';
-};
-
-export type PreviewPracticeAdoptionErrors = {
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
-    /**
-     * Practice is not offered
-     */
-    404: ProblemDetail;
-};
-
-export type PreviewPracticeAdoptionError = PreviewPracticeAdoptionErrors[keyof PreviewPracticeAdoptionErrors];
-
-export type PreviewPracticeAdoptionResponses = {
-    /**
-     * Adoption preview returned
-     */
-    200: CatalogPracticePreview;
-};
-
-export type PreviewPracticeAdoptionResponse = PreviewPracticeAdoptionResponses[keyof PreviewPracticeAdoptionResponses];
-
-export type AdoptPracticeData = {
-    body?: never;
-    headers?: {
-        'If-Match'?: string;
-    };
-    path: {
-        /**
-         * Workspace slug
-         */
-        workspaceSlug: string;
-        slug: string;
-    };
-    query?: never;
-    url: '/workspaces/{workspaceSlug}/practice-catalog/adoption/{slug}';
-};
-
-export type AdoptPracticeErrors = {
-    /**
-     * Workspace administrator access is required
-     */
-    403: ProblemDetail;
-    /**
-     * The practice slug already exists in the workspace
-     */
-    409: ProblemDetail;
-    /**
-     * Catalog or workspace state changed since preview
-     */
-    412: ProblemDetail;
-    /**
-     * The If-Match preview validator is required
-     */
-    428: ProblemDetail;
-};
-
-export type AdoptPracticeError = AdoptPracticeErrors[keyof AdoptPracticeErrors];
-
-export type AdoptPracticeResponses = {
-    /**
-     * Practice adopted
-     */
-    201: Practice;
-};
-
-export type AdoptPracticeResponse = AdoptPracticeResponses[keyof AdoptPracticeResponses];
+export type ListPracticeAreaTrendResponse = ListPracticeAreaTrendResponses[keyof ListPracticeAreaTrendResponses];
 
 export type GetCuratedPracticeCatalogEntryData = {
     body?: never;
@@ -9611,6 +9683,57 @@ export type GetInAppFeedbackResponses = {
 
 export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
+export type RemoveFeedbackHelpfulnessRatingData = {
+    body?: never;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/helpfulness';
+};
+
+export type RemoveFeedbackHelpfulnessRatingResponses = {
+    /**
+     * Rating removed or did not exist
+     */
+    204: void;
+};
+
+export type RemoveFeedbackHelpfulnessRatingResponse = RemoveFeedbackHelpfulnessRatingResponses[keyof RemoveFeedbackHelpfulnessRatingResponses];
+
+export type RateFeedbackHelpfulnessData = {
+    body: FeedbackHelpfulnessVoteRequest;
+    path: {
+        /**
+         * Workspace slug
+         */
+        workspaceSlug: string;
+        feedbackId: string;
+    };
+    query?: never;
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/helpfulness';
+};
+
+export type RateFeedbackHelpfulnessErrors = {
+    /**
+     * Feedback not found
+     */
+    404: unknown;
+};
+
+export type RateFeedbackHelpfulnessResponses = {
+    /**
+     * Rating recorded
+     */
+    200: FeedbackHelpfulnessVote;
+};
+
+export type RateFeedbackHelpfulnessResponse = RateFeedbackHelpfulnessResponses[keyof RateFeedbackHelpfulnessResponses];
+
 export type GetLatestReactionData = {
     body?: never;
     path: {
@@ -9716,9 +9839,33 @@ export type ListObservationsData = {
          */
         practiceSlug?: string;
         /**
+         * Filter by the practice area the observed practice belongs to
+         */
+        areaSlug?: string;
+        /**
          * Filter by presence
          */
         presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
+        /**
+         * Only observations on these artifact kinds (repeatable); omit for all kinds
+         */
+        artifactKinds?: Array<string>;
+        /**
+         * Only observations with these severities (repeatable); omit for all
+         */
+        severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * Drop NOT_APPLICABLE rows — only observations where the practice actually applied
+         */
+        displayableOnly?: boolean;
+        /**
+         * Feed ordering: DATE (default) or SEVERITY (most severe first, ties newest-first)
+         */
+        sort?: 'DATE' | 'SEVERITY';
+        /**
+         * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
+         */
+        direction?: 'ASC' | 'DESC';
         page?: number;
         size?: number;
     };

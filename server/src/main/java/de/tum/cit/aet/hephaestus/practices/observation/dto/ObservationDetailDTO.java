@@ -44,11 +44,15 @@ public record ObservationDetailDTO(
     @NonNull
     @Schema(description = "What occasioned the measurement; never mix origins in one trend line")
     ObservationOrigin origin,
+    @Nullable
+    @Schema(description = "Link to the reviewed artifact on its platform (null when it cannot be resolved)")
+    String artifactUrl,
     @NonNull @Schema(description = "When the observation was made") Instant observedAt
 ) {
     public static ObservationDetailDTO from(
         Observation observation,
         @Nullable String deliveredFeedback,
+        @Nullable String artifactUrl,
         boolean includeEvidence
     ) {
         var practice = observation.getPractice();
@@ -67,6 +71,7 @@ public record ObservationDetailDTO(
             deliveredFeedback,
             ReviewClaimCurrentness.of(observation.getPracticeRevision(), practice),
             observation.getOrigin(),
+            artifactUrl,
             observation.getObservedAt()
         );
     }
