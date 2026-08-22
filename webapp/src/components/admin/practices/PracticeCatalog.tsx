@@ -26,6 +26,8 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Section } from "@/components/core/Section";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
+import { DASHBOARD_VISIBILITY_DEFS } from "@/components/practice-vocabulary/dashboard-visibility-defs";
+import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -213,8 +215,10 @@ export function PracticeCatalog({
 				)}
 				renderAreaMeta={(area) => (
 					<>
+						{/* Only the exception is shown: a badge on every area would be noise, and "on the
+						    dashboards" is what an area does unless someone changed it. */}
 						{!area.visibleInPracticeDashboards && (
-							<Badge variant="outline">Hidden from practice dashboards</Badge>
+							<StatusBadge def={DASHBOARD_VISIBILITY_DEFS.HIDDEN} />
 						)}
 						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</>
