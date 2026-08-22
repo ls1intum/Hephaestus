@@ -14,6 +14,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.InteractiveSan
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.InteractiveSandboxRegistry;
 import de.tum.cit.aet.hephaestus.agent.sandbox.docker.interactive.StdinWriteWatchdog;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.InteractiveSandboxService;
+import de.tum.cit.aet.hephaestus.agent.sandbox.spi.ResourceLimits;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxManager;
 import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
@@ -27,6 +28,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadPoolExecutor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -55,16 +57,55 @@ public class DockerSandboxConfiguration {
 
     private static final Logger log = LoggerFactory.getLogger(DockerSandboxConfiguration.class);
 
-    /** Connections per container: create/start, wait, logs/copy. */
-    private static final int CONNECTIONS_PER_CONTAINER = 3;
+    /** RPC connections per container: create/start, logs, and a copy-out lease held while it is read. */
+    private static final int RPC_CONNECTIONS_PER_CONTAINER = 3;
 
     private static final Duration HTTP_CONNECTION_TIMEOUT = Duration.ofSeconds(5);
 
-    /** docker wait/logs can block for the full container lifetime. */
-    private static final Duration HTTP_RESPONSE_TIMEOUT = Duration.ofMinutes(30);
+    /**
+     * Idle timeout, not a deadline: Apache installs responseTimeout as the socket timeout for the
+     * whole exchange, so it bounds the gap between reads and a call that keeps producing bytes runs
+     * as long as it likes. Every RPC call carries its own budget, so this only has to reclaim the
+     * connection when the daemon goes silent — generous enough that a slow image layer or a large
+     * archive upload never trips it.
+     */
+    static final Duration HTTP_RESPONSE_TIMEOUT = Duration.ofMinutes(30);
+
+    /**
+     * `docker wait` sends nothing until the container exits, so for it the idle timeout is a ceiling
+     * on the container's life. Sitting above {@link ResourceLimits#MAX_RUNTIME} it can never cut a
+     * legitimate wait short, while still reclaiming a connection the daemon has abandoned —
+     * docker-java's reader thread only ever gets an interrupt, which a blocking read ignores.
+     */
+    static final Duration HTTP_STREAMING_RESPONSE_TIMEOUT = ResourceLimits.MAX_RUNTIME.plusMinutes(10);
+
+    /** Calls whose response body is the stream. One wait per container, and nothing else. */
+    @Bean(name = "dockerStreamingClient", destroyMethod = "close")
+    public DockerClient dockerStreamingClient(SandboxProperties properties) {
+        return buildClient(
+            properties,
+            HTTP_STREAMING_RESPONSE_TIMEOUT,
+            properties.maxConcurrentContainers(),
+            "streaming"
+        );
+    }
 
     @Bean(destroyMethod = "close")
     public DockerClient dockerClient(SandboxProperties properties) {
+        return buildClient(
+            properties,
+            HTTP_RESPONSE_TIMEOUT,
+            properties.maxConcurrentContainers() * RPC_CONNECTIONS_PER_CONTAINER,
+            "rpc"
+        );
+    }
+
+    private DockerClient buildClient(
+        SandboxProperties properties,
+        Duration responseTimeout,
+        int maxConnections,
+        String kind
+    ) {
         var configBuilder = DefaultDockerClientConfig.createDefaultConfigBuilder()
             .withDockerHost(properties.dockerHost())
             .withDockerTlsVerify(properties.tlsVerify());
@@ -78,24 +119,30 @@ public class DockerSandboxConfiguration {
         var httpClient = new ApacheDockerHttpClient.Builder()
             .dockerHost(config.getDockerHost())
             .sslConfig(config.getSSLConfig())
-            .maxConnections(properties.maxConcurrentContainers() * CONNECTIONS_PER_CONTAINER)
+            .maxConnections(maxConnections)
             .connectionTimeout(HTTP_CONNECTION_TIMEOUT)
-            .responseTimeout(HTTP_RESPONSE_TIMEOUT)
+            .responseTimeout(responseTimeout)
             .build();
 
         DockerClient client = DockerClientImpl.getInstance(config, httpClient);
         log.info(
-            "Docker sandbox client configured: host={}, tlsVerify={}",
+            "Docker sandbox client configured: kind={}, host={}, tlsVerify={}, responseTimeout={}, maxConnections={}",
+            kind,
             properties.dockerHost(),
-            properties.tlsVerify()
+            properties.tlsVerify(),
+            responseTimeout,
+            maxConnections
         );
 
         return client;
     }
 
     @Bean
-    public DockerClientOperations dockerClientOperations(DockerClient dockerClient) {
-        return new DockerClientOperations(dockerClient);
+    public DockerClientOperations dockerClientOperations(
+        DockerClient dockerClient,
+        @Qualifier("dockerStreamingClient") DockerClient dockerStreamingClient
+    ) {
+        return new DockerClientOperations(dockerClient, dockerStreamingClient);
     }
 
     @Bean
