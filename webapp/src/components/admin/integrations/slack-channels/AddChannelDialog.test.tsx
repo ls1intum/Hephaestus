@@ -44,8 +44,6 @@ describe("AddChannelDialog — form submit", () => {
 		fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
 		expect(onOpenChange).toHaveBeenCalledWith(false);
-		expect((screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement).value).toBe(
-			"",
-		);
+		expect(screen.getByLabelText<HTMLInputElement>(/paste a channel link or id/i).value).toBe("");
 	});
 });

@@ -103,7 +103,7 @@ describe("resolveLegalContent", () => {
 						get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null),
 					},
 					text: async () => body,
-				} as unknown as Response;
+				};
 			},
 		);
 	}

@@ -44,7 +44,7 @@ function createMockMessage(role: "user" | "assistant", text: string, id?: string
 		id: id ?? `msg-${Math.random().toString(36).slice(2)}`,
 		role,
 		parts: [{ type: "text", text, state: role === "assistant" ? "done" : undefined }],
-	} as ChatMessage;
+	};
 }
 
 function textOf(message: ChatMessage): string {

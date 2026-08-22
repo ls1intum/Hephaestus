@@ -179,12 +179,11 @@ describe("CuratedPracticeForm", () => {
 		);
 
 		screen.getByDisplayValue("Write a clear pull request description");
+		expect(screen.getByRole<HTMLButtonElement>("button", { name: "Save changes" }).disabled).toBe(
+			true,
+		);
 		expect(
-			(screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled,
-		).toBe(true);
-		expect(
-			(screen.getByRole("button", { name: "Continue with my draft" }) as HTMLButtonElement)
-				.disabled,
+			screen.getByRole<HTMLButtonElement>("button", { name: "Continue with my draft" }).disabled,
 		).toBe(false);
 	});
 

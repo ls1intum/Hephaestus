@@ -37,7 +37,6 @@ import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flag
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { isCopilotExcludedRoute } from "@/lib/copilot-route";
 import { getProviderSlug } from "@/lib/provider";
-import type { ChatMessage } from "@/lib/types";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -218,7 +217,7 @@ function GlobalCopilot() {
 			}}
 		>
 			<Chat
-				messages={mentorChat.messages as ChatMessage[]}
+				messages={mentorChat.messages}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}

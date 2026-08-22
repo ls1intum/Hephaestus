@@ -34,7 +34,7 @@ export function SortFilter({
 			<Label htmlFor="sort">Sort by</Label>
 			<Select
 				value={selectedSort}
-				onValueChange={(value) => value && onSortChange?.(value as LeaderboardSortType)}
+				onValueChange={(value) => value && onSortChange?.(value)}
 				items={visibleOptions}
 			>
 				<SelectTrigger id="sort" className="w-full">

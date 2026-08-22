@@ -260,7 +260,7 @@ export function PostHogSurveyWidget({
 				return;
 			}
 			posthog.getSurveys((updatedSurveys) => {
-				void resolveSurvey(updatedSurveys as PostHogSurveyRaw[]);
+				void resolveSurvey(updatedSurveys);
 			}, false);
 		});
 
@@ -270,7 +270,7 @@ export function PostHogSurveyWidget({
 			}
 
 			posthog.getSurveys((surveys) => {
-				void resolveSurvey(surveys as PostHogSurveyRaw[]);
+				void resolveSurvey(surveys);
 			}, false);
 		}, 100);
 

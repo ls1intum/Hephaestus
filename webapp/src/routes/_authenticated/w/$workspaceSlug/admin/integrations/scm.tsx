@@ -294,8 +294,8 @@ function ScmIntegrationPage() {
 					repositories={(repositories ?? []).map((repo) => ({ nameWithOwner: repo }))}
 					providerLabel={label}
 					isLoading={isLoadingRepositories}
-					error={repositoriesError as Error | null}
-					addRepositoryError={addRepository.error as Error | null}
+					error={repositoriesError}
+					addRepositoryError={addRepository.error}
 					isAddingRepository={addRepository.isPending}
 					isRemovingRepository={removeRepository.isPending}
 					onAddRepository={(nameWithOwner) => {

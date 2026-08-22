@@ -201,7 +201,7 @@ describe("Outline integration — connect happy path", () => {
 			target: { value: "ol_api_secret" },
 		});
 		expect(
-			(screen.getByRole("button", { name: /connect outline/i }) as HTMLButtonElement).disabled,
+			screen.getByRole<HTMLButtonElement>("button", { name: /connect outline/i }).disabled,
 		).toBe(true);
 
 		fireEvent.change(serverUrl, { target: { value: "https://wiki.acme.dev" } });

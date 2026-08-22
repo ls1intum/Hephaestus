@@ -212,7 +212,7 @@ export function SurveyContainer({
 
 			<div className="flex-1 overflow-y-auto px-4 pb-4 sm:px-6 sm:pb-6">
 				<SurveyQuestion
-					question={currentQuestion as SurveyQuestionType}
+					question={currentQuestion}
 					value={responses[currentQuestion.id]}
 					onChange={(nextValue) => handleResponse(currentQuestion.id, nextValue)}
 					error={errors[currentQuestion.id]}

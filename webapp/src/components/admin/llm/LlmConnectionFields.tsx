@@ -140,7 +140,7 @@ export function LlmConnectionFields({
 						<Select
 							items={PROVIDER_PRESET_SELECT_ITEMS}
 							value={value.preset}
-							onValueChange={(next) => next && applyPreset(next as ProviderPreset)}
+							onValueChange={(next) => next && applyPreset(next)}
 						>
 							<SelectTrigger id={presetId} className="w-full">
 								<SelectValue />
@@ -207,7 +207,7 @@ export function LlmConnectionFields({
 							{ value: "API_KEY", label: "api-key header" },
 						]}
 						value={value.authMode}
-						onValueChange={(next) => next && update({ authMode: next as LlmAuthMode })}
+						onValueChange={(next) => next && update({ authMode: next })}
 					>
 						<SelectTrigger id={authModeId} className="w-full">
 							<SelectValue />

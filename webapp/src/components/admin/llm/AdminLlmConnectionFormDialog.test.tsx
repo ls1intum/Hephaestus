@@ -52,7 +52,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 		const onProbe = vi.fn();
 		const onProbeSaved = vi.fn();
 		renderDialog({ editing: connection, onUpdate, onProbe, onProbeSaved });
-		expect((screen.getByLabelText("Base URL") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByLabelText<HTMLInputElement>("Base URL").disabled).toBe(true);
 		expect(screen.queryByRole("combobox", { name: "Endpoint preset" })).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Test saved connection" }));
 		expect(onProbeSaved).toHaveBeenCalledWith(connection.id, expect.any(Object));

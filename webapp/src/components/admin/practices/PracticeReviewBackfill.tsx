@@ -182,7 +182,7 @@ function EstimateSection({
 					value={artifactKind}
 					onValueChange={(value) => {
 						if (value) {
-							setArtifactKind(value as CreateReviewBackfillRunRequest["artifactKind"]);
+							setArtifactKind(value);
 						}
 					}}
 				>

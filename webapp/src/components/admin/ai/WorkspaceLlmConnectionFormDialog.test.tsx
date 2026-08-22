@@ -49,7 +49,7 @@ describe("WorkspaceLlmConnectionFormDialog", () => {
 
 	it("keeps endpoint routing immutable after creation", () => {
 		const onUpdate = renderDialog();
-		expect((screen.getByLabelText("Base URL") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByLabelText<HTMLInputElement>("Base URL").disabled).toBe(true);
 		expect(screen.queryByRole("combobox", { name: "Endpoint preset" })).toBeNull();
 		expect(screen.queryByLabelText("Slug")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));

@@ -82,9 +82,7 @@ export function useMentorChat({
 		...listThreadsOptions({ path: { workspaceSlug: slug } }),
 		enabled: hasWorkspace,
 		initialData: () =>
-			hasWorkspace
-				? (queryClient.getQueryData(threadsKey) as ChatThreadSummary[] | undefined)
-				: undefined,
+			hasWorkspace ? queryClient.getQueryData<ChatThreadSummary[]>(threadsKey) : undefined,
 		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
@@ -302,7 +300,7 @@ export function useMentorChat({
 		// Thread management
 		threadDetail,
 		isThreadLoading,
-		threadError: threadError as Error | null,
+		threadError: threadError,
 		threads,
 		isThreadsLoading,
 		currentThreadId: threadId || id,

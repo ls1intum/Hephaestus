@@ -276,6 +276,10 @@
 		// mutation these rules exist to catch cannot happen at any of them.
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-array-reverse": "off",
+		// Its two shapes here are both wrong. An effect that bails early and otherwise returns a cleanup
+		// is React's documented idiom, and an exhaustive `switch` with an annotated return type is
+		// already a TypeScript error when a union member is added (TS2366) — verified, not assumed.
+		"typescript/consistent-return": "off",
 		// Wants a type parameter on every `vi.fn()`. It buys nothing here: `toHaveBeenCalledWith` is not
 		// type-narrowed by this Vitest/TS setup — a deliberately wrong argument against a
 		// `vi.fn<(open: boolean) => void>()` type-checks clean — so the parameter would be ceremony on

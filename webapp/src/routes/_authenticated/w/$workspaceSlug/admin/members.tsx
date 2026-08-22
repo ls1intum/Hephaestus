@@ -80,7 +80,7 @@ function AdminMembersContainer() {
 			});
 		},
 		onError: (error) => {
-			toast.error(`Failed to update visibility: ${(error as Error).message}`);
+			toast.error(`Failed to update visibility: ${error.message}`);
 		},
 	});
 

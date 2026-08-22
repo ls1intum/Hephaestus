@@ -260,7 +260,7 @@ function CatalogToolbar({
 			<Select
 				items={WORK_ARTIFACT_FILTER_ITEMS}
 				value={focusFilter}
-				onValueChange={(value) => value && onFocusFilterChange(value as FocusFilter)}
+				onValueChange={(value) => value && onFocusFilterChange(value)}
 			>
 				<SelectTrigger className="w-full sm:hidden" aria-label="Filter by work type">
 					<SelectValue />

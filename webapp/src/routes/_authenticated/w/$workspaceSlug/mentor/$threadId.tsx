@@ -3,7 +3,6 @@ import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMentorChat } from "@/hooks/use-mentor-chat";
-import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({
 	component: ThreadContainer,
@@ -121,7 +120,7 @@ function ThreadContainer() {
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<Chat
-				messages={mentorChat.messages as unknown as ChatMessage[]}
+				messages={mentorChat.messages}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}

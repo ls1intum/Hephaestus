@@ -7,6 +7,7 @@ export function filedUnder<TOptions extends object>(
 	return { ...options, mutationKey };
 }
 
+// oxlint-disable-next-line typescript/no-unnecessary-type-parameters -- `TVariables` appears once, but callers instantiate it explicitly to type `idOf`'s parameter
 export function usePendingMutationIds<TVariables, TId extends string | number = number>(
 	mutationKey: MutationKey,
 	idOf: (variables: TVariables) => TId | undefined,

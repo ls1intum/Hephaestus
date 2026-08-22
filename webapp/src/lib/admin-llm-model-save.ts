@@ -62,7 +62,7 @@ export async function saveAdminLlmModelSafely({
 			if (editing.enabled) {
 				await operations.updateMetadata(
 					editing.id,
-					shouldEnable ? { enabled: false } : (body.metadata as UpdateLlmModelRequest),
+					shouldEnable ? { enabled: false } : body.metadata,
 				);
 			}
 		}
@@ -73,7 +73,7 @@ export async function saveAdminLlmModelSafely({
 		if (!editing && shouldEnable) {
 			await operations.updateMetadata(modelId, { enabled: true });
 		} else if (editing && (!editing.enabled || shouldEnable)) {
-			await operations.updateMetadata(editing.id, body.metadata as UpdateLlmModelRequest);
+			await operations.updateMetadata(editing.id, body.metadata);
 		}
 	} catch (error) {
 		if (modelId == null) throw error;

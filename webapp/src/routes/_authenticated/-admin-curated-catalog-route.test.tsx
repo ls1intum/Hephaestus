@@ -624,7 +624,7 @@ describe("instance catalog routes", () => {
 
 		fireEvent.click(screen.getByRole("button", { name: "Continue with my draft" }));
 		await waitFor(() =>
-			expect((screen.getByRole("textbox", { name: /Name/ }) as HTMLInputElement).value).toBe(
+			expect(screen.getByRole<HTMLInputElement>("textbox", { name: /Name/ }).value).toBe(
 				"My unsaved draft",
 			),
 		);

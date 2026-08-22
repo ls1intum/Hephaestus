@@ -55,7 +55,7 @@ function AdminTeamsContainer() {
 				const next = prev.map((t) => (t.id === teamId ? { ...t, hidden } : t));
 				queryClient.setQueryData(teamsQueryKey, next);
 			}
-			return { prev } as { prev: TeamInfo[] | undefined };
+			return { prev };
 		},
 		onError: (_err, _vars, ctx) => {
 			if (ctx?.prev) {
@@ -107,7 +107,7 @@ function AdminTeamsContainer() {
 				});
 				queryClient.setQueryData(teamsQueryKey, next);
 			}
-			return { prev } as { prev: TeamInfo[] | undefined };
+			return { prev };
 		},
 		onError: (_err, _vars, ctx) => {
 			if (ctx?.prev) {

@@ -134,6 +134,6 @@ export function useActiveWorkspaceSlug() {
 		providerType: toScmProviderType(activeWorkspace?.providerType),
 		selectWorkspace: setSelectedSlug,
 		isLoading: query.isLoading || workspaceSelectionLoading,
-		error: query.error as Error | null,
+		error: query.error,
 	};
 }

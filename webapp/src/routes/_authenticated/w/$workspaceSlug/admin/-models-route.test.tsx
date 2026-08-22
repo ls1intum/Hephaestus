@@ -163,11 +163,8 @@ describe("workspace AI models route", () => {
 		await screen.findByText("Not ready");
 
 		expect(
-			(
-				within(card("Practice reviews model")).getByLabelText(
-					"Timeout (seconds)",
-				) as HTMLInputElement
-			).value,
+			within(card("Practice reviews model")).getByLabelText<HTMLInputElement>("Timeout (seconds)")
+				.value,
 		).toBe("900");
 	});
 
@@ -200,9 +197,7 @@ describe("workspace AI models route", () => {
 
 		const saved = card("Practice reviews model");
 		fireEvent.click(within(saved).getByRole("button", { name: "Advanced" }));
-		expect((within(saved).getByLabelText("Timeout (seconds)") as HTMLInputElement).value).toBe(
-			"900",
-		);
+		expect(within(saved).getByLabelText<HTMLInputElement>("Timeout (seconds)").value).toBe("900");
 		await act(async () => {
 			await queryClient.cancelQueries({ queryKey: AGENTS_QUERY_KEY });
 			refetch.release();
@@ -223,7 +218,7 @@ describe("workspace AI models route", () => {
 
 		const detection = card("Practice reviews model");
 		fireEvent.click(within(detection).getByRole("button", { name: "Advanced" }));
-		expect((within(detection).getByLabelText("Timeout (seconds)") as HTMLInputElement).value).toBe(
+		expect(within(detection).getByLabelText<HTMLInputElement>("Timeout (seconds)").value).toBe(
 			"900",
 		);
 
@@ -236,9 +231,7 @@ describe("workspace AI models route", () => {
 		);
 		const reset = card("Practice reviews model");
 		fireEvent.click(within(reset).getByRole("button", { name: "Advanced" }));
-		expect((within(reset).getByLabelText("Timeout (seconds)") as HTMLInputElement).value).toBe(
-			"600",
-		);
+		expect(within(reset).getByLabelText<HTMLInputElement>("Timeout (seconds)").value).toBe("600");
 		await act(async () => {
 			await queryClient.cancelQueries({ queryKey: AGENTS_QUERY_KEY });
 			refetch.release();

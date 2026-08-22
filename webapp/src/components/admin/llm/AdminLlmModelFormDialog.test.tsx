@@ -66,7 +66,7 @@ describe("AdminLlmModelFormDialog", () => {
 				onSave={onSave}
 			/>,
 		);
-		expect((screen.getByLabelText("Upstream model id") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByLabelText<HTMLInputElement>("Upstream model id").disabled).toBe(true);
 		expect(screen.queryByLabelText("Initial workspace access")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		expect(onSave.mock.calls[0]?.[0].metadata).not.toHaveProperty("upstreamModelId");
