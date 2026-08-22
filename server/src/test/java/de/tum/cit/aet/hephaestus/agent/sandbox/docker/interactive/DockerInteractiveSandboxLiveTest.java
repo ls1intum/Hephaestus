@@ -124,7 +124,7 @@ class DockerInteractiveSandboxLiveTest {
             new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build()
         );
 
-        dockerOps = new DockerClientOperations(dockerClient);
+        dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
         containerManager = new SandboxContainerManager(dockerOps, image -> {}, sandboxProperties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, sandboxProperties);
