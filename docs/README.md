@@ -13,6 +13,21 @@ This site is powered by [Docusaurus 3](https://docusaurus.io/) with Rspack, SWC,
 Those three directories are the whole site: each is one `@docusaurus/plugin-content-docs` instance in
 `docusaurus.config.ts`, and every page in them must be reachable from its sidebar.
 
+## Diagrams
+
+Mermaid, validated by `pnpm run check:diagrams` — which fails a diagram with no `accTitle` and
+`accDescr`, because the picture is the only copy of that information for a sighted reader.
+
+Three shapes, so a reader recognises what they are looking at before reading it:
+
+| Shape | Use | Node ids |
+|---|---|---|
+| `flowchart LR` | something moves through owners or doors | PascalCase, labelled with what crosses the arrow |
+| `flowchart TB` | stages, and the distinct way each one can end | PascalCase |
+| `sequenceDiagram` | one exchange across processes | participant names as deployed |
+
+No emoji, no single-letter ids, and no `graph` — it is a deprecated alias for `flowchart`.
+
 ## What is deliberately *not* published
 
 `decisions/`, `runbooks/`, `auth-architecture.md` and `auth-glossary.md` are repo-only reference
