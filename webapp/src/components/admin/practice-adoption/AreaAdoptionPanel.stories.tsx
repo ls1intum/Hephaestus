@@ -11,6 +11,7 @@ import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
+import { expectNoPanelOverflow } from "@/test/reflow";
 import { AreaAdoptionPanel, type AreaAdoptionState } from "./AreaAdoptionPanel";
 
 const practice = {
@@ -186,6 +187,11 @@ export const LongContent: Story = {
 
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async () => {
+		const [panel] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
+		await expectSettledVisible(panel);
+		await expectNoPanelOverflow(panel);
+	},
 };
 
 export const DarkMode: Story = {

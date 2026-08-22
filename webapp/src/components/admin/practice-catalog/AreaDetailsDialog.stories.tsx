@@ -79,6 +79,14 @@ export const Pending: Story = {
 	},
 };
 
+/** The verb differs from creating, so the label is not one string with a spinner in front of it. */
+export const SavingAnEdit: Story = {
+	args: { area: mockAreas[0], pending: true },
+	play: async () => {
+		await expectGenuinelyDisabled(await screen.findByRole("button", { name: "Saving…" }));
+	},
+};
+
 export const ChoosingAnIcon: Story = {
 	play: async ({ args }) => {
 		await expectSettledVisible(await screen.findByLabelText("Name"));

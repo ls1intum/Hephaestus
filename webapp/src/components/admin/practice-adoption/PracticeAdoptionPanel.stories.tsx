@@ -12,6 +12,7 @@ import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectGenuinelyDisabled } from "@/test/controls";
 import { expectSettledVisible } from "@/test/overlay";
+import { expectNoPanelOverflow } from "@/test/reflow";
 import { PracticeAdoptionPanel, type PracticeAdoptionState } from "./PracticeAdoptionPanel";
 
 const preview: CatalogPracticePreview = {
@@ -51,9 +52,7 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 
 /**
  * The panel has no page of its own — the route it used to occupy redirects here with the drawer
- * already open — so every story mounts a real drawer over a real page. That is also what makes the
- * dismiss testable: the stack is stateful, so Escape, an outside press and the header control all
- * actually close it instead of firing an inert spy.
+ * already open — so every story mounts a real drawer over a real page.
  */
 const meta = {
 	title: "Workspace admin/Practice adoption/Practice panel",
@@ -68,6 +67,8 @@ const meta = {
 		// A discriminated union renders as a free-text box, which cannot produce a valid value.
 		state: { control: false },
 	},
+	// Stateful, so Escape, an outside press and the header control really close the panel instead
+	// of firing an inert spy.
 	render: (args) => (
 		<Stateful initial={[{ kind: "practice", id: preview.slug }]}>
 			{(stack, setStack) => (
@@ -168,8 +169,12 @@ export const FailedToLoad: Story = {
 	args: {
 		state: { status: "error", error: new Error("offline"), onRetry: fn() },
 	},
-	play: async () => {
-		await expectSettledVisible(await screen.findByRole("button", { name: "Retry" }));
+	play: async ({ args }) => {
+		const retry = await screen.findByRole("button", { name: "Retry" });
+		await expectSettledVisible(retry);
+		await userEvent.click(retry);
+		const state = args.state;
+		await expect(state.status === "error" && state.onRetry).toHaveBeenCalledOnce();
 	},
 };
 
@@ -190,6 +195,11 @@ export const LongContent: Story = {
 
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async () => {
+		const [panel] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
+		await expectSettledVisible(panel);
+		await expectNoPanelOverflow(panel);
+	},
 };
 
 export const DarkMode: Story = {

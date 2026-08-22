@@ -4,11 +4,9 @@ import type { CatalogPracticeSummary } from "@/api/types.gen";
 import { mockAuthorDeclaredEvidenceValidation } from "@/mocks/fixtures/practice";
 import { AvailablePracticeList } from "./AvailablePracticeList";
 
-/**
- * The `detail` param a row would push. Read back off the href rather than compared as a whole URL,
- * because a stack link preserves whatever search the surrounding route already had — in Storybook
- * that is the preview iframe's own `sessionId`.
- */
+// The `detail` param a row would push. Read back off the href rather than compared as a whole URL,
+// because a stack link preserves whatever search the surrounding route already had — in Storybook
+// that is the preview iframe's own `sessionId`.
 const detailParamOf = (link: HTMLElement) =>
 	new URL(link.getAttribute("href") ?? "", "https://example.test").searchParams.get("detail");
 

@@ -44,7 +44,7 @@ const practices = [
 	},
 ];
 
-/** The size a workspace installs the shipped catalogue at. */
+// The size a workspace installs the shipped catalogue at.
 const scaleAreas = [
 	"Submitting review-ready work",
 	"Writing issues a maintainer can act on",

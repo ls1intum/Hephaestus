@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, screen, userEvent } from "storybook/test";
+import { expect, screen, userEvent, waitFor } from "storybook/test";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { DrawerBody, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
@@ -53,7 +53,11 @@ export const TopLevel: Story = {
 		await expectSettledVisible(close);
 		await expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
 		await userEvent.click(close);
-		await expect(await screen.findByRole("heading", { name: "Practice setup" })).toBeVisible();
+		// The panel leaving is the claim; the page behind it belongs to the decorator, not to this
+		// component.
+		await waitFor(() =>
+			expect(document.querySelectorAll('[data-slot="drawer-popup"]')).toHaveLength(0),
+		);
 	},
 };
 

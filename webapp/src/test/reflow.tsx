@@ -89,6 +89,24 @@ export async function expectTablesScrollInPlace(
 	}
 }
 
+/**
+ * The drawer popup is `fixed`, so it never widens the document and {@link expectNoPageOverflow}
+ * cannot see it. At 320px the panel is the whole viewport, so content that overflows it is content a
+ * reader has to drag sideways to finish — SC 1.4.10 on the only box that can break here.
+ *
+ * Measured on the body rather than the popup: the popup paints a `::after` swipe bleed at
+ * `left: 100%`, and an absolutely positioned pseudo still counts toward its ancestor's
+ * `scrollWidth`. That box is `pointer-events-none`, the popup is `overflow-x: visible`, so it
+ * reaches nobody — but it makes the popup's own `scrollWidth` read one bleed too wide, every time.
+ */
+export async function expectNoPanelOverflow(panel: HTMLElement) {
+	const body = panel.querySelector<HTMLElement>('[data-slot="drawer-body"]');
+	if (body == null) {
+		throw new Error("A drawer panel with no body has no content box to measure.");
+	}
+	await expect(body.scrollWidth).toBeLessThanOrEqual(body.clientWidth + LAYOUT_SLACK_PX);
+}
+
 export async function expectTargetSize(control: HTMLElement) {
 	const rect = control.getBoundingClientRect();
 	await expect(rect.width).toBeGreaterThanOrEqual(MIN_TARGET_PX);

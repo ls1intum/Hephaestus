@@ -117,3 +117,24 @@ export const RationaleLeadsTheRuleFollows: Story = {
 		).toBeTruthy();
 	},
 };
+
+/** A practice may carry only one of the two guidance fields; nothing above may collapse without it. */
+export const RationaleOnly: Story = {
+	args: { definition: { ...definition, whatGoodLooksLike: undefined } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText(definition.whyItMatters as string)).toBeVisible();
+		await expect(
+			canvas.queryByRole("heading", { name: "What good looks like" }),
+		).not.toBeInTheDocument();
+		await expect(canvas.getByRole("button", { name: "How it decides" })).toBeVisible();
+	},
+};
+
+/** An artifact kind the options do not describe: the evidence summary must still render. */
+export const UnknownWorkType: Story = {
+	args: { options: { ...mockPracticeDefinitionOptions, workTypes: [] } },
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "What it reads" }));
+		await expect(await canvas.findByRole("button", { name: "How it decides" })).toBeVisible();
+	},
+};

@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen } from "storybook/test";
+import { expect, fn, screen, userEvent } from "storybook/test";
 import type { Practice } from "@/api/types.gen";
 import { mockPractices } from "@/components/admin/practices/story-mock-data";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
@@ -7,6 +7,7 @@ import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
 import { withPageBehind } from "@/stories/decorators";
 import { Stateful } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
+import { expectNoPanelOverflow } from "@/test/reflow";
 import { WorkspacePracticePanel, type WorkspacePracticeState } from "./WorkspacePracticePanel";
 
 const practice = mockPractices[0] as Practice;
@@ -88,13 +89,22 @@ export const Loading: Story = {
 
 export const FailedToLoad: Story = {
 	args: { state: { status: "error", error: new Error("offline"), onRetry: fn() } },
-	play: async () => {
-		await expectSettledVisible(await screen.findByRole("button", { name: "Retry" }));
+	play: async ({ args }) => {
+		const retry = await screen.findByRole("button", { name: "Retry" });
+		await expectSettledVisible(retry);
+		await userEvent.click(retry);
+		const state = args.state;
+		await expect(state.status === "error" && state.onRetry).toHaveBeenCalledOnce();
 	},
 };
 
 export const NarrowViewport: Story = {
 	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { viewports: [320] } },
+	play: async () => {
+		const [panel] = document.querySelectorAll<HTMLElement>('[data-slot="drawer-popup"]');
+		await expectSettledVisible(panel);
+		await expectNoPanelOverflow(panel);
+	},
 };
 
 export const DarkMode: Story = {
