@@ -3,7 +3,7 @@
 // guard could live — the LLM decides whether a guard is actually present. General by design: a per-language
 // pattern table keyed off the file extension, NOT a single-language scan. Adding a language = adding a row,
 // no engine change. NO observation, severity, or "defect" — facts only.
-import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
 
 // Cross-language boundary/edge constructs. Most are language-agnostic enough to share, but the table is
 // keyed per-language so a row can be tuned without affecting others.
@@ -21,7 +21,7 @@ const COMMON: Array<[string, RegExp]> = [
 const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 	swift: [
 		...COMMON,
-		["force-unwrap !", /[A-Za-z0-9_)\]]\!(\.|\s|$|\))/],
+		["force-unwrap !", /[A-Za-z0-9_)\]]!(\.|\s|$|\))/],
 		["try!", /\btry!/],
 		["Int(...) parse", /\bU?Int\d*\s*\(/],
 		["Double/Float(...) parse", /\b(Double|Float)\s*\(/],
@@ -30,7 +30,7 @@ const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 	],
 	ts: [
 		...COMMON,
-		["non-null assertion !", /[A-Za-z0-9_)\]]\![.;)\s]/],
+		["non-null assertion !", /[A-Za-z0-9_)\]]![.;)\s]/],
 		["parseInt/parseFloat", /\bparse(Int|Float)\s*\(/],
 		["Number(...) parse", /\bNumber\s*\(/],
 		["JSON.parse", /\bJSON\.parse\s*\(/],
@@ -66,7 +66,7 @@ const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 	],
 	kotlin: [
 		...COMMON,
-		["!! force non-null", /\!\!(\.|\s|$|\))/],
+		["!! force non-null", /!!(\.|\s|$|\))/],
 		["toInt/toDouble parse", /\.to(Int|Long|Double|Float)\s*\(/],
 		[".get(i) access", /\.get\s*\(/],
 		[".first()/.last()", /\.(first|last)\s*\(\s*\)/],
@@ -91,8 +91,11 @@ const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 	],
 	csharp: [
 		...COMMON,
-		["null-forgiving !", /[A-Za-z0-9_)\]]\!\.(?=[A-Za-z_])/],
-		["int.Parse/Convert", /\b(int|long|double|float|decimal|Int32|Int64|Convert)\.(Parse|To[A-Za-z]+)\s*\(/],
+		["null-forgiving !", /[A-Za-z0-9_)\]]!\.(?=[A-Za-z_])/],
+		[
+			"int.Parse/Convert",
+			/\b(int|long|double|float|decimal|Int32|Int64|Convert)\.(Parse|To[A-Za-z]+)\s*\(/,
+		],
 		["JsonSerializer.Deserialize", /\.Deserialize\s*\(/],
 		[".First()/.Last()/[i]", /\.(First|Last|Single)\s*\(/],
 	],
@@ -135,12 +138,12 @@ const SIGNATURE_PATTERNS: Record<string, RegExp> = {
 	js: /\bexport\s+(async\s+)?function\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
 	python: /^\s*def\s+(?!_)\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
 	go: /^func\s+(\([^)]*\)\s*)?[A-Z]\w*\s*\([^)]*[A-Za-z_][^)]*\)/,
-	java: /\bpublic\s+[\w<>\[\],?\s]+\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
+	java: /\bpublic\s+[\w<>[\],?\s]+\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
 	kotlin: /\b(public\s+)?fun\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
 	rust: /\bpub\s+(async\s+)?fn\s+\w+\s*(<[^>]*>)?\s*\([^)]*[A-Za-z_][^)]*\)/,
-	ruby: /^\s*def\s+(?!_)\w+\s*[\(\s][^)]*[A-Za-z_]/,
-	c: /^[A-Za-z_][\w\s\*]+\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)\s*\{?$/,
-	csharp: /\bpublic\s+[\w<>\[\],?\s]+\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
+	ruby: /^\s*def\s+(?!_)\w+\s*[(\s][^)]*[A-Za-z_]/,
+	c: /^[A-Za-z_][\w\s*]+\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)\s*\{?$/,
+	csharp: /\bpublic\s+[\w<>[\],?\s]+\s+\w+\s*\([^)]*[A-Za-z_][^)]*\)/,
 };
 
 function langOf(path: string): string | null {
@@ -150,10 +153,19 @@ function langOf(path: string): string | null {
 
 // Strip the obvious comment forms so we don't flag a pattern that only appears inside a comment.
 function isComment(trimmed: string): boolean {
-	return trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("*") || trimmed.startsWith("/*");
+	return (
+		trimmed.startsWith("//") ||
+		trimmed.startsWith("#") ||
+		trimmed.startsWith("*") ||
+		trimmed.startsWith("/*")
+	);
 }
 
-export default async function (_repo: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	_repo: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	const hints: Hint[] = [];
 	const byLang: Record<string, number> = {};
 	let signatureSites = 0;
@@ -170,7 +182,7 @@ export default async function (_repo: string, diffFiles: Map<string, DiffFile>, 
 			if (isComment(trimmed)) continue;
 
 			// Public/exported signature with parameters: the parameters are an unguarded-input candidate.
-			if (sigRe && sigRe.test(content)) {
+			if (sigRe?.test(content)) {
 				hints.push({
 					file: path,
 					line,
@@ -210,7 +222,11 @@ export default async function (_repo: string, diffFiles: Map<string, DiffFile>, 
 
 	return {
 		hints: hints.slice(0, 40),
-		metrics: { edgeCandidateSitesAdded: hints.length, exportedSignatureSites: signatureSites, ...byLang },
+		metrics: {
+			edgeCandidateSitesAdded: hints.length,
+			exportedSignatureSites: signatureSites,
+			...byLang,
+		},
 		directions,
 	};
 }

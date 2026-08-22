@@ -341,7 +341,7 @@ public class PiEventToUiChunkTranslator {
     // link_observation → DataObservation
 
     private List<UIMessageChunk> handleLinkObservation(JsonNode event, TranslatorState state) {
-        // Runner emits camelCase `observationId` (pi-mentor-runner.mjs defineLinkObservationTool).
+        // Runner emits camelCase `observationId` (pi-mentor-runner.ts defineLinkObservationTool).
         String observationIdStr = optionalString(event, "observationId");
         if (observationIdStr == null) {
             log.debug("link_observation missing observationId — skipping: {}", event);

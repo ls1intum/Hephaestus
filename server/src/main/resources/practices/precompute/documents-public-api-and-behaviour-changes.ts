@@ -9,7 +9,7 @@
 // export-status table classifies it as internal. The table is keyed off file extension: adding a language =
 // one row, no engine change.
 import { findFiles, readFileLines } from "../lib/grep";
-import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
 
 // ── (1) Public-product manifest scan ──────────────────────────────────────────────────────────────────────
 // Each manifest filename maps to a predicate over its raw text that answers "does this declare a consumable
@@ -25,7 +25,10 @@ const PRODUCT_MANIFESTS: Array<[RegExp, (text: string) => boolean]> = [
 	// Maven: packaged as a real artifact (jar/etc.), not an aggregator pom.
 	[/(^|\/)pom\.xml$/, (t) => !/<packaging>\s*pom\s*<\/packaging>/.test(t)],
 	// Gradle: applies the java-library plugin or a publishing plugin.
-	[/(^|\/)build\.gradle(\.kts)?$/, (t) => /(java-library|maven-publish|`maven-publish`|com\.vanniktech\.maven\.publish)/.test(t)],
+	[
+		/(^|\/)build\.gradle(\.kts)?$/,
+		(t) => /(java-library|maven-publish|`maven-publish`|com\.vanniktech\.maven\.publish)/.test(t),
+	],
 	// Python: declares packages to distribute.
 	[/(^|\/)setup\.py$/, (t) => /(packages\s*=|find_packages\s*\()/.test(t)],
 	[/(^|\/)setup\.cfg$/, (t) => /\[options\][^[]*packages\s*=/.test(t)],
@@ -57,7 +60,7 @@ const EXPORT_RULES: Record<string, ExportRule> = {
 	},
 	// Java: only `public` declarations are part of the API; package-private/protected/private are not.
 	java: {
-		decl: /\b(class|interface|enum|record|void|[A-Z][A-Za-z0-9_<>\[\]]*)\s+[A-Za-z_]\w*\s*[({]/,
+		decl: /\b(class|interface|enum|record|void|[A-Z][A-Za-z0-9_<>[\]]*)\s+[A-Za-z_]\w*\s*[({]/,
 		isPublic: (l) => /\bpublic\b/.test(l),
 	},
 	// Kotlin: declarations are public by default; private/internal/protected demote them.
@@ -101,10 +104,19 @@ function langOf(path: string): string | null {
 }
 
 function isComment(trimmed: string): boolean {
-	return trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("*") || trimmed.startsWith("/*");
+	return (
+		trimmed.startsWith("//") ||
+		trimmed.startsWith("#") ||
+		trimmed.startsWith("*") ||
+		trimmed.startsWith("/*")
+	);
 }
 
-export default async function (repoPath: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	repoPath: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	// (1) Does the repo declare a public library/framework product?
 	let hasPublicProduct = false;
 	for (const ext of MANIFEST_NAMES) {

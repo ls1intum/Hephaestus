@@ -131,7 +131,7 @@ results and recovery distinguishable.
 - [Practice review pipeline](../contributor/practice-review-pipeline.mdx)
 - [Practice review glossary](../contributor/practice-review-glossary.mdx)
 - [Practice review data model](../contributor/practice-feedback-schema.md)
-- `agent/feedback-composer.md`, `pi-runner.mjs`, and `agent.handler.composition`
+- `agent/feedback-composer.md`, `pi-runner.ts`, and `agent.handler.composition`
 
 ## Sources
 

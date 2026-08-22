@@ -2,8 +2,9 @@
 // labels) surface structural FACTS a maintainer-readiness judge needs — work-kind signals, presence of
 // reproduction / expected-vs-actual (BUG) or a value clause (STORY), and stub/empty/template bodies.
 // FACTS and DIRECTIONS only — the LLM decides whether the report is genuinely act-on-able. No observation.
+
+import { type InventoryItem, readProjectInventory } from "../lib/context";
 import type { Hint } from "../lib/types";
-import { readProjectInventory, type InventoryItem } from "../lib/context";
 
 /** Title-token overlap (Jaccard) — a coarse near-duplicate signal across the project inventory. */
 function titleOverlap(a: string, b: string): number {
@@ -60,10 +61,13 @@ export default async function (
 	const titleNorm = norm(title);
 	const bodyNorm = norm(body);
 	const titleEcho =
-		bodyNorm.length > 0 && (bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
+		bodyNorm.length > 0 &&
+		(bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
 	const emptyOrTitleEcho = body.length < 25 || titleEcho;
 	const hasDeliverableTypeLabel = labels.some((l) =>
-		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/.test(l),
+		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/.test(
+			l,
+		),
 	);
 	const looksUmbrella =
 		labels.some((l) => /\b(epic|umbrella|meta|initiative|requirement)\b/.test(l)) ||
@@ -77,10 +81,13 @@ export default async function (
 	);
 	const bodyRequestsCapability = has(
 		/\b(add|support|implement|introduce|allow|enable|provide|ability to)\b/i,
-		body + " " + title,
+		`${body} ${title}`,
 	);
 
-	const hasRepro = has(/\b(steps to reproduce|to reproduce|repro(duction)? steps|reproduce)\b/i, body);
+	const hasRepro = has(
+		/\b(steps to reproduce|to reproduce|repro(duction)? steps|reproduce)\b/i,
+		body,
+	);
 	const hasExpectedActual =
 		has(/\b(expected|actual)\b[\s\S]{0,40}\b(result|behaviou?r|output)\b/i, body) ||
 		(/\bexpected\b/i.test(body) && /\bactual\b/i.test(body));
@@ -88,7 +95,11 @@ export default async function (
 		has(/\bso that\b/i, body) || has(/\bas an?\b[\s\S]{0,60}\bi (want|need|would like)\b/i, body);
 
 	const kind =
-		labelBug || bodyAssertsMalfunction ? "BUG" : labelStory || bodyRequestsCapability ? "STORY" : "UNCLASSIFIED";
+		labelBug || bodyAssertsMalfunction
+			? "BUG"
+			: labelStory || bodyRequestsCapability
+				? "STORY"
+				: "UNCLASSIFIED";
 
 	const directions: string[] = [];
 	if (emptyOrTitleEcho && hasDeliverableTypeLabel) {

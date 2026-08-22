@@ -46,7 +46,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <ol>
  *   <li>Ensures the Pi SDK is installed under {@code target/pi-sdk/node_modules} (idempotent;
  *       the install marker survives across test runs and parallel JVMs use a directory lock).</li>
- *   <li>Spawns {@code pi-mentor-runner.mjs} directly with {@code node} — no Docker — and points
+ *   <li>Spawns {@code pi-mentor-runner.ts} directly with {@code node} — no Docker — and points
  *       it at a real OpenAI-compatible endpoint via {@code OPENAI_BASE_URL} +
  *       {@code OPENAI_API_KEY}.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
@@ -57,7 +57,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <p>To exercise the production routing end-to-end, this test uses the real
  * {@link PiRuntimeFactory} to mint the settings.json (defaultProvider=hephaestus) — the same
  * bytes the production agent container would see. The hephaestus custom provider is registered
- * directly on the ModelRegistry by {@code pi-mentor-runner.mjs} before {@code createAgentSession},
+ * directly on the ModelRegistry by {@code pi-mentor-runner.ts} before {@code createAgentSession},
  * driven by the {@code PI_HEPHAESTUS_*} env vars seeded from {@link LiveLlmCredentials}. If a
  * future refactor regresses the production path, this live test fails — no test-only extension
  * masks the bug.
@@ -67,7 +67,7 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** Pi SDK version pinned in pi-mentor-runner.mjs. Bump in lockstep with the runner. */
+    /** Pi SDK version pinned in pi-mentor-runner.ts. Bump in lockstep with the runner. */
     private static final String PI_SDK_VERSION = "0.74.0";
 
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
@@ -80,7 +80,7 @@ class MentorLiveLlmTest {
         "main",
         "resources",
         "agent",
-        "pi-mentor-runner.mjs"
+        "pi-mentor-runner.ts"
     ).toAbsolutePath();
 
     private final List<Path> workspaceDirs = new ArrayList<>();
@@ -570,13 +570,13 @@ class MentorLiveLlmTest {
 
         // ESM resolution walks node_modules upward from the *importing* file, not from cwd. The
         // production container handles this by `ln -sf /opt/pi-sdk/node_modules
-        // /workspace/node_modules` and bind-mounting the runner under /workspace/.run-pi.mjs
+        // /workspace/node_modules` and bind-mounting the runner under /workspace/.run-pi.ts
         // (see PiRuntimeFactory). We mirror both moves here: symlink node_modules under the
         // workspace, and copy the runner into the workspace so resolution finds the symlink.
         Path nodeModulesLink = tmp.resolve("node_modules");
         Path sdkNodeModules = SDK_DIR.resolve("node_modules");
         Files.createSymbolicLink(nodeModulesLink, sdkNodeModules);
-        Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.mjs"));
+        Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.ts"));
         for (String sidecar : new MentorRunnerProfile().sidecarScripts()) {
             Files.copy(Path.of("src", "main", "resources", "agent", sidecar), tmp.resolve(sidecar));
         }
@@ -616,7 +616,7 @@ class MentorLiveLlmTest {
         Files.write(piHome.resolve("settings.json"), settingsBytes);
 
         // pi-provider.json — the single non-secret provider spec both runners read via the shared
-        // pi-provider.mjs helper. Written at the workspace root (mirrors PiRuntimeFactory.build()).
+        // pi-provider.ts helper. Written at the workspace root (mirrors PiRuntimeFactory.build()).
         byte[] providerConfigBytes = MAPPER.writerWithDefaultPrettyPrinter().writeValueAsBytes(
             java.util.Map.of(
                 "apiProtocol",
@@ -629,8 +629,8 @@ class MentorLiveLlmTest {
         );
         Files.write(tmp.resolve("pi-provider.json"), providerConfigBytes);
 
-        // No extension file is written: pi-mentor-runner.mjs registers the hephaestus provider
-        // directly on the ModelRegistry before createAgentSession (mirrors pi-runner.mjs), driven by
+        // No extension file is written: pi-mentor-runner.ts registers the hephaestus provider
+        // directly on the ModelRegistry before createAgentSession (mirrors pi-runner.ts), driven by
         // pi-provider.json + the LLM_PROXY_URL/LLM_PROXY_TOKEN env vars set in spawnRunner.
 
         return tmp;
@@ -643,7 +643,7 @@ class MentorLiveLlmTest {
         // The runner reads LLM_PROXY_URL / LLM_PROXY_TOKEN — the same env vars the sandbox adapter sets
         // in production (via NetworkPolicy). No real proxy sits in front of this live test, so these point
         // straight at the upstream gateway and the real credential; the runner cannot tell the difference.
-        // Without them the provider registration in pi-provider.mjs no-ops and no model resolves.
+        // Without them the provider registration in pi-provider.ts no-ops and no model resolves.
         env.put("LLM_PROXY_URL", creds.baseUrl());
         env.put("LLM_PROXY_TOKEN", creds.apiKey());
         // Pi looks for settings under PI_CODING_AGENT_DIR; pin it inside our temp dir so the
@@ -661,7 +661,7 @@ class MentorLiveLlmTest {
         );
         pb.directory(workspace.toFile());
 
-        pb.command("node", workspace.resolve("pi-mentor-runner.mjs").toString());
+        pb.command("bun", workspace.resolve("pi-mentor-runner.ts").toString());
 
         pb.redirectErrorStream(false);
         Process process = pb.start();

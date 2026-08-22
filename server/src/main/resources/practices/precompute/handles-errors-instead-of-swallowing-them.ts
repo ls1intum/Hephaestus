@@ -3,7 +3,7 @@
 // genuinely swallowed (no surfacing, logging, or recovery). Empty/no-op catch bodies routinely span lines
 // (`catch {\n}`), so patterns run over a window of CONSECUTIVE added lines per file, NOT a single line.
 // General by design: a per-language pattern table keyed off the file extension. Adding a language = a row.
-import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
 
 // language key -> [human label, regex] of error-discarding / swallowing constructs in ADDED code. The `\s`
 // in each regex spans the newlines joined into a window, so multi-line empty bodies match.
@@ -85,27 +85,39 @@ function langOf(path: string): string | null {
 }
 
 function isComment(trimmed: string): boolean {
-	return trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("*") || trimmed.startsWith("/*");
+	return (
+		trimmed.startsWith("//") ||
+		trimmed.startsWith("#") ||
+		trimmed.startsWith("*") ||
+		trimmed.startsWith("/*")
+	);
 }
 
 // Group a file's added lines into windows of CONSECUTIVE line numbers so a multi-line construct
 // (e.g. `catch {` then `}`) is one searchable text block without falsely joining distant additions.
 function consecutiveWindows(added: Map<number, string>): Array<{ start: number; lines: string[] }> {
-	const nums = [...added.keys()].sort((a, b) => a - b);
 	const windows: Array<{ start: number; lines: string[] }> = [];
-	let cur: number[] = [];
-	for (const n of nums) {
-		if (cur.length && n !== cur[cur.length - 1] + 1) {
-			windows.push({ start: cur[0], lines: cur.map((k) => added.get(k) ?? "") });
-			cur = [];
+	// The open window carries its own first and last line number, so "is there a window" and "what does
+	// it end at" are one nullable value rather than length checks against a scratch array.
+	let open: { start: number; end: number; lines: string[] } | null = null;
+	for (const n of [...added.keys()].sort((a, b) => a - b)) {
+		if (open !== null && n !== open.end + 1) {
+			windows.push({ start: open.start, lines: open.lines });
+			open = null;
 		}
-		cur.push(n);
+		open ??= { start: n, end: n, lines: [] };
+		open.end = n;
+		open.lines.push(added.get(n) ?? "");
 	}
-	if (cur.length) windows.push({ start: cur[0], lines: cur.map((k) => added.get(k) ?? "") });
+	if (open !== null) windows.push({ start: open.start, lines: open.lines });
 	return windows;
 }
 
-export default async function (_repo: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	_repo: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	const hints: Hint[] = [];
 	const byLang: Record<string, number> = {};
 	for (const [path, df] of diffFiles) {
@@ -141,5 +153,9 @@ export default async function (_repo: string, diffFiles: Map<string, DiffFile>, 
 					`Found ${hints.length} construct(s) added across ${Object.keys(byLang).length} language(s) that may discard or silence an error — investigate whether the failure is genuinely swallowed (no surfacing, logging, or recovery).`,
 				]
 			: [];
-	return { hints: hints.slice(0, 40), metrics: { errorSwallowCandidates: hints.length, ...byLang }, directions };
+	return {
+		hints: hints.slice(0, 40),
+		metrics: { errorSwallowCandidates: hints.length, ...byLang },
+		directions,
+	};
 }

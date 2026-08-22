@@ -154,7 +154,7 @@ class PiPlanSpecValidationTest extends BaseUnitTest {
         }
 
         @Override
-        public List<String> nodeFlags() {
+        public List<String> runtimeFlags() {
             return List.of();
         }
 

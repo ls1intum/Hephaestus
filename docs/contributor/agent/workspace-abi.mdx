@@ -33,7 +33,7 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 │   │                                #   ALWAYS present, empty on a first-ever review.
 │   └── practices/                   #   Practice catalog (index.json, {slug}.md, all-criteria.md).
 ├── work/                            # AGENT + PRECOMPUTE SCRATCH. Never collected back into SQL.
-│   ├── precompute/                  #   Per-practice precompute scripts injected by the server.
+│   ├── precompute/                  #   Per-practice precompute scripts (TypeScript, run on Bun).
 │   ├── precompute-out/              #   Precompute runtime output (logs, structured hints).
 │   └── analysis/practices/          #   Per-practice analysis output (holds the .gitkeep marker).
 ├── out/                             # THE ONLY collected directory — result.json, review-state.json,
@@ -43,10 +43,10 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 │   ├── AGENTS.md                    #   Orchestrator instructions
 │   └── settings.json                #   Pi SDK config (provider, model, compaction)
 ├── pi-provider.json                 # Provider/model routing for the runner.
-├── pi-provider.mjs                  # Provider helper module loaded by the runner.
-├── pi-observation-normalize.mjs         # Normalises sandbox observations before out/ is written.
+├── pi-provider.ts                  # Provider helper module loaded by the runner.
+├── pi-observation-normalize.ts         # Normalises sandbox observations before out/ is written.
 ├── node_modules -> /opt/pi-sdk/…    # Symlink created at container start, not staged.
-└── .run-pi.mjs                      # Runner script entry point.
+└── .run-pi.ts                      # Runner script entry point.
 ```
 
 The mentor interactive sandbox has its own `context/target/`, `context/user/`, and `scratch/` layout and is not
@@ -78,6 +78,11 @@ covered by this ABI.
 - **`work/`** — agent + precompute scratch. The Pi agent may write here; the server never
   collects it.
 - **`out/`** — the *only* directory the sandbox collects after the run.
+- **`node_modules`** — a symlink to `/opt/pi-sdk/node_modules`, so the runner's bare-specifier
+  import of `@earendil-works/pi-coding-agent` resolves. The name is only the directory convention
+  Bun shares with Node: the agent image ships **no `node` or `npm` binary**, and its build fails
+  if one appears. Everything in the sandbox — the runner, the precompute scripts, the SDK's own
+  native bindings — executes on Bun.
 - **`task.json`** — `TaskEnvelope<T extends Task>`. Schema version `1`. The runner asserts
   `schemaVersion` and `task.kind`, exiting `42` on mismatch (envelope/image drift signal).
 - **`.pi*`** / `inputs/practices/` / `work/precompute*` / `work/analysis/` / `out/`

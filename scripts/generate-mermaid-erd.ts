@@ -105,9 +105,7 @@ class MermaidErdGenerator {
 			await this.client.end();
 			this.logger.debug("Database connection closed.");
 		} catch (error) {
-			this.logger.error(
-				`Failed to close database connection: ${(error as Error).message}`,
-			);
+			this.logger.error(`Failed to close database connection: ${(error as Error).message}`);
 		}
 	}
 
@@ -151,10 +149,7 @@ class MermaidErdGenerator {
 			ORDER BY c.relname
 		`;
 		const params = [this.schema, ...excludedTables];
-		const result = await this.client.query<{ table_name: string }>(
-			query,
-			params,
-		);
+		const result = await this.client.query<{ table_name: string }>(query, params);
 		return result.rows.map((row) => row.table_name);
 	}
 
@@ -236,10 +231,7 @@ class MermaidErdGenerator {
 				constraints.push("UK");
 			}
 
-			const comment =
-				row.is_nullable === "NO" && row.is_primary_key !== "YES"
-					? "NOT NULL"
-					: "";
+			const comment = row.is_nullable === "NO" && row.is_primary_key !== "YES" ? "NOT NULL" : "";
 
 			return {
 				name: row.column_name,
@@ -257,9 +249,7 @@ class MermaidErdGenerator {
 			? []
 			: ["databasechangelog", "databasechangeloglock"];
 		const exclusionsClause = excludedTables.length
-			? `AND conrel.relname NOT IN (${excludedTables
-					.map((_, idx) => `$${idx + 2}`)
-					.join(", ")})
+			? `AND conrel.relname NOT IN (${excludedTables.map((_, idx) => `$${idx + 2}`).join(", ")})
 			   AND confrel.relname NOT IN (${excludedTables
 						.map((_, idx) => `$${idx + 2 + excludedTables.length}`)
 						.join(", ")})`
@@ -306,11 +296,7 @@ class MermaidErdGenerator {
 			if (!childColumn || !parentColumn) {
 				continue;
 			}
-			const label = this.generateRelationshipLabel(
-				row.child_table,
-				row.parent_table,
-				childColumn,
-			);
+			const label = this.generateRelationshipLabel(row.child_table, row.parent_table, childColumn);
 			const cardinality = await this.detectRelationshipCardinality(
 				row.child_table,
 				row.child_columns,
@@ -365,10 +351,7 @@ class MermaidErdGenerator {
 		if (parentTable === "user" && childColumn.includes("merged_by")) {
 			return "merged_by";
 		}
-		if (
-			childColumn.includes(parentTable) ||
-			parentTable.includes(cleanColumn)
-		) {
+		if (childColumn.includes(parentTable) || parentTable.includes(cleanColumn)) {
 			return "has";
 		}
 		return "references";
@@ -395,10 +378,11 @@ class MermaidErdGenerator {
 				HAVING array_agg(ku.column_name::text ORDER BY ku.column_name) <@ $3::text[]
 			) AS unique_constraints
 		`;
-		const uniqueResult = await this.client.query<{ count: string }>(
-			uniqueQuery,
-			[childTable, this.schema, sortedChildColumns],
-		);
+		const uniqueResult = await this.client.query<{ count: string }>(uniqueQuery, [
+			childTable,
+			this.schema,
+			sortedChildColumns,
+		]);
 		const isUnique = Number(uniqueResult.rows[0]?.count ?? 0) > 0;
 
 		const fkCountResult = await this.client.query<{ count: string }>(
@@ -463,15 +447,9 @@ class MermaidErdGenerator {
 
 		let formattedType = typeMapping[dataType] ?? dataType.toUpperCase();
 
-		if (
-			charMaxLen &&
-			(formattedType === "VARCHAR" || formattedType === "CHAR")
-		) {
+		if (charMaxLen && (formattedType === "VARCHAR" || formattedType === "CHAR")) {
 			formattedType = `${formattedType}(${charMaxLen})`;
-		} else if (
-			numPrecision &&
-			(formattedType === "NUMERIC" || formattedType === "DECIMAL")
-		) {
+		} else if (numPrecision && (formattedType === "NUMERIC" || formattedType === "DECIMAL")) {
 			formattedType = numScale
 				? `${formattedType}(${numPrecision},${numScale})`
 				: `${formattedType}(${numPrecision})`;
@@ -491,9 +469,7 @@ class MermaidErdGenerator {
 		lines.push("    layout: elk");
 		lines.push("---");
 		lines.push("erDiagram");
-		lines.push(
-			"    %% Generated automatically from PostgreSQL database schema",
-		);
+		lines.push("    %% Generated automatically from PostgreSQL database schema");
 		lines.push("    %% using scripts/generate-mermaid-erd.ts");
 		lines.push("    %% To regenerate: pnpm run db:generate-erd-docs");
 		lines.push("");
@@ -521,10 +497,7 @@ class MermaidErdGenerator {
 
 		lines.push("    %% Relationships");
 
-		const relationshipGroups: Record<
-			RelationshipCardinality,
-			RelationshipInfo[]
-		> = {
+		const relationshipGroups: Record<RelationshipCardinality, RelationshipInfo[]> = {
 			"||--||": [],
 			"||--o{": [],
 			"}o--o{": [],
@@ -542,10 +515,7 @@ class MermaidErdGenerator {
 			)} : ${rel.label || "has"}`;
 		const lineCounts = new Map<string, number>();
 		for (const rel of relationships) {
-			lineCounts.set(
-				renderedLine(rel),
-				(lineCounts.get(renderedLine(rel)) ?? 0) + 1,
-			);
+			lineCounts.set(renderedLine(rel), (lineCounts.get(renderedLine(rel)) ?? 0) + 1);
 		}
 
 		for (const [cardinality, rels] of Object.entries(relationshipGroups)) {
@@ -563,26 +533,16 @@ class MermaidErdGenerator {
 				const parentEntity = this.toEntityName(rel.parentTable);
 				const childEntity = this.toEntityName(rel.childTable);
 				const label =
-					(lineCounts.get(renderedLine(rel)) ?? 0) > 1
-						? rel.childColumn
-						: rel.label || "has";
-				lines.push(
-					`    ${parentEntity} ${cardinality} ${childEntity} : ${label}`,
-				);
+					(lineCounts.get(renderedLine(rel)) ?? 0) > 1 ? rel.childColumn : rel.label || "has";
+				lines.push(`    ${parentEntity} ${cardinality} ${childEntity} : ${label}`);
 			}
 			lines.push("");
 		}
 
 		lines.push("    %% Styling");
-		lines.push(
-			"    classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px",
-		);
-		lines.push(
-			"    classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px",
-		);
-		lines.push(
-			"    classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px",
-		);
+		lines.push("    classDef primaryEntity fill:#e1f5fe,stroke:#01579b,stroke-width:2px");
+		lines.push("    classDef associationEntity fill:#f3e5f5,stroke:#4a148c,stroke-width:2px");
+		lines.push("    classDef metadataEntity fill:#e8f5e8,stroke:#1b5e20,stroke-width:2px");
 		lines.push("");
 
 		for (const tableName of tableData.keys()) {
@@ -676,9 +636,7 @@ function parseJdbcUrl(jdbcUrl: string): JdbcInfo {
 	}
 
 	// Match: jdbc:postgresql://host[:port]/database
-	const match = /^jdbc:postgresql:\/\/([^:/]+)(?::(\d+))?\/([^?]+)$/.exec(
-		jdbcUrl,
-	);
+	const match = /^jdbc:postgresql:\/\/([^:/]+)(?::(\d+))?\/([^?]+)$/.exec(jdbcUrl);
 	if (!match) {
 		throw new Error(
 			`Invalid JDBC URL format: ${sanitizeJdbcUrl(jdbcUrl)}. Expected jdbc:postgresql://host:port/database`,
@@ -752,8 +710,7 @@ async function main() {
 
 	const options = program.opts<CliOptions>();
 	const args = program.args as string[];
-	const jdbcUrl =
-		options.jdbcUrl ?? args[0] ?? process.env.HEPHAESTUS_DB_JDBC_URL;
+	const jdbcUrl = options.jdbcUrl ?? args[0] ?? process.env.HEPHAESTUS_DB_JDBC_URL;
 	const username = options.username ?? args[1] ?? process.env.POSTGRES_USER;
 	const password = options.password ?? args[2] ?? process.env.POSTGRES_PASSWORD;
 	const outputFile = options.output ?? args[3] ?? DEFAULT_OUTPUT_PATH;

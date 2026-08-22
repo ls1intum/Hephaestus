@@ -3,6 +3,7 @@
 // test-absence negative (expensive for a model to prove). FACTS only — the LLM judges readiness.
 import { findFiles } from "../lib/grep";
 import type { DiffFile, PullRequestMetadata } from "../lib/types";
+
 const isTest = (p: string) =>
 	/(^|\/)(tests?|specs?|__tests__)(\/)|[._-](test|tests|spec|specs)\.[a-z]+$|Tests?\.[a-z0-9]+$|Spec\.[a-z0-9]+$/i.test(
 		p,
@@ -13,16 +14,20 @@ const BARE_REF = /#(\d+)(?![\w.])/g;
 /** Issue id at the start of a branch-slug segment, e.g. `1313-foo` or `feat/1313-foo`. */
 const BRANCH_REF = /(?:^|\/)(\d{1,7})-/g;
 
-export default async function (repoPath: string, _d: Map<string, DiffFile>, m: PullRequestMetadata) {
+export default async function (
+	repoPath: string,
+	_d: Map<string, DiffFile>,
+	m: PullRequestMetadata,
+) {
 	const directions: string[] = [];
 
 	// --- Traceability: does the handoff reference a motivating issue at all? ---
-	const body = (m.body ?? "") + "\n" + (m.commits ?? []).map((c) => c.message ?? "").join("\n");
+	const body = `${m.body ?? ""}\n${(m.commits ?? []).map((c) => c.message ?? "").join("\n")}`;
 	const branch = m.source_branch ?? "";
 	const bodyRefs = new Set<string>();
-	for (const mt of body.matchAll(BARE_REF)) bodyRefs.add("#" + mt[1]);
+	for (const mt of body.matchAll(BARE_REF)) bodyRefs.add(`#${mt[1]}`);
 	const branchRefs = new Set<string>();
-	for (const mt of branch.matchAll(BRANCH_REF)) branchRefs.add("#" + mt[1]);
+	for (const mt of branch.matchAll(BRANCH_REF)) branchRefs.add(`#${mt[1]}`);
 	const allRefs = new Set<string>([...bodyRefs, ...branchRefs]);
 	if (allRefs.size > 0) {
 		directions.push(

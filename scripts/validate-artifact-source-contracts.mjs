@@ -22,7 +22,7 @@
  *   - every precompute script on disk belongs to a practice, and every practice's script is on disk.
  */
 import { createHash } from "node:crypto";
-import { readFile, readdir } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import Ajv2020 from "ajv/dist/2020.js";
@@ -196,7 +196,11 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 
 	for (const artifactKind of artifactKinds) {
 		const applicable = sourcesFor(artifactKind);
-		validate(manifestId, manifestOf(artifactKind, applicable), `${version} ${artifactKind} manifest`);
+		validate(
+			manifestId,
+			manifestOf(artifactKind, applicable),
+			`${version} ${artifactKind} manifest`,
+		);
 		// A manifest enumerates every source that could have applied, including the ones it did not
 		// collect. Dropping one is how "we chose not to look" becomes indistinguishable from silence.
 		expectRejection(
@@ -227,7 +231,8 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 	}
 
 	// The rejection paths that are not about the allow-list, exercised against the same fixtures.
-	const pullRequestKind = artifactKinds.find((kind) => sourcesFor(kind).length > 1) ?? artifactKinds[0];
+	const pullRequestKind =
+		artifactKinds.find((kind) => sourcesFor(kind).length > 1) ?? artifactKinds[0];
 	const applicable = sourcesFor(pullRequestKind);
 	const manifest = manifestOf(pullRequestKind, applicable);
 	const available = {
@@ -236,28 +241,53 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		completeness: "COMPLETE",
 		facts: { capturedAt },
 	};
-	const artifact = { path: "context.json", mediaType: "application/json", sha256: "b".repeat(64), bytes: 1 };
+	const artifact = {
+		path: "context.json",
+		mediaType: "application/json",
+		sha256: "b".repeat(64),
+		bytes: 1,
+	};
 	const withFirstSource = (state, artifacts) => ({
 		...manifest,
 		sources: [{ kind: applicable[0], state, artifacts }, ...manifest.sources.slice(1)],
 	});
-	validate(manifestId, withFirstSource(available, [artifact]), `${version} available-source manifest`);
+	validate(
+		manifestId,
+		withFirstSource(available, [artifact]),
+		`${version} available-source manifest`,
+	);
 	for (const [label, invalid] of [
 		["an empty source list", { ...manifest, sources: [] }],
-		["an unknown source kind", manifestOf(pullRequestKind, ["scm.unknown.source", ...applicable.slice(1)])],
-		["a duplicate source capture", { ...manifest, sources: [...manifest.sources, { ...manifest.sources[0] }] }],
+		[
+			"an unknown source kind",
+			manifestOf(pullRequestKind, ["scm.unknown.source", ...applicable.slice(1)]),
+		],
+		[
+			"a duplicate source capture",
+			{ ...manifest, sources: [...manifest.sources, { ...manifest.sources[0] }] },
+		],
 		["a wrong catalog digest", { ...manifest, catalogDigest: "a".repeat(64) }],
 		["an absent source carrying artifacts", withFirstSource(absent, [artifact])],
 		["an escaping artifact path", withFirstSource(available, [{ ...artifact, path: "../secret" }])],
-		["a non-canonical artifact path", withFirstSource(available, [{ ...artifact, path: "./context.json" }])],
+		[
+			"a non-canonical artifact path",
+			withFirstSource(available, [{ ...artifact, path: "./context.json" }]),
+		],
 	]) {
-		expectRejection(manifestId, invalid, `${version}/artifact-source-manifest.schema.json accepted ${label}`);
+		expectRejection(
+			manifestId,
+			invalid,
+			`${version}/artifact-source-manifest.schema.json accepted ${label}`,
+		);
 	}
 
 	const readiness = readinessOf(pullRequestKind, applicable[0]);
 	const decision = readiness.decisions[0];
 	const check = decision.sourceChecks[0];
-	const withDecision = (overrides) => ({ ...readiness, decisions: [{ ...decision, ...overrides }] });
+	const withDecision = (overrides) => ({
+		...readiness,
+		decisions: [{ ...decision, ...overrides }],
+	});
 	// A practice can be skipped before any source is read at all — nothing to review it with, or the
 	// author declaring the evidence insufficient. That says nothing about the sources, so it carries no
 	// source checks and must still carry a reason.
@@ -271,11 +301,21 @@ const validateSchemasTrackTheCatalog = async (version, catalog) => {
 		["a duplicate source check", { sourceChecks: [check, { ...check }] }],
 		[
 			"a ready decision over a failed source check",
-			{ sourceChecks: [{ ...check, meetsRequirements: false, reasonCodes: ["SOURCE_NOT_AVAILABLE"] }] },
+			{
+				sourceChecks: [
+					{ ...check, meetsRequirements: false, reasonCodes: ["SOURCE_NOT_AVAILABLE"] },
+				],
+			},
 		],
 		["a skipped practice with no reason", { ready: false }],
-		["a failed source check with no reason", { ready: false, sourceChecks: [{ ...check, meetsRequirements: false }] }],
-		["a passing source check carrying a reason", { sourceChecks: [{ ...check, reasonCodes: ["SOURCE_INCOMPLETE"] }] }],
+		[
+			"a failed source check with no reason",
+			{ ready: false, sourceChecks: [{ ...check, meetsRequirements: false }] },
+		],
+		[
+			"a passing source check carrying a reason",
+			{ sourceChecks: [{ ...check, reasonCodes: ["SOURCE_INCOMPLETE"] }] },
+		],
 	]) {
 		expectRejection(
 			readinessId,
@@ -294,38 +334,90 @@ const validatePolicySchema = (version) => {
 	const id = schemaId(version, "practice-automated-review-policy.schema.json");
 	const reviewed = {
 		sourceContractVersion: version,
-		automatedReview: { mode: "LANGUAGE_MODEL", evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET" },
+		automatedReview: {
+			mode: "LANGUAGE_MODEL",
+			evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET",
+		},
 		whenEvidenceIsInsufficient: "SKIP_AUTOMATED_REVIEW",
 		knownLimitations: [
-			{ code: "RUNTIME_BEHAVIOR_NOT_OBSERVED", description: "Repository evidence does not establish runtime behaviour." },
+			{
+				code: "RUNTIME_BEHAVIOR_NOT_OBSERVED",
+				description: "Repository evidence does not establish runtime behaviour.",
+			},
 		],
 	};
-	const reason = { code: "NEEDS_A_PERSON", description: "Judging this needs context no source carries." };
+	const reason = {
+		code: "NEEDS_A_PERSON",
+		description: "Judging this needs context no source carries.",
+	};
 	validate(id, reviewed, `${version} reviewed-practice policy`);
 	validate(
 		id,
-		{ ...reviewed, automatedReview: { ...reviewed.automatedReview, evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT" }, insufficiencyReason: reason },
+		{
+			...reviewed,
+			automatedReview: {
+				...reviewed.automatedReview,
+				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
+			},
+			insufficiencyReason: reason,
+		},
 		`${version} declared-insufficient policy`,
 	);
 	validate(
 		id,
-		{ ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" }, knownLimitations: [] },
+		{
+			...reviewed,
+			automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
+			knownLimitations: [],
+		},
 		`${version} human-only policy`,
 	);
 	for (const [label, invalid] of [
-		["a review mode with no sufficiency verdict", { ...reviewed, automatedReview: { mode: "LANGUAGE_MODEL", evidenceSufficiency: "NONE" } }],
-		["a practice it does not review claiming sufficient evidence", { ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET" }, knownLimitations: [] }],
-		["limitations on a practice it does not review", { ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" } }],
+		[
+			"a review mode with no sufficiency verdict",
+			{ ...reviewed, automatedReview: { mode: "LANGUAGE_MODEL", evidenceSufficiency: "NONE" } },
+		],
+		[
+			"a practice it does not review claiming sufficient evidence",
+			{
+				...reviewed,
+				automatedReview: { mode: "NONE", evidenceSufficiency: "SUFFICIENT_WHEN_REQUIREMENTS_MET" },
+				knownLimitations: [],
+			},
+		],
+		[
+			"limitations on a practice it does not review",
+			{ ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" } },
+		],
 		// The reason a person is needed is the one field an operator asked about; folding it back into
 		// the limitation list is how it stopped being answerable the first time.
-		["insufficient evidence with no reason a person is needed", { ...reviewed, automatedReview: { ...reviewed.automatedReview, evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT" } }],
-		["a reason a person is needed on a practice it does review", { ...reviewed, insufficiencyReason: reason }],
+		[
+			"insufficient evidence with no reason a person is needed",
+			{
+				...reviewed,
+				automatedReview: {
+					...reviewed.automatedReview,
+					evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
+				},
+			},
+		],
+		[
+			"a reason a person is needed on a practice it does review",
+			{ ...reviewed, insufficiencyReason: reason },
+		],
 		["a retired evidence profile", { ...reviewed, evidenceProfile: "pull-request-review" }],
 		// The sources a review reads moved onto the bindings, because they depend on what occasioned it.
-		["evidence needs on the policy", { ...reviewed, needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }] }],
+		[
+			"evidence needs on the policy",
+			{ ...reviewed, needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }] },
+		],
 		["a limitation with no code", { ...reviewed, knownLimitations: [{ description: "…" }] }],
 	]) {
-		expectRejection(id, invalid, `${version}/practice-automated-review-policy.schema.json accepted ${label}`);
+		expectRejection(
+			id,
+			invalid,
+			`${version}/practice-automated-review-policy.schema.json accepted ${label}`,
+		);
 	}
 };
 
@@ -351,7 +443,11 @@ const validateContractVersion = async (version) => {
 	}
 	catalogDigests.set(version, catalogDigest);
 
-	validate(schemaId(version, "artifact-source-catalog.schema.json"), catalog, `${version}/catalog.json`);
+	validate(
+		schemaId(version, "artifact-source-catalog.schema.json"),
+		catalog,
+		`${version}/catalog.json`,
+	);
 	rejectDuplicateProperty(catalog.sources, "kind", `${version} source kind`);
 	validate(
 		schemaId(version, "source-use-decisions.schema.json"),
@@ -366,7 +462,10 @@ const validateContractVersion = async (version) => {
 
 for (const version of contractVersions) await validateContractVersion(version);
 
-const practiceCatalogPath = path.join(root, "server/src/main/resources/practices/default-catalog.json");
+const practiceCatalogPath = path.join(
+	root,
+	"server/src/main/resources/practices/default-catalog.json",
+);
 const practiceCatalog = await readJson(practiceCatalogPath);
 validate(defaultCatalogSchema.$id, practiceCatalog, "practices/default-catalog.json");
 
@@ -389,7 +488,9 @@ for (const area of practiceCatalog.areas) {
 			);
 		}
 		if (!precomputeScripts.has(expected)) {
-			throw new Error(`default-catalog.json practice '${practice.slug}' names a missing precompute script`);
+			throw new Error(
+				`default-catalog.json practice '${practice.slug}' names a missing precompute script`,
+			);
 		}
 		referencedPrecomputeScripts.add(expected);
 	}

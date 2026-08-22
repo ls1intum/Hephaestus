@@ -9,12 +9,18 @@ const isTest = (p: string) => TEST.test(p);
 const isExcluded = (p: string) =>
 	p.split("/").some((seg) => seg === "node_modules" || seg === ".build" || seg.startsWith("."));
 
-export default async function (repoPath: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	repoPath: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	let repoTestFileCount = 0;
 	let repoCodeFileCount = 0;
 	// One tree walk classified by extension, instead of one full scan per extension (~19x the I/O
 	// under the shared 15s precompute timeout). The brace pattern enumerates the same code extensions.
-	const matcher = new Bun.Glob("**/*.{swift,ts,tsx,js,jsx,py,java,kt,go,rb,cs,cpp,cc,cxx,c,m,mm,h,hpp}");
+	const matcher = new Bun.Glob(
+		"**/*.{swift,ts,tsx,js,jsx,py,java,kt,go,rb,cs,cpp,cc,cxx,c,m,mm,h,hpp}",
+	);
 	for (const path of matcher.scanSync(repoPath)) {
 		if (isExcluded(path)) {
 			continue;

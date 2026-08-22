@@ -6,25 +6,26 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Runner profile for the one-shot practice-review agent. Conservative tuning: no heap cap (30-file
- * diff patches allocate transiently and 256 MB would convert worst-case OOMs from rare to regular)
- * and no jemalloc LD_PRELOAD (page-decay tuning helps long-lived heaps, not bursty one-shots).
+ * Runner profile for the one-shot practice-review agent. It takes no flags: a review is bursty and
+ * short-lived, so the eager collection {@code --smol} buys the mentor would cost throughput here for
+ * no benefit, and the process exits before any tuning would pay off.
  */
 public final class PracticeRunnerProfile implements PiRunnerProfile {
 
-    public static final String SCRIPT = "pi-runner.mjs";
+    public static final String SCRIPT = "pi-runner.ts";
 
     /** Imported by {@link #SCRIPT} with a relative specifier, so each must be staged beside it. */
     private static final List<String> SIDECARS = List.of(
-        "pi-observation-normalize.mjs",
-        "pi-runner-timings.mjs",
-        "pi-runner-usage.mjs",
+        "pi-observation-normalize.ts",
+        "pi-runner-usage.ts",
+        "pi-runner-timings.ts",
+        "pi-runner-composition.ts",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 
     private static final List<String> PROMPTS = List.of(SandboxLayout.FEEDBACK_COMPOSER_PROMPT_FILENAME);
 
-    private static final List<String> FLAGS = List.of("--no-warnings");
+    private static final List<String> FLAGS = List.of();
 
     @Override
     public String runnerScript() {
@@ -42,7 +43,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
     }
 
     @Override
-    public List<String> nodeFlags() {
+    public List<String> runtimeFlags() {
         return FLAGS;
     }
 

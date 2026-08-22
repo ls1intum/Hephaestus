@@ -7,17 +7,14 @@
  * It includes validation to ensure the downloaded content is a valid GraphQL schema.
  */
 
-import { statSync, unlinkSync, writeFileSync, renameSync } from "node:fs";
+import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SCHEMA_DIR = resolve(
-	__dirname,
-	"../server/src/main/resources/graphql/github",
-);
+const SCHEMA_DIR = resolve(__dirname, "../server/src/main/resources/graphql/github");
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.github.graphql");
 // Official GitHub GraphQL schema URL - this is the only trusted source
 const SCHEMA_URL = "https://docs.github.com/public/fpt/schema.docs.graphql";
@@ -40,17 +37,26 @@ const HAS_INPUT = /^input\s+\w+/m;
 function validateGraphQLSchema(content: string): { valid: boolean; reason?: string } {
 	// Check for minimum content length (quick check before regex)
 	if (content.length < MIN_SIZE_BYTES) {
-		return { valid: false, reason: `Content too small (${content.length} bytes, minimum ${MIN_SIZE_BYTES})` };
+		return {
+			valid: false,
+			reason: `Content too small (${content.length} bytes, minimum ${MIN_SIZE_BYTES})`,
+		};
 	}
 
 	// Check for maximum content length to prevent DoS
 	if (content.length > MAX_SIZE_BYTES) {
-		return { valid: false, reason: `Content too large (${content.length} bytes, maximum ${MAX_SIZE_BYTES})` };
+		return {
+			valid: false,
+			reason: `Content too large (${content.length} bytes, maximum ${MAX_SIZE_BYTES})`,
+		};
 	}
 
 	// Verify content starts with expected GraphQL patterns
 	if (!STARTS_WITH_DOC_COMMENT.test(content)) {
-		return { valid: false, reason: "Content does not start with expected GraphQL documentation comment" };
+		return {
+			valid: false,
+			reason: "Content does not start with expected GraphQL documentation comment",
+		};
 	}
 
 	// Verify essential GraphQL constructs are present

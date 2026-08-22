@@ -124,7 +124,7 @@ class DockerInteractiveSandboxLiveTest {
             new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build()
         );
 
-        dockerOps = new DockerClientOperations(dockerClient);
+        dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
         containerManager = new SandboxContainerManager(dockerOps, image -> {}, sandboxProperties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, sandboxProperties);
@@ -157,7 +157,7 @@ class DockerInteractiveSandboxLiveTest {
             proxyCredentialRegistry
         );
 
-        runnerBytes = Files.readAllBytes(Path.of("src/main/resources/agent/pi-mentor-runner.mjs"));
+        runnerBytes = Files.readAllBytes(Path.of("src/main/resources/agent/pi-mentor-runner.ts"));
     }
 
     @AfterEach
@@ -200,12 +200,12 @@ class DockerInteractiveSandboxLiveTest {
             userId,
             workspaceId,
             NODE_IMAGE,
-            List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
+            List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
             Map.of(),
             new NetworkPolicy(true, null, null),
             new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
             sec,
-            Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
+            Map.of(".runner/pi-mentor-runner.ts", runnerBytes),
             Map.of()
         );
     }
@@ -573,12 +573,12 @@ class DockerInteractiveSandboxLiveTest {
                 "u_pi_perm",
                 "w_pi_perm",
                 AGENT_PI_IMAGE,
-                List.of("node", "/workspace/.runner/pi-mentor-runner.mjs"),
+                List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
                 Map.of(),
                 new NetworkPolicy(true, null, null),
                 new ResourceLimits(512 * 1024 * 1024, 1.0, 256, Duration.ofMinutes(5)),
                 sec,
-                Map.of(".runner/pi-mentor-runner.mjs", runnerBytes),
+                Map.of(".runner/pi-mentor-runner.ts", runnerBytes),
                 Map.of()
             );
             AttachedSandbox sb = adapter.attach(piSpec);

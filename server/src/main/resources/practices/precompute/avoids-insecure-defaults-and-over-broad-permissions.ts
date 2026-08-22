@@ -2,7 +2,7 @@
 // over-broad-permission / secret-exposure constructs ADDED in the diff, across languages. CANDIDATES only —
 // the LLM confirms whether each is a real, exploitable insecure default on a reachable path. General by
 // design: a pattern table keyed off the construct, applied to every added code line regardless of language.
-import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
 
 // [label, regex] — each fires on an ADDED line. Tuned to the auth/transport/secret surface a login or API
 // change touches, where a "looks fine" review most often misses the real insecure default.
@@ -31,14 +31,21 @@ const PATTERNS: Array<[string, RegExp]> = [
 		/chmod\s+0?777|\b0o?777\b|permitAll\(\)|\.anyRequest\(\)\.permitAll|Access-Control-Allow-Origin["'\s:]*\*|allowedOrigins?["'\s:]*\*/,
 	],
 	// Hardcoded credential-ish literal assigned to a secret-named field.
-	["hardcoded secret literal", /\b(password|secret|api[_-]?key|token)\s*[:=]\s*["'`][A-Za-z0-9_\-\/+]{8,}["'`]/i],
+	[
+		"hardcoded secret literal",
+		/\b(password|secret|api[_-]?key|token)\s*[:=]\s*["'`][A-Za-z0-9_\-/+]{8,}["'`]/i,
+	],
 ];
 
 function isComment(t: string): boolean {
 	return t.startsWith("//") || t.startsWith("#") || t.startsWith("*") || t.startsWith("/*");
 }
 
-export default async function (_repo: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	_repo: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	const hints: Hint[] = [];
 	const byKind: Record<string, number> = {};
 	for (const [path, df] of diffFiles) {
@@ -67,5 +74,9 @@ export default async function (_repo: string, diffFiles: Map<string, DiffFile>, 
 					`Found ${hints.length} insecure-default / secret-exposure candidate(s) on added lines — investigate each on the reachable auth/transport surface: a token in a URL path leaks into logs; a keychain write needs an accessibility class; logging a response body or token exposes secrets; disabled TLS / wildcard CORS / world-writable perms are over-broad. Confirm whether each is real and exploitable before deciding.`,
 				]
 			: [];
-	return { hints: hints.slice(0, 40), metrics: { insecureDefaultCandidates: hints.length, ...byKind }, directions };
+	return {
+		hints: hints.slice(0, 40),
+		metrics: { insecureDefaultCandidates: hints.length, ...byKind },
+		directions,
+	};
 }

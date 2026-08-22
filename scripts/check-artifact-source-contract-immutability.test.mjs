@@ -1,12 +1,15 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 
-const CHECKER = join(dirname(fileURLToPath(import.meta.url)), "check-artifact-source-contract-immutability.mjs");
+const CHECKER = join(
+	dirname(fileURLToPath(import.meta.url)),
+	"check-artifact-source-contract-immutability.mjs",
+);
 
 /**
  * Git hooks export GIT_DIR, GIT_INDEX_FILE and friends, which would point every command below at the
@@ -62,7 +65,10 @@ test("passes and says what it verified when published contracts are untouched", 
 test("fails when a published contract file is edited", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
-	writeFileSync(join(repo, CONTRACTS, "1.0.0", "catalog.json"), '{"version":"1.0.0","sneaked":true}\n');
+	writeFileSync(
+		join(repo, CONTRACTS, "1.0.0", "catalog.json"),
+		'{"version":"1.0.0","sneaked":true}\n',
+	);
 	git("add", "-A");
 	git("commit", "--quiet", "-m", "mutate published contract");
 
@@ -119,7 +125,10 @@ test("reports honestly when nothing is published at the merge base", (t) => {
 test("runs from a subdirectory", (t) => {
 	const { repo, git } = repoWithPublishedContract();
 	t.after(() => rmSync(repo, { recursive: true, force: true }));
-	writeFileSync(join(repo, CONTRACTS, "1.0.0", "catalog.json"), '{"version":"1.0.0","sneaked":true}\n');
+	writeFileSync(
+		join(repo, CONTRACTS, "1.0.0", "catalog.json"),
+		'{"version":"1.0.0","sneaked":true}\n',
+	);
 	git("add", "-A");
 	git("commit", "--quiet", "-m", "mutate published contract");
 

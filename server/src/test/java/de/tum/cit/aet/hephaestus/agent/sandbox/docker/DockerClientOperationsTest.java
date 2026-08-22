@@ -9,6 +9,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.github.dockerjava.api.DockerClient;
@@ -52,11 +53,14 @@ class DockerClientOperationsTest extends BaseUnitTest {
     @Mock
     private DockerClient dockerClient;
 
+    @Mock
+    private DockerClient streamingClient;
+
     private DockerClientOperations ops;
 
     @BeforeEach
     void setUp() {
-        ops = new DockerClientOperations(dockerClient);
+        ops = new DockerClientOperations(dockerClient, streamingClient);
     }
 
     @Nested
@@ -498,13 +502,26 @@ class DockerClientOperationsTest extends BaseUnitTest {
         void shouldReturnExitCode() {
             WaitContainerCmd cmd = mock(WaitContainerCmd.class);
             WaitContainerResultCallback callback = mock(WaitContainerResultCallback.class);
-            when(dockerClient.waitContainerCmd("ctr-1")).thenReturn(cmd);
+            when(streamingClient.waitContainerCmd("ctr-1")).thenReturn(cmd);
             when(cmd.start()).thenReturn(callback);
             when(callback.awaitStatusCode()).thenReturn(42);
 
             DockerOperations.WaitResult result = ops.waitContainer("ctr-1");
 
             assertThat(result.exitCode()).isEqualTo(42);
+        }
+
+        @Test
+        void shouldNotUseTheRpcClientWhenWaitingForAContainer() {
+            WaitContainerCmd cmd = mock(WaitContainerCmd.class);
+            WaitContainerResultCallback callback = mock(WaitContainerResultCallback.class);
+            when(streamingClient.waitContainerCmd("ctr-1")).thenReturn(cmd);
+            when(cmd.start()).thenReturn(callback);
+            when(callback.awaitStatusCode()).thenReturn(0);
+
+            ops.waitContainer("ctr-1");
+
+            verifyNoInteractions(dockerClient);
         }
     }
 

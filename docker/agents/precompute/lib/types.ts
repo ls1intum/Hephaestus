@@ -6,7 +6,34 @@ export interface Hint {
 	pattern: string;
 	context: string;
 	inDiff: boolean;
-	flags: Record<string, boolean | number | string>;
+	flags: Record<string, HintFlag>;
+}
+
+/** A hint flag renders into summary.md verbatim, so it stays a JSON scalar. */
+export type HintFlag = boolean | number | string;
+
+/**
+ * The parsed `inputs/context/metadata.json` every script receives as its 3rd argument. Its shape
+ * depends on the artifact under review — `PullRequestMetadata` below for a pull request, the issue
+ * metadata the issue scripts declare for an issue — so the shared contract says only "a JSON
+ * object". A script narrows it by declaring the parameter type it actually reads.
+ */
+export type ArtifactMetadata = Record<string, unknown>;
+
+/**
+ * What a precompute script returns. `practice` and `status` are NOT part of it: the runner stamps
+ * those on, so the filename slug stays the single source of truth for a script's identity.
+ */
+export interface PracticeFindings {
+	hints: Hint[];
+	metrics: Record<string, number>;
+	directions: string[];
+}
+
+/** A validated `PracticeFindings` attributed to a practice — the shape of `{output}/{slug}.json`. */
+export interface PracticeResult extends PracticeFindings {
+	practice: string;
+	status: "ok" | "error" | "timeout";
 }
 
 /**
@@ -14,21 +41,16 @@ export interface Hint {
  * metadata, and (optionally) the materialised context directory so it can read the SAME cross-artifact
  * context the agent sees (project_inventory.json, linked_work_items.json, …) via lib/context.ts helpers.
  * The 4th argument is additive — existing 3-arg scripts keep working unchanged.
+ *
+ * Scripts are dynamic data (injected from the DB), so this is the contract the runner CALLS under,
+ * not a guarantee: `parseFindings` in lib/practice-contract.ts re-checks the return value at runtime.
  */
 export type PracticeScript = (
 	repoPath: string,
 	diffFiles: Map<string, DiffFile>,
-	metadata: any,
+	metadata: ArtifactMetadata,
 	contextDir?: string,
-) => PracticeResult | Promise<PracticeResult>;
-
-export interface PracticeResult {
-	practice: string;
-	status: "ok" | "error" | "timeout";
-	hints: Hint[];
-	metrics: Record<string, number>;
-	directions: string[];
-}
+) => PracticeFindings | Promise<PracticeFindings>;
 
 export interface DiffFile {
 	path: string;

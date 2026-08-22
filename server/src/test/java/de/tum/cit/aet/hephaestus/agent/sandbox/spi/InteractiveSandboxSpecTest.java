@@ -23,7 +23,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
             "u1",
             "w1",
             "ghcr.io/example/agent:latest",
-            List.of("node", "/run.mjs"),
+            List.of("bun", "/run.ts"),
             env,
             new NetworkPolicy(true, null, null),
             new ResourceLimits(256 * 1024 * 1024, 0.5, 64, Duration.ofMinutes(1)),
@@ -76,7 +76,7 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
 
     @Test
     void commandIsCopied() {
-        List<String> cmd = new ArrayList<>(List.of("node", "/run.mjs"));
+        List<String> cmd = new ArrayList<>(List.of("bun", "/run.ts"));
         InteractiveSandboxSpec s = new InteractiveSandboxSpec(
             UUID.randomUUID(),
             "u1",
@@ -93,6 +93,6 @@ class InteractiveSandboxSpecTest extends BaseUnitTest {
         cmd.set(0, "/bin/sh");
         cmd.add("-c");
         cmd.add("rm -rf /");
-        assertThat(s.command()).containsExactly("node", "/run.mjs");
+        assertThat(s.command()).containsExactly("bun", "/run.ts");
     }
 }
