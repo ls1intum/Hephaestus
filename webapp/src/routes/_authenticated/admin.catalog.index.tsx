@@ -223,8 +223,8 @@ function AdminCuratedCatalogPage() {
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
-				title="Practice library"
-				description="Choose which areas and practices workspace administrators can add. Library changes never rewrite existing workspace practices."
+				title="Practice catalog"
+				description="Choose which areas and practices workspace administrators can add. Catalog changes never rewrite existing workspace practices."
 				actions={
 					<div className="flex flex-wrap gap-2">
 						{writePending ? (

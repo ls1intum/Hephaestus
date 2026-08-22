@@ -141,7 +141,7 @@ export const PreviewWentStale: Story = {
 	args: { state: ready({ action: "stale" }) },
 	play: async () => {
 		await expectSettledVisible(
-			await screen.findByText("The library changed while you were reading"),
+			await screen.findByText("The catalog changed while you were reading"),
 		);
 	},
 };

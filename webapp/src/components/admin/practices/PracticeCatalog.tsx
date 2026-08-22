@@ -164,14 +164,14 @@ export function PracticeCatalog({
 			{library?.open && (
 				<Section
 					size="sm"
-					title="Practice library"
-					description="Add a practice as an independent workspace copy. You can change or remove it later."
+					title="Instance catalog"
+					description="Practices this instance offers. Adding one gives you a copy you own — later catalog changes never reach it."
 					className="rounded-lg border bg-muted/20 p-4"
 				>
 					{library.state.status === "error" ? (
 						<QueryErrorAlert
 							error={library.state.error}
-							title="Couldn't load the library"
+							title="Couldn't load the catalog"
 							onRetry={library.state.onRetry}
 						/>
 					) : visibleCatalogPractices ? (
@@ -373,7 +373,7 @@ function CatalogToolbar({
 					onPressedChange={(pressed) => library?.onOpenChange(pressed)}
 				>
 					<Library />
-					Show library
+					Show catalog
 				</Toggle>
 				<Button
 					variant="outline"

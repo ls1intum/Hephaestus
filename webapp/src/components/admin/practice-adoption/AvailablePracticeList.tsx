@@ -59,7 +59,7 @@ export function AvailablePracticeList({
 					<EmptyTitle>{allAdded ? "Everything is already added" : "Nothing to add"}</EmptyTitle>
 					<EmptyDescription>
 						{allAdded
-							? "This workspace already has every practice the library currently offers."
+							? "This workspace already has every practice the catalog currently includes."
 							: "The instance catalog does not currently offer any practices to this workspace."}
 					</EmptyDescription>
 				</EmptyHeader>

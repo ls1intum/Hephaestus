@@ -15,9 +15,23 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/**
+ * The matching case used to render nothing, which made it indistinguishable from a practice with no
+ * provenance at all. Naming it is also the only place that says the relationship is permanent.
+ */
 export const MatchesCatalog: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.queryByText(/catalog/)).not.toBeInTheDocument();
+		canvas.getByRole("button", { name: "Same as the catalog" }).focus();
+		const tooltip = await within(document.body).findByText(/the catalog never edits your copy/);
+		await waitFor(() => expect(tooltip).toBeVisible());
+	},
+};
+
+/** No provenance at all — a practice this workspace wrote itself. Still the only silent state. */
+export const NoProvenance: Story = {
+	args: { origin: null },
+	play: async ({ canvas }) => {
+		await expect(canvas.queryByRole("button")).not.toBeInTheDocument();
 	},
 };
 
@@ -30,10 +44,10 @@ export const CatalogChanged: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByRole("button", { name: "Instance catalog changed" }).focus();
-		const tooltip = await within(document.body).findByText(
-			"The instance catalog now has different review rules. This workspace keeps its current version.",
-		);
+		canvas.getByRole("button", { name: "Catalog changed, yours did not" }).focus();
+		// The label carries the outcome, not just the event: nothing applies a catalog update to a
+		// workspace copy, so "the catalog changed" on its own invites the opposite reading.
+		const tooltip = await within(document.body).findByText(/Your copy is untouched/);
 		await waitFor(() => expect(tooltip).toBeVisible());
 	},
 };
@@ -57,13 +71,9 @@ export const NoLongerIncluded: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		const status = canvas.getByRole("button", {
-			name: "Not in the current instance catalog",
-		});
+		const status = canvas.getByRole("button", { name: "No longer in the catalog" });
 		status.focus();
-		const tooltip = await within(document.body).findByText(
-			"New workspaces no longer receive this practice from the instance catalog. This workspace keeps its version.",
-		);
+		const tooltip = await within(document.body).findByText(/Yours keeps working exactly as it is/);
 		await waitFor(() => expect(tooltip).toBeVisible());
 	},
 };
@@ -78,13 +88,9 @@ export const AreaChanged: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		const status = canvas.getByRole("button", {
-			name: "Instance catalog changed",
-		});
+		const status = canvas.getByRole("button", { name: "Catalog changed, yours did not" });
 		status.focus();
-		const tooltip = await within(document.body).findByText(
-			"The instance catalog now has different area details. This workspace keeps its current version.",
-		);
+		const tooltip = await within(document.body).findByText(/different area details/);
 		await waitFor(() => expect(tooltip).toBeVisible());
 	},
 };

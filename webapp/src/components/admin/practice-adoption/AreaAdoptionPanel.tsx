@@ -87,7 +87,7 @@ export function AreaAdoptionPanel({
 				{state.status === "ready" && state.action === "stale" && (
 					<Alert variant="warning">
 						<CircleAlert />
-						<AlertTitle>The library changed while you were reading</AlertTitle>
+						<AlertTitle>The catalog changed while you were reading</AlertTitle>
 						<AlertDescription>
 							This is the current plan for the area. Nothing was added.
 						</AlertDescription>

@@ -7,30 +7,57 @@ export interface CatalogOriginBadgeProps {
 	kind: "practice" | "area";
 }
 
+/**
+ * How a workspace copy stands against the catalog entry it came from.
+ *
+ * Every one of these says the same underlying thing, because a copy never tracks its source:
+ * `UPDATE_AVAILABLE` is computed for display and nothing in the product applies it, and the one-time
+ * install is guarded by an installation record so it never runs twice. The wording is explicit about
+ * that, because "the catalog changed" alone invites the opposite reading — that the copy is about to
+ * change too.
+ *
+ * A copy with no provenance at all renders nothing, which is a fourth state; the matching case is
+ * named rather than silent so the two are distinguishable.
+ */
 export function CatalogOriginBadge({ origin, kind }: CatalogOriginBadgeProps) {
-	if (!origin || (origin.link === "IN_SYNC" && origin.sourceOffered)) {
+	if (!origin) {
 		return null;
 	}
+	const subject = kind === "practice" ? "review rules" : "area details";
+
 	if (!origin.sourceOffered) {
 		return (
-			<Tooltip>
-				<TooltipTrigger className={badgeVariants({ variant: "outline" })}>
-					Not in the current instance catalog
-				</TooltipTrigger>
-				<TooltipContent>
-					{`New workspaces no longer receive this ${kind} from the instance catalog. This workspace keeps its version.`}
-				</TooltipContent>
-			</Tooltip>
+			<OriginBadge
+				label="No longer in the catalog"
+				explanation={`New workspaces no longer receive this ${kind}. Yours keeps working exactly as it is.`}
+			/>
 		);
 	}
+	if (origin.link === "UPDATE_AVAILABLE") {
+		return (
+			<OriginBadge
+				label="Catalog changed, yours did not"
+				explanation={`The catalog now has different ${subject}. Your copy is untouched — bring anything you want across by editing it.`}
+			/>
+		);
+	}
+	if (origin.link === "IN_SYNC") {
+		return (
+			<OriginBadge
+				label="Same as the catalog"
+				explanation={`These ${subject} still match the entry this was copied from. It will stay that way: the catalog never edits your copy.`}
+			/>
+		);
+	}
+	return (
+		<OriginBadge
+			label="Edited here"
+			explanation={`The ${subject} differ from the version copied into this workspace.`}
+		/>
+	);
+}
 
-	const isUpdate = origin.link === "UPDATE_AVAILABLE";
-	const subject = kind === "practice" ? "review rules" : "area details";
-	const label = isUpdate ? "Instance catalog changed" : "Customized for this workspace";
-	const explanation = isUpdate
-		? `The instance catalog now has different ${subject}. This workspace keeps its current version.`
-		: `The ${subject} differ from the version copied into this workspace.`;
-
+function OriginBadge({ label, explanation }: { label: string; explanation: string }) {
 	return (
 		<Tooltip>
 			<TooltipTrigger className={badgeVariants({ variant: "outline" })}>{label}</TooltipTrigger>

@@ -73,7 +73,7 @@ describe("catalog adoption over practice setup", () => {
 		);
 	});
 
-	it("shows every offered practice in the library and distinguishes adoption states", async () => {
+	it("shows every included practice in the catalog and distinguishes adoption states", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([
@@ -105,7 +105,7 @@ describe("catalog adoption over practice setup", () => {
 
 		renderRouteAt(LIBRARY);
 
-		await screen.findByRole("heading", { name: "Practice library" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Instance catalog" }, ROUTE_RENDER_WAIT);
 		expect(screen.queryByText("Available")).toBeNull();
 		expect(await screen.findByText("Name unavailable")).not.toBeNull();
 		// The row's accessible name is its own visible text plus the registry's action phrase, not an
@@ -118,7 +118,7 @@ describe("catalog adoption over practice setup", () => {
 		).not.toBeNull();
 	});
 
-	it("reviews a practice over the library instead of leaving the page", async () => {
+	it("reviews a practice over the catalog instead of leaving the page", async () => {
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
 				HttpResponse.json([
@@ -179,7 +179,7 @@ describe("catalog adoption over practice setup", () => {
 		expect(router.state.location.search.detail).toEqual(["practice:already-mine"]);
 	});
 
-	it("pins adoption to the reviewed ETag and returns to the library", async () => {
+	it("pins adoption to the reviewed ETag and returns to the catalog", async () => {
 		const seenIfMatch = vi.fn();
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/practice-catalog/adoption", () =>
@@ -246,7 +246,7 @@ describe("catalog adoption over practice setup", () => {
 		await waitFor(() => expect(seenIfMatch).toHaveBeenCalledWith(preview.etag));
 		// `role="alert"` announces the change without pulling focus off the action.
 		const changed = await screen.findByRole("alert");
-		expect(changed.textContent).toContain("The library changed while you were reading");
+		expect(changed.textContent).toContain("The catalog changed while you were reading");
 		// The rule is what a 412 is about, so open the disclosure that holds it and check the panel
 		// is showing the refetched one rather than the plan that was just rejected.
 		fireEvent.click(await screen.findByRole("button", { name: "How it decides" }));
@@ -280,7 +280,7 @@ describe("catalog adoption over practice setup", () => {
 		fireEvent.click(await screen.findByRole("button", { name: "Add practice" }, ROUTE_RENDER_WAIT));
 
 		await screen.findByText("Couldn't load the adoption preview", {}, ROUTE_RENDER_WAIT);
-		expect(screen.queryByText("The library changed while you were reading")).toBeNull();
+		expect(screen.queryByText("The catalog changed while you were reading")).toBeNull();
 	});
 
 	it("recovers a concurrent adoption by closing the drawer", async () => {

@@ -84,7 +84,7 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 				{action === "stale" && (
 					<Alert variant="warning">
 						<CircleAlert />
-						<AlertTitle>The library changed while you were reading</AlertTitle>
+						<AlertTitle>The catalog changed while you were reading</AlertTitle>
 						<AlertDescription>
 							This is the current definition and outcome. Nothing was added.
 						</AlertDescription>

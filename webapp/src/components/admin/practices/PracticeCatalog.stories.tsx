@@ -160,7 +160,7 @@ export const Populated: Story = {
 	},
 };
 
-export const WithPracticeLibrary: Story = {
+export const WithInstanceCatalog: Story = {
 	args: {
 		library: {
 			open: true,
@@ -193,7 +193,7 @@ export const WithPracticeLibrary: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		canvas.getByRole("heading", { name: "Practice library" });
+		canvas.getByRole("heading", { name: "Instance catalog" });
 		// An already-added practice is not offered a second time, so the library lists only the one
 		// the workspace lacks.
 		await expect(
@@ -208,7 +208,7 @@ export const WithPracticeLibrary: Story = {
  * watching.
  */
 /** The library is a section of this page, so its failure must not take the tree down with it. */
-export const PracticeLibraryFailed: Story = {
+export const InstanceCatalogFailed: Story = {
 	args: {
 		library: {
 			open: true,
@@ -230,18 +230,18 @@ export const PracticeLibraryFailed: Story = {
 	},
 };
 
-export const PracticeLibraryLoading: Story = {
+export const InstanceCatalogLoading: Story = {
 	args: {
 		library: { open: true, onOpenChange: fn(), state: { status: "loading" } },
 	},
 	play: async ({ canvas }) => {
 		// A skeleton, not a spinner: the region holds the shape the rows will take, so nothing jumps
 		// when they arrive. It is `aria-hidden`, so the assertion is on the DOM rather than a role.
-		const library = within(canvas.getByRole("region", { name: "Practice library" }));
+		const library = within(canvas.getByRole("region", { name: "Instance catalog" }));
 		await expect(library.queryByRole("status")).not.toBeInTheDocument();
 		await expect(
 			canvas
-				.getByRole("region", { name: "Practice library" })
+				.getByRole("region", { name: "Instance catalog" })
 				.querySelectorAll('[data-slot="skeleton"]').length,
 		).toBeGreaterThan(0);
 	},

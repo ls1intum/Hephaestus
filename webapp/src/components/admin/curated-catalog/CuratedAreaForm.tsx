@@ -196,8 +196,8 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 				title={mode === "create" ? "Create area" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Use areas to group related practices in the instance library."
-						: "Saving updates the instance library. Existing workspace copies will not change."
+						? "Use areas to group related practices in the instance catalog."
+						: "Saving updates the instance catalog. Existing workspace copies will not change."
 				}
 			/>
 

@@ -139,8 +139,8 @@ export function CuratedPracticeForm(props: CuratedPracticeFormProps) {
 				title={mode === "create" ? "Create practice" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Define a practice for the instance library."
-						: "Saving updates the instance library. Existing workspace copies will not change."
+						? "Define a practice for the instance catalog."
+						: "Saving updates the instance catalog. Existing workspace copies will not change."
 				}
 			/>
 

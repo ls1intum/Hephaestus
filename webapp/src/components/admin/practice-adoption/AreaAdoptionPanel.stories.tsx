@@ -179,7 +179,7 @@ export const PlanWentStale: Story = {
 	play: async () => {
 		const alert = await screen.findByRole("alert");
 		await expectSettledVisible(alert);
-		await expect(alert.textContent).toContain("The library changed while you were reading");
+		await expect(alert.textContent).toContain("The catalog changed while you were reading");
 		// Still actionable: the refreshed plan is on screen and can be applied as it now stands.
 		await expect(screen.getByRole("button", { name: "Add 1 practice" })).toBeEnabled();
 	},
