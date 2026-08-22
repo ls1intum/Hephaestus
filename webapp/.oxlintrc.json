@@ -24,10 +24,12 @@
 	// A suppression that has stopped suppressing anything fails the build rather than outliving the
 	// problem it named. Root config only — oxlint rejects `options` in an override.
 	//
-	// Type-aware linting is off, and the `correctness` rules that need type information —
-	// `typescript/no-floating-promises` and `await-thenable` among two dozen — therefore do nothing at
-	// all, and do it silently, with no hint in the output that they were skipped. Check whether a rule
-	// is type-aware before trusting this config to enforce it. Turning it on is #1476.
+	// Type-aware linting is OFF, and this is the biggest hole in the setup. oxlint ships 59 of
+	// typescript-eslint's 61 type-aware rules, but they need the `oxlint-tsgolint` package, which is
+	// not a dependency here — so any such rule reads as enabled and silently checks nothing. Measured
+	// on this tree: `pnpm add -D oxlint-tsgolint && pnpm exec oxlint --type-aware` reports 461 findings
+	// across 15 rules (174 of them `no-floating-promises`) for +1.2s and +0.4GB. Adopting that is
+	// #1476. Until then, check whether a rule is type-aware before adding it here.
 	"options": { "reportUnusedDisableDirectives": "error" },
 
 	// Read by `no-undef` alone, which is off — so this is forward-looking. Kept in step with
@@ -140,7 +142,6 @@
 		"typescript/no-empty-object-type": "error",
 		"typescript/no-import-type-side-effects": "error",
 		"typescript/no-non-null-asserted-nullish-coalescing": "error",
-		"typescript/non-nullable-type-assertion-style": "error",
 		"typescript/prefer-literal-enum-member": "error",
 		"react/no-clone-element": "error",
 		"react/no-react-children": "error",
