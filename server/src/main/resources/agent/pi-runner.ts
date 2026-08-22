@@ -12,26 +12,20 @@ import {
 	SessionManager,
 	SettingsManager,
 } from "@earendil-works/pi-coding-agent";
+import { errorText } from "./pi-error-text.ts";
 import type { NormalizedObservation } from "./pi-observation-normalize.ts";
 import {
-	ASSESSMENT_DESCRIPTIONS,
-	ASSESSMENT_VALUES,
 	citationMatchesArtifact,
 	dedupeKeyForObservation,
-	describeVocabulary,
 	isRecord,
 	normalizeObservation,
-	PRESENCE_DESCRIPTIONS,
-	PRESENCE_VALUES,
-	SEVERITY_DESCRIPTIONS,
-	SEVERITY_VALUES,
 	validateEvidenceSources,
 	validateInapplicabilityScope,
 	validateSearchScope,
 } from "./pi-observation-normalize.ts";
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.ts";
 import type { ComposedFeedbackEnvelope, ComposedFeedbackUnit } from "./pi-runner-composition.ts";
-import { undeliverableUnits } from "./pi-runner-composition.ts";
+import { ACTIONS, CHANNELS, undeliverableUnits } from "./pi-runner-composition.ts";
 import { deriveTimeouts } from "./pi-runner-timings.ts";
 import type { UsageReport } from "./pi-runner-usage.ts";
 import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi-runner-usage.ts";
@@ -48,11 +42,6 @@ import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi
  * does not re-export and pnpm's strict layout does not put on our resolution path.
  */
 type SessionState = AgentSession["state"];
-
-/** The message of whatever was thrown. `catch` hands back `unknown`; every log site here wants a line. */
-function errorMessage(error: unknown): string {
-	return error instanceof Error ? error.message : String(error);
-}
 
 /** JSON.parse with the return type it actually has. */
 function parseJson(text: string): unknown {
@@ -283,36 +272,6 @@ const reviewState: { observations: NormalizedObservation[]; observationKeys: str
 	observations: [],
 	observationKeys: [],
 };
-// NOTE: _presenceSchema, _assessmentSchema and _severitySchema are not referenced by observationSchema —
-// the tool asks for one fused `outcome` word instead of three fields, so the per-value discriminators
-// these render never reach the model. What they still do on every boot is run describeVocabulary(),
-// which throws when a vocabulary value has no description; that guard is the only reason they are kept
-// here rather than deleted, and wiring them back into the schema is a separate decision.
-const _presenceSchema = {
-	type: "string",
-	enum: PRESENCE_VALUES,
-	description:
-		"Is the behaviour this practice names in the work? Every practice names one — read its criteria for " +
-		"what the behaviour is, then pick the value whose test you can actually pass.\n" +
-		describeVocabulary(PRESENCE_VALUES, PRESENCE_DESCRIPTIONS),
-};
-const _assessmentSchema = {
-	type: "string",
-	enum: ASSESSMENT_VALUES,
-	description:
-		"Is what presence recorded good or bad FOR THE DEVELOPER? Required for PRESENT and ABSENT; omit it " +
-		"entirely for NOT_APPLICABLE and INCONCLUSIVE, which assert no direction and are not quiet verdicts.\n" +
-		describeVocabulary(ASSESSMENT_VALUES, ASSESSMENT_DESCRIPTIONS),
-};
-const _severitySchema = {
-	type: "string",
-	enum: SEVERITY_VALUES,
-	description:
-		"How much the problem costs. Set it only when assessment is BAD, and read it off the practice's own " +
-		"severity table keyed to the fact you quoted — never from a feeling of how bad it is, so identical " +
-		"facts land in the same band every run.\n" +
-		describeVocabulary(SEVERITY_VALUES, SEVERITY_DESCRIPTIONS),
-};
 const searchSchema = {
 	type: "object",
 	additionalProperties: false,
@@ -515,7 +474,9 @@ function isValidObservationsPayload(payload: unknown): payload is ObservationsPa
 function lenientJsonParse(text: string): unknown {
 	try {
 		return JSON.parse(text);
-	} catch {}
+	} catch {
+		// Unparseable as-is; the repair pass below is the point of this function.
+	}
 	// biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what this repairs — model output that embedded a raw newline or tab inside a JSON string.
 	const cleaned = text.replace(/[\u0000-\u001F\u007F]/g, (ch) => {
 		if (ch === "\n") return "\\n";
@@ -549,7 +510,7 @@ function checkResultFile(): boolean {
 		writeFileSync(RESULT_PATH, JSON.stringify({ observations: normalized }, null, 2));
 		return true;
 	} catch (e) {
-		console.error(`[pi-runner] result.json parse error: ${errorMessage(e)}`);
+		console.error(`[pi-runner] result.json parse error: ${errorText(e)}`);
 		return false;
 	}
 }
@@ -716,19 +677,23 @@ function tryParseJsonFromText(text: string | null): ObservationsPayload | null {
 	try {
 		const parsed = JSON.parse(text);
 		if (isValidObservationsPayload(parsed)) return parsed;
-	} catch {}
+	} catch {
+		// The whole text is rarely bare JSON; the fenced and braced passes below are the real attempts.
+	}
 	// matchAll rather than a hand-driven exec loop: the fenced body is the only group, so destructuring
 	// it names what each iteration is about and keeps the regex's lastIndex out of the loop condition.
 	for (const [, fencedBody = ""] of text.matchAll(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/g)) {
 		try {
 			const parsed = JSON.parse(fencedBody.trim());
 			if (isValidObservationsPayload(parsed)) return parsed;
-		} catch {}
+		} catch {
+			// A fence that is not JSON: try the next one.
+		}
 	}
 	const observationsMatch = text.match(/\{\s*"observations"/);
 	if (!observationsMatch || observationsMatch.index === undefined) return null;
 	const braceStart = observationsMatch.index;
-	// Bound brace-heavy recovery input consistently with the Java parser.
+	// Bounded: each attempt re-parses a longer slice, so an unclosed brace is quadratic without a cap.
 	let attempts = 0;
 	for (
 		let end = text.indexOf("}", braceStart);
@@ -740,7 +705,9 @@ function tryParseJsonFromText(text: string | null): ObservationsPayload | null {
 			const candidate = text.slice(braceStart, end + 1);
 			const parsed = JSON.parse(candidate);
 			if (isValidObservationsPayload(parsed)) return parsed;
-		} catch {}
+		} catch {
+			// This brace does not close the object: widen to the next candidate.
+		}
 	}
 	return null;
 }
@@ -750,7 +717,9 @@ function tryRescueFromTextResponse(sessionState: SessionState): boolean {
 	if (!text) return false;
 	try {
 		writeFileSync(`${OUTPUT}/last-assistant-text.txt`, text);
-	} catch {}
+	} catch {
+		// The dump is a diagnostic; failing to write it must not fail the rescue.
+	}
 	const payload = tryParseJsonFromText(text);
 	if (!payload) {
 		console.error(
@@ -816,14 +785,14 @@ function readTaskEnvelope(): TaskEnvelope {
 	try {
 		raw = readFileSync(TASK_PATH, "utf-8");
 	} catch (err) {
-		console.error(`[pi-runner] Failed to read ${TASK_PATH}: ${errorMessage(err)}`);
+		console.error(`[pi-runner] Failed to read ${TASK_PATH}: ${errorText(err)}`);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
 	}
 	let parsed: unknown;
 	try {
 		parsed = parseJson(raw);
 	} catch (err) {
-		console.error(`[pi-runner] Failed to parse ${TASK_PATH}: ${errorMessage(err)}`);
+		console.error(`[pi-runner] Failed to parse ${TASK_PATH}: ${errorText(err)}`);
 		process.exit(ENVELOPE_MISMATCH_EXIT);
 	}
 	const envelope: Record<string, unknown> = isRecord(parsed) ? parsed : {};
@@ -876,8 +845,7 @@ const PREPARED_FEEDBACK_PATH = `${CWD}/inputs/history/prepared.json`;
 const COMPOSITION_OBSERVATIONS_PATH = `${CWD}/work/composition/observations.json`;
 let compositionAdmitted = false;
 let admissionDigest: string | null = null;
-const CHANNELS = ["IN_CONTEXT", "IN_APP", "IN_CHAT"] as const;
-const ACTIONS = ["NEW", "SUPERSEDE", "WITHHOLD"] as const;
+
 const WITHHOLD_REASONS = ["NO_MATERIAL_CHANGE", "ALREADY_SAID", "BELOW_BAR"] as const;
 
 type Channel = (typeof CHANNELS)[number];
@@ -1014,7 +982,7 @@ function loadCompositionRequest(): CompositionRequest | null {
 			minDistinctArtifacts: Math.max(2, Number(parsed.minDistinctArtifacts) || 2),
 		};
 	} catch (e) {
-		console.error(`[pi-runner] composition request unreadable: ${errorMessage(e)}`);
+		console.error(`[pi-runner] composition request unreadable: ${errorText(e)}`);
 		return null;
 	}
 }
@@ -1037,7 +1005,7 @@ function composablePracticeSlugs(): string[] {
 			}
 		}
 	} catch (e) {
-		console.error(`[pi-runner] observation history unreadable for composition: ${errorMessage(e)}`);
+		console.error(`[pi-runner] observation history unreadable for composition: ${errorText(e)}`);
 	}
 	return [...slugs].sort();
 }
@@ -1056,7 +1024,7 @@ function stagedPreparedThreadKeys(): string[] {
 			),
 		];
 	} catch (e) {
-		console.error(`[pi-runner] prepared feedback unreadable for composition: ${errorMessage(e)}`);
+		console.error(`[pi-runner] prepared feedback unreadable for composition: ${errorText(e)}`);
 		return [];
 	}
 }
@@ -1320,6 +1288,12 @@ function asFeedbackUnit(value: unknown): FeedbackUnit | null {
 	const { channel, action, practiceSlug } = value;
 	if (!isChannel(channel) || !isFeedbackAction(action) || typeof practiceSlug !== "string")
 		return null;
+	// minItems: 1 in the schema, and the reader drops a unit that cites nothing. Admitting one here
+	// would tell the model it succeeded and then deliver nothing.
+	const basedOn = jsonArray(value.basedOn).filter(
+		(reference): reference is string => typeof reference === "string" && reference.length > 0,
+	);
+	if (basedOn.length === 0) return null;
 	const notes = isRecord(value.notes)
 		? {
 				situation: optionalString(value.notes.situation),
@@ -1342,9 +1316,7 @@ function asFeedbackUnit(value: unknown): FeedbackUnit | null {
 		channel,
 		practiceSlug,
 		action,
-		basedOn: jsonArray(value.basedOn).filter(
-			(reference): reference is string => typeof reference === "string",
-		),
+		basedOn,
 		supersedesThreadKey: optionalString(value.supersedesThreadKey),
 		withholdReason: optionalString(value.withholdReason),
 		title: optionalString(value.title),
@@ -1595,7 +1567,7 @@ async function main() {
 			session
 				.abort()
 				.catch((error) =>
-					console.error(`[pi-runner] composition abort failed: ${errorMessage(error)}`),
+					console.error(`[pi-runner] composition abort failed: ${errorText(error)}`),
 				);
 		}, COMPOSITION_TIMEOUT_MS);
 		try {
@@ -1621,13 +1593,13 @@ async function main() {
 			PERSIST_DISCIPLINE;
 		session
 			.steer(steerMessage)
-			.catch((err) => console.error(`[pi-runner] steer failed: ${errorMessage(err)}`));
+			.catch((err) => console.error(`[pi-runner] steer failed: ${errorText(err)}`));
 	}, SOFT_TIMEOUT_MS);
 
 	const hardTimer = setTimeout(() => {
 		hardAborted = true;
 		console.error(`[pi-runner] Hard timeout — aborting agent`);
-		session.abort().catch((err) => console.error(`[pi-runner] abort failed: ${errorMessage(err)}`));
+		session.abort().catch((err) => console.error(`[pi-runner] abort failed: ${errorText(err)}`));
 	}, INITIAL_TIMEOUT_MS);
 
 	const events: { type: string; timestamp: number }[] = [];
@@ -1692,7 +1664,7 @@ async function main() {
 				await session.prompt(batchPrompt);
 			} catch (err) {
 				console.error(
-					`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${errorMessage(err)}`,
+					`[pi-runner] turn ${bi + 1}/${batches.length} prompt error: ${errorText(err)}`,
 				);
 				if (hardAborted) break;
 			}
@@ -1716,7 +1688,7 @@ async function main() {
 				try {
 					await session.prompt(gatePrompt);
 				} catch (err) {
-					console.error(`[pi-runner] coverage-gate prompt error: ${errorMessage(err)}`);
+					console.error(`[pi-runner] coverage-gate prompt error: ${errorText(err)}`);
 				}
 				const stillMissing = allSlugs.filter(
 					(s) => !new Set(reviewState.observations.map((f) => f.practiceSlug)).has(s),
@@ -1811,7 +1783,7 @@ async function main() {
 		console.error(`[pi-runner] Retry hard timeout — aborting`);
 		session
 			.abort()
-			.catch((err) => console.error(`[pi-runner] retry abort failed: ${errorMessage(err)}`));
+			.catch((err) => console.error(`[pi-runner] retry abort failed: ${errorText(err)}`));
 	}, RETRY_TIMEOUT_MS);
 
 	const retryStartMs = Date.now();
@@ -1845,7 +1817,7 @@ async function main() {
 		try {
 			await session.prompt(retryPrompt);
 		} catch (err) {
-			console.error(`[pi-runner] Retry error: ${errorMessage(err)}`);
+			console.error(`[pi-runner] Retry error: ${errorText(err)}`);
 		}
 	} finally {
 		clearTimeout(retryTimer);
@@ -1904,7 +1876,7 @@ async function main() {
 }
 
 process.on("uncaughtException", (err) => {
-	console.error(`[pi-runner] FATAL: ${errorMessage(err)}`);
+	console.error(`[pi-runner] FATAL: ${errorText(err)}`);
 	persistRunnerDebug();
 	persistUsage();
 	process.exit(2);
@@ -1918,9 +1890,7 @@ process.on("unhandledRejection", (reason) => {
 });
 
 main().catch((err: unknown) => {
-	console.error(
-		`[pi-runner] FATAL: ${errorMessage(err)}\n${err instanceof Error ? err.stack : ""}`,
-	);
+	console.error(`[pi-runner] FATAL: ${errorText(err)}\n${err instanceof Error ? err.stack : ""}`);
 	persistRunnerDebug();
 	persistUsage();
 	process.exit(2);

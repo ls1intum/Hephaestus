@@ -17,6 +17,7 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import type { ModelRegistry, ProviderModelConfig } from "@earendil-works/pi-coding-agent";
+import { errorText } from "./pi-error-text.ts";
 
 /** The subset of pi-provider.json this helper reads; the server writes it from the job's snapshot. */
 export interface ProviderConfig {
@@ -43,7 +44,7 @@ export function loadProviderConfig(cwd = DEFAULT_WORKSPACE_ROOT): ProviderConfig
 	try {
 		return JSON.parse(readFileSync(path, "utf-8"));
 	} catch (e) {
-		console.error(`[pi-provider] failed to parse ${path}: ${(e as Error).message}`);
+		console.error(`[pi-provider] failed to parse ${path}: ${errorText(e)}`);
 		return null;
 	}
 }

@@ -118,9 +118,6 @@ export function extractUsageFromSession(
 	const messages = session.messages || [];
 	const walked = newUsageLedger();
 	for (const msg of messages) {
-		// Responses-path shape (output_tokens_details.reasoning_tokens) surfaced by the SDK as
-		// usage.reasoning when the upstream model reports it (e.g. o-series/gpt-5 reasoning models);
-		// absent for chat/completions-only models, so that bucket stays 0 for those.
 		addAssistantUsage(walked, msg);
 	}
 	const source = streamLedger ?? walked;

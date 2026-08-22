@@ -14,7 +14,7 @@ feedback to the developer in-context, in a reflection page, or in conversation.
 - `docs/` — contributor docs published to GitHub Pages, including the generated ERD.
 
 Node is pinned in `.node-version` and drives the repo's own tooling; the repo is pnpm 11 workspaces.
-`webapp` is the TypeScript package. The agent sandbox runs no Node at all: the runner
+`webapp` is the main TypeScript package; `docs` is a second, with its own tooling. The agent sandbox runs no Node at all: the runner
 (`server/src/main/resources/agent/`), the precompute runner and lib (`docker/agents/precompute/`) and
 the per-practice precompute scripts (`server/src/main/resources/practices/precompute/`) are
 TypeScript executed directly by Bun, whose version the agent image pins in
@@ -42,13 +42,14 @@ reflect the final state. Document any skipped gate in the PR description.
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | The full gate: `check:server` + `check:client` + `check:agents` + `check:stories` + `check:components` + `check:diagrams` + `check:env` + `check:contracts` |
+| `pnpm run check` | The full gate: `check:biome-pin` + `check:server` + `check:client` + `check:agents` + `check:stories` + `check:components` + `check:diagrams` + `check:env` + `check:contracts` |
 | `pnpm run test:webapp` | Vitest |
 | `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
 | `mvn test -P'!quick'` | Server unit tests — see `server/AGENTS.md` for the four tiers and why `!quick` is mandatory |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-comprehensive verification. A `:webapp`, `:java` or `:agents` suffix scopes any of them.
+comprehensive verification. A `:webapp` or `:agents` suffix scopes any of them; `:java` scopes
+`format` and `lint` only — the Java check is `check:server`.
 
 ### Biome scopes
 
@@ -62,8 +63,7 @@ Two Biome configurations, one per tree, both on the pinned `@biomejs/biome` in t
 
 `biome.jsonc` is the monorepo root config and `webapp/biome.json` declares `"root": false`, so each
 tree keeps its own rules. The root file documents why each non-default rule is on; `check:agents`
-also runs `typecheck:agents` and `typecheck:scripts`, so lint, format and types cover the same
-surface. `pnpm run check:agents:fix` applies every safe fix.
+also runs `typecheck:agents` and `typecheck:scripts`. `pnpm run check:agents:fix` applies every safe fix.
 
 ## Generated artefacts — never hand-edit, regenerate
 

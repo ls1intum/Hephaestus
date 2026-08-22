@@ -455,4 +455,4 @@ test("watchdog cross-thread rebind: no event leakage from concurrently-bound thr
 
 // Note: fetch_context end-to-end coverage lives Java-side in MentorRunnerClientTest +
 // MentorChatServiceTest. A Node-side smoke test would either assert on stderr text (brittle)
-// or require a real Pi LLM round-trip. Skipped here on purpose.
+// or require a real Pi LLM round-trip.

@@ -24,6 +24,7 @@ import type {
 	AgentToolResult,
 	CreateAgentSessionRuntimeFactory,
 } from "@earendil-works/pi-coding-agent";
+import { errorText } from "./pi-error-text.ts";
 import {
 	MENTOR_ERROR_CODES as ERR,
 	JSONRPC_VERSION,
@@ -133,19 +134,6 @@ function log(...args: unknown[]) {
 		)
 		.join(" ");
 	process.stderr.write(`[pi-mentor-runner ${ts}] ${msg}\n`);
-}
-
-/**
- * `catch` binds `unknown`, but the diagnostics below want the same text the previous `e?.message ??
- * e` chain produced: an Error's message, a message-carrying object's message, and otherwise the
- * value's own string form.
- */
-function errorText(e: unknown): string {
-	if (e instanceof Error) return e.message;
-	if (typeof e === "object" && e !== null && "message" in e && typeof e.message === "string") {
-		return e.message;
-	}
-	return String(e);
 }
 
 /** Narrowing predicate for anything that arrived as parsed JSON, used instead of a cast. */
@@ -302,7 +290,7 @@ const RUNTIME_INIT_COOLDOWN_MS = 30_000;
 // cannot race `runtime.switchSession` against each other.
 let dispatchQueue = Promise.resolve();
 
-// Returns nothing on purpose: the tail of the chain is not a useful handle for any caller here —
+// The tail of the chain is not a useful handle for any caller here —
 // every task is fire-and-forget and its failure is already logged below — and handing one out
 // invites an `await` that would deadlock a task queued from inside another task.
 function enqueue(fn: () => unknown): void {
@@ -812,6 +800,27 @@ async function handleCloseThread(id: JsonRpcId | undefined, params: MentorParams
 	sendResult(id, { closed: true });
 }
 
+/** A shutdown that has not drained by here is wedged; losing the frame beats never exiting. */
+const DRAIN_DEADLINE_MS = 5_000;
+
+/**
+ * Stops the runner once stdout has drained. `process.exit` discards whatever is still queued for a
+ * pipe, and the frame most likely to be queued is the last one — the result the caller is waiting
+ * for. Setting `exitCode` and releasing stdin lets the loop empty on its own, which drains the pipe;
+ * the unref'd timer is the backstop for a runtime that never settles.
+ */
+function exitWhenDrained(code: number): void {
+	// First failure wins: a later clean shutdown must not mask a crash's code.
+	if (code !== 0 || !process.exitCode) process.exitCode = code;
+	process.stdin.pause();
+	setTimeout(() => {
+		// Say what was lost. Exiting quietly on a wedged pipe is the defect this function exists for.
+		const unsent = process.stdout.writableLength;
+		if (unsent > 0) log(`drain deadline exceeded — exiting with ${unsent} bytes unsent`);
+		process.exit(code);
+	}, DRAIN_DEADLINE_MS).unref();
+}
+
 async function handleShutdown(id: JsonRpcId | undefined) {
 	sendResult(id, { shuttingDown: true });
 	// Reject pending fetch_context callbacks (Pi flushes a clean is-error tool result) and
@@ -824,13 +833,8 @@ async function handleShutdown(id: JsonRpcId | undefined) {
 	} catch (e) {
 		log(`runtime.dispose during shutdown failed: ${errorText(e)}`);
 	}
-	// Node buffers stdout when it's a pipe (always under Java's ProcessBuilder); the empty
-	// write callback fires after the queued result frame reaches the kernel, so process.exit
-	// doesn't truncate it.
-	process.stdout.write("", () => {
-		log("shutdown requested — exiting");
-		process.exit(0);
-	});
+	log("shutdown requested — exiting");
+	exitWhenDrained(0);
 }
 
 // Max characters of context surfaced to the LLM per fetch_context call. Context JSONs
@@ -1226,19 +1230,14 @@ function start() {
 	});
 	process.stdin.on("error", (e) => {
 		log("stdin error:", e);
-		// Distinct from ENVELOPE_MISMATCH_EXIT (42): this is a transport-layer failure, not a
-		// structured protocol/image drift. Node default fatal exit code is 1.
-		process.exit(1);
+		// Distinct from ENVELOPE_MISMATCH_EXIT (42): a transport failure, not protocol/image drift.
+		exitWhenDrained(1);
 	});
 
 	process.on("uncaughtException", (e) => {
 		log("uncaughtException:", e);
-		try {
-			// Same rationale: uncaught is a runtime crash, not an envelope mismatch.
-			process.stdout.write("", () => process.exit(1));
-		} catch {
-			process.exit(1);
-		}
+		// A crash still owes the caller whatever is already queued, so drain rather than exit.
+		exitWhenDrained(1);
 	});
 	process.on("unhandledRejection", (e) => {
 		log("unhandledRejection:", e);

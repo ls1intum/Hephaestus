@@ -304,13 +304,6 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        void shouldRunTheRunnerOnBunRatherThanNode() {
-            String body = factory.build(spec("openai-completions", "gpt-x", false)).command().get(2);
-
-            assertThat(body).contains("bun ").doesNotContain("node ");
-        }
-
-        @Test
         @DisplayName("Practice profile contributes no flags and no per-process env")
         void runtimeFlagsForPractice() {
             String body = factory.build(spec("openai-completions", "gpt-x", false)).command().get(2);
@@ -318,10 +311,9 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
 
             assertThat(body.substring(bunIdx, scriptIdx)).isEqualTo("bun " + SandboxLayout.WORKSPACE_ROOT + "/");
-            // Per-process env immediately preceding `bun ` must be empty for practice.
             int lastAmp = body.lastIndexOf("&&", bunIdx);
             int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
-            assertThat(body.substring(sliceStart, bunIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
+            assertThat(body.substring(sliceStart, bunIdx)).isBlank();
         }
 
         @Test

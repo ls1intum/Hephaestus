@@ -43,11 +43,20 @@ vs writable is decided by *where* a file lives, not by convention. Three top-lev
 │   ├── AGENTS.md                    #   Orchestrator instructions
 │   └── settings.json                #   Pi SDK config (provider, model, compaction)
 ├── pi-provider.json                 # Provider/model routing for the runner.
-├── pi-provider.ts                  # Provider helper module loaded by the runner.
-├── pi-observation-normalize.ts         # Normalises sandbox observations before out/ is written.
+├── pi-provider.ts                   # Provider/model helper imported by both runners.
+├── pi-error-text.ts                 # Shared error-message helper.
+├── pi-observation-normalize.ts      # Normalises sandbox observations before out/ is written.
+├── pi-runner-usage.ts               # Token-usage accounting sidecar.
+├── pi-runner-timings.ts             # Attempt-timing sidecar.
+├── pi-runner-composition.ts         # Feedback-composition contract and coherence rules.
+├── feedback-composer.md             # Composition-stage prompt; digested with the prompt scaffolding.
 ├── node_modules -> /opt/pi-sdk/…    # Symlink created at container start, not staged.
-└── .run-pi.ts                      # Runner script entry point.
+└── .run-pi.ts                       # Runner script entry point.
 ```
+
+The mentor runner stages `pi-provider.ts`, `pi-error-text.ts` and `pi-mentor-protocol.ts` instead. Everything
+here runs on Bun — the image ships no `node` and no `npm`, and its build fails if either appears; see
+[ADR 0030](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0030-agent-runtime-is-typescript-on-bun.md).
 
 The mentor interactive sandbox has its own `context/target/`, `context/user/`, and `scratch/` layout and is not
 covered by this ABI.

@@ -2,18 +2,11 @@
 // and pi-mentor-runner.ts over the sandbox's stdin/stdout (one JSON object per line, terminator
 // strictly `\n`).
 //
-// This module is the single declaration of that wire contract. It is imported by the runner (which
-// produces the frames) and by pi-mentor-runner.spec.ts (which consumes them), so a change to either
-// side that the other does not follow is a type error rather than a runtime surprise.
-//
 // The authoritative Java counterparts, for anyone reconciling the two:
 //   requests / responses  → MentorRunnerClient
 //   hello handshake       → MentorChatService#verifyProtocol
 //   event → UI chunks     → PiEventToUiChunkTranslator
 //   fetch_context replies → MentorChatService#handleFetchContext
-//
-// Nothing here is emitted at runtime beyond the two frozen constant tables; the frame shapes are
-// types and erase at load.
 
 import type { AgentSessionEvent } from "@earendil-works/pi-coding-agent";
 

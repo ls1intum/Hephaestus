@@ -64,7 +64,6 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("live")
 class DockerInteractiveSandboxLiveTest {
 
-    private static final String NODE_IMAGE = "node:22-slim";
     private static final String AGENT_PI_IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:latest";
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
@@ -199,7 +198,7 @@ class DockerInteractiveSandboxLiveTest {
             sessionId,
             userId,
             workspaceId,
-            NODE_IMAGE,
+            AGENT_PI_IMAGE,
             List.of("bun", "/workspace/.runner/pi-mentor-runner.ts"),
             Map.of(),
             new NetworkPolicy(true, null, null),
@@ -557,9 +556,8 @@ class DockerInteractiveSandboxLiveTest {
 
         @Test
         void agentPiWorkspaceSetupWithCapDropAll() {
-            // node:22-slim lets root create /workspace itself, so it owns it and mkdir never fails.
-            // agent-pi pre-creates /workspace owned by 1000:1000 in the Dockerfile; mkdir as root
-            // with --cap-drop=ALL (no CAP_DAC_OVERRIDE) would fail without the CONTAINER_USER fix.
+            // agent-pi pre-creates /workspace owned by 1000:1000, so mkdir as root under --cap-drop=ALL
+            // (no CAP_DAC_OVERRIDE) fails without the CONTAINER_USER fix.
             assumeTrue(
                 dockerOps.imageIsPresent(AGENT_PI_IMAGE),
                 "agent-pi image not in local daemon — build with: docker build -t " +
