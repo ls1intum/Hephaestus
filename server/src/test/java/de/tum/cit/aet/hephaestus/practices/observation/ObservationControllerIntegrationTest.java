@@ -259,9 +259,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
             practiceRepository.save(practiceA);
 
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "In area", "PRESENT", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
+            insertFinding(practiceA, developer, "In area", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
             // practiceB has NO area — the LEFT JOIN must keep it visible when no filter is set.
-            insertFinding(practiceB, developer, "No area", "ABSENT", "MAJOR", 0.8f, "PULL_REQUEST", 2L, now);
+            insertFinding(practiceB, developer, "No area", "ABSENT", "MAJOR", 0.8f, "scm.pull_request", 2L, now);
 
             webTestClient
                 .get()
@@ -273,7 +273,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("In area");
 
             webTestClient
@@ -293,12 +293,22 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("filters by artifact kind so a single integration's events can be shown")
         void shouldFilterByArtifactKinds() {
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "From a PR", "PRESENT", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
-            insertFinding(practiceA, developer, "From Slack", "ABSENT", "MINOR", 0.8f, "CONVERSATION_THREAD", 2L, now);
+            insertFinding(practiceA, developer, "From a PR", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "From Slack",
+                "ABSENT",
+                "MINOR",
+                0.8f,
+                "chat.conversation_thread",
+                2L,
+                now
+            );
 
             webTestClient
                 .get()
-                .uri(BASE_URI + "?artifactKinds=CONVERSATION_THREAD", workspace.getWorkspaceSlug())
+                .uri(BASE_URI + "?artifactKinds=chat.conversation_thread", workspace.getWorkspaceSlug())
                 .headers(TestAuthUtils.withCurrentUser())
                 .exchange()
                 .expectStatus()
@@ -306,7 +316,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("From Slack");
         }
 
@@ -315,8 +325,8 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("filters gaps by severity while keeping strengths visible")
         void shouldFilterBySeverities() {
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "Major gap", "ABSENT", "MAJOR", 0.9f, "PULL_REQUEST", 1L, now);
-            insertFinding(practiceA, developer, "Minor nit", "ABSENT", "MINOR", 0.9f, "PULL_REQUEST", 2L, now);
+            insertFinding(practiceA, developer, "Major gap", "ABSENT", "MAJOR", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(practiceA, developer, "Minor nit", "ABSENT", "MINOR", 0.9f, "scm.pull_request", 2L, now);
             insertFinding(
                 practiceA,
                 developer,
@@ -324,7 +334,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "PRESENT",
                 null,
                 0.9f,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 3L,
                 now.minus(1, ChronoUnit.DAYS)
             );
@@ -339,9 +349,9 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(2)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Major gap")
-                .jsonPath("$.content[1].title")
+                .jsonPath("$.content[1].summary")
                 .isEqualTo("Recent strength");
         }
 
@@ -350,7 +360,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("sorts most-severe-first when sort=SEVERITY, ties broken newest-first")
         void shouldSortBySeverity() {
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "Newest minor", "ABSENT", "MINOR", 0.9f, "PULL_REQUEST", 1L, now);
+            insertFinding(practiceA, developer, "Newest minor", "ABSENT", "MINOR", 0.9f, "scm.pull_request", 1L, now);
             insertFinding(
                 practiceA,
                 developer,
@@ -358,7 +368,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "ABSENT",
                 "CRITICAL",
                 0.9f,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 2L,
                 now.minus(3, ChronoUnit.DAYS)
             );
@@ -369,7 +379,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 "PRESENT",
                 null,
                 0.9f,
-                "PULL_REQUEST",
+                "scm.pull_request",
                 3L,
                 now.minus(1, ChronoUnit.DAYS)
             );
@@ -382,11 +392,11 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Older critical")
-                .jsonPath("$.content[1].title")
+                .jsonPath("$.content[1].summary")
                 .isEqualTo("Newest minor")
-                .jsonPath("$.content[2].title")
+                .jsonPath("$.content[2].summary")
                 .isEqualTo("Strength without severity");
         }
 
@@ -395,9 +405,19 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("reverses the severity order with direction=ASC (strengths lead)")
         void shouldSortBySeverityAscending() {
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "Critical gap", "ABSENT", "CRITICAL", 0.9f, "PULL_REQUEST", 1L, now);
-            insertFinding(practiceA, developer, "Minor nit", "ABSENT", "MINOR", 0.9f, "PULL_REQUEST", 2L, now);
-            insertFinding(practiceA, developer, "Strength", "PRESENT", null, 0.9f, "PULL_REQUEST", 3L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "Critical gap",
+                "ABSENT",
+                "CRITICAL",
+                0.9f,
+                "scm.pull_request",
+                1L,
+                now
+            );
+            insertFinding(practiceA, developer, "Minor nit", "ABSENT", "MINOR", 0.9f, "scm.pull_request", 2L, now);
+            insertFinding(practiceA, developer, "Strength", "PRESENT", null, 0.9f, "scm.pull_request", 3L, now);
 
             webTestClient
                 .get()
@@ -407,11 +427,11 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectStatus()
                 .isOk()
                 .expectBody()
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Strength")
-                .jsonPath("$.content[1].title")
+                .jsonPath("$.content[1].summary")
                 .isEqualTo("Minor nit")
-                .jsonPath("$.content[2].title")
+                .jsonPath("$.content[2].summary")
                 .isEqualTo("Critical gap");
         }
 
@@ -420,8 +440,18 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         @DisplayName("drops NOT_APPLICABLE rows when displayableOnly is set")
         void shouldDropNotApplicableWhenDisplayableOnly() {
             Instant now = Instant.now();
-            insertFinding(practiceA, developer, "Observed", "PRESENT", "INFO", 0.9f, "PULL_REQUEST", 1L, now);
-            insertFinding(practiceA, developer, "Did not apply", "NOT_APPLICABLE", null, 0.9f, "PULL_REQUEST", 2L, now);
+            insertFinding(practiceA, developer, "Observed", "PRESENT", "INFO", 0.9f, "scm.pull_request", 1L, now);
+            insertFinding(
+                practiceA,
+                developer,
+                "Did not apply",
+                "NOT_APPLICABLE",
+                null,
+                0.9f,
+                "scm.pull_request",
+                2L,
+                now
+            );
 
             webTestClient
                 .get()
@@ -433,7 +463,7 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
                 .expectBody()
                 .jsonPath("$.content.length()")
                 .isEqualTo(1)
-                .jsonPath("$.content[0].title")
+                .jsonPath("$.content[0].summary")
                 .isEqualTo("Observed");
         }
 

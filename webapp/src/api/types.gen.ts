@@ -3260,7 +3260,7 @@ export type PracticeAreaTrend = {
 };
 
 /**
- * A developer's derived qualitative standing for one practice area
+ * A developer's derived qualitative standing for one Area including 1<=n<many practices
  */
 export type PracticeAreaStatus = {
     /**
@@ -3271,6 +3271,10 @@ export type PracticeAreaStatus = {
      * Area slug
      */
     areaSlug: string;
+    /**
+     * Evidence-weighted, opportunity-indexed direction across the area's practices
+     */
+    direction?: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
     /**
      * Oldest contributing observation, for provenance only (null without a verdict)
      */
@@ -3300,11 +3304,7 @@ export type PracticeAreaStatus = {
      */
     status: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
     /**
-     * Evidence-weighted, opportunity-indexed direction across the area's practices
-     */
-    trajectory?: 'IMPROVING' | 'STABLE' | 'DECLINING' | 'UNCERTAIN' | 'INSUFFICIENT_EVIDENCE';
-    /**
-     * Evidence support and provenance for the trajectory
+     * Evidence support and provenance for the direction
      */
     trendSupport?: TrendSupport;
 };
@@ -3314,7 +3314,7 @@ export type PracticeAreaStatus = {
  */
 export type FeedbackSourceCount = {
     /**
-     * Distinct artifacts of this kind in the window
+     * Distinct artifacts of this kind in the selected time period
      */
     count: number;
     /**
@@ -3339,11 +3339,12 @@ export type PracticeAreaReviewMoment = {
 export type PracticeAreaReviewFinding = {
     assessment: 'GOOD' | 'BAD';
     feedbackId?: string;
-    helpful?: boolean;
     observationId: string;
     practiceName: string;
     practiceSlug: string;
     presence: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
+    rating?: 'HELPFUL' | 'UNHELPFUL' | 'INCORRECT';
+    ratingComment?: string;
     recurrenceKey?: string;
     severity?: 'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO';
     title: string;
@@ -4671,21 +4672,26 @@ export type GitLabGroup = {
 };
 
 /**
- * Rate whether delivered practice feedback was helpful
+ * Mark delivered practice feedback as helpful, unhelpful, or incorrect
  */
-export type FeedbackHelpfulnessVoteRequest = {
+export type FeedbackRatingRequest = {
     /**
-     * true when the feedback was helpful, false when it was not
+     * Optional comment explaining the assessment
      */
-    helpful: boolean;
+    comment?: string;
+    /**
+     * The recipient's assessment
+     */
+    state: 'HELPFUL' | 'UNHELPFUL' | 'INCORRECT';
 };
 
 /**
- * Current usefulness rating for a delivered feedback unit
+ * The recipient's current rating for a delivered feedback unit
  */
-export type FeedbackHelpfulnessVote = {
+export type FeedbackRating = {
+    comment?: string;
     feedbackId: string;
-    helpful?: boolean;
+    state: 'HELPFUL' | 'UNHELPFUL' | 'INCORRECT';
     updatedAt: Date;
 };
 
@@ -9341,9 +9347,18 @@ export type ListPracticeAreaReviewHistoryData = {
     };
     query?: {
         practiceSlug?: string;
+        /**
+         * Only reviews of these artifact kinds, e.g. scm.pull_request (repeatable)
+         */
         artifactKinds?: Array<string>;
         severities?: Array<'CRITICAL' | 'MAJOR' | 'MINOR' | 'INFO'>;
+        /**
+         * Zero-based page; a negative value is read as the first page
+         */
         page?: number;
+        /**
+         * Page size, clamped to 1..50
+         */
         size?: number;
     };
     url: '/workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history';
@@ -9683,7 +9698,7 @@ export type GetInAppFeedbackResponses = {
 
 export type GetInAppFeedbackResponse = GetInAppFeedbackResponses[keyof GetInAppFeedbackResponses];
 
-export type RemoveFeedbackHelpfulnessRatingData = {
+export type RemoveFeedbackRatingData = {
     body?: never;
     path: {
         /**
@@ -9693,20 +9708,20 @@ export type RemoveFeedbackHelpfulnessRatingData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/helpfulness';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/rating';
 };
 
-export type RemoveFeedbackHelpfulnessRatingResponses = {
+export type RemoveFeedbackRatingResponses = {
     /**
      * Rating removed or did not exist
      */
     204: void;
 };
 
-export type RemoveFeedbackHelpfulnessRatingResponse = RemoveFeedbackHelpfulnessRatingResponses[keyof RemoveFeedbackHelpfulnessRatingResponses];
+export type RemoveFeedbackRatingResponse = RemoveFeedbackRatingResponses[keyof RemoveFeedbackRatingResponses];
 
-export type RateFeedbackHelpfulnessData = {
-    body: FeedbackHelpfulnessVoteRequest;
+export type SetFeedbackRatingData = {
+    body: FeedbackRatingRequest;
     path: {
         /**
          * Workspace slug
@@ -9715,24 +9730,24 @@ export type RateFeedbackHelpfulnessData = {
         feedbackId: string;
     };
     query?: never;
-    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/helpfulness';
+    url: '/workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/rating';
 };
 
-export type RateFeedbackHelpfulnessErrors = {
+export type SetFeedbackRatingErrors = {
     /**
      * Feedback not found
      */
     404: unknown;
 };
 
-export type RateFeedbackHelpfulnessResponses = {
+export type SetFeedbackRatingResponses = {
     /**
      * Rating recorded
      */
-    200: FeedbackHelpfulnessVote;
+    200: FeedbackRating;
 };
 
-export type RateFeedbackHelpfulnessResponse = RateFeedbackHelpfulnessResponses[keyof RateFeedbackHelpfulnessResponses];
+export type SetFeedbackRatingResponse = SetFeedbackRatingResponses[keyof SetFeedbackRatingResponses];
 
 export type GetLatestReactionData = {
     body?: never;
@@ -9847,7 +9862,7 @@ export type ListObservationsData = {
          */
         presence?: 'PRESENT' | 'ABSENT' | 'NOT_APPLICABLE' | 'INCONCLUSIVE';
         /**
-         * Only observations on these artifact kinds (repeatable); omit for all kinds
+         * Only observations on these artifact kinds, e.g. scm.pull_request (repeatable)
          */
         artifactKinds?: Array<string>;
         /**
@@ -9866,7 +9881,13 @@ export type ListObservationsData = {
          * Ordering direction: for DATE newest/oldest first, for SEVERITY most/least severe first
          */
         direction?: 'ASC' | 'DESC';
+        /**
+         * Zero-based page; a negative value is read as the first page
+         */
         page?: number;
+        /**
+         * Page size, clamped to 1..100
+         */
         size?: number;
     };
     url: '/workspaces/{workspaceSlug}/practices/observations';

@@ -10,22 +10,17 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The current developer's derived standing for one practice area — the area's reflection feedback
+ * The current developer's derived standing for one area. The area's reflection feedback
  * aggregated to a single qualitative status, with the supporting items so the status stays traceable
  * to real findings rather than an opaque grade. Like the reflection surface it is a learner-facing
  * read model, NOT a scoreboard: no raw score, no observation enums, no criteria. The feedback span
  * and trajectory are provenance about the derivation, not scores about the developer.
  */
-@Schema(description = "A developer's derived qualitative standing for one practice area")
+@Schema(description = "A developer's derived qualitative standing for one Area including 1<=n<many practices")
 public record PracticeAreaStatusDTO(
     @NonNull @Schema(description = "Area slug") String areaSlug,
     @NonNull @Schema(description = "Area name") String areaName,
-    @NonNull
-    @Schema(
-        description = "Derived qualitative status across the area's practices",
-        allowableValues = { "DEVELOPING", "STRENGTH", "MIXED", "NOT_OBSERVED", "NO_OPPORTUNITY" }
-    )
-    AreaStatus status,
+    @NonNull @Schema(description = "Derived qualitative status across the area's practices") AreaStatus status,
     @Nullable
     @Schema(
         description = "Learner-facing guidance aggregated from the area's feedback (null unless the status is a verdict). " +
@@ -34,18 +29,12 @@ public record PracticeAreaStatusDTO(
     )
     String guidance,
     @Nullable
-    @Schema(
-        description = "How the guidance text was produced (null when there is no guidance)",
-        allowableValues = { "RULE_BASED", "AI_AGGREGATED" }
-    )
+    @Schema(description = "How the guidance text was produced (null when there is no guidance)")
     GuidanceSource guidanceSource,
     @Nullable
-    @Schema(
-        description = "Evidence-weighted, opportunity-indexed direction across the area's practices",
-        allowableValues = { "IMPROVING", "STABLE", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE" }
-    )
-    TrendDirection trajectory,
-    @Nullable @Schema(description = "Evidence support and provenance for the trajectory") TrendSupportDTO trendSupport,
+    @Schema(description = "Evidence-weighted, opportunity-indexed direction across the area's practices")
+    TrendDirection direction,
+    @Nullable @Schema(description = "Evidence support and provenance for the direction") TrendSupportDTO trendSupport,
     @Nullable
     @Schema(description = "Calendar span covered by the feedback, for provenance only; never a trend-analysis unit")
     Integer feedbackSpanDays,

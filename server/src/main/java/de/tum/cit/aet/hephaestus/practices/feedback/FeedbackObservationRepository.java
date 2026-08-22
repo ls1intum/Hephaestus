@@ -138,10 +138,11 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         SELECT DISTINCT ON (fo.observation_id)
                fo.observation_id AS "observationId",
                f.id AS "feedbackId",
-               v.helpful AS "helpful"
+               r.state AS "ratingState",
+               r.comment AS "ratingComment"
         FROM feedback_observation fo
         JOIN feedback f ON f.id = fo.feedback_id
-        LEFT JOIN feedback_helpfulness_vote v ON v.feedback_id = f.id
+        LEFT JOIN feedback_rating r ON r.feedback_id = f.id
         WHERE fo.observation_id IN (:observationIds)
           AND f.workspace_id = :workspaceId
           AND f.recipient_user_id = :recipientUserId
@@ -159,7 +160,8 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
     interface DeliveredFeedbackBinding {
         UUID getObservationId();
         UUID getFeedbackId();
-        Boolean getHelpful();
+        String getRatingState();
+        String getRatingComment();
     }
 
     // --- conversational feedback delivery loop ---

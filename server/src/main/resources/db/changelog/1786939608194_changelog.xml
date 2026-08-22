@@ -5,18 +5,19 @@
         xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
         http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
-    <changeSet author="practice-feedback-helpfulness" id="1786939608194-1">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback_helpfulness_vote already exists">
-            <not><tableExists tableName="feedback_helpfulness_vote"/></not>
+    <changeSet author="practice-feedback-rating" id="1786939608194-1">
+        <preConditions onFail="MARK_RAN" onFailMessage="feedback_rating already exists">
+            <not><tableExists tableName="feedback_rating"/></not>
         </preConditions>
-        <comment>Store a learner's usefulness rating for delivered practice feedback.</comment>
-        <createTable tableName="feedback_helpfulness_vote">
+        <comment>Store a recipient's current assessment of delivered practice feedback.</comment>
+        <createTable tableName="feedback_rating">
             <column name="feedback_id" type="UUID">
-                <constraints nullable="false" primaryKey="true" primaryKeyName="feedback_helpfulness_votePK"/>
+                <constraints nullable="false" primaryKey="true" primaryKeyName="feedback_ratingPK"/>
             </column>
-            <column name="helpful" type="BOOLEAN">
+            <column name="state" type="VARCHAR(16)">
                 <constraints nullable="false"/>
             </column>
+            <column name="comment" type="TEXT"/>
             <column name="created_at" type="TIMESTAMP(6) WITH TIME ZONE">
                 <constraints nullable="false"/>
             </column>
@@ -26,40 +27,17 @@
         </createTable>
         <addForeignKeyConstraint
                 baseColumnNames="feedback_id"
-                baseTableName="feedback_helpfulness_vote"
-                constraintName="fk_feedback_helpfulness_vote_feedback"
-                referencedColumnNames="id"
-                referencedTableName="feedback"/>
-        <rollback>
-            <dropTable tableName="feedback_helpfulness_vote"/>
-        </rollback>
-    </changeSet>
-
-    <changeSet author="practice-feedback-helpfulness" id="1786939608194-2">
-        <preConditions onFail="MARK_RAN" onFailMessage="feedback helpfulness foreign key is unavailable">
-            <foreignKeyConstraintExists foreignKeyName="fk_feedback_helpfulness_vote_feedback"/>
-        </preConditions>
-        <comment>Delete usefulness ratings with their parent feedback unit.</comment>
-        <dropForeignKeyConstraint
-                baseTableName="feedback_helpfulness_vote"
-                constraintName="fk_feedback_helpfulness_vote_feedback"/>
-        <addForeignKeyConstraint
-                baseColumnNames="feedback_id"
-                baseTableName="feedback_helpfulness_vote"
-                constraintName="fk_feedback_helpfulness_vote_feedback"
+                baseTableName="feedback_rating"
+                constraintName="fk_feedback_rating_feedback"
                 referencedColumnNames="id"
                 referencedTableName="feedback"
                 onDelete="CASCADE"/>
+        <sql>
+            ALTER TABLE feedback_rating
+            ADD CONSTRAINT chk_feedback_rating_state CHECK (state IN ('HELPFUL', 'UNHELPFUL', 'INCORRECT'));
+        </sql>
         <rollback>
-            <dropForeignKeyConstraint
-                    baseTableName="feedback_helpfulness_vote"
-                    constraintName="fk_feedback_helpfulness_vote_feedback"/>
-            <addForeignKeyConstraint
-                    baseColumnNames="feedback_id"
-                    baseTableName="feedback_helpfulness_vote"
-                    constraintName="fk_feedback_helpfulness_vote_feedback"
-                    referencedColumnNames="id"
-                    referencedTableName="feedback"/>
+            <dropTable tableName="feedback_rating"/>
         </rollback>
     </changeSet>
 </databaseChangeLog>

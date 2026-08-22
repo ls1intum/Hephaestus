@@ -1,5 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.reviewhistory.dto;
 
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRatingState;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
@@ -13,7 +14,8 @@ import org.jspecify.annotations.Nullable;
 public record PracticeAreaReviewFindingDTO(
     @NonNull UUID observationId,
     @Nullable UUID feedbackId,
-    @Nullable Boolean helpful,
+    @Nullable FeedbackRatingState rating,
+    @Nullable String ratingComment,
     @NonNull String practiceSlug,
     @NonNull String practiceName,
     @NonNull String title,
@@ -25,12 +27,14 @@ public record PracticeAreaReviewFindingDTO(
     public static PracticeAreaReviewFindingDTO from(
         Observation observation,
         @Nullable UUID feedbackId,
-        @Nullable Boolean helpful
+        @Nullable FeedbackRatingState rating,
+        @Nullable String ratingComment
     ) {
         return new PracticeAreaReviewFindingDTO(
             observation.getId(),
             feedbackId,
-            helpful,
+            rating,
+            ratingComment,
             observation.getPractice().getSlug(),
             observation.getPractice().getName(),
             observation.getSummary(),

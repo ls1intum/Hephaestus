@@ -1,8 +1,6 @@
 package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
@@ -21,6 +19,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendServic
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendSupportDTO;
 import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
 import de.tum.cit.aet.hephaestus.practices.review.autonomy.AutonomyResolver;
+import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -63,7 +62,7 @@ public class PracticeReflectionService {
 
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
-    private final UserRepository userRepository;
+    private final CurrentDeveloperLookup currentDeveloperLookup;
     private final ObservationVisibilityPolicy visibilityPolicy;
     private final PracticeRepository practiceRepository;
     private final WorkspaceReviewDefaultsProvider workspaceReviewDefaultsProvider;
@@ -71,8 +70,9 @@ public class PracticeReflectionService {
     private final Clock clock;
 
     /**
-     * Returns practice cards built from each target's latest review run. {@code NOT_APPLICABLE} findings and
-     * uncorroborated low-confidence gaps do not reach this learner-facing surface.
+     * Returns practice cards built from each target's latest review run. {@code NOT_APPLICABLE} observations
+     * do not reach this learner-facing surface, and neither does anything the caller is not cleared to see;
+     * every problem that survives both is shown, worst severity first.
      */
     @Transactional(readOnly = true)
     public List<ReflectionPracticeDTO> getReflection(Long workspaceId) {
@@ -81,14 +81,14 @@ public class PracticeReflectionService {
 
     /** Shared evidence snapshot used by both the practice reflection and practice-area status surfaces. */
     public ReflectionSnapshot getReflectionSnapshot(Long workspaceId) {
-        Optional<User> currentUser = userRepository.getCurrentUser();
-        if (currentUser.isEmpty()) {
+        Optional<Long> currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
+        if (currentDeveloperId.isEmpty()) {
             return ReflectionSnapshot.EMPTY;
         }
         Instant since = clock.instant().minus(LOOKBACK_DAYS, ChronoUnit.DAYS);
         // No global row cap: it could silently remove complete practices. Per-practice caps are applied only
         // after every eligible latest-run finding has been grouped.
-        Long developerId = currentUser.get().getId();
+        Long developerId = currentDeveloperId.get();
         List<Observation> recent = observationRepository.findRecentByDeveloperAndWorkspace(
             developerId,
             workspaceId,

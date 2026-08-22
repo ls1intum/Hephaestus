@@ -18,6 +18,7 @@ import org.springframework.data.web.PagedModel;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 
 /** Learner-facing read endpoints for one practice-area detail page. */
 @WorkspaceScopedController
+@PreAuthorize("@workspaceSecure.isMember()")
 @RequestMapping("/practice-areas/{areaSlug}")
 @Tag(name = "Practice Area Detail", description = "Learner-facing practice-area detail views")
 @RequiredArgsConstructor
@@ -87,7 +89,7 @@ public class PracticeAreaDetailController {
                     workspaceContext,
                     areaSlug,
                     filter.practiceSlug(),
-                    filter.artifactKinds(),
+                    filter.kinds(),
                     filter.severities(),
                     PageRequest.of(filter.page(), filter.size())
                 )

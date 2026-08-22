@@ -3,6 +3,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.ForeignKey;
 import jakarta.persistence.Id;
@@ -20,12 +22,17 @@ import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
-/** A recipient's usefulness rating for one delivered feedback unit. */
+/**
+ * A recipient's current rating for one delivered feedback unit.
+ *
+ * <p>A feedback row represents one delivery to one recipient. If the same conceptual feedback is delivered to
+ * several recipients, each delivery has its own feedback id and therefore its own independent rating.
+ */
 @Entity
-@Table(name = "feedback_helpfulness_vote")
+@Table(name = "feedback_rating")
 @Getter
 @NoArgsConstructor
-public class FeedbackHelpfulnessVote {
+public class FeedbackRating {
 
     @Id
     @Column(name = "feedback_id", columnDefinition = "UUID")
@@ -36,7 +43,7 @@ public class FeedbackHelpfulnessVote {
         name = "feedback_id",
         insertable = false,
         updatable = false,
-        foreignKey = @ForeignKey(name = "fk_feedback_helpfulness_vote_feedback")
+        foreignKey = @ForeignKey(name = "fk_feedback_rating_feedback")
     )
     @OnDelete(action = OnDeleteAction.CASCADE)
     @ToString.Exclude
@@ -44,8 +51,12 @@ public class FeedbackHelpfulnessVote {
     private Feedback feedback;
 
     @NotNull
-    @Column(name = "helpful", nullable = false)
-    private Boolean helpful;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "state", nullable = false, length = 16)
+    private FeedbackRatingState state;
+
+    @Column(name = "comment", columnDefinition = "TEXT")
+    private String comment;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

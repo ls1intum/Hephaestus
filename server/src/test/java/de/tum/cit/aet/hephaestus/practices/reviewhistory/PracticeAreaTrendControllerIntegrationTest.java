@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.reviewhistory;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
+import de.tum.cit.aet.hephaestus.practices.PracticeTestEvidence;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -52,13 +53,12 @@ class PracticeAreaTrendControllerIntegrationTest extends AbstractWorkspaceIntegr
         area = areaRepository.save(area);
 
         Practice practice = new Practice();
+        practice.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         practice.setWorkspace(workspace);
         practice.setArea(area);
         practice.setSlug("small-functions");
         practice.setName("Keep functions small");
         practice.setCriteria("Keep functions focused on one concern.");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
         practiceRepository.save(practice);
     }
 
@@ -83,14 +83,18 @@ class PracticeAreaTrendControllerIntegrationTest extends AbstractWorkspaceIntegr
     }
 
     @Test
-    @WithUser(username = "foreign-user", userId = "foreign-user-id")
-    @DisplayName("denies a caller outside the workspace")
+    @WithUser
+    @DisplayName("denies a caller who is not a member of the workspace")
     void shouldDenyForeignCaller() {
-        persistUser("foreign-user");
+        // A different workspace the caller has no membership in. The caller is the SAME signed-in user:
+        // the test issuer resolves every mock token to `testuser`, so "someone else asks" cannot be
+        // expressed by naming another username — only by asking about a workspace they are not in.
+        User otherOwner = persistUser("other-owner");
+        Workspace foreign = createWorkspace("foreign-ws", "Foreign WS", "foreign-org", AccountType.ORG, otherOwner);
 
         webTestClient
             .get()
-            .uri(URI, workspace.getWorkspaceSlug(), "code-quality")
+            .uri(URI, foreign.getWorkspaceSlug(), "code-quality")
             .headers(TestAuthUtils.withCurrentUser())
             .exchange()
             .expectStatus()

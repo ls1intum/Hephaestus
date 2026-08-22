@@ -343,7 +343,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * broken newest-first) because a {@code Pageable} sort on the enum column would order
      * alphabetically; {@code severitySign} {@code +1} puts the most severe first, {@code -1} the
      * least severe (then strengths lead). Callers pass an UNSORTED pageable.
+     *
+     * <p>Same entity graph as the date-ordered form, and for the same reason: the row's DTO reports whether
+     * the claim was measured against the practice's current rules, which reads both revisions. Without the
+     * graph that read happens after the session closed and the whole page fails.
      */
+    @EntityGraph(attributePaths = { "practice.currentRevision", "practiceRevision" })
     @Query(
         value = """
         SELECT f FROM Observation f

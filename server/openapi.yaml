@@ -28,6 +28,8 @@ security:
 tags:
 - description: User achievement progress and unlocks
   name: Achievements
+- description: Recipient assessments of delivered practice feedback
+  name: Feedback Rating
 - description: Per-workspace LLM spend rollup and budget status
   name: LLM Usage
 - description: Manage practice areas
@@ -56,8 +58,6 @@ tags:
   name: Auth
 - description: Workspace-scoped practice-review policy
   name: Practice Review Settings
-- description: Learner usefulness ratings for delivered practice feedback
-  name: Feedback Helpfulness
 - description: Workspace integration connection management
   name: Connections
 - description: Up/down votes on mentor assistant messages
@@ -4284,7 +4284,9 @@ paths:
         required: false
         schema:
           type: string
-      - in: query
+      - description: "Only reviews of these artifact kinds, e.g. scm.pull_request\
+          \ (repeatable)"
+        in: query
         name: artifactKinds
         required: false
         schema:
@@ -4303,21 +4305,20 @@ paths:
             - MAJOR
             - MINOR
             - INFO
-      - in: query
+      - description: Zero-based page; a negative value is read as the first page
+        in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
-          minimum: 0
-      - in: query
+      - description: "Page size, clamped to 1..50"
+        in: query
         name: size
         required: false
         schema:
           type: integer
           format: int32
-          maximum: 50
-          minimum: 1
       responses:
         "200":
           content:
@@ -4710,9 +4711,9 @@ paths:
       summary: The current developer's in-app feedback
       tags:
       - In-App Feedback
-  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/helpfulness:
+  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/rating:
     delete:
-      operationId: removeFeedbackHelpfulnessRating
+      operationId: removeFeedbackRating
       parameters:
       - description: Workspace slug
         in: path
@@ -4730,11 +4731,11 @@ paths:
       responses:
         "204":
           description: Rating removed or did not exist
-      summary: Remove a usefulness rating
+      summary: Remove a feedback rating
       tags:
-      - Feedback Helpfulness
-    post:
-      operationId: rateFeedbackHelpfulness
+      - Feedback Rating
+    put:
+      operationId: setFeedbackRating
       parameters:
       - description: Workspace slug
         in: path
@@ -4753,20 +4754,20 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/FeedbackHelpfulnessVoteRequest"
+              $ref: "#/components/schemas/FeedbackRatingRequest"
         required: true
       responses:
         "200":
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/FeedbackHelpfulnessVote"
+                $ref: "#/components/schemas/FeedbackRating"
           description: Rating recorded
         "404":
           description: Feedback not found
-      summary: Rate delivered practice feedback
+      summary: Create or replace a feedback rating
       tags:
-      - Feedback Helpfulness
+      - Feedback Rating
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
     get:
       description: "Returns the current user's most recent reaction to the specified\
@@ -4903,8 +4904,8 @@ paths:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
-      - description: Only observations on these artifact kinds (repeatable); omit
-          for all kinds
+      - description: "Only observations on these artifact kinds, e.g. scm.pull_request\
+          \ (repeatable)"
         in: query
         name: artifactKinds
         required: false
@@ -4953,21 +4954,20 @@ paths:
           enum:
           - ASC
           - DESC
-      - in: query
+      - description: Zero-based page; a negative value is read as the first page
+        in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
-          minimum: 0
-      - in: query
+      - description: "Page size, clamped to 1..100"
+        in: query
         name: size
         required: false
         schema:
           type: integer
           format: int32
-          maximum: 100
-          minimum: 1
       responses:
         "200":
           content:
@@ -9436,30 +9436,46 @@ components:
           - DUPLICATE
           - INAPPROPRIATE_PLACEMENT
           - OTHER
-    FeedbackHelpfulnessVote:
+    FeedbackRating:
       type: object
-      description: Current usefulness rating for a delivered feedback unit
+      description: The recipient's current rating for a delivered feedback unit
       properties:
+        comment:
+          type: string
         feedbackId:
           type: string
           format: uuid
-        helpful:
-          type: boolean
+        state:
+          type: string
+          enum:
+          - HELPFUL
+          - UNHELPFUL
+          - INCORRECT
         updatedAt:
           type: string
           format: date-time
       required:
       - feedbackId
+      - state
       - updatedAt
-    FeedbackHelpfulnessVoteRequest:
+    FeedbackRatingRequest:
       type: object
-      description: Rate whether delivered practice feedback was helpful
+      description: "Mark delivered practice feedback as helpful, unhelpful, or incorrect"
       properties:
-        helpful:
-          type: boolean
-          description: "true when the feedback was helpful, false when it was not"
+        comment:
+          type: string
+          description: Optional comment explaining the assessment
+          maxLength: 2000
+          minLength: 0
+        state:
+          type: string
+          description: The recipient's assessment
+          enum:
+          - HELPFUL
+          - UNHELPFUL
+          - INCORRECT
       required:
-      - helpful
+      - state
     FeedbackSourceCount:
       type: object
       description: Distinct work artifacts of one kind that contributed feedback
@@ -9467,7 +9483,7 @@ components:
         count:
           type: integer
           format: int64
-          description: Distinct artifacts of this kind in the window
+          description: Distinct artifacts of this kind in the selected time period
         source:
           type: string
           description: The kind of work the feedback came from
@@ -11118,8 +11134,6 @@ components:
         feedbackId:
           type: string
           format: uuid
-        helpful:
-          type: boolean
         observationId:
           type: string
           format: uuid
@@ -11134,6 +11148,14 @@ components:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
+        rating:
+          type: string
+          enum:
+          - HELPFUL
+          - UNHELPFUL
+          - INCORRECT
+        ratingComment:
+          type: string
         recurrenceKey:
           type: string
         severity:
@@ -11175,7 +11197,8 @@ components:
       - reviewedAt
     PracticeAreaStatus:
       type: object
-      description: A developer's derived qualitative standing for one practice area
+      description: A developer's derived qualitative standing for one Area including
+        1<=n<many practices
       properties:
         areaName:
           type: string
@@ -11183,6 +11206,16 @@ components:
         areaSlug:
           type: string
           description: Area slug
+        direction:
+          type: string
+          description: "Evidence-weighted, opportunity-indexed direction across the\
+            \ area's practices"
+          enum:
+          - IMPROVING
+          - STABLE
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
         feedbackSince:
           type: string
           format: date-time
@@ -11226,19 +11259,9 @@ components:
           - MIXED
           - NOT_OBSERVED
           - NO_OPPORTUNITY
-        trajectory:
-          type: string
-          description: "Evidence-weighted, opportunity-indexed direction across the\
-            \ area's practices"
-          enum:
-          - IMPROVING
-          - STABLE
-          - DECLINING
-          - UNCERTAIN
-          - INSUFFICIENT_EVIDENCE
         trendSupport:
           $ref: "#/components/schemas/TrendSupport"
-          description: Evidence support and provenance for the trajectory
+          description: Evidence support and provenance for the direction
       required:
       - areaName
       - areaSlug

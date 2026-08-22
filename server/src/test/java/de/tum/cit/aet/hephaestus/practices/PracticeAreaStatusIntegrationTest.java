@@ -12,8 +12,10 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
+import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
 import de.tum.cit.aet.hephaestus.practices.observation.AreaGuidanceProvider;
 import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository;
 import de.tum.cit.aet.hephaestus.testconfig.TestAuthUtils;
@@ -40,13 +42,23 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * Functional coverage for {@code GET /practice-areas/status} — the current developer's
  * derived area standing. Verifies the status derivation (problems → DEVELOPING, strengths →
- * STRENGTH, both → MIXED), the three explicit no-verdict shapes, the quarantine floor, and that neither
- * another contributor's nor another workspace's findings leak into the caller's status.
+ * STRENGTH, both → MIXED), the two explicit no-verdict shapes, and that neither another contributor's nor
+ * another workspace's findings leak into the caller's status.
  */
 class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
     private static final String STATUS_URI = "/workspaces/{workspaceSlug}/practice-areas/status";
+
+    /**
+     * Observations reach a learner surface only when the claim was measured against the practice's CURRENT
+     * review rules and its evidence is still authorized for delivery. Both are real conditions, so the
+     * fixtures satisfy both: every practice carries a revision, and every observation cites a source.
+     */
+    private static final String DIFF_EVIDENCE_JSON =
+        "{\"citations\":[{\"sourceKind\":\"scm.pull-request.diff\",\"artifactPath\":\"inputs/context/diff.patch\"," +
+        "\"path\":\"src/Main.java\",\"side\":\"NEW\",\"startLine\":42,\"endLine\":42,\"quote\":\"example\"," +
+        "\"quoteRedacted\":false}]}";
 
     @Autowired
     private WebTestClient webTestClient;
@@ -56,6 +68,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     @Autowired
     private PracticeRepository practiceRepository;
+
+    @Autowired
+    private PracticeRevisionRepository practiceRevisionRepository;
 
     @Autowired
     private ObservationRepository observationRepository;
@@ -98,14 +113,15 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
     private Practice persistPractice(Workspace ws, PracticeArea boundArea, String slug, String name) {
         Practice p = new Practice();
+        p.setAutomatedReviewPolicy(PracticeTestEvidence.pullRequest());
         p.setWorkspace(ws);
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Description for " + slug);
-        p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        p.setActive(true);
         p.setArea(boundArea);
-        return practiceRepository.save(p);
+        p = practiceRepository.saveAndFlush(p);
+        p.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(p, 1)));
+        return practiceRepository.saveAndFlush(p);
     }
 
     private AgentJob persistAgentJob(Workspace ws) {
@@ -113,6 +129,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         job.setWorkspace(ws);
         job.setJobType(AgentJobType.PULL_REQUEST_REVIEW);
         job.setConfigSnapshot(OBJECT_MAPPER.valueToTree(Map.of("model", "test")));
+        // Evidence delivery is authorized against the run's recorded evidence contract: a job without one
+        // has nothing a learner surface may quote, so every observation from it stays hidden.
+        job.setEvidenceSnapshot(OBJECT_MAPPER.valueToTree(Map.of("manifest", Map.of("contractVersion", "1.0.0"))));
         return agentJobRepository.save(job);
     }
 
@@ -123,20 +142,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         String title,
         String presence,
         String severity,
-        float confidence,
         Long artifactId
     ) {
-        return insertFinding(
-            job,
-            targetPractice,
-            user,
-            title,
-            presence,
-            severity,
-            confidence,
-            artifactId,
-            Instant.now()
-        );
+        return insertFinding(job, targetPractice, user, title, presence, severity, artifactId, Instant.now());
     }
 
     private UUID insertFinding(
@@ -146,7 +154,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         String title,
         String presence,
         String severity,
-        float confidence,
         Long artifactId,
         Instant observedAt
     ) {
@@ -157,10 +164,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
             title,
             presence,
             severity,
-            confidence,
             artifactId,
             observedAt,
-            "PULL_REQUEST"
+            ArtifactKinds.PULL_REQUEST.value()
         );
     }
 
@@ -171,7 +177,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         String title,
         String presence,
         String severity,
-        float confidence,
         Long artifactId,
         Instant observedAt,
         String artifactKind
@@ -182,7 +187,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
             "key-" + id,
             job.getId(),
             targetPractice.getId(),
-            null,
+            targetPractice.getCurrentRevision().getId(),
             artifactKind,
             artifactId,
             user.getId(),
@@ -190,11 +195,11 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
             presence,
             "PRESENT".equals(presence) ? "GOOD" : "BAD",
             severity,
-            confidence,
-            null,
+            DIFF_EVIDENCE_JSON,
             "Test reasoning for " + title,
             null,
-            observedAt
+            observedAt,
+            "LIVE"
         );
         return id;
     }
@@ -235,7 +240,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 "Missing rollout plan",
                 "ABSENT",
                 "MAJOR",
-                0.9f,
                 1L
             );
             deliverFeedbackFor(findingId, "Add a rollout section describing how the change ships.");
@@ -260,8 +264,8 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .jsonPath("$[0].guidanceSource")
                 .isEqualTo("RULE_BASED")
                 // One evidence-bearing day has no previous daily snapshot to compare with.
-                .jsonPath("$[0].trajectory")
-                .doesNotExist()
+                .jsonPath("$[0].direction")
+                .isEqualTo("INSUFFICIENT_EVIDENCE")
                 // Observed just now: the verdict rests on a single day of feedback.
                 .jsonPath("$[0].feedbackSpanDays")
                 .isEqualTo(1)
@@ -271,7 +275,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isEqualTo(1)
                 .jsonPath("$[0].items[0].title")
                 .isEqualTo("Missing rollout plan")
-                .jsonPath("$[0].items[0].guidance")
+                .jsonPath("$[0].items[0].deliveredFeedback")
                 .isEqualTo("Add a rollout section describing how the change ships.")
                 .jsonPath("$[0].items[0].observationId")
                 .isEqualTo(findingId.toString())
@@ -279,7 +283,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .jsonPath("$[0].sources.length()")
                 .isEqualTo(1)
                 .jsonPath("$[0].sources[0].source")
-                .isEqualTo("PULL_REQUEST")
+                .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
                 .jsonPath("$[0].sources[0].count")
                 .isEqualTo(1);
         }
@@ -289,9 +293,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         @DisplayName("counts distinct contributing artifacts per kind for the provenance line")
         void shouldCountDistinctSourceArtifactsPerKind() {
             // Two observations on PR 1 must count that PR once; PR 2 and issue 7 add one each of their kind.
-            insertFinding(agentJob, practice, developer, "Gap on PR one", "ABSENT", "MAJOR", 0.9f, 1L);
-            insertFinding(agentJob, practice, developer, "Second gap on PR one", "ABSENT", "MINOR", 0.9f, 1L);
-            insertFinding(agentJob, practice, developer, "Gap on PR two", "ABSENT", "MAJOR", 0.9f, 2L);
+            insertFinding(agentJob, practice, developer, "Gap on PR one", "ABSENT", "MAJOR", 1L);
+            insertFinding(agentJob, practice, developer, "Second gap on PR one", "ABSENT", "MINOR", 1L);
+            insertFinding(agentJob, practice, developer, "Gap on PR two", "ABSENT", "MAJOR", 2L);
             insertFinding(
                 agentJob,
                 practice,
@@ -299,10 +303,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 "Vague issue description",
                 "ABSENT",
                 "MINOR",
-                0.9f,
                 7L,
                 Instant.now(),
-                "ISSUE"
+                ArtifactKinds.ISSUE.value()
             );
 
             webTestClient
@@ -315,22 +318,24 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectBody()
                 .jsonPath("$[0].sources.length()")
                 .isEqualTo(2)
-                // ArtifactKind declaration order keeps the rendering stable: pull requests first.
+                // Ordered by kind value: ArtifactKind is an open "<domain>.<kind>" vocabulary, so there is
+                // no declaration order left to render against, and "scm.issue" sorts before
+                // "scm.pull_request".
                 .jsonPath("$[0].sources[0].source")
-                .isEqualTo("PULL_REQUEST")
+                .isEqualTo(ArtifactKinds.ISSUE.value())
                 .jsonPath("$[0].sources[0].count")
-                .isEqualTo(2)
+                .isEqualTo(1)
                 .jsonPath("$[0].sources[1].source")
-                .isEqualTo("ISSUE")
+                .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
                 .jsonPath("$[0].sources[1].count")
-                .isEqualTo(1);
+                .isEqualTo(2);
         }
 
         @Test
         @WithUser
         @DisplayName("derives STRENGTH when the area only has strengths")
         void shouldReturnStrengthForGoodOnly() {
-            insertFinding(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 0.9f, 1L);
+            insertFinding(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 1L);
 
             webTestClient
                 .get()
@@ -345,8 +350,8 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .jsonPath("$[0].guidance")
                 .isEqualTo("Your recent feedback shows a strength in “PR Description Quality”. Keep building on it.")
                 // One evidence-bearing day has no previous daily snapshot to compare with.
-                .jsonPath("$[0].trajectory")
-                .doesNotExist()
+                .jsonPath("$[0].direction")
+                .isEqualTo("INSUFFICIENT_EVIDENCE")
                 .jsonPath("$[0].items.length()")
                 .isEqualTo(1)
                 .jsonPath("$[0].items[0].title")
@@ -375,8 +380,8 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .doesNotExist()
                 .jsonPath("$[0].guidanceSource")
                 .doesNotExist()
-                .jsonPath("$[0].trajectory")
-                .doesNotExist()
+                .jsonPath("$[0].direction")
+                .isEqualTo("INSUFFICIENT_EVIDENCE")
                 .jsonPath("$[0].feedbackSpanDays")
                 .doesNotExist()
                 .jsonPath("$[0].feedbackSince")
@@ -387,13 +392,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithUser
-        @DisplayName("quarantines a low-confidence single-target problem into LOW_CONFIDENCE, not NOT_OBSERVED")
-        void shouldQuarantineLowConfidenceSingleTargetProblem() {
-            // Below the 0.5 quarantine floor and seen on ONE artifact only: must never reach the learner
-            // surface, so the area carries no verdict. It must still report LOW_CONFIDENCE rather than
-            // NOT_OBSERVED — the finding exists, it is only withheld, and a learner who sees "not observed"
-            // after a real review cannot tell that from a broken detector.
-            insertFinding(agentJob, practice, developer, "Coin-flip hunch", "ABSENT", "MINOR", 0.3f, 1L);
+        @DisplayName("a problem seen on a single work item still yields a verdict, not an empty state")
+        void shouldReportDevelopingForSingleArtifactProblem() {
+            // An earlier revision withheld this shape — one problem, one artifact — and reported the area as
+            // having no verdict. It relied on a detector-reported confidence that was dropped after validation
+            // found it carried no signal, so there is nothing left to withhold on: the learner is told what was
+            // found, and how thin the evidence is stays a question for the trajectory, not for suppression.
+            insertFinding(agentJob, practice, developer, "Coin-flip hunch", "ABSENT", "MINOR", 1L);
 
             webTestClient
                 .get()
@@ -404,12 +409,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isOk()
                 .expectBody()
                 .jsonPath("$[0].status")
-                .isEqualTo("LOW_CONFIDENCE")
-                // A quarantined-only area must not pair "nothing to show" with a direction.
-                .jsonPath("$[0].trajectory")
-                .doesNotExist()
+                .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].items.length()")
-                .isEqualTo(0);
+                .isEqualTo(1);
         }
 
         @Test
@@ -417,8 +419,8 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         @DisplayName("derives MIXED across two practices and names both sides in the guidance")
         void shouldComposeMixedGuidanceAcrossPractices() {
             Practice reviewPractice = persistPractice(workspace, area, "review-comments", "Actionable Review Comments");
-            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 0.9f, 1L);
-            insertFinding(agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 0.9f, 1L);
+            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L);
+            insertFinding(agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 1L);
 
             webTestClient
                 .get()
@@ -449,9 +451,9 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         void shouldKeepStrengthEvidenceWhenMixedAreaReachesItemCap() {
             Practice reviewPractice = persistPractice(workspace, area, "review-comments", "Actionable Review Comments");
             for (long artifactId = 1; artifactId <= 5; artifactId++) {
-                insertFinding(agentJob, practice, developer, "Gap " + artifactId, "ABSENT", "MAJOR", 0.9f, artifactId);
+                insertFinding(agentJob, practice, developer, "Gap " + artifactId, "ABSENT", "MAJOR", artifactId);
             }
-            insertFinding(agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 0.9f, 6L);
+            insertFinding(agentJob, reviewPractice, developer, "Concrete line references", "PRESENT", null, 6L);
 
             webTestClient
                 .get()
@@ -471,10 +473,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithUser
-        @DisplayName("reports insufficient evidence instead of a direction from a quarantined problem")
-        void shouldNotContradictStrengthWithQuarantinedProblemTrajectory() {
-            insertFinding(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 0.9f, 1L);
-            insertFinding(agentJob, practice, developer, "Speculative gap", "ABSENT", "MINOR", 0.3f, 2L);
+        @DisplayName("a thin record still yields a verdict, but never a direction")
+        void shouldNotDeriveADirectionFromTwoObservations() {
+            // One strength and one problem: both are reported, so the verdict is MIXED. Two reviewed work
+            // items are still far too little to say where the developer is heading, and a direction asserted
+            // from them would read as a finding about the person rather than about the evidence.
+            insertFinding(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 1L);
+            insertFinding(agentJob, practice, developer, "Speculative gap", "ABSENT", "MINOR", 2L);
 
             webTestClient
                 .get()
@@ -485,13 +490,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .isOk()
                 .expectBody()
                 .jsonPath("$[0].status")
-                .isEqualTo("STRENGTH")
-                .jsonPath("$[0].trajectory")
+                .isEqualTo("MIXED")
+                .jsonPath("$[0].direction")
                 .isEqualTo("INSUFFICIENT_EVIDENCE")
                 .jsonPath("$[0].trendSupport.level")
                 .isEqualTo("NONE")
                 .jsonPath("$[0].items.length()")
-                .isEqualTo(1);
+                .isEqualTo(2);
         }
 
         @Test
@@ -507,7 +512,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "Previous gap " + artifactId,
                     "ABSENT",
                     "MAJOR",
-                    0.9f,
                     artifactId,
                     previousDay
                 );
@@ -520,7 +524,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "Current strength " + artifactId,
                     "PRESENT",
                     null,
-                    0.9f,
                     artifactId
                 );
             }
@@ -535,7 +538,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectBody()
                 .jsonPath("$[0].status")
                 .isEqualTo("MIXED")
-                .jsonPath("$[0].trajectory")
+                .jsonPath("$[0].direction")
                 .isEqualTo("IMPROVING")
                 // Calendar time remains provenance; it does not define either bundle.
                 .jsonPath("$[0].feedbackSpanDays")
@@ -555,7 +558,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "Previous strength " + artifactId,
                     "PRESENT",
                     null,
-                    0.9f,
                     artifactId,
                     previousDay
                 );
@@ -568,7 +570,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                     "Current gap " + artifactId,
                     "ABSENT",
                     "MAJOR",
-                    0.9f,
                     artifactId
                 );
             }
@@ -583,7 +584,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectBody()
                 .jsonPath("$[0].status")
                 .isEqualTo("MIXED")
-                .jsonPath("$[0].trajectory")
+                .jsonPath("$[0].direction")
                 .isEqualTo("DECLINING");
         }
 
@@ -593,7 +594,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         void shouldNotLeakOtherContributorOrWorkspace() {
             // Another contributor's finding in THIS workspace and area.
             User otherUser = persistUser("other-user");
-            insertFinding(agentJob, practice, otherUser, "Someone else's gap", "ABSENT", "MAJOR", 0.9f, 2L);
+            insertFinding(agentJob, practice, otherUser, "Someone else's gap", "ABSENT", "MAJOR", 2L);
 
             // The developer's OWN finding, but in a same-slug area of a DIFFERENT workspace.
             User otherOwner = persistUser("other-ws-owner");
@@ -607,7 +608,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
             PracticeArea otherArea = persistArea(otherWorkspace, "code-quality", "Code Quality");
             Practice otherPractice = persistPractice(otherWorkspace, otherArea, "pr-description-quality", "PR Quality");
             AgentJob otherJob = persistAgentJob(otherWorkspace);
-            insertFinding(otherJob, otherPractice, developer, "Cross-workspace gap", "ABSENT", "MAJOR", 0.9f, 3L);
+            insertFinding(otherJob, otherPractice, developer, "Cross-workspace gap", "ABSENT", "MAJOR", 3L);
 
             webTestClient
                 .get()
@@ -627,7 +628,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         @WithUser
         @DisplayName("returns statuses for active areas only")
         void shouldReturnStatusesForActiveAreasOnly() {
-            area.setActive(false);
+            area.setVisibleInPracticeDashboards(false);
             areaRepository.saveAndFlush(area);
 
             webTestClient
@@ -671,7 +672,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         @WithUser
         @DisplayName("serves the provider's text with AI_AGGREGATED provenance instead of the rule-based sentence")
         void shouldPreferAggregatedGuidance() {
-            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 0.9f, 1L);
+            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L);
 
             webTestClient
                 .get()

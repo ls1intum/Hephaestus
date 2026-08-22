@@ -395,6 +395,14 @@ erDiagram
         UUID chat_message_id FK
     }
 
+    FeedbackRating {
+        UUID feedback_id PK,FK
+        VARCHAR(16) state "NOT NULL"
+        TEXT comment
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
     FxRate {
         BIGINT id PK
         DATE rate_date UK "NOT NULL"
@@ -1430,6 +1438,7 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessageVote : has
     DiscussionComment ||--|| Discussion : references
+    Feedback ||--|| FeedbackRating : has
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed

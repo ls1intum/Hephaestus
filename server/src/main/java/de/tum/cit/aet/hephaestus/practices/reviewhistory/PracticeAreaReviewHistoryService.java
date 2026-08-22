@@ -1,10 +1,10 @@
 package de.tum.cit.aet.hephaestus.practices.reviewhistory;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeAreaService;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.DeliveredFeedbackBinding;
+import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRatingState;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
@@ -13,6 +13,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.Rev
 import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewArtifactDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewFindingDTO;
 import de.tum.cit.aet.hephaestus.practices.reviewhistory.dto.PracticeAreaReviewMomentDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.practices.spi.ReviewRunTargetLookup;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.Collection;
@@ -37,7 +38,7 @@ public class PracticeAreaReviewHistoryService {
     private final ObservationRepository observationRepository;
     private final FeedbackObservationRepository feedbackObservationRepository;
     private final ReviewRunTargetLookup reviewRunTargetLookup;
-    private final UserRepository userRepository;
+    private final CurrentDeveloperLookup currentDeveloperLookup;
 
     @Transactional(readOnly = true)
     public Page<PracticeAreaReviewMomentDTO> list(
@@ -49,8 +50,8 @@ public class PracticeAreaReviewHistoryService {
         Pageable pageable
     ) {
         practiceAreaService.getArea(workspaceContext, areaSlug);
-        var currentUser = userRepository.getCurrentUser();
-        if (currentUser.isEmpty()) {
+        var currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
+        if (currentDeveloperId.isEmpty()) {
             return Page.empty(pageable);
         }
 
@@ -60,7 +61,7 @@ public class PracticeAreaReviewHistoryService {
         List<Severity> severityFilter = hasSeverities ? severities : List.of(Severity.INFO);
 
         Page<ReviewHistoryRunRow> runs = observationRepository.findReviewHistoryRuns(
-            currentUser.get().getId(),
+            currentDeveloperId.get(),
             workspaceContext.id(),
             areaSlug,
             practiceSlug,
@@ -77,7 +78,7 @@ public class PracticeAreaReviewHistoryService {
         List<UUID> jobIds = runs.stream().map(ReviewHistoryRunRow::getJobId).toList();
         List<Observation> observations = observationRepository.findReviewHistoryObservationsByJobs(
             jobIds,
-            currentUser.get().getId(),
+            currentDeveloperId.get(),
             workspaceContext.id(),
             areaSlug,
             practiceSlug,
@@ -91,7 +92,7 @@ public class PracticeAreaReviewHistoryService {
             .collect(Collectors.groupingBy(Observation::getAgentJobId));
         Map<UUID, DeliveredFeedbackBinding> feedbackByObservation = feedbackByObservation(
             workspaceContext.id(),
-            currentUser.get().getId(),
+            currentDeveloperId.get(),
             observations
         );
         Map<UUID, ReviewRunTargetLookup.Target> targets = reviewRunTargetLookup.findByJobIds(
@@ -141,10 +142,17 @@ public class PracticeAreaReviewHistoryService {
                 return PracticeAreaReviewFindingDTO.from(
                     observation,
                     binding == null ? null : binding.getFeedbackId(),
-                    binding == null ? null : binding.getHelpful()
+                    ratingState(binding),
+                    binding == null ? null : binding.getRatingComment()
                 );
             })
             .toList();
         return new PracticeAreaReviewMomentDTO(run.getJobId(), run.getReviewedAt(), artifact, findings);
+    }
+
+    private @Nullable FeedbackRatingState ratingState(@Nullable DeliveredFeedbackBinding binding) {
+        return binding == null || binding.getRatingState() == null
+            ? null
+            : FeedbackRatingState.valueOf(binding.getRatingState());
     }
 }
