@@ -8,29 +8,29 @@ import { readFileSync, writeFileSync } from "node:fs";
 const version = JSON.parse(readFileSync("package.json", "utf8")).version;
 
 const edits = [
-  {
-    file: "docker/self-host/.env.example",
-    re: /^IMAGE_TAG=.*$/m,
-    line: `IMAGE_TAG=${version}`,
-  },
-  {
-    file: "docs/admin/install.mdx",
-    re: /^VERSION=\S+(\s+# the release you are installing.*)$/m,
-    line: `VERSION=${version}$1`,
-  },
+	{
+		file: "docker/self-host/.env.example",
+		re: /^IMAGE_TAG=.*$/m,
+		line: `IMAGE_TAG=${version}`,
+	},
+	{
+		file: "docs/admin/install.mdx",
+		re: /^VERSION=\S+(\s+# the release you are installing.*)$/m,
+		line: `VERSION=${version}$1`,
+	},
 ];
 
 for (const { file, re, line } of edits) {
-  let text;
-  try {
-    text = readFileSync(file, "utf8");
-  } catch {
-    continue; // file may not exist in every checkout; skip quietly
-  }
-  if (!re.test(text)) {
-    throw new Error(`sync-selfhost-version: no version literal matched in ${file}`);
-  }
-  writeFileSync(file, text.replace(re, line));
+	let text;
+	try {
+		text = readFileSync(file, "utf8");
+	} catch {
+		continue; // file may not exist in every checkout; skip quietly
+	}
+	if (!re.test(text)) {
+		throw new Error(`sync-selfhost-version: no version literal matched in ${file}`);
+	}
+	writeFileSync(file, text.replace(re, line));
 }
 
 console.log(`Synced self-host version literals to ${version}`);

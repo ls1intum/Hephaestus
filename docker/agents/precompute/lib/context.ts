@@ -10,16 +10,24 @@
  * they never decide.
  */
 
-/** Best-effort JSON read of a context file; returns `null` when absent/unreadable (the common case). */
-export async function readContextJson<T = any>(
+import { isJsonObject } from "./practice-contract";
+
+/**
+ * Best-effort JSON read of a context file; returns `null` when absent/unreadable (the common case).
+ *
+ * The result is `unknown` on purpose: the file is written by whichever connector produced the context,
+ * so its shape is a claim about another system, not something this side can know. Narrow it — see
+ * `readProjectInventory` below for the pattern.
+ */
+export async function readContextJson(
 	contextDir: string | undefined,
 	name: string,
-): Promise<T | null> {
+): Promise<unknown> {
 	if (!contextDir) return null;
 	try {
 		const file = Bun.file(`${contextDir}/${name}`);
 		if (!(await file.exists())) return null;
-		return (await file.json()) as T;
+		return await file.json();
 	} catch {
 		return null;
 	}
@@ -35,6 +43,7 @@ export interface ProjectInventory {
 	truncated?: boolean;
 }
 
+/** An issue or pull request in the inventory listing. Every consumer renders `#number "title"`. */
 export interface InventoryItem {
 	number: number;
 	title: string;
@@ -45,9 +54,67 @@ export interface InventoryItem {
 	isDraft?: boolean;
 }
 
+function optionalString(value: unknown): string | undefined {
+	return typeof value === "string" ? value : undefined;
+}
+
+function optionalNumber(value: unknown): number | undefined {
+	return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
+function optionalBoolean(value: unknown): boolean | undefined {
+	return typeof value === "boolean" ? value : undefined;
+}
+
+/**
+ * An item without a usable number AND title cannot be rendered or compared by any consumer, so it is
+ * dropped here rather than being handed on as a hole for every call site to defend against.
+ */
+function parseInventoryItems(value: unknown): InventoryItem[] | undefined {
+	if (!Array.isArray(value)) return undefined;
+	const items: InventoryItem[] = [];
+	for (const entry of value) {
+		if (!isJsonObject(entry)) continue;
+		const number = optionalNumber(entry.number);
+		const title = optionalString(entry.title);
+		if (number === undefined || title === undefined) continue;
+		items.push({
+			number,
+			title,
+			state: optionalString(entry.state),
+			author: optionalString(entry.author),
+			milestone: optionalString(entry.milestone),
+			url: optionalString(entry.url),
+			isDraft: optionalBoolean(entry.isDraft),
+		});
+	}
+	return items;
+}
+
+/** Narrow a parsed `project_inventory.json` to the fields this side actually reads. */
+export function parseProjectInventory(value: unknown): ProjectInventory | null {
+	if (!isJsonObject(value)) return null;
+	const focal = isJsonObject(value.focal) ? value.focal : undefined;
+	const counts = isJsonObject(value.counts) ? value.counts : undefined;
+	return {
+		repository: optionalString(value.repository),
+		focal: focal && {
+			type: optionalString(focal.type),
+			number: optionalNumber(focal.number),
+		},
+		issues: parseInventoryItems(value.issues),
+		pullRequests: parseInventoryItems(value.pullRequests),
+		counts: counts && {
+			issuesListed: optionalNumber(counts.issuesListed),
+			pullRequestsListed: optionalNumber(counts.pullRequestsListed),
+		},
+		truncated: optionalBoolean(value.truncated),
+	};
+}
+
 /** Convenience: load the whole-project inventory, or `null` when it was not materialised. */
-export function readProjectInventory(
+export async function readProjectInventory(
 	contextDir: string | undefined,
 ): Promise<ProjectInventory | null> {
-	return readContextJson<ProjectInventory>(contextDir, "project_inventory.json");
+	return parseProjectInventory(await readContextJson(contextDir, "project_inventory.json"));
 }

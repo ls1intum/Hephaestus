@@ -70,7 +70,8 @@ Before any release, code must pass:
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
 | Java formatting | Prettier (`prettier-plugin-java`) | Code style |
 | Java lint       | PMD         | Static analysis      |
-| TypeScript      | oxlint + Biome + tsc | Lint + format + typecheck |
+| Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
+| Agent + scripts TypeScript | Biome (`biome.jsonc`) + tsc | Lint + format + typecheck for the Bun runtime, its specs, both precompute trees and `scripts/**` |
 | Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships |
 
 ## 🔒 Security
@@ -172,7 +173,7 @@ CI only runs jobs for components that actually changed:
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
 | Webapp               | `webapp/**`, `docs/images/readme/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.node-version` |
-| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008), `docker/agents/**`, `tsconfig.agents.json` |
+| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008), `docker/agents/**`, `tsconfig.agents.json`, `biome.jsonc`, `package.json`, `pnpm-lock.yaml` |
 | Agent images         | `docker/agents/**`                                            |
 | Docs                 | `docs/**`                                                     |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
@@ -182,6 +183,10 @@ contract validator and the changelog-immutability guard live there, and a PR edi
 would otherwise skip the workflow that runs it. `docker/agents/**` appears twice for the same reason
 — it builds the agent images, and `test:agents` and `typecheck:agents` cover the precompute tree
 inside it, so a PR editing only a precompute script must still run those gates.
+
+`biome.jsonc`, `package.json` and `pnpm-lock.yaml` are listed because they decide the verdict of the
+App Server leg's Biome step: the rule set, the `:agents` scripts that invoke it, and the Biome binary
+version respectively. A gate whose own configuration can change without re-running it is not a gate.
 
 **Benefits:**
 
@@ -250,15 +255,22 @@ cd server && ./mvnw test -P'!quick'  # Unit tests — see the testing guide for 
 
 # Agent runtime (Bun) — the Pi runner and the practice precompute scripts
 pnpm run test:agents           # Runner + precompute specs
-pnpm run typecheck:agents      # Precompute TypeScript
+pnpm run check:agents          # Biome lint + format + import order, then both typechecks
+pnpm run check:agents:fix      # Same, applying every safe fix
+pnpm run typecheck:agents      # Agent + precompute TypeScript
 ```
+
+`check:agents` covers every TypeScript tree outside the webapp — the runtime, its specs, both
+precompute trees and `scripts/**`. Its rules and path roots live in `biome.jsonc`; CI runs the same
+thing as `pnpm run ci:agents`, which reports findings as inline annotations on the diff.
 
 ### Common Issues
 
 | Issue                 | Solution                                      |
 | --------------------- | --------------------------------------------- |
 | Formatting errors     | Run `pnpm run format`                          |
-| TypeScript errors     | Run `pnpm run typecheck:webapp` to see details |
+| Lint errors (agent runtime, precompute, `scripts/`) | Run `pnpm run check:agents:fix`, then fix what remains |
+| TypeScript errors     | Run `pnpm run typecheck` to see details        |
 | Test failures         | Check the specific test output for details    |
 | OpenAPI out of sync   | Run `pnpm run generate:api`                    |
 | Database schema drift | Run `pnpm run db:draft-changelog`              |

@@ -147,14 +147,16 @@ for (const path of componentFiles) {
 }
 
 /** R2 — a story of a presentational component needs no network, so it needs no mock. */
-const componentStories = componentFiles.length > 0 ? await listFiles(COMPONENTS, [".stories.tsx"]) : [];
+const componentStories =
+	componentFiles.length > 0 ? await listFiles(COMPONENTS, [".stories.tsx"]) : [];
 if (componentStories.length === 0) {
 	console.error(`No story files found under ${COMPONENTS} — this check would pass unchecked.`);
 	process.exit(1);
 }
 for (const path of componentStories) {
 	const source = await readSource(path);
-	const mocked = importsAny(source, MOCK_MODULES).length > 0 || source.includes("story-mock-server");
+	const mocked =
+		importsAny(source, MOCK_MODULES).length > 0 || source.includes("story-mock-server");
 	const allowed = ALLOWLIST.storyMocks.includes(path);
 	if (mocked && !allowed) fetchingFailures.push(`${path} — mocks the network in a story`);
 	if (!mocked && allowed) stale.push(`${path} (storyMocks)`);
@@ -186,7 +188,10 @@ for (const [message, entries] of [
 		'A story file that mocks the network must set docs: { story: { inline: false } } on its meta, or drop tags: ["autodocs"].',
 		docsFailures,
 	],
-	["These are no longer violations. Delete them from ALLOWLIST in this script — it only shrinks.", stale],
+	[
+		"These are no longer violations. Delete them from ALLOWLIST in this script — it only shrinks.",
+		stale,
+	],
 ]) {
 	if (entries.length === 0) continue;
 	console.error(message);

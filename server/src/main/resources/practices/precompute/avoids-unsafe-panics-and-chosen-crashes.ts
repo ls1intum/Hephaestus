@@ -2,7 +2,7 @@
 // in the diff, across languages. These are CANDIDATES to investigate — the LLM decides whether each is a
 // real, unsafe crash a realistic input/state can trigger. General by design: a per-language pattern table
 // keyed off the file extension, NOT a Swift-only scan. Adding a language = adding a row, no engine change.
-import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
 
 // language key -> [human label, regex] of deliberate-crash / force-unwrap constructs in ADDED code.
 const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
@@ -12,11 +12,11 @@ const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 		["force-cast as!", /\bas!\s/],
 		["preconditionFailure", /\bpreconditionFailure\s*\(/],
 		["assertionFailure", /\bassertionFailure\s*\(/],
-		["force-unwrap", /[A-Za-z0-9_)\]]\!(\.|\s|$|\))/],
+		["force-unwrap", /[A-Za-z0-9_)\]]!(\.|\s|$|\))/],
 	],
 	ts: [
 		["process.exit", /\bprocess\.exit\s*\(/],
-		["non-null assertion", /[A-Za-z0-9_)\]]\![.;)\s]/],
+		["non-null assertion", /[A-Za-z0-9_)\]]![.;)\s]/],
 	],
 	js: [["process.exit", /\bprocess\.exit\s*\(/]],
 	python: [
@@ -36,7 +36,7 @@ const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 		["Optional.get()", /\bOptional[^;]*\.get\s*\(\s*\)/],
 	],
 	kotlin: [
-		["!! force non-null", /\!\!(\.|\s|$|\))/],
+		["!! force non-null", /!!(\.|\s|$|\))/],
 		["error(", /(^|[^.\w])error\s*\(/],
 		["TODO(", /\bTODO\s*\(/],
 	],
@@ -61,7 +61,7 @@ const LANG_PATTERNS: Record<string, Array<[string, RegExp]>> = {
 		["Environment.FailFast", /\bEnvironment\.FailFast\s*\(/],
 		["Debug.Assert", /\bDebug\.Assert\s*\(/],
 		["throw new", /\bthrow\s+new\s+\w+/],
-		["null-forgiving !", /[A-Za-z0-9_)\]]\!\.(?=[A-Za-z_])/],
+		["null-forgiving !", /[A-Za-z0-9_)\]]!\.(?=[A-Za-z_])/],
 	],
 };
 
@@ -101,10 +101,19 @@ function langOf(path: string): string | null {
 
 // Strip the obvious comment forms so we don't flag a pattern that only appears inside a comment.
 function isComment(trimmed: string): boolean {
-	return trimmed.startsWith("//") || trimmed.startsWith("#") || trimmed.startsWith("*") || trimmed.startsWith("/*");
+	return (
+		trimmed.startsWith("//") ||
+		trimmed.startsWith("#") ||
+		trimmed.startsWith("*") ||
+		trimmed.startsWith("/*")
+	);
 }
 
-export default async function (_repo: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	_repo: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	const hints: Hint[] = [];
 	const byLang: Record<string, number> = {};
 	for (const [path, df] of diffFiles) {
@@ -137,5 +146,9 @@ export default async function (_repo: string, diffFiles: Map<string, DiffFile>, 
 					`Found ${hints.length} deliberate-crash / force-unwrap construct(s) added across ${Object.keys(byLang).length} language(s) — investigate whether each can be triggered by realistic input/state and should handle the failure instead of crashing.`,
 				]
 			: [];
-	return { hints: hints.slice(0, 40), metrics: { crashConstructsAdded: hints.length, ...byLang }, directions };
+	return {
+		hints: hints.slice(0, 40),
+		metrics: { crashConstructsAdded: hints.length, ...byLang },
+		directions,
+	};
 }

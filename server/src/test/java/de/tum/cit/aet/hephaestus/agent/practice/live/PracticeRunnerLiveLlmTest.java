@@ -38,7 +38,7 @@ import tools.jackson.databind.ObjectMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 /**
- * Live end-to-end test for the practice-review {@code pi-runner.mjs} against a real LLM.
+ * Live end-to-end test for the practice-review {@code pi-runner.ts} against a real LLM.
  *
  * <p>Exercises Pi SDK ↔ LLM, the runner's two-attempt loop, watchdog, custom
  * {@code report_observation} tool, and the result schema the runner emits — all without Docker.
@@ -58,11 +58,11 @@ import tools.jackson.databind.node.ObjectNode;
 class PracticeRunnerLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** Pinned to {@code pi-mentor-runner.mjs}'s version so a single npm install covers both tests. */
+    /** Pinned to {@code pi-mentor-runner.ts}'s version so a single npm install covers both tests. */
     private static final String PI_SDK_VERSION = "0.74.0";
 
     private static final Path SDK_DIR = Path.of("target", "pi-sdk").toAbsolutePath();
-    private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-runner.mjs").toAbsolutePath();
+    private static final Path RUNNER = Path.of("src", "main", "resources", "agent", "pi-runner.ts").toAbsolutePath();
     private static final Path FIXTURE_DIR = Path.of(
         "src",
         "test",
@@ -292,7 +292,7 @@ class PracticeRunnerLiveLlmTest {
         Files.createSymbolicLink(nodeModulesLink, SDK_DIR.resolve("node_modules"));
 
         // Copy the production runner verbatim — same bytes that ship to the agent container.
-        Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.mjs"), StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(RUNNER, WORKSPACE.resolve("pi-runner.ts"), StandardCopyOption.REPLACE_EXISTING);
         for (String sidecar : new PracticeRunnerProfile().sidecarScripts()) {
             Files.copy(
                 Path.of("src", "main", "resources", "agent", sidecar),
@@ -399,7 +399,7 @@ class PracticeRunnerLiveLlmTest {
     // Process plumbing
 
     private static Process spawnRunner(LiveLlmCredentials creds) throws IOException {
-        ProcessBuilder pb = new ProcessBuilder("node", "pi-runner.mjs");
+        ProcessBuilder pb = new ProcessBuilder("bun", "pi-runner.ts");
         pb.directory(WORKSPACE.toFile());
         Map<String, String> env = pb.environment();
         // Fail closed: the agent has a bash tool, so inheriting the developer's shell environment would

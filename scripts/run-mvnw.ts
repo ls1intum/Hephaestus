@@ -19,22 +19,16 @@ const isWindows = process.platform === "win32";
 function main(): void {
 	// shell: true is required on Windows for .cmd files (CVE-2024-27980).
 	// Safe here because args come from hardcoded npm scripts, not user input.
-	const result = spawnSync(
-		isWindows ? "mvnw.cmd" : "./mvnw",
-		process.argv.slice(2),
-		{
-			stdio: "inherit",
-			cwd: mvnwDir,
-			shell: isWindows,
-		},
-	);
+	const result = spawnSync(isWindows ? "mvnw.cmd" : "./mvnw", process.argv.slice(2), {
+		stdio: "inherit",
+		cwd: mvnwDir,
+		shell: isWindows,
+	});
 
 	if (result.error) {
 		const errCode = (result.error as NodeJS.ErrnoException).code;
 		if (errCode === "ENOENT") {
-			console.error(
-				`Maven wrapper not found in ${mvnwDir}. Is the Maven wrapper installed?`,
-			);
+			console.error(`Maven wrapper not found in ${mvnwDir}. Is the Maven wrapper installed?`);
 		} else {
 			console.error(`Failed to run Maven wrapper: ${result.error.message}`);
 		}

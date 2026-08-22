@@ -1,5 +1,7 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+	// Nested under the repo-root config, which owns the agent runtime and `scripts/`.
+	"root": false,
 	"vcs": {
 		"enabled": true,
 		"clientKind": "git",

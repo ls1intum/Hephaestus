@@ -46,4 +46,6 @@ if (offenders.length > 0) {
 	process.exit(1);
 }
 
-console.log(`check-story-prose: ${files.length} story files, no HTML paragraphs in published prose.`);
+console.log(
+	`check-story-prose: ${files.length} story files, no HTML paragraphs in published prose.`,
+);

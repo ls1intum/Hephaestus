@@ -11,7 +11,7 @@
 //   PIN_DROPPED   — a version constraint was present and is now entirely absent
 //   BUMPED        — same constraint shape, different version value
 import { findFiles } from "../lib/grep";
-import type { DiffFile, PullRequestMetadata, Hint } from "../lib/types";
+import type { DiffFile, Hint, PullRequestMetadata } from "../lib/types";
 
 // ecosystem key -> how to recognise its manifest + lockfile, and how to read a "name => constraint" line.
 interface Ecosystem {
@@ -40,7 +40,8 @@ function isLoose(c: string): boolean {
 // see which object block a line sits in, so this shape guard keeps `"build": "tsc"` or `"./dist": "..."`
 // out of the dependency tally. A bare "*"/"x"/"latest" and the npm pseudo-protocols (workspace:/npm:/
 // file:/link:/git/http) are real dependency specifiers and are admitted.
-const VERSIONISH = /^(?:[\^~>=<* v]|\d|x\b|latest$|workspace:|npm:|file:|link:|git[+:]|https?:|github:|gitlab:|bitbucket:)/i;
+const VERSIONISH =
+	/^(?:[\^~>=<* v]|\d|x\b|latest$|workspace:|npm:|file:|link:|git[+:]|https?:|github:|gitlab:|bitbucket:)/i;
 function isVersionish(c: string): boolean {
 	return VERSIONISH.test(c.trim());
 }
@@ -70,18 +71,28 @@ const NPM_NON_DEP_KEYS = new Set([
 // TOML name = "constraint"  or  name = { version = "constraint" }
 const reTomlDep = /^\s*([A-Za-z0-9_.-]+)\s*=\s*(?:"([^"]*)"|\{[^}]*version\s*=\s*"([^"]*)"[^}]*\})/;
 // requirements.txt  name==1.2.3 / name>=1,<2 / name
-const reReqDep = /^\s*([A-Za-z0-9_.\-\[\]]+)\s*((?:[<>=!~]=?|@)\S.*)?$/;
+const reReqDep = /^\s*([A-Za-z0-9_.\-[\]]+)\s*((?:[<>=!~]=?|@)\S.*)?$/;
 // Gemfile  gem "name", "~> 1.2"
 const reGemDep = /^\s*gem\s+["']([^"']+)["']\s*(?:,\s*["']([^"']*)["'])?/;
 // Maven pom.xml  <artifactId>name</artifactId> ... we approximate per-line on artifactId/version pairs.
 const reMvnArtifact = /<artifactId>\s*([^<\s]+)\s*<\/artifactId>/;
 const reMvnVersion = /<version>\s*([^<\s]+)\s*<\/version>/;
 // Gradle  implementation("group:name:1.2.3")  or  implementation 'group:name:1.2.3'
-const reGradleDep = /["']([\w.\-]+:[\w.\-]+):([^"']*)["']/;
+const reGradleDep = /["']([\w.-]+:[\w.-]+):([^"']*)["']/;
 // Swift PM  .package(url: "...", from: "1.2.3") / exact: "1.2.3" / "1.0.0"..."2.0.0"
-const reSwiftPkg = /\.package\(\s*url:\s*["']([^"']+)["'][^)]*?(?:from:\s*["']([^"']+)["']|exact:\s*["']([^"']+)["']|["']([^"']+)["']\s*\.\.[.<]\s*["']([^"']+)["'])/;
+const reSwiftPkg =
+	/\.package\(\s*url:\s*["']([^"']+)["'][^)]*?(?:from:\s*["']([^"']+)["']|exact:\s*["']([^"']+)["']|["']([^"']+)["']\s*\.\.[.<]\s*["']([^"']+)["'])/;
 // go.mod  require module v1.2.3  (single-line or block-body line)
-const reGoMod = /^\s*(?:require\s+)?([\w./\-]+\.[\w./\-]+\/\S+|[\w.\-]+\/\S+)\s+(v\d\S*)/;
+const reGoMod = /^\s*(?:require\s+)?([\w./-]+\.[\w./-]+\/\S+|[\w.-]+\/\S+)\s+(v\d\S*)/;
+
+// Cargo.toml and pyproject.toml read dependency lines identically. The two version groups are the two
+// arms of an alternation — `name = "1.2"` fills the first, `name = { version = "1.2" }` the second, and
+// an inline table with no version key (`name = { features = [...] }`) fills neither.
+function parseTomlDependency(line: string): { name: string; constraint: string } | null {
+	const [, name, quotedVersion, tableVersion] = reTomlDep.exec(line) ?? [];
+	if (name === undefined) return null;
+	return { name, constraint: quotedVersion ?? tableVersion ?? "" };
+}
 
 const ECOSYSTEMS: Ecosystem[] = [
 	{
@@ -89,26 +100,24 @@ const ECOSYSTEMS: Ecosystem[] = [
 		isManifest: (b) => b === "package.json",
 		lockfiles: ["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json"],
 		parse: (line) => {
-			const m = reJsonDep.exec(line);
-			if (!m) return null;
+			// The value group matches empty (`"dep": ""`); the key group cannot, so its absence means the
+			// line is not a `"key": "value"` pair at all.
+			const [, name, constraint = ""] = reJsonDep.exec(line) ?? [];
+			if (name === undefined) return null;
 			// Skip the package's own scalar fields (name/version/etc.) so we only surface dependency-block edits.
-			if (NPM_NON_DEP_KEYS.has(m[1].toLowerCase())) return null;
+			if (NPM_NON_DEP_KEYS.has(name.toLowerCase())) return null;
 			// Per-line parsing can't tell a dependency block from scripts/engines/exports/resolutions/config —
 			// they all share the `"key": "value"` shape. Require the value to look like a version specifier so a
 			// `"build": "tsc"` line is not misread as `dep:ADDED build tsc`.
-			if (!isVersionish(m[2])) return null;
-			return { name: m[1], constraint: m[2] };
+			if (!isVersionish(constraint)) return null;
+			return { name, constraint };
 		},
 	},
 	{
 		// Rust Cargo
 		isManifest: (b) => b === "cargo.toml",
 		lockfiles: ["Cargo.lock"],
-		parse: (line) => {
-			const m = reTomlDep.exec(line);
-			if (!m) return null;
-			return { name: m[1], constraint: m[2] ?? m[3] ?? "" };
-		},
+		parse: parseTomlDependency,
 	},
 	{
 		// Python requirements
@@ -117,29 +126,28 @@ const ECOSYSTEMS: Ecosystem[] = [
 		parse: (line) => {
 			const t = line.trim();
 			if (t === "" || t.startsWith("#") || t.startsWith("-")) return null;
-			const m = reReqDep.exec(t);
-			if (!m) return null;
-			return { name: m[1], constraint: m[2] ?? "" };
+			// A bare `numpy` line has no constraint group at all — that absence is the PIN_DROPPED signal
+			// this script exists to surface, so it becomes "" rather than dropping the dependency.
+			const [, name, constraint = ""] = reReqDep.exec(t) ?? [];
+			if (name === undefined) return null;
+			return { name, constraint };
 		},
 	},
 	{
 		// Python pyproject (PEP 621 / poetry tables)
 		isManifest: (b) => b === "pyproject.toml",
 		lockfiles: ["poetry.lock", "uv.lock", "pdm.lock"],
-		parse: (line) => {
-			const m = reTomlDep.exec(line);
-			if (!m) return null;
-			return { name: m[1], constraint: m[2] ?? m[3] ?? "" };
-		},
+		parse: parseTomlDependency,
 	},
 	{
 		// Ruby Bundler
 		isManifest: (b) => b === "gemfile",
 		lockfiles: ["Gemfile.lock"],
 		parse: (line) => {
-			const m = reGemDep.exec(line);
-			if (!m) return null;
-			return { name: m[1], constraint: m[2] ?? "" };
+			// `gem "puma"` carries no constraint group — an absent pin, not an absent dependency.
+			const [, name, constraint = ""] = reGemDep.exec(line) ?? [];
+			if (name === undefined) return null;
+			return { name, constraint };
 		},
 	},
 	{
@@ -153,9 +161,11 @@ const ECOSYSTEMS: Ecosystem[] = [
 		isManifest: (b) => b === "build.gradle" || b === "build.gradle.kts",
 		lockfiles: ["gradle.lockfile"],
 		parse: (line) => {
-			const m = reGradleDep.exec(line);
-			if (!m) return null;
-			return { name: m[1], constraint: m[2] };
+			// The version group matches empty for a trailing-colon coordinate (`"g:a:"`); the coordinate
+			// group cannot be empty.
+			const [, coordinate, constraint = ""] = reGradleDep.exec(line) ?? [];
+			if (coordinate === undefined) return null;
+			return { name: coordinate, constraint };
 		},
 	},
 	{
@@ -163,11 +173,23 @@ const ECOSYSTEMS: Ecosystem[] = [
 		isManifest: (b) => b === "package.swift",
 		lockfiles: ["Package.resolved"],
 		parse: (line) => {
-			const m = reSwiftPkg.exec(line);
-			if (!m) return null;
-			const name = m[1].split("/").pop()?.replace(/\.git$/, "") ?? m[1];
+			// The url group is required; the three constraint forms are alternatives, so at most one of
+			// them is present on any given line and the range form always yields BOTH of its bounds.
+			const [, url, fromVersion, exactVersion, rangeLow, rangeHigh] = reSwiftPkg.exec(line) ?? [];
+			if (url === undefined) return null;
+			const name =
+				url
+					.split("/")
+					.pop()
+					?.replace(/\.git$/, "") ?? url;
 			// from: => caret-like (loose), exact: => exact, range => loose
-			const constraint = m[2] ? `from:${m[2]}` : m[3] ? `exact:${m[3]}` : m[4] ? `${m[4]}..${m[5]}` : "";
+			const constraint = fromVersion
+				? `from:${fromVersion}`
+				: exactVersion
+					? `exact:${exactVersion}`
+					: rangeLow && rangeHigh
+						? `${rangeLow}..${rangeHigh}`
+						: "";
 			return { name, constraint };
 		},
 	},
@@ -176,9 +198,10 @@ const ECOSYSTEMS: Ecosystem[] = [
 		isManifest: (b) => b === "go.mod",
 		lockfiles: ["go.sum"],
 		parse: (line) => {
-			const m = reGoMod.exec(line);
-			if (!m) return null;
-			return { name: m[1], constraint: m[2] };
+			// Both groups are required: a go.mod require line without a `v…` version is not matched at all.
+			const [, name, version] = reGoMod.exec(line) ?? [];
+			if (name === undefined || version === undefined) return null;
+			return { name, constraint: version };
 		},
 	},
 ];
@@ -213,11 +236,7 @@ function classifyDelta(oldC: string, newC: string): string {
 }
 
 // Collect { name -> constraint } from added/removed manifest lines for a single ecosystem file.
-function collectDeps(
-	df: DiffFile,
-	eco: Ecosystem,
-	side: "added" | "removed",
-): Map<string, string> {
+function collectDeps(df: DiffFile, eco: Ecosystem, side: "added" | "removed"): Map<string, string> {
 	const out = new Map<string, string>();
 	const lines = side === "added" ? df.addedLines : df.removedLines;
 	for (const [, content] of lines) {
@@ -239,23 +258,27 @@ function collectMavenDeps(df: DiffFile, side: "added" | "removed"): Map<string, 
 	let pendingName: string | null = null;
 	let pendingLine = 0;
 	for (const [ln, content] of ordered) {
-		const a = reMvnArtifact.exec(content);
-		if (a) {
-			pendingName = a[1];
+		const [, artifactId] = reMvnArtifact.exec(content) ?? [];
+		if (artifactId !== undefined) {
+			pendingName = artifactId;
 			pendingLine = ln;
-			out.set(a[1], ""); // record artifact even if no adjacent version line appears
+			out.set(artifactId, ""); // record artifact even if no adjacent version line appears
 			continue;
 		}
-		const v = reMvnVersion.exec(content);
-		if (v && pendingName && ln - pendingLine <= MVN_PAIR_WINDOW) {
-			out.set(pendingName, v[1]);
+		const [, version] = reMvnVersion.exec(content) ?? [];
+		if (version !== undefined && pendingName !== null && ln - pendingLine <= MVN_PAIR_WINDOW) {
+			out.set(pendingName, version);
 			pendingName = null;
 		}
 	}
 	return out;
 }
 
-export default async function (repoPath: string, diffFiles: Map<string, DiffFile>, _m: PullRequestMetadata) {
+export default async function (
+	repoPath: string,
+	diffFiles: Map<string, DiffFile>,
+	_m: PullRequestMetadata,
+) {
 	const hints: Hint[] = [];
 	const changedManifests = new Set<string>();
 	const touchedLockfiles = new Set<string>();
@@ -266,7 +289,9 @@ export default async function (repoPath: string, diffFiles: Map<string, DiffFile
 	let bumped = 0;
 
 	// Which lockfile basenames exist anywhere in the repo (sibling-present fact)?
-	const allLockfileNames = new Set(ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())));
+	const allLockfileNames = new Set(
+		ECOSYSTEMS.flatMap((e) => e.lockfiles.map((l) => l.toLowerCase())),
+	);
 	const repoLockfilesPresent = new Set<string>();
 	// findFiles needs an extension; scan the basenames we care about via their extensions.
 	for (const ext of ["json", "lock", "yaml", "resolved", "lockfile", "sum"]) {

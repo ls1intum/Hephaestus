@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtemp, mkdir, rm } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { findFiles, grep } from "./grep";
 
 const tempDirs: string[] = [];
@@ -69,8 +69,8 @@ describe("grep", () => {
 	it("auto-expands basename-only globs to recursive matching", async () => {
 		const dir = await createTempDir();
 		await mkdir(join(dir, "src", "Views"), { recursive: true });
-		await Bun.write(join(dir, "src", "Views", "ContentView.swift"), "print(\"hello\")\n");
-		await Bun.write(join(dir, "RootFile.swift"), "print(\"root\")\n");
+		await Bun.write(join(dir, "src", "Views", "ContentView.swift"), 'print("hello")\n');
+		await Bun.write(join(dir, "RootFile.swift"), 'print("root")\n');
 
 		const matches = await grep("print", dir, {
 			fixedString: true,

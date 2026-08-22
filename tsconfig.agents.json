@@ -5,7 +5,12 @@
 		"moduleResolution": "Bundler",
 		"lib": ["ES2023"],
 		"types": ["bun"],
+		// Bun resolves ./x.ts directly, so that is what the runner imports; nothing is ever emitted.
+		"allowImportingTsExtensions": true,
 		"strict": true,
+		// Regex captures and split() results are the dominant shape here; without this they read as
+		// always-present and an unmatched group becomes a runtime undefined instead of a build error.
+		"noUncheckedIndexedAccess": true,
 		"noImplicitReturns": true,
 		"noFallthroughCasesInSwitch": true,
 		"forceConsistentCasingInFileNames": true,
@@ -14,6 +19,8 @@
 		"rootDirs": ["server/src/main/resources/practices", "docker/agents/precompute"]
 	},
 	"include": [
+		"server/src/main/resources/agent/**/*.ts",
+		"server/src/test/resources/agent/**/*.ts",
 		"server/src/main/resources/practices/precompute/**/*.ts",
 		"docker/agents/precompute/**/*.ts"
 	]

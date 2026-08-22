@@ -16,7 +16,8 @@ Install and configure the following tools before you attempt a local build:
 3. **Node.js LTS (>= 24)** and **pnpm (>= 11)** (enable via `corepack enable`) – For the React client and root scripts.
 4. **Bun** – Runs the agent runtime and precompute tests (`pnpm run test:agents`). `corepack` does not
    provide it; install it separately. CI runs the version the agent image pins in
-   `docker/agents/pi/Dockerfile`.
+   `docker/agents/pi/Dockerfile`. Bun runs the code but does not lint or format it — Bun ships no
+   `bun fmt` or `bun lint` in the pinned version, so Biome covers that tree (see below).
 5. **NATS CLI (optional)** – Helpful when inspecting the webhook/sync event stream (NATS is disabled by default locally). The agent job queue runs on PostgreSQL and needs no NATS.
 
 ## Recommended IDE setup
@@ -28,6 +29,20 @@ Open the repository using the `project.code-workspace` file in VS Code and insta
 - Node.js + TypeScript tooling
 - oxlint (lint) and Biome (format)
 - Tailwind CSS IntelliSense
+
+The Biome extension picks up both configurations automatically: `biome.jsonc` at the repository root
+covers the Bun agent runtime, its specs, both precompute trees and `scripts/**`, and
+`webapp/biome.json` (declared `"root": false`) covers the SPA. Editing a file in either tree
+formats it to that tree's rules on save.
+
+Run the same checks from the shell with:
+
+```bash
+pnpm run check:agents          # Lint + format + import order + typecheck, outside the webapp
+pnpm run check:agents:fix      # Apply every safe fix
+pnpm run check:webapp          # The SPA equivalent
+pnpm run check                 # Everything, the way CI runs it
+```
 
 JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
 
