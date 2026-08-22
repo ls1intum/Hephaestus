@@ -20,6 +20,7 @@ import de.tum.cit.aet.hephaestus.core.runtime.RuntimeRole;
 import io.micrometer.core.instrument.MeterRegistry;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -186,9 +187,10 @@ public class DockerSandboxConfiguration {
         AgentJobRepository jobRepository,
         SandboxContainerManager containerManager,
         SandboxNetworkManager networkManager,
-        MeterRegistry meterRegistry
+        MeterRegistry meterRegistry,
+        Clock clock
     ) {
-        return new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
+        return new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry, clock);
     }
 
     @Bean

@@ -17,6 +17,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -394,7 +395,8 @@ public class DockerClientOperations
                         c.getId(),
                         c.getNames() != null && c.getNames().length > 0 ? c.getNames()[0] : "",
                         c.getLabels() != null ? c.getLabels() : Map.of(),
-                        c.getState() != null ? c.getState() : "unknown"
+                        c.getState() != null ? c.getState() : "unknown",
+                        c.getCreated() != null ? Instant.ofEpochSecond(c.getCreated()) : null
                     )
                 )
                 .toList();
