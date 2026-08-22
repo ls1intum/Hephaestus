@@ -103,7 +103,7 @@ const meta = {
 		focusFilter: "ALL",
 		onFocusFilterChange: fn(),
 		onCreateArea: fn(async () => true),
-		onRenameArea: fn(async () => true),
+		onUpdateArea: fn(async () => true),
 		onSetAreaDashboardVisibility: fn(),
 		onDeleteArea: fn(),
 		onReorderAreas: fn(),

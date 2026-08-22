@@ -241,22 +241,29 @@ function PracticeCatalogRoute() {
 							}),
 						})
 					}
-					onCreateArea={async (name) => {
+					onCreateArea={async ({ name, icon, color }) => {
 						try {
 							await catalog.createArea.mutateAsync({
 								path: { workspaceSlug },
-								body: { slug: generateSlug(name), name },
+								// The picker only ever sets a value, so `null` means "not chosen" — omit it and the
+								// server keeps seeding the chip from the slug.
+								body: {
+									slug: generateSlug(name),
+									name,
+									icon: icon ?? undefined,
+									color: color ?? undefined,
+								},
 							});
 							return true;
 						} catch {
 							return false;
 						}
 					}}
-					onRenameArea={async (areaSlug, name) => {
+					onUpdateArea={async (areaSlug, { name, icon, color }) => {
 						try {
 							await catalog.updateArea.mutateAsync({
 								path: { workspaceSlug, areaSlug },
-								body: { name },
+								body: { name, icon: icon ?? undefined, color: color ?? undefined },
 							});
 							return true;
 						} catch {

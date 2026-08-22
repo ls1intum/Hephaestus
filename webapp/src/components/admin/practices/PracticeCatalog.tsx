@@ -8,7 +8,10 @@ import type {
 	PracticeDefinitionOptions,
 } from "@/api/types.gen";
 import { AvailablePracticeList } from "@/components/admin/practice-adoption/AvailablePracticeList";
-import { AreaNameDialog } from "@/components/admin/practice-catalog/AreaNameDialog";
+import {
+	type AreaDetails,
+	AreaDetailsDialog,
+} from "@/components/admin/practice-catalog/AreaDetailsDialog";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
@@ -78,8 +81,8 @@ export interface PracticeCatalogProps {
 	pending: PracticeCatalogPendingState;
 	focusFilter: FocusFilter;
 	onFocusFilterChange: (f: FocusFilter) => void;
-	onCreateArea: (name: string) => Promise<boolean>;
-	onRenameArea: (slug: string, name: string) => Promise<boolean>;
+	onCreateArea: (details: AreaDetails) => Promise<boolean>;
+	onUpdateArea: (slug: string, details: AreaDetails) => Promise<boolean>;
 	onSetAreaDashboardVisibility: (slug: string, visibleInPracticeDashboards: boolean) => void;
 	onDeleteArea: (slug: string) => void;
 	onReorderAreas: (orderedSlugs: string[]) => void;
@@ -100,7 +103,7 @@ export function PracticeCatalog({
 	focusFilter,
 	onFocusFilterChange,
 	onCreateArea,
-	onRenameArea,
+	onUpdateArea,
 	onSetAreaDashboardVisibility,
 	onDeleteArea,
 	onReorderAreas,
@@ -273,14 +276,16 @@ export function PracticeCatalog({
 				</Empty>
 			)}
 
-			<AreaNameDialog
+			<AreaDetailsDialog
 				area={namingArea ?? null}
 				open={namingArea !== undefined}
 				pending={namingArea ? pending.areaSlugs.has(namingArea.slug) : pending.creatingArea}
 				onOpenChange={(open) => {
 					if (!open) setNamingArea(undefined);
 				}}
-				onSubmit={(name) => (namingArea ? onRenameArea(namingArea.slug, name) : onCreateArea(name))}
+				onSubmit={(details) =>
+					namingArea ? onUpdateArea(namingArea.slug, details) : onCreateArea(details)
+				}
 			/>
 		</div>
 	);

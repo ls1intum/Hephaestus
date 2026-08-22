@@ -73,7 +73,7 @@ export const DisabledWhileOpen: Story = {
 		await expect(
 			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
 		).toBeDisabled();
-		await expect(screen.queryByRole("searchbox", { name: "Search icons" })).not.toBeInTheDocument();
+		await expect(screen.queryByRole("textbox", { name: "Search icons" })).not.toBeInTheDocument();
 		await expect(args.onChange).not.toHaveBeenCalled();
 	},
 };

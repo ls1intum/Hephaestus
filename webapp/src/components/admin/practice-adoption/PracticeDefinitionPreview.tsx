@@ -1,6 +1,7 @@
 import { CircleCheck, Lightbulb } from "lucide-react";
 import type { CuratedPracticeDefinition, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
 import { Section } from "@/components/core/Section";
 import {
 	Accordion,
@@ -10,6 +11,7 @@ import {
 } from "@/components/ui/accordion";
 import { Separator } from "@/components/ui/separator";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
+import { cn } from "@/lib/utils";
 
 export interface PracticeDefinitionPreviewProps {
 	definition: CuratedPracticeDefinition;
@@ -23,10 +25,14 @@ export function PracticeDefinitionPreview({ definition, options }: PracticeDefin
 
 	return (
 		<div className="space-y-8">
-			<Section size="sm" title="What this practice checks">
-				<p className="whitespace-pre-wrap text-xl font-semibold tracking-tight">
-					{definition.criteria}
-				</p>
+			<Section size="sm" level={3} title="What this practice checks">
+				{/* The editor promises "Markdown is supported", and criteria is the one definition field
+				    that uses it: headings, lists and emphasis across several paragraphs. */}
+				{/* `max-w-2xl` because the drawer reaches 62rem and criteria runs to several thousand
+				    characters: unconstrained, a line here is well past a comfortable measure. */}
+				<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-2xl")}>
+					<UntrustedMarkdown>{definition.criteria}</UntrustedMarkdown>
+				</div>
 			</Section>
 
 			{(definition.whyItMatters || definition.whatGoodLooksLike) && (
@@ -34,6 +40,7 @@ export function PracticeDefinitionPreview({ definition, options }: PracticeDefin
 					{definition.whyItMatters && (
 						<Section
 							size="sm"
+							level={3}
 							className="rounded-xl bg-muted/50 p-4"
 							title={
 								<>
@@ -53,6 +60,7 @@ export function PracticeDefinitionPreview({ definition, options }: PracticeDefin
 					{definition.whatGoodLooksLike && (
 						<Section
 							size="sm"
+							level={3}
 							className="rounded-xl bg-muted/50 p-4"
 							title={
 								<>

@@ -67,3 +67,33 @@ export const LongContentInDarkMode: Story = {
 	},
 	globals: { theme: "dark" },
 };
+
+/**
+ * Every bundled practice writes `criteria` as markdown, and the editor promises it is supported.
+ * Rendered as one paragraph it reached the reader as literal `##` and `-` characters.
+ */
+export const CriteriaIsMarkdown: Story = {
+	args: {
+		definition: {
+			...definition,
+			criteria: [
+				"## The standard",
+				"Judge whether the change is packaged at a size a reviewer can read *end to end*.",
+				"",
+				"## Signals",
+				"- One self-contained concern",
+				"- A `diff` a reviewer can hold in their head",
+			].join("\n"),
+		},
+	},
+	play: async ({ canvas }) => {
+		// Demoted to h4 by UntrustedMarkdown, so a practice cannot outrank the section it sits in.
+		const standard = canvas.getByRole("heading", { name: "The standard", level: 4 });
+		await expect(standard).toBeVisible();
+		await expect(canvas.getByRole("list")).toBeVisible();
+		await expect(canvas.getAllByRole("listitem")).toHaveLength(2);
+		await expect(canvas.getByText("end to end").tagName).toBe("EM");
+		// The literal syntax is gone, which is the whole point.
+		await expect(canvas.queryByText(/^## /)).not.toBeInTheDocument();
+	},
+};
