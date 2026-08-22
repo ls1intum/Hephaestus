@@ -1,9 +1,14 @@
 import { XCircleIcon } from "lucide-react";
 import type { Profile, ProfileActivityMonitor } from "@/api/types.gen";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Separator } from "@/components/ui/separator";
 import type { ActivityMonitorFilters } from "@/lib/activity-monitor";
 import type { ProviderType } from "@/lib/provider";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
+import {
+	PracticeAreaStatusCard,
+	type PracticeAreaStatusSectionProps,
+} from "./PracticeAreaStatusCard";
 import { ProfileContent } from "./ProfileContent";
 import { ProfileHeader } from "./ProfileHeader";
 
@@ -26,6 +31,8 @@ interface ProfileProps {
 	achievementsEnabled?: boolean;
 	progressionEnabled?: boolean;
 	leaguesEnabled?: boolean;
+	/** Own-profile practice-area status section; omit to hide (e.g. on someone else's profile). */
+	practiceAreaStatus?: PracticeAreaStatusSectionProps;
 }
 
 export function ProfilePage({
@@ -46,6 +53,7 @@ export function ProfilePage({
 	achievementsEnabled = true,
 	progressionEnabled = true,
 	leaguesEnabled = true,
+	practiceAreaStatus,
 }: ProfileProps) {
 	if (error) {
 		return (
@@ -73,6 +81,14 @@ export function ProfilePage({
 				progressionEnabled={progressionEnabled}
 				leaguesEnabled={leaguesEnabled}
 			/>
+			{practiceAreaStatus && (
+				<>
+					<PracticeAreaStatusCard {...practiceAreaStatus} />
+					{/* Same section rule the area detail page uses, so the practice surfaces read as one
+					    family and the activity monitor is visibly a separate section. */}
+					<Separator />
+				</>
+			)}
 			<ProfileContent
 				providerType={providerType}
 				activityMonitorData={activityMonitorData}

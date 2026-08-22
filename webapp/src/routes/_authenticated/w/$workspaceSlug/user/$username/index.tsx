@@ -3,9 +3,14 @@ import { createFileRoute, retainSearchParams, useNavigate } from "@tanstack/reac
 import { z } from "zod";
 import {
 	getActivityMonitorOptions,
+	getPracticeAreaStatusesOptions,
+	getReflectionOptions,
 	getUserProfileOptions,
 	getWorkspaceOptions,
+	listAreasOptions,
+	listLearnerPracticesOptions,
 } from "@/api/@tanstack/react-query.gen";
+import type { ReflectionPractice } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { useNow } from "@/components/common/use-now";
 import { ProfilePage } from "@/components/profile/ProfilePage";
@@ -98,6 +103,58 @@ function UserProfile() {
 
 	const currUserIsDashboardUser = isCurrentUser(username);
 
+	// Practice-area status is a self-view: the endpoint derives the CALLER's standing, so only
+	// fetch (and render) it when the profile being viewed is the logged-in user's own.
+	const areasQuery = useQuery({
+		...listAreasOptions({
+			path: { workspaceSlug },
+			query: { visibleInPracticeDashboardsOnly: true },
+		}),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const practiceAreas = areasQuery.data ?? [];
+	const areaStatusesQuery = useQuery({
+		...getPracticeAreaStatusesOptions({
+			path: { workspaceSlug },
+		}),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const areaStatuses = Object.fromEntries(
+		(areaStatusesQuery.data ?? []).map((status) => [status.areaSlug, status]),
+	);
+	// Per-practice standings feed the cards' proportion bar. Same query the area detail page runs, so
+	// navigating between the two is served from cache. The bar is additive: while this is in flight the
+	// cards render without it rather than blocking on it.
+	const reflectionQuery = useQuery({
+		...getReflectionOptions({ path: { workspaceSlug } }),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	// The catalogue, for the practices that carry no measurement yet: the reflection only returns
+	// practices with a standing, so the difference is what the ring draws as its grey share.
+	const learnerPracticesQuery = useQuery({
+		...listLearnerPracticesOptions({ path: { workspaceSlug } }),
+		enabled: Boolean(workspaceSlug) && currUserIsDashboardUser,
+	});
+	const practiceCountByArea = (learnerPracticesQuery.data ?? []).reduce<Record<string, number>>(
+		(counted, practice) => {
+			if (!practice.areaSlug) return counted;
+			counted[practice.areaSlug] = (counted[practice.areaSlug] ?? 0) + 1;
+			return counted;
+		},
+		{},
+	);
+	const practicesByArea = (reflectionQuery.data ?? []).reduce<Record<string, ReflectionPractice[]>>(
+		(grouped, practice) => {
+			if (!practice.areaSlug) return grouped;
+			const forArea = grouped[practice.areaSlug] ?? [];
+			forArea.push(practice);
+			grouped[practice.areaSlug] = forArea;
+			return grouped;
+		},
+		{},
+	);
+
+	// Query for user profile data
 	const profileQuery = useQuery({
 		...getUserProfileOptions({
 			path: { workspaceSlug, login: username },
@@ -180,6 +237,27 @@ function UserProfile() {
 			achievementsEnabled={achievementsEnabled === true}
 			progressionEnabled={progressionEnabled === true}
 			leaguesEnabled={leaguesEnabled === true}
+			practiceAreaStatus={
+				currUserIsDashboardUser
+					? {
+							areas: practiceAreas,
+							statuses: areaStatuses,
+							practicesByArea,
+							practiceCountByArea,
+							isLoading: areasQuery.isPending || areaStatusesQuery.isPending,
+							error: areasQuery.error ?? areaStatusesQuery.error ?? undefined,
+							onRetry: () => {
+								if (areasQuery.isError) areasQuery.refetch();
+								if (areaStatusesQuery.isError) areaStatusesQuery.refetch();
+							},
+							onOpenDetails: (area) =>
+								navigate({
+									to: "/w/$workspaceSlug/user/$username/practice-areas/$areaSlug",
+									params: { workspaceSlug, username, areaSlug: area.slug },
+								}),
+						}
+					: undefined
+			}
 		/>
 	);
 }

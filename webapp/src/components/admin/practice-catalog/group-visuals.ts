@@ -101,11 +101,29 @@ import {
 } from "lucide-react";
 import { hasText } from "@/lib/text";
 
+<<<<<<<< HEAD:webapp/src/components/admin/practice-catalog/group-visuals.ts
 export type GroupVisual = { Icon: LucideIcon; pill: string };
 
 const SLATE_PILL = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
+========
+/**
+ * Visual identity for a practice area: a lucide icon (the primary, glanceable identity) plus an
+ * accessible colour pill. Colour is a redundant cue only — the icon and the area NAME always carry
+ * the meaning, so the chip stays legible for colour-blind readers and never relies on hue alone.
+ *
+ * An area persists an optional {@code icon} (a lucide name) and {@code color} (a palette key) that an
+ * admin can edit; when set they win, otherwise the seeded defaults below apply, otherwise a keyword
+ * fallback.
+ *
+ * Pill classes are written as full literal strings so Tailwind keeps them (no runtime interpolation).
+ * Every family is contrast-checked: text-700/800 on bg-100 (light) and text-200 on bg-950/800 (dark)
+ * all clear AA. Free-form hex is intentionally NOT offered — it would defeat this guaranteed-legible,
+ * theme-aware, purge-safe contract; admins pick from this curated, accessible spectrum instead.
+ */
+export type AreaVisual = { Icon: LucideIcon; pill: string };
+>>>>>>>> 9f7bcd795 (feat(webapp): show practice-area standing and its evidence on the profile):webapp/src/components/shared/area-visuals.ts
 
-// Tailwind requires complete class names in source to include them in the generated CSS.
+/** Palette family → accessible chip classes (AA on Tailwind 50–950, light + dark). */
 export const PILL: Record<string, string> = {
 	red: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-200",
 	orange: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-200",
@@ -130,8 +148,10 @@ export const PILL: Record<string, string> = {
 	stone: "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-200",
 };
 
+/** The colour keys offered in the admin picker, in spectrum-then-neutral display order. */
 export const COLOR_KEYS = Object.keys(PILL);
 
+/** Curated lucide icons offered in the admin picker — a broad, searchable software-practice set. */
 export const ICON_COMPONENTS: Record<string, LucideIcon> = {
 	ShieldAlert,
 	ShieldCheck,
@@ -233,21 +253,26 @@ export const ICON_COMPONENTS: Record<string, LucideIcon> = {
 	Folder,
 };
 
+/** The icon names offered in the admin picker, in display order. */
 export const ICON_NAMES = Object.keys(ICON_COMPONENTS);
 
+/** Human-readable label for a PascalCase icon name, e.g. "MessageSquareReply" → "Message square reply". */
 export function iconLabel(name: string): string {
 	const words = name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 	return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Lowercased, word-split form of a PascalCase icon name, so a search for "git" matches "GitBranch". */
 export function iconSearchText(name: string): string {
-	return iconLabel(name).toLowerCase();
+	return name.replace(/([a-z])([A-Z])/g, "$1 $2").toLowerCase();
 }
 
+/** Resolve a stored lucide name to a component, or undefined if unknown/unset. */
 function resolveIcon(name?: string | null): LucideIcon | undefined {
 	return name ? ICON_COMPONENTS[name] : undefined;
 }
 
+<<<<<<<< HEAD:webapp/src/components/admin/practice-catalog/group-visuals.ts
 export function iconComponent(name: string): LucideIcon {
 	return ICON_COMPONENTS[name] ?? Folder;
 }
@@ -266,5 +291,66 @@ export const DEFAULT_GROUP_COLOR = "slate";
 export function getGroupVisual(icon?: string | null, color?: string | null): GroupVisual {
 	const Icon = resolveIcon(icon) ?? Folder;
 	const pill = pillFor(color) ?? SLATE_PILL;
+========
+type Seed = { icon: string; color: string };
+
+/** Icon + colour for each of the 11 seeded practice areas (keyed on slug). */
+const AREA_SEEDS: Record<string, Seed> = {
+	"robust-error-handling": { icon: "ShieldAlert", color: "rose" },
+	"secure-by-default-changes": { icon: "ShieldCheck", color: "red" },
+	"testing-discipline": { icon: "TestTube", color: "amber" },
+	"review-ready-work": { icon: "Package", color: "sky" },
+	"acting-on-review-feedback": { icon: "MessageSquareReply", color: "cyan" },
+	"constructive-code-review": { icon: "Eye", color: "teal" },
+	"code-craftsmanship": { icon: "Wrench", color: "emerald" },
+	"actionable-issue-authoring": { icon: "FileText", color: "violet" },
+	"issue-traceability-and-lifecycle": { icon: "ListChecks", color: "indigo" },
+	"decisions-and-documentation": { icon: "BookText", color: "slate" },
+	"delivery-and-version-control-discipline": {
+		icon: "GitBranch",
+		color: "fuchsia",
+	},
+};
+
+/** The slugs of the seeded areas — exported for tests/guards. */
+export const SEEDED_AREA_SLUGS = Object.keys(AREA_SEEDS);
+
+const FALLBACK: Seed = { icon: "Folder", color: "slate" };
+
+/** The effective icon/colour *names* for an area before any admin override — for picker highlighting. */
+export function areaSeed(slug: string, name = ""): { icon: string; color: string } {
+	return seedFor(slug, name);
+}
+
+/** Seed defaults for any slug: the curated entry, else a keyword guess, else a neutral folder. */
+function seedFor(slug: string, name: string): Seed {
+	const known = AREA_SEEDS[slug];
+	if (known) return known;
+	const h = `${slug} ${name}`.toLowerCase();
+	if (/secur|shield|auth|permission|escap/.test(h)) return { icon: "ShieldCheck", color: "red" };
+	if (/error|fail|crash|exception|panic/.test(h)) return { icon: "ShieldAlert", color: "rose" };
+	if (/test/.test(h)) return { icon: "TestTube", color: "amber" };
+	if (/issue|triage|plan|track|backlog/.test(h)) return { icon: "ListChecks", color: "indigo" };
+	if (/review|comment|feedback/.test(h)) return { icon: "MessageSquareReply", color: "cyan" };
+	if (/doc|decision|rationale|record/.test(h)) return { icon: "BookText", color: "slate" };
+	if (/commit|branch|deliver|version|merge/.test(h)) return { icon: "GitBranch", color: "fuchsia" };
+	return FALLBACK;
+}
+
+/**
+ * Resolve the visual for an area. An explicit (admin-set) `icon`/`color` wins; otherwise the seeded
+ * default for the slug; otherwise a keyword fallback. Unknown icon names / colour keys degrade to the
+ * seed so the chip always renders.
+ */
+export function getAreaVisual(
+	slug: string,
+	name = "",
+	icon?: string | null,
+	color?: string | null,
+): AreaVisual {
+	const seed = seedFor(slug, name);
+	const Icon = resolveIcon(icon) ?? ICON_COMPONENTS[seed.icon] ?? Folder;
+	const pill = (color && PILL[color]) || PILL[seed.color] || PILL.slate;
+>>>>>>>> 9f7bcd795 (feat(webapp): show practice-area standing and its evidence on the profile):webapp/src/components/shared/area-visuals.ts
 	return { Icon, pill };
 }
