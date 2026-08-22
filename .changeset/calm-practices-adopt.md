@@ -2,4 +2,10 @@
 "hephaestus": minor
 ---
 
-Workspace administrators can now review an instance-catalog practice's full definition, evidence requirements, and workspace outcome before adopting an independent, editable copy. Adoption never enables automatic sending: reviewable practices start with Review before sending, while practices Hephaestus cannot review remain Off.
+Workspace administrators now choose which practices their workspace reviews, instead of receiving a copy of the instance library at creation. Practice setup shows the library beside the practices you already have, so you can read a practice's full definition, the evidence it needs, and what it will look like in your workspace before you add it. Adding one gives you an independent copy you can edit; later library changes never rewrite it.
+
+Adding never starts sending feedback on its own. A practice Hephaestus can review starts at **Review before sending**, and a practice it cannot review stays **Off** until you connect what it reads.
+
+You can also add a whole area at once. Hephaestus shows every practice it would add, reuse, or skip first, and applies the result in one step or not at all. Adding is refused if the library or your workspace changed while you were reading the preview, so you always act on what you saw.
+
+New workspaces now start with no practices. Existing workspaces keep everything they have.

@@ -6,4 +6,4 @@ Practice setup no longer sends you to another page to look at something on it. S
 
 Your own practices now have a read-only view for the first time. Opening one used to mean opening the edit form, so "what does this practice say?" and "change this practice" were the same act; now reading is reading, and editing is one clearly marked step away. A practice looks the same whether you met it in the library or in your own tree, because both show the same definition.
 
-Adding a practice returns you to the library with the row marked Added, instead of dropping you into an edit form, so adding five practices is five selections rather than five round trips. Everything is addressable: the URL you are looking at is the URL you can share, and it reopens exactly the panels you had open.
+Adding a practice returns you to the library you were working through — the practice moves into your own tree and stops being offered — instead of dropping you into an edit form. Adding five practices is now five selections rather than five round trips. Everything is addressable: the URL you are looking at is the URL you can share, and it reopens exactly the panels you had open.
