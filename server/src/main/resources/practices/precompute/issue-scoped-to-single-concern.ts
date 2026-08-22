@@ -2,8 +2,9 @@
 // one independently-shippable deliverable — multiple distinct task sections, "and also"/enumerated asks,
 // many referenced child issues. FACTS only (counts + the sub-issue rollup); the LLM decides single vs
 // multi-concern. No observation.
-import type { Hint } from "../lib/types";
+
 import { readProjectInventory } from "../lib/context";
+import type { Hint } from "../lib/types";
 
 interface IssueMeta {
 	title?: string;
@@ -25,7 +26,8 @@ export default async function (
 
 	const isStub = body.length < 40;
 	const isDiscussion =
-		labels.some((l) => /support|question|discussion/.test(l)) || (/\?\s*$/.test(title) && body.length < 120);
+		labels.some((l) => /support|question|discussion/.test(l)) ||
+		(/\?\s*$/.test(title) && body.length < 120);
 
 	// Empty-or-title-echo gate — the SAME classification fact issue-has-checkable-outcome keys its observation
 	// off. When the body carries no content of its own, there is NO deliverable to scope, so the practice is
@@ -35,7 +37,8 @@ export default async function (
 	const titleNorm = norm(title);
 	const bodyNorm = norm(body);
 	const titleEcho =
-		bodyNorm.length > 0 && (bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
+		bodyNorm.length > 0 &&
+		(bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
 	const emptyOrTitleEcho = body.length < 25 || titleEcho;
 
 	const checkboxes = (body.match(/^[\s>]*[-*]\s+\[[ xX]\]/gm) ?? []).length;
@@ -43,7 +46,9 @@ export default async function (
 	const andAlso = (body.match(/\b(and also|additionally|as well as|plus,|also,)\b/gi) ?? []).length;
 	// distinct imperative deliverable verbs as a coarse multi-ask signal
 	const deliverableVerbs = (
-		body.match(/\b(add|implement|fix|refactor|migrate|remove|create|build|support|introduce|redesign)\b/gi) ?? []
+		body.match(
+			/\b(add|implement|fix|refactor|migrate|remove|create|build|support|introduce|redesign)\b/gi,
+		) ?? []
 	).length;
 	const headingSections = (body.match(/^#{1,4}\s+\S/gm) ?? []).length;
 

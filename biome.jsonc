@@ -1,0 +1,100 @@
+{
+	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+	// Root of the Biome monorepo graph. `webapp/biome.json` is the one nested config; it declares
+	// `"root": false` and keeps its own rules, so nothing here changes how the webapp is linted.
+	// This file governs every other TypeScript/JavaScript tree in the repo:
+	//   - the Bun agent runtime          server/src/main/resources/agent/**
+	//   - its bun:test specs             server/src/test/resources/agent/**
+	//   - the shipped precompute scripts server/src/main/resources/practices/precompute/**
+	//   - the precompute harness         docker/agents/precompute/**
+	//   - the repo tooling scripts       scripts/**
+	// The same set `tsconfig.agents.json` and `scripts/tsconfig.json` type-check, so lint, format
+	// and typecheck cover exactly one surface with no gap between them.
+	"root": true,
+	"vcs": {
+		"enabled": true,
+		"clientKind": "git",
+		"useIgnoreFile": true,
+		"defaultBranch": "main"
+	},
+	"files": {
+		// .gitignore already prunes node_modules/ and target/, so no negations are needed here.
+		"ignoreUnknown": true,
+		"includes": [
+			"server/src/main/resources/agent/**/*.ts",
+			"server/src/test/resources/agent/**/*.ts",
+			"server/src/main/resources/practices/precompute/**/*.ts",
+			"docker/agents/precompute/**/*.ts",
+			"scripts/**/*.ts",
+			"scripts/**/*.mjs"
+		]
+	},
+	// Byte-identical to webapp/biome.json's formatter so a contributor moving between the SPA and
+	// the agent runtime never re-learns the house style.
+	"formatter": {
+		"enabled": true,
+		"indentStyle": "tab",
+		"lineWidth": 100,
+		"lineEnding": "lf"
+	},
+	"assist": {
+		"actions": {
+			"source": {
+				"organizeImports": "on"
+			}
+		}
+	},
+	"linter": {
+		"enabled": true,
+		// Only deltas from the recommended preset are listed; rules it already blocks on
+		// (noDoubleEquals, noImplicitAnyLet, noAssignInExpressions, ...) are not repeated.
+		// `error` is the blocking tier; the preset's warnings and infos stay advisory, so each
+		// promotion below has to buy a specific class of defect rather than a preference.
+		//
+		// Three defect-shaped rules are deliberately left off, because in this codebase each one
+		// reports far more correct code than broken code:
+		//   - nursery/noMisusedPromises — cannot tell the memoised `Promise | null` init idiom in
+		//     pi-mentor-runner.ts from a real truthiness test on a Promise.
+		//   - suspicious/useAwait — every precompute practice exports `async function` to satisfy
+		//     the runner's contract whether or not its body awaits; the signature is the interface.
+		//   - suspicious/noMisplacedAssertion — does not follow the call graph, so the assert()
+		//     inside a spec's readResult()/readError() helper reads as an assertion outside a test.
+		"rules": {
+			"preset": "recommended",
+			"correctness": {
+				// The .mjs -> .ts conversion stranded dead bindings that the compiler happily
+				// accepts. `tsc --noEmit` does not report them; this is the only gate that does.
+				"noUnusedImports": "error",
+				"noUnusedVariables": "error",
+				"noUnusedFunctionParameters": "error"
+			},
+			"suspicious": {
+				// `any` silently voids `strict` in tsconfig.agents.json, which makes the typecheck
+				// gate report success over unchecked code. Blocking here keeps that gate honest.
+				"noExplicitAny": "error"
+			},
+			"style": {
+				// Bun resolves a bare "path"/"fs"/"util" to a node_modules package of that name
+				// before the builtin. The agent image runs `bun install`, so the unprefixed form is
+				// a live shadowing hazard rather than a stylistic preference.
+				"useNodejsImportProtocol": "error"
+			},
+			"nursery": {
+				// The runtime is one long async pipeline, so a dropped Promise surfaces as an agent
+				// that hangs, or exits 0 having done nothing, with the rejection never logged.
+				// Type-aware: it reads inferred types, so how much it catches tracks how well the
+				// surrounding code is annotated, and a deliberate fire-and-forget is marked `void`.
+				// Nursery rules can change between releases; the Biome version is pinned exactly
+				// and check:biome-pin keeps it that way, so a bump is the only thing that moves it.
+				"noFloatingPromises": "error"
+			}
+		}
+	},
+	"javascript": {
+		"formatter": {
+			"quoteStyle": "double",
+			"trailingCommas": "all",
+			"semicolons": "always"
+		}
+	}
+}

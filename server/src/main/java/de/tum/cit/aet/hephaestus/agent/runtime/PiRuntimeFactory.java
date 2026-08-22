@@ -85,22 +85,23 @@ public class PiRuntimeFactory {
 
         String workspaceRoot = SandboxLayout.WORKSPACE_ROOT;
         PiRunnerProfile profile = spec.runnerProfile();
-        String nodeFlagsFragment = renderNodeFlags(profile.nodeFlags());
-        String nodeEnvFragment = renderNodeEnv(profile.additionalEnv());
+        String runtimeFlagsFragment = renderRuntimeFlags(profile.runtimeFlags());
+        String runtimeEnvFragment = renderRuntimeEnv(profile.additionalEnv());
 
         String command =
             "mkdir -p " +
             SandboxLayout.OUTPUT_PATH +
             " /home/agent/.config /home/agent/.local/tmp && " +
-            // Pi SDK ESM imports resolve from <workspace>/node_modules, and Node's ESM resolver ignores
-            // NODE_PATH, so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.
+            // The runner imports the Pi SDK by bare specifier, which resolves from <workspace>/node_modules,
+            // so the SDK the image exposes at /opt/pi-sdk must be symlinked into place.
             "ln -sf /opt/pi-sdk/node_modules " +
             workspaceRoot +
             "/node_modules && " +
             spec.precomputeStep() +
-            nodeEnvFragment +
-            "node " +
-            nodeFlagsFragment +
+            runtimeEnvFragment +
+            // Bun executes the TypeScript runner directly; there is no build step and no Node.
+            "bun " +
+            runtimeFlagsFragment +
             workspaceRoot +
             "/" +
             SandboxLayout.RUNNER_SCRIPT_FILENAME;
@@ -123,7 +124,7 @@ public class PiRuntimeFactory {
         );
     }
 
-    private static String renderNodeFlags(List<String> flags) {
+    private static String renderRuntimeFlags(List<String> flags) {
         if (flags == null || flags.isEmpty()) {
             return "";
         }
@@ -131,7 +132,7 @@ public class PiRuntimeFactory {
     }
 
     /** Emitted verbatim into the command line, unquoted: a profile's values must be shell-safe. */
-    private static String renderNodeEnv(Map<String, String> env) {
+    private static String renderRuntimeEnv(Map<String, String> env) {
         if (env == null || env.isEmpty()) {
             return "";
         }

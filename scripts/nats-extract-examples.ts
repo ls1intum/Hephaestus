@@ -3,11 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import type {
-	ConsumerConfig,
-	ConsumerMessages,
-	JsMsg,
-} from "@nats-io/jetstream";
+import type { ConsumerConfig, ConsumerMessages, JsMsg } from "@nats-io/jetstream";
 import {
 	AckPolicy,
 	DeliverPolicy,
@@ -73,8 +69,7 @@ function parseIsoDate(value: string): Date {
 		throw new InvalidArgumentError("Timestamp cannot be empty");
 	}
 	const hasOffset = /[+-]\d{2}:\d{2}$/.test(trimmed);
-	const normalized =
-		trimmed.endsWith("Z") || hasOffset ? trimmed : `${trimmed}Z`;
+	const normalized = trimmed.endsWith("Z") || hasOffset ? trimmed : `${trimmed}Z`;
 	const parsed = new Date(normalized);
 	if (Number.isNaN(parsed.getTime())) {
 		throw new InvalidArgumentError(`Invalid ISO8601 timestamp: ${value}`);
@@ -102,10 +97,7 @@ function parseEventFilters(entries: string[]): Map<string, Set<string>> {
 	return filters;
 }
 
-function getExampleFilename(
-	eventType: string,
-	action: string | undefined,
-): string {
+function getExampleFilename(eventType: string, action: string | undefined): string {
 	return action ? `${eventType}.${action}.json` : `${eventType}.json`;
 }
 
@@ -186,9 +178,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 		if (deliverPolicy === DeliverPolicy.New) {
 			logger.info("Consumer deliver policy: NEW (future messages only)");
 		} else if (deliverPolicy === DeliverPolicy.StartTime && options.since) {
-			logger.info(
-				`Consumer deliver policy: START_TIME from ${options.since.toISOString()}`,
-			);
+			logger.info(`Consumer deliver policy: START_TIME from ${options.since.toISOString()}`);
 		} else {
 			logger.info("Consumer deliver policy: ALL (full stream history)");
 		}
@@ -235,10 +225,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 
 					let payload: Record<string, unknown>;
 					try {
-						payload = JSON.parse(decoder.decode(msg.data)) as Record<
-							string,
-							unknown
-						>;
+						payload = JSON.parse(decoder.decode(msg.data)) as Record<string, unknown>;
 					} catch {
 						logger.info("Skipping invalid JSON message");
 						msg.ack();
@@ -262,8 +249,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 					const action = payload.action ? String(payload.action) : undefined;
 
 					if (options.eventFilters.size > 0) {
-						const allowedActions =
-							options.eventFilters.get(normalizedEventType);
+						const allowedActions = options.eventFilters.get(normalizedEventType);
 						if (!allowedActions) {
 							skippedByFilter += 1;
 							msg.ack();
@@ -298,19 +284,13 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 						const count = filenameCounts.get(baseName) ?? 0;
 						let candidate = filename;
 						let counter = count;
-						while (
-							existingExamples.has(candidate) ||
-							extractedExamples.has(candidate)
-						) {
+						while (existingExamples.has(candidate) || extractedExamples.has(candidate)) {
 							counter += 1;
 							candidate = `${baseName}.${counter}.json`;
 						}
 						filenameCounts.set(baseName, counter);
 						filename = candidate;
-					} else if (
-						existingExamples.has(filename) ||
-						extractedExamples.has(filename)
-					) {
+					} else if (existingExamples.has(filename) || extractedExamples.has(filename)) {
 						msg.ack();
 						continue;
 					}
@@ -347,9 +327,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 			logger.info(`Skipped by time window: ${skippedByTime} messages`);
 		}
 		logger.info(`Extracted: ${extractedExamples.size} new examples`);
-		logger.info(
-			`Total examples: ${existingExamples.size + extractedExamples.size}`,
-		);
+		logger.info(`Total examples: ${existingExamples.size + extractedExamples.size}`);
 
 		if (extractedExamples.size > 0) {
 			logger.info("New examples created:");
@@ -391,19 +369,10 @@ function buildProgram() {
 		)
 		.option("--since <iso>", "Only include messages after this timestamp")
 		.option("--until <iso>", "Only include messages before this timestamp")
-		.option(
-			"--allow-duplicates",
-			"Allow multiple examples per event/action",
-			false,
-		)
+		.option("--allow-duplicates", "Allow multiple examples per event/action", false)
 		.option("--start-with-new", "Consume only new messages", false)
 		.option("--batch-size <n>", "Batch size per fetch", parsePositiveInt, 50)
-		.option(
-			"--fetch-timeout <sec>",
-			"Fetch timeout in seconds",
-			parsePositiveFloat,
-			5,
-		)
+		.option("--fetch-timeout <sec>", "Fetch timeout in seconds", parsePositiveFloat, 5)
 		.option("--dry-run", "Validate configuration and exit", false)
 		.addOption(
 			new Option("--log-level <level>", "Log verbosity")
@@ -436,9 +405,7 @@ async function main() {
 	const logger = createLogger(rawOptions.logLevel);
 
 	if (rawOptions.startWithNew && (rawOptions.since || rawOptions.until)) {
-		throw new InvalidArgumentError(
-			"--start-with-new cannot be combined with --since/--until",
-		);
+		throw new InvalidArgumentError("--start-with-new cannot be combined with --since/--until");
 	}
 
 	const since = rawOptions.since ? parseIsoDate(rawOptions.since) : null;
@@ -469,12 +436,10 @@ async function main() {
 			examplesDir: options.examplesDir,
 			natsSubject: options.natsSubject,
 			natsStream: options.natsStream,
-			eventFilters: [...options.eventFilters.entries()].map(
-				([event, actions]) => ({
-					event,
-					actions: [...actions],
-				}),
-			),
+			eventFilters: [...options.eventFilters.entries()].map(([event, actions]) => ({
+				event,
+				actions: [...actions],
+			})),
 			since: options.since?.toISOString() ?? null,
 			until: options.until?.toISOString() ?? null,
 			allowDuplicates: options.allowDuplicates,

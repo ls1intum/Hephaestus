@@ -36,7 +36,7 @@ public final class MentorRunnerClient implements AutoCloseable {
     /**
      * Deadline for the {@code prompt} JSON-RPC <em>ack</em> — not a turn duration. The runner
      * replies {@code {accepted:true}} synchronously after binding the thread and arming its
-     * watchdog (see {@code pi-mentor-runner.mjs#handlePrompt} → {@code sendResult(id, {accepted:true})}),
+     * watchdog (see {@code pi-mentor-runner.ts#handlePrompt} → {@code sendResult(id, {accepted:true})}),
      * then fires {@code runtime.session.prompt(...)} fire-and-forget. Turn streaming and
      * cancellation are observed via subscribed events; the runner's 120s + 30s watchdog owns
      * the actual turn deadline. This timeout exists only to surface a runner hang during

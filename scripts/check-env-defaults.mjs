@@ -55,7 +55,9 @@ for (const file of COMPOSE_FILES) {
 }
 
 if (failed) {
-	console.error("Align the Compose fallback with the application's, or drop it so the application decides.");
+	console.error(
+		"Align the Compose fallback with the application's, or drop it so the application decides.",
+	);
 	process.exit(1);
 }
 
@@ -69,7 +71,9 @@ for (const file of DELIBERATE_OVERRIDES) {
 	for (const [name, fallback] of collect(text, COMPOSE)) {
 		const expected = application.get(name);
 		if (expected !== undefined && expected !== fallback) {
-			console.log(`  ${file} runs ${name} at "${fallback}" rather than "${expected}" — on purpose.`);
+			console.log(
+				`  ${file} runs ${name} at "${fallback}" rather than "${expected}" — on purpose.`,
+			);
 		}
 	}
 }

@@ -2,44 +2,37 @@ package de.tum.cit.aet.hephaestus.agent.mentor;
 
 import de.tum.cit.aet.hephaestus.agent.runtime.PiRunnerProfile;
 import de.tum.cit.aet.hephaestus.agent.runtime.SandboxLayout;
-import java.util.Collections;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * Runner profile for the long-lived mentor chat agent. Tuning is set for ~100 MB V8 heap floor
- * and predictable page-decay over hours-long sessions.
+ * Runner profile for the long-lived mentor chat agent, whose heap lives for hours rather than for
+ * one review.
  *
- * <p>V8 flags: {@code --max-old-space-size=256} caps the heap so a leaky session OOMs itself
- * (default ~1.4 GB lets one bad runner take the host); {@code --expose-gc} backs
- * {@code pi-mentor-runner.mjs}'s post-turn compaction call to {@code global.gc()}.
+ * <p>{@code --smol} is Bun's reduced-memory mode: it collects more eagerly, which suits a session
+ * that idles between turns. {@code --expose-gc} publishes {@code global.gc}, which
+ * {@code pi-mentor-runner.ts} calls after a turn once the heap passes its watermark.
  *
- * <p>Per-process env preloads jemalloc and tunes page decay because mentor's long-lived heap
- * benefits from background-thread decay sweeps (cf. jemalloc TUNING.md "long-lived process");
- * practice's bursty allocations don't, hence kernel-scoped LD_PRELOAD on the node invocation
- * only. {@code /usr/local/lib/libjemalloc.so.2} is the per-arch symlink the Pi Dockerfile
- * creates so this literal stays arch-independent.
+ * <p>There is no per-process heap ceiling. Bun runs on JavaScriptCore and has no equivalent of
+ * V8's {@code --max-old-space-size}; passing one would be accepted and ignored, which is worse than
+ * not passing it, because the cap would appear to exist. A leaky session is bounded instead by the
+ * sandbox's own memory limit, which caps the whole process rather than one heap generation.
  */
 public final class MentorRunnerProfile implements PiRunnerProfile {
 
-    public static final String SCRIPT = "pi-mentor-runner.mjs";
+    public static final String SCRIPT = "pi-mentor-runner.ts";
 
-    /** Shared with the practice runner — stage it beside pi-mentor-runner.mjs. */
-    private static final List<String> SIDECARS = List.of(SandboxLayout.PROVIDER_HELPER_FILENAME);
+    /**
+     * {@code pi-provider.ts} is shared with the practice runner; {@code pi-mentor-protocol.ts}
+     * declares the JSON-RPC contract this runner speaks with {@code MentorRunnerClient}. Both are
+     * imported with relative specifiers, so both must be staged beside pi-mentor-runner.ts.
+     */
+    private static final List<String> SIDECARS = List.of(
+        SandboxLayout.PROVIDER_HELPER_FILENAME,
+        "pi-mentor-protocol.ts"
+    );
 
-    private static final List<String> FLAGS = List.of("--max-old-space-size=256", "--no-warnings", "--expose-gc");
-
-    // Iteration order is load-bearing: renderNodeEnv emits `KEY=value` pairs in iteration order,
-    // so a non-deterministic Map yields a non-deterministic command line across builds.
-    private static final Map<String, String> ENV;
-
-    static {
-        LinkedHashMap<String, String> env = new LinkedHashMap<>();
-        env.put("LD_PRELOAD", "/usr/local/lib/libjemalloc.so.2");
-        env.put("MALLOC_CONF", "background_thread:true,narenas:2,dirty_decay_ms:30000,muzzy_decay_ms:30000");
-        ENV = Collections.unmodifiableMap(env);
-    }
+    private static final List<String> FLAGS = List.of("--smol", "--expose-gc");
 
     @Override
     public String runnerScript() {
@@ -52,12 +45,12 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
     }
 
     @Override
-    public List<String> nodeFlags() {
+    public List<String> runtimeFlags() {
         return FLAGS;
     }
 
     @Override
     public Map<String, String> additionalEnv() {
-        return ENV;
+        return Map.of();
     }
 }

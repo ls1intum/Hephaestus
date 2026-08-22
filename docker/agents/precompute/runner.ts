@@ -1,4 +1,6 @@
 #!/usr/bin/env bun
+import { existsSync } from "node:fs";
+import { mkdir, rename, rm } from "node:fs/promises";
 /**
  * Precomputation runner — executes per-practice static analysis scripts.
  *
@@ -11,11 +13,13 @@
  * Usage:
  *   bun run runner.ts --repo <path> --diff <path> [--metadata <path>] [--output <path>]
  */
-import { parseArgs } from "util";
-import { mkdir, rename, rm } from "fs/promises";
-import { existsSync } from "fs";
+import { parseArgs } from "node:util";
 import { parseDiff } from "./lib/diff-parser";
-import type { PracticeResult, DiffFile } from "./lib/types";
+import { isJsonObject, isPracticeModule, parseFindings } from "./lib/practice-contract";
+import type { ArtifactMetadata, DiffFile, PracticeResult } from "./lib/types";
+
+const DEFAULT_OUTPUT_DIR = ".precompute";
+const DEFAULT_TIMEOUT_MS = 15_000;
 
 const { values } = parseArgs({
 	args: Bun.argv.slice(2),
@@ -24,8 +28,8 @@ const { values } = parseArgs({
 		diff: { type: "string" },
 		metadata: { type: "string" },
 		context: { type: "string" },
-		output: { type: "string", default: ".precompute" },
-		timeout: { type: "string", default: "15000" },
+		output: { type: "string", default: DEFAULT_OUTPUT_DIR },
+		timeout: { type: "string", default: String(DEFAULT_TIMEOUT_MS) },
 	},
 });
 
@@ -38,12 +42,21 @@ if (!values.repo) {
 
 const globalStart = Date.now();
 const repoPath = values.repo;
-const outputDir = values.output!;
-const timeoutMs = parseInt(values.timeout!);
+const outputDir = values.output ?? DEFAULT_OUTPUT_DIR;
+// A non-numeric or non-positive --timeout would make every race timer fire immediately and time out
+// every practice on the spot, so an unusable value falls back to the default instead of silently
+// disabling precompute.
+const requestedTimeoutMs = Number.parseInt(values.timeout ?? "", 10);
+const timeoutIsUsable = Number.isFinite(requestedTimeoutMs) && requestedTimeoutMs > 0;
+if (!timeoutIsUsable) {
+	console.error(`Ignoring unusable --timeout ${values.timeout}; using ${DEFAULT_TIMEOUT_MS}ms`);
+}
+const timeoutMs = timeoutIsUsable ? requestedTimeoutMs : DEFAULT_TIMEOUT_MS;
 // The materialised context directory (inputs/context/) — gives scripts read access to the SAME
 // cross-artifact context the agent sees (project_inventory.json, linked_work_items.json, comments.json,
 // issue_summary.md, …), so a precompute can point the LLM at relevant neighbours. Optional and read-only.
-const contextDir = values.context ?? (values.metadata ? values.metadata.replace(/\/[^/]*$/, "") : "");
+const contextDir =
+	values.context ?? (values.metadata ? values.metadata.replace(/\/[^/]*$/, "") : "");
 
 // Parse diff
 let diffFiles = new Map<string, DiffFile>();
@@ -58,10 +71,15 @@ if (values.diff) {
 }
 
 // Load metadata
-let metadata: any = {};
+let metadata: ArtifactMetadata = {};
 if (values.metadata) {
 	try {
-		metadata = await Bun.file(values.metadata).json();
+		const parsed: unknown = await Bun.file(values.metadata).json();
+		if (isJsonObject(parsed)) {
+			metadata = parsed;
+		} else {
+			console.error(`Metadata ${values.metadata} is not a JSON object; scripts will see {}`);
+		}
 	} catch (e) {
 		console.error(`Could not load metadata: ${e}`);
 	}
@@ -98,26 +116,24 @@ const tmpDir = `${outputDir}.tmp.${process.pid}`;
 await rm(tmpDir, { recursive: true, force: true });
 await mkdir(tmpDir, { recursive: true });
 
+/** A practice script is foreign code (DB-stored data), so it can reject with a non-Error value. */
+function messageOf(error: unknown): string {
+	return error instanceof Error ? error.message : String(error);
+}
+
 /**
- * Validate that a script return value has the expected PracticeResult shape.
+ * Validate that a script return value has the expected PracticeFindings shape.
  * Throws on invalid shape so the caller can catch and produce an error result.
  */
 function validateResult(result: unknown, slug: string): PracticeResult {
-	if (!result || typeof result !== "object") {
-		throw new Error(`Script ${slug} must return an object`);
-	}
-	const r = result as any;
-	if (!Array.isArray(r.hints)) throw new Error(`Script ${slug}: hints must be an array`);
-	if (typeof r.metrics !== "object" || r.metrics === null)
-		throw new Error(`Script ${slug}: metrics must be an object`);
-	if (!Array.isArray(r.directions)) throw new Error(`Script ${slug}: directions must be an array`);
+	const findings = parseFindings(result, `Script ${slug}`);
 	// Force practice name to match the filename slug — single source of truth
 	return {
 		practice: slug,
 		status: "ok",
-		hints: r.hints,
-		metrics: r.metrics,
-		directions: r.directions.slice(0, 10), // cap directions to prevent bloat
+		hints: findings.hints,
+		metrics: findings.metrics,
+		directions: findings.directions.slice(0, 10), // cap directions to prevent bloat
 	};
 }
 
@@ -126,8 +142,11 @@ const results = await Promise.allSettled(
 	practiceModules.map(async ([slug, modulePath]) => {
 		const start = Date.now();
 		try {
-			const mod = await import(modulePath);
-			const rawResult = await Promise.race([
+			const mod: unknown = await import(modulePath);
+			if (!isPracticeModule(mod)) {
+				throw new Error(`Script ${slug} must export a default function`);
+			}
+			const rawResult: unknown = await Promise.race([
 				mod.default(repoPath, diffFiles, metadata, contextDir),
 				new Promise<never>((_, reject) =>
 					setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs),
@@ -137,15 +156,16 @@ const results = await Promise.allSettled(
 			const elapsed = Date.now() - start;
 			console.error(`  ok ${slug}: ${result.hints.length} hints (${elapsed}ms)`);
 			return result;
-		} catch (e: any) {
+		} catch (e) {
 			const elapsed = Date.now() - start;
-			console.error(`  FAIL ${slug}: ${e.message} (${elapsed}ms)`);
+			const message = messageOf(e);
+			console.error(`  FAIL ${slug}: ${message} (${elapsed}ms)`);
 			return {
 				practice: slug,
 				status: "error" as const,
 				hints: [],
 				metrics: { error: 1 },
-				directions: [`Script failed: ${e.message}`],
+				directions: [`Script failed: ${message}`],
 			} satisfies PracticeResult;
 		}
 	}),

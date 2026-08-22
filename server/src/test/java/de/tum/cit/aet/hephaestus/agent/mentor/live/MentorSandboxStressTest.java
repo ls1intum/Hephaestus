@@ -65,7 +65,7 @@ class MentorSandboxStressTest {
         "main",
         "resources",
         "agent",
-        "pi-mentor-runner.mjs"
+        "pi-mentor-runner.ts"
     ).toAbsolutePath();
     /** Per-session deadline: cold-start + handshake + prompt + agent_end against live LLM. */
     private static final Duration SESSION_BUDGET = Duration.ofSeconds(120);
@@ -750,7 +750,7 @@ class MentorSandboxStressTest {
         Path tmp = Files.createTempDirectory("hephaestus-mentor-stress-" + idx + "-");
         Files.createDirectories(tmp.resolve(".sessions"));
         Files.createSymbolicLink(tmp.resolve("node_modules"), SDK_DIR.resolve("node_modules"));
-        Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.mjs"));
+        Files.copy(RUNNER, tmp.resolve("pi-mentor-runner.ts"));
 
         Path systemPromptDir = tmp.resolve("agent").resolve("mentor");
         Files.createDirectories(systemPromptDir);
@@ -800,10 +800,10 @@ class MentorSandboxStressTest {
         env.put("PI_CODING_AGENT_DIR", workspace.resolve(".pi-home").toString());
         pb.directory(workspace.toFile());
 
-        Path shim = workspace.resolve("runner-entry.mjs");
-        Path stagedRunner = workspace.resolve("pi-mentor-runner.mjs");
+        Path shim = workspace.resolve("runner-entry.ts");
+        Path stagedRunner = workspace.resolve("pi-mentor-runner.ts");
         Files.writeString(shim, buildRunnerShim(workspace, stagedRunner));
-        pb.command("node", shim.toString());
+        pb.command("bun", shim.toString());
         pb.redirectErrorStream(false);
         Process process = pb.start();
         return new StdioAttachedSandbox(
