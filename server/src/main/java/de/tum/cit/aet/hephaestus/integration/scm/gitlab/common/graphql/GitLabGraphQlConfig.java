@@ -205,7 +205,9 @@ public class GitLabGraphQlConfig {
                     }
 
                     if (status.is5xxServerError() || status.value() == 429) {
-                        return response.releaseBody().then(Mono.error(new RetryableStatusException(status.value())));
+                        return response
+                            .releaseBody()
+                            .then(Mono.<ClientResponse>error(new RetryableStatusException(status.value())));
                     }
 
                     return Mono.just(response);
