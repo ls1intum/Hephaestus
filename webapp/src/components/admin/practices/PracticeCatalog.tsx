@@ -13,7 +13,7 @@ import {
 	AreaDetailsDialog,
 } from "@/components/admin/practice-catalog/AreaDetailsDialog";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
-import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/constants";
+import { WORK_TYPE_FILTER_OPTIONS } from "@/components/admin/practice-catalog/constants";
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
@@ -22,6 +22,8 @@ import {
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import { type FilterOption, FilterToggle } from "@/components/common/FilterToggle";
+import { MetaRow } from "@/components/common/MetaRow";
 import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
@@ -53,21 +55,9 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
-import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import {
-	ARTIFACT_KIND,
-	artifactKindPluralLabel,
-	type KnownArtifactKind,
-} from "@/lib/artifact-kinds";
+import { artifactKindPluralLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
 import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
@@ -366,56 +356,12 @@ function CatalogToolbar({
 }) {
 	return (
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-			<Select
-				items={WORK_ARTIFACT_FILTER_ITEMS}
+			<FilterToggle
+				label="Filter by work type"
+				options={WORK_TYPE_FILTER_OPTIONS as FilterOption<FocusFilter>[]}
 				value={focusFilter}
-				onValueChange={(value) => value && onFocusFilterChange(value as FocusFilter)}
-			>
-				<SelectTrigger className="w-full sm:hidden" aria-label="Filter by work type">
-					<SelectValue />
-				</SelectTrigger>
-				<SelectContent>
-					{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
-						<SelectItem key={filter.value} value={filter.value}>
-							{filter.label}
-						</SelectItem>
-					))}
-				</SelectContent>
-			</Select>
-			{/* `toolbar`, not the default `group`: Base UI gives the group a roving tabindex, and
-			    `toolbar` is the role that contract belongs to. `radiogroup` would be worse — the items
-			    are `aria-pressed`, not radios. */}
-			<ToggleGroup
-				role="toolbar"
-				value={[focusFilter]}
-				onValueChange={(value) => value[0] && onFocusFilterChange(value[0] as FocusFilter)}
-				variant="outline"
-				size="sm"
-				aria-label="Filter by work type"
-				className="hidden sm:flex"
-			>
-				{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
-					<ToggleGroupItem
-						key={filter.value}
-						value={filter.value}
-						className={cn(
-							"min-w-0",
-							filter.value === ARTIFACT_KIND.pullRequest &&
-								"h-auto min-h-7 whitespace-normal py-1 sm:whitespace-nowrap",
-						)}
-					>
-						{/* Shortened on screen to fit the row; the accessible name still contains the visible
-						    text and names the filter in full (WCAG 2.2 SC 2.5.3). */}
-						{filter.value === "ALL" ? (
-							<>
-								All<span className="sr-only"> work types</span>
-							</>
-						) : (
-							filter.label
-						)}
-					</ToggleGroupItem>
-				))}
-			</ToggleGroup>
+				onChange={onFocusFilterChange}
+			/>
 			<div className="grid gap-2 sm:flex">
 				<Toggle
 					variant="outline"
@@ -647,12 +593,20 @@ function PracticeRowDetails({
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
-			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<WorkTypeLabel artifactKind={practice.artifactKind} />
-				<AutonomyBadge autonomy={practice.autonomy.effective} />
-				<AutonomySourceNote source={autonomySource} />
-				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
-				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
+			<ItemDescription>
+				<MetaRow
+					captions={[
+						<WorkTypeLabel key="work" artifactKind={practice.artifactKind} />,
+						<AutonomySourceNote key="source" source={autonomySource} />,
+					]}
+					badges={
+						<>
+							<AutonomyBadge autonomy={practice.autonomy.effective} />
+							{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
+							<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
+						</>
+					}
+				/>
 			</ItemDescription>
 		</ItemContent>
 	);

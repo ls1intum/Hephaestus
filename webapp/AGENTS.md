@@ -305,3 +305,52 @@ guarantees the jump the skeleton exists to prevent — take a row count from the
 ([ARIA22](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA22) needs the role to exist *before* the
 message) · `role` or `aria-label` on `<Spinner>` — pass `label` if it genuinely needs announcing, and
 never inside a control, where a live region corrupts the button's own accessible name.
+
+## Motion
+
+280ms in, 200ms out. Enter is the longer half — it is the reader orienting; exit is getting out of
+the way ([Material](https://m2.material.io/design/motion/speed.html): 225/195 and "transitions that
+exceed 400ms may feel too slow"). Split the curve by direction: decelerate in
+(`cubic-bezier(0.05,0.7,0.1,1)`), standard out (`cubic-bezier(0.2,0,0.38,0.9)`). A dismissible side
+panel takes standard out, not accelerate — it can come back.
+
+Under `prefers-reduced-motion`, cut what triggers symptoms and keep what carries meaning: no scaling,
+no travelling the width of the viewport, but the fade stays so the arrival is still legible. Scope it
+(`motion-reduce:` / a media block on the component); never `* { transition: none }`.
+
+**Only `transform`, `opacity` and `filter` may appear in a `transition-*` on an overlay.** Anything
+resolving to `width`/`height`/inset must be constant, or scoped to the axis where it is constant —
+a survivor's geometry must never depend on the element that is leaving.
+
+## Search params that are UI state
+
+A filter, a toggle, an open panel on the page you are already on is not a navigation. Write it with
+`useSearchState` (`lib/search-params.ts`), which passes `resetScroll: false` — the router resets
+scroll on **every** commit, including a search-only one, so without it a control halfway down a long
+page throws the reader back to the top.
+
+## Vocabulary
+
+`docs/contributor/practice-feedback-language.md` is normative. The rulings this branch settled:
+
+| Concept | The word | Not |
+|---|---|---|
+| What an instance offers | **catalog** / instance catalog | library |
+| Availability to workspaces | **include / exclude** | offer, retire |
+| A grouping of practices | **group** (user-facing); `area` stays in code, types and the API | area, section |
+| A practice with no group | **Unassigned** | No area, Not in an area, Belong to no area |
+| Inputs and criteria | **review rules** | review behavior, detection config |
+
+Prefer dropping the class noun where the thing's own name is already on screen: "No practices here",
+not "No practices in this area".
+
+## Status vocabularies
+
+Every enum a practice surface renders goes in `components/practice-vocabulary/` as `StatusDefs` and
+renders through `StatusBadge`. The icon is required and unique within its enum because badge variants
+collapse, and colour alone fails WCAG 2.2 SC 1.4.1. **Nothing else may hold words, a colour or an
+icon for an enum value** — a bare `<Badge>` next to a registry badge reads as the same family and is
+how a *setting* came to look identical to a *provenance state*.
+
+A registry entry that would be identical for every value is not information. Say what to do about it
+in a sentence instead.
