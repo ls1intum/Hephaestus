@@ -57,7 +57,9 @@ async function waitForStorybook() {
 		} catch {
 			// Storybook is still starting.
 		}
-		await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+		await new Promise((resolveDelay) => {
+			setTimeout(resolveDelay, 500);
+		});
 	}
 	throw new Error("Storybook did not start within 60 seconds.");
 }

@@ -50,92 +50,98 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-export const Route = createRootRouteWithContext<MyRouterContext>()({
-	// Fallback tab title; the deepest match that sets its own `head` wins.
-	head: () => ({ meta: [{ title: "Hephaestus" }] }),
-	component: () => {
-		const { pathname } = useLocation();
-		const surface = useMatches({
-			select: (matches) => {
-				for (let index = matches.length - 1; index >= 0; index -= 1) {
-					const matchSurface = matches[index]?.staticData.surface;
-					if (matchSurface) return matchSurface;
-				}
-				return "standard";
-			},
-		});
-		const { isAuthenticated, isLoading } = useAuth();
-		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
-		const { data: userSettings, isError: userSettingsError } = useQuery({
-			...getUserSettingsOptions({}),
-			enabled: isAuthenticated && isPosthogEnabled,
-			retry: 1,
-		});
-		const allowSurveys =
-			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
-		const showCopilot =
-			!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
+/**
+ * Named rather than an inline `component: () => …`, so the hooks below sit in something React
+ * and its lint rules can both recognise as a component.
+ */
+function RootLayout() {
+	const { pathname } = useLocation();
+	const surface = useMatches({
+		select: (matches) => {
+			for (let index = matches.length - 1; index >= 0; index -= 1) {
+				const matchSurface = matches[index]?.staticData.surface;
+				if (matchSurface) return matchSurface;
+			}
+			return "standard";
+		},
+	});
+	const { isAuthenticated, isLoading } = useAuth();
+	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
+	const { data: userSettings, isError: userSettingsError } = useQuery({
+		...getUserSettingsOptions({}),
+		enabled: isAuthenticated && isPosthogEnabled,
+		retry: 1,
+	});
+	const allowSurveys =
+		isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
+	const showCopilot =
+		!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
 
-		if (surface === "auth") {
-			return (
-				<>
-					<HeadContent />
-					<CookieConsentBanner />
-					<ProviderColorScope>
-						<main>
-							<Outlet />
-						</main>
-					</ProviderColorScope>
-					<Toaster />
-				</>
-			);
-		}
-
+	if (surface === "auth") {
 		return (
 			<>
 				<HeadContent />
-				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 				<CookieConsentBanner />
-				<ImpersonationBanner />
 				<ProviderColorScope>
-					<SidebarProvider>
-						<AppSidebarContainer />
-						<SidebarInset
-							className="min-w-0"
-							style={{ marginRight: "var(--right-sidebar-width, 0)" }}
-						>
-							<HeaderContainer />
-							<div className="flex min-h-0 flex-1 flex-col">
-								{surface === "standard" ? (
-									<StandardPageSurface className="flex-1">
-										<Outlet />
-									</StandardPageSurface>
-								) : (
-									<div
-										className={
-											surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
-										}
-									>
-										<Outlet />
-									</div>
-								)}
-								{surface !== "fullscreen" && (
-									<Footer
-										buildInfo={environment.buildInfo}
-										isProduction={environment.deployment.isProduction}
-									/>
-								)}
-							</div>
-						</SidebarInset>
-					</SidebarProvider>
+					<main>
+						<Outlet />
+					</main>
 				</ProviderColorScope>
 				<Toaster />
-				{showCopilot && <GlobalCopilot />}
-				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
-				<FeatureFlagDevTools />
 			</>
 		);
-	},
+	}
+
+	return (
+		<>
+			<HeadContent />
+			{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
+			<CookieConsentBanner />
+			<ImpersonationBanner />
+			<ProviderColorScope>
+				<SidebarProvider>
+					<AppSidebarContainer />
+					<SidebarInset
+						className="min-w-0"
+						style={{ marginRight: "var(--right-sidebar-width, 0)" }}
+					>
+						<HeaderContainer />
+						<div className="flex min-h-0 flex-1 flex-col">
+							{surface === "standard" ? (
+								<StandardPageSurface className="flex-1">
+									<Outlet />
+								</StandardPageSurface>
+							) : (
+								<div
+									className={
+										surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
+									}
+								>
+									<Outlet />
+								</div>
+							)}
+							{surface !== "fullscreen" && (
+								<Footer
+									buildInfo={environment.buildInfo}
+									isProduction={environment.deployment.isProduction}
+								/>
+							)}
+						</div>
+					</SidebarInset>
+				</SidebarProvider>
+			</ProviderColorScope>
+			<Toaster />
+			{showCopilot && <GlobalCopilot />}
+			{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
+			<FeatureFlagDevTools />
+		</>
+	);
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+	// Fallback tab title; the deepest match that sets its own `head` wins.
+	head: () => ({ meta: [{ title: "Hephaestus" }] }),
+	component: RootLayout,
 	notFoundComponent: () => (
 		<div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-16 text-center">
 			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>

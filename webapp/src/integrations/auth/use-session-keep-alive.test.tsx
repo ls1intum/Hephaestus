@@ -30,7 +30,10 @@ function userPayload(expiresInSec: number) {
 	};
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+	new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 
 describe("useSessionKeepAlive", () => {
 	it("proactively rotates the access cookie before it expires while the user is active", async () => {

@@ -46,7 +46,10 @@ function res(status: number, url: string): Response {
 }
 
 // The 401 recovery is async (a silent refresh attempt); let its microtasks/timer settle.
-const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+const flush = () =>
+	new Promise((resolve) => {
+		setTimeout(resolve, 0);
+	});
 
 describe("handlePossibleSessionExpiry", () => {
 	it("recovers a mid-session 401 via a silent refresh — no redirect", async () => {

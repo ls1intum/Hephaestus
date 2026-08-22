@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
 import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
@@ -179,41 +180,46 @@ export const OpenEndedMode: Story = {
 };
 
 /**
+ * A story `render` that calls hooks is not a component React can track, so the stateful harness is its own.
+ */
+function InteractiveHarness(props: React.ComponentProps<typeof TimeframeFilter>) {
+	const [afterDate, setAfterDate] = useState<string | undefined>(props.initialAfterDate);
+	const [beforeDate, setBeforeDate] = useState<string | undefined>(props.initialBeforeDate);
+	const [timeframe, setTimeframe] = useState<string | undefined>();
+
+	return (
+		<div className="flex flex-col gap-4 w-64">
+			<TimeframeFilter
+				{...props}
+				initialAfterDate={afterDate}
+				initialBeforeDate={beforeDate}
+				onTimeframeChange={(after, before, tf) => {
+					setAfterDate(after);
+					setBeforeDate(before);
+					setTimeframe(tf);
+					props.onTimeframeChange?.(after, before, tf);
+				}}
+			/>
+			<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
+				<div>
+					<strong>timeframe:</strong> {timeframe ?? "undefined"}
+				</div>
+				<div>
+					<strong>after:</strong> {afterDate ?? "undefined"}
+				</div>
+				<div>
+					<strong>before:</strong> {beforeDate ?? "undefined"}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/**
  * Interactive stateful story to test the component behavior.
  */
 export const Interactive: Story = {
-	render: (props) => {
-		const [afterDate, setAfterDate] = useState<string | undefined>(props.initialAfterDate);
-		const [beforeDate, setBeforeDate] = useState<string | undefined>(props.initialBeforeDate);
-		const [timeframe, setTimeframe] = useState<string | undefined>();
-
-		return (
-			<div className="flex flex-col gap-4 w-64">
-				<TimeframeFilter
-					{...props}
-					initialAfterDate={afterDate}
-					initialBeforeDate={beforeDate}
-					onTimeframeChange={(after, before, tf) => {
-						setAfterDate(after);
-						setBeforeDate(before);
-						setTimeframe(tf);
-						props.onTimeframeChange?.(after, before, tf);
-					}}
-				/>
-				<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
-					<div>
-						<strong>timeframe:</strong> {timeframe ?? "undefined"}
-					</div>
-					<div>
-						<strong>after:</strong> {afterDate ?? "undefined"}
-					</div>
-					<div>
-						<strong>before:</strong> {beforeDate ?? "undefined"}
-					</div>
-				</div>
-			</div>
-		);
-	},
+	render: (props) => <InteractiveHarness {...props} />,
 	args: {
 		leaderboardSchedule: {
 			day: 1,

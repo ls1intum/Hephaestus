@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
+import type * as React from "react";
 import { useState } from "react";
 import { fn } from "storybook/test";
 import { DEFAULT_SCHEDULE, formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
@@ -121,37 +122,42 @@ export const CustomRange: Story = {
 };
 
 /**
+ * A story `render` that calls hooks is not a component React can track, so the stateful harness is its own.
+ */
+function InteractiveHarness(props: React.ComponentProps<typeof ProfileTimeframePicker>) {
+	const [afterDate, setAfterDate] = useState<string | undefined>(props.afterDate);
+	const [beforeDate, setBeforeDate] = useState<string | undefined>(props.beforeDate);
+
+	return (
+		<div className="flex flex-col gap-4 items-start">
+			<ProfileTimeframePicker
+				{...props}
+				afterDate={afterDate}
+				beforeDate={beforeDate}
+				onTimeframeChange={(after, before) => {
+					setAfterDate(after);
+					setBeforeDate(before);
+					props.onTimeframeChange?.(after, before);
+				}}
+			/>
+			<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
+				<div>
+					<strong>after:</strong> {afterDate ?? "undefined"}
+				</div>
+				<div>
+					<strong>before:</strong> {beforeDate ?? "undefined"}
+				</div>
+			</div>
+		</div>
+	);
+}
+
+/**
  * Interactive stateful story to test label updates live.
  * Demonstrates how the component responds to user interactions.
  */
 export const Interactive: Story = {
-	render: (props) => {
-		const [afterDate, setAfterDate] = useState<string | undefined>(props.afterDate);
-		const [beforeDate, setBeforeDate] = useState<string | undefined>(props.beforeDate);
-
-		return (
-			<div className="flex flex-col gap-4 items-start">
-				<ProfileTimeframePicker
-					{...props}
-					afterDate={afterDate}
-					beforeDate={beforeDate}
-					onTimeframeChange={(after, before) => {
-						setAfterDate(after);
-						setBeforeDate(before);
-						props.onTimeframeChange?.(after, before);
-					}}
-				/>
-				<div className="text-sm text-muted-foreground font-mono bg-muted p-3 rounded-md">
-					<div>
-						<strong>after:</strong> {afterDate ?? "undefined"}
-					</div>
-					<div>
-						<strong>before:</strong> {beforeDate ?? "undefined"}
-					</div>
-				</div>
-			</div>
-		);
-	},
+	render: (props) => <InteractiveHarness {...props} />,
 };
 
 /**
