@@ -10,7 +10,7 @@ const sidebars: SidebarsConfig = {
       label: 'Practices',
       collapsed: false,
       items: [
-        {type: 'doc', id: 'practice-library', label: 'Practice Library'},
+        {type: 'doc', id: 'practice-catalog', label: 'Practice Catalog'},
         {type: 'doc', id: 'practice-review', label: 'Practice Review'},
         {type: 'doc', id: 'practice-review-operations', label: 'Practice Review Operations'},
       ],

@@ -1,8 +1,8 @@
 ---
-id: practice-library
+id: practice-catalog
 sidebar_position: 4
-title: Practice Library
-description: Curate the practices an instance offers, adopt them into a workspace, and read the badges that say when a workspace copy and the library have drifted apart.
+title: Practice Catalog
+description: Curate the practices an instance offers, adopt them into a workspace, and read the badges that say when a workspace copy and the catalog have drifted apart.
 ---
 
 A practice is a habit Hephaestus reviews work against. Where a practice lives decides who owns it and
@@ -11,16 +11,16 @@ what changing it affects.
 ```mermaid
 flowchart LR
     accTitle: The three places a practice definition lives
-    accDescr: Hephaestus ships bundled defaults. An instance administrator customizes them into the instance library, which decides what workspaces may adopt. A workspace administrator adopts a practice as an independent copy that later library changes never rewrite.
-    Bundled[Bundled defaults<br/>shipped with Hephaestus] -->|upgrade, unless customized| Library[Instance library<br/>what workspaces may adopt]
-    Library -->|adoption, by an administrator| Copy[Workspace practice<br/>an independent copy]
-    Copy -->|never flows back| Library
+    accDescr: Hephaestus ships bundled defaults. An instance administrator customizes them into the instance catalog, which decides what workspaces may adopt. A workspace administrator adopts a practice as an independent copy that later catalog changes never rewrite.
+    Bundled[Bundled defaults<br/>shipped with Hephaestus] -->|upgrade, unless customized| Catalog[Instance catalog<br/>what workspaces may adopt]
+    Catalog -->|adoption, by an administrator| Copy[Workspace practice<br/>an independent copy]
+    Copy -->|never flows back| Catalog
 ```
 
 | Scope | Owner | Changing it affects |
 |---|---|---|
 | Bundled defaults | Hephaestus releases | Every instance that has not customized the entry |
-| Instance library | Instance administrator | What workspaces may adopt **next** — never a copy already adopted |
+| Instance catalog | Instance administrator | What workspaces may adopt **next** — never a copy already adopted |
 | Workspace practice | Workspace administrator | Reviews in that one workspace |
 
 The arrow only ever points right. A release can update an instance entry nobody customized, and an
@@ -29,7 +29,7 @@ whole point of adoption: a workspace can rely on its practices not changing unde
 
 ## Adopt a practice into a workspace
 
-In **Workspace administration → Practice setup**, select **Show library**. Available practices appear
+In **Workspace administration → Practice setup**, select **Show catalog**. Available practices appear
 beside the ones you already have, grouped by area.
 
 Select one to read it before deciding. You get the habit and why it matters first, then what good
@@ -42,14 +42,14 @@ stays **Off** until you connect what it needs to read. Moving a practice to **Se
 a separate decision you make later, on the **Review** screen.
 :::
 
-What you get is a copy. Edit it, move it, rename it, delete it — none of that touches the library, and
-nothing in the library reaches back into it.
+What you get is a copy. Edit it, move it, rename it, delete it — none of that touches the catalog, and
+nothing in the catalog reaches back into it.
 
 ### Adopt a whole area
 
 An area's action adopts everything in it that the workspace is missing. Hephaestus shows the full plan
 first — what it will add, what is already there, and anything it cannot add — and then applies all of
-it or none of it. If the library or your workspace changed while you were reading, the plan is
+it or none of it. If the catalog or your workspace changed while you were reading, the plan is
 refused and you review the current one.
 
 ### Remove an area
@@ -59,29 +59,29 @@ Removing an area asks what should happen to the practices in it:
 - **Keep practices unassigned** — they stay in the workspace, without an area.
 - **Delete area and practices** — this also deletes their observations, and cannot be undone.
 
-If you kept them, the library offers **Restore area**, which puts the matching unassigned copies back
+If you kept them, the catalog offers **Restore area**, which puts the matching unassigned copies back
 without touching any edits you made to them.
 
 ### Adopt something again
 
-Delete an adopted practice and the library offers it again immediately. Adoption is keyed on the
+Delete an adopted practice and the catalog offers it again immediately. Adoption is keyed on the
 practice's slug in your workspace, so you cannot end up with two copies of the same practice.
 
 ## Read the badges
 
-Most practices carry no badge. A badge means this entry and its source have diverged, and it is
-always informational — Hephaestus never resolves drift for you.
+A badge says how your copy stands against the entry it came from. All of them are informational:
+**a copy never tracks the catalog**, edited or not, so nothing here ever changes on its own.
 
-**In a workspace**, comparing your copy against the library:
+**In a workspace**, comparing your copy against the catalog:
 
 | Badge | Meaning | What to do |
 |---|---|---|
-| *(none)* | Your copy matches the library | Nothing |
-| **Customized for this workspace** | You changed the review rules | Nothing, unless you meant to track the library |
-| **Instance catalog changed** | The library moved on after you adopted | Read the library entry and copy anything you want by hand |
-| **Not in the current instance catalog** | The source was excluded or removed | Nothing. Your copy keeps working |
+| **Same as the catalog** | Your copy still matches the entry it came from | Nothing. It stays that way — the catalog never edits your copy |
+| **Edited here** | You changed the review rules | Nothing, unless you meant to track the catalog |
+| **Catalog changed, yours did not** | The catalog moved on after you adopted. Nothing applies that change to your copy — bring across what you want by editing it | Read the catalog entry and copy anything you want by hand |
+| **No longer in the catalog** | The source was excluded or removed | Nothing. Your copy keeps working |
 
-**On the instance**, comparing the library against the bundled defaults:
+**On the instance**, comparing the catalog against the bundled defaults:
 
 | Badge | Meaning |
 |---|---|
@@ -97,15 +97,16 @@ Drift compares only what changes review behaviour: slug, name, bindings, criteri
 the automated-review policy, and area. **Why it matters** and **What good looks like** are guidance —
 editing them never raises a drift badge.
 
-## What "Not independently validated" means
+## How reliable a practice is
 
-Every practice today carries author-declared validation metadata, not measured reliability. The badge
-says so rather than showing numbers nobody has earned. Treat it as "nobody has checked how often this
-practice is right", and keep new practices at **Review before sending** until you have watched them.
+Nobody has measured how often any practice is right. Each one carries its author's description of
+what it checks; that description has not been tested against real work, and the practice says so
+under **What it reads**. This is why a practice starts by asking you to approve each piece of
+feedback — keep it there until you have watched it on your own work.
 
 ## Curate what the instance offers
 
-In **Instance administration → Practice library** you decide what workspaces may adopt.
+In **Instance administration → Practice catalog** you decide what workspaces may adopt.
 
 - **Customize** an entry to change its definition for this instance.
 - **Stop offering** an entry to take it off the menu. Workspaces that already adopted it keep their
@@ -117,7 +118,7 @@ Excluding an area also removes its practices from what workspaces may adopt.
 
 ## Where practices come from on a new instance
 
-At startup, any workspace with no recorded catalog installation receives the whole library once. On a
+At startup, any workspace with no recorded catalog installation receives the whole catalog once. On a
 fresh instance that means the workspaces provisioned at boot arrive already stocked; you adopt to add
 what you passed over, and to add back anything you deleted.
 
