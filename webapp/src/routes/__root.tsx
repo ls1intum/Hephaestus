@@ -184,7 +184,7 @@ function GlobalCopilot() {
 	};
 
 	const handleCopy = (content: string) => {
-		navigator.clipboard.writeText(content).catch((error) => {
+		navigator.clipboard.writeText(content).catch((error: unknown) => {
 			console.error("Failed to copy to clipboard:", error);
 		});
 	};

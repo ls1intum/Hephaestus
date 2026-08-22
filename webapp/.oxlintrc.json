@@ -210,6 +210,70 @@
 		"typescript/prefer-function-type": "error",
 		"typescript/unified-signatures": "error",
 		"typescript/consistent-type-assertions": "error",
+		// Nothing here fires today. They are on so the first occurrence is caught, not accumulated.
+		"import/export": "error",
+		"import/named": "error",
+		"no-unreachable-loop": "error",
+		"promise/no-return-in-finally": "error",
+		"promise/spec-only": "error",
+		"typescript/no-invalid-void-type": "error",
+		"typescript/prefer-find": "error",
+		"typescript/consistent-type-exports": "error",
+		"typescript/related-getter-setter-pairs": "error",
+		"typescript/prefer-reduce-type-parameter": "error",
+		"typescript/prefer-return-this-type": "error",
+		"typescript/restrict-plus-operands": "error",
+		"typescript/prefer-readonly": "error",
+		// `strictFunctionTypes` only checks property syntax; a method shorthand stays bivariant, so
+		// `handler(e: MouseEvent): void` accepts a handler that will be called with something else.
+		"typescript/method-signature-style": "error",
+		// `@ts-ignore` outlives the error it hid; `@ts-expect-error` fails the build once it stops
+		// being needed — the same reason `reportUnusedDisableDirectives` is on for lint suppressions.
+		"typescript/prefer-ts-expect-error": "error",
+		"unicorn/no-useless-switch-case": "error",
+		"unicorn/no-useless-iterator-to-array": "error",
+		"unicorn/prefer-event-target": "error",
+		"unicorn/prefer-type-error": "error",
+		"unicorn/prefer-classlist-toggle": "error",
+		"unicorn/prefer-reflect-apply": "error",
+		"unicorn/prefer-response-static-json": "error",
+		"unicorn/prefer-bigint-literals": "error",
+		"unicorn/require-module-attributes": "error",
+		// A barrel re-export makes the bundler pull a whole directory in for one symbol.
+		"oxc/no-barrel-file": "error",
+		// Class components: none exist, and these keep it that way cheaply.
+		"react/no-set-state": "error",
+		"react/prefer-es6-class": "error",
+		"react/require-render-return": "error",
+		"react/state-in-constructor": "error",
+		"react/no-redundant-should-component-update": "error",
+		"vitest/prefer-called-exactly-once-with": "error",
+		"vitest/prefer-to-be-object": "error",
+		"vitest/prefer-to-have-been-called-times": "error",
+		"vitest/no-large-snapshots": "error",
+
+		"typescript/no-misused-spread": "error",
+		"typescript/require-array-sort-compare": "error",
+		"typescript/prefer-promise-reject-errors": "error",
+		"typescript/no-meaningless-void-operator": "error",
+		"typescript/no-unnecessary-template-expression": "error",
+		// A `default` clause is how this repo says "the rest is deliberate", so it counts as exhaustive.
+		// Left at the rule's default, all nine existing switches would need a suppression and no bug
+		// would be found; with it, a switch that drops both a case and its `default` still fails.
+		"typescript/switch-exhaustiveness-check": [
+			"error",
+			{ "considerDefaultExhaustiveForUnions": true }
+		],
+		// TanStack Router signals redirects and 404s by throwing them; everything else must be an Error.
+		"typescript/only-throw-error": [
+			"error",
+			{
+				"allow": [
+					{ "from": "package", "package": "@tanstack/router-core", "name": "Redirect" },
+					{ "from": "package", "package": "@tanstack/router-core", "name": "NotFoundError" }
+				]
+			}
+		],
 		// DOM and platform APIs.
 		"unicorn/error-message": "error",
 		"unicorn/throw-new-error": "error",

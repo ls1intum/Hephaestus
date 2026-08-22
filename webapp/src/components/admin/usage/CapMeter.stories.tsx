@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { expect, type within } from "storybook/test";
+import { expect } from "storybook/test";
+import type { Canvas } from "@/test/canvas";
 import { CapMeter } from "./CapMeter";
 
-const sharedBudgetMeter = (canvas: ReturnType<typeof within>) =>
+const sharedBudgetMeter = (canvas: Canvas) =>
 	canvas.getByRole("progressbar", { name: "Shared-model budget used" });
 
 const meta = {

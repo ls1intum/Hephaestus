@@ -31,11 +31,13 @@ class FakeEventSource extends EventTarget {
 	readyState = 1;
 	closed = false;
 
-	constructor(
-		readonly url: string,
-		readonly options?: EventSourceInit,
-	) {
+	readonly url: string;
+	readonly options?: EventSourceInit;
+
+	constructor(url: string, options?: EventSourceInit) {
 		super();
+		this.url = url;
+		this.options = options;
 		FakeEventSource.instances.push(this);
 	}
 

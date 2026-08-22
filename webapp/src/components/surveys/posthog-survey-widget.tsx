@@ -319,8 +319,9 @@ export function PostHogSurveyWidget({
 		if (submissionId) {
 			return submissionId;
 		}
-		const generated =
-			typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+		// Through `globalThis` so this stays safe where `crypto` is not declared at all — a bare
+		// `crypto?.` would still throw a ReferenceError there, which is what the `typeof` guarded.
+		const generated = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
 		setSubmissionId(generated);
 		return generated;
 	};

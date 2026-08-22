@@ -2,11 +2,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, userEvent, within } from "storybook/test";
 import type { AgentBinding } from "@/api/types.gen";
 import { withStandardPage } from "@/stories/decorators";
+import type { Canvas } from "@/test/canvas";
 import { expectControlOnScreen, expectNoPageOverflow } from "@/test/reflow";
 import { AgentBindingsPage } from "./AgentBindingsPage";
 import { mockAvailableModels } from "./story-mock-data";
-
-type Canvas = ReturnType<typeof within>;
 
 function purposeCard(canvas: Canvas, name: string) {
 	return within(canvas.getByRole("region", { name }));

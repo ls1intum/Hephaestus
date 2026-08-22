@@ -1,9 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { fn, screen, userEvent, within } from "storybook/test";
 import type { WorkspaceLlmModel } from "@/api/types.gen";
+import type { Canvas } from "@/test/canvas";
 import { WorkspaceLlmModelsTable } from "./WorkspaceLlmModelsTable";
 
-async function openDeleteConfirm(canvas: ReturnType<typeof within>, name: RegExp) {
+async function openDeleteConfirm(canvas: Canvas, name: RegExp) {
 	await userEvent.click(canvas.getByRole("button", { name }));
 	return await screen.findByRole("alertdialog");
 }

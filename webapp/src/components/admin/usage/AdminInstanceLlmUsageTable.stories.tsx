@@ -1,10 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { expect, fn, within } from "storybook/test";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import type { Canvas } from "@/test/canvas";
 import { expectTargetSize, horizontalScrollParentOf } from "@/test/reflow";
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
-
-type Canvas = ReturnType<typeof within>;
 
 const FX_DISCLOSURE = /reference rate published on/;
 

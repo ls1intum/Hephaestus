@@ -1,6 +1,5 @@
 {
 	"include": ["**/*.ts", "**/*.tsx"],
-	"exclude": ["src/api/**/*"],
 	"compilerOptions": {
 		"target": "ES2022",
 		"jsx": "react-jsx",
@@ -19,6 +18,13 @@
 		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true,
+		"noImplicitOverride": true,
+		"noImplicitReturns": true,
+		"allowUnreachableCode": false,
+		"allowUnusedLabels": false,
+		/* Only syntax a type-stripping runtime can erase: no enums, namespaces or parameter
+		   properties. Keeps `node --experimental-strip-types` viable for anything in this tree. */
+		"erasableSyntaxOnly": true,
 		"paths": {
 			"@/*": ["./src/*"]
 		}

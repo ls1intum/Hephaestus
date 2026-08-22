@@ -4,6 +4,7 @@ import type { ListPracticeReviewObservationsResponse, ReviewObservation } from "
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
+import type { Canvas } from "@/test/canvas";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { areaFacetOptions, practiceFacetOptions } from "./ObservationFilters";
 import { ObservationsListPage } from "./ObservationsListPage";
@@ -156,7 +157,7 @@ type Story = StoryObj<typeof meta>;
  * trigger is captured before the click because choosing an option renames it.
  */
 async function pickFacet(
-	canvas: ReturnType<typeof within>,
+	canvas: Canvas,
 	userEvent: { click: (element: Element) => Promise<void> },
 	facet: string,
 	option: RegExp,

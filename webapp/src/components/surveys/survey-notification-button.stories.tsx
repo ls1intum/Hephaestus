@@ -55,10 +55,9 @@ export const FullPagePreview: Story = {
 			const clear = useSurveyNotificationStore((s) => s.clearPendingSurvey);
 
 			useEffect(() => {
-				if (!pending) {
-					const t = setTimeout(() => setVisible(true), 400);
-					return () => clearTimeout(t);
-				}
+				if (pending) return;
+				const t = setTimeout(() => setVisible(true), 400);
+				return () => clearTimeout(t);
 			}, [pending]);
 
 			// Mirrors the widget: the badge raises a one-shot reopen request through the store.

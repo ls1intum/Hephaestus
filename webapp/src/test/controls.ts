@@ -1,6 +1,5 @@
-import { expect, type within } from "storybook/test";
-
-type Canvas = ReturnType<typeof within>;
+import { expect } from "storybook/test";
+import type { Canvas } from "@/test/canvas";
 
 /**
  * A closed Base UI select shows the *label* for its value, looked up from the options.
