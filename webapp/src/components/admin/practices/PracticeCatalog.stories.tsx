@@ -247,6 +247,16 @@ export const InstanceCatalogLoading: Story = {
 	},
 };
 
+/** Filtering to zero used to leave "No matching practices." and a banner with no control to clear. */
+export const FilteredToNothing: Story = {
+	args: { focusFilter: "docs.document" },
+	play: async ({ args, canvas, userEvent }) => {
+		await expect(canvas.getByText("No practices match this filter")).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Clear the filter" }));
+		await expect(args.onFocusFilterChange).toHaveBeenCalledWith("ALL");
+	},
+};
+
 export const AtScale: Story = {
 	args: { areas: scaleAreas, practices: scalePractices },
 	parameters: { chromatic: { viewports: [320, 1440] } },
@@ -393,7 +403,11 @@ export const DeletingArea: Story = {
 };
 
 export const Empty: Story = {
-	args: { areas: [], practices: [] },
+	args: {
+		areas: [],
+		practices: [],
+		library: { open: false, onOpenChange: fn(), state: { status: "loading" } },
+	},
 	parameters: { chromatic: { viewports: [1440] } },
 };
 

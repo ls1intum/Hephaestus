@@ -4,6 +4,7 @@ import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { DetailRow } from "@/components/common/DetailRow";
+import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
@@ -32,16 +33,12 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
-export type PracticeAdoptionState =
-	| { status: "loading" }
-	| { status: "error"; error: unknown; onRetry: () => void }
-	| {
-			status: "ready";
-			preview: CatalogPracticePreview;
-			definitionOptions: PracticeDefinitionOptions;
-			/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
-			action: "idle" | "adding" | "stale";
-	  };
+export type PracticeAdoptionState = PanelState<{
+	preview: CatalogPracticePreview;
+	definitionOptions: PracticeDefinitionOptions;
+	/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
+	action: "idle" | "adding" | "stale";
+}>;
 
 export interface PracticeAdoptionPanelProps {
 	state: PracticeAdoptionState;

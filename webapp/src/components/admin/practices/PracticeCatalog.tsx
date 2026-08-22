@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { GripVertical, Library, MoreHorizontal, Plus } from "lucide-react";
+import { GripVertical, Library, ListChecks, MoreHorizontal, Plus } from "lucide-react";
 import { type ReactNode, useState } from "react";
 import type {
 	CatalogPracticeSummary,
@@ -22,6 +22,7 @@ import {
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Section } from "@/components/core/Section";
@@ -43,7 +44,14 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "@/components/ui/empty";
+import {
+	Empty,
+	EmptyContent,
+	EmptyDescription,
+	EmptyHeader,
+	EmptyMedia,
+	EmptyTitle,
+} from "@/components/ui/empty";
 import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/item";
 import {
 	Select,
@@ -55,7 +63,11 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ARTIFACT_KIND, type KnownArtifactKind } from "@/lib/artifact-kinds";
+import {
+	ARTIFACT_KIND,
+	artifactKindPluralLabel,
+	type KnownArtifactKind,
+} from "@/lib/artifact-kinds";
 import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
@@ -71,11 +83,8 @@ export interface PracticeCatalogPendingState {
 	creatingArea: boolean;
 }
 
-/** The practice library's own state, independent of the tree beside it. */
-export type LibraryState =
-	| { status: "loading" }
-	| { status: "error"; error: unknown; onRetry: () => void }
-	| { status: "ready"; practices: CatalogPracticeSummary[] };
+/** The catalog section's own state, independent of the tree beside it. */
+export type LibraryState = PanelState<{ practices: CatalogPracticeSummary[] }>;
 
 /**
  * One prop, because `open` without a `state` was representable and rendered a loading block that
@@ -280,13 +289,47 @@ export function PracticeCatalog({
 				}}
 			/>
 
-			{areas.length === 0 && practices.length === 0 && (
-				<Empty className="border">
+			{areas.length === 0 && practices.length === 0 ? (
+				<Empty className="min-h-56 border">
 					<EmptyHeader>
+						<EmptyMedia variant="icon">
+							<ListChecks aria-hidden />
+						</EmptyMedia>
 						<EmptyTitle>No practices yet</EmptyTitle>
-						<EmptyDescription>Create a practice, then group related practices.</EmptyDescription>
+						<EmptyDescription>
+							Add one from the instance catalog, or write your own.
+						</EmptyDescription>
 					</EmptyHeader>
+					<EmptyContent>
+						<Button onClick={() => library?.onOpenChange(true)} disabled={!library}>
+							<Library className="mr-1.5 size-4" aria-hidden />
+							Show catalog
+						</Button>
+					</EmptyContent>
 				</Empty>
+			) : (
+				focusFilter !== "ALL" &&
+				visiblePracticeSlugs.size === 0 && (
+					// Without a way out, the reader is left with per-group "No matching practices." strings
+					// and a banner telling them to clear a filter, and no control that clears it.
+					<Empty className="min-h-56 border">
+						<EmptyHeader>
+							<EmptyMedia variant="icon">
+								<ListChecks aria-hidden />
+							</EmptyMedia>
+							<EmptyTitle>No practices match this filter</EmptyTitle>
+							<EmptyDescription>
+								Nothing in this workspace reviews{" "}
+								{artifactKindPluralLabel(focusFilter).toLowerCase()}.
+							</EmptyDescription>
+						</EmptyHeader>
+						<EmptyContent>
+							<Button variant="outline" onClick={() => onFocusFilterChange("ALL")}>
+								Clear the filter
+							</Button>
+						</EmptyContent>
+					</Empty>
+				)
 			)}
 
 			<AreaDetailsDialog

@@ -53,6 +53,15 @@ import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
 import { useSearchState } from "@/lib/search-params";
 
+type DetailKind = (typeof DETAIL_LEVEL_KINDS)[number];
+
+/** The payload each level kind resolves to, so a panel can ask for its own and get `undefined` else. */
+type LevelPayload<TKind extends DetailKind> = TKind extends "catalog-area"
+	? CatalogAreaAdoptionPreview
+	: TKind extends "catalog-practice"
+		? CatalogPracticePreview
+		: Practice;
+
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practices"),
 	validateSearch: practiceSetupSearchSchema,
@@ -88,17 +97,39 @@ function PracticeCatalogRoute() {
 		...listAdoptablePracticesOptions({ path: { workspaceSlug } }),
 		enabled: library === true,
 	});
+	// `select` tags each payload with the kind that asked for it. `useQueries` cannot correlate a
+	// result with the entry that produced it, so without the tag every read of `query.data` is a
+	// union and each panel needs a cast — and a mis-ordered stack becomes a runtime `undefined.name`
+	// instead of a type error.
 	const levelQueries = useQueries({
 		queries: detailStack.map((entry) => {
 			if (entry.kind === "catalog-area") {
-				return previewAreaAdoptionOptions({ path: { workspaceSlug, slug: entry.id } });
+				return {
+					...previewAreaAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
+					select: (data: CatalogAreaAdoptionPreview) => ({ kind: "catalog-area", data }) as const,
+				};
 			}
 			if (entry.kind === "catalog-practice") {
-				return previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } });
+				return {
+					...previewPracticeAdoptionOptions({ path: { workspaceSlug, slug: entry.id } }),
+					select: (data: CatalogPracticePreview) => ({ kind: "catalog-practice", data }) as const,
+				};
 			}
-			return getPracticeOptions({ path: { workspaceSlug, practiceSlug: entry.id } });
+			return {
+				...getPracticeOptions({ path: { workspaceSlug, practiceSlug: entry.id } }),
+				select: (data: Practice) => ({ kind: "practice", data }) as const,
+			};
 		}),
 	});
+
+	/** Reads a level's payload only when it is the kind the caller is rendering. */
+	const levelData = <TKind extends DetailKind>(
+		query: (typeof levelQueries)[number] | undefined,
+		kind: TKind,
+	) => {
+		const tagged = query?.data;
+		return tagged?.kind === kind ? (tagged.data as LevelPayload<TKind>) : undefined;
+	};
 
 	const refreshCatalog = () =>
 		Promise.all([
@@ -133,7 +164,7 @@ function PracticeCatalogRoute() {
 	const adoptReviewedPractice = async (depth: number) => {
 		const entry = detailStack[depth];
 		const query = levelQueries[depth];
-		const preview = query?.data as CatalogPracticePreview | undefined;
+		const preview = levelData(query, "catalog-practice");
 		if (!entry || !preview) return;
 		setStaleLevelKey(null);
 		try {
@@ -289,17 +320,18 @@ function PracticeCatalogRoute() {
 				{(entry, level) => {
 					const query = levelQueries[level.depth];
 					if (entry.kind === "catalog-area") {
+						const areaPreview = levelData(query, "catalog-area");
 						return (
 							<AreaAdoptionPanel
 								nested={level.nested}
 								state={
-									query.isPending
+									areaPreview === undefined || query.isPending
 										? { status: "loading" }
 										: query.isError
 											? { status: "error", error: query.error, onRetry: () => query.refetch() }
 											: {
 													status: "ready",
-													preview: query.data as CatalogAreaAdoptionPreview,
+													preview: areaPreview,
 													action:
 														staleLevelKey === detailStackKey(entry)
 															? "stale"
@@ -312,7 +344,7 @@ function PracticeCatalogRoute() {
 									stackControls.open({ kind: "catalog-practice", id: catalogSlug })
 								}
 								onConfirm={async () => {
-									const preview = query.data as CatalogAreaAdoptionPreview | undefined;
+									const preview = levelData(query, "catalog-area");
 									if (!preview) return;
 									setStaleLevelKey(null);
 									try {
@@ -333,12 +365,15 @@ function PracticeCatalogRoute() {
 						);
 					}
 					if (entry.kind === "practice") {
+						const workspacePractice = levelData(query, "practice");
 						return (
 							<WorkspacePracticePanel
 								workspaceSlug={workspaceSlug}
 								nested={level.nested}
 								state={
-									query.isPending || definitionOptionsQuery.isPending
+									workspacePractice === undefined ||
+									query.isPending ||
+									definitionOptionsQuery.isPending
 										? { status: "loading" }
 										: query.isError || definitionOptionsQuery.isError
 											? {
@@ -351,21 +386,22 @@ function PracticeCatalogRoute() {
 												}
 											: {
 													status: "ready",
-													practice: query.data as Practice,
+													practice: workspacePractice,
 													definitionOptions: definitionOptionsQuery.data,
 													areaName: areasQuery.data?.find(
-														(area) => area.slug === (query.data as Practice).areaSlug,
+														(area) => area.slug === workspacePractice.areaSlug,
 													)?.name,
 												}
 								}
 							/>
 						);
 					}
+					const catalogPreview = levelData(query, "catalog-practice");
 					return (
 						<PracticeAdoptionPanel
 							nested={level.nested}
 							state={
-								query.isPending || definitionOptionsQuery.isPending
+								catalogPreview === undefined || query.isPending || definitionOptionsQuery.isPending
 									? { status: "loading" }
 									: query.isError || definitionOptionsQuery.isError
 										? {
@@ -378,7 +414,7 @@ function PracticeCatalogRoute() {
 											}
 										: {
 												status: "ready",
-												preview: query.data as CatalogPracticePreview,
+												preview: catalogPreview,
 												definitionOptions: definitionOptionsQuery.data,
 												action:
 													staleLevelKey === detailStackKey(entry)

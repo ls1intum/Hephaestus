@@ -5,6 +5,7 @@ import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBadge";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
@@ -18,16 +19,12 @@ import { Separator } from "@/components/ui/separator";
 import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 
-export type WorkspacePracticeState =
-	| { status: "loading" }
-	| { status: "error"; error: unknown; onRetry: () => void }
-	| {
-			status: "ready";
-			practice: Practice;
-			definitionOptions: PracticeDefinitionOptions;
-			/** The area's display name, for the inheritance sentence. Absent when unassigned. */
-			areaName?: string;
-	  };
+export type WorkspacePracticeState = PanelState<{
+	practice: Practice;
+	definitionOptions: PracticeDefinitionOptions;
+	/** The group's display name, for the inheritance sentence. Absent when unassigned. */
+	areaName?: string;
+}>;
 
 export interface WorkspacePracticePanelProps {
 	workspaceSlug: string;

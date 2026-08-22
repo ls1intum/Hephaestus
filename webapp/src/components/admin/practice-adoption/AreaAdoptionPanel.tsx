@@ -2,6 +2,7 @@ import { ChevronRight, CircleAlert } from "lucide-react";
 import type { CatalogAreaAdoptionPreview } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
+import type { PanelState } from "@/components/common/panel-state";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import {
@@ -22,15 +23,11 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 
-export type AreaAdoptionState =
-	| { status: "loading" }
-	| { status: "error"; error: unknown; onRetry: () => void }
-	| {
-			status: "ready";
-			preview: CatalogAreaAdoptionPreview;
-			/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
-			action: "idle" | "adding" | "stale";
-	  };
+export type AreaAdoptionState = PanelState<{
+	preview: CatalogAreaAdoptionPreview;
+	/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
+	action: "idle" | "adding" | "stale";
+}>;
 
 export interface AreaAdoptionPanelProps {
 	state: AreaAdoptionState;
