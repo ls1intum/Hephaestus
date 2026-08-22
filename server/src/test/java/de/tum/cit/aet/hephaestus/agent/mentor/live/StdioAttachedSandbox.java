@@ -29,7 +29,7 @@ import tools.jackson.databind.ObjectMapper;
  * <p>Design constraints kept identical to the Docker adapter so this stand-in catches the same
  * class of bugs:
  * <ul>
- *   <li>Strict {@code \n}-terminated JSON-line framing on stdout (per pi-mentor-runner.mjs §86-113).</li>
+ *   <li>Strict {@code \n}-terminated JSON-line framing on stdout (per pi-mentor-runner.ts §86-113).</li>
  *   <li>Fan-out subscribe — each listener runs on a dedicated virtual thread; the pump thread
  *       never blocks on slow consumers.</li>
  *   <li>After {@link #close(Duration)}, {@code send} throws and {@code subscribe} returns a
@@ -43,7 +43,7 @@ import tools.jackson.databind.ObjectMapper;
 final class StdioAttachedSandbox implements AttachedSandbox {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** Buffer cap mirrors {@code MAX_LINE_BYTES} in pi-mentor-runner.mjs. */
+    /** Buffer cap mirrors {@code MAX_LINE_BYTES} in pi-mentor-runner.ts. */
     private static final int MAX_LINE_BYTES = 8 * 1024 * 1024;
 
     private final UUID sessionId;
@@ -133,7 +133,7 @@ final class StdioAttachedSandbox implements AttachedSandbox {
         Thread.ofVirtual()
             .name("stdio-sandbox-stdout-" + sessionId)
             .start(() -> {
-                // Buffered reader is fine here: pi-mentor-runner.mjs already strips trailing \r, and the
+                // Buffered reader is fine here: pi-mentor-runner.ts already strips trailing \r, and the
                 // single-byte \n delimiter has no overlap with multibyte UTF-8 continuation bytes — the
                 // U+2028/U+2029 readline hazard called out in the runner doesn't apply to us because we
                 // never split on those code points. We do still cap line size to detect a runaway runner.

@@ -1,0 +1,103 @@
+/**
+ * Runtime half of the precompute contract in ./types.ts.
+ *
+ * A practice script is DATA: it is stored per-practice in the DB and injected into
+ * {output}/practices/{slug}.ts, so nothing the compiler knows about it survives to run time. Every
+ * value crossing that boundary — the imported module, what it returns, the JSON already written to
+ * disk — is therefore `unknown` until one of the guards below has checked it.
+ *
+ * These validators throw with a `source`-prefixed message instead of returning a partial value: the
+ * runner turns that throw into a per-practice `status: "error"` result, so one off-contract script
+ * degrades to "the agent must analyse this practice manually" and never corrupts the run.
+ */
+
+import type { Hint, HintFlag, PracticeFindings, PracticeResult, PracticeScript } from "./types";
+
+/** Narrow parsed JSON (or any foreign value) to a plain object — arrays and null are not objects here. */
+export function isJsonObject(value: unknown): value is Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * All a dynamic import can prove about a practice module is that it exports a callable default.
+ * The signature is unverifiable at run time; the value the call RETURNS is verified by
+ * `parseFindings`, which is what actually protects the runner.
+ */
+export function isPracticeModule(mod: unknown): mod is { default: PracticeScript } {
+	return isJsonObject(mod) && typeof mod.default === "function";
+}
+
+function isHintFlag(value: unknown): value is HintFlag {
+	return typeof value === "boolean" || typeof value === "number" || typeof value === "string";
+}
+
+function isString(value: unknown): value is string {
+	return typeof value === "string";
+}
+
+/**
+ * A hint is rendered into summary.md field by field (`file:line`, `context.slice(...)`,
+ * `Object.entries(flags)`), and that rendering happens AFTER the per-practice error boundary — so an
+ * incomplete hint that slips through here takes the whole run down instead of one practice.
+ */
+function isHint(value: unknown): value is Hint {
+	return (
+		isJsonObject(value) &&
+		typeof value.file === "string" &&
+		typeof value.line === "number" &&
+		typeof value.pattern === "string" &&
+		typeof value.context === "string" &&
+		typeof value.inDiff === "boolean" &&
+		isJsonObject(value.flags) &&
+		Object.values(value.flags).every(isHintFlag)
+	);
+}
+
+/** Validate a script's return value against the PracticeFindings contract. */
+export function parseFindings(value: unknown, source: string): PracticeFindings {
+	if (!isJsonObject(value)) {
+		throw new Error(`${source} must return an object`);
+	}
+
+	const { hints, metrics, directions } = value;
+	if (!Array.isArray(hints) || !hints.every(isHint)) {
+		throw new Error(
+			`${source}: hints must be an array of {file, line, pattern, context, inDiff, flags}`,
+		);
+	}
+	if (!Array.isArray(directions) || !directions.every(isString)) {
+		throw new Error(`${source}: directions must be an array of strings`);
+	}
+	if (!isJsonObject(metrics)) {
+		throw new Error(`${source}: metrics must be an object`);
+	}
+
+	const numericMetrics: Record<string, number> = {};
+	for (const [key, metric] of Object.entries(metrics)) {
+		if (typeof metric !== "number" || !Number.isFinite(metric)) {
+			// JSON.stringify writes NaN/Infinity as `null`, so an unchecked metric silently becomes a
+			// hole in {slug}.json. Naming the key here makes the script's bug findable.
+			throw new Error(`${source}: metrics.${key} must be a finite number`);
+		}
+		numericMetrics[key] = metric;
+	}
+
+	return { hints, metrics: numericMetrics, directions };
+}
+
+/** Validate an already-written `{slug}.json` against the full PracticeResult contract. */
+export function parsePracticeResult(value: unknown, source: string): PracticeResult {
+	if (!isJsonObject(value)) {
+		throw new Error(`${source} must be an object`);
+	}
+
+	const { practice, status } = value;
+	if (typeof practice !== "string" || practice.length === 0) {
+		throw new Error(`${source}: practice must be a non-empty string`);
+	}
+	if (status !== "ok" && status !== "error" && status !== "timeout") {
+		throw new Error(`${source}: status must be one of ok, error, timeout`);
+	}
+
+	return { practice, status, ...parseFindings(value, source) };
+}

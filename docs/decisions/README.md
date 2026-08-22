@@ -68,5 +68,6 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0027](0027-dialog-lifetime-and-where-a-write-outcome-lands.md) | Dialog lifetime, and where a write's outcome lands when the dialog is gone | Accepted |
 | [0028](0028-source-synced-practice-catalog.md) | Source-synced practice catalog with sparse instance overrides | Accepted |
 | [0029](0029-measurement-intervention-seam-and-channel-levels.md) | Measurement and intervention are separate turns; a channel names where feedback lands, and its level follows | Accepted |
+| [0030](0030-agent-runtime-is-typescript-on-bun.md) | The agent runtime is TypeScript on Bun, with no Node in the sandbox | Accepted |
 
 Template: [0000-template.md](0000-template.md).

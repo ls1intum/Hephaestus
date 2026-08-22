@@ -22,28 +22,28 @@ import org.junit.jupiter.api.Test;
 
 class AgentVocabularySyncTest extends BaseUnitTest {
 
-    private static final Path NORMALIZER = resolveResource("agent/pi-observation-normalize.mjs");
-    private static final Path RUNNER = resolveResource("agent/pi-runner.mjs");
+    private static final Path NORMALIZER = resolveResource("agent/pi-observation-normalize.ts");
+    private static final Path RUNNER = resolveResource("agent/pi-runner.ts");
     private static final Path ORCHESTRATOR = resolveResource("agent/pi-orchestrator.md");
 
     @Test
     void presenceVocabularyMatches() throws IOException {
         assertThat(jsArray("PRESENCE_VALUES"))
-            .as("PRESENCE_VALUES in pi-observation-normalize.mjs vs Presence.values()")
+            .as("PRESENCE_VALUES in pi-observation-normalize.ts vs Presence.values()")
             .containsExactlyInAnyOrderElementsOf(names(Presence.values()));
     }
 
     @Test
     void assessmentVocabularyMatches() throws IOException {
         assertThat(jsArray("ASSESSMENT_VALUES"))
-            .as("ASSESSMENT_VALUES in pi-observation-normalize.mjs vs Assessment.values()")
+            .as("ASSESSMENT_VALUES in pi-observation-normalize.ts vs Assessment.values()")
             .containsExactlyInAnyOrderElementsOf(names(Assessment.values()));
     }
 
     @Test
     void severityVocabularyMatches() throws IOException {
         assertThat(jsArray("SEVERITY_VALUES"))
-            .as("SEVERITY_VALUES in pi-observation-normalize.mjs vs Severity.values()")
+            .as("SEVERITY_VALUES in pi-observation-normalize.ts vs Severity.values()")
             .containsExactlyInAnyOrderElementsOf(names(Severity.values()));
     }
 
@@ -51,10 +51,12 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     void carriesValenceAgrees() throws IOException {
         String body = Files.readString(NORMALIZER, StandardCharsets.UTF_8);
         Matcher fn = Pattern.compile(
-            "export function carriesValence\\(presence\\) \\{(.*?)\\n\\}",
+            // Tolerates the parameter and return annotations the TypeScript runtime carries; the body,
+            // which is what this test reads the valenced presences out of, is captured either way.
+            "export function carriesValence\\([^)]*\\)[^{]*\\{(.*?)\\n\\}",
             Pattern.DOTALL
         ).matcher(body);
-        assertThat(fn.find()).as("carriesValence() is declared in pi-observation-normalize.mjs").isTrue();
+        assertThat(fn.find()).as("carriesValence() is declared in pi-observation-normalize.ts").isTrue();
 
         Set<String> jsValenced = quotedStrings(fn.group(1));
         Set<String> javaValenced = Arrays.stream(Presence.values())
@@ -72,7 +74,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
         String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("pi-runner.mjs imports the shared vocabularies from pi-observation-normalize.mjs")
+            .as("pi-runner.ts imports the shared vocabularies from pi-observation-normalize.ts")
             .contains("PRESENCE_VALUES")
             .contains("ASSESSMENT_VALUES")
             .contains("SEVERITY_VALUES");
@@ -98,7 +100,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
             "]";
 
         assertThat(Files.readString(RUNNER, StandardCharsets.UTF_8))
-            .as("pi-runner.mjs conversation-note schema vs ConversationBrief")
+            .as("pi-runner.ts conversation-note schema vs ConversationBrief")
             .contains(required);
         assertThat(Files.readString(resolveResource("agent/feedback-composer.md"), StandardCharsets.UTF_8))
             .as("feedback-composer.md conversation-note shape vs ConversationBrief")
@@ -138,7 +140,7 @@ class AgentVocabularySyncTest extends BaseUnitTest {
             "export const " + Pattern.quote(constantName) + "\\s*=\\s*\\[(.*?)]",
             Pattern.DOTALL
         ).matcher(body);
-        assertThat(matcher.find()).as("%s is declared in pi-observation-normalize.mjs", constantName).isTrue();
+        assertThat(matcher.find()).as("%s is declared in pi-observation-normalize.ts", constantName).isTrue();
         Set<String> values = quotedStrings(matcher.group(1));
         assertThat(values).as("%s is not empty", constantName).isNotEmpty();
         return values;

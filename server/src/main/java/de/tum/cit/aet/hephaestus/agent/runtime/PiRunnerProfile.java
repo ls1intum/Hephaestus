@@ -13,7 +13,7 @@ public interface PiRunnerProfile {
     String runnerScript();
 
     /**
-     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-observation-normalize.mjs}).
+     * Sibling ES-module files the runner imports relatively (e.g. {@code ./pi-observation-normalize.ts}).
      * Each is staged at the workspace root next to the runner so the import resolves. Empty by default.
      */
     default List<String> sidecarScripts() {
@@ -30,9 +30,9 @@ public interface PiRunnerProfile {
         return List.of();
     }
 
-    /** V8 flags for the {@code node} invocation. */
-    List<String> nodeFlags();
+    /** Flags for the {@code bun} invocation. Bun ignores unknown flags silently, so V8 flags do nothing. */
+    List<String> runtimeFlags();
 
-    /** {@code KEY=value} pairs scoped to the {@code node} invocation only — not image-wide ENV. */
+    /** {@code KEY=value} pairs scoped to the {@code bun} invocation only — not image-wide ENV. */
     Map<String, String> additionalEnv();
 }

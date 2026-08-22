@@ -5,8 +5,13 @@ import { afterEach, beforeAll, describe, expect, it } from "bun:test";
 import { cp, mkdir, mkdtemp, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { isPracticeModule } from "./lib/practice-contract";
+import type { DiffFile, PracticeScript } from "./lib/types";
 
-const SCRIPTS_DIR = resolve(import.meta.dir, "../../../server/src/main/resources/practices/precompute");
+const SCRIPTS_DIR = resolve(
+	import.meta.dir,
+	"../../../server/src/main/resources/practices/precompute",
+);
 const LIB_DIR = resolve(import.meta.dir, "lib");
 
 const tempDirs: string[] = [];
@@ -21,14 +26,22 @@ async function createTempDir(prefix: string): Promise<string> {
  * Stage a single script in a work dir laid out like the runner (`practices/<script>` + symlinked `lib/`)
  * so its `../lib/types` import resolves, then import the staged copy and return its default export.
  */
-async function loadScript(name: string): Promise<(...args: any[]) => any> {
+async function loadScript(name: string): Promise<PracticeScript> {
 	const work = await createTempDir(`pc-script-${name}-`);
 	await mkdir(join(work, "practices"), { recursive: true });
 	await symlink(LIB_DIR, join(work, "lib"));
 	const staged = join(work, "practices", `${name}.ts`);
 	await cp(join(SCRIPTS_DIR, `${name}.ts`), staged);
-	const mod = await import(staged);
+	const mod: unknown = await import(staged);
+	if (!isPracticeModule(mod)) {
+		throw new Error(`${name} does not export a default function`);
+	}
 	return mod.default;
+}
+
+/** A path the diff touched. The scripts under test read the changed paths, not the hunk bodies. */
+function changedFile(path: string): DiffFile {
+	return { path, addedLines: new Map(), removedLines: new Map(), hunks: [] };
 }
 
 afterEach(async () => {
@@ -36,7 +49,7 @@ afterEach(async () => {
 });
 
 describe("ships-tests-with-the-change", () => {
-	let run: (...args: any[]) => any;
+	let run: PracticeScript;
 	beforeAll(async () => {
 		run = await loadScript("ships-tests-with-the-change");
 	});
@@ -58,7 +71,7 @@ describe("ships-tests-with-the-change", () => {
 			"Tests/AppTests.swift": "// test",
 		});
 		// Diff touches a production file, adds no test file.
-		const diff = new Map([["src/App.swift", { path: "src/App.swift" } as any]]);
+		const diff = new Map([["src/App.swift", changedFile("src/App.swift")]]);
 
 		const result = await run(repo, diff, {});
 
@@ -78,7 +91,7 @@ describe("ships-tests-with-the-change", () => {
 			".hidden/secret.go": "package x",
 		});
 
-		const result = await run(repo, new Map(), {});
+		const result = await run(repo, new Map<string, DiffFile>(), {});
 
 		// Only src/main.ts counts; the three excluded-dir files are skipped.
 		expect(result.metrics.repoCodeFileCount).toBe(1);
@@ -87,7 +100,7 @@ describe("ships-tests-with-the-change", () => {
 	it("reports the worktree as not visible when zero source files are seen", async () => {
 		const repo = await repoWith({ "README.md": "# docs only" });
 
-		const result = await run(repo, new Map(), {});
+		const result = await run(repo, new Map<string, DiffFile>(), {});
 
 		expect(result.metrics.worktreeVisible).toBe(0);
 		expect(result.directions.join(" ")).toContain("WORKTREE NOT VISIBLE");

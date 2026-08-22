@@ -21,7 +21,7 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
 
     @Test
     void runnerLiteralsMatchAbi() throws IOException {
-        Path runner = resolveResource("agent/pi-runner.mjs");
+        Path runner = resolveResource("agent/pi-runner.ts");
         assertThat(runner).isRegularFile();
         String body = Files.readString(runner, StandardCharsets.UTF_8);
 
@@ -66,10 +66,10 @@ class SandboxLayoutSyncTest extends BaseUnitTest {
 
     @Test
     @DisplayName(
-        "pi-mentor-runner.mjs pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR_PREFIX, PI_AGENT_DIR, and the envelope exit"
+        "pi-mentor-runner.ts pins MENTOR_SYSTEM_PROMPT_PATH, SESSIONS_DIR_PREFIX, PI_AGENT_DIR, and the envelope exit"
     )
     void mentorRunnerLiteralsMatchAbi() throws IOException {
-        Path runner = resolveResource("agent/pi-mentor-runner.mjs");
+        Path runner = resolveResource("agent/pi-mentor-runner.ts");
         assertThat(runner).isRegularFile();
         String body = Files.readString(runner, StandardCharsets.UTF_8);
 

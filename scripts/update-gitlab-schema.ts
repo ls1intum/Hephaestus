@@ -7,18 +7,20 @@
  * Default instance: https://gitlab.lrz.de (public introspection, no auth needed)
  */
 
-import { mkdirSync, statSync, unlinkSync, writeFileSync, renameSync } from "node:fs";
+import { mkdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildClientSchema, getIntrospectionQuery, printSchema, type IntrospectionQuery } from "graphql";
+import {
+	buildClientSchema,
+	getIntrospectionQuery,
+	type IntrospectionQuery,
+	printSchema,
+} from "graphql";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SCHEMA_DIR = resolve(
-	__dirname,
-	"../server/src/main/resources/graphql/gitlab",
-);
+const SCHEMA_DIR = resolve(__dirname, "../server/src/main/resources/graphql/gitlab");
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.gitlab.graphql");
 const DEFAULT_GITLAB_URL = "https://gitlab.lrz.de";
 
@@ -73,11 +75,17 @@ Options:
 
 function validateGraphQLSchema(content: string): { valid: boolean; reason?: string } {
 	if (content.length < MIN_SIZE_BYTES) {
-		return { valid: false, reason: `Content too small (${content.length} bytes, minimum ${MIN_SIZE_BYTES})` };
+		return {
+			valid: false,
+			reason: `Content too small (${content.length} bytes, minimum ${MIN_SIZE_BYTES})`,
+		};
 	}
 
 	if (content.length > MAX_SIZE_BYTES) {
-		return { valid: false, reason: `Content too large (${content.length} bytes, maximum ${MAX_SIZE_BYTES})` };
+		return {
+			valid: false,
+			reason: `Content too large (${content.length} bytes, maximum ${MAX_SIZE_BYTES})`,
+		};
 	}
 
 	if (!HAS_TYPE.test(content)) {
@@ -196,7 +204,11 @@ async function main(): Promise<void> {
 		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
 		console.log("\nTo regenerate types: cd server && ./mvnw compile -DskipTests");
 	} catch (error) {
-		try { unlinkSync(tempFile); } catch { /* ignore */ }
+		try {
+			unlinkSync(tempFile);
+		} catch {
+			/* ignore */
+		}
 		throw error;
 	}
 }

@@ -21,14 +21,10 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const SPEC_DIR = resolve(
-	__dirname,
-	"../server/src/main/resources/openapi/outline",
-);
+const SPEC_DIR = resolve(__dirname, "../server/src/main/resources/openapi/outline");
 const SPEC_FILE = join(SPEC_DIR, "spec3.yml");
 // Official Outline OpenAPI spec — the only trusted source.
-const SPEC_URL =
-	"https://raw.githubusercontent.com/outline/openapi/main/spec3.yml";
+const SPEC_URL = "https://raw.githubusercontent.com/outline/openapi/main/spec3.yml";
 
 // Validation constants — the Outline spec is ~250KB.
 const MIN_SIZE_BYTES = 50_000;
@@ -81,9 +77,7 @@ async function main(): Promise<void> {
 
 	const response = await fetch(SPEC_URL);
 	if (!response.ok) {
-		console.error(
-			`Failed to fetch spec: ${response.status} ${response.statusText}`,
-		);
+		console.error(`Failed to fetch spec: ${response.status} ${response.statusText}`);
 		process.exit(1);
 	}
 
@@ -111,9 +105,7 @@ async function main(): Promise<void> {
 		console.log(`Downloaded ${Math.round(stats.size / 1024)}KB`);
 		renameSync(tempFile, SPEC_FILE);
 		console.log(`Spec updated successfully: ${SPEC_FILE}`);
-		console.log(
-			"\nTo regenerate models: cd server && ./mvnw -o clean compile -P'!quick'",
-		);
+		console.log("\nTo regenerate models: cd server && ./mvnw -o clean compile -P'!quick'");
 	} catch (error) {
 		try {
 			unlinkSync(tempFile);

@@ -16,11 +16,14 @@ const ISSUE_URL = /https?:\/\/[^\s)]+?\/(?:-\/)?issues\/(\d+)/gi;
 // Issue number embedded in a branch name: feature/123-foo, issue-123, 123-fix-thing, bugfix/GH-123.
 const BRANCH_REF = /(?:^|[/_-])(?:issue[-_]?|gh[-_]?|#)?(\d{1,6})(?:[-_/]|$)/gi;
 
+// Every pattern below is global and captures the issue number in group 1; matchAll iterates a clone,
+// so the shared module-level regexes keep a lastIndex of 0 between calls.
 function collect(re: RegExp, text: string, into: Set<string>): void {
 	if (!text) return;
 	re.lastIndex = 0;
-	let m: RegExpExecArray | null;
-	while ((m = re.exec(text)) !== null) into.add(`#${m[1]}`);
+	for (const match of text.matchAll(re)) {
+		into.add(`#${match[1]}`);
+	}
 }
 
 // A linked work item, as projected by the SCM connector into inputs/context/linked_work_items.json (optional).
@@ -55,7 +58,9 @@ async function readLinkedItemsFromRepoPath(repoPath: string): Promise<LinkedWork
 	const idx = repoPath.lastIndexOf("/inputs/");
 	if (idx < 0) return null;
 	try {
-		const data = await Bun.file(`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`).json();
+		const data = await Bun.file(
+			`${repoPath.slice(0, idx)}/inputs/context/linked_work_items.json`,
+		).json();
 		return unwrapLinkedItems(data);
 	} catch {
 		// absent or unreadable — that itself is the over-NA condition; fall through.
@@ -69,7 +74,9 @@ async function readLinkedItems(
 	repoPath: string,
 	contextDir: string | undefined,
 ): Promise<LinkedWorkItem[] | null> {
-	const fromContext = unwrapLinkedItems(await readContextJson(contextDir, "linked_work_items.json"));
+	const fromContext = unwrapLinkedItems(
+		await readContextJson(contextDir, "linked_work_items.json"),
+	);
 	if (fromContext !== null) return fromContext;
 	return readLinkedItemsFromRepoPath(repoPath);
 }
@@ -77,7 +84,9 @@ async function readLinkedItems(
 // A checkable acceptance-criteria artifact: an AC/DoD heading or a "- [ ]" checklist in the issue body.
 function acFacts(body: string): { heading: boolean; boxes: number } {
 	const heading =
-		/(acceptance criteria|definition of done|\bDoD\b|done when|expected (?:outcome|result|behaviou?r))/i.test(body);
+		/(acceptance criteria|definition of done|\bDoD\b|done when|expected (?:outcome|result|behaviou?r))/i.test(
+			body,
+		);
 	const boxes = (body.match(/^[\s>]*[-*]\s+\[[ xX]\]/gm) ?? []).length;
 	return { heading, boxes };
 }
@@ -110,8 +119,9 @@ export default async function (
 	CLOSE_KEYWORD.lastIndex = 0;
 
 	const linked = await readLinkedItems(repoPath, contextDir);
-	const linkedIssueBodyPresent =
-		linked !== null && linked.some((i) => (i.bodyExcerpt ?? i.body ?? i.description ?? "").trim().length > 0);
+	const linkedIssueBodyPresent = linked?.some(
+		(i) => (i.bodyExcerpt ?? i.body ?? i.description ?? "").trim().length > 0,
+	);
 	let acHeading = false;
 	let acBoxes = 0;
 	if (linked) {

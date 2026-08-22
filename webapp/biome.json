@@ -1,5 +1,6 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
+	"root": false,
 	"plugins": [
 		"./.biome/no-redundant-in-the-document.grit",
 		"./.biome/no-within-canvas-element.grit",

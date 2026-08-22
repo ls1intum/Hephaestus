@@ -27,7 +27,7 @@ const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const ROOTS = [join(REPO_ROOT, "docs")];
 
 const dom = new JSDOM("<!DOCTYPE html><body></body>", {
-  pretendToBeVisual: true,
+	pretendToBeVisual: true,
 });
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
@@ -42,68 +42,65 @@ const FENCED = /```mermaid[^\n]*\n([\s\S]*?)```/g;
 /** Each entry is `{ label, source }`, so a failure names the page and which block on it. */
 const diagrams = [];
 for (const root of ROOTS) {
-  for (const entry of await readdir(root, { recursive: true })) {
-    // Dependency READMEs are neither committed documentation nor rendered by Docusaurus. pnpm may
-    // materialize docs/node_modules as a real directory, so recursive readdir must exclude it itself.
-    if (entry.split(sep).includes("node_modules")) continue;
-    const path = join(root, entry);
-    if (entry.endsWith(".mmd")) {
-      diagrams.push({
-        label: path,
-        source: await readFile(path, "utf8"),
-        requiresAccessibleName: false,
-      });
-      continue;
-    }
-    if (!entry.endsWith(".md") && !entry.endsWith(".mdx")) continue;
-    const text = await readFile(path, "utf8");
-    let block = 0;
-    for (const match of text.matchAll(FENCED)) {
-      block += 1;
-      diagrams.push({
-        label: `${path} (mermaid block ${block})`,
-        source: match[1],
-        requiresAccessibleName: true,
-      });
-    }
-  }
+	for (const entry of await readdir(root, { recursive: true })) {
+		// Dependency READMEs are neither committed documentation nor rendered by Docusaurus. pnpm may
+		// materialize docs/node_modules as a real directory, so recursive readdir must exclude it itself.
+		if (entry.split(sep).includes("node_modules")) continue;
+		const path = join(root, entry);
+		if (entry.endsWith(".mmd")) {
+			diagrams.push({
+				label: path,
+				source: await readFile(path, "utf8"),
+				requiresAccessibleName: false,
+			});
+			continue;
+		}
+		if (!entry.endsWith(".md") && !entry.endsWith(".mdx")) continue;
+		const text = await readFile(path, "utf8");
+		let block = 0;
+		for (const match of text.matchAll(FENCED)) {
+			block += 1;
+			diagrams.push({
+				label: `${path} (mermaid block ${block})`,
+				source: match[1],
+				requiresAccessibleName: true,
+			});
+		}
+	}
 }
 
 if (diagrams.length === 0) {
-  console.error(
-    "No diagrams found — this check would pass without checking anything.",
-  );
-  process.exit(1);
+	console.error("No diagrams found — this check would pass without checking anything.");
+	process.exit(1);
 }
 
 let failed = false;
 for (const { label, source, requiresAccessibleName } of diagrams) {
-  if (
-    requiresAccessibleName &&
-    (!/^\s*accTitle:\s*\S.+$/m.test(source) ||
-      !/^\s*accDescr:\s*\S.+$/m.test(source))
-  ) {
-    failed = true;
-    console.error(
-      `${label}\n  Add non-empty accTitle and accDescr lines so the diagram has an accessible name and description.\n`,
-    );
-  }
-  try {
-    await mermaid.parse(source);
-  } catch (error) {
-    failed = true;
-    const detail = String(error?.message ?? error).split("\n")[0];
-    console.error(`${label}\n  ${detail}\n`);
-  }
+	if (
+		requiresAccessibleName &&
+		(!/^\s*accTitle:\s*\S.+$/m.test(source) || !/^\s*accDescr:\s*\S.+$/m.test(source))
+	) {
+		failed = true;
+		console.error(
+			`${label}\n  Add non-empty accTitle and accDescr lines so the diagram has an accessible name and description.\n`,
+		);
+	}
+	try {
+		await mermaid.parse(source);
+	} catch (error) {
+		failed = true;
+		const detail = String(error?.message ?? error).split("\n")[0];
+		console.error(`${label}\n  ${detail}\n`);
+	}
 }
 
 if (failed) {
-  console.error(
-    `Fix the Mermaid ${version} parse or accessibility errors above before publishing.`,
-  );
-  process.exit(1);
+	console.error(
+		`Fix the Mermaid ${version} parse or accessibility errors above before publishing.`,
+	);
+	process.exit(1);
 }
 
 console.log(
-  `check-mermaid-diagrams: ${diagrams.length} diagram(s) parse under mermaid ${version}.`,
+	`check-mermaid-diagrams: ${diagrams.length} diagram(s) parse under mermaid ${version}.`,
 );

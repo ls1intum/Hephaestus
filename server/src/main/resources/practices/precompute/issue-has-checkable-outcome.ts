@@ -22,7 +22,8 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 		/(acceptance criteria|definition of done|\bDoD\b|done when|verif(y|iable)|expected (outcome|result|behaviou?r))/i.test(
 			body,
 		);
-	const valueClause = /\bso that\b/i.test(body) || /\bas an?\b[\s\S]{0,60}\bi (want|need|would like)\b/i.test(body);
+	const valueClause =
+		/\bso that\b/i.test(body) || /\bas an?\b[\s\S]{0,60}\bi (want|need|would like)\b/i.test(body);
 	const isStub = body.length < 40;
 
 	// Issue-type classification — duplicated verbatim from issue-states-an-actionable-problem.ts on purpose
@@ -31,10 +32,13 @@ export default async function (_repo: string, _diff: Map<string, unknown>, m: Is
 	const titleNorm = norm(title);
 	const bodyNorm = norm(body);
 	const titleEcho =
-		bodyNorm.length > 0 && (bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
+		bodyNorm.length > 0 &&
+		(bodyNorm === titleNorm || titleNorm.includes(bodyNorm) || bodyNorm.includes(titleNorm));
 	const emptyOrTitleEcho = body.length < 25 || titleEcho;
 	const hasDeliverableTypeLabel = labels.some((l) =>
-		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/.test(l),
+		/\b(user ?story|story|bug|defect|feature|enhancement|task|chore|requirement|artifact|epic|spike)\b/.test(
+			l,
+		),
 	);
 	const looksUmbrella =
 		labels.some((l) => /\b(epic|umbrella|meta|initiative|requirement)\b/.test(l)) ||

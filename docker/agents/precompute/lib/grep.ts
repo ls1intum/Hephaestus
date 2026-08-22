@@ -1,6 +1,6 @@
+import { join, relative } from "node:path";
 import { isInDiff } from "./diff-parser";
 import type { DiffFile, Hint } from "./types";
-import { join, relative } from "path";
 
 export interface GrepMatch {
 	file: string;
@@ -17,15 +17,17 @@ export interface GrepOptions {
 const GLOB_GREP_BATCH_SIZE = 256;
 
 function parseGrepLine(line: string, dir: string): GrepMatch | null {
-	const match = line.match(/^(.+?):(\d+):(.*)$/);
-	if (!match) {
+	// Path and line number are required groups; the trailing content group matches empty for a blank
+	// matched line, so it defaults instead of rejecting the whole match.
+	const [, file, lineNumber, content = ""] = line.match(/^(.+?):(\d+):(.*)$/) ?? [];
+	if (file === undefined || lineNumber === undefined) {
 		return null;
 	}
 
 	return {
-		file: relative(dir, match[1]),
-		line: Number.parseInt(match[2], 10),
-		content: match[3].trim(),
+		file: relative(dir, file),
+		line: Number.parseInt(lineNumber, 10),
+		content: content.trim(),
 	};
 }
 
@@ -106,7 +108,9 @@ async function collectMatchesForGlob(
 		}
 
 		const remaining = maxResults - matches.length;
-		matches.push(...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining)));
+		matches.push(
+			...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining)),
+		);
 		if (matches.length >= maxResults) {
 			return matches.slice(0, maxResults);
 		}
@@ -122,14 +126,16 @@ async function collectMatchesForGlob(
 		return matches.slice(0, maxResults);
 	}
 
-	matches.push(...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining)));
+	matches.push(
+		...(await collectGrepMatches([...grepArgs, "--", pattern, ...batch], dir, remaining)),
+	);
 	return matches.slice(0, maxResults);
 }
 
 function shouldIncludeDiscoveredFile(path: string): boolean {
 	const segments = path.split("/");
-	return !segments.some((segment) =>
-		segment === "node_modules" || segment === ".build" || segment.startsWith("."),
+	return !segments.some(
+		(segment) => segment === "node_modules" || segment === ".build" || segment.startsWith("."),
 	);
 }
 
@@ -161,7 +167,11 @@ export async function grep(
 		return collectMatchesForGlob(pattern, dir, grepArgs, recursiveGlob, maxResults);
 	}
 
-	return collectGrepMatches(["grep", "-r", ...grepArgs.slice(1), "--", pattern, dir], dir, maxResults);
+	return collectGrepMatches(
+		["grep", "-r", ...grepArgs.slice(1), "--", pattern, dir],
+		dir,
+		maxResults,
+	);
 }
 
 /**
@@ -186,9 +196,7 @@ export function matchesToHints(
 /**
  * Read a file and return its lines (1-indexed Map).
  */
-export async function readFileLines(
-	path: string,
-): Promise<Map<number, string>> {
+export async function readFileLines(path: string): Promise<Map<number, string>> {
 	try {
 		const content = await Bun.file(path).text();
 		const lines = new Map<number, string>();
@@ -205,10 +213,7 @@ export async function readFileLines(
 /**
  * Find all files matching a given extension in a directory.
  */
-export async function findFiles(
-	dir: string,
-	extension: string,
-): Promise<string[]> {
+export async function findFiles(dir: string, extension: string): Promise<string[]> {
 	const pattern = `**/*.${extension}`;
 	const matcher = new Bun.Glob(pattern);
 	return [...matcher.scanSync(dir)]

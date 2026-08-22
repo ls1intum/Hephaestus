@@ -108,7 +108,7 @@ public final class SandboxLayout {
     public static final String PI_AGENT_DIR = WORKSPACE_ROOT + "/" + PI_AGENT_NAME;
 
     /** Workspace-relative filename of the runner script copied from the classpath. */
-    public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.mjs";
+    public static final String RUNNER_SCRIPT_FILENAME = ".run-pi.ts";
 
     /**
      * Workspace-relative filename of the non-secret LLM-provider spec written by
@@ -118,7 +118,7 @@ public final class SandboxLayout {
     public static final String PROVIDER_CONFIG_FILENAME = "pi-provider.json";
 
     /** Workspace-relative filename of the shared provider-registration ES module both runners import. */
-    public static final String PROVIDER_HELPER_FILENAME = "pi-provider.mjs";
+    public static final String PROVIDER_HELPER_FILENAME = "pi-provider.ts";
 
     /** Workspace-relative filename of the orchestrator instructions loaded into Pi at runtime. */
     public static final String ORCHESTRATOR_FILENAME = "AGENTS.md";
@@ -126,7 +126,7 @@ public final class SandboxLayout {
     /** Workspace-relative path of the orchestrator instructions (combination of prefix + filename). */
     public static final String ORCHESTRATOR_PATH = PI_AGENT_PREFIX + ORCHESTRATOR_FILENAME;
 
-    /** Mentor system prompt path — pinned by {@code SandboxLayoutSyncTest} against pi-mentor-runner.mjs. */
+    /** Mentor system prompt path — pinned by {@code SandboxLayoutSyncTest} against pi-mentor-runner.ts. */
     public static final String MENTOR_SYSTEM_PROMPT_PATH = "agent/mentor/system.md";
 
     /** Workspace-relative directory for restored Pi SDK session JSONL files (matches the mentor runner's {@code SESSIONS_DIR}). */

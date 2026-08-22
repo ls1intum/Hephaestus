@@ -85,7 +85,7 @@ import tools.jackson.databind.node.ObjectNode;
  * ├── out/                               # the ONLY directory collected back into SQL
  * ├── task.json                          # Task envelope (TaskEnvelope around Task.PracticeReview)
  * ├── .pi/{AGENTS.md, settings.json, extensions/} # Pi SDK agent dir ($PI_CODING_AGENT_DIR)
- * └── .run-pi.mjs                          # runner entry point
+ * └── .run-pi.ts                          # runner entry point
  * </pre>
  */
 public class PullRequestReviewHandler implements JobTypeHandler {

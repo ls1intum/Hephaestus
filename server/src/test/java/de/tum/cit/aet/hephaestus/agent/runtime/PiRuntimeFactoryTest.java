@@ -94,15 +94,15 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
         @DisplayName("stages the runner's relative-import sidecars beside the runner")
         void stagesRunnerSidecars() {
             var inputs = factory.build(spec("openai-completions", "m", false)).inputFiles();
-            // pi-runner.mjs imports each relatively; unstaged, the sandbox exits 1 with ERR_MODULE_NOT_FOUND.
+            // pi-runner.ts imports each relatively; unstaged, the sandbox exits 1 with ERR_MODULE_NOT_FOUND.
             for (String sidecar : PRACTICE.sidecarScripts()) {
                 assertThat(inputs).containsKey(sidecar);
                 assertThat(inputs.get(sidecar)).isNotEmpty();
             }
             assertThat(PRACTICE.sidecarScripts()).contains(
-                "pi-observation-normalize.mjs",
-                "pi-runner-usage.mjs",
-                "pi-provider.mjs"
+                "pi-observation-normalize.ts",
+                "pi-runner-usage.ts",
+                "pi-provider.ts"
             );
         }
 
@@ -304,36 +304,35 @@ class PiRuntimeFactoryTest extends BaseUnitTest {
     class CommandAssembly {
 
         @Test
-        @DisplayName("Practice profile contributes --no-warnings and no per-process env")
-        void nodeFlagsForPractice() {
+        void shouldRunTheRunnerOnBunRatherThanNode() {
             String body = factory.build(spec("openai-completions", "gpt-x", false)).command().get(2);
-            int nodeIdx = body.indexOf("node ");
-            int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
-            String nodePrefix = body.substring(nodeIdx, scriptIdx);
-            assertThat(nodePrefix)
-                .contains("--no-warnings")
-                .doesNotContain("--max-old-space-size")
-                .doesNotContain("--expose-gc")
-                .doesNotContain("--disable-source-maps");
-            // Per-process env immediately preceding `node ` must be empty for practice.
-            int lastAmp = body.lastIndexOf("&&", nodeIdx);
-            int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
-            assertThat(body.substring(sliceStart, nodeIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
+
+            assertThat(body).contains("bun ").doesNotContain("node ");
         }
 
         @Test
-        void mentorProfileContributesMentorFlagsAndEnv() {
-            String body = factory.build(spec(MENTOR)).command().get(2);
-            int nodeIdx = body.indexOf("node ");
+        @DisplayName("Practice profile contributes no flags and no per-process env")
+        void runtimeFlagsForPractice() {
+            String body = factory.build(spec("openai-completions", "gpt-x", false)).command().get(2);
+            int bunIdx = body.indexOf("bun ");
             int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
-            assertThat(body.substring(nodeIdx, scriptIdx))
-                .contains("--max-old-space-size=256")
-                .contains("--no-warnings")
-                .contains("--expose-gc")
-                .doesNotContain("--disable-source-maps");
-            assertThat(body.substring(0, nodeIdx))
-                .contains("LD_PRELOAD=/usr/local/lib/libjemalloc.so.2")
-                .contains("MALLOC_CONF=background_thread:true");
+
+            assertThat(body.substring(bunIdx, scriptIdx)).isEqualTo("bun " + SandboxLayout.WORKSPACE_ROOT + "/");
+            // Per-process env immediately preceding `bun ` must be empty for practice.
+            int lastAmp = body.lastIndexOf("&&", bunIdx);
+            int sliceStart = lastAmp >= 0 ? lastAmp + 2 : 0;
+            assertThat(body.substring(sliceStart, bunIdx)).doesNotContain("LD_PRELOAD").doesNotContain("MALLOC_CONF");
+        }
+
+        @Test
+        void mentorProfileContributesMentorFlags() {
+            String body = factory.build(spec(MENTOR)).command().get(2);
+            int bunIdx = body.indexOf("bun ");
+            int scriptIdx = body.indexOf(SandboxLayout.RUNNER_SCRIPT_FILENAME);
+
+            assertThat(body.substring(bunIdx, scriptIdx)).contains("--smol").contains("--expose-gc");
+            // V8 flags would be accepted and silently ignored by Bun, so none may be emitted.
+            assertThat(body).doesNotContain("--max-old-space-size").doesNotContain("--no-warnings");
         }
 
         @Test
