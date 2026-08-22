@@ -60,9 +60,6 @@ export function PostHogSurveyWidget({
 	const posthog = usePostHog();
 
 	// Zustand store for persistent survey notifications
-	const shouldShowSurvey = useSurveyNotificationStore((s) => s.shouldShowSurvey);
-	const pendingSurvey = useSurveyNotificationStore((s) => s.pendingSurvey);
-	const clearShowSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
 	const setPendingSurvey = useSurveyNotificationStore((s) => s.setPendingSurvey);
 	const clearPendingSurvey = useSurveyNotificationStore((s) => s.clearPendingSurvey);
 
@@ -75,6 +72,15 @@ export function PostHogSurveyWidget({
 	// Refs to capture latest values for cleanup effect (avoids stale closures)
 	const surveyRef = useRef<PostHogSurvey | null>(null);
 	const isVisibleRef = useRef(isVisible);
+
+	// Hiding the survey re-arms the reveal delay, so a later reopen animates in again.
+	const [wasVisible, setWasVisible] = useState(isVisible);
+	if (wasVisible !== isVisible) {
+		setWasVisible(isVisible);
+		if (!isVisible) {
+			setShowWithDelay(false);
+		}
+	}
 
 	// Sync refs with state so cleanup always has current values
 	useEffect(() => {
@@ -92,17 +98,27 @@ export function PostHogSurveyWidget({
 		};
 	}, [setPendingSurvey]);
 
-	// Handle reopening the survey from the notification button
+	// Handle reopening the survey from the notification button. The request is a one-shot event
+	// raised elsewhere in the tree, not render state, so it is consumed straight off the store -
+	// reading it through a selector would render this widget once with the signal still pending.
 	// Uses the pending survey object from Zustand - synchronous, no fetch needed
 	useEffect(() => {
-		if (shouldShowSurvey && pendingSurvey) {
+		const consumeShowSignal = () => {
+			const { shouldShowSurvey, pendingSurvey, clearShowSignal } =
+				useSurveyNotificationStore.getState();
+			if (!shouldShowSurvey || !pendingSurvey) {
+				return;
+			}
 			clearShowSignal();
 			setSurvey(pendingSurvey);
 			setIsVisible(true);
 			setShowWithDelay(true);
 			hasTrackedShown.current = false;
-		}
-	}, [shouldShowSurvey, pendingSurvey, clearShowSignal]);
+		};
+
+		consumeShowSignal();
+		return useSurveyNotificationStore.subscribe(consumeShowSignal);
+	}, []);
 
 	// Monitor URL changes and re-check survey conditions
 	useEffect(() => {
@@ -158,7 +174,6 @@ export function PostHogSurveyWidget({
 	// Delay showing the survey by 5 seconds for a better UX
 	useEffect(() => {
 		if (!isVisible) {
-			setShowWithDelay(false);
 			return;
 		}
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
 	Field,
 	FieldContent,
@@ -61,49 +61,25 @@ export function QuestionSingleChoice({
 	const openChoiceId = `${groupId}-choice-open`;
 	const openChoiceInputId = `${openChoiceId}-input`;
 
-	useEffect(() => {
-		if (!hasCustomOption) {
-			if (customSelected || customValue !== "") {
-				setCustomSelected(false);
-				setCustomValue("");
-			}
-			return;
+	// The open choice is driven by the user, but the answer can also arrive from the outside
+	// (restored draft, question swapped in). Reconcile the two while rendering so the field
+	// never paints an answer the parent no longer holds. An empty answer is left alone: the
+	// custom option stays selected without input so users can type later.
+	if (!hasCustomOption || isKnownValue) {
+		if (customSelected) {
+			setCustomSelected(false);
 		}
-
-		const baseChoicesForEffect = hasCustomOption ? choices.slice(0, -1) : choices;
-		const isCustomAnswer = stringValue !== "" && !baseChoicesForEffect.includes(stringValue);
-
-		if (isCustomAnswer) {
-			if (!customSelected) {
-				setCustomSelected(true);
-			}
-			if (customValue !== stringValue) {
-				setCustomValue(stringValue);
-			}
-			return;
-		}
-
-		if (stringValue === "") {
-			// Keep the custom option selected even without input so users can type later.
-			return;
-		}
-
-		const isBaseChoice = baseChoicesForEffect.includes(stringValue);
-		if (isBaseChoice) {
-			if (customSelected) {
-				setCustomSelected(false);
-			}
-			if (customValue !== "") {
-				setCustomValue("");
-			}
-			return;
-		}
-
-		// Fallback when value is cleared externally but selection was not reset.
-		if (customSelected && customValue !== "") {
+		if (customValue !== "") {
 			setCustomValue("");
 		}
-	}, [choices, customSelected, customValue, hasCustomOption, stringValue]);
+	} else if (stringValue !== "") {
+		if (!customSelected) {
+			setCustomSelected(true);
+		}
+		if (customValue !== stringValue) {
+			setCustomValue(stringValue);
+		}
+	}
 
 	const radioGroupValue = customSelected ? customRadioValue : isKnownValue ? stringValue : "";
 

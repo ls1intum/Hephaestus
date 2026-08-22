@@ -8,8 +8,8 @@ import {
 } from "@/components/consent/ConsentBanner";
 import {
 	analyticsConfigured,
+	type ConsentChoice,
 	closeConsentReopen,
-	consumeReopenSeed,
 	errorMonitoringConfigured,
 	optionalIntegrationsAvailable,
 	setStoredConsent,
@@ -49,27 +49,37 @@ function configuredCategories(): ConsentCategory[] {
 export function CookieConsentBanner() {
 	const consent = useCookieConsent();
 	const reopen = useConsentReopenRequested();
-	const editing = consent !== null; // reopened to change an existing decision (vs first visit)
 	const open = optionalIntegrationsAvailable && (consent === null || reopen);
 
+	if (!open) {
+		return null;
+	}
+
+	// Mounted per appearance, so the toggles start from the decision being revisited (revisiting
+	// preferences never silently drops a choice) without ever being re-seeded in place.
+	return <ConsentForm decision={consent} reopened={reopen} />;
+}
+
+interface ConsentFormProps {
+	/** The decision being revisited, or `null` on a first visit. Seeds the toggles. */
+	decision: ConsentChoice | null;
+	/** True when the banner was explicitly re-opened (vs appearing passively on a first visit). */
+	reopened: boolean;
+}
+
+function ConsentForm({ decision, reopened }: ConsentFormProps) {
 	const [values, setValues] = useState<Record<ConsentCategoryKey, boolean>>({
-		analytics: false,
-		errorMonitoring: false,
+		analytics: decision?.analytics ?? false,
+		errorMonitoring: decision?.errorMonitoring ?? false,
 	});
 	const cardRef = useRef<HTMLDivElement>(null);
 
-	// On an explicit reopen, pre-seed the toggles from the prior decision (so revisiting never
-	// silently drops a choice) and move focus to the banner. A passive first visit does neither.
+	// An explicit reopen moves focus to the banner; a passive first visit must not steal it.
 	useEffect(() => {
-		if (reopen) {
-			const seed = consumeReopenSeed();
-			setValues({
-				analytics: seed?.analytics ?? false,
-				errorMonitoring: seed?.errorMonitoring ?? false,
-			});
+		if (reopened) {
 			cardRef.current?.focus();
 		}
-	}, [reopen]);
+	}, [reopened]);
 
 	// Saving/closing unmounts the banner; move focus to the main landmark first so the next Tab lands
 	// somewhere sensible instead of falling back to <body>.
@@ -106,16 +116,12 @@ export function CookieConsentBanner() {
 		},
 	};
 
-	if (!open) {
-		return null;
-	}
-
 	return (
 		<ConsentBanner
 			ref={cardRef}
 			categories={configuredCategories()}
 			values={values}
-			editing={editing}
+			editing={decision !== null}
 			privacyPolicy={
 				<Link to="/privacy" className="underline underline-offset-4 hover:text-foreground">
 					Read our Privacy Policy

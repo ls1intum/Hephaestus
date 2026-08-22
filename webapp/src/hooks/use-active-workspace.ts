@@ -2,9 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
+import type { WorkspaceListItem } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { toScmProviderType } from "@/lib/provider";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+/** Shared so an unloaded query keeps the same `workspaces` identity across renders. */
+const NO_WORKSPACES: WorkspaceListItem[] = [];
 
 /**
  * Returns the active workspace slug, the available workspaces and a setter to switch between them.
@@ -24,7 +28,7 @@ export function useActiveWorkspaceSlug() {
 		staleTime: 30_000, // 30 seconds
 		refetchOnWindowFocus: true,
 	});
-	const workspaces = Array.isArray(query.data) ? query.data : [];
+	const workspaces = Array.isArray(query.data) ? query.data : NO_WORKSPACES;
 	const location = useLocation();
 	const workspaceSelectionLoading = isAuthenticated && !authLoading && !hasHydrated;
 
@@ -84,8 +88,10 @@ export function useActiveWorkspaceSlug() {
 				// Redirect to the same relative path under a different workspace
 				const remainder = location.pathname.replace(/^\/w\/[^/]+/, "");
 				setSelectedSlug(fallbackSlug);
+				// `href` is how the router takes a path built at runtime; a relative one still
+				// navigates in-app, only an absolute URL would reload the document.
 				void navigate({
-					to: `/w/${fallbackSlug}${remainder || "/"}` as never,
+					href: `/w/${fallbackSlug}${remainder || "/"}`,
 					replace: true,
 				});
 			} else {

@@ -213,10 +213,8 @@ export function SortableCatalogTree<
 			for (const type of ["entry", "bucket", "area"] as const) {
 				const collision = collisions.find(
 					({ id }) =>
-						(
-							droppableContainers.find((container) => container.id === id)?.data.current as
-								| CatalogDndData
-								| undefined
+						catalogDndData(
+							droppableContainers.find((container) => container.id === id)?.data.current,
 						)?.type === type,
 				);
 				if (collision) return [collision];

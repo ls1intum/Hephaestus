@@ -3,23 +3,41 @@ import { expect, within } from "storybook/test";
 import { RefusalFixLink, type RefusalFixLinkProps } from "./RefusalFixLink";
 import { REFUSAL_FIXES, SIGNAL_STATE_REASON_LABELS, type SignalStateReason } from "./trace-format";
 
-const REASONS = Object.keys(SIGNAL_STATE_REASON_LABELS) as SignalStateReason[];
+/** The whole refusal vocabulary; `EveryReason` proves none of it was left off this list. */
+const REASONS: SignalStateReason[] = [
+	"GATE_SKIPPED",
+	"COOLDOWN_ACTIVE",
+	"REQUEST_COOLDOWN_ACTIVE",
+	"REQUESTER_QUOTA_EXHAUSTED",
+	"CONCURRENT_DUPLICATE",
+	"OUT_OF_REVIEW_SCOPE",
+	"WORKSPACE_INACTIVE",
+	"PRACTICES_DISABLED",
+	"NO_ACTIVE_PRACTICE",
+	"REVIEW_MODEL_UNBOUND",
+	"PRACTICE_AUTONOMY_OFF",
+	"BUDGET_EXHAUSTED",
+	"SUBJECT_UNLINKED",
+	"MODEL_UNAVAILABLE",
+	"PENDING_DEADLINE_EXCEEDED",
+	"ARTIFACT_GONE",
+];
 
 /**
  * Written out rather than derived from `REFUSAL_FIXES`: branching on `section` the way the component
  * does would make a wrong component and a wrong test agree. `how-much` is the Review page's default
  * section, so it carries no search param.
  */
-const EXPECTED_HREFS: Partial<Record<SignalStateReason, string>> = {
-	GATE_SKIPPED: "/w/demo/admin/practices/review?section=when-and-where",
-	OUT_OF_REVIEW_SCOPE: "/w/demo/admin/practices/review?section=when-and-where",
-	PRACTICES_DISABLED: "/w/demo/admin/practices/review?section=when-and-where",
-	PRACTICE_AUTONOMY_OFF: "/w/demo/admin/practices/review",
-	NO_ACTIVE_PRACTICE: "/w/demo/admin/practices",
-	REVIEW_MODEL_UNBOUND: "/w/demo/admin/models",
-	MODEL_UNAVAILABLE: "/w/demo/admin/models",
-	BUDGET_EXHAUSTED: "/w/demo/admin/usage",
-};
+const EXPECTED_HREFS: ReadonlyArray<readonly [SignalStateReason, string]> = [
+	["GATE_SKIPPED", "/w/demo/admin/practices/review?section=when-and-where"],
+	["OUT_OF_REVIEW_SCOPE", "/w/demo/admin/practices/review?section=when-and-where"],
+	["PRACTICES_DISABLED", "/w/demo/admin/practices/review?section=when-and-where"],
+	["PRACTICE_AUTONOMY_OFF", "/w/demo/admin/practices/review"],
+	["NO_ACTIVE_PRACTICE", "/w/demo/admin/practices"],
+	["REVIEW_MODEL_UNBOUND", "/w/demo/admin/models"],
+	["MODEL_UNAVAILABLE", "/w/demo/admin/models"],
+	["BUDGET_EXHAUSTED", "/w/demo/admin/usage"],
+];
 
 /**
  * The whole refusal vocabulary at once. Takes the component's own props and overrides only
@@ -81,8 +99,11 @@ export const NoFixForThisReason: Story = {
 export const EveryReason: Story = {
 	render: (args) => <RefusalCatalogue {...args} />,
 	play: async ({ canvas }) => {
+		// A reason added to the vocabulary without reaching the list above fails here.
+		await expect([...REASONS].sort()).toEqual(Object.keys(SIGNAL_STATE_REASON_LABELS).sort());
+
 		const links = canvas.getAllByRole("link");
-		await expect(links).toHaveLength(Object.keys(EXPECTED_HREFS).length);
+		await expect(links).toHaveLength(EXPECTED_HREFS.length);
 		// A link is read out of its sentence, so its name has to name the destination (WCAG 2.4.4).
 		for (const link of links) {
 			await expect(link).toHaveAccessibleName(/^(Open|Set up) \S/);
@@ -96,10 +117,12 @@ export const WhereEachFixLives: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas }) => {
 		// A reason that grows a fix without an entry above fails here rather than going unchecked.
-		await expect(Object.keys(EXPECTED_HREFS).sort()).toEqual(Object.keys(REFUSAL_FIXES).sort());
+		await expect(EXPECTED_HREFS.map(([reason]) => reason).sort()).toEqual(
+			Object.keys(REFUSAL_FIXES).sort(),
+		);
 
-		for (const [reason, href] of Object.entries(EXPECTED_HREFS)) {
-			const sentence = SIGNAL_STATE_REASON_LABELS[reason as SignalStateReason];
+		for (const [reason, href] of EXPECTED_HREFS) {
+			const sentence = SIGNAL_STATE_REASON_LABELS[reason];
 			const row = canvas.getByText(`${sentence}.`).closest("li");
 			if (!(row instanceof HTMLElement)) throw new Error(`No row for ${reason}`);
 			await expect(within(row).getByRole("link")).toHaveAttribute("href", href);

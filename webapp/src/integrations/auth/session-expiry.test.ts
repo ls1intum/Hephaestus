@@ -20,7 +20,7 @@ function stubLocation(pathname: string, search = ""): { assigned: string[] } {
 		pathname,
 		search,
 		origin: "http://localhost",
-	} as unknown as Location;
+	};
 	Object.defineProperty(window, "location", { configurable: true, value: stub });
 	return { assigned };
 }

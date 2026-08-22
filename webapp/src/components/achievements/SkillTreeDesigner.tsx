@@ -35,6 +35,11 @@ import {
 	getMiniMapNodeColor,
 } from "@/components/achievements/utils";
 
+/** The registry is keyed by the generated ids, so a key it owns is one of them. */
+function isRegisteredAchievementId(id: string): id is AchievementId {
+	return Object.hasOwn(ACHIEVEMENT_REGISTRY, id);
+}
+
 const FIT_VIEW_OPTIONS = { padding: 0.15 } as const;
 const PRO_OPTIONS = { hideAttribution: true } as const;
 
@@ -124,18 +129,21 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				status: "unlocked" as const,
 			}));
 		} else {
-			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).map(
-				([id, def]) =>
-					({
-						...def,
-						id: id as AchievementId,
-						status: "unlocked" as const,
-						category: "milestones" as const,
-						rarity: "common" as const,
-						isHidden: false,
-						progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
-						unlockedAt: new Date(),
-					}) satisfies UIAchievement,
+			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).flatMap(([id, def]) =>
+				isRegisteredAchievementId(id)
+					? [
+							{
+								...def,
+								id,
+								status: "unlocked" as const,
+								category: "milestones" as const,
+								rarity: "common" as const,
+								isHidden: false,
+								progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
+								unlockedAt: new Date(),
+							} satisfies UIAchievement,
+						]
+					: [],
 			);
 		}
 
@@ -170,11 +178,11 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 			<ReactFlow
 				nodes={nodes.map((n) => {
-					if (n.type === "categoryLabel") return n;
-					return {
-						...n,
-						data: { ...n.data, showTooltips },
-					} as AchievementNode | AvatarNode;
+					// Narrowed one node kind at a time: spreading the union would merge the two node
+					// shapes into one whose `data` fits neither.
+					if (n.type === "achievement") return { ...n, data: { ...n.data, showTooltips } };
+					if (n.type === "avatar") return { ...n, data: { ...n.data, showTooltips } };
+					return n;
 				})}
 				edges={edges}
 				onNodesChange={handleNodesChange}

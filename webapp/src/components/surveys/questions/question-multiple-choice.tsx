@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -55,29 +55,26 @@ export function QuestionMultipleChoice({
 	const [customSelected, setCustomSelected] = useState(Boolean(derivedCustomValue));
 	const [customValue, setCustomValue] = useState(derivedCustomValue ?? "");
 
-	useEffect(() => {
-		if (!hasCustomOption) {
-			if (customSelected || customValue !== "") {
-				setCustomSelected(false);
-				setCustomValue("");
-			}
-			return;
+	// The open choice is driven by the user, but the answer can also arrive from the outside
+	// (restored draft, question swapped in). Reconcile the two while rendering so the field
+	// never paints an answer the parent no longer holds.
+	if (!hasCustomOption) {
+		if (customSelected) {
+			setCustomSelected(false);
 		}
-
-		if (derivedCustomValue !== undefined) {
-			if (!customSelected) {
-				setCustomSelected(true);
-			}
-			if (customValue !== derivedCustomValue) {
-				setCustomValue(derivedCustomValue);
-			}
-			return;
-		}
-
-		if (!customSelected && customValue !== "") {
+		if (customValue !== "") {
 			setCustomValue("");
 		}
-	}, [customSelected, customValue, derivedCustomValue, hasCustomOption]);
+	} else if (derivedCustomValue !== undefined) {
+		if (!customSelected) {
+			setCustomSelected(true);
+		}
+		if (customValue !== derivedCustomValue) {
+			setCustomValue(derivedCustomValue);
+		}
+	} else if (!customSelected && customValue !== "") {
+		setCustomValue("");
+	}
 
 	const baseSelections = selectedValues.filter((choice) => baseChoices.includes(choice));
 

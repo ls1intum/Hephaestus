@@ -8,10 +8,10 @@ const saved: InstanceLlmSettings = {
 	allowWorkspaceConnections: true,
 };
 
-const hostsField = () => screen.getByLabelText("Allowed provider hosts") as HTMLTextAreaElement;
+const hostsField = () => screen.getByLabelText<HTMLTextAreaElement>("Allowed provider hosts");
 const ownProviderSwitch = () =>
 	screen.getByRole("switch", { name: /Let workspaces add providers and models/ });
-const saveButton = () => screen.getByRole("button", { name: "Save settings" }) as HTMLButtonElement;
+const saveButton = () => screen.getByRole<HTMLButtonElement>("button", { name: "Save settings" });
 
 function renderCard(settings: InstanceLlmSettings = saved) {
 	const onSave = vi.fn();

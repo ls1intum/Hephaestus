@@ -38,7 +38,7 @@ export function AutonomyLadder({
 			value={value}
 			disabled={disabled}
 			onValueChange={(next) => {
-				const autonomy = next as PracticeAutonomy;
+				const autonomy = next;
 				if (autonomy && autonomy !== value) onChange(autonomy);
 			}}
 			className={cn(

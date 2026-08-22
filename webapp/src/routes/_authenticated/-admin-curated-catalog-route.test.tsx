@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { delay, HttpResponse, http } from "msw";
+import { delay, HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { CuratedPracticeRequest } from "@/api/types.gen";
 import {
@@ -654,14 +654,17 @@ describe("instance catalog routes", () => {
 						status: status(),
 					}),
 				),
-				http.put("*/admin/practice-catalog/practices/:slug", async ({ request }) => {
-					requestBody = (await request.json()) as CuratedPracticeRequest;
-					return HttpResponse.json({
-						slug: "describe-what-and-why",
-						definition: practiceDefinition,
-						status: status({ etag: "tag-2" }),
-					});
-				}),
+				http.put<PathParams, CuratedPracticeRequest>(
+					"*/admin/practice-catalog/practices/:slug",
+					async ({ request }) => {
+						requestBody = await request.json();
+						return HttpResponse.json({
+							slug: "describe-what-and-why",
+							definition: practiceDefinition,
+							status: status({ etag: "tag-2" }),
+						});
+					},
+				),
 			);
 			renderRouteAt("/admin/catalog/practices/describe-what-and-why");
 

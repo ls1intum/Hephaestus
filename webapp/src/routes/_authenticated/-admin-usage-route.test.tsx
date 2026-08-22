@@ -1,5 +1,5 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminWorkspaceLlmUsage, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { currentMonthUtc, formatMonthLabel } from "@/components/admin/usage/usage-utils";
@@ -66,10 +66,13 @@ function mockUsageRoutes(options: {
 			return HttpResponse.json({ month: MONTH, workspaces: [row(budget)] });
 		}),
 		http.get("*/workspaces/:workspaceSlug/llm/usage", () => HttpResponse.json(detail(budget))),
-		http.put("*/admin/workspaces/:workspaceSlug/llm/budget", async ({ request }) => {
-			const body = (await request.json()) as { monthlyBudgetUsd?: number };
-			return putBudget(body.monthlyBudgetUsd);
-		}),
+		http.put<PathParams, { monthlyBudgetUsd?: number }>(
+			"*/admin/workspaces/:workspaceSlug/llm/budget",
+			async ({ request }) => {
+				const body = await request.json();
+				return putBudget(body.monthlyBudgetUsd);
+			},
+		),
 	);
 }
 

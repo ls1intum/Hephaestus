@@ -46,6 +46,9 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 /** Providers that can only be *linked* from Settings — they are never a sign-in method. */
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
 
+/** A provider row that can actually start a link flow — the flow is keyed by its registration id. */
+type LinkableProvider = IdentityProviderView & { registrationId: string };
+
 /**
  * Why each link-only account is worth connecting. Both are linked, never signed in with, so the copy
  * has to earn the click on its own — the account it links to is not a way into Hephaestus.
@@ -138,9 +141,9 @@ export function LinkedAccountsSection({
 	// either (Outline is unique on (type, base_url), one row per deployment), so this is a list and
 	// never a single `find(...)` match; each unconnected one is named by its display name.
 	const linkOnlyProviders = linkableProviders.filter(
-		(provider) =>
+		(provider): provider is LinkableProvider =>
 			LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
-			provider.registrationId,
+			Boolean(provider.registrationId),
 	);
 	const signInProviders = linkableProviders.filter(
 		(provider) => !LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
@@ -260,7 +263,7 @@ export function LinkedAccountsSection({
 								const type = provider.providerType?.toUpperCase() ?? "";
 								const Icon = getProviderIcon(type);
 								const label = provider.displayName || getProviderLabel(type, "this account");
-								const registrationId = provider.registrationId as string;
+								const registrationId = provider.registrationId;
 								return (
 									<Item key={registrationId} variant="outline" role="listitem">
 										<ItemMedia variant="icon">

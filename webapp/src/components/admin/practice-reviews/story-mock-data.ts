@@ -138,10 +138,10 @@ type AreaSlug = keyof typeof areaNames;
 
 const area = (slug: AreaSlug) => ({ slug, name: areaNames[slug] });
 
-export const practiceAreas = (Object.keys(areaNames) as AreaSlug[]).map((slug, index) => ({
+export const practiceAreas = Object.entries(areaNames).map(([slug, name], index) => ({
 	id: index + 1,
 	slug,
-	name: areaNames[slug],
+	name,
 	active: true,
 	displayOrder: index,
 	createdAt: new Date("2026-01-01T00:00:00Z"),
@@ -873,19 +873,29 @@ function feedbackFor(observationId: string) {
 		.sort((a, b) => b.item.composedAt.localeCompare(a.item.composedAt));
 }
 
-function disposition(observationId: string) {
-	const counts = { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 0 };
+type Disposition = "delivered" | "failed" | "prepared" | "superseded" | "suppressed";
+
+/** Which bucket each wire delivery state lands in; the surfaces count dispositions, not states. */
+const DISPOSITION_OF: Record<ReviewFeedback["deliveryState"], Disposition> = {
+	AWAITING_APPROVAL: "prepared",
+	DELIVERED: "delivered",
+	DISCARDED: "suppressed",
+	FAILED: "failed",
+	PREPARED: "prepared",
+	SUPERSEDED: "superseded",
+	SUPPRESSED: "suppressed",
+};
+
+function disposition(observationId: string): Record<Disposition, number> {
+	const counts: Record<Disposition, number> = {
+		delivered: 0,
+		failed: 0,
+		prepared: 0,
+		superseded: 0,
+		suppressed: 0,
+	};
 	for (const { item } of feedbackFor(observationId)) {
-		const key = {
-			AWAITING_APPROVAL: "prepared",
-			DELIVERED: "delivered",
-			DISCARDED: "suppressed",
-			FAILED: "failed",
-			PREPARED: "prepared",
-			SUPERSEDED: "superseded",
-			SUPPRESSED: "suppressed",
-		}[item.outcome] as keyof typeof counts;
-		counts[key] += 1;
+		counts[DISPOSITION_OF[item.outcome]] += 1;
 	}
 	return counts;
 }

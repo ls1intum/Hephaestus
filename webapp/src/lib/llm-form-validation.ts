@@ -11,10 +11,14 @@ import type { PricingMode } from "@/lib/llm-pricing";
 
 export type FieldErrors<TField extends string> = Partial<Record<TField, string>>;
 
-function firstIssuePerField<TField extends string>(error: z.ZodError): FieldErrors<TField> {
+/** `fields` is the form's own field list: an issue against anything else is not one a form can show. */
+function firstIssuePerField<TField extends string>(
+	error: z.ZodError,
+	fields: readonly TField[],
+): FieldErrors<TField> {
 	const errors: FieldErrors<TField> = {};
 	for (const issue of error.issues) {
-		const field = issue.path[0] as TField | undefined;
+		const field = fields.find((candidate) => candidate === issue.path[0]);
 		if (field !== undefined && errors[field] === undefined) {
 			errors[field] = issue.message;
 		}
@@ -80,7 +84,9 @@ const rateSchema = z
 	.refine(Number.isFinite, "Enter an amount in USD.")
 	.min(0, "Rates can't be negative.");
 
-export type LlmConnectionFormField = "displayName" | "baseUrl";
+const LLM_CONNECTION_FORM_FIELDS = ["displayName", "baseUrl"] as const;
+
+export type LlmConnectionFormField = (typeof LLM_CONNECTION_FORM_FIELDS)[number];
 
 export interface LlmConnectionFormValue {
 	displayName: string;
@@ -97,17 +103,23 @@ export function validateLlmConnectionForm(
 	value: LlmConnectionFormValue,
 ): FieldErrors<LlmConnectionFormField> {
 	const result = llmConnectionFormSchema.safeParse(value);
-	return result.success ? {} : firstIssuePerField<LlmConnectionFormField>(result.error);
+	return result.success ? {} : firstIssuePerField(result.error, LLM_CONNECTION_FORM_FIELDS);
 }
 
-export type LlmModelFormField =
-	| "displayName"
-	| "upstreamModelId"
-	| "contextWindow"
-	| "maxOutputTokens"
-	| "per1mInputUsd"
-	| "per1mOutputUsd"
-	| "note";
+const LLM_MODEL_FORM_FIELDS = [
+	"displayName",
+	"upstreamModelId",
+	"contextWindow",
+	"maxOutputTokens",
+	"pricingMode",
+	"per1mInputUsd",
+	"per1mOutputUsd",
+	"per1mCacheReadUsd",
+	"per1mCacheWriteUsd",
+	"note",
+] as const;
+
+export type LlmModelFormField = (typeof LLM_MODEL_FORM_FIELDS)[number];
 
 export interface LlmModelFormValue {
 	displayName: string;
@@ -184,5 +196,5 @@ const llmModelFormSchema = z
 
 export function validateLlmModelForm(value: LlmModelFormValue): FieldErrors<LlmModelFormField> {
 	const result = llmModelFormSchema.safeParse(value);
-	return result.success ? {} : firstIssuePerField<LlmModelFormField>(result.error);
+	return result.success ? {} : firstIssuePerField(result.error, LLM_MODEL_FORM_FIELDS);
 }

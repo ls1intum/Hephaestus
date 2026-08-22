@@ -37,8 +37,34 @@ type Action = NonNullable<ConfigAuditEntryView["action"]>;
 
 const ENTITY_TYPE_OPTIONS = toFacetOptions(ENTITY_TYPE_LABELS);
 const ACTION_OPTIONS = toFacetOptions(ACTION_LABELS);
-const ENTITY_TYPES = Object.keys(ENTITY_TYPE_LABELS) as EntityType[];
-const ACTIONS = Object.keys(ACTION_LABELS) as Action[];
+/** The values the server accepts as filters. An entity type or action the server adds fails its
+ * label record first, which is the prompt to name it here too. */
+const ENTITY_TYPES: EntityType[] = [
+	"PRACTICE_REVIEW_SETTINGS",
+	"AGENT_BINDING",
+	"WORKSPACE_ROLE",
+	"WORKSPACE_FEATURES",
+	"WORKSPACE_STATUS",
+	"WORKSPACE_TOKEN",
+	"WORKSPACE_VISIBILITY",
+	"PRACTICE_USAGE",
+	"PRACTICE_DEFINITION",
+	"PRACTICE_AREA",
+	"CURATED_PRACTICE",
+	"CURATED_PRACTICE_AREA",
+	"WORKSPACE_INSTANCE_LLM_BUDGET",
+	"WORKSPACE_OWN_PROVIDER_LLM_BUDGET",
+	"REVIEW_BACKFILL_RUN",
+	"REVIEW_SWEEP_SCHEDULE",
+	"WORKSPACE_LLM_CONNECTION",
+	"WORKSPACE_LLM_MODEL",
+	"AGENT_CONFIG",
+	"AI_CONFIG_BINDING",
+	"PRACTICE_ACTIVE",
+	"WORKSPACE_LLM_BUDGET",
+	"WORKSPACE_BYO_LLM_BUDGET",
+];
+const ACTIONS: Action[] = ["CREATED", "UPDATED", "DELETED"];
 
 function toQuery(search: ConfigAuditSearch) {
 	const dateRange = toDateRange(search);

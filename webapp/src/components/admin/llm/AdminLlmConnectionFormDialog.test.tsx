@@ -94,8 +94,8 @@ describe("AdminLlmConnectionFormDialog", () => {
 			displayName: "Gateway",
 			baseUrl: "https://gw.example.com/v1?api-key=SECRET",
 		}).baseUrl;
-		expect(rejection).toBeTruthy();
-		screen.getByText(rejection as string);
+		if (rejection === undefined) throw new Error("A base URL carrying a secret must be rejected");
+		screen.getByText(rejection);
 		expect(onCreate).not.toHaveBeenCalled();
 	});
 

@@ -55,15 +55,30 @@ export function LegalPage({
 	resolver = resolveLegalContent,
 	profileOverride,
 }: LegalPageProps) {
+	const profile = profileOverride ?? environment.legal.profile;
+
+	return (
+		<div className="max-w-4xl mx-auto flex flex-col gap-4">
+			<h1 className="text-3xl font-bold">{title}</h1>
+			{/* Keyed by what identifies the content: a switch remounts, so the previous page's markdown
+			    is never on screen while the new one loads. */}
+			<LegalContent key={`${page}:${profile}`} page={page} profile={profile} resolver={resolver} />
+		</div>
+	);
+}
+
+interface LegalContentProps {
+	page: LegalPageId;
+	profile: string;
+	resolver: typeof resolveLegalContent;
+}
+
+function LegalContent({ page, profile, resolver }: LegalContentProps) {
 	const [resolved, setResolved] = useState<ResolvedLegalContent | null>(null);
 	const [error, setError] = useState<Error | null>(null);
 
-	const profile = profileOverride ?? environment.legal.profile;
-
 	useEffect(() => {
 		const controller = new AbortController();
-		setError(null);
-		setResolved(null);
 		resolver(page, { signal: controller.signal, profile })
 			.then((content) => {
 				if (controller.signal.aborted) return;
@@ -84,9 +99,7 @@ export function LegalPage({
 	}, [page, profile, resolver]);
 
 	return (
-		<div className="max-w-4xl mx-auto flex flex-col gap-4">
-			<h1 className="text-3xl font-bold">{title}</h1>
-
+		<>
 			{resolved?.source === "disclaimer" ? (
 				<div
 					role="alert"
@@ -109,8 +122,8 @@ export function LegalPage({
 			{resolved ? (
 				<article lang="en" className="prose dark:prose-invert max-w-none">
 					{/* Empty `rehypePlugins` drops Streamdown's default rehype-raw, and its bundled
-					    rehype-harden ships `allowedProtocols: ["*"]`, so SAFE_COMPONENTS is the only
-					    thing keeping `javascript:` and unknown schemes out of the DOM. */}
+				    rehype-harden ships `allowedProtocols: ["*"]`, so SAFE_COMPONENTS is the only
+				    thing keeping `javascript:` and unknown schemes out of the DOM. */}
 					<Streamdown
 						mode="static"
 						rehypePlugins={[]}
@@ -122,6 +135,6 @@ export function LegalPage({
 					</Streamdown>
 				</article>
 			) : null}
-		</div>
+		</>
 	);
 }

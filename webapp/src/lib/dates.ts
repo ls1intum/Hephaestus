@@ -11,7 +11,14 @@
  * Returning `undefined` rather than an Invalid Date keeps a bad value from rendering as the string
  * "Invalid Date"; callers pick their own fallback.
  */
-export function asDate(value: Date | string | undefined | null): Date | undefined {
+/**
+ * What {@link asDate} accepts, and therefore the honest parameter type for anything that formats a
+ * date through it: a real `Date`, the raw ISO string that appears in its place when the transformer
+ * is not in the path, or nothing at all.
+ */
+export type DateLike = Date | string | undefined | null;
+
+export function asDate(value: DateLike): Date | undefined {
 	if (value == null) return undefined;
 	const date = value instanceof Date ? value : new Date(value);
 	return Number.isNaN(date.getTime()) ? undefined : date;

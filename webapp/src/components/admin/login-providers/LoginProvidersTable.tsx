@@ -1,5 +1,5 @@
 import { Copy, KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import type { LoginProviderView } from "@/api/types.gen";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -71,18 +71,17 @@ export function LoginProvidersTable({
 	// ONE delete dialog for the whole table, driven by the row it targets — a dialog per row means N
 	// portals mounted for a single, rare action.
 	const [deleting, setDeleting] = useState<LoginProviderView | null>(null);
-	const isDeletePending = deleting != null && mutatingIds.has(deleting.registrationId);
 
 	// The delete succeeded exactly when the row leaves the list; close on that, so a *failed* delete
 	// (row still present, mutation settled) keeps the dialog open to retry.
-	useEffect(() => {
-		if (
-			deleting &&
-			!providers.some((provider) => provider.registrationId === deleting.registrationId)
-		) {
-			setDeleting(null);
-		}
-	}, [providers, deleting]);
+	if (
+		deleting &&
+		!providers.some((provider) => provider.registrationId === deleting.registrationId)
+	) {
+		setDeleting(null);
+	}
+
+	const isDeletePending = deleting != null && mutatingIds.has(deleting.registrationId);
 
 	if (isError) {
 		return (

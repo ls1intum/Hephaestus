@@ -44,9 +44,14 @@ export function getProviderTerms(provider: ProviderType): ProviderTerminology {
 	return TERMS[provider];
 }
 
+const SLUGS = {
+	GITHUB: "github",
+	GITLAB: "gitlab",
+} as const satisfies Record<ProviderType, ProviderSlug>;
+
 /** Converts a ProviderType to its lowercase slug for `data-provider` attributes. */
 export function getProviderSlug(provider: ProviderType): ProviderSlug {
-	return provider.toLowerCase() as ProviderSlug;
+	return SLUGS[provider];
 }
 
 /**

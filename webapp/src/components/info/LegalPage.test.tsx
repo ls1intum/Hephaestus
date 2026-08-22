@@ -13,6 +13,17 @@ import {
 } from "@/lib/legal";
 import { LegalPage } from "./LegalPage";
 
+declare global {
+	interface Window {
+		/** Set by the `<script>` in the hostile fixture, if the sanitiser ever lets one run. */
+		__xss_executed__?: true;
+		/** Set from inside the fixture's `<iframe srcdoc>`, if the frame ever renders. */
+		__xss_frame__?: 1;
+		/** Set by the fixture image's `onerror`, if an event handler ever survives. */
+		__xss_onerror__?: 1;
+	}
+}
+
 // Operator-supplied Markdown is untrusted. These fixtures inject every
 // attack primitive we promised to strip: raw HTML, javascript: hrefs,
 // data: images, and event handlers. If any reach the DOM, the guard has
@@ -94,9 +105,9 @@ describe("LegalPage — XSS guardrail", () => {
 			expect(el.hasAttribute("title")).toBe(false);
 		}
 
-		expect((window as unknown as { __xss_executed__?: true }).__xss_executed__).toBeUndefined();
-		expect((window as unknown as { __xss_frame__?: true }).__xss_frame__).toBeUndefined();
-		expect((window as unknown as { __xss_onerror__?: true }).__xss_onerror__).toBeUndefined();
+		expect(window.__xss_executed__).toBeUndefined();
+		expect(window.__xss_frame__).toBeUndefined();
+		expect(window.__xss_onerror__).toBeUndefined();
 	});
 
 	it("external links get noopener/noreferrer + target=_blank", async () => {

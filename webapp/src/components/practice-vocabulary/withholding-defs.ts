@@ -92,20 +92,25 @@ export function withholdingReasonSentence(reason: WithholdingReason): string {
 	return WITHHOLDING_REASON_DEFS[reason];
 }
 
-const WITHHOLDING_FAMILY_REASONS: Record<WithholdingFamily, WithholdingReason[]> = Object.entries(
-	REASON_FAMILY,
-).reduce(
-	(families, [reason, family]) => {
-		families[family].push(reason as WithholdingReason);
-		return families;
-	},
-	{
-		WORK_MOVED_ON: [],
-		POLICY: [],
-		DEVELOPER_CHOICE: [],
-		HOUSEKEEPING: [],
-	} as Record<WithholdingFamily, WithholdingReason[]>,
-);
+/** `REASON_FAMILY` is total over the reasons, so being a key of it is what being a reason means. */
+function isWithholdingReason(value: string): value is WithholdingReason {
+	return Object.hasOwn(REASON_FAMILY, value);
+}
+
+const WITHHOLDING_FAMILY_REASONS = Object.keys(REASON_FAMILY)
+	.filter(isWithholdingReason)
+	.reduce<Record<WithholdingFamily, WithholdingReason[]>>(
+		(families, reason) => {
+			families[withholdingFamily(reason)].push(reason);
+			return families;
+		},
+		{
+			WORK_MOVED_ON: [],
+			POLICY: [],
+			DEVELOPER_CHOICE: [],
+			HOUSEKEEPING: [],
+		},
+	);
 
 export function reasonsInFamilies(families: readonly WithholdingFamily[]): WithholdingReason[] {
 	return families.flatMap((family) => WITHHOLDING_FAMILY_REASONS[family]);

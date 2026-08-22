@@ -11,6 +11,7 @@ import { useAllAchievementDefinitions } from "@/hooks/use-all-achievement-defini
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { workspaceAdminHead } from "@/lib/page-title";
+import { queryOperationId } from "@/lib/query-operation-id";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/achievement-designer")(
 	{
@@ -35,7 +36,7 @@ function AchievementDesignerPage() {
 				success: () => {
 					void queryClient.invalidateQueries({
 						predicate: (query) => {
-							const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+							const id = queryOperationId(query.queryKey);
 							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";
 						},
 					});

@@ -23,6 +23,12 @@ export interface GitLabInstanceOption {
 	baseUrl: string;
 }
 
+/** The fields an issue can be reported against; anything else belongs to the object as a whole. */
+const CONNECTION_FIELDS = [
+	"serverUrl",
+	"personalAccessToken",
+] as const satisfies readonly (keyof ConnectionFormData)[];
+
 export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstanceOption[] }) {
 	const { state, dispatch } = useWizard();
 	// Only instances with a known base URL can be offered as a pick; a blank one falls back to the
@@ -66,8 +72,10 @@ export function ConnectGitLabStep({ instances = [] }: { instances?: GitLabInstan
 		if (!result.success) {
 			const errors: Partial<Record<keyof ConnectionFormData, string>> = {};
 			for (const issue of result.error.issues) {
-				const key = issue.path[0] as keyof ConnectionFormData;
-				errors[key] = issue.message;
+				const field = CONNECTION_FIELDS.find((candidate) => candidate === issue.path[0]);
+				if (field) {
+					errors[field] = issue.message;
+				}
 			}
 			setFieldErrors(errors);
 			return;

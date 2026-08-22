@@ -29,9 +29,12 @@ function encode(scope: ModelSelection["scope"], id: number): string {
 	return `${scope}:${id}`;
 }
 
-function decode(value: string): ModelSelection {
-	const [scope, id] = value.split(":");
-	return { scope: scope as ModelSelection["scope"], id: Number(id) };
+/** Reads back what {@link encode} wrote; anything else is not an option this picker offered. */
+function decode(value: string): ModelSelection | null {
+	const [scope, rawId] = value.split(":");
+	const id = Number(rawId);
+	if ((scope !== "SHARED" && scope !== "WORKSPACE") || !Number.isInteger(id)) return null;
+	return { scope, id };
 }
 
 function optionLabel(model: AvailableLlmModel): string {
@@ -78,7 +81,8 @@ export function ModelPicker({
 			}))}
 			value={value ? encode(value.scope, value.id) : null}
 			onValueChange={(next) => {
-				if (next) onChange(decode(next));
+				const selection = next ? decode(next) : null;
+				if (selection) onChange(selection);
 			}}
 			disabled={disabled}
 		>

@@ -20,7 +20,7 @@ import { LoginProvidersTable } from "@/components/admin/login-providers/LoginPro
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -71,9 +71,8 @@ function AdminLoginProvidersPage() {
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the login provider")),
 	});
 
-	const mutatingIds = usePendingMutationIds<{ path: { registrationId: string } }, string>(
-		PROVIDER_WRITE_MUTATION_KEY,
-		(variables) => variables.path.registrationId,
+	const mutatingIds = usePendingMutationIds(PROVIDER_WRITE_MUTATION_KEY, (variables) =>
+		pathString(variables, "registrationId"),
 	);
 
 	const openCreate = () => {

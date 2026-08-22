@@ -112,13 +112,14 @@ export const WithOptOuts: Story = {
 	play: async ({ canvas }) => {
 		// Scope each count to its own row (via the deterministic action-button label): a bare
 		// getByText("2") would be satisfied by a stray "2" rendered anywhere in the table.
-		const activeRow = canvas
-			.getByRole("button", { name: "Actions for team-standup" })
-			.closest("tr");
-		const pendingRow = canvas.getByRole("button", { name: "Actions for team-intro" }).closest("tr");
-		within(activeRow as HTMLElement).getByText("2");
+		const rowFor = (channel: string) => {
+			const row = canvas.getByRole("button", { name: `Actions for ${channel}` }).closest("tr");
+			if (!row) throw new Error(`The actions button for ${channel} is not inside a row.`);
+			return row;
+		};
+		within(rowFor("team-standup")).getByText("2");
 		// 0 is rendered as a trust signal rather than blanked out.
-		within(pendingRow as HTMLElement).getByText("0");
+		within(rowFor("team-intro")).getByText("0");
 	},
 };
 

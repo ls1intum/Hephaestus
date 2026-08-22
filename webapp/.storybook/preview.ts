@@ -107,7 +107,8 @@ const StorybookThemeProvider = ({
 		ThemeProvider,
 		{
 			key: theme,
-			defaultTheme: theme as "light" | "dark",
+			// The toolbar only offers the two themes configured below; light is the default there too.
+			defaultTheme: theme === "dark" ? "dark" : "light",
 			storageKey: "storybook-theme",
 		},
 		children,

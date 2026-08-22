@@ -84,12 +84,11 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 			};
 		case "GO_BACK": {
 			if (state.step === 1) return state;
-			const prevStep = (state.step - 1) as WizardStep;
 			// Clear downstream state so stale values don't persist when user changes selection
-			if (prevStep === 1) {
+			if (state.step === 2) {
 				return {
 					...state,
-					step: prevStep,
+					step: 1,
 					groups: [],
 					selectedGroup: null,
 					displayName: "",
@@ -97,16 +96,13 @@ export function wizardReducer(state: WizardState, action: WizardAction): WizardS
 					slugManuallyEdited: false,
 				};
 			}
-			if (prevStep === 2) {
-				return {
-					...state,
-					step: prevStep,
-					displayName: "",
-					workspaceSlug: "",
-					slugManuallyEdited: false,
-				};
-			}
-			return { ...state, step: prevStep };
+			return {
+				...state,
+				step: 2,
+				displayName: "",
+				workspaceSlug: "",
+				slugManuallyEdited: false,
+			};
 		}
 		case "RESET":
 			return initialWizardState;

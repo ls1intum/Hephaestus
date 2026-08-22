@@ -232,14 +232,15 @@ function ActorCell({
 			</span>
 		);
 	}
+	const { filterId } = actor;
 	return (
 		<span className="flex items-center gap-1.5">
 			{actor.kind === "IMPERSONATED" && <UserCog className="size-3.5 shrink-0" aria-hidden />}
-			{onFilterActor && actor.filterId != null ? (
+			{onFilterActor && filterId != null ? (
 				<FilterLink
 					label={actor.primary}
 					title={actor.primaryEmail ?? `Filter by ${actor.primary}`}
-					onSelect={() => onFilterActor(actor.filterId as number)}
+					onSelect={() => onFilterActor(filterId)}
 				/>
 			) : (
 				<span className="truncate" title={actor.primaryEmail ?? undefined}>

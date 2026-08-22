@@ -2,11 +2,19 @@ import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { RepositoryCard } from "./RepositoryCard";
 import { TeamCard } from "./TeamCard";
 
+/** A nested team's heading sits one rank below its parent's, and stops at the last rank that exists. */
+const HEADING_LEVELS = [2, 3, 4, 5, 6] as const;
+
+type HeadingLevel = (typeof HEADING_LEVELS)[number];
+
+const nestedHeadingLevel = (level: HeadingLevel): HeadingLevel =>
+	HEADING_LEVELS[HEADING_LEVELS.indexOf(level) + 1] ?? level;
+
 export interface TeamTreeProps {
 	team: TeamInfo;
 	childrenMap: Map<number, TeamInfo[]>;
 	displaySet: Set<number>;
-	headingLevel?: 2 | 3 | 4 | 5 | 6;
+	headingLevel?: HeadingLevel;
 	onToggleVisibility: (teamId: number, hidden: boolean) => void | Promise<void>;
 	onToggleRepositoryVisibility: (
 		teamId: number,
@@ -70,7 +78,7 @@ export function TeamTree({
 							team={child}
 							childrenMap={childrenMap}
 							displaySet={displaySet}
-							headingLevel={Math.min(headingLevel + 1, 6) as 2 | 3 | 4 | 5 | 6}
+							headingLevel={nestedHeadingLevel(headingLevel)}
 							onToggleVisibility={onToggleVisibility}
 							onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 							onAddLabel={onAddLabel}

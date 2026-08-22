@@ -91,8 +91,25 @@ export function useMentorChat({
 	// Vote message mutation
 	const voteMessageMut = useMutation(voteMutation());
 
-	// Optimistic votes state: messageId -> isUpvoted
-	const [voteState, setVoteState] = useState<Record<string, boolean | undefined>>({});
+	// Votes cast here, kept apart from the server's record and laid over it: an entry wins while
+	// its mutation is in flight, and dropping it on failure falls straight back to the server.
+	const [castVotes, setCastVotes] = useState<Record<string, boolean>>({});
+
+	// A thread carries its own votes, so switching threads drops them. Keyed by the id the votes
+	// were cast against, which means a brand-new thread learning its id is not a switch.
+	const voteThreadId = threadId || stableThreadId;
+	const [votedThreadId, setVotedThreadId] = useState(voteThreadId);
+	if (votedThreadId !== voteThreadId) {
+		setVotedThreadId(voteThreadId);
+		setCastVotes({});
+	}
+
+	const voteState: Record<string, boolean | undefined> = {};
+	for (const vote of extractVotesFromThreadDetail(threadDetail)) {
+		if (vote.messageId) voteState[vote.messageId] = vote.isUpvoted;
+	}
+	Object.assign(voteState, castVotes);
+
 	const votes: ChatMessageVote[] = Object.entries(voteState)
 		.filter((entry): entry is [string, boolean] => entry[1] !== undefined)
 		.map(([messageId, isUpvoted]) => ({
@@ -197,24 +214,6 @@ export function useMentorChat({
 		hydratedRef.current = threadId;
 	}, [threadId, threadDetail?.messages, status, setMessages]);
 
-	// Hydrate votes from server thread detail when available
-	const hydratedVotesRef = useRef<string | null>(null);
-	useEffect(() => {
-		if (!threadId) return; // only hydrate for existing threads
-		if (hydratedVotesRef.current === threadId) return;
-
-		// Safely extract and validate votes from thread detail
-		const serverVotes = extractVotesFromThreadDetail(threadDetail);
-		if (serverVotes.length === 0) return;
-
-		const next: Record<string, boolean | undefined> = {};
-		for (const v of serverVotes) {
-			if (v?.messageId) next[v.messageId] = v.isUpvoted ?? undefined;
-		}
-		setVoteState(next);
-		hydratedVotesRef.current = threadId;
-	}, [threadId, threadDetail]);
-
 	// Send message function
 	const sendMessage = (text: string) => {
 		if (!text.trim() || !hasWorkspace) {
@@ -235,21 +234,20 @@ export function useMentorChat({
 		if (!hasWorkspace) {
 			return;
 		}
-		const effectiveThreadId = threadId || stableThreadId;
-		if (!effectiveThreadId) {
+		if (!voteThreadId) {
 			return;
 		}
 		// Optimistically set local vote state
-		setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
+		setCastVotes((prev) => ({ ...prev, [messageId]: isUpvoted }));
 		voteMessageMut.mutate(
 			{
-				path: { workspaceSlug: slug, threadId: effectiveThreadId, messageId },
+				path: { workspaceSlug: slug, threadId: voteThreadId, messageId },
 				body: { isUpvoted },
 			},
 			{
 				onError: () => {
 					// Rollback optimistic update on error
-					setVoteState((prev) => {
+					setCastVotes((prev) => {
 						const next = { ...prev };
 						delete next[messageId];
 						return next;
@@ -260,7 +258,7 @@ export function useMentorChat({
 						queryKey: getThreadQueryKey({
 							path: {
 								workspaceSlug: slug,
-								threadId: effectiveThreadId,
+								threadId: voteThreadId,
 							},
 						}),
 					});

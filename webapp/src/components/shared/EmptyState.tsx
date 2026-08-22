@@ -1,10 +1,27 @@
-import type { LucideIcon } from "lucide-react";
 import React, { type ComponentType, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
+/** The props the empty state passes to an icon component — Lucide and Octicons both accept them. */
+interface IconProps {
+	className?: string;
+	size?: number;
+}
+
+/**
+ * Lucide icons are `forwardRef` objects rather than plain functions, so a component icon is
+ * recognised by either shape.
+ */
+function isIconComponent(
+	icon: ReactNode | ComponentType<IconProps>,
+): icon is ComponentType<IconProps> {
+	if (typeof icon === "function") return true;
+	if (typeof icon !== "object" || icon === null || !("render" in icon)) return false;
+	return typeof icon.render === "function";
+}
+
 export interface EmptyStateProps {
-	/** The icon to display at the top of the empty state */
-	icon: LucideIcon | ReactNode | ComponentType<{ className?: string; size?: number }>;
+	/** The icon to display at the top of the empty state: an icon component or a rendered element */
+	icon: ReactNode | ComponentType<IconProps>;
 	/** The title to display as the main message */
 	title: string;
 	/** Optional description text to provide more context */
@@ -35,22 +52,8 @@ export function EmptyState({
 			return icon;
 		}
 
-		if (typeof icon === "function") {
-			return React.createElement(icon, {
-				className: "h-6 w-6 text-muted-foreground",
-				size: 24,
-			});
-		}
-
-		// Handle Lucide icons which are objects with a render method
-		if (icon && typeof icon === "object" && "render" in icon && typeof icon.render === "function") {
-			// Cast to unknown first to avoid TypeScript errors
-			// Use a specific interface for Lucide icon props
-			interface IconProps {
-				className?: string;
-				size?: number;
-			}
-			const IconComponent = icon as unknown as React.ComponentType<IconProps>;
+		if (isIconComponent(icon)) {
+			const IconComponent = icon;
 			return <IconComponent className="h-6 w-6 text-muted-foreground" size={24} />;
 		}
 

@@ -15,6 +15,8 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { ConnectionSummary, IntegrationCatalogEntry } from "@/api/types.gen";
 import environment from "@/environment";
+import { isRecord } from "@/lib/is-record";
+import { queryOperationId } from "@/lib/query-operation-id";
 
 type SyncEventScope = "job" | "resources" | "connection" | "activity";
 
@@ -86,10 +88,16 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 	const queryClient = useQueryClient();
 	const [livePushUnavailable, setLivePushUnavailable] = useState(false);
 
+	// Each workspace gets its own stream, so the failures counted against the previous one say
+	// nothing about this one — clear the flag as the switch happens, not a paint later.
+	const [streamedSlug, setStreamedSlug] = useState(workspaceSlug);
+	if (streamedSlug !== workspaceSlug) {
+		setStreamedSlug(workspaceSlug);
+		setLivePushUnavailable(false);
+	}
+
 	useEffect(() => {
 		if (!workspaceSlug) return;
-
-		setLivePushUnavailable(false);
 
 		let source: EventSource | null = null;
 		let reconnectTimer: ReturnType<typeof setTimeout> | undefined;
@@ -112,17 +120,11 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 			const familyIds = integrationQueryFamilyIds(workspaceSlug);
 			void queryClient.invalidateQueries({
 				predicate: ({ queryKey }) => {
+					const id = queryOperationId(queryKey);
+					if (id === undefined || !familyIds.has(id)) return false;
 					const [key] = queryKey;
-					if (!key || typeof key !== "object" || !("_id" in key)) return false;
-					const { _id: id } = key as { _id?: unknown };
-					if (typeof id !== "string" || !familyIds.has(id)) return false;
-					const path = "path" in key ? (key as { path?: unknown }).path : undefined;
-					return (
-						typeof path === "object" &&
-						path !== null &&
-						"workspaceSlug" in path &&
-						(path as { workspaceSlug?: unknown }).workspaceSlug === workspaceSlug
-					);
+					if (!isRecord(key) || !isRecord(key.path)) return false;
+					return key.path.workspaceSlug === workspaceSlug;
 				},
 			});
 		};

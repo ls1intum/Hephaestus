@@ -23,7 +23,7 @@ function renderDialog(onSave = vi.fn()) {
 describe("AdminLlmModelFormDialog", () => {
 	it("creates a model inactive and shared with no workspace by default", async () => {
 		const onSave = renderDialog();
-		const active = screen.getByRole("switch", { name: "Active" }) as HTMLButtonElement;
+		const active = screen.getByRole<HTMLButtonElement>("switch", { name: "Active" });
 		expect(active.getAttribute("aria-checked")).toBe("false");
 		await expectUnavailable(active);
 		fireEvent.click(active);
@@ -92,8 +92,8 @@ describe("AdminLlmModelFormDialog", () => {
 			per1mInputUsd: 0,
 			per1mOutputUsd: 0,
 		}).per1mInputUsd;
-		expect(rejection).toBeTruthy();
-		screen.getByText(rejection as string);
+		if (rejection === undefined) throw new Error("A priced model without a price must be rejected");
+		screen.getByText(rejection);
 		expect(onSave).not.toHaveBeenCalled();
 	});
 

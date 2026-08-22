@@ -26,7 +26,7 @@ import {
 	unassignPractices,
 	upsertArea,
 } from "@/hooks/practice-catalog-cache";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemStatusOf } from "@/lib/problem-detail";
 
 const UNASSIGNED = "__unassigned__";
@@ -283,13 +283,11 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 		...listPracticesOptions({ path: { workspaceSlug } }),
 		select: (all) => all.map(({ slug, areaSlug }) => ({ slug, areaSlug })),
 	});
-	const pendingAreaSlugs = usePendingMutationIds<{ path: { areaSlug?: string } }, string>(
-		areaMutationKey,
-		(variables) => variables.path.areaSlug,
+	const pendingAreaSlugs = usePendingMutationIds(areaMutationKey, (variables) =>
+		pathString(variables, "areaSlug"),
 	);
-	const pendingPracticeSlugs = usePendingMutationIds<{ path: { practiceSlug?: string } }, string>(
-		practiceMutationKey,
-		(variables) => variables.path.practiceSlug,
+	const pendingPracticeSlugs = usePendingMutationIds(practiceMutationKey, (variables) =>
+		pathString(variables, "practiceSlug"),
 	);
 	const blockedPracticeOrderBuckets = new Set<string>();
 	const blockedMoveDestinationSlugs = new Set<string>();

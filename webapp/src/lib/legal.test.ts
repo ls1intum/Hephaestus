@@ -91,21 +91,11 @@ describe("resolveLegalContent", () => {
 	function mockResponses(
 		urlMatcher: (url: string) => { status: number; body?: string; contentType?: string },
 	) {
-		(globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
-			async (input: RequestInfo | URL) => {
-				const url =
-					typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-				const { status, body = "", contentType = "text/markdown" } = urlMatcher(url);
-				return {
-					ok: status >= 200 && status < 300,
-					status,
-					headers: {
-						get: (name: string) => (name.toLowerCase() === "content-type" ? contentType : null),
-					},
-					text: async () => body,
-				};
-			},
-		);
+		vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
+			const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+			const { status, body = "", contentType = "text/markdown" } = urlMatcher(url);
+			return new Response(body, { status, headers: { "Content-Type": contentType } });
+		});
 	}
 
 	it("prefers the override when present", async () => {
@@ -166,7 +156,7 @@ describe("resolveLegalContent", () => {
 	});
 
 	it("re-throws AbortError as a DOMException so teardown is distinguishable", async () => {
-		(globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+		vi.mocked(globalThis.fetch).mockImplementation(async () => {
 			throw new DOMException("aborted", "AbortError");
 		});
 		await expect(resolveLegalContent("privacy", { profile: "tumaet" })).rejects.toSatisfy(

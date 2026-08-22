@@ -19,7 +19,7 @@ const ToggleGroupContext = React.createContext<
 	orientation: "horizontal",
 });
 
-function ToggleGroup({
+function ToggleGroup<Value extends string>({
 	className,
 	variant,
 	size,
@@ -27,7 +27,7 @@ function ToggleGroup({
 	orientation = "horizontal",
 	children,
 	...props
-}: ToggleGroupPrimitive.Props &
+}: ToggleGroupPrimitive.Props<Value> &
 	VariantProps<typeof toggleVariants> & {
 		spacing?: number;
 		orientation?: "horizontal" | "vertical";
@@ -52,7 +52,7 @@ function ToggleGroup({
 			// `CompositeRoot` reads its axis from the `orientation` prop above, not from the attribute.
 			// `toggle-group.stories.tsx` asserts the attribute is absent in both orientations.
 			aria-orientation={undefined}
-			style={{ "--gap": spacing } as React.CSSProperties}
+			style={{ "--gap": spacing }}
 			className={cn(
 				"rounded-lg data-[size=sm]:rounded-[min(var(--radius-md),10px)] group/toggle-group flex w-fit flex-row items-center gap-[--spacing(var(--gap))] data-[orientation=vertical]:flex-col data-[orientation=vertical]:items-stretch",
 				className,

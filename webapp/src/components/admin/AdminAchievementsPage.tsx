@@ -13,6 +13,7 @@ import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { queryOperationId } from "@/lib/query-operation-id";
 import { AdminAchievementsTable } from "./AdminAchievementsTable";
 
 interface AdminAchievementsPageProps {
@@ -48,7 +49,7 @@ export function AdminAchievementsPage({
 				success: () => {
 					void queryClient.invalidateQueries({
 						predicate: (query) => {
-							const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
+							const id = queryOperationId(query.queryKey);
 							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";
 						},
 					});

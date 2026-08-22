@@ -24,7 +24,7 @@ import {
 	rarityLabels,
 } from "@/components/achievements/styles";
 import type { AchievementCategory, UIAchievement, ViewMode } from "@/components/achievements/types";
-import { calculateStats } from "@/components/achievements/utils";
+import { ACHIEVEMENT_CATEGORIES, calculateStats } from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
@@ -125,8 +125,7 @@ function SidebarBody({
 							<ToggleGroup
 								value={[viewMode]}
 								onValueChange={(value) => {
-									const newValue =
-										value.length > 0 ? (value[value.length - 1] as ViewMode) : viewMode;
+									const newValue = value.length > 0 ? value[value.length - 1] : viewMode;
 									if (newValue !== viewMode) onViewModeChange(newValue);
 								}}
 								role="toolbar"
@@ -222,8 +221,8 @@ function SidebarBody({
 				<SidebarGroup>
 					<SidebarGroupLabel>Categories</SidebarGroupLabel>
 					<SidebarGroupContent className="space-y-2">
-						{Object.entries(categoryMeta).map(([key, meta]) => {
-							const category = key as AchievementCategory;
+						{ACHIEVEMENT_CATEGORIES.map((category) => {
+							const meta = categoryMeta[category];
 							const catStats = stats.byCategory[category];
 							if (!catStats || catStats.total === 0) return null;
 							const Icon = categoryIcons[category];

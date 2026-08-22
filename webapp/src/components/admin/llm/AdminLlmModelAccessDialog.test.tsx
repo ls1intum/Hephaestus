@@ -142,7 +142,7 @@ describe("AdminLlmModelAccessDialog", () => {
 		);
 
 		fireEvent.click(screen.getByRole("radio", { name: /^All workspaces/i }));
-		const save = screen.getByRole("button", { name: "Save access" }) as HTMLButtonElement;
+		const save = screen.getByRole<HTMLButtonElement>("button", { name: "Save access" });
 		expect(save.disabled).toBe(false);
 
 		fireEvent.click(save);

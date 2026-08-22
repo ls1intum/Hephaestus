@@ -7,7 +7,7 @@ import { AdminConfigAuditPanel, WorkspaceConfigAuditPanel } from "./ConfigAuditP
 const entries: ConfigAuditEntryView[] = [
 	{
 		id: 3,
-		occurredAt: "2026-07-24T09:14:32Z" as unknown as Date,
+		occurredAt: new Date("2026-07-24T09:14:32Z"),
 		action: "UPDATED",
 		entityType: "AGENT_BINDING",
 		entityId: "PRACTICE_REVIEW",
@@ -21,7 +21,7 @@ const entries: ConfigAuditEntryView[] = [
 	},
 	{
 		id: 2,
-		occurredAt: "2026-07-23T14:02:00Z" as unknown as Date,
+		occurredAt: new Date("2026-07-23T14:02:00Z"),
 		action: "CREATED",
 		entityType: "WORKSPACE_LLM_CONNECTION",
 		entityId: "12",
@@ -33,7 +33,7 @@ const entries: ConfigAuditEntryView[] = [
 	},
 	{
 		id: 1,
-		occurredAt: "2026-07-22T06:00:00Z" as unknown as Date,
+		occurredAt: new Date("2026-07-22T06:00:00Z"),
 		action: "UPDATED",
 		entityType: "WORKSPACE_STATUS",
 		entityId: "3",

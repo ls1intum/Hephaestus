@@ -24,6 +24,7 @@ import {
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { isRecord } from "@/lib/is-record";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
@@ -152,17 +153,19 @@ function GitLabWizardPage() {
 		...listIdentityProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
-	const gitlabProviders: GitLabProvider[] = (identityProviders ?? [])
-		.filter((p) => p.providerType === "GITLAB" && !!p.registrationId)
-		.map((p) => ({
-			registrationId: p.registrationId as string,
-			displayName: p.displayName || (p.registrationId as string),
-			baseUrl: p.baseUrl ?? "",
-		}));
+	const gitlabProviders: GitLabProvider[] = (identityProviders ?? []).flatMap((p) => {
+		// A row without a registrationId cannot be linked against, so it is not an option to offer.
+		if (p.providerType !== "GITLAB" || !p.registrationId) return [];
+		return [
+			{
+				registrationId: p.registrationId,
+				displayName: p.displayName || p.registrationId,
+				baseUrl: p.baseUrl ?? "",
+			},
+		];
+	});
 	const linkedGitlabServerUrls = new Set(
-		linkedProviders
-			.filter((p) => p.type === "GITLAB" && p.serverUrl)
-			.map((p) => p.serverUrl as string),
+		linkedProviders.flatMap((p) => (p.type === "GITLAB" && p.serverUrl ? [p.serverUrl] : [])),
 	);
 
 	const gitlabEnabled = !!providers?.gitlab;
@@ -204,10 +207,7 @@ function GitLabWizardPage() {
 				serverUrl: state.serverUrl,
 				message: error instanceof Error ? error.message : "Unknown error",
 			});
-			const rawError =
-				typeof error === "object" && error !== null && "error" in error
-					? (error as Record<string, unknown>).error
-					: undefined;
+			const rawError = isRecord(error) ? error.error : undefined;
 			toast.error(
 				typeof rawError === "string" ? rawError : "Failed to create workspace. Please try again.",
 			);

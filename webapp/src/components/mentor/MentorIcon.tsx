@@ -36,16 +36,14 @@ export function MentorIcon({
 			strokeWidth={strokeWidth}
 			strokeLinecap="round"
 			strokeLinejoin="round"
-			style={
-				{
-					color: "currentColor",
-					height: size,
-					width: size,
-					// Theme-aware CSS custom properties
-					"--mentor-shadow-opacity": "0.08",
-					"--mentor-blush-opacity": "0.25",
-				} as React.CSSProperties
-			}
+			style={{
+				color: "currentColor",
+				height: size,
+				width: size,
+				// Theme-aware CSS custom properties
+				"--mentor-shadow-opacity": "0.08",
+				"--mentor-blush-opacity": "0.25",
+			}}
 			role="img"
 			aria-label="Heph - AI Mentor"
 		>

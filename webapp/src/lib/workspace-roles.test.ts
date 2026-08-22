@@ -22,6 +22,6 @@ describe("hasMinimumWorkspaceRole", () => {
 	});
 
 	it("fails closed on a role the client does not know, so the server can ship one first", () => {
-		expect(hasMinimumWorkspaceRole("SUPER_OWNER" as WorkspaceRole, "MEMBER")).toBe(false);
+		expect(hasMinimumWorkspaceRole("SUPER_OWNER", "MEMBER")).toBe(false);
 	});
 });

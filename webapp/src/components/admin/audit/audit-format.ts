@@ -1,5 +1,6 @@
 import type { AdminListAuthEventsData } from "@/api/types.gen";
 import { humanizeToken } from "@/lib/humanize";
+import { isRecord } from "@/lib/is-record";
 export type AuditSeverity = "error" | "warning" | "info";
 
 const HIGH_RISK_EVENTS = new Set([
@@ -67,12 +68,11 @@ export function humanizeDetails(details: string | undefined): string | null {
 	} catch {
 		return details;
 	}
-	if (parsed === null || typeof parsed !== "object") return String(parsed);
-	const obj = parsed as Record<string, unknown>;
-	if ("from" in obj || "to" in obj) {
-		return `${stringify(obj.from)} → ${stringify(obj.to)}`;
+	if (!isRecord(parsed)) return String(parsed);
+	if ("from" in parsed || "to" in parsed) {
+		return `${stringify(parsed.from)} → ${stringify(parsed.to)}`;
 	}
-	const entries = Object.entries(obj);
+	const entries = Object.entries(parsed);
 	if (entries.length === 0) return null;
 	return entries.map(([k, v]) => `${k}: ${stringify(v)}`).join(", ");
 }

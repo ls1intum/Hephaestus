@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import type { ComponentProps, ReactElement } from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { addMonths, formatMonthLabel } from "./usage-utils";
 
@@ -12,14 +12,19 @@ export interface MonthNavigatorProps {
 
 export function MonthNavigator({ month, canGoNext, renderMonthLink }: MonthNavigatorProps) {
 	const label = formatMonthLabel(month);
+	const nextMonth = addMonths(month, 1);
 	const prevRef = useRef<HTMLAnchorElement>(null);
-	const steppedForward = useRef(false);
+
+	// Stepping onto the newest month unmounts the link the click came from — it becomes the
+	// disabled button — so keyboard focus would fall to the document. Remembering the month the
+	// user asked for is what tells arriving there apart from getting there any other way.
+	const [focusPreviousOnMonth, setFocusPreviousOnMonth] = useState<string | undefined>(undefined);
 	useEffect(() => {
-		if (steppedForward.current && !canGoNext) {
+		if (month === focusPreviousOnMonth && !canGoNext) {
 			prevRef.current?.focus();
 		}
-		steppedForward.current = false;
-	}, [canGoNext]);
+	}, [month, canGoNext, focusPreviousOnMonth]);
+
 	return (
 		<div className="flex items-center gap-1">
 			{renderMonthLink(addMonths(month, -1), {
@@ -30,12 +35,12 @@ export function MonthNavigator({ month, canGoNext, renderMonthLink }: MonthNavig
 			})}
 			<span className="w-32 text-center text-sm font-medium tabular-nums">{label}</span>
 			{canGoNext ? (
-				renderMonthLink(addMonths(month, 1), {
+				renderMonthLink(nextMonth, {
 					"aria-label": "Next month",
 					className: buttonVariants({ variant: "outline", size: "icon-sm" }),
 					children: <ChevronRight />,
 					onClick: () => {
-						steppedForward.current = true;
+						setFocusPreviousOnMonth(nextMonth);
 					},
 				})
 			) : (

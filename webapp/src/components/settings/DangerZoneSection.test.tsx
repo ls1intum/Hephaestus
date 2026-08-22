@@ -58,9 +58,9 @@ describe("DangerZoneSection — account deletion", () => {
 		openDeleteDialog();
 
 		const dialog = await screen.findByRole("alertdialog");
-		const confirmButton = within(dialog).getByRole("button", {
+		const confirmButton = within(dialog).getByRole<HTMLButtonElement>("button", {
 			name: "Delete account",
-		}) as HTMLButtonElement;
+		});
 		expect(confirmButton.disabled).toBe(true);
 
 		const input = within(dialog).getByLabelText("Confirmation phrase");
@@ -89,9 +89,9 @@ describe("DangerZoneSection — account deletion", () => {
 		openDeleteDialog();
 
 		const dialog = await screen.findByRole("alertdialog");
-		const confirmButton = within(dialog).getByRole("button", {
+		const confirmButton = within(dialog).getByRole<HTMLButtonElement>("button", {
 			name: "Delete account",
-		}) as HTMLButtonElement;
+		});
 		fireEvent.change(within(dialog).getByLabelText("Confirmation phrase"), {
 			target: { value: "  Delete My Account  " }, // trimmed + case-insensitive match
 		});

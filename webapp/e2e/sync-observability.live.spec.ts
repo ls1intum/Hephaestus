@@ -47,7 +47,12 @@ test.describe("live integration operations", () => {
 
 		const acceptedResponse = await accepted;
 		expect([200, 202]).toContain(acceptedResponse.status());
-		const job = (await acceptedResponse.json()) as { id: number };
+		const job: unknown = await acceptedResponse.json();
+		if (typeof job !== "object" || job === null || !("id" in job) || typeof job.id !== "number") {
+			throw new Error(
+				`Expected the accepted sync job to carry a numeric id: ${JSON.stringify(job)}`,
+			);
+		}
 		await expect(page.getByText(/sync started/i)).toBeVisible();
 		await expect(page.locator(`[data-job-id="${job.id}"]`)).toBeVisible({ timeout: 15_000 });
 	});

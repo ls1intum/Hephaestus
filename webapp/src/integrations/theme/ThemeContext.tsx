@@ -1,6 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "dark" | "light" | "system";
+const THEMES = ["dark", "light", "system"] as const;
+
+type Theme = (typeof THEMES)[number];
+
+/** The stored theme is user-writable, so anything unrecognised falls back to the default. */
+function isTheme(value: string | null): value is Theme {
+	return THEMES.some((theme) => theme === value);
+}
 
 type ThemeProviderProps = {
 	children?: React.ReactNode;
@@ -26,9 +33,10 @@ export function ThemeProvider({
 	storageKey = "theme",
 	...props
 }: ThemeProviderProps) {
-	const [theme, setTheme] = useState<Theme>(
-		() => (localStorage.getItem(storageKey) as Theme) || defaultTheme,
-	);
+	const [theme, setTheme] = useState<Theme>(() => {
+		const stored = localStorage.getItem(storageKey);
+		return isTheme(stored) ? stored : defaultTheme;
+	});
 
 	useEffect(() => {
 		const root = window.document.documentElement;

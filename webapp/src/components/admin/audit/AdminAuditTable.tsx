@@ -133,8 +133,9 @@ export function AdminAuditTable({
 						{events.map((e) => {
 							const severity = eventSeverity(e.eventType, e.result);
 							const screenReaderPrefix = severityScreenReaderPrefix(severity);
-							const account = refLabel(e.account, e.accountId);
-							const actor = refLabel(e.actor, e.actingAccountId);
+							const { accountId, actingAccountId } = e;
+							const account = refLabel(e.account, accountId);
+							const actor = refLabel(e.actor, actingAccountId);
 							return (
 								<TableRow key={e.id}>
 									<TableCell className="whitespace-nowrap text-sm text-muted-foreground">
@@ -158,11 +159,11 @@ export function AdminAuditTable({
 									<TableCell className="max-w-[12rem]">
 										<span className="block truncate">
 											{account ? (
-												onFilterAccount && e.accountId != null ? (
+												onFilterAccount && accountId != null ? (
 													<FilterLink
 														label={account}
 														title={e.account?.email ?? `Filter by ${account}`}
-														onSelect={() => onFilterAccount(e.accountId as number)}
+														onSelect={() => onFilterAccount(accountId)}
 													/>
 												) : (
 													<span title={e.account?.email ?? undefined}>{account}</span>
@@ -174,11 +175,11 @@ export function AdminAuditTable({
 										{actor && (
 											<span className="block truncate text-xs text-muted-foreground">
 												impersonated by{" "}
-												{onFilterActor && e.actingAccountId != null ? (
+												{onFilterActor && actingAccountId != null ? (
 													<FilterLink
 														label={actor}
 														title={e.actor?.email ?? `Filter by ${actor}`}
-														onSelect={() => onFilterActor(e.actingAccountId as number)}
+														onSelect={() => onFilterActor(actingAccountId)}
 													/>
 												) : (
 													actor

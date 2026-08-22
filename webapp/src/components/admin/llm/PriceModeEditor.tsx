@@ -103,7 +103,7 @@ export function PriceModeEditor({
 			<RadioGroup
 				value={value.pricingMode}
 				onValueChange={(next) => {
-					if (next) set("pricingMode", next as PricingMode);
+					if (next) set("pricingMode", next);
 				}}
 				aria-label="Price"
 			>

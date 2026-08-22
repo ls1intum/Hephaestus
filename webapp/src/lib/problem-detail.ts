@@ -1,3 +1,5 @@
+import { isRecord } from "@/lib/is-record";
+
 /**
  * Extract a human-readable message from a thrown request error.
  *
@@ -17,10 +19,9 @@ export function problemDetailOf(
 	if (typeof err === "string") {
 		return err;
 	}
-	if (err && typeof err === "object") {
-		const record = err as Record<string, unknown>;
+	if (isRecord(err)) {
 		for (const key of ["detail", "title", "error"] as const) {
-			const value = record[key];
+			const value = err[key];
 			if (typeof value === "string" && value.trim().length > 0) {
 				return value;
 			}
@@ -39,17 +40,16 @@ export function problemDetailOf(
  * different situation from any status the server could have returned.
  */
 export function problemStatusOf(err: unknown): number | undefined {
-	if (!err || typeof err !== "object") {
+	if (!isRecord(err)) {
 		return undefined;
 	}
-	const record = err as Record<string, unknown>;
-	const direct = record.status;
+	const direct = err.status;
 	if (typeof direct === "number" && Number.isInteger(direct)) {
 		return direct;
 	}
-	const response = record.response;
-	if (response && typeof response === "object") {
-		const nested = (response as Record<string, unknown>).status;
+	const response = err.response;
+	if (isRecord(response)) {
+		const nested = response.status;
 		if (typeof nested === "number" && Number.isInteger(nested)) {
 			return nested;
 		}

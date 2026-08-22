@@ -1,6 +1,5 @@
 import type { Node, NodeProps } from "@xyflow/react";
 import { Handle, Position } from "@xyflow/react";
-import type React from "react";
 import { useState } from "react";
 import { AchievementTooltip } from "@/components/achievements/AchievementTooltip";
 import { StandaloneAura } from "@/components/achievements/StandaloneAura";
@@ -71,9 +70,9 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 						)}
 						style={
 							isMythic
-								? ({
+								? {
 										"--mythic-bg": mythicBackgroundVars[achievement.status],
-									} as React.CSSProperties)
+									}
 								: undefined
 						}
 						onMouseEnter={() => setIsHovered(true)}

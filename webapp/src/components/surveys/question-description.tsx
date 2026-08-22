@@ -19,7 +19,11 @@ export function QuestionDescription({
 		return (
 			<FieldDescription
 				className={className}
-				// oxlint-disable-next-line react/no-danger -- survey HTML is authored in PostHog by an admin of this instance, not by a respondent
+				// The only raw-HTML sink in the app. The string is a survey question's description as
+				// configured in the PostHog project this deployment is wired to, so its author is whoever
+				// operates that project — never a workspace member, and never a respondent, whose answers
+				// are rendered as text.
+				// oxlint-disable-next-line react/no-danger
 				dangerouslySetInnerHTML={{ __html: description }}
 			/>
 		);

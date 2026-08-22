@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http, type PathParams } from "msw";
 import { toast } from "sonner";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
@@ -195,7 +195,7 @@ describe("Outline integration — connect happy path", () => {
 
 		// The server URL starts EMPTY: a prefilled cloud URL would send a self-hoster's token to
 		// Outline Cloud if they only pasted the token. Connect stays disabled until it is typed.
-		const serverUrl = screen.getByLabelText(/server url/i) as HTMLInputElement;
+		const serverUrl = screen.getByLabelText<HTMLInputElement>(/server url/i);
 		expect(serverUrl.value).toBe("");
 		fireEvent.change(screen.getByLabelText(/api token/i), {
 			target: { value: "ol_api_secret" },
@@ -278,10 +278,10 @@ describe("Outline integration — pause / resume", () => {
 		const patchBodies: unknown[] = [];
 		useConnectedHandlers(collectionsRef);
 		server.use(
-			http.patch(
+			http.patch<PathParams, { state: string }>(
 				"*/workspaces/demo/outline/collections/:collectionId",
 				async ({ request, params }) => {
-					const body = (await request.json()) as { state: string };
+					const body = await request.json();
 					patchBodies.push({ collectionId: params.collectionId, ...body });
 					const next = body.state === "PAUSED" ? pausedRow : engineering;
 					collectionsRef.current = [next];
@@ -360,8 +360,8 @@ describe("Outline integration — sync now", () => {
 		);
 
 		renderContainer();
-		const syncButton = await screen.findByRole("button", { name: /sync now/i });
-		await waitFor(() => expect((syncButton as HTMLButtonElement).disabled).toBe(false));
+		const syncButton = await screen.findByRole<HTMLButtonElement>("button", { name: /sync now/i });
+		await waitFor(() => expect(syncButton.disabled).toBe(false));
 		fireEvent.click(syncButton);
 
 		await waitFor(() => expect(syncRequestBody).toEqual({ type: "RECONCILIATION" }));

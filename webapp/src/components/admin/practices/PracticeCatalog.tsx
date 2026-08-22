@@ -279,7 +279,7 @@ function CatalogToolbar({
 			<ToggleGroup
 				role="toolbar"
 				value={[focusFilter]}
-				onValueChange={(value) => value[0] && onFocusFilterChange(value[0] as FocusFilter)}
+				onValueChange={(value) => value[0] && onFocusFilterChange(value[0])}
 				variant="outline"
 				size="sm"
 				aria-label="Filter by work type"

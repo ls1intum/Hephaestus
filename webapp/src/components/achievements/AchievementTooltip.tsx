@@ -1,5 +1,5 @@
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip";
-import type { ReactElement, ReactNode } from "react";
+import type { ReactElement } from "react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
 import { rarityBorderColors, rarityLabels, statusIcons } from "@/components/achievements/styles";
 import type { UIAchievement } from "@/components/achievements/types";
@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 
 export interface AchievementTooltipProps {
 	achievement: UIAchievement;
-	children: ReactNode;
+	/** `render` clones this, so it has to be a single element rather than any renderable node. */
+	children: ReactElement;
 	open: boolean;
 }
 
@@ -23,7 +24,7 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 	return (
 		<TooltipPrimitive.Provider delay={0}>
 			<TooltipPrimitive.Root open={open}>
-				<TooltipPrimitive.Trigger render={children as ReactElement} />
+				<TooltipPrimitive.Trigger render={children} />
 				<TooltipPrimitive.Portal>
 					<TooltipPrimitive.Positioner
 						side="top"

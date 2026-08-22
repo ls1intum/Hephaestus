@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen } from "storybook/test";
 import type { ReviewArtifact } from "@/api/types.gen";
-import type { KnownArtifactKind } from "@/lib/artifact-kinds";
+import { isKnownArtifactKind } from "@/lib/artifact-kinds";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { REVIEW_PREVIEW_SIZE, type ReviewSectionState } from "./ReviewOutputSections";
 import { ReviewTargetPage } from "./ReviewTargetPage";
@@ -38,12 +38,18 @@ const empty = <T,>(): ReviewSectionState<T> => ({ status: "ready", items: [], to
 /** The practice one of this work's observations names, and the one the card is read on. */
 const THIN_CONTROLLERS = workspacePractices[0];
 
-const argsFor = (artifact: ReviewArtifact) => ({
-	artifactKind: artifact.type as KnownArtifactKind,
-	artifactId: artifact.id,
-	feedback: outputFor(reviewFeedback, artifact),
-	observations: outputFor(reviewObservations, artifact),
-});
+const argsFor = (artifact: ReviewArtifact) => {
+	// The page labels and links the kind, so a fixture on an unlabelled one would prove nothing.
+	if (!isKnownArtifactKind(artifact.type)) {
+		throw new Error(`Fixture artifact ${artifact.id} has an unlabelled kind: ${artifact.type}`);
+	}
+	return {
+		artifactKind: artifact.type,
+		artifactId: artifact.id,
+		feedback: outputFor(reviewFeedback, artifact),
+		observations: outputFor(reviewObservations, artifact),
+	};
+};
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Reviewed work",

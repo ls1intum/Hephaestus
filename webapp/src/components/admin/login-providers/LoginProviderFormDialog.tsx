@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type {
 	CreateLoginProviderRequest,
 	LoginProviderView,
@@ -38,6 +38,11 @@ function scopesPlaceholder(type: ProviderType): string {
 	return "Defaulted by provider type if blank";
 }
 
+/** The stored type is a plain string; anything this build cannot render falls back to the default. */
+function toProviderType(value: string | null | undefined): ProviderType {
+	return PROVIDER_TYPE_ITEMS.find((item) => item.value === value)?.value ?? "GITLAB";
+}
+
 interface LoginProviderFormDialogProps {
 	open: boolean;
 	onOpenChange: (open: boolean) => void;
@@ -55,27 +60,42 @@ export function LoginProviderFormDialog({
 	onCreate,
 	onUpdate,
 }: LoginProviderFormDialogProps) {
+	return (
+		<Dialog open={open} onOpenChange={onOpenChange}>
+			<DialogContent className="sm:max-w-lg">
+				{/* The popup unmounts on close and the key remounts the form when the target record
+				    changes, so the fields below start from `editing` and never need re-seeding. */}
+				<ProviderForm
+					key={editing?.registrationId ?? "new"}
+					editing={editing}
+					isSubmitting={isSubmitting}
+					onCreate={onCreate}
+					onUpdate={onUpdate}
+					onCancel={() => onOpenChange(false)}
+				/>
+			</DialogContent>
+		</Dialog>
+	);
+}
+
+interface ProviderFormProps {
+	editing: LoginProviderView | null;
+	isSubmitting: boolean;
+	onCreate: (body: CreateLoginProviderRequest) => void;
+	onUpdate: (registrationId: string, body: UpdateLoginProviderRequest) => void;
+	onCancel: () => void;
+}
+
+function ProviderForm({ editing, isSubmitting, onCreate, onUpdate, onCancel }: ProviderFormProps) {
 	const isEdit = editing !== null;
-	const [registrationId, setRegistrationId] = useState("");
-	const [type, setType] = useState<ProviderType>("GITLAB");
-	const [displayName, setDisplayName] = useState("");
-	const [baseUrl, setBaseUrl] = useState("");
+	const [registrationId, setRegistrationId] = useState(editing?.registrationId ?? "");
+	const [type, setType] = useState<ProviderType>(toProviderType(editing?.type));
+	const [displayName, setDisplayName] = useState(editing?.displayName ?? "");
+	const [baseUrl, setBaseUrl] = useState(editing?.baseUrl ?? "");
 	const [clientId, setClientId] = useState("");
 	const [clientSecret, setClientSecret] = useState("");
-	const [scopes, setScopes] = useState("");
+	const [scopes, setScopes] = useState(editing?.scopes ?? "");
 	const [errors, setErrors] = useState<{ registrationId?: string; baseUrl?: string }>({});
-
-	useEffect(() => {
-		if (!open) return;
-		setRegistrationId(editing?.registrationId ?? "");
-		setType((editing?.type as ProviderType) ?? "GITLAB");
-		setDisplayName(editing?.displayName ?? "");
-		setBaseUrl(editing?.baseUrl ?? "");
-		setClientId("");
-		setClientSecret("");
-		setScopes(editing?.scopes ?? "");
-		setErrors({});
-	}, [open, editing]);
 
 	const needsBaseUrl = type === "GITLAB" || type === "OUTLINE";
 	const isSlack = type === "SLACK";
@@ -132,156 +152,150 @@ export function LoginProviderFormDialog({
 	};
 
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-lg">
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<DialogHeader>
-						<DialogTitle>{isEdit ? "Edit login provider" : "Add login provider"}</DialogTitle>
-						<DialogDescription>
-							Configure sign-in and account-link providers. Slack and Outline are link-only: they
-							appear in Settings for account linking, not on the public sign-in page.
-						</DialogDescription>
-					</DialogHeader>
+		<form onSubmit={handleSubmit} className="space-y-4">
+			<DialogHeader>
+				<DialogTitle>{isEdit ? "Edit login provider" : "Add login provider"}</DialogTitle>
+				<DialogDescription>
+					Configure sign-in and account-link providers. Slack and Outline are link-only: they appear
+					in Settings for account linking, not on the public sign-in page.
+				</DialogDescription>
+			</DialogHeader>
 
-					<Field data-invalid={errors.registrationId ? "true" : undefined}>
-						<FieldLabel htmlFor="lp-registration-id">Registration ID</FieldLabel>
-						<Input
-							id="lp-registration-id"
-							value={registrationId}
-							onChange={(e) => setRegistrationId(e.target.value)}
-							placeholder="gitlab-acme"
-							disabled={isEdit}
-							required={!isEdit}
-							aria-invalid={errors.registrationId ? "true" : undefined}
-							aria-describedby="lp-registration-id-description"
-							autoComplete="off"
-						/>
-						<FieldDescription id="lp-registration-id-description">
-							Stable id used in the OAuth callback path. Lowercase letters, digits, hyphens.
-							Immutable once created.
-						</FieldDescription>
-						{errors.registrationId && <FieldError>{errors.registrationId}</FieldError>}
-					</Field>
+			<Field data-invalid={errors.registrationId ? "true" : undefined}>
+				<FieldLabel htmlFor="lp-registration-id">Registration ID</FieldLabel>
+				<Input
+					id="lp-registration-id"
+					value={registrationId}
+					onChange={(e) => setRegistrationId(e.target.value)}
+					placeholder="gitlab-acme"
+					disabled={isEdit}
+					required={!isEdit}
+					aria-invalid={errors.registrationId ? "true" : undefined}
+					aria-describedby="lp-registration-id-description"
+					autoComplete="off"
+				/>
+				<FieldDescription id="lp-registration-id-description">
+					Stable id used in the OAuth callback path. Lowercase letters, digits, hyphens. Immutable
+					once created.
+				</FieldDescription>
+				{errors.registrationId && <FieldError>{errors.registrationId}</FieldError>}
+			</Field>
 
-					<Field>
-						<FieldLabel id="lp-type-label" htmlFor="lp-type">
-							Provider type
-						</FieldLabel>
-						<Select
-							items={PROVIDER_TYPE_ITEMS}
-							value={type}
-							onValueChange={(v) => setType(v as ProviderType)}
-							disabled={isEdit}
-						>
-							<SelectTrigger id="lp-type">
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent aria-labelledby="lp-type-label">
-								{PROVIDER_TYPE_ITEMS.map((item) => (
-									<SelectItem key={item.value} value={item.value}>
-										{item.label}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-						{isSlack && (
-							<FieldDescription>
-								Use the same Slack app client ID and secret. Add this provider's redirect URI to the
-								Slack app redirect URLs.
-							</FieldDescription>
-						)}
-						{isOutline && (
-							<FieldDescription>
-								Outline is <strong>link-only</strong>: users connect it from Settings so their
-								documents are attributed to them — nobody signs in to Hephaestus with it. Create an
-								OAuth app in Outline under <strong>Settings → Applications</strong> and register
-								this redirect URI: <code className="break-all">{redirectUri}</code>
-							</FieldDescription>
-						)}
-					</Field>
+			<Field>
+				<FieldLabel id="lp-type-label" htmlFor="lp-type">
+					Provider type
+				</FieldLabel>
+				<Select
+					items={PROVIDER_TYPE_ITEMS}
+					value={type}
+					onValueChange={(v) => setType(toProviderType(v))}
+					disabled={isEdit}
+				>
+					<SelectTrigger id="lp-type">
+						<SelectValue />
+					</SelectTrigger>
+					<SelectContent aria-labelledby="lp-type-label">
+						{PROVIDER_TYPE_ITEMS.map((item) => (
+							<SelectItem key={item.value} value={item.value}>
+								{item.label}
+							</SelectItem>
+						))}
+					</SelectContent>
+				</Select>
+				{isSlack && (
+					<FieldDescription>
+						Use the same Slack app client ID and secret. Add this provider's redirect URI to the
+						Slack app redirect URLs.
+					</FieldDescription>
+				)}
+				{isOutline && (
+					<FieldDescription>
+						Outline is <strong>link-only</strong>: users connect it from Settings so their documents
+						are attributed to them — nobody signs in to Hephaestus with it. Create an OAuth app in
+						Outline under <strong>Settings → Applications</strong> and register this redirect URI:{" "}
+						<code className="break-all">{redirectUri}</code>
+					</FieldDescription>
+				)}
+			</Field>
 
-					<Field>
-						<FieldLabel htmlFor="lp-display-name">Display name</FieldLabel>
-						<Input
-							id="lp-display-name"
-							value={displayName}
-							onChange={(e) => setDisplayName(e.target.value)}
-							placeholder="Defaults to the registration ID"
-						/>
-					</Field>
+			<Field>
+				<FieldLabel htmlFor="lp-display-name">Display name</FieldLabel>
+				<Input
+					id="lp-display-name"
+					value={displayName}
+					onChange={(e) => setDisplayName(e.target.value)}
+					placeholder="Defaults to the registration ID"
+				/>
+			</Field>
 
-					{needsBaseUrl && (
-						<Field data-invalid={errors.baseUrl ? "true" : undefined}>
-							<FieldLabel htmlFor="lp-base-url">Instance base URL</FieldLabel>
-							<Input
-								id="lp-base-url"
-								type="url"
-								value={baseUrl}
-								onChange={(e) => setBaseUrl(e.target.value)}
-								placeholder={
-									isOutline ? "https://outline.example.com" : "https://gitlab.example.com"
-								}
-								required={!isEdit}
-								aria-invalid={errors.baseUrl ? "true" : undefined}
-								aria-describedby="lp-base-url-description"
-							/>
-							<FieldDescription id="lp-base-url-description">
-								HTTPS only. GitHub and Slack are always at a fixed host, so this field applies to
-								self-hosted GitLab and Outline instances.
-							</FieldDescription>
-							{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
-						</Field>
-					)}
+			{needsBaseUrl && (
+				<Field data-invalid={errors.baseUrl ? "true" : undefined}>
+					<FieldLabel htmlFor="lp-base-url">Instance base URL</FieldLabel>
+					<Input
+						id="lp-base-url"
+						type="url"
+						value={baseUrl}
+						onChange={(e) => setBaseUrl(e.target.value)}
+						placeholder={isOutline ? "https://outline.example.com" : "https://gitlab.example.com"}
+						required={!isEdit}
+						aria-invalid={errors.baseUrl ? "true" : undefined}
+						aria-describedby="lp-base-url-description"
+					/>
+					<FieldDescription id="lp-base-url-description">
+						HTTPS only. GitHub and Slack are always at a fixed host, so this field applies to
+						self-hosted GitLab and Outline instances.
+					</FieldDescription>
+					{errors.baseUrl && <FieldError>{errors.baseUrl}</FieldError>}
+				</Field>
+			)}
 
-					<Field>
-						<FieldLabel htmlFor="lp-client-id">Client ID</FieldLabel>
-						<Input
-							id="lp-client-id"
-							value={clientId}
-							onChange={(e) => setClientId(e.target.value)}
-							placeholder={isEdit ? "Leave blank to keep current" : ""}
-							required={!isEdit}
-							autoComplete="off"
-						/>
-					</Field>
+			<Field>
+				<FieldLabel htmlFor="lp-client-id">Client ID</FieldLabel>
+				<Input
+					id="lp-client-id"
+					value={clientId}
+					onChange={(e) => setClientId(e.target.value)}
+					placeholder={isEdit ? "Leave blank to keep current" : ""}
+					required={!isEdit}
+					autoComplete="off"
+				/>
+			</Field>
 
-					<Field>
-						<FieldLabel htmlFor="lp-client-secret">Client secret</FieldLabel>
-						<Input
-							id="lp-client-secret"
-							type="password"
-							value={clientSecret}
-							onChange={(e) => setClientSecret(e.target.value)}
-							placeholder={isEdit ? "Leave blank to keep current" : ""}
-							required={!isEdit}
-							autoComplete="off"
-							aria-describedby="lp-client-secret-description"
-						/>
-						<FieldDescription id="lp-client-secret-description">
-							Sealed at rest; never displayed after saving.
-						</FieldDescription>
-					</Field>
+			<Field>
+				<FieldLabel htmlFor="lp-client-secret">Client secret</FieldLabel>
+				<Input
+					id="lp-client-secret"
+					type="password"
+					value={clientSecret}
+					onChange={(e) => setClientSecret(e.target.value)}
+					placeholder={isEdit ? "Leave blank to keep current" : ""}
+					required={!isEdit}
+					autoComplete="off"
+					aria-describedby="lp-client-secret-description"
+				/>
+				<FieldDescription id="lp-client-secret-description">
+					Sealed at rest; never displayed after saving.
+				</FieldDescription>
+			</Field>
 
-					<Field>
-						<FieldLabel htmlFor="lp-scopes">Scopes</FieldLabel>
-						<Input
-							id="lp-scopes"
-							value={scopes}
-							onChange={(e) => setScopes(e.target.value)}
-							placeholder={scopesPlaceholder(type)}
-						/>
-					</Field>
+			<Field>
+				<FieldLabel htmlFor="lp-scopes">Scopes</FieldLabel>
+				<Input
+					id="lp-scopes"
+					value={scopes}
+					onChange={(e) => setScopes(e.target.value)}
+					placeholder={scopesPlaceholder(type)}
+				/>
+			</Field>
 
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={isSubmitting}>
-							{isEdit ? "Save changes" : "Add provider"}
-						</Button>
-					</DialogFooter>
-				</form>
-			</DialogContent>
-		</Dialog>
+			<DialogFooter>
+				<Button type="button" variant="outline" onClick={onCancel}>
+					Cancel
+				</Button>
+				<Button type="submit" disabled={isSubmitting}>
+					{isEdit ? "Save changes" : "Add provider"}
+				</Button>
+			</DialogFooter>
+		</form>
 	);
 }

@@ -2,7 +2,7 @@
  * Chat message validation utilities.
  *
  * Provides runtime validation for chat messages received from the server.
- * Uses Zod schemas to safely parse and validate data before type assertion.
+ * Uses Zod schemas to safely parse and validate data before it reaches the chat UI.
  */
 
 import { z } from "zod";
@@ -38,6 +38,20 @@ const chatMessagesArraySchema = z.array(chatMessageSchema);
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * The part union stays open — the mentor streams part kinds the client ignores — so the schema
+ * checks the envelope every consumer relies on (id, role, and a `type` on each part) and the
+ * renderers narrow each part before reading its fields.
+ */
+function isChatMessageArray(value: unknown): value is ChatMessage[] {
+	const result = chatMessagesArraySchema.safeParse(value);
+	if (!result.success) {
+		console.warn("[parseThreadMessages] Validation failed:", result.error);
+		return false;
+	}
+	return true;
+}
+
+/**
  * Safely parse and validate an array of chat messages.
  * Returns validated messages or undefined if validation fails.
  *
@@ -45,13 +59,7 @@ const chatMessagesArraySchema = z.array(chatMessageSchema);
  * @returns Validated ChatMessage[] or undefined
  */
 export function parseThreadMessages(messages: unknown): ChatMessage[] | undefined {
-	const result = chatMessagesArraySchema.safeParse(messages);
-	if (!result.success) {
-		console.warn("[parseThreadMessages] Validation failed:", result.error);
-		return undefined;
-	}
-	// Schema validated the structure, safe to cast to ChatMessage[]
-	return result.data as unknown as ChatMessage[];
+	return isChatMessageArray(messages) ? messages : undefined;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,12 +89,11 @@ export function extractVotesFromThreadDetail(
 		return [];
 	}
 
-	const detail = threadDetail as Record<string, unknown>;
-	if (!("votes" in detail) || !Array.isArray(detail.votes)) {
+	if (!("votes" in threadDetail) || !Array.isArray(threadDetail.votes)) {
 		return [];
 	}
 
-	const result = votesArraySchema.safeParse(detail.votes);
+	const result = votesArraySchema.safeParse(threadDetail.votes);
 	if (!result.success) {
 		console.warn("[extractVotesFromThreadDetail] Validation failed:", result.error);
 		return [];

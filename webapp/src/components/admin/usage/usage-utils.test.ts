@@ -81,7 +81,7 @@ describe("month and day labels", () => {
 		["a day the server could not parse", "not a date"],
 		["a missing day", undefined],
 	])("shows a dash rather than 'Invalid Date' for %s", (_name, value) => {
-		expect(formatUsageDay(value as unknown as Date)).toBe("–");
+		expect(formatUsageDay(value)).toBe("–");
 	});
 });
 

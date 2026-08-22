@@ -9,7 +9,7 @@
 // client is unconfigured and issues same-origin relative requests (`/user`).
 // The leading `*` matches the optional `<scheme>://<host>` prefix.
 
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http, type PathParams } from "msw";
 import {
 	adminUsers,
 	currentUser,
@@ -23,6 +23,9 @@ import {
 // Per-export poll counter: the first status read returns PENDING, subsequent reads
 // return READY — mirroring the async export job completing server-side.
 const exportPolls = new Map<string, number>();
+
+/** Body of `PATCH /admin/users/:id` — the only field the admin table sends. */
+type AdminUserPatch = { appRole?: string };
 
 export const handlers = [
 	// --- current user -------------------------------------------------------
@@ -67,8 +70,8 @@ export const handlers = [
 
 	// --- admin users ---------------------------------------------------------
 	http.get("*/admin/users", () => HttpResponse.json(adminUsers)),
-	http.patch("*/admin/users/:id", async ({ request, params }) => {
-		const body = (await request.json().catch(() => ({}))) as { appRole?: string };
+	http.patch<PathParams, AdminUserPatch>("*/admin/users/:id", async ({ request, params }) => {
+		const body = await request.json().catch((): AdminUserPatch => ({}));
 		const existing = adminUsers.find((u) => String(u.id) === String(params.id)) ?? adminUsers[0];
 		return HttpResponse.json({ ...existing, appRole: body.appRole ?? existing.appRole });
 	}),

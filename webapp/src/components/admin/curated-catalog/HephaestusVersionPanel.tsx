@@ -19,9 +19,11 @@ import {
 	curatedEntryCopy,
 } from "./curated-entry-state";
 
-type ShippedDefinition = Partial<
-	Record<keyof CuratedPracticeDefinition | keyof CuratedAreaRequest, unknown>
->;
+/**
+ * Either shipped shape, read through the field names its label map lists. The label maps are where
+ * the field names are checked, so nothing here has to re-state them.
+ */
+type ShippedDefinition = Readonly<Record<string, unknown>>;
 
 interface HephaestusVersionPanelBaseProps {
 	status: CatalogEntryStatus;
@@ -64,10 +66,6 @@ const PRACTICE_FIELDS = {
 	Exclude<keyof CuratedPracticeDefinition, "automatedReviewValidation" | "bindings">,
 	string
 >;
-
-function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
-	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
-}
 
 function displayValue(
 	field: string,
@@ -152,7 +150,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 								render={<dl />}
 								className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3"
 							>
-								{fieldEntries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
+								{Object.entries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
 									([field, label]) => (
 										<div key={field} className="space-y-1">
 											<dt className="font-medium text-xs">{label}</dt>

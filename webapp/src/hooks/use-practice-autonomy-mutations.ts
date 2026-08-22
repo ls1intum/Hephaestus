@@ -9,7 +9,7 @@ import {
 	setAutonomyMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { PracticeArea } from "@/api/types.gen";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import type { PracticeAutonomy } from "@/lib/practice-autonomy";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -124,13 +124,11 @@ export function usePracticeAutonomyMutations(workspaceSlug: string) {
 		}
 	};
 
-	const pendingAreaSlugs = usePendingMutationIds<{ path: { areaSlug?: string } }, string>(
-		areaMutationKey,
-		(variables) => variables.path.areaSlug,
+	const pendingAreaSlugs = usePendingMutationIds(areaMutationKey, (variables) =>
+		pathString(variables, "areaSlug"),
 	);
-	const pendingPracticeSlugs = usePendingMutationIds<{ path: { practiceSlug?: string } }, string>(
-		practiceMutationKey,
-		(variables) => variables.path.practiceSlug,
+	const pendingPracticeSlugs = usePendingMutationIds(practiceMutationKey, (variables) =>
+		pathString(variables, "practiceSlug"),
 	);
 
 	return {

@@ -35,7 +35,36 @@ const OUTCOME_OPTIONS = [
 	{ value: "FAILURE", label: "Failure" },
 ];
 
-const EVENT_TYPES = Object.keys(EVENT_TYPE_LABELS) as AuthEventType[];
+/** The values the server accepts as an `eventType` filter. A type the server adds fails
+ * `EVENT_TYPE_LABELS` first, which is the prompt to name it here too. */
+const EVENT_TYPES: AuthEventType[] = [
+	"LOGIN",
+	"LOGIN_FAILED",
+	"LOGOUT",
+	"TOKEN_REFRESH",
+	"JWT_REVOKED",
+	"IDENTITY_LINKED",
+	"IDENTITY_UNLINKED",
+	"IMPERSONATION_BEGIN",
+	"IMPERSONATION_END",
+	"ACCOUNT_DELETED",
+	"EXPORT_REQUESTED",
+	"APP_ROLE_CHANGED",
+	"RESEARCH_CONSENT_REVOKED",
+	"LLM_CONNECTION_CREATED",
+	"LLM_CONNECTION_UPDATED",
+	"LLM_CONNECTION_DELETED",
+	"LLM_MODEL_CREATED",
+	"LLM_MODEL_UPDATED",
+	"LLM_MODEL_DELETED",
+	"LLM_MODEL_PRICE_CHANGED",
+	"LLM_MODEL_SHARING_CHANGED",
+	"LLM_SETTINGS_CHANGED",
+	"LOGIN_PROVIDER_CREATED",
+	"LOGIN_PROVIDER_UPDATED",
+	"LOGIN_PROVIDER_DELETED",
+	"SILENT_MODE_CHANGED",
+];
 const OUTCOMES: ("SUCCESS" | "FAILURE")[] = ["SUCCESS", "FAILURE"];
 
 export interface AuthAuditPanelProps {

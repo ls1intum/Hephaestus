@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { z } from "zod";
 import { getUserFeatures } from "@/api/sdk.gen";
 import type { FeatureFlags } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
@@ -14,12 +15,26 @@ type FeatureFlagsResponse = Record<FeatureFlagName, boolean>;
 
 const FEATURE_FLAGS_QUERY_KEY = ["user", "features"] as const;
 
+/**
+ * Every flag is optional on the wire, and a flag an older server has never heard of is simply
+ * absent — so each one is parsed down to a definite boolean, and "absent" reads as off rather than
+ * as an `undefined` that every caller would have to spell out. Missing a flag here fails to
+ * satisfy `FeatureFlagsResponse`, so a new backend flag cannot silently go unparsed.
+ */
+const featureFlagsSchema = z.object({
+	ADMIN: z.boolean().catch(false),
+	GITLAB_WORKSPACE_CREATION: z.boolean().catch(false),
+	MENTOR_ACCESS: z.boolean().catch(false),
+	NOTIFICATION_ACCESS: z.boolean().catch(false),
+});
+
 async function fetchFeatureFlags(): Promise<FeatureFlagsResponse> {
 	const { data } = await getUserFeatures();
-	if (!data) {
+	const parsed = featureFlagsSchema.safeParse(data);
+	if (!parsed.success) {
 		throw new Error("Failed to fetch feature flags");
 	}
-	return data as FeatureFlagsResponse;
+	return parsed.data;
 }
 
 function useFeatureFlagsQuery() {

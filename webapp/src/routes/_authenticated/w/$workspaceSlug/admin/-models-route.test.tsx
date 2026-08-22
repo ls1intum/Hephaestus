@@ -1,5 +1,5 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { listAgentsQueryKey } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding } from "@/api/types.gen";
@@ -112,7 +112,7 @@ function card(purposeLabel: string): HTMLElement {
 }
 
 const saveButton = (purposeLabel: string) =>
-	within(card(purposeLabel)).getByRole("button", { name: "Save assignment" }) as HTMLButtonElement;
+	within(card(purposeLabel)).getByRole<HTMLButtonElement>("button", { name: "Save assignment" });
 
 describe("workspace AI models route", () => {
 	it("keeps each purpose's card pending independently when two saves run at once", async () => {
@@ -152,7 +152,7 @@ describe("workspace AI models route", () => {
 
 		const detection = card("Practice reviews model");
 		fireEvent.click(within(detection).getByRole("button", { name: "Advanced" }));
-		const timeout = within(detection).getByLabelText("Timeout (seconds)") as HTMLInputElement;
+		const timeout = within(detection).getByLabelText<HTMLInputElement>("Timeout (seconds)");
 		fireEvent.change(timeout, { target: { value: "900" } });
 		expect(timeout.value).toBe("900");
 
@@ -174,16 +174,19 @@ describe("workspace AI models route", () => {
 		const refetch = deferredBindingsRefetch(() => bindings);
 		server.use(
 			refetch.handler,
-			http.put("*/workspaces/:workspaceSlug/agents/PRACTICE_REVIEW", async ({ request }) => {
-				const body = (await request.json()) as { instanceModelId: number; timeoutSeconds: number };
-				const saved: AgentBinding = {
-					...binding("PRACTICE_REVIEW", body.instanceModelId),
-					timeoutSeconds: body.timeoutSeconds,
-					ready: false,
-				};
-				bindings = [saved];
-				return HttpResponse.json(saved);
-			}),
+			http.put<PathParams, { instanceModelId: number; timeoutSeconds: number }>(
+				"*/workspaces/:workspaceSlug/agents/PRACTICE_REVIEW",
+				async ({ request }) => {
+					const body = await request.json();
+					const saved: AgentBinding = {
+						...binding("PRACTICE_REVIEW", body.instanceModelId),
+						timeoutSeconds: body.timeoutSeconds,
+						ready: false,
+					};
+					bindings = [saved];
+					return HttpResponse.json(saved);
+				},
+			),
 		);
 
 		const detection = card("Practice reviews model");

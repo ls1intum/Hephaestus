@@ -103,7 +103,7 @@ describe("authClient.login — returnTo forwarding (safeReturnTo guard)", () => 
 	// `assign` so we can capture the redirect target without a real navigation.
 	function stubLocation(): { assigned: string[] } {
 		const assigned: string[] = [];
-		const stub = { assign: (url: string) => assigned.push(url) } as unknown as Location;
+		const stub = { assign: (url: string) => assigned.push(url) };
 		Object.defineProperty(window, "location", { configurable: true, value: stub });
 		return { assigned };
 	}
@@ -141,7 +141,7 @@ describe("applyStateChangingHeaders (app-wide CSRF + impersonation guard)", () =
 		Object.defineProperty(document, "cookie", { configurable: true, get: () => raw });
 	}
 	function req(method: string): Request {
-		return { method, headers: new Headers() } as unknown as Request;
+		return new Request("http://localhost:8080/user", { method });
 	}
 
 	afterEach(() => setCookie(""));

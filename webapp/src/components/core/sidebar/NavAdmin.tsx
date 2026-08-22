@@ -16,7 +16,7 @@ import {
 	Users,
 	Workflow,
 } from "lucide-react";
-import { type ReactElement, type ReactNode, useEffect, useState } from "react";
+import { type ReactElement, type ReactNode, useState } from "react";
 import type { IntegrationCatalogEntry } from "@/api/types.gen";
 import { ADMIN_NAV_LABELS } from "@/components/core/sidebar/admin-nav-labels";
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
@@ -38,6 +38,27 @@ export interface NavAdminProps {
 	achievementsEnabled: boolean;
 	integrationKinds: ReadonlyArray<IntegrationCatalogEntry["kind"]>;
 	scmProviderType?: "GITHUB" | "GITLAB";
+}
+
+/**
+ * Open state for a nav section, forced open when the user navigates into it and freely collapsible
+ * the rest of the time.
+ *
+ * The adjustment happens during render rather than in an effect: an effect would let the browser
+ * paint the section closed and then reopen it, so arriving at an admin page would flash a collapsed
+ * sidebar. Comparing against the previous value is what keeps a deliberate collapse from being
+ * undone on every later render while the user is still inside the section.
+ */
+function useSectionOpen(onSection: boolean) {
+	const [open, setOpen] = useState(onSection);
+	const [wasOnSection, setWasOnSection] = useState(onSection);
+
+	if (onSection !== wasOnSection) {
+		setWasOnSection(onSection);
+		if (onSection) setOpen(true);
+	}
+
+	return [open, setOpen] as const;
 }
 
 export function NavAdmin({
@@ -89,19 +110,11 @@ export function NavAdmin({
 	const onModels = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/models", fuzzy: true }));
 	const onUsage = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/usage", fuzzy: true }));
 	const onAudit = Boolean(matchRoute({ to: "/w/$workspaceSlug/admin/audit", fuzzy: true }));
-	const [practicesOpen, setPracticesOpen] = useState(onSection);
-	const [integrationsOpen, setIntegrationsOpen] = useState(onIntegrationsSection);
+	const [practicesOpen, setPracticesOpen] = useSectionOpen(onSection);
+	const [integrationsOpen, setIntegrationsOpen] = useSectionOpen(onIntegrationsSection);
 	const ScmIcon = scmProviderType === "GITLAB" ? GitlabIcon : GithubIcon;
 	const scmLabel = scmProviderType === "GITLAB" ? "GitLab" : "GitHub";
 	const scmKind = scmProviderType === "GITLAB" ? "GITLAB" : "GITHUB";
-
-	useEffect(() => {
-		if (onSection) setPracticesOpen(true);
-	}, [onSection]);
-
-	useEffect(() => {
-		if (onIntegrationsSection) setIntegrationsOpen(true);
-	}, [onIntegrationsSection]);
 
 	return (
 		<SidebarGroup>

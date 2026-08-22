@@ -5,6 +5,12 @@ import { type WorkspaceDetailsData, workspaceDetailsSchema } from "./schemas";
 import { generateSlug } from "./slug-utils";
 import { useWizard } from "./wizard-context";
 
+/** The fields an issue can be reported against; anything else belongs to the object as a whole. */
+const DETAIL_FIELDS = [
+	"displayName",
+	"workspaceSlug",
+] as const satisfies readonly (keyof WorkspaceDetailsData)[];
+
 export function ConfigureWorkspaceStep() {
 	const { state, dispatch } = useWizard();
 	const [fieldErrors, setFieldErrors] = useState<
@@ -22,8 +28,10 @@ export function ConfigureWorkspaceStep() {
 		if (!result.success) {
 			const errors: Partial<Record<keyof WorkspaceDetailsData, string>> = {};
 			for (const issue of result.error.issues) {
-				const key = issue.path[0] as keyof WorkspaceDetailsData;
-				errors[key] = issue.message;
+				const field = DETAIL_FIELDS.find((candidate) => candidate === issue.path[0]);
+				if (field) {
+					errors[field] = issue.message;
+				}
 			}
 			setFieldErrors(errors);
 		} else {

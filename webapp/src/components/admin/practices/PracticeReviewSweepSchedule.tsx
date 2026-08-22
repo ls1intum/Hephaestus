@@ -41,19 +41,24 @@ export interface PracticeReviewSweepScheduleProps {
 }
 
 /** The kinds a campaign can enumerate, which is what a sweep opens one of. */
-const WORK_KINDS = [ARTIFACT_KIND.pullRequest, ARTIFACT_KIND.issue] as const;
+type WorkKind = CreateReviewSweepScheduleRequest["artifactKind"];
 
-const WORK_KIND_ITEMS = WORK_KINDS.map((kind) => ({
-	value: kind as string,
+const WORK_KINDS = [
+	ARTIFACT_KIND.pullRequest,
+	ARTIFACT_KIND.issue,
+] as const satisfies readonly WorkKind[];
+
+const WORK_KIND_ITEMS: { value: WorkKind; label: string }[] = WORK_KINDS.map((kind) => ({
+	value: kind,
 	label: artifactKindPluralLabel(kind),
 }));
 
-const CADENCES = [
+type Cadence = CreateReviewSweepScheduleRequest["cadence"];
+
+const CADENCES: { value: Cadence; label: string }[] = [
 	{ value: "DAILY", label: "Every day" },
 	{ value: "WEEKLY", label: "Every week" },
-] as const;
-
-type Cadence = (typeof CADENCES)[number]["value"];
+];
 
 /**
  * The same ceiling the server enforces, offered here so an admin picks from what is allowed instead
@@ -235,7 +240,7 @@ function AddScheduleForm({
 	isLoading,
 	onCreate,
 }: {
-	availableKinds: { value: string; label: string }[];
+	availableKinds: { value: WorkKind; label: string }[];
 	isSaving: boolean;
 	isLoading: boolean;
 	onCreate: (request: CreateReviewSweepScheduleRequest) => void;
@@ -297,7 +302,7 @@ function AddScheduleForm({
 				<Select
 					items={CADENCES}
 					value={cadence}
-					onValueChange={(value) => changeCadence((value as Cadence) ?? cadence)}
+					onValueChange={(value) => changeCadence(value ?? cadence)}
 				>
 					<SelectTrigger id="sweep-cadence" className="w-56">
 						<SelectValue />
@@ -343,7 +348,7 @@ function AddScheduleForm({
 					disabled={isSaving || isLoading}
 					onClick={() =>
 						onCreate({
-							artifactKind: artifactKind as CreateReviewSweepScheduleRequest["artifactKind"],
+							artifactKind,
 							cadence,
 							lookbackDays: Number(lookbackDays),
 						})

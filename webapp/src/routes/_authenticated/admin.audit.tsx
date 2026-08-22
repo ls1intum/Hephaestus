@@ -43,7 +43,9 @@ function AdminAuditPage() {
 				onValueChange={(value) =>
 					navigate({
 						search: (prev) => ({
-							tab: value as AuditSearch["tab"],
+							// The tab component hands back an untyped value; the schema is what decides
+							// which tabs exist, and falls back to the default for anything else.
+							tab: auditSearchSchema.shape.tab.parse(value),
 							actorId: prev.actorId,
 							from: prev.from,
 							to: prev.to,

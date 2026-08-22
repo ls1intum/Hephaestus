@@ -33,7 +33,10 @@
 	// Read by `no-undef` alone, which is off — so this is forward-looking. Kept in step with
 	// `tsconfig.json`'s `lib`; turning `no-undef` on would also need `node` and the Vitest globals.
 	"env": { "browser": true, "es2022": true },
-	"settings": { "react": { "version": "19.2" } },
+	"settings": {
+		"react": { "version": "19.2" },
+		"jsx-a11y": { "components": { "Label": "label", "FieldLabel": "label" } }
+	},
 
 	"ignorePatterns": [
 		// Generated: the hey-api client and the TanStack Router tree.
@@ -54,6 +57,9 @@
 		"operator-assignment": "error",
 		"typescript/prefer-for-of": "error",
 		"typescript/no-explicit-any": "error",
+		// Paired with `no-unsafe-type-assertion`: without it, `!` stays an unchecked way to make the
+		// same claim, and every assertion the other rule rejects can be laundered through it.
+		"typescript/no-non-null-assertion": "error",
 		"unicorn/prefer-node-protocol": "error",
 		"oxc/no-accumulating-spread": "error",
 		"react/no-danger": "error",
@@ -311,7 +317,7 @@
 		// where it does not.
 		"vitest/valid-expect": ["error", { "maxArgs": 2 }],
 		// CSS side effects and module augmentation are the only unassigned imports this repo writes.
-		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router"] }],
+		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router", "react"] }],
 		// A Testing Library query IS the assertion — `getBy*`/`getAllBy*` throw when they find nothing,
 		// which is what `hephaestus/no-redundant-in-the-document` exists to say. Supplying this option
 		// replaces oxlint's defaults rather than extending them, so the first four are its list, restated.
@@ -360,34 +366,17 @@
 			}
 		},
 		{
-			// A test that asserts a `javascript:` URL is rejected has to be able to name one. And a fixture
-			// is a stub cast into shape — typescript-eslint says as much under `no-unsafe-type-assertion`'s
-			// "When Not To Use It": "If your project frequently stubs objects in test files … Consider
-			// disabling the rule for such files."
-			"files": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "src/test/**", "src/mocks/**"],
+			// A test that asserts a `javascript:` URL is rejected has to be able to name one.
+			"files": ["**/*.test.ts", "**/*.test.tsx"],
 			"rules": {
-				"no-script-url": "off",
-				"typescript/no-unsafe-type-assertion": "off"
+				"no-script-url": "off"
 			}
 		},
 		{
-			// Playwright, not React. Its fixture callback is named `use`, which the React plugin reads as
-			// the `use` hook.
+			// Playwright, not React: its fixture callback takes the setup/teardown function positionally
+			// and Playwright's own docs name it `use`, which the React plugin reads as the `use` hook.
 			"files": ["e2e/**"],
-			"rules": { "react/rules-of-hooks": "off" }
-		},
-		{
-			// Vendored shadcn primitives, edited only to fit Base UI. Add a line here only for a finding
-			// you have seen; each of these is one site.
-			"files": ["src/components/ui/**"],
-			"rules": {
-				"jsx-a11y/label-has-associated-control": "off",
-				// Both fire on the same `<div role="group">` in `input-group.tsx`.
-				"jsx-a11y/no-noninteractive-element-interactions": "off",
-				"jsx-a11y/click-events-have-key-events": "off",
-				// `sidebar.tsx` persists its open state in a cookie so the shell does not flash on reload.
-				"unicorn/no-document-cookie": "off"
-			}
+			"rules": { "react-hooks/rules-of-hooks": "off" }
 		}
 	]
 }

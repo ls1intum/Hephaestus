@@ -13,10 +13,14 @@ import {
 	workspaceListAvailableLlmModelsOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentBinding } from "@/api/types.gen";
-import { AgentBindingsPage, PURPOSE_TITLES } from "@/components/admin/ai/AgentBindingsPage";
+import {
+	AgentBindingsPage,
+	isPurpose,
+	PURPOSE_TITLES,
+} from "@/components/admin/ai/AgentBindingsPage";
 import { WorkspaceLlmProviderPanel } from "@/components/admin/ai/WorkspaceLlmProviderPanel";
 import { currentMonthUtc } from "@/components/admin/usage/usage-utils";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -97,10 +101,10 @@ function ModelsContainer() {
 		},
 	});
 
-	const pendingPurposes = usePendingMutationIds<{ path: { purpose: Purpose } }, Purpose>(
-		agentWriteKey,
-		(variables) => variables.path.purpose,
-	);
+	const pendingPurposes = usePendingMutationIds(agentWriteKey, (variables) => {
+		const purpose = pathString(variables, "purpose");
+		return purpose !== undefined && isPurpose(purpose) ? purpose : undefined;
+	});
 
 	return (
 		<AgentBindingsPage

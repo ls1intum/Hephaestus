@@ -6,9 +6,10 @@ import {
 } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { filedUnder, usePendingMutationIds } from "./use-pending-mutation-ids";
+import { filedUnder, pathNumber, usePendingMutationIds } from "./use-pending-mutation-ids";
 
-type Vars = { id: number };
+/** The shape every generated mutation takes: the path parameters the endpoint is keyed on. */
+type Vars = { path: { id: number } };
 
 const KEY = ["thing"];
 
@@ -31,18 +32,25 @@ function Harness({ releaseFast }: { releaseFast: Promise<void> }) {
 	const generated = useMutation({
 		...filedUnder([...KEY, "generated"], generatedMutation()),
 	});
-	const pending = usePendingMutationIds<Vars>(KEY, (variables) => variables.id);
+	const foreign = useMutation({
+		mutationKey: [...KEY, "foreign"],
+		mutationFn: (_variables: { body: { note: string } }) => new Promise<void>(() => {}),
+	});
+	const pending = usePendingMutationIds(KEY, (variables) => pathNumber(variables, "id"));
 
 	return (
 		<>
-			<button type="button" onClick={() => slow.mutate({ id: 1 })}>
+			<button type="button" onClick={() => slow.mutate({ path: { id: 1 } })}>
 				start slow
 			</button>
-			<button type="button" onClick={() => fast.mutate({ id: 2 })}>
+			<button type="button" onClick={() => fast.mutate({ path: { id: 2 } })}>
 				start fast
 			</button>
-			<button type="button" onClick={() => generated.mutate({ id: 3 })}>
+			<button type="button" onClick={() => generated.mutate({ path: { id: 3 } })}>
 				start generated
+			</button>
+			<button type="button" onClick={() => foreign.mutate({ body: { note: "hi" } })}>
+				start foreign
 			</button>
 			<output>{[...pending].sort((a, b) => a - b).join(",")}</output>
 		</>
@@ -77,6 +85,15 @@ describe("usePendingMutationIds", () => {
 		await waitFor(() => expect(pendingIds()).toBe("1,2"));
 
 		releaseFast();
+		await waitFor(() => expect(pendingIds()).toBe("1"));
+	});
+
+	it("ignores a call filed under the same key whose variables carry no such id", async () => {
+		renderHarness();
+
+		click("start foreign");
+		click("start slow");
+
 		await waitFor(() => expect(pendingIds()).toBe("1"));
 	});
 

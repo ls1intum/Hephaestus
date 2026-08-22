@@ -41,7 +41,7 @@ import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import {
 	type AdminLlmModelSaveBody,
 	AdminLlmModelSaveError,
@@ -141,9 +141,8 @@ function AdminLlmPage() {
 			toast.error("Couldn't delete the connection", { description: problemDetailOf(error) }),
 	});
 
-	const mutatingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
-		CONNECTION_WRITE_MUTATION_KEY,
-		(variables) => variables.path.id,
+	const mutatingConnectionIds = usePendingMutationIds(CONNECTION_WRITE_MUTATION_KEY, (variables) =>
+		pathNumber(variables, "id"),
 	);
 
 	const probeDraft = useMutation({ ...adminProbeLlmConnectionDraftMutation() });
@@ -165,9 +164,8 @@ function AdminLlmPage() {
 			toast.error("Couldn't delete the model", { description: problemDetailOf(error) }),
 	});
 
-	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
-		MODEL_WRITE_MUTATION_KEY,
-		(variables) => variables.path.id,
+	const mutatingModelIds = usePendingMutationIds(MODEL_WRITE_MUTATION_KEY, (variables) =>
+		pathNumber(variables, "id"),
 	);
 
 	const updateSettings = useMutation({

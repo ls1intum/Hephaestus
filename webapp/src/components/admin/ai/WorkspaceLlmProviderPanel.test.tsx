@@ -106,10 +106,10 @@ describe("WorkspaceLlmProviderPanel", () => {
 
 		expect(await within(gpuCard).findByText(/1 model available/)).toBeTruthy();
 
-		const slowButton = within(openAiCard).getByRole("button", {
+		const slowButton = within(openAiCard).getByRole<HTMLButtonElement>("button", {
 			name: "Testing… OpenAI production",
 		});
-		expect((slowButton as HTMLButtonElement).disabled).toBe(true);
+		expect(slowButton.disabled).toBe(true);
 
 		releaseSlowProbe?.();
 		expect(await within(openAiCard).findByText(/3 models available/)).toBeTruthy();
@@ -148,8 +148,10 @@ describe("WorkspaceLlmProviderPanel", () => {
 		await confirmDelete("Fast model");
 		await waitFor(() => expect(screen.queryByText("Fast model")).not.toBeNull());
 
-		const slowRowDelete = screen.getByRole("button", { name: "Delete Slow model" });
-		expect((slowRowDelete as HTMLButtonElement).disabled).toBe(true);
+		const slowRowDelete = screen.getByRole<HTMLButtonElement>("button", {
+			name: "Delete Slow model",
+		});
+		expect(slowRowDelete.disabled).toBe(true);
 
 		releaseSlowDelete?.();
 		await waitFor(() => expect(slowDeleteCalls).toBe(1));

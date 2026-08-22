@@ -4,6 +4,7 @@ import {
 	getCurrentUserOptions,
 } from "@/api/@tanstack/react-query.gen";
 import type { CurrentUserView, WorkspaceMembership } from "@/api/types.gen";
+import { isRecord } from "@/lib/is-record";
 
 /**
  * Shared by the route guards and `AuthContext` so both read one cache entry on one schedule. A 401
@@ -55,7 +56,8 @@ export function isAppAdmin(
 
 /** A "not a member" answer, as opposed to a transport failure, which carries no status at all. */
 function isServerRefusal(error: unknown): boolean {
-	const status = (error as { status?: unknown } | null)?.status;
+	if (!isRecord(error)) return false;
+	const status = error.status;
 	return typeof status === "number" && status >= 400 && status < 500;
 }
 

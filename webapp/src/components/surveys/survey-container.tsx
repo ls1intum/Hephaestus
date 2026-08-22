@@ -1,6 +1,6 @@
 import { Progress as ProgressRoot } from "@base-ui/react/progress";
 import { AlertCircle, CheckCircle2, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,12 +64,15 @@ function SurveyHeader({
 	);
 }
 
-export function SurveyContainer({
-	survey,
-	onComplete,
-	onDismiss,
-	onProgress,
-}: SurveyContainerProps) {
+/**
+ * Answers, step history and errors belong to a single run of a single survey, so a different
+ * survey starts from a clean slate instead of inheriting the previous run.
+ */
+export function SurveyContainer(props: SurveyContainerProps) {
+	return <SurveyRun key={props.survey.id} {...props} />;
+}
+
+function SurveyRun({ survey, onComplete, onDismiss, onProgress }: SurveyContainerProps) {
 	const [history, setHistory] = useState<number[]>([0]);
 	const [responses, setResponses] = useState<Record<string, SurveyResponse>>({});
 	const [errors, setErrors] = useState<ErrorMap>({});
@@ -86,16 +89,6 @@ export function SurveyContainer({
 
 	const viewIndex = Math.min(currentStepIndex + 1, totalSteps);
 	const progress = (viewIndex / Math.max(totalSteps, 1)) * 100;
-
-	const surveyId = survey.id;
-
-	useEffect(() => {
-		void surveyId;
-		setHistory([0]);
-		setResponses({});
-		setErrors({});
-		setCompletedResponses(null);
-	}, [surveyId]);
 
 	const handleResponse = (questionId: string, value: SurveyResponse) => {
 		setResponses((prev) => ({ ...prev, [questionId]: value }));

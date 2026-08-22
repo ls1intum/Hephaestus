@@ -1,15 +1,16 @@
+import { isStaticToolUIPart } from "ai";
 import { AnimatePresence, motion } from "motion/react";
 import { type InputHTMLAttributes, useState } from "react";
 import { Streamdown } from "streamdown";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { MarkdownCode } from "@/components/common/MarkdownCode";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, ChatTools } from "@/lib/types";
 import { cn, sanitizeText } from "@/lib/utils";
 import { MentorAvatar } from "./MentorAvatar";
 import { MessageActions } from "./MessageActions";
 import { MessageEditor } from "./MessageEditor";
 import { PreviewAttachment } from "./PreviewAttachment";
-import type { PartRenderer, PartRendererMap, ToolPart } from "./renderers/types";
+import type { PartRendererMap } from "./renderers/types";
 
 export interface MessageProps {
 	message: ChatMessage;
@@ -138,20 +139,15 @@ export function PreviewMessage({
 								}
 							}
 
-							if (type.startsWith("tool-")) {
-								if (!partRenderers) return null;
-								const toolKey = (part as { toolCallId?: string }).toolCallId || key;
-								const isAnyToolPart = (p: unknown): p is ToolPart =>
-									Boolean(
-										p &&
-											typeof (p as { type?: unknown }).type === "string" &&
-											(p as { type: string }).type.startsWith("tool-"),
-									);
-								if (!isAnyToolPart(part)) return null;
-								const renderers = partRenderers as unknown as Record<string, PartRenderer>;
-								const Renderer = renderers[type];
+							if (isStaticToolUIPart<ChatTools>(part)) {
+								const Renderer = partRenderers?.[part.type];
 								return Renderer ? (
-									<Renderer key={toolKey} message={message} part={part} variant={variant} />
+									<Renderer
+										key={part.toolCallId || key}
+										message={message}
+										part={part}
+										variant={variant}
+									/>
 								) : null;
 							}
 

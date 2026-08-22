@@ -24,9 +24,9 @@ export const POSITIONED_POPUPS = [
  * animation of its own and would otherwise look settled the moment it mounts.
  */
 function enteringAnimationsOf(element: Element): Animation[] {
-	return document.getAnimations().filter((animation) => {
-		const target = (animation.effect as KeyframeEffect | null)?.target;
-		return target instanceof Element && target.contains(element);
+	return document.getAnimations().filter(({ effect }) => {
+		if (!(effect instanceof KeyframeEffect)) return false;
+		return effect.target instanceof Element && effect.target.contains(element);
 	});
 }
 

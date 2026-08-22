@@ -16,6 +16,37 @@ export interface LeaderboardOverviewProps {
 	leaguesEnabled?: boolean;
 }
 
+/** Coarse time left until the leaderboard closes, e.g. "2d 3h", "4h 12m", "58s". */
+function formatTimeRemaining(leaderboardEnd: string | undefined, now: Date): string {
+	if (!leaderboardEnd) return "N/A";
+
+	const endDate = new Date(leaderboardEnd);
+
+	if (isPast(endDate)) {
+		return "Ended";
+	}
+
+	const diffHours = differenceInHours(endDate, now);
+	const diffMinutes = differenceInMinutes(endDate, now) % 60;
+	const diffSeconds = differenceInSeconds(endDate, now) % 60;
+
+	if (diffHours > 24) {
+		const days = Math.floor(diffHours / 24);
+		const hours = diffHours % 24;
+		return `${days}d ${hours}h`;
+	}
+
+	if (diffHours > 0) {
+		return `${diffHours}h ${diffMinutes}m`;
+	}
+
+	if (diffMinutes > 0) {
+		return `${diffMinutes}m ${diffSeconds}s`;
+	}
+
+	return `${diffSeconds}s`;
+}
+
 export function LeaderboardOverview({
 	leaderboardEntry,
 	leaguePoints,
@@ -24,54 +55,21 @@ export function LeaderboardOverview({
 	leaguesEnabled = true,
 }: LeaderboardOverviewProps) {
 	const [leagueInfoOpen, setLeagueInfoOpen] = useState(false);
-	const [countdown, setCountdown] = useState<string>("Calculating...");
 	const user = leaderboardEntry.user;
 
-	// Use an effect to update the countdown timer every second
+	// The countdown is a view of the wall clock: tick a timestamp, derive the label from it. The tick
+	// stops once the label can no longer change, so a closed or absent deadline costs no renders —
+	// and it stops by itself, because the render that first sees the deadline pass clears the timer.
+	const [now, setNow] = useState(() => new Date());
+	const counting = leaderboardEnd !== undefined && !isPast(new Date(leaderboardEnd));
+
 	useEffect(() => {
-		// Calculate countdown function that uses the current leaderboardEnd
-		const calculateCountdown = () => {
-			if (!leaderboardEnd) return "N/A";
-
-			const endDate = new Date(leaderboardEnd);
-
-			if (isPast(endDate)) {
-				return "Ended";
-			}
-
-			const now = new Date();
-			const diffHours = differenceInHours(endDate, now);
-			const diffMinutes = differenceInMinutes(endDate, now) % 60;
-			const diffSeconds = differenceInSeconds(endDate, now) % 60;
-
-			if (diffHours > 24) {
-				const days = Math.floor(diffHours / 24);
-				const hours = diffHours % 24;
-				return `${days}d ${hours}h`;
-			}
-
-			if (diffHours > 0) {
-				return `${diffHours}h ${diffMinutes}m`;
-			}
-
-			if (diffMinutes > 0) {
-				return `${diffMinutes}m ${diffSeconds}s`;
-			}
-
-			return `${diffSeconds}s`;
-		};
-
-		// Initial calculation
-		setCountdown(calculateCountdown());
-
-		// Update the countdown every second
-		const timer = setInterval(() => {
-			setCountdown(calculateCountdown());
-		}, 1000);
-
-		// Cleanup interval on unmount
+		if (!counting) return;
+		const timer = setInterval(() => setNow(new Date()), 1000);
 		return () => clearInterval(timer);
-	}, [leaderboardEnd]);
+	}, [counting]);
+
+	const countdown = formatTimeRemaining(leaderboardEnd, now);
 
 	if (!user) {
 		return null;

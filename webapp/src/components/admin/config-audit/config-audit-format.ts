@@ -1,4 +1,5 @@
 import type { ConfigAuditEntryView } from "@/api/types.gen";
+import { isRecord } from "@/lib/is-record";
 import { refLabel } from "../audit-shared/ref-label";
 
 type EntityType = NonNullable<ConfigAuditEntryView["entityType"]>;
@@ -49,14 +50,18 @@ export const ACTION_BADGE: Record<Action, "default" | "secondary" | "outline"> =
 	DELETED: "outline",
 };
 
+/** A row can carry a spelling this build has no label for, so both lookups are honestly partial. */
+const ENTITY_TYPE_LOOKUP: Record<string, string | undefined> = ENTITY_TYPE_LABELS;
+const ACTION_LOOKUP: Record<string, string | undefined> = ACTION_LABELS;
+
 export function entityTypeLabel(entityType: string | undefined): string {
-	return entityType && entityType in ENTITY_TYPE_LABELS
-		? ENTITY_TYPE_LABELS[entityType as EntityType]
-		: (entityType ?? "Unknown");
+	if (!entityType) return "Unknown";
+	return ENTITY_TYPE_LOOKUP[entityType] ?? entityType;
 }
 
 export function actionLabel(action: string | undefined): string {
-	return action && action in ACTION_LABELS ? ACTION_LABELS[action as Action] : (action ?? "—");
+	if (!action) return "—";
+	return ACTION_LOOKUP[action] ?? action;
 }
 
 export interface ActorDisplay {
@@ -153,10 +158,8 @@ function identifier(entityId: string): string {
 function parseSnapshot(value: string | undefined): Record<string, unknown> | null {
 	if (!value) return null;
 	try {
-		const parsed = JSON.parse(value);
-		return parsed && typeof parsed === "object" && !Array.isArray(parsed)
-			? (parsed as Record<string, unknown>)
-			: null;
+		const parsed: unknown = JSON.parse(value);
+		return isRecord(parsed) && !Array.isArray(parsed) ? parsed : null;
 	} catch {
 		return null;
 	}
@@ -164,8 +167,8 @@ function parseSnapshot(value: string | undefined): Record<string, unknown> | nul
 
 function leafAt(obj: Record<string, unknown>, path: string): unknown {
 	return path.split(".").reduce<unknown>((acc, segment) => {
-		if (acc && typeof acc === "object" && !Array.isArray(acc)) {
-			return (acc as Record<string, unknown>)[segment];
+		if (isRecord(acc) && !Array.isArray(acc)) {
+			return acc[segment];
 		}
 		return undefined;
 	}, obj);

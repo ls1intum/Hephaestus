@@ -416,7 +416,7 @@ function CatalogFilters({
 					value[0] &&
 					onSearchChange({
 						...search,
-						status: value[0] === "ALL" ? undefined : (value[0] as "OFFERED" | "NOT_OFFERED"),
+						status: value[0] === "ALL" ? undefined : value[0],
 					})
 				}
 				variant="outline"

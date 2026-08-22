@@ -11,7 +11,7 @@ import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownT
 const eur: FxRateInfo = {
 	currencyCode: "EUR",
 	ratePerUsd: 0.88,
-	rateDate: "2026-07-24" as unknown as Date,
+	rateDate: new Date("2026-07-24"),
 	source: "ECB",
 };
 
@@ -44,21 +44,21 @@ const jobTypeRows: LlmUsageByJobType[] = [
 
 const dayRows: LlmUsageByDay[] = [
 	{
-		day: "2026-07-20" as unknown as Date,
+		day: new Date("2026-07-20"),
 		events: 42,
 		instanceTotalCostUsd: 4.1,
 		ownProviderTotalCostUsd: 0.9,
 		unpricedEventCount: 0,
 	},
 	{
-		day: "2026-07-21" as unknown as Date,
+		day: new Date("2026-07-21"),
 		events: 77,
 		instanceTotalCostUsd: 6.3,
 		ownProviderTotalCostUsd: 1.25,
 		unpricedEventCount: 2,
 	},
 	{
-		day: "2026-07-22" as unknown as Date,
+		day: new Date("2026-07-22"),
 		events: 70,
 		instanceTotalCostUsd: 2.0,
 		ownProviderTotalCostUsd: 1.0,

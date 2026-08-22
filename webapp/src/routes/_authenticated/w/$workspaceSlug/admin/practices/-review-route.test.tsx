@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { HttpResponse, http } from "msw";
+import { HttpResponse, http, type PathParams } from "msw";
 import { describe, expect, it, vi } from "vitest";
 import { buildAutonomyFixture } from "@/components/admin/practices/practice-autonomy/story-mock-data";
 import { server } from "@/mocks/server";
@@ -129,10 +129,10 @@ describe("review route", () => {
 	it("clears an override by omitting the autonomy, not by sending null", async () => {
 		const bodies: Array<Record<string, unknown>> = [];
 		stubWorkspace([
-			http.patch(
+			http.patch<PathParams, Record<string, unknown>>(
 				"*/workspaces/:workspaceSlug/practices/:practiceSlug/autonomy",
 				async ({ request }) => {
-					bodies.push((await request.json()) as Record<string, unknown>);
+					bodies.push(await request.json());
 					return HttpResponse.json({
 						...fixture.practices[1],
 						autonomy: { effective: "HUMAN_APPROVAL", source: "AREA", inherited: true },

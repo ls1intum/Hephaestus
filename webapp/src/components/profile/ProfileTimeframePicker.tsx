@@ -55,11 +55,12 @@ export function ProfileTimeframePicker({
 	enableAllActivity = true,
 	schedule = DEFAULT_SCHEDULE,
 }: ProfileTimeframePickerProps) {
-	const [userInteracted, setUserInteracted] = useState(false);
+	// Once the user picks a timeframe their choice wins; until then the preset follows the dates
+	// the parent supplies.
+	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
 
-	const [selectedPreset, setSelectedPreset] = useState<TimeframePreset>(() =>
-		detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity),
-	);
+	const selectedPreset =
+		chosenPreset ?? detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity);
 
 	const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
 		if (selectedPreset === "custom" && afterDate) {
@@ -72,8 +73,8 @@ export function ProfileTimeframePicker({
 
 	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
 
-	const items = useMemo(() => {
-		const baseItems = [
+	const items = useMemo<{ value: TimeframePreset; label: string }[]>(() => {
+		const baseItems: { value: TimeframePreset; label: string }[] = [
 			{ value: "this-week", label: formatDropdownLabel("this-week") },
 			{ value: "last-week", label: formatDropdownLabel("last-week") },
 			{ value: "this-month", label: formatDropdownLabel("this-month") },
@@ -85,14 +86,6 @@ export function ProfileTimeframePicker({
 		}
 		return baseItems;
 	}, [enableAllActivity]);
-
-	useEffect(() => {
-		if (userInteracted) return;
-		const detected = detectPresetFromDates(afterDate, beforeDate, schedule, enableAllActivity);
-		if (detected !== selectedPreset) {
-			setSelectedPreset(detected);
-		}
-	}, [afterDate, beforeDate, schedule, enableAllActivity, userInteracted, selectedPreset]);
 
 	useEffect(() => {
 		if (!onTimeframeChange) return;
@@ -122,10 +115,8 @@ export function ProfileTimeframePicker({
 		onTimeframeChange(range.after, range.before);
 	}, [selectedPreset, customRange, schedule, onTimeframeChange]);
 
-	const handlePresetChange = (value: string) => {
-		const preset = value as TimeframePreset;
-		setUserInteracted(true);
-		setSelectedPreset(preset);
+	const handlePresetChange = (preset: TimeframePreset) => {
+		setChosenPreset(preset);
 
 		if (preset === "custom" && !customRange?.from) {
 			const now = new Date();
@@ -146,7 +137,8 @@ export function ProfileTimeframePicker({
 
 	const handleCustomRangeChange = (range: DateRange | undefined) => {
 		if (range) {
-			setUserInteracted(true);
+			// The calendar is only reachable from the custom preset, so picking dates pins it.
+			setChosenPreset("custom");
 			setCustomRange(range);
 		}
 	};

@@ -50,11 +50,9 @@ export const FullPagePreview: Story = {
 	render: () => {
 		const Demo = () => {
 			const [visible, setVisible] = useState(false);
-			const shouldShow = useSurveyNotificationStore((s) => s.shouldShowSurvey);
 			const pending = useSurveyNotificationStore((s) => s.pendingSurvey);
 			const setPending = useSurveyNotificationStore((s) => s.setPendingSurvey);
 			const clear = useSurveyNotificationStore((s) => s.clearPendingSurvey);
-			const clearSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
 
 			useEffect(() => {
 				if (!pending) {
@@ -63,12 +61,20 @@ export const FullPagePreview: Story = {
 				}
 			}, [pending]);
 
+			// Mirrors the widget: the badge raises a one-shot reopen request through the store.
 			useEffect(() => {
-				if (shouldShow) {
-					clearSignal();
+				const consumeShowSignal = () => {
+					const { shouldShowSurvey, clearShowSignal } = useSurveyNotificationStore.getState();
+					if (!shouldShowSurvey) {
+						return;
+					}
+					clearShowSignal();
 					setVisible(true);
-				}
-			}, [shouldShow, clearSignal]);
+				};
+
+				consumeShowSignal();
+				return useSurveyNotificationStore.subscribe(consumeShowSignal);
+			}, []);
 
 			return (
 				<div className="min-h-screen bg-background">

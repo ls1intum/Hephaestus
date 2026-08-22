@@ -145,22 +145,17 @@ export function setStoredConsent(consent: ConsentChoice) {
 }
 
 // Edit-mode reopen: set when the user clicks "Cookie preferences". The banner then shows even though
-// a decision exists, pre-seeded from `reopenSeed` and cancelable (so backing out keeps the prior
-// choice). This is NOT a passive first-visit appearance.
+// a decision exists, and is cancelable (so backing out keeps the prior choice). This is NOT a
+// passive first-visit appearance.
 let reopenRequested = false;
-let reopenSeed: ConsentChoice | null = null;
 
 /**
- * Re-open the consent banner in edit mode, pre-seeded with the current decision. Cancelling leaves
- * the existing choice untouched; saving records a new one. Satisfies GDPR Art. 7(3) (withdrawing is
- * as easy as giving — open and pick "Reject all") without destroying the prior decision on a passive
- * revisit.
+ * Re-open the consent banner in edit mode. The banner seeds its toggles from the stored decision, so
+ * cancelling leaves the existing choice untouched and saving records a new one. Satisfies GDPR
+ * Art. 7(3) (withdrawing is as easy as giving — open and pick "Reject all") without destroying the
+ * prior decision on a passive revisit.
  */
 export function requestConsentReopen() {
-	const current = getStoredConsent();
-	reopenSeed = current
-		? { analytics: current.analytics, errorMonitoring: current.errorMonitoring }
-		: null;
 	reopenRequested = true;
 	emitChange();
 }
@@ -171,13 +166,6 @@ export function closeConsentReopen() {
 		reopenRequested = false;
 		emitChange();
 	}
-}
-
-/** The pre-seed for a reopen, read-and-cleared so it applies once. */
-export function consumeReopenSeed(): ConsentChoice | null {
-	const seed = reopenSeed;
-	reopenSeed = null;
-	return seed;
 }
 
 /** Whether the banner is currently in explicit edit-mode reopen (non-hook accessor). */
