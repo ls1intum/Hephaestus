@@ -114,8 +114,12 @@ for the architectural decision.
   Changing a slug requires an explicit remapping strategy; changing a display name does not.
 - **Definitions and order are independent.** Reordering does not create a definition override or an
   audit event. **Use Hephaestus order** removes custom positions.
-- **Automatic installation is repair-only.** Workspaces without a recorded catalogue installation retain
-  a one-time repair path. New workspaces start empty and adopt practices explicitly.
+- **Automatic installation is repair-only, and the repair is keyed on the installation record, not on
+  age.** At startup every workspace without a `practice_catalog_installation` row receives the whole
+  effective catalogue once. Only `WorkspaceService.createWorkspaceWithInitialization` publishes
+  `WorkspaceCreatedEvent`, so only a workspace created through that path records the installation and
+  starts empty. `WorkspaceProvisioningService` and `GithubLifecycleListener` call `createWorkspace`
+  directly, so the workspaces a fresh instance provisions at boot are still seeded by the repair.
 - **Adoption is deliberate.** Workspace administrators can show the instance library alongside their
   workspace configuration, inspect a complete effective definition, and add either one practice or all
   available practices in an area as independent copies. Area adoption is one transaction. Both flows

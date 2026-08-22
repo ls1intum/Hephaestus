@@ -8,4 +8,4 @@ Adding never starts sending feedback on its own. A practice Hephaestus can revie
 
 You can also add a whole area at once. Hephaestus shows every practice it would add, reuse, or skip first, and applies the result in one step or not at all. Adding is refused if the library or your workspace changed while you were reading the preview, so you always act on what you saw.
 
-New workspaces now start with no practices. Existing workspaces keep everything they have.
+Workspaces you already have keep everything in them, and a workspace that has never recorded a catalog installation still receives one at the next start, so nothing goes missing.
