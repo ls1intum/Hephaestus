@@ -2,11 +2,11 @@ import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { RepositoryCard } from "./RepositoryCard";
 import { TeamCard } from "./TeamCard";
 
-/** A nested team's heading sits one rank below its parent's, and stops at the last rank that exists. */
 const HEADING_LEVELS = [2, 3, 4, 5, 6] as const;
 
 type HeadingLevel = (typeof HEADING_LEVELS)[number];
 
+/** One rank below the parent's heading, clamped at the last rank HTML has. */
 const nestedHeadingLevel = (level: HeadingLevel): HeadingLevel =>
 	HEADING_LEVELS[HEADING_LEVELS.indexOf(level) + 1] ?? level;
 

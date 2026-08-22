@@ -50,7 +50,7 @@ export const ACTION_BADGE: Record<Action, "default" | "secondary" | "outline"> =
 	DELETED: "outline",
 };
 
-/** A row can carry a spelling this build has no label for, so both lookups are honestly partial. */
+/** Widened: an append-only row can carry a spelling this build has no label for. */
 const ENTITY_TYPE_LOOKUP: Record<string, string | undefined> = ENTITY_TYPE_LABELS;
 const ACTION_LOOKUP: Record<string, string | undefined> = ACTION_LABELS;
 

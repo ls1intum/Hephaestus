@@ -46,10 +46,6 @@ export function clearedFeedbackFilters(): Partial<FeedbackSearch> {
 	};
 }
 
-/**
- * Whether anything above is set — read by the count's wording and by the empty state's copy. Empty
- * arrays and absent scalars alike are "not filtered"; see the note on `hasObservationFilter`.
- */
 export function hasFeedbackFilter(search: FeedbackSearch): boolean {
 	return (
 		(search.deliveryState?.length ?? 0) > 0 ||

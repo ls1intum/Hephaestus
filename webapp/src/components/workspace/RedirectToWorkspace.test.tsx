@@ -5,8 +5,6 @@ import type { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import type { AuthContextType } from "@/integrations/auth/AuthContext";
 
 const mockNavigate = vi.fn();
-// A double stands in for the whole hook, not for the fields this component happens to read, so it
-// carries the hook's real signature and stops matching it the moment the hook's shape moves.
 const mockUseActiveWorkspaceSlug = vi.fn<typeof useActiveWorkspaceSlug>();
 const mockUseAuth = vi.fn<() => AuthContextType>();
 

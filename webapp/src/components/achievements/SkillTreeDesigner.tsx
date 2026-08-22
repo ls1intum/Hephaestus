@@ -35,7 +35,6 @@ import {
 	getMiniMapNodeColor,
 } from "@/components/achievements/utils";
 
-/** The registry is keyed by the generated ids, so a key it owns is one of them. */
 function isRegisteredAchievementId(id: string): id is AchievementId {
 	return Object.hasOwn(ACHIEVEMENT_REGISTRY, id);
 }
@@ -178,8 +177,8 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 			<ReactFlow
 				nodes={nodes.map((n) => {
-					// Narrowed one node kind at a time: spreading the union would merge the two node
-					// shapes into one whose `data` fits neither.
+					// One branch per node kind: spreading the union merges the two `data` shapes into one
+					// that fits neither.
 					if (n.type === "achievement") return { ...n, data: { ...n.data, showTooltips } };
 					if (n.type === "avatar") return { ...n, data: { ...n.data, showTooltips } };
 					return n;

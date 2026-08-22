@@ -55,13 +55,13 @@ export function CookieConsentBanner() {
 		return null;
 	}
 
-	// Mounted per appearance, so the toggles start from the decision being revisited (revisiting
-	// preferences never silently drops a choice) without ever being re-seeded in place.
+	// A fresh mount per appearance, so the toggles seed from the stored decision and are never
+	// re-seeded in place.
 	return <ConsentForm decision={consent} reopened={reopen} />;
 }
 
 interface ConsentFormProps {
-	/** The decision being revisited, or `null` on a first visit. Seeds the toggles. */
+	/** Seeds the toggles; `null` on a first visit. */
 	decision: ConsentChoice | null;
 	/** True when the banner was explicitly re-opened (vs appearing passively on a first visit). */
 	reopened: boolean;

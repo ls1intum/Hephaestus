@@ -5,33 +5,24 @@
 	"plugins": ["typescript", "unicorn", "oxc", "import", "react", "jsx-a11y", "vitest", "promise"],
 	"jsPlugins": ["./tools/oxlint/index.ts"],
 
-	// No warn tier, deliberately: oxlint exits 0 on warnings unless `--deny-warnings` is passed, so a
-	// warn-level rule is a rule nobody ever fails on. Every entry below is `error` or `off`.
-	//
-	// `perf` is off as a category with one rule taken from it by name. React Compiler runs at build
-	// time and this repo bans hand-written `useMemo`/`useCallback` (`AGENTS.md`), so the rest of `perf`
-	// asks for the memoisation the compiler exists to remove — as does the whole `react-perf` plugin,
-	// which is left out of `plugins` for the same reason.
+	// No `warn` tier: oxlint exits 0 on warnings unless `--deny-warnings` is passed.
 	"categories": {
 		"correctness": "error",
 		"suspicious": "error",
+		// React Compiler runs at build time and this repo bans hand-written `useMemo`/`useCallback`
+		// (`AGENTS.md`), so `perf` — and the `react-perf` plugin, left out of `plugins` — asks for the
+		// memoisation the compiler exists to remove.
 		"perf": "off",
 		"pedantic": "off",
 		"style": "off",
 		"restriction": "off"
 	},
 
-	// A suppression that has stopped suppressing anything fails the build rather than outliving the
-	// problem it named. Root config only — oxlint rejects `options` in an override.
-	//
-	// `typeAware` needs the `oxlint-tsgolint` dependency and TypeScript 7, which `typecheck` and
-	// `build` already run. It costs about a second and 0.4GB, and it is what makes
-	// `typescript/no-floating-promises` and two dozen other rules do anything at all — without it they
-	// read as enabled and silently check nothing.
+	// Only settable here: oxlint rejects `options` in an override. Without `typeAware` (and the
+	// `oxlint-tsgolint` dependency) every type-aware rule below reads as enabled and checks nothing.
 	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true },
 
-	// Read by `no-undef` alone, which is off — so this is forward-looking. Kept in step with
-	// `tsconfig.json`'s `lib`; turning `no-undef` on would also need `node` and the Vitest globals.
+	// The globals a rule may assume exist. Kept in step with `tsconfig.json`'s `lib`.
 	"env": { "browser": true, "es2022": true },
 	"settings": {
 		"react": { "version": "19.2" },
@@ -39,12 +30,12 @@
 	},
 
 	"ignorePatterns": [
-		// Generated: the hey-api client and the TanStack Router tree.
+		// Generated.
 		"src/api",
 		"src/routeTree.gen.ts",
-		// Written by `msw init`; a rule it trips is an msw upgrade blocked for no reason.
+		// Vendored by `msw init`.
 		"public/mockServiceWorker.js",
-		// Build output. oxlint honours `.gitignore` on its own; these two are not in it.
+		// Build output, and neither is in `.gitignore`, which oxlint would otherwise honour.
 		"playwright-report",
 		"coverage"
 	],
@@ -57,34 +48,24 @@
 		"operator-assignment": "error",
 		"typescript/prefer-for-of": "error",
 		"typescript/no-explicit-any": "error",
-		// An `async` with nothing to await promises a completion the caller cannot wait for. Two auth
-		// helpers claimed `Promise<void>` around a synchronous redirect, which is why every call site
-		// wrote `void linkAccount(...)`.
 		"typescript/require-await": "error",
-		// `no-explicit-any` only catches the `any` this repo writes. These five catch the `any` that
-		// arrives — from a library that types a prop or a callback argument as `any`, from `JSON.parse`,
-		// and from an untyped `vi.fn()`, whose `mock.calls` made an assertion about a submitted value
-		// check nothing at all. Each one is a place where the checker stops working silently, so the
-		// fix is always to establish the type at the boundary rather than downstream.
+		// `no-explicit-any` catches the `any` this repo writes; the `no-unsafe-*` rules catch the `any`
+		// that arrives — from a library, from `JSON.parse`, from an untyped `vi.fn()`.
 		"typescript/no-unsafe-call": "error",
 		"typescript/no-unsafe-assignment": "error",
 		"typescript/no-unsafe-argument": "error",
 		"typescript/no-unsafe-return": "error",
 		"typescript/no-unsafe-member-access": "error",
-		// Paired with `no-unsafe-type-assertion`: without it, `!` stays an unchecked way to make the
-		// same claim, and every assertion the other rule rejects can be laundered through it.
+		// Without it, `!` is an unchecked way to make the claim `no-unsafe-type-assertion` rejects.
 		"typescript/no-non-null-assertion": "error",
 		"unicorn/prefer-node-protocol": "error",
 		"oxc/no-accumulating-spread": "error",
 		"react/no-danger": "error",
 		// `null == x` is the idiomatic "null or undefined" check and stays allowed.
 		"eqeqeq": ["error", "always", { "null": "ignore" }],
-		// A directive naming no rule disables every rule on that line.
 		"unicorn/no-abusive-eslint-disable": "error",
 
-		// Rules oxlint files under `pedantic`/`perf` that are not pedantic at all. Each reports zero on
-		// this tree, so they cost nothing today and guard the next person. Re-derive the list by running
-		// a category on its own and taking whatever does not fire.
+		// -- Taken by name out of `pedantic` and `perf` ----------------------------------------------
 		"react/rules-of-hooks": "error",
 		"react/jsx-no-target-blank": "error",
 		"react/display-name": "error",
@@ -95,9 +76,6 @@
 		"no-inner-declarations": "error",
 		"no-prototype-builtins": "error",
 		"no-self-compare": "error",
-		// A name that means one thing outside a callback and another inside it is how a value goes
-		// stale: the reader checks the outer binding and the code uses the inner one. `typescript/`
-		// spelling of this rule is inert here — the base rule is the one that fires.
 		"no-shadow": "error",
 		"no-throw-literal": "error",
 		"no-constructor-return": "error",
@@ -141,8 +119,7 @@
 		"unicorn/prefer-blob-reading-methods": "error",
 		"unicorn/require-number-to-fixed-digits-argument": "error",
 
-		// `restriction` rules that are not restrictive here — all report zero, and the first block is
-		// Biome-recommended coverage this migration would otherwise have dropped.
+		// -- Taken by name out of `restriction` ------------------------------------------------------
 		"no-proto": "error",
 		"no-script-url": "error",
 		"no-var": "error",
@@ -180,9 +157,8 @@
 		"oxc/no-const-enum": "error",
 		"oxc/bad-bitwise-operator": "error",
 		"promise/catch-or-return": "error",
-		// Same again for `style`, which is not adoptable as a category (it contains `sort-keys` and both
-		// `no-named-export` and `prefer-default-export`), but these report zero and each guards a bug
-		// rather than a preference.
+		// -- Taken by name out of `style`, which is not adoptable whole: it holds `sort-keys` and both
+		// `no-named-export` and `prefer-default-export` -----------------------------------------------
 		"no-template-curly-in-string": "error",
 		"no-new-func": "error",
 		"no-return-assign": "error",
@@ -198,7 +174,6 @@
 		"default-param-last": "error",
 		"grouped-accessor-pairs": "error",
 		"func-name-matching": "error",
-		// Modern equivalents of shapes that still parse.
 		"prefer-regex-literals": "error",
 		"prefer-object-has-own": "error",
 		"prefer-object-spread": "error",
@@ -207,9 +182,8 @@
 		"prefer-numeric-literals": "error",
 		"prefer-exponentiation-operator": "error",
 		"prefer-arrow-callback": "error",
-		// Imports and promises. `import/no-duplicates` accepts a type-only import standing beside a
-		// value import from the same module; `no-duplicate-imports` does not, and merging the pair with
-		// an inline `type` keeps one list per module for a reader to check a symbol against.
+		// `import/no-duplicates` accepts a type-only import standing beside a value import from the same
+		// module; `no-duplicate-imports` does not, and one import list per module is the point.
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",
@@ -218,7 +192,6 @@
 		"promise/no-nesting": "error",
 		"promise/no-return-wrap": "error",
 		"promise/prefer-catch": "error",
-		// React and TypeScript.
 		"react/jsx-pascal-case": "error",
 		"react/self-closing-comp": "error",
 		"react/jsx-fragments": "error",
@@ -230,7 +203,6 @@
 		"typescript/prefer-function-type": "error",
 		"typescript/unified-signatures": "error",
 		"typescript/consistent-type-assertions": "error",
-		// Nothing here fires today. They are on so the first occurrence is caught, not accumulated.
 		"import/export": "error",
 		"import/named": "error",
 		"no-unreachable-loop": "error",
@@ -247,8 +219,6 @@
 		// `strictFunctionTypes` only checks property syntax; a method shorthand stays bivariant, so
 		// `handler(e: MouseEvent): void` accepts a handler that will be called with something else.
 		"typescript/method-signature-style": "error",
-		// `@ts-ignore` outlives the error it hid; `@ts-expect-error` fails the build once it stops
-		// being needed — the same reason `reportUnusedDisableDirectives` is on for lint suppressions.
 		"typescript/prefer-ts-expect-error": "error",
 		"unicorn/no-useless-switch-case": "error",
 		"unicorn/no-useless-iterator-to-array": "error",
@@ -259,9 +229,7 @@
 		"unicorn/prefer-response-static-json": "error",
 		"unicorn/prefer-bigint-literals": "error",
 		"unicorn/require-module-attributes": "error",
-		// A barrel re-export makes the bundler pull a whole directory in for one symbol.
 		"oxc/no-barrel-file": "error",
-		// Class components: none exist, and these keep it that way cheaply.
 		"react/no-set-state": "error",
 		"react/prefer-es6-class": "error",
 		"react/require-render-return": "error",
@@ -272,36 +240,20 @@
 		"vitest/prefer-to-have-been-called-times": "error",
 		"vitest/no-large-snapshots": "error",
 
-		// The half of the promise story `no-floating-promises` cannot see: a promise handed to a
-		// position typed `void`, where nothing downstream will ever await it or observe its rejection.
-		// Left at its defaults, including `checksVoidReturn.attributes` — the JSX bucket is the majority
-		// of the findings here and the fix is the `void` this repo already writes, so keeping the
-		// sub-check on costs nothing and keeps a real failure mode in view.
 		"typescript/no-misused-promises": "error",
-		// A dependency's `@deprecated` is the only warning shipped before the removal, and it is
-		// invisible outside an editor. Reading it here means the migration happens on the upgrade that
-		// announced it rather than on the one that breaks the build.
 		"typescript/no-deprecated": "error",
 		"typescript/no-misused-spread": "error",
-		// `a || b` falls back on `0`, `""` and `false`; `a ?? b` falls back only on absence. Left at its
-		// defaults, `ignorePrimitives` included: where a blank string really should fall through, the
-		// question is asked by name (`hasText`/`firstNonBlank` in `@/lib/text`) rather than left to the
-		// operator, so switching the option on would only buy back the one case already spelled out.
+		// Where a blank string should fall through, the question is asked by name (`hasText` /
+		// `firstNonBlank` in `@/lib/text`), so `ignorePrimitives` stays off.
 		"typescript/prefer-nullish-coalescing": "error",
 		"typescript/require-array-sort-compare": "error",
 		"typescript/prefer-promise-reject-errors": "error",
 		"typescript/no-meaningless-void-operator": "error",
 		"typescript/no-unnecessary-template-expression": "error",
-		// A check the types already settle. It only tells the truth with `noUncheckedIndexedAccess`
-		// on (`tsconfig.json`), which is what stops it skipping every array index. Its findings split
-		// three ways and only one of them is "delete the branch": a guard that cannot fire, a chain
-		// on a value that was never nullable, and — the one worth having — a type that claims more
-		// than the wire delivers, where the fix is the type and the guard stays.
+		// Truthful only with `noUncheckedIndexedAccess` (`tsconfig.json`), which is what makes an array
+		// index nullable. A finding is as often a type claiming more than the wire delivers — fix the
+		// type, keep the guard — as it is a dead branch.
 		"typescript/no-unnecessary-condition": "error",
-		// A `default` clause is how this repo says "the rest is deliberate", so it counts as exhaustive.
-		// Left at the rule's default, the `default`-carrying switches already here would each need a
-		// suppression and no bug would be found; with it, a switch that drops both a case and its
-		// `default` still fails.
 		"typescript/switch-exhaustiveness-check": [
 			"error",
 			{ "considerDefaultExhaustiveForUnions": true }
@@ -316,7 +268,6 @@
 				]
 			}
 		],
-		// DOM and platform APIs.
 		"unicorn/error-message": "error",
 		"unicorn/throw-new-error": "error",
 		"unicorn/no-array-method-this-argument": "error",
@@ -336,7 +287,6 @@
 		"unicorn/prefer-string-trim-start-end": "error",
 		"unicorn/consistent-template-literal-escape": "error",
 		"unicorn/text-encoding-identifier-case": "error",
-		// Tests that quietly do not run, or assert nothing.
 		"vitest/no-identical-title": "error",
 		"vitest/no-duplicate-hooks": "error",
 		"vitest/no-alias-methods": "error",
@@ -358,95 +308,70 @@
 		"vitest/prefer-mock-promise-shorthand": "error",
 		"vitest/prefer-mock-return-shorthand": "error",
 		"vitest/consistent-vitest-vi": "error",
-		// `toEqual` ignores a property whose value is `undefined`, so it passes on an object that has
-		// one the expectation does not name. `toStrictEqual` also checks class identity and array
-		// sparseness. Every equality assertion here is against a value this codebase produces, so the
-		// looser matcher only ever hides a difference.
 		"vitest/prefer-strict-equal": "error",
-		// `toBeTruthy` on a boolean accepts `1` and `"no"` as well as `true`. The rule is untyped — it
-		// flags every `toBeTruthy`/`toBeFalsy`, including the ones wrapped around a Testing Library
-		// query — which is what makes it useful here: a query already throws, so wrapping it in
-		// `expect(...).toBeTruthy()` is ceremony, and the fix is to keep the query and drop the wrapper.
 		"vitest/prefer-strict-boolean-matchers": "error",
-		// A branch inside a test is a set of assertions that may not run, and a test that skipped its
-		// assertions still passes. This also reaches `&&`, `||`, `??` and `?.` inside the test body,
-		// which is where the same failure hides in miniature: `getAttribute("href") ?? ""` turns a
-		// missing attribute into an empty string the assertion then accepts. Setup that genuinely
-		// branches — a mock server answering different calls differently — belongs beside the handler
-		// rather than in the test, and `@/test/responses` is where that shape lives.
+		// Reaches `&&`, `||`, `??` and `?.` in a test body too: `getAttribute("href") ?? ""` turns a
+		// missing attribute into an empty string the assertion then accepts. Setup that really does
+		// branch belongs in the mock handler, not the test body.
 		"vitest/no-conditional-in-test": "error",
 
-		// -- Off. Every reason below was read off this rule's own findings; re-derive with
-		// `pnpm exec oxlint -D <rule>` before trusting or changing one -------------------------------
+		// -- Off -------------------------------------------------------------------------------------
 		// React 19's automatic JSX runtime.
 		"react/react-in-jsx-scope": "off",
-		// The exact inverse of `prefer-strict-boolean-matchers`, above: these two rewrite `toBe(true)`
-		// into `toBeTruthy()` and `toBe(false)` into `toBeFalsy()`, which is the weaker assertion —
-		// `toBeTruthy` passes on `1`, `"false"` and `{}`. Both cannot be on; the stricter one wins, and
-		// turning these on would mean loosening every boolean assertion this repo already spells out.
+		// The inverse of `prefer-strict-boolean-matchers` above: these rewrite `toBe(true)` into
+		// `toBeTruthy()`, which also passes on `1`, `"false"` and `{}`. Both cannot be on.
 		"vitest/prefer-to-be-truthy": "off",
 		"vitest/prefer-to-be-falsy": "off",
-		// React Compiler's own effect check. What it reports here are effects whose whole point is to
-		// re-run on the dependency it calls extra, so clearing them changes when they fire.
+		// React Compiler's own effect check. The effects it reports here re-run on the dependency it
+		// calls extra on purpose, so clearing them changes when they fire.
 		"react/exhaustive-effect-dependencies": "off",
 		// shadcn primitives over Base UI set `role` themselves.
 		"jsx-a11y/prefer-tag-over-role": "off",
 		// Base UI passes the control through `render=` and keeps the label in the wrapper's children,
 		// where no jsx-a11y rule can see it. Expect this from any rule that inspects children.
 		"jsx-a11y/control-has-associated-label": "off",
-		// Same shape, plus the `renderPageLink` prop pattern: every site is an `<a>` whose content is
-		// supplied by whoever renders it.
+		// Same shape, plus `renderPageLink`: the `<a>`'s content comes from whoever renders it.
 		"jsx-a11y/anchor-has-content": "off",
-		// Placeholder rows and decorative layers have no identity but their position
-		// (`Array.from({ length: n })`), and even a composite `${id}:${index}` key still trips it.
+		// Placeholder rows and decorative layers have no identity but their position, and even a
+		// composite `${id}:${index}` key still trips it.
 		"react/no-array-index-key": "off",
 		// `rows.length ? … : …` on a value that is only ever an array reads fine.
 		"unicorn/explicit-length-check": "off",
-		// Both want ES2023 `toSorted`/`toReversed`, which `tsconfig.json`'s `lib` does not declare. The
-		// in-place mutation they exist to catch needs an array someone else can observe, and no site
-		// here has one: each either copies first (`[...x].sort(…)`, `.filter(…).sort(…)`) or sorts an
-		// array it just built itself in the same scope. Read the site before adding another — a `.sort()`
-		// on an array that arrived as a prop or came out of a cache is the bug these rules describe.
+		// Both want ES2023 `toSorted`/`toReversed`, which `tsconfig.json`'s `lib` does not declare. Copy
+		// before sorting an array a caller can observe — that mutation is the bug they describe.
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-array-reverse": "off",
-		// Its two shapes here are both wrong. An effect that bails early and otherwise returns a cleanup
-		// is React's documented idiom, and an exhaustive `switch` with an annotated return type is
-		// already a TypeScript error when a union member is added (TS2366) — verified, not assumed.
+		// Its two shapes here: an effect that bails early and otherwise returns a cleanup, which is
+		// React's idiom, and an annotated exhaustive `switch`, which TypeScript already fails (TS2366).
 		"typescript/consistent-return": "off",
-		// Wants a type parameter on every `vi.fn()`. It buys nothing here: `toHaveBeenCalledWith` is not
-		// type-narrowed by this Vitest/TS setup — a deliberately wrong argument against a
-		// `vi.fn<(open: boolean) => void>()` type-checks clean — so the parameter would be ceremony on
-		// every call assertion and on every `onChange={vi.fn()}` prop.
+		// `toHaveBeenCalledWith` is not type-narrowed by this Vitest/TS setup — a wrong argument against
+		// `vi.fn<(open: boolean) => void>()` type-checks clean — so the parameter buys nothing.
 		"vitest/require-mock-type-parameters": "off",
-		// Flags `const Icon = iconFor(kind)` as creating a component during render. Those helpers return
-		// one of a fixed set of module-level icons, so the identity it warns about is already stable —
-		// it just cannot prove that. `react/no-unstable-nested-components` (on, above) catches the case
-		// this is actually for: a component literally defined inside another's body.
+		// Flags `const Icon = iconFor(kind)`, where the helper returns one of a fixed set of
+		// module-level icons. `react/no-unstable-nested-components` still catches a component defined
+		// inside another's body.
 		"react/static-components": "off",
-		// A handler defined next to the JSX that uses it is the point. Some findings are genuinely
-		// hoistable helpers; the rule cannot tell the two apart.
+		// A handler defined next to the JSX that uses it is the point, and the rule cannot tell it from
+		// a genuinely hoistable helper.
 		"unicorn/consistent-function-scoping": "off",
 		// Server field names (`_id`), test hooks (`__resetSessionRecoveryForTests`), the runtime config
-		// global (`__ENV__`) and exhaustiveness bindings (`_exhaustive`) all read better with the prefix.
+		// global (`__ENV__`) and exhaustiveness bindings (`_exhaustive`).
 		"no-underscore-dangle": "off",
 
-		// -- Options, not exemptions: each teaches a rule something true about this codebase ----------
-		// Whether a component's `autoFocus` prop reaches a DOM `autofocus` is not knowable from the JSX,
-		// so `ignoreNonDOM` trades away the component-level sites for a rule that does not guess.
+		// -- Options ---------------------------------------------------------------------------------
 		"jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": true }],
-		// TanStack Table column defs are `cell: ({ row }) => <Badge …/>` — a component passed as a prop,
-		// which is what `allowAsProps` exists for.
+		// TanStack Table column defs are `cell: ({ row }) => <Badge …/>` — a component passed as a prop.
 		"react/no-unstable-nested-components": ["error", { "allowAsProps": true }],
 		// `void somePromise.then(sideEffect)` is fire-and-forget; only a chain's interior needs a return.
 		"promise/always-return": ["error", { "ignoreLastCallback": true }],
 		// Vitest's `expect(actual, message)` takes a second argument; the rule is ported from Jest,
 		// where it does not.
 		"vitest/valid-expect": ["error", { "maxArgs": 2 }],
-		// CSS side effects and module augmentation are the only unassigned imports this repo writes.
+		// CSS side effects and module augmentation.
 		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router", "react"] }],
-		// A Testing Library query IS the assertion — `getBy*`/`getAllBy*` throw when they find nothing,
-		// which is what `hephaestus/no-redundant-in-the-document` exists to say. Supplying this option
-		// replaces oxlint's defaults rather than extending them, so the first four are its list, restated.
+		// A Testing Library query IS the assertion: `getBy*` throws when it finds nothing. Supplying
+		// this option replaces oxlint's defaults rather than extending them, so the first four restate
+		// its list — drop one and a plain `expect()` stops counting.
 		"vitest/expect-expect": [
 			"error",
 			{
@@ -466,8 +391,8 @@
 				]
 			}
 		],
-		// `catch (_error)` is this repo's spelling for a deliberately ignored binding. tsc's
-		// `noUnusedLocals`/`noUnusedParameters` is the other half of this gate.
+		// `varsIgnorePattern` buys less than it looks: tsc's `noUnusedLocals` (`tsconfig.json`) still
+		// fails an unused `_local`. Only the parameter and caught-error escapes hold on both sides.
 		"no-unused-vars": [
 			"error",
 			{
@@ -477,22 +402,17 @@
 			}
 		],
 
-		// -- House rules. `tools/oxlint/` is where each of these decisions is written down ------------
+		// -- House rules, defined in `tools/oxlint/` -------------------------------------------------
 		"hephaestus/no-redundant-in-the-document": "error",
 		"hephaestus/no-within-canvas-element": "error",
 		"hephaestus/typed-story-meta": "error"
 	},
 
+	// Never configure one rule for the same file from two entries: where two overrides match a file,
+	// the later one's copy of a rule REPLACES the earlier one's options instead of merging with them.
+	// Entries whose globs overlap but set different rules are fine, and there are several below.
 	"overrides": [
 		{
-			// Layering, encoded while it still holds. None of these fires today; each exists so the first
-			// edge that would invert the dependency is rejected instead of becoming precedent.
-			//
-			// Never configure one rule for the same file from two entries: where two overrides match a
-			// file, the later one's copy of a rule REPLACES the earlier one's options rather than merging
-			// with them, so a broad `src/components/**` entry would silently drop the narrower
-			// `no-restricted-imports` patterns below. Entries whose globs overlap but set *different*
-			// rules are fine and this file has several.
 			"files": ["src/lib/**", "src/stores/**"],
 			"rules": {
 				"no-restricted-imports": [
@@ -533,8 +453,8 @@
 			}
 		},
 		{
-			// Every feature directory named, because a `src/components/**` glob would also match
-			// `ui/**` and replace the narrower entry above rather than adding to it.
+			// Named one by one because a `src/components/**` glob would also match `ui/**` and replace
+			// the entry above rather than add to it.
 			"files": [
 				"src/components/achievements/**",
 				"src/components/admin/**",
@@ -570,28 +490,27 @@
 			}
 		},
 		{
-			// The directories this repo writes by hand. `AGENTS.md` § File naming is the rule itself.
+			// The directories this repo writes by hand; `AGENTS.md` § File naming is the rule itself.
 			"files": ["src/components/**", "src/lib/**", "src/hooks/**", "src/integrations/**"],
 			"rules": {
 				"unicorn/filename-case": ["error", { "cases": { "kebabCase": true, "pascalCase": true } }]
 			}
 		},
 		{
-			// A test that asserts a `javascript:` URL is rejected has to be able to name one.
+			// A test that asserts a `javascript:` URL is rejected has to name one.
 			"files": ["**/*.test.ts", "**/*.test.tsx"],
 			"rules": {
 				"no-script-url": "off"
 			}
 		},
 		{
-			// A double for an async API is declared `async` so it returns a promise like the real thing;
-			// having nothing to await is the point, not an oversight.
+			// A double for an async API is `async` so it returns a promise like the real thing; having
+			// nothing to await is the point.
 			"files": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "src/test/**", "src/mocks/**"],
 			"rules": { "typescript/require-await": "off" }
 		},
 		{
-			// Playwright, not React: its fixture callback takes the setup/teardown function positionally
-			// and Playwright's own docs name it `use`, which the React plugin reads as the `use` hook.
+			// Playwright names its fixture callback `use`, which the React plugin reads as the hook.
 			"files": ["e2e/**"],
 			"rules": { "react-hooks/rules-of-hooks": "off" }
 		}

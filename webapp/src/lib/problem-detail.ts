@@ -1,16 +1,12 @@
 import { isRecord } from "@/lib/is-record";
 
 /**
- * Extract a human-readable message from a thrown request error.
+ * A human-readable message from a thrown request error: the generated client (with `throwOnError`)
+ * throws the parsed response body on a non-2xx, so RFC 9457's `detail` and `title` and the
+ * controllers' legacy `{ error }` are the shapes worth reading.
  *
- * The generated client (with `throwOnError`) throws the parsed response body on a non-2xx. For
- * RFC 9457 problem+json failures the server returns `{ type, title, status, detail }`; we prefer
- * `detail`, then `title`, then the controller's legacy `{ error }` shape, then the caller's
- * `fallback`.
- *
- * **`message` is deliberately not in that list**: a network rejection and a null-deref in our own
- * code are both a thrown `TypeError`, so only wording the server chose is ever shown. "No HTTP
- * answer at all" comes from {@link problemStatusOf} returning `undefined`.
+ * **`message` is deliberately not among them**: a network rejection and a null-deref in our own code
+ * are both a thrown `TypeError`, so only wording the server chose is ever shown.
  */
 export function problemDetailOf(
 	err: unknown,
@@ -31,13 +27,9 @@ export function problemDetailOf(
 }
 
 /**
- * Extract the HTTP status from a thrown request error, or `undefined` when there isn't one.
- *
- * RFC 9457 puts `status` in the problem body, which is what the generated client throws, so that is
- * the primary source; `response.status` is read as a fallback for the shapes that carry the raw
- * `Response` instead. `undefined` is meaningful and must not be collapsed to a number: it means the
- * request never got an HTTP answer (offline, DNS failure, CORS, an aborted fetch), which is a
- * different situation from any status the server could have returned.
+ * `undefined` is meaningful here and must not be collapsed to a number: it means the request never
+ * got an HTTP answer (offline, DNS failure, CORS, an aborted fetch), which is a different situation
+ * from any status the server could have returned.
  */
 export function problemStatusOf(err: unknown): number | undefined {
 	if (!isRecord(err)) {

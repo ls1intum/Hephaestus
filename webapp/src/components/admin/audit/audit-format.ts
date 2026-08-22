@@ -81,8 +81,7 @@ function stringify(value: unknown): string {
 	if (value === null || value === undefined) return "—";
 	if (typeof value === "string") return value;
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
-	// Anything else is decoded JSON — an object or an array — and neither has a `toString` worth
-	// showing: "[object Object]" for one, a comma-joined run of values for the other.
+	// Objects and arrays: `String` would give "[object Object]" or a bare comma-joined run.
 	return JSON.stringify(value);
 }
 

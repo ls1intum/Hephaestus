@@ -22,7 +22,6 @@ interface ThreadGroupData {
 	threads: ChatThreadSummary[];
 }
 
-/** Named so the record is total over them and the lookup below needs no fallback. */
 type BucketName = "Today" | "Yesterday" | "Last 7 days" | "Last 30 days" | "Older";
 
 /**

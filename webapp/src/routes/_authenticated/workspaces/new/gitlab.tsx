@@ -156,7 +156,6 @@ function GitLabWizardPage() {
 		staleTime: 5 * 60 * 1000,
 	});
 	const gitlabProviders: GitLabProvider[] = (identityProviders ?? []).flatMap((p) => {
-		// A row without a registrationId cannot be linked against, so it is not an option to offer.
 		if (p.providerType !== "GITLAB" || !p.registrationId) return [];
 		return [
 			{
@@ -230,7 +229,7 @@ function GitLabWizardPage() {
 			workspaceSlug: state.workspaceSlug,
 		}).success;
 
-	// `state.step` is an intentional trigger: the heading refocuses on every step change.
+	// Focus moves to the new step's heading so a screen reader announces where the wizard now is.
 	useEffect(() => {
 		headingRef.current?.focus();
 	}, [state.step]);

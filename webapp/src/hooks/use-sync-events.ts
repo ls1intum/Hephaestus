@@ -25,7 +25,6 @@ interface SyncEventHint {
 	connectionId: number;
 }
 
-/** Spelled out so a scope added to the union is rejected here until it is also accepted off the wire. */
 const SYNC_EVENT_SCOPES = {
 	job: true,
 	resources: true,
@@ -38,10 +37,8 @@ function isSyncEventScope(value: unknown): value is SyncEventScope {
 }
 
 /**
- * A hint arrives over the network, so its shape is established rather than assumed. Anything that
- * does not match is dropped, and dropping it is not free: with the stream healthy and no job
- * running, `syncPollInterval` polls not at all, so the surface only catches up on the next poll or
- * navigation. A change to the hint's shape must not reach here silently.
+ * Drops a hint whose shape does not match. Dropping is not free: with the stream healthy and no job
+ * running, the surface only catches up on the next poll or navigation.
  */
 function parseHint(payload: string): SyncEventHint | undefined {
 	let decoded: unknown;

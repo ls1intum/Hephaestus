@@ -25,10 +25,7 @@ const models: AvailableLlmModel[] = [
 	},
 ];
 
-/**
- * The picker names its popup listbox from the caller's label, so a render without one leaves the
- * open list anonymous — the state these tests are least able to notice and a reader relies on.
- */
+/** Wires a real label, because the picker names its popup listbox from it. */
 function renderPicker(props: Omit<ModelPickerProps, "id" | "aria-labelledby">) {
 	return render(
 		<>

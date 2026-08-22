@@ -15,7 +15,6 @@ import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
 
-/** Document order is what the catalog's reorder controls actually move, so assert on it directly. */
 function precedes(earlier: Node, later: Node) {
 	return Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
 }

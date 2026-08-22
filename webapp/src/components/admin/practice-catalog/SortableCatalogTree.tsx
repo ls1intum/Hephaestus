@@ -55,11 +55,6 @@ export interface SortableCatalogEntry {
 /** Restores focus to the row's action trigger after a reorder moves it. */
 export type ActionTriggerRef = (node: HTMLButtonElement | null) => void;
 
-/**
- * Reorder state for one row. Deliberately free of refs: the focus-restoring callback travels beside
- * this object rather than inside it, so a consumer reading `canMoveUp` during render is not reading
- * through a ref.
- */
 export interface CatalogMoveActions {
 	canMoveDown: boolean;
 	canMoveUp: boolean;
@@ -121,12 +116,7 @@ interface ActiveEntryDrop extends CatalogDropTarget {
 	overType: CatalogDndData["type"];
 }
 
-/**
- * dnd-kit types `data.current` as an open record, so reading a field off it is a claim about a
- * payload nothing has checked. Going through this guard instead makes a payload that does not match
- * `undefined` at the call site, where it is handled, rather than a shape the type checker vouches
- * for and the code then trips over.
- */
+/** dnd-kit types `data.current` as an open record, so the payload is checked rather than asserted. */
 function isCatalogDndData(data: unknown): data is CatalogDndData {
 	if (typeof data !== "object" || data === null || !("type" in data)) return false;
 	return data.type === "area" || data.type === "bucket" || data.type === "entry";

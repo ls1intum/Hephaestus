@@ -15,10 +15,7 @@ const SPEND_DIGITS = 2;
 const CAP_DIGITS = 0;
 const RATE_DIGITS = 3;
 
-/**
- * A rate as the server reports it. `source` is wider than the generated literal on purpose: a newer
- * server can name a publisher this build has never heard of — see {@link publisherOf}.
- */
+/** `source` is wider than the generated literal: a newer server can name a publisher this build has never heard of. */
 export type Fx = (Omit<FxRateInfo, "source"> & { source: string }) | null | undefined;
 
 type CurrencyDisplay = "symbol" | "code" | "name";

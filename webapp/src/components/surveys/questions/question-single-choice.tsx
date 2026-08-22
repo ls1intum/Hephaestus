@@ -61,10 +61,9 @@ export function QuestionSingleChoice({
 	const openChoiceId = `${groupId}-choice-open`;
 	const openChoiceInputId = `${openChoiceId}-input`;
 
-	// The open choice is driven by the user, but the answer can also arrive from the outside
-	// (restored draft, question swapped in). Reconcile the two while rendering so the field
-	// never paints an answer the parent no longer holds. An empty answer is left alone: the
-	// custom option stays selected without input so users can type later.
+	// Reconciled during render so an answer arriving from outside (restored draft, question swapped
+	// in) never paints one the parent no longer holds. An empty answer is left alone: the custom
+	// option stays selected without input so the user can type later.
 	if (!hasCustomOption || isKnownValue) {
 		if (customSelected) {
 			setCustomSelected(false);

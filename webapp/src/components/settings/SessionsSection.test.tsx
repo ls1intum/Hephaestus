@@ -42,8 +42,6 @@ describe("SessionsSection", () => {
 
 	it("revokes a non-current session and refetches the list (the row disappears)", async () => {
 		server.use(
-			// The first GET returns the whole fixture; after the DELETE-driven invalidation the refetch
-			// returns it without the revoked row, proving the cache was refreshed end-to-end.
 			http.get("*/user/sessions", () => HttpResponse.json(sessions), { once: true }),
 			http.get("*/user/sessions", () =>
 				HttpResponse.json(sessions.filter((s) => s.jti !== "sess-other-002")),

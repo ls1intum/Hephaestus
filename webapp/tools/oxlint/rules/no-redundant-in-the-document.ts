@@ -1,22 +1,10 @@
 import { defineRule } from "@oxlint/plugins";
 
-/**
- * Anchored, so the subject has to *be* the query: `getByRole(…)`, `canvas.getByText(…)`. A query with
- * something read off it — `getByRole(…).closest("tr")` — can be null, and asserting on that is real.
- */
+/** Anchored, so `getByRole(…).closest("tr")` — which can be null — is not a match. */
 const GET_BY_QUERY = /\bgetBy[A-Za-z]+$/;
 
 const VACUOUS_MATCHERS = new Set(["toBeInTheDocument", "toBeTruthy", "toBeDefined"]);
 
-/**
- * `getBy*` throws when it finds nothing, so it already is the assertion. Wrapping it in
- * `expect(...).toBeInTheDocument()` or `.toBeTruthy()` adds a matcher that can only ever run against
- * an element that exists and is therefore never null — it asserts nothing, and a file full of them
- * trains the reader to skim past the assertions that do.
- *
- * Narrow on purpose: every neighbouring shape whose subject can actually be null still asserts
- * something, and must keep working. The `valid` cases in the adjacent test are that list.
- */
 export const noRedundantInTheDocument = defineRule({
 	meta: {
 		type: "problem",

@@ -4,15 +4,8 @@ import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectNoPageOverflow } from "@/test/reflow";
-import { tracedArtifactPage, tracedArtifacts } from "./story-mock-data";
+import { tracedArtifact, tracedArtifactPage } from "./story-mock-data";
 import { TRACE_PAGE_SIZE, TraceListPage } from "./TraceListPage";
-
-/** Looked up by id rather than indexed, so a fixture row added above cannot repoint a story. */
-function tracedArtifact(artifactId: number) {
-	const match = tracedArtifacts.find((candidate) => candidate.artifactId === artifactId);
-	if (!match) throw new Error(`No traced-artifact fixture with id ${artifactId}`);
-	return match;
-}
 
 /**
  * The member-facing list of everything this workspace recorded. The route asks for the page; this

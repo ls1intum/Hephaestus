@@ -38,7 +38,6 @@ export function ReviewPage({ section, onSectionChange, running, sections }: Revi
 			<Tabs
 				value={section}
 				onValueChange={(next) => {
-					// The tab value is whatever a trigger carried, so it becomes a section id by matching one.
 					const opened = REVIEW_SECTIONS.find((candidate) => candidate.id === next);
 					if (opened) onSectionChange(opened.id);
 				}}

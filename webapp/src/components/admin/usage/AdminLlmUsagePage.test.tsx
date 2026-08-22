@@ -62,7 +62,7 @@ async function renderPage(
 	await screen.findByRole("heading", { name: "AI usage" });
 }
 
-/** The href the banner offers as the fix, or null where the reader is not the one who can apply it. */
+/** The banner's fix link, or null where the reader is not the one who can apply it. */
 function fixLinkHref(banner: HTMLElement) {
 	return (
 		within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ?? null

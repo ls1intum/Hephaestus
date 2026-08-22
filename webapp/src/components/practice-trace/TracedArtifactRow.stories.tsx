@@ -1,15 +1,8 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect } from "storybook/test";
 import { ItemGroup } from "@/components/ui/item";
-import { tracedArtifacts } from "./story-mock-data";
+import { tracedArtifact } from "./story-mock-data";
 import { TracedArtifactRow } from "./TracedArtifactRow";
-
-/** Looked up by id rather than indexed, so a fixture row added above cannot repoint a story. */
-function tracedArtifact(artifactId: number) {
-	const match = tracedArtifacts.find((candidate) => candidate.artifactId === artifactId);
-	if (!match) throw new Error(`No traced-artifact fixture with id ${artifactId}`);
-	return match;
-}
 
 const pullRequestRow = tracedArtifact(1423);
 const issueWithNoReviews = tracedArtifact(1430);

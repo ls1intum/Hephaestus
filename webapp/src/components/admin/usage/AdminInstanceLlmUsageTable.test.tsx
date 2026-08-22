@@ -85,10 +85,7 @@ function firstDataRow(): HTMLElement {
 	return dataRow;
 }
 
-/**
- * What a screen reader announces for each control in the workspace row, in DOM order — the label
- * where one is set, the visible text otherwise. Which controls a row offers is the assertion.
- */
+/** What a screen reader announces for each control in the workspace row, in DOM order. */
 function rowControlNames() {
 	return within(firstDataRow())
 		.getAllByRole("button")

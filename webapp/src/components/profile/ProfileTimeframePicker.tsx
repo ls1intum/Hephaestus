@@ -55,8 +55,6 @@ export function ProfileTimeframePicker({
 	enableAllActivity = true,
 	schedule = DEFAULT_SCHEDULE,
 }: ProfileTimeframePickerProps) {
-	// Once the user picks a timeframe their choice wins; until then the preset follows the dates
-	// the parent supplies.
 	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
 
 	const selectedPreset =
@@ -137,7 +135,6 @@ export function ProfileTimeframePicker({
 
 	const handleCustomRangeChange = (range: DateRange | undefined) => {
 		if (range) {
-			// The calendar is only reachable from the custom preset, so picking dates pins it.
 			setChosenPreset("custom");
 			setCustomRange(range);
 		}

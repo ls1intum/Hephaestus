@@ -92,7 +92,6 @@ export function withholdingReasonSentence(reason: WithholdingReason): string {
 	return WITHHOLDING_REASON_DEFS[reason];
 }
 
-/** `REASON_FAMILY` is total over the reasons, so being a key of it is what being a reason means. */
 function isWithholdingReason(value: string): value is WithholdingReason {
 	return Object.hasOwn(REASON_FAMILY, value);
 }

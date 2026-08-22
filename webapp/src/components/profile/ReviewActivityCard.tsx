@@ -8,7 +8,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getPullRequestStateIcon, type IconComponent, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
-/** What an unrecognised review state renders as. Named so the lookup below has a definite fallback. */
 const UNKNOWN_STATE_STYLE = {
 	icon: null,
 	color: "text-provider-muted-foreground",

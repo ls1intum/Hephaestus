@@ -37,8 +37,6 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	const [isHovered, setIsHovered] = useState(false);
 	const Icon = achievement.icon;
 	const isMythic = achievement.rarity === "mythic";
-	// Two independent grants, not a default and an override: the graph can force an aura onto any
-	// node, and a definition can declare one it always wears.
 	const showAura = data.forceAura === true || achievement.forceAura === true;
 
 	return (

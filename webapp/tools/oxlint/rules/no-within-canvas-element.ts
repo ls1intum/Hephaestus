@@ -1,15 +1,5 @@
 import { defineRule } from "@oxlint/plugins";
 
-/**
- * A play function already receives `canvas` — a Testing Library instance bound to the story's own
- * canvas — so `within(canvasElement)` rebuilds by hand the argument that was handed in. Two spellings
- * of one thing is the whole cost: a reader has to check which one a file uses before copying a line
- * out of it.
- *
- * Only re-deriving `canvas` is wrong; reading the element itself is not. `within(…)` over a subtree
- * or a portal, and `canvasElement.querySelector`/`.clientWidth`, all keep working — see the `valid`
- * cases in the adjacent test for the shapes this must not touch.
- */
 export const noWithinCanvasElement = defineRule({
 	meta: {
 		type: "problem",

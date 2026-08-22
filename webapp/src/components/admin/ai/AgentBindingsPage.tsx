@@ -37,13 +37,11 @@ interface PurposeMeta {
 	disabledLabel: string;
 }
 
-/** Named here so the toasts a save raises call a purpose what its card calls it. */
 export const PURPOSE_TITLES = {
 	PRACTICE_REVIEW: "Practice reviews",
 	MENTOR: "Heph",
 } satisfies Record<Purpose, string>;
 
-/** Narrows a purpose that arrived as a plain string, e.g. read back off a mutation's variables. */
 export function isPurpose(value: string): value is Purpose {
 	return Object.hasOwn(PURPOSE_TITLES, value);
 }

@@ -54,16 +54,14 @@ excluded from linting entirely.
 carries the reason beside it — read that before switching one back on.
 
 - **Suppress with `// oxlint-disable-next-line <rule> -- <why>`**, above the line the diagnostic
-  points at, spelling the rule the way oxlint printed it. A directive that stops suppressing anything
-  fails the build, so a suppression cannot outlive its reason.
-- **A rule that cannot resolve is a hard config error, not a silent skip.** oxlint refuses to start if
-  `jsPlugins` names a module it cannot load, or if `rules` names a rule no loaded plugin defines. That
-  is what makes the house rules impossible to drop silently (oxc-project/oxc#25203), so keep them
-  named in `rules`.
-- **There is no baseline file.** Every enabled rule reports zero, so a finding is always new and is
-  always fixed rather than recorded. The only suppressions are a handful of `oxlint-disable-next-line`
-  directives, each naming its rules and its reason; `reportUnusedDisableDirectives` fails the build
-  when one stops suppressing anything.
+  points at, spelled `plugin/rule` (the diagnostic prints `plugin(rule)`). A directive that stops
+  suppressing anything fails the build, so a suppression cannot outlive its reason.
+- **Everything about the config is validated up front, and a failure is a hard error, not a silent
+  skip.** oxlint refuses to start when `jsPlugins` names a module it cannot load, or when `rules` —
+  in the root or in an override — names a rule no loaded plugin defines. That is what makes the house
+  rules impossible to drop silently (oxc-project/oxc#25203), so keep them named in `rules`.
+- **Re-derive an off rule's findings with `pnpm exec oxlint -D <rule>`** before trusting or changing
+  the reason written beside it.
 - **House rules live in `tools/oxlint/`**, in TypeScript, so `pnpm run typecheck` covers them, with a
   `RuleTester` suite beside each (`oxlint/plugins-dev`).
 - **These have no linter behind them and are on review**: an inline `<svg>` needs a `<title>`, an

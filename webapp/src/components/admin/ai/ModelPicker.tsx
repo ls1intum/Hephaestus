@@ -23,11 +23,7 @@ export interface ModelPickerProps {
 	disabled?: boolean;
 	invalid?: boolean;
 	"aria-describedby"?: string;
-	/**
-	 * Ids the caller's visible label. Required, and a label id rather than a literal, because the
-	 * picker owns a popup listbox but not the words beside it: only the caller can say what the open
-	 * list is a list of, and only its label keeps that name in step with what the reader sees.
-	 */
+	/** Ids the caller's visible label — only the caller can say what the popup listbox is a list of. */
 	"aria-labelledby": string;
 }
 
@@ -35,7 +31,6 @@ function encode(scope: ModelSelection["scope"], id: number): string {
 	return `${scope}:${id}`;
 }
 
-/** Reads back what {@link encode} wrote; anything else is not an option this picker offered. */
 function decode(value: string): ModelSelection | null {
 	const [scope, rawId] = value.split(":");
 	const id = Number(rawId);

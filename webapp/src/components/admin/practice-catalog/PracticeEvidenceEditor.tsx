@@ -50,7 +50,6 @@ const EVIDENCE_ROLE_OPTIONS = [
 	selected: string;
 }>;
 
-/** The roles a segment stands for; EXHAUSTIVE rides on REQUIRED's segment. */
 type SegmentedRole = Exclude<EvidenceRole, "EXHAUSTIVE">;
 
 function selectedRole(role: EvidenceRole): SegmentedRole {

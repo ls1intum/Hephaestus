@@ -115,10 +115,8 @@ function ComboboxSearchInput({
 }
 
 /**
- * The listbox itself — `ComboboxContent` is only the box around it — which is why the accessible
- * name is required here and not there. The popup is `role="presentation"` unless it holds the input,
- * so a name given to the box either lands on nothing or names a dialog, and the list stays anonymous
- * either way.
+ * The listbox itself, which is why the accessible name is required here and not on `ComboboxContent`:
+ * that popup is `role="presentation"` unless it holds the input, so a name on it lands on nothing.
  */
 type ComboboxListProps = Omit<ComboboxPrimitive.List.Props, "aria-label" | "aria-labelledby"> &
 	AccessibleNameProps;

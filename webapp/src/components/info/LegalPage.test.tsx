@@ -88,8 +88,7 @@ describe("LegalPage — XSS guardrail", () => {
 
 		const anchors = Array.from(article.querySelectorAll("a"));
 		expect(anchors.length).toBeGreaterThan(0);
-		// The raw attribute, not a `?? ""` stand-in: a rendered link with no href at all is its own
-		// failure, and both guards reject anything that is not a string.
+		// The raw attribute, with no `?? ""` stand-in: a link with no href at all has to fail too.
 		for (const anchor of anchors) {
 			const href = anchor.getAttribute("href");
 			expect({ href, safe: isSafeLegalHref(href) }).toStrictEqual({ href, safe: true });

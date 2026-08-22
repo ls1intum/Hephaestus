@@ -45,11 +45,8 @@ export function statusToneClass(variant: BadgeVariant): string {
 }
 
 /**
- * The registry's values in declaration order, which is the order a reader should meet them in.
- *
- * <p>Typed as a non-empty tuple so it drops straight into `z.enum(...)`, which will not take a plain
- * array. A registry is a total `Record` over a union of string literals, so it always has a first
- * value; an empty one is refused rather than assumed away.
+ * The registry's values in declaration order, as a non-empty tuple so it drops straight into
+ * `z.enum(...)`, which will not take a plain array.
  */
 export function statusValues<TValue extends string>(
 	defs: StatusDefs<TValue>,

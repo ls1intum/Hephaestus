@@ -37,7 +37,7 @@ function deleteButton() {
 	return screen.getByRole("button", { name: /^delete workspace$/i });
 }
 
-/** Resolves only once the permission check has come back and the owner-only control is on screen. */
+/** Waits out the permission check that gates the owner-only control. */
 function findDeleteButton() {
 	return screen.findByRole("button", { name: /^delete workspace$/i }, WAIT);
 }

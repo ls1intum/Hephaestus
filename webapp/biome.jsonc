@@ -8,8 +8,8 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		// Formatting covers what oxlint lints, so a file is never one tool's business and not the
-		// other's. Check a new directory against `.oxlintrc.json`'s `ignorePatterns`.
+		// Keep in step with `.oxlintrc.json`'s `ignorePatterns`: a file oxlint lints is a file this
+		// formats.
 		"includes": [
 			"**/src/**/*",
 			"**/tools/**/*",
@@ -43,8 +43,7 @@
 			}
 		}
 	},
-	// oxlint lints — see `.oxlintrc.json`. Two linters over one tree is two sources of truth for every
-	// rule and two suppression syntaxes, so this one is off outright rather than narrowed.
+	// oxlint lints; see `.oxlintrc.json`.
 	"linter": { "enabled": false },
 	"javascript": {
 		"formatter": {

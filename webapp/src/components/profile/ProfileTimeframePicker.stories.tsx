@@ -121,9 +121,6 @@ export const CustomRange: Story = {
 	},
 };
 
-/**
- * A story `render` that calls hooks is not a component React can track, so the stateful harness is its own.
- */
 function InteractiveHarness(props: React.ComponentProps<typeof ProfileTimeframePicker>) {
 	const [afterDate, setAfterDate] = useState<string | undefined>(props.afterDate);
 	const [beforeDate, setBeforeDate] = useState<string | undefined>(props.beforeDate);

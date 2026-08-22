@@ -101,8 +101,6 @@ describe("fieldChanges", () => {
 		).toStrictEqual([{ path: "publicKey", before: "false", after: "true" }]);
 	});
 
-	// A creation has no prior snapshot and a deletion has no subsequent one, so the row the formatter
-	// builds must leave that side null rather than echoing the one snapshot it was given.
 	it.each<
 		["CREATED" | "DELETED", "before" | "after", Pick<ConfigAuditEntryView, "oldValue" | "newValue">]
 	>([

@@ -26,8 +26,8 @@ function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
 
 describe("feedback proposal route", () => {
 	it("shows the exact proposal and sends an approval through the generated operation", async () => {
-		// The GET reports whatever the approval PUT last left behind, so the page's re-read after the
-		// decision is what has to show PREPARED — not a fixture the test swapped in by hand.
+		// The GET reports what the approval PUT left behind, so the page's own re-read is what has to
+		// show PREPARED.
 		let deliveryState: "AWAITING_APPROVAL" | "PREPARED" = "AWAITING_APPROVAL";
 		let requestBody: unknown;
 		server.use(

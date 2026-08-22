@@ -9,12 +9,8 @@ export function filedUnder<TOptions extends object>(
 }
 
 /**
- * Reads one path parameter out of a mutation's variables.
- *
  * The mutation cache holds every mutation the app has fired, so it types `variables` as `unknown` —
- * a filter by key narrows which mutations come back but not what they carry. Checking the value is
- * what keeps that honest: a mutation whose variables do not have the field contributes no id, rather
- * than a claim that would surface as `undefined` somewhere further away.
+ * filtering by key narrows which mutations come back, not what they carry.
  */
 function pathParam(variables: unknown, field: string): unknown {
 	if (!isRecord(variables) || !isRecord(variables.path)) return undefined;
@@ -31,10 +27,7 @@ export function pathString(variables: unknown, field: string): string | undefine
 	return typeof value === "string" ? value : undefined;
 }
 
-/**
- * The ids of the mutations currently in flight under `mutationKey`, for disabling the rows they are
- * about. `idOf` reads the id from a mutation's variables — see {@link pathNumber}/{@link pathString}.
- */
+/** For disabling the rows in-flight mutations are about; `pathNumber`/`pathString` supply `idOf`. */
 export function usePendingMutationIds<TId extends string | number>(
 	mutationKey: MutationKey,
 	idOf: (variables: unknown) => TId | undefined,

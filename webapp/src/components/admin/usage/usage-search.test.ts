@@ -16,9 +16,8 @@ describe("usageSearchSchema", () => {
 		expect(usageSearchSchema.parse({ month: "2026-06" })).toStrictEqual({ month: "2026-06" });
 	});
 
-	// An absent `month` stays absent — the key is never invented. The `.catch()` path below is the
-	// one shape that carries `month` as an own key holding `undefined`, because a value was supplied
-	// and discarded.
+	// `toStrictEqual` separates an absent key from one present but `undefined`, which is what the
+	// `.catch()` cases below produce.
 	it("leaves a bare link meaning 'this month' rather than freezing one into it", () => {
 		expect(usageSearchSchema.parse({})).toStrictEqual({});
 	});

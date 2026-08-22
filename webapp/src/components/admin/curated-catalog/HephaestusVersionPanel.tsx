@@ -19,10 +19,6 @@ import {
 	curatedEntryCopy,
 } from "./curated-entry-state";
 
-/**
- * Either shipped shape, read through the field names its label map lists. The label maps are where
- * the field names are checked, so nothing here has to re-state them.
- */
 type ShippedDefinition = Readonly<Record<string, unknown>>;
 
 interface HephaestusVersionPanelBaseProps {

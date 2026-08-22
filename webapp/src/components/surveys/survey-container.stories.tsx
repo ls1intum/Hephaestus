@@ -162,9 +162,6 @@ export const HephaestusFeedback: Story = {
 	},
 };
 
-/**
- * A story `render` that calls hooks is not a component React can track, so the stateful harness is its own.
- */
 function InPagePopoverHarness(args: React.ComponentProps<typeof SurveyContainer>) {
 	const [open, setOpen] = useState(true);
 

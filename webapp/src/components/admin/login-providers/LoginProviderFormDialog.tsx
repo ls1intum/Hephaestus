@@ -38,7 +38,6 @@ function scopesPlaceholder(type: ProviderType): string {
 	return "Defaulted by provider type if blank";
 }
 
-/** The stored type is a plain string; anything this build cannot render falls back to the default. */
 function toProviderType(value: string | null | undefined): ProviderType {
 	return PROVIDER_TYPE_ITEMS.find((item) => item.value === value)?.value ?? "GITLAB";
 }

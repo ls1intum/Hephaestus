@@ -18,7 +18,6 @@ function isAcceptedSyncJob(response: Response) {
 	);
 }
 
-/** The id the job list is keyed by, or a failure naming the payload that carried none. */
 function acceptedJobId(job: unknown): number {
 	const id = typeof job === "object" && job !== null && "id" in job ? job.id : undefined;
 	assert.ok(

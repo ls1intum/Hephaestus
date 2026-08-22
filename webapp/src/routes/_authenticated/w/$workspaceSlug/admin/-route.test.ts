@@ -23,9 +23,8 @@ function newRouter(url?: string) {
 	});
 }
 
-// `looseRoutesById` is `routesById` under a map type: the generated id-keyed interface has no index
-// signature, so `Object.values` over it widens to `any`. A route's own `fullPath` is untyped either
-// way, so it is checked on the way out rather than trusted.
+// `looseRoutesById` because the generated id-keyed `routesById` has no index signature, so
+// `Object.values` over it widens to `any`; `fullPath` is untyped either way and checked on the way out.
 const adminUrls = Object.values(newRouter().looseRoutesById)
 	.map((route): unknown => route.fullPath)
 	.filter((fullPath): fullPath is string => typeof fullPath === "string")

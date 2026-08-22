@@ -60,7 +60,6 @@ export const FullPagePreview: Story = {
 				return () => clearTimeout(t);
 			}, [pending]);
 
-			// Mirrors the widget: the badge raises a one-shot reopen request through the store.
 			useEffect(() => {
 				const consumeShowSignal = () => {
 					const { shouldShowSurvey, clearShowSignal } = useSurveyNotificationStore.getState();

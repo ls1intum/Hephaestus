@@ -522,7 +522,6 @@ function RenameAreaDialog({
 	onRename: (slug: string, name: string) => Promise<boolean>;
 	pending: boolean;
 }) {
-	// The dialog stays open when the rename is rejected, so the reader keeps the name they typed.
 	const rename = async (slug: string, name: string) => {
 		if (await onRename(slug, name)) onClose();
 	};
@@ -640,7 +639,6 @@ function CreateAreaButton({
 	disabled: boolean;
 }) {
 	const [open, setOpen] = useState(false);
-	// The popover stays open when creation is rejected, so the reader keeps the name they typed.
 	const create = async (name: string) => {
 		if (await onCreate(name)) setOpen(false);
 	};

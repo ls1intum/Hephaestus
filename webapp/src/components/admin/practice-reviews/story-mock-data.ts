@@ -875,7 +875,6 @@ function feedbackFor(observationId: string) {
 
 type Disposition = "delivered" | "failed" | "prepared" | "superseded" | "suppressed";
 
-/** Which bucket each wire delivery state lands in; the surfaces count dispositions, not states. */
 const DISPOSITION_OF: Record<ReviewFeedback["deliveryState"], Disposition> = {
 	AWAITING_APPROVAL: "prepared",
 	DELIVERED: "delivered",

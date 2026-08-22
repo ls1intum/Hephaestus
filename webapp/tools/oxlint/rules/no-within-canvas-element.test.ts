@@ -12,7 +12,6 @@ ruleTester.run("no-within-canvas-element", noWithinCanvasElement, {
 	invalid: [
 		{
 			code: "within(canvasElement);",
-			// The report points at the argument, not the whole call — that is what makes the fix obvious.
 			errors: [{ messageId: "redundant", line: 1, column: 8, endColumn: 21 }],
 		},
 	],

@@ -27,7 +27,7 @@ export interface ObservationSortSelectProps {
 /**
  * A list has no sortable column headers, so the ordering has to be offered explicitly.
  *
- * <p>`NEWEST` is reported as `undefined` rather than as the string: it is the server's default, so
+ * `NEWEST` is reported as `undefined` rather than as the string: it is the server's default, so
  * writing it into the URL would put a parameter in every link that changes nothing.
  */
 export function ObservationSortSelect({ value, onChange }: ObservationSortSelectProps) {

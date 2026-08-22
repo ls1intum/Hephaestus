@@ -40,17 +40,10 @@ function ToggleGroup<Value extends string>({
 			data-spacing={spacing}
 			data-orientation={orientation}
 			orientation={orientation}
-			// Upstream bug, fixed here so no call site has to. The primitive renders `role="group"` and
-			// then hands its props to `CompositeRoot`, whose `useCompositeRoot` unconditionally adds
-			// `aria-orientation` (only the value `'both'` suppresses it, and the public API cannot reach
-			// it). ARIA 1.2 lists `aria-orientation` under `scrollbar select separator slider tablist
-			// toolbar` — `group` is not among them, so axe fails every group this kit renders.
-			// https://www.w3.org/TR/wai-aria-1.2/#group — Radix shipped the same bug
-			// (radix-ui/primitives#964). `undefined` is enough to drop it because Base UI's `mergeProps`
-			// assigns every own key of the later object, `undefined` included, and React omits an
-			// attribute whose value is `undefined`; the arrow-key roving focus is unaffected because
-			// `CompositeRoot` reads its axis from the `orientation` prop above, not from the attribute.
-			// `toggle-group.stories.tsx` asserts the attribute is absent in both orientations.
+			// Upstream bug: `CompositeRoot` adds `aria-orientation` unconditionally, which ARIA 1.2 does
+			// not allow on `role="group"` (https://www.w3.org/TR/wai-aria-1.2/#group), so axe fails every
+			// group this kit renders — Radix shipped the same bug (radix-ui/primitives#964). `undefined`
+			// drops the attribute; roving focus reads its axis from the `orientation` prop above.
 			aria-orientation={undefined}
 			style={{ "--gap": spacing }}
 			className={cn(
@@ -81,16 +74,11 @@ function ToggleGroupItem({
 			data-variant={context.variant ?? variant}
 			data-size={context.size ?? size}
 			data-spacing={context.spacing}
-			// Match the axis on `data-orientation`, never on `data-horizontal`. Base UI derives its state
-			// attributes through `getStateAttributesProps`, which writes a non-boolean state as
-			// `data-<key>="<value>"`; a `group-data-horizontal/…` variant compiles to `[data-horizontal]`
-			// and so matches nothing, which is how joined groups came to render square-cornered with a
-			// doubled border down every seam.
-			//
-			// Joined segments overlap by one pixel instead of dropping a border, so the selected segment
-			// keeps a border on all four sides and raises it over its neighbours (`aria-pressed:z-10` in
-			// `toggle.tsx`) — a segment missing its leading edge cannot show a selection the eye reads as
-			// one box.
+			// Match the axis on `data-orientation`, never `data-horizontal`: Base UI writes non-boolean
+			// state as `data-<key>="<value>"`, so a `group-data-horizontal/…` variant compiles to
+			// `[data-horizontal]` and matches nothing — that is how joined groups came to render
+			// square-cornered with a doubled border down every seam. Joined segments overlap by a pixel
+			// rather than dropping a border, so a selected one keeps an edge on all four sides.
 			className={cn(
 				"group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:last:rounded-b-lg shrink-0 focus:z-10 focus-visible:z-10 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-ml-px group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-mt-px",
 				toggleVariants({

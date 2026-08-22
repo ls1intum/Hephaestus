@@ -76,7 +76,6 @@ export function chosenAutonomy(effective: PracticeAutonomy): AutonomyAssignment 
 	return { effective, override: effective, source: "PRACTICE", inherited: false };
 }
 
-/** Cloned by tests that need a list of realistic practices; any of the fixtures would do. */
 export const mockPractice: Practice = {
 	id: 1,
 	slug: "pr-description-quality",

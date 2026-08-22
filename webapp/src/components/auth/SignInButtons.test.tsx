@@ -32,8 +32,7 @@ describe("SignInButtons", () => {
 
 		renderWithClient(<SignInButtons onSignIn={vi.fn()} />);
 
-		// The accessible name proves the provider was resolved; `disabled` is what decides whether a
-		// visitor can actually reach the OAuth path, and no role query checks it.
+		// `disabled` decides whether the OAuth path is reachable at all, and no role query checks it.
 		const button = await screen.findByRole<HTMLButtonElement>("button", {
 			name: /continue with github/i,
 		});

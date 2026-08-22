@@ -64,10 +64,7 @@ function SurveyHeader({
 	);
 }
 
-/**
- * Answers, step history and errors belong to a single run of a single survey, so a different
- * survey starts from a clean slate instead of inheriting the previous run.
- */
+/** Keyed by survey, so a different survey starts from a clean slate rather than the previous run's. */
 export function SurveyContainer(props: SurveyContainerProps) {
 	return <SurveyRun key={props.survey.id} {...props} />;
 }

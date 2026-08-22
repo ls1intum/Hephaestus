@@ -24,7 +24,6 @@ export interface GitLabInstanceOption {
 	baseUrl: string;
 }
 
-/** The fields an issue can be reported against; anything else belongs to the object as a whole. */
 const CONNECTION_FIELDS = [
 	"serverUrl",
 	"personalAccessToken",

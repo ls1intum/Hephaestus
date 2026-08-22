@@ -3,7 +3,6 @@ import { expect, within } from "storybook/test";
 import { RefusalFixLink, type RefusalFixLinkProps } from "./RefusalFixLink";
 import { REFUSAL_FIXES, SIGNAL_STATE_REASON_LABELS, type SignalStateReason } from "./trace-format";
 
-/** The whole refusal vocabulary; `EveryReason` proves none of it was left off this list. */
 const REASONS: SignalStateReason[] = [
 	"GATE_SKIPPED",
 	"COOLDOWN_ACTIVE",
@@ -99,7 +98,6 @@ export const NoFixForThisReason: Story = {
 export const EveryReason: Story = {
 	render: (args) => <RefusalCatalogue {...args} />,
 	play: async ({ canvas }) => {
-		// A reason added to the vocabulary without reaching the list above fails here.
 		await expect([...REASONS].sort()).toEqual(Object.keys(SIGNAL_STATE_REASON_LABELS).sort());
 
 		const links = canvas.getAllByRole("link");

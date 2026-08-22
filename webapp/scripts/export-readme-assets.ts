@@ -12,20 +12,13 @@ const storybookUrl = `http://127.0.0.1:${port}`;
 
 type Theme = "light" | "dark";
 
-/**
- * Breakpoints an asset can be exported at. `desktop` and `mobile` are mandatory because the README
- * shows both; `tablet` only exists for assets whose layout has a third state.
- */
 type Breakpoint = "desktop" | "tablet" | "mobile";
 
 interface CaptureConfig {
 	storyId: string;
 	selector: string;
 	viewportWidth: number;
-	/**
-	 * The width the surface must measure once rendered. A mismatch means the story's layout moved out
-	 * from under the README, so the export fails rather than silently committing a resized image.
-	 */
+	/** Asserted after render; a mismatch fails the export instead of committing a resized image. */
 	expectedWidth: number;
 }
 

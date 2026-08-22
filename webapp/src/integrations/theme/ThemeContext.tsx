@@ -21,9 +21,8 @@ type ThemeProviderState = {
 };
 
 /**
- * What a consumer reads outside a `ThemeProvider`: the system theme, and a `setTheme` that does
- * nothing. Deliberately a fallback rather than a thrown invariant — theme-aware components are
- * rendered on their own in tests and in isolation, where the surrounding shell is not mounted.
+ * The context default, so a theme-aware component rendered on its own — in a test or a story, with
+ * no shell around it — reads the system theme instead of throwing.
  */
 const NO_PROVIDER: ThemeProviderState = {
 	theme: "system",

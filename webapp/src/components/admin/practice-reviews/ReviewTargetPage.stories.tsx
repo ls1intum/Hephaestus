@@ -40,7 +40,6 @@ const THIN_CONTROLLERS = workspacePractices.find((p) => p.slug === "thin-control
 if (!THIN_CONTROLLERS) throw new Error("The practice fixtures no longer cover thin-controllers");
 
 const argsFor = (artifact: ReviewArtifact) => {
-	// The page labels and links the kind, so a fixture on an unlabelled one would prove nothing.
 	if (!isKnownArtifactKind(artifact.type)) {
 		throw new Error(`Fixture artifact ${artifact.id} has an unlabelled kind: ${artifact.type}`);
 	}

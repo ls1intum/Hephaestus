@@ -103,7 +103,6 @@ import { hasText } from "@/lib/text";
 
 export type AreaVisual = { Icon: LucideIcon; pill: string };
 
-/** The pill every unknown colour key falls back to; named so the fallback is definite. */
 const SLATE_PILL = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
 
 // Tailwind requires complete class names in source to include them in the generated CSS.
@@ -253,12 +252,10 @@ export function iconComponent(name: string): LucideIcon {
 	return ICON_COMPONENTS[name] ?? Folder;
 }
 
-/** The pill classes a colour key names, or nothing when this build ships no such key. */
 function pillFor(color?: string | null): string | undefined {
 	return hasText(color) ? PILL[color] : undefined;
 }
 
-/** The pill classes for a colour key, or slate when the key is not one this build ships. */
 export function pillClasses(color?: string | null): string {
 	return pillFor(color) ?? SLATE_PILL;
 }
@@ -311,8 +308,6 @@ export function getAreaVisual(
 ): AreaVisual {
 	const seed = seedFor(slug, name);
 	const Icon = resolveIcon(icon) ?? iconComponent(seed.icon);
-	// A colour the area does not carry, or names a key this build never shipped, falls to the seed's
-	// colour before it falls to slate — an unknown key must not skip the seed.
 	const pill = pillFor(color) ?? pillClasses(seed.color);
 	return { Icon, pill };
 }

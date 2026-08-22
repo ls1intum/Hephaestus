@@ -12,10 +12,8 @@ const isWorkspaceRole = (value: string): value is WorkspaceRole =>
 	Object.hasOwn(WORKSPACE_ROLE_RANK, value);
 
 /**
- * Gates fail closed: no role and a role only the server knows about both rank as unranked.
- *
- * `role` is whatever the membership payload carried, so it is typed as the wire types it — a
- * plain string. A server that ships a new role before the client knows it must not be let in.
+ * Gates fail closed: no role, and a role only the server knows about, both rank as unranked — a
+ * server that ships a new role before the client knows it must not be let in.
  */
 export function hasMinimumWorkspaceRole(
 	role: string | null | undefined,

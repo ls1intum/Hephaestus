@@ -176,11 +176,7 @@ function DropdownMenuCheckboxItem({
 	);
 }
 
-/**
- * Base UI types the selected value as `any`, so a handler reading it gets no help. The type
- * parameter carries whatever the group's items hold through to `onValueChange`, the way
- * `RadioGroup` and `ToggleGroup` do for their primitives.
- */
+/** Base UI types the selected value as `any`; the parameter carries the items' type to `onValueChange`. */
 function DropdownMenuRadioGroup<Value>({
 	...props
 }: Omit<MenuPrimitive.RadioGroup.Props, "value" | "defaultValue" | "onValueChange"> & {

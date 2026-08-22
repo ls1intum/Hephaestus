@@ -42,12 +42,8 @@ export interface NavAdminProps {
 
 /**
  * Open state for a nav section, forced open when the user navigates into it and freely collapsible
- * the rest of the time.
- *
- * The adjustment happens during render rather than in an effect: an effect would let the browser
- * paint the section closed and then reopen it, so arriving at an admin page would flash a collapsed
- * sidebar. Comparing against the previous value is what keeps a deliberate collapse from being
- * undone on every later render while the user is still inside the section.
+ * the rest of the time. Adjusted during render, not in an effect, so arriving at an admin page
+ * never paints the section collapsed first.
  */
 function useSectionOpen(onSection: boolean) {
 	const [open, setOpen] = useState(onSection);

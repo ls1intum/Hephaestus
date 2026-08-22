@@ -45,7 +45,6 @@ export interface AutonomyFixture {
 	practices: Practice[];
 }
 
-/** The server's rollup carries every rung even at zero, so no reader ever has to gap-fill. */
 const emptyCounts = (): Record<PracticeAutonomy, number> => ({
 	OFF: 0,
 	HUMAN_APPROVAL: 0,

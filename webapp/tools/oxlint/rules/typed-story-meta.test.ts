@@ -8,7 +8,7 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 		"const meta = { parameters: { docs: { description: { component: 'All icons.' } } } } satisfies Meta;",
 		"const meta = { ...base } satisfies Meta;",
 		"const story = { component: Button } satisfies StoryObj;",
-		// The annotation spelling, which story files in this repo also use.
+		// The annotation spelling.
 		"const meta: Meta<typeof Button> = { component: Button };",
 		"const meta: Meta = { title: 'Icons/Brand' };",
 		"const meta: StoryObj = { component: Button };",

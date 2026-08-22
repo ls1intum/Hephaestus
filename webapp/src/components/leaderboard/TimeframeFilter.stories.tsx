@@ -179,9 +179,6 @@ export const OpenEndedMode: Story = {
 	},
 };
 
-/**
- * A story `render` that calls hooks is not a component React can track, so the stateful harness is its own.
- */
 function InteractiveHarness(props: React.ComponentProps<typeof TimeframeFilter>) {
 	const [afterDate, setAfterDate] = useState<string | undefined>(props.initialAfterDate);
 	const [beforeDate, setBeforeDate] = useState<string | undefined>(props.initialBeforeDate);
@@ -215,9 +212,7 @@ function InteractiveHarness(props: React.ComponentProps<typeof TimeframeFilter>)
 	);
 }
 
-/**
- * Interactive stateful story to test the component behavior.
- */
+/** Driven by local state, so picking a preset feeds the dates back in the way a page does. */
 export const Interactive: Story = {
 	render: (props) => <InteractiveHarness {...props} />,
 	args: {

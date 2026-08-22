@@ -283,8 +283,7 @@ describe("Outline integration — pause / resume", () => {
 				async ({ request, params }) => {
 					const body = await request.json();
 					patchBodies.push({ collectionId: params.collectionId, ...body });
-					// The server echoes the row in its new state, so the refetch below is the only thing
-					// that can move the UI — a hard-coded row would let a dropped PATCH still look applied.
+					// The handler echoes the row's new state, so only a real refetch can move the UI.
 					const next = { ...engineering, state: body.state };
 					collectionsRef.current = [next];
 					return HttpResponse.json(next);

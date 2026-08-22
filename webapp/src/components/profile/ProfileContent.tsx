@@ -45,8 +45,6 @@ export function ProfileContent({
 	schedule,
 }: ProfileContentProps) {
 	const stats = activityMonitorData?.activityStats;
-	// How the empty states name whoever's page this is. A provider that stored no display name, or
-	// stored a blank one, still leaves the login to address them by.
 	const personLabel = firstNonBlank(displayName) ?? username;
 	const repositories = activityMonitorData?.repositories ?? [];
 

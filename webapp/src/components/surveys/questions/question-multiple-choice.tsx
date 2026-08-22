@@ -55,9 +55,8 @@ export function QuestionMultipleChoice({
 	const [customSelected, setCustomSelected] = useState(Boolean(derivedCustomValue));
 	const [customValue, setCustomValue] = useState(derivedCustomValue ?? "");
 
-	// The open choice is driven by the user, but the answer can also arrive from the outside
-	// (restored draft, question swapped in). Reconcile the two while rendering so the field
-	// never paints an answer the parent no longer holds.
+	// Reconciled during render so an answer arriving from outside (restored draft, question swapped
+	// in) never paints one the parent no longer holds.
 	if (!hasCustomOption) {
 		if (customSelected) {
 			setCustomSelected(false);

@@ -1,17 +1,5 @@
 import { defineRule, type ESTree } from "@oxlint/plugins";
 
-/**
- * A story `meta` that names a `component` must be typed `Meta<typeof That>`, because that type
- * parameter is the only thing tying `args` to the component's real props. A bare `satisfies Meta`
- * types `args` as an open bag: a renamed prop, a misspelled one, or one that no longer exists all
- * keep type-checking, and the story keeps rendering — it just stops passing what it claims to pass.
- * The Controls panel drifts with it, since Storybook infers controls from the same types.
- *
- * A gallery page documents several components at once and names none, so a bare `Meta` is correct
- * there and must keep working. So must the object's descendants: a nested
- * `parameters.docs.description.component` is prose every autodocs page may set, and descending into
- * it would read every gallery as a violation.
- */
 export const typedStoryMeta = defineRule({
 	meta: {
 		type: "problem",

@@ -14,9 +14,8 @@ export function MonthNavigator({ month, canGoNext, renderMonthLink }: MonthNavig
 	const nextMonth = addMonths(month, 1);
 	const prevRef = useRef<HTMLAnchorElement>(null);
 
-	// Stepping onto the newest month unmounts the link the click came from — it becomes the
-	// disabled button — so keyboard focus would fall to the document. Remembering the month the
-	// user asked for is what tells arriving there apart from getting there any other way.
+	// Stepping onto the newest month unmounts the clicked link — it becomes the disabled button — so
+	// focus would otherwise fall to the document.
 	const [focusPreviousOnMonth, setFocusPreviousOnMonth] = useState<string | undefined>(undefined);
 	useEffect(() => {
 		if (month === focusPreviousOnMonth && !canGoNext) {

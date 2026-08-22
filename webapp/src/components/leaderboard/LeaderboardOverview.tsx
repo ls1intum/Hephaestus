@@ -57,9 +57,8 @@ export function LeaderboardOverview({
 	const [leagueInfoOpen, setLeagueInfoOpen] = useState(false);
 	const user = leaderboardEntry.user;
 
-	// The countdown is a view of the wall clock: tick a timestamp, derive the label from it. The tick
-	// stops once the label can no longer change, so a closed or absent deadline costs no renders —
-	// and it stops by itself, because the render that first sees the deadline pass clears the timer.
+	// The interval only runs while the label can still change: an absent or passed deadline costs no
+	// renders, and the render that first sees the deadline pass clears the timer.
 	const [now, setNow] = useState(() => new Date());
 	const counting = leaderboardEnd !== undefined && !isPast(new Date(leaderboardEnd));
 

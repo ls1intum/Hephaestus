@@ -35,10 +35,6 @@ const initialData: CuratedPracticeFormInitialValue = {
 	},
 };
 
-/**
- * What the form hands back is most of what these tests assert on, so the spy carries the form's
- * signature and every claim about a submitted value is checked against the real shape.
- */
 function submitSpy() {
 	return vi.fn<(value: CuratedPracticeFormValue) => void>();
 }

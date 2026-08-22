@@ -11,8 +11,8 @@ export function nonEmpty<T>(values: T[]): T[] | undefined {
 }
 
 /**
- * The page number as the URL should carry it. Page one is index `0`, which is also the default every
- * parser falls back to, so spelling it out would put `page=0` in every link a reader copies.
+ * Page one is index `0`, which every parser here already falls back to, so emitting it would put a
+ * redundant `page=0` in every link a reader copies.
  */
 export function pageParam(page: number | undefined): number | undefined {
 	return page === 0 ? undefined : page;

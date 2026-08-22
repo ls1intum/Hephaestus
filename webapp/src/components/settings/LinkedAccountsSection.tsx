@@ -47,7 +47,6 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 /** Providers that can only be *linked* from Settings — they are never a sign-in method. */
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
 
-/** A provider row that can actually start a link flow — the flow is keyed by its registration id. */
 type LinkableProvider = IdentityProviderView & { registrationId: string };
 
 /**

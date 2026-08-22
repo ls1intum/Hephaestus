@@ -6,7 +6,7 @@ import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.
 import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
-import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
+import { EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
 import {
 	type AuditSearch,
 	dayAfterInstant,
@@ -29,41 +29,11 @@ import { narrowToEnum, nonEmpty } from "@/lib/search-params";
 const PAGE_SIZE = 50;
 
 const EVENT_TYPE_OPTIONS = toFacetOptions(EVENT_TYPE_LABELS);
+const EVENT_TYPES = EVENT_TYPE_OPTIONS.map((option) => option.value);
 
 const OUTCOME_OPTIONS = [
 	{ value: "SUCCESS", label: "Success" },
 	{ value: "FAILURE", label: "Failure" },
-];
-
-/** The values the server accepts as an `eventType` filter. A type the server adds fails
- * `EVENT_TYPE_LABELS` first, which is the prompt to name it here too. */
-const EVENT_TYPES: AuthEventType[] = [
-	"LOGIN",
-	"LOGIN_FAILED",
-	"LOGOUT",
-	"TOKEN_REFRESH",
-	"JWT_REVOKED",
-	"IDENTITY_LINKED",
-	"IDENTITY_UNLINKED",
-	"IMPERSONATION_BEGIN",
-	"IMPERSONATION_END",
-	"ACCOUNT_DELETED",
-	"EXPORT_REQUESTED",
-	"APP_ROLE_CHANGED",
-	"RESEARCH_CONSENT_REVOKED",
-	"LLM_CONNECTION_CREATED",
-	"LLM_CONNECTION_UPDATED",
-	"LLM_CONNECTION_DELETED",
-	"LLM_MODEL_CREATED",
-	"LLM_MODEL_UPDATED",
-	"LLM_MODEL_DELETED",
-	"LLM_MODEL_PRICE_CHANGED",
-	"LLM_MODEL_SHARING_CHANGED",
-	"LLM_SETTINGS_CHANGED",
-	"LOGIN_PROVIDER_CREATED",
-	"LOGIN_PROVIDER_UPDATED",
-	"LOGIN_PROVIDER_DELETED",
-	"SILENT_MODE_CHANGED",
 ];
 const OUTCOMES: ("SUCCESS" | "FAILURE")[] = ["SUCCESS", "FAILURE"];
 
@@ -98,8 +68,6 @@ export function AuthAuditPanel({
 	const pages = loadedPages(listQuery.data);
 	const events: AuthEventView[] = dedupeById(pages.flatMap((p) => p.content ?? []));
 	const total = pages[0]?.totalElements;
-	// A facet whose URL values were all rejected by the allowlist narrows nothing, so it does not
-	// count as applied.
 	const hasAppliedFilter =
 		(filters.eventType?.length ?? 0) > 0 ||
 		(filters.result?.length ?? 0) > 0 ||

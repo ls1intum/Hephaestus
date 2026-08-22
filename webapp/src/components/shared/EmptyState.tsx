@@ -1,16 +1,13 @@
 import React, { type ComponentType, type ReactNode } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 
-/** The props the empty state passes to an icon component — Lucide and Octicons both accept them. */
+/** Kept to what Lucide and Octicons both accept. */
 interface IconProps {
 	className?: string;
 	size?: number;
 }
 
-/**
- * Lucide icons are `forwardRef` objects rather than plain functions, so a component icon is
- * recognised by either shape.
- */
+/** Lucide icons are `forwardRef` objects, not plain functions, so both shapes count. */
 function isIconComponent(
 	icon: ReactNode | ComponentType<IconProps>,
 ): icon is ComponentType<IconProps> {

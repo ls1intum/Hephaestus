@@ -13,19 +13,15 @@ import type { UIAchievement } from "@/components/achievements/types";
 import { Github } from "@/components/icons/brand";
 
 /**
- * A real {@link UIAchievement} plus the coordinates the skill-tree stories pin nodes at, so a story
- * lays out a tree without the layout pass. The ids are the catalogue's own: the tree keys nodes and
- * edges by id, and an invented one would draw a tree the app can never render.
+ * A {@link UIAchievement} plus the coordinates skill-tree stories pin nodes at. Ids must be the
+ * catalogue's own: the tree keys nodes and edges by id, so an invented one is unreachable in the app.
  */
 export type MockUIAchievement = UIAchievement & {
 	x?: number;
 	y?: number;
 };
 
-/**
- * What an achievement nobody has earned looks like on the client: the server omits `unlockedAt`,
- * and the generated response transformer turns that absence into an invalid Date.
- */
+/** The server omits `unlockedAt`, and the generated response transformer turns that into an invalid Date. */
 const NEVER_UNLOCKED = new Date(Number.NaN);
 
 export const mockUser = {
@@ -284,10 +280,7 @@ const mythicAchievements: MockUIAchievement[] = [
 	dionysusDeploy,
 ];
 
-/**
- * Retypes a mock as a plain `UIAchievement`, for args declared as one. The object is returned
- * untouched — the story-only coordinates are still on it at runtime, just no longer in its type.
- */
+/** Retypes a mock for args declared as `UIAchievement`; the coordinates are still on it at runtime. */
 export function asUI(mock: MockUIAchievement): UIAchievement {
 	return mock;
 }

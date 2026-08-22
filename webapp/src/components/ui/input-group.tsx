@@ -44,9 +44,8 @@ function InputGroupAddon({
 	...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
 	return (
-		// The click only forwards focus to the input, which is a tab stop of its own however the addon
-		// is aligned around it, so there is nothing here a keyboard user cannot already reach — a key
-		// handler would add a second way to do nothing.
+		// The click only forwards focus to the input, which is already a tab stop of its own, so a key
+		// handler would add a second way to reach nothing new.
 		// oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
 		<div
 			role="group"

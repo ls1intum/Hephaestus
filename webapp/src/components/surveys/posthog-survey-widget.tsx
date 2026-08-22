@@ -99,10 +99,8 @@ export function PostHogSurveyWidget({
 		};
 	}, [setPendingSurvey]);
 
-	// Handle reopening the survey from the notification button. The request is a one-shot event
-	// raised elsewhere in the tree, not render state, so it is consumed straight off the store -
-	// reading it through a selector would render this widget once with the signal still pending.
-	// Uses the pending survey object from Zustand - synchronous, no fetch needed
+	// Read off the store rather than through a selector: the reopen request is a one-shot signal, and
+	// a selector would render this widget once with the signal still pending.
 	useEffect(() => {
 		const consumeShowSignal = () => {
 			const { shouldShowSurvey, pendingSurvey, clearShowSignal } =
@@ -191,8 +189,8 @@ export function PostHogSurveyWidget({
 		}
 
 		let active = true;
-		// Read through a call: a plain boolean would stay narrowed by the previous check and stop
-		// reflecting a cleanup that happened while an `await` below was in flight.
+		// A function, not `active` itself: TypeScript narrows the boolean at the first check and would
+		// then hide a cleanup that landed while an `await` below was in flight.
 		const isActive = () => active;
 		let latestRequestId = 0;
 

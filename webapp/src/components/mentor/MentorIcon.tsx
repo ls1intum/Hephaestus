@@ -40,7 +40,6 @@ export function MentorIcon({
 				color: "currentColor",
 				height: size,
 				width: size,
-				// Theme-aware CSS custom properties
 				"--mentor-shadow-opacity": "0.08",
 				"--mentor-blush-opacity": "0.25",
 			}}

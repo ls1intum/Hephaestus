@@ -5,7 +5,6 @@ import { type WorkspaceDetailsData, workspaceDetailsSchema } from "./schemas";
 import { generateSlug } from "./slug-utils";
 import { useWizard } from "./wizard-context";
 
-/** The fields an issue can be reported against; anything else belongs to the object as a whole. */
 const DETAIL_FIELDS = [
 	"displayName",
 	"workspaceSlug",

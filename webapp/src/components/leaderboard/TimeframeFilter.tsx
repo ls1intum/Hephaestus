@@ -81,8 +81,7 @@ export function TimeframeFilter({
 	openEndedPresets = false,
 	enableAllActivityOption = false,
 }: TimeframeFilterProps) {
-	// Convert the leaderboardSchedule prop to the LeaderboardSchedule type. Callers pass an inline
-	// object, so keep the identity tied to the fields rather than to the caller's render.
+	// Callers pass an inline object, so the memo keys on the fields rather than on the caller's render.
 	const scheduleDay = leaderboardSchedule?.day ?? DEFAULT_SCHEDULE.day;
 	const scheduleHour = leaderboardSchedule?.hour ?? DEFAULT_SCHEDULE.hour;
 	const scheduleMinute = leaderboardSchedule?.minute ?? DEFAULT_SCHEDULE.minute;
@@ -91,8 +90,6 @@ export function TimeframeFilter({
 		[scheduleDay, scheduleHour, scheduleMinute],
 	);
 
-	// Once the user picks a timeframe their choice wins; until then the preset follows the dates
-	// the parent supplies.
 	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
 
 	const selectedPreset =
@@ -199,7 +196,6 @@ export function TimeframeFilter({
 
 	const handleCustomRangeChange = (range: DateRange | undefined) => {
 		if (range) {
-			// The calendar is only reachable from the custom preset, so picking dates pins it.
 			setChosenPreset("custom");
 			setCustomRange(range);
 		}
