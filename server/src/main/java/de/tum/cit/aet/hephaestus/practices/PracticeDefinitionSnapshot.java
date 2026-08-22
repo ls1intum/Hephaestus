@@ -17,7 +17,9 @@ record PracticeDefinitionSnapshot(
     String automatedReviewPolicySha256,
     @Nullable String whyItMatters,
     @Nullable String whatGoodLooksLike,
-    @Nullable String areaSlug
+    @Nullable String areaSlug,
+    @Nullable String sourceCuratedSlug,
+    @Nullable String sourceCuratedFingerprint
 ) implements ConfigAuditSnapshot {
     static PracticeDefinitionSnapshot of(Practice practice, @Nullable Integer criteriaRevision) {
         return new PracticeDefinitionSnapshot(
@@ -31,7 +33,9 @@ record PracticeDefinitionSnapshot(
             PracticeAutomatedReviewPolicyDigest.digest(practice.getAutomatedReviewPolicy()),
             practice.getWhyItMatters(),
             practice.getWhatGoodLooksLike(),
-            practice.getArea() == null ? null : practice.getArea().getSlug()
+            practice.getArea() == null ? null : practice.getArea().getSlug(),
+            practice.getSourceCuratedSlug(),
+            practice.getSourceCuratedFingerprint()
         );
     }
 }

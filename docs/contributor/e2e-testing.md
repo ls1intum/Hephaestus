@@ -59,7 +59,13 @@ Existing resources are reused only when their immutable SCM and model-routing fi
 The script prints the dev-trigger command after sync has produced a suitable artifact:
 
 ```bash
-curl -X POST "http://localhost:8080/api/dev/trigger-review?prId=<id>&workspaceId=<id>"
+JWT="$(curl -fsS -i -X POST http://localhost:8080/auth/dev-login \
+  -H 'content-type: application/json' \
+  -d '{"username":"e2e","admin":true}' \
+  | sed -nE 's/.*(__Host-)?HEPHAESTUS_AT=([^;]+).*/\2/p' | tr -d '\r')"
+test -n "$JWT"
+curl -fsS -X POST -H "Authorization: Bearer $JWT" \
+  "http://localhost:8080/api/dev/trigger-review?prId=<id>&workspaceId=<id>"
 ```
 
 To test webhook ingestion too, configure `hephaestus.webhook.external-url` and a secret of at least 32

@@ -218,7 +218,14 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		expect(onSubmit).not.toHaveBeenCalled();
-		expect(screen.getByRole("alert").textContent).toBe("Choose when this practice is reviewed.");
+		// Two alerts now: the summary at the top of the form listing every refusal, and this one at
+		// the field it is about. The inline one is what this test is for — a summary alone would put
+		// the message a screenful away from the control that fixes it.
+		expect(
+			screen
+				.getAllByRole("alert")
+				.some((alert) => alert.textContent === "Choose when this practice is reviewed."),
+		).toBe(true);
 		// The strip stays on screen with nothing ticked, rather than taking the kind of work — and the
 		// only way to tick one again — with it. A message at the bottom of a long form is not the fix.
 		expect(occasion().getAllByRole("checkbox")).toHaveLength(6);

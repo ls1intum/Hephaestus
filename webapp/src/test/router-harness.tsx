@@ -12,7 +12,13 @@ import type { ReactNode } from "react";
 import { AuthProvider } from "@/integrations/auth/AuthContext";
 import { routeTree } from "@/routeTree.gen";
 
-export const ROUTE_RENDER_WAIT = { timeout: 10_000 } as const;
+/**
+ * A backstop against a route that never resolves, not a budget for how fast one should render. A
+ * cold route mount costs ~1.5s alone and several seconds more when the whole file pool is running,
+ * so a value close to the observed time turns saturation into a red build — and it did: two
+ * different route tests failed on two consecutive full runs while each passed in isolation.
+ */
+export const ROUTE_RENDER_WAIT = { timeout: 30_000 } as const;
 
 export function testQueryClient(): QueryClient {
 	return new QueryClient({

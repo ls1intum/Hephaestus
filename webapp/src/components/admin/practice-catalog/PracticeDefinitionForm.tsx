@@ -1,4 +1,3 @@
-import { useBlocker } from "@tanstack/react-router";
 import deepEqual from "fast-deep-equal";
 import { ChevronRight, RotateCcw } from "lucide-react";
 import { useRef, useState } from "react";
@@ -36,17 +35,9 @@ import {
 	practicePolicyError,
 	practicePolicyErrorTarget,
 } from "@/components/admin/practice-catalog/PracticeMentoringSupportEditor";
+import { FormActionBar } from "@/components/common/FormActionBar";
+import { type FormError, FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { CodeEditor } from "@/components/shared/CodeEditor";
-import {
-	AlertDialog,
-	AlertDialogAction,
-	AlertDialogCancel,
-	AlertDialogContent,
-	AlertDialogDescription,
-	AlertDialogFooter,
-	AlertDialogHeader,
-	AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
@@ -72,6 +63,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
 
 const NO_AREA = "__none__";
@@ -232,7 +224,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	} = props;
 	const formDisabled = isPending || disabled;
 	const [form, setForm] = useState<FormState>(() => initialState(definitionOptions, initialData));
-	const [submitted, setSubmitted] = useState(false);
+	// Counts refused submits, not "has submitted": it re-keys the summary so a second refusal
+	// focuses it again.
+	const [refusals, setRefusals] = useState(0);
 	const [showAdvanced, setShowAdvanced] = useState(() => Boolean(initialData?.precomputeScript));
 	const workTypes = orderedWorkTypes(definitionOptions);
 	const areaItems = [
@@ -275,16 +269,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 			: canRunMentoring
 				? "reviewed"
 				: "human-review";
-	const isDirty = !deepEqual(form, initialState(definitionOptions, initialData));
-	// Down from the moment a save is dispatched until the caller says it failed. `isPending` drops
-	// before the caller navigates, so releasing the guard on it races that navigation.
-	const [saving, setSaving] = useState(false);
-	const guarded = isDirty && !saving;
-	const blocker = useBlocker({
-		shouldBlockFn: () => guarded,
-		enableBeforeUnload: guarded,
-		disabled: !guarded || formDisabled,
-		withResolver: true,
+	const unsavedChanges = useUnsavedChanges({
+		isDirty: !deepEqual(form, initialState(definitionOptions, initialData)),
+		disabled: formDisabled,
 	});
 
 	const handleNameChange = (name: string) => {
@@ -349,13 +336,13 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 	};
 
 	const nameError =
-		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
+		refusals > 0 && form.name.trim().length < 3 ? "Name must be at least 3 characters" : undefined;
 	const slugError =
-		submitted && mode === "create" && !isValidSlug(form.slug)
+		refusals > 0 && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers, and single hyphens."
 			: undefined;
 	const criteriaError =
-		submitted && form.criteria.trim().length < 3
+		refusals > 0 && form.criteria.trim().length < 3
 			? "Criteria must be at least 3 characters"
 			: undefined;
 	const policyError = practicePolicyError(form.automatedReviewPolicy);
@@ -365,31 +352,39 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		selectedWorkType,
 	);
 
-	const valid =
-		form.name.trim().length >= 3 &&
-		form.criteria.trim().length >= 3 &&
-		!policyError &&
-		!bindingsError &&
-		(mode === "edit" || isValidSlug(form.slug));
+	// One list, in the order the fields appear, so the summary reads down the form and the first
+	// entry is also the field to focus. Deriving both from it keeps them from disagreeing.
+	const errorSummary: FormError[] = [
+		form.name.trim().length < 3 && {
+			fieldId: "practice-name",
+			message: "Give the practice a name of at least three characters.",
+		},
+		form.criteria.trim().length < 3 && {
+			fieldId: "practice-criteria",
+			message: "Say what this practice checks, in at least three characters.",
+		},
+		policyError && {
+			fieldId: practicePolicyErrorTarget(form.automatedReviewPolicy),
+			message: policyError,
+		},
+		bindingsError && { fieldId: bindingsError.focusId, message: bindingsError.message },
+		mode === "create" &&
+			!isValidSlug(form.slug) && {
+				fieldId: "practice-slug",
+				message: "The identifier must be lowercase letters, numbers and hyphens.",
+				// Lives inside the collapsed Technical settings panel, which unmounts its contents.
+				reveal: () => setShowAdvanced(true),
+			},
+	].filter((entry): entry is FormError => Boolean(entry));
+	const valid = errorSummary.length === 0;
 
 	const handleSubmit = (event: React.FormEvent) => {
 		event.preventDefault();
-		setSubmitted(true);
 		if (!valid) {
-			const firstInvalidId =
-				form.name.trim().length < 3
-					? "practice-name"
-					: form.criteria.trim().length < 3
-						? "practice-criteria"
-						: policyError
-							? practicePolicyErrorTarget(form.automatedReviewPolicy)
-							: bindingsError
-								? bindingsError.focusId
-								: mode === "create" && !isValidSlug(form.slug)
-									? "practice-slug"
-									: "practice-name";
-			if (firstInvalidId === "practice-slug") setShowAdvanced(true);
-			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
+			setRefusals((count) => count + 1);
+			const first = errorSummary[0];
+			first.reveal?.();
+			requestAnimationFrame(() => document.getElementById(first.fieldId)?.focus());
 			return;
 		}
 
@@ -408,40 +403,19 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				: {}),
 			automatedReviewPolicy: form.automatedReviewPolicy,
 		});
-		// Only a caller that returns a promise can say the save failed, so only that caller gets the
-		// guard held down for it.
-		if (submission instanceof Promise) {
-			setSaving(true);
-			void submission.catch(() => setSaving(false));
-		}
+		// After dispatch, not before: `track` needs the promise the dispatch returns.
+		unsavedChanges.track(submission);
 	};
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
 	return (
 		<form onSubmit={handleSubmit} noValidate className="flex flex-col gap-8">
-			<AlertDialog
-				open={blocker.status === "blocked"}
-				onOpenChange={(open, eventDetails) => {
-					if (!open && eventDetails.reason === "escape-key") {
-						blocker.reset?.();
-					}
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-						<AlertDialogDescription>
-							Your draft will be lost if you leave this page.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel onClick={blocker.reset}>Keep editing</AlertDialogCancel>
-						<AlertDialogAction variant="destructive" onClick={blocker.proceed}>
-							Discard changes
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			{unsavedChanges.dialog}
+			<FormErrorSummary
+				key={refusals}
+				errors={refusals > 0 ? errorSummary : []}
+				className="max-w-3xl"
+			/>
 			<fieldset disabled={formDisabled} className="contents">
 				<div className="max-w-3xl space-y-10">
 					<p className="text-sm text-muted-foreground">
@@ -580,7 +554,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 						supportedAutomatedReviewModes={selectedWorkType?.supportedAutomatedReviewModes ?? []}
 						disabled={formDisabled}
 						onChange={updatePolicy}
-						error={submitted ? policyError : undefined}
+						error={refusals > 0 ? policyError : undefined}
 					/>
 
 					<Separator />
@@ -638,8 +612,8 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								mode={occasionMode}
 								outcome={workTypeUnchanged ? evidenceOutcome : undefined}
 								disabled={formDisabled}
-								error={submitted ? bindingsError?.message : undefined}
-								errorFocusId={submitted ? bindingsError?.focusId : undefined}
+								error={refusals > 0 ? bindingsError?.message : undefined}
+								errorFocusId={refusals > 0 ? bindingsError?.focusId : undefined}
 								onChange={(binding) =>
 									setForm((previous) => ({ ...previous, bindings: [binding] }))
 								}
@@ -744,8 +718,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 				</div>
 			</fieldset>
 
-			<div className="flex max-w-3xl justify-between border-t pt-4">
-				{cancelAction}
+			<FormActionBar className="max-w-3xl" secondary={cancelAction}>
 				<Button type="submit" disabled={formDisabled || isSubmitDisabled}>
 					{isPending && <Spinner className="size-4" />}
 					{isPending
@@ -756,7 +729,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							? "Create practice"
 							: "Save changes"}
 				</Button>
-			</div>
+			</FormActionBar>
 		</form>
 	);
 }

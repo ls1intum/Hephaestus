@@ -6,9 +6,11 @@ import {
 	deleteAreaMutation,
 	deletePracticeMutation,
 	getPracticeQueryKey,
+	listAdoptablePracticesQueryKey,
 	listAreasQueryKey,
 	listPracticesQueryKey,
 	placePracticeMutation,
+	previewAreaAdoptionQueryKey,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice } from "@/api/types.gen";
 import { mockAreas, mockPractices } from "@/components/admin/practices/story-mock-data";
@@ -27,6 +29,9 @@ vi.mock("@/api/@tanstack/react-query.gen", async (importOriginal) => {
 const WORKSPACE = "acme";
 const queryKey = listPracticesQueryKey({ path: { workspaceSlug: WORKSPACE } });
 const areasQueryKey = listAreasQueryKey({ path: { workspaceSlug: WORKSPACE } });
+const adoptionCatalogQueryKey = listAdoptablePracticesQueryKey({
+	path: { workspaceSlug: WORKSPACE },
+});
 
 function practice(slug: string, areaSlug: string | undefined, displayOrder: number): Practice {
 	return {
@@ -199,6 +204,7 @@ describe("usePracticeCatalogMutations", () => {
 			practice("deleting", "quality", 0),
 			practice("elsewhere", "delivery", 0),
 		]);
+		client.setQueryData(adoptionCatalogQueryKey, []);
 		let resolveDelete: () => void = () => {};
 		vi.mocked(deletePracticeMutation).mockReturnValue({
 			mutationFn: () =>
@@ -221,12 +227,17 @@ describe("usePracticeCatalogMutations", () => {
 		expect(result.current.blockedMoveDestinationSlugs).toEqual(new Set(["quality"]));
 		resolveDelete();
 		await waitFor(() => expect(result.current.deletePractice.isSuccess).toBe(true));
+		expect(client.getQueryState(adoptionCatalogQueryKey)?.isInvalidated).toBe(true);
 	});
 
 	it("removes a deleting area from move destinations", async () => {
 		const client = queryClient();
 		client.setQueryData(areasQueryKey, mockAreas);
 		client.setQueryData(queryKey, mockPractices);
+		const areaPreviewKey = previewAreaAdoptionQueryKey({
+			path: { workspaceSlug: WORKSPACE, slug: "quality" },
+		});
+		client.setQueryData(areaPreviewKey, {});
 		let resolveDelete: () => void = () => {};
 		vi.mocked(deleteAreaMutation).mockReturnValue({
 			mutationFn: () =>
@@ -250,5 +261,31 @@ describe("usePracticeCatalogMutations", () => {
 		);
 		resolveDelete();
 		await waitFor(() => expect(result.current.deleteArea.isSuccess).toBe(true));
+		expect(client.getQueryState(areaPreviewKey)?.isInvalidated).toBe(true);
+	});
+
+	it("removes an area's practices and refreshes the library when deletion includes practices", async () => {
+		const client = queryClient();
+		client.setQueryData(areasQueryKey, mockAreas);
+		client.setQueryData(queryKey, [
+			practice("deleted-with-area", "quality", 0),
+			practice("kept", "delivery", 0),
+		]);
+		client.setQueryData(adoptionCatalogQueryKey, []);
+		vi.mocked(deleteAreaMutation).mockReturnValue({ mutationFn: async () => {} });
+		const { result } = renderHook(() => usePracticeCatalogMutations(WORKSPACE), {
+			wrapper: wrapper(client),
+		});
+
+		act(() => {
+			result.current.deleteArea.mutate({
+				path: { workspaceSlug: WORKSPACE, areaSlug: "quality" },
+				query: { deletePractices: true },
+			});
+		});
+
+		await waitFor(() => expect(result.current.deleteArea.isSuccess).toBe(true));
+		expect(client.getQueryData<Practice[]>(queryKey)?.map(({ slug }) => slug)).toEqual(["kept"]);
+		expect(client.getQueryState(adoptionCatalogQueryKey)?.isInvalidated).toBe(true);
 	});
 });

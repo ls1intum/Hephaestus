@@ -312,14 +312,14 @@ describe("instance catalog routes", () => {
 		fireEvent.click(
 			await screen.findByRole(
 				"switch",
-				{ name: "Include Packaging work in new workspaces" },
+				{ name: "Offer Packaging work to workspaces" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
 		const confirmation = screen.getByRole("alertdialog");
-		within(confirmation).getByText(/also excludes 1 currently included practice/);
+		within(confirmation).getByText(/also stops offering 1 currently offered practice/);
 		within(confirmation).getByText("Say what changed and why");
-		fireEvent.click(within(confirmation).getByRole("button", { name: "Exclude area" }));
+		fireEvent.click(within(confirmation).getByRole("button", { name: "Stop offering" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"structure-1"'));
 	});
@@ -355,16 +355,16 @@ describe("instance catalog routes", () => {
 		fireEvent.click(
 			await screen.findByRole(
 				"switch",
-				{ name: "Include Packaging work in new workspaces" },
+				{ name: "Offer Packaging work to workspaces" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Exclude area" }));
+		fireEvent.click(screen.getByRole("button", { name: "Stop offering" }));
 
 		await waitFor(() =>
 			expect(
 				screen
-					.getByRole("switch", { name: "Include Delivery in new workspaces" })
+					.getByRole("switch", { name: "Offer Delivery to workspaces" })
 					.getAttribute("aria-disabled"),
 			).toBe("true"),
 		);
@@ -397,11 +397,11 @@ describe("instance catalog routes", () => {
 		fireEvent.click(
 			await screen.findByRole(
 				"switch",
-				{ name: "Include Say what changed and why in new workspaces" },
+				{ name: "Offer Say what changed and why to workspaces" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Exclude practice" }));
+		fireEvent.click(screen.getByRole("button", { name: "Stop offering" }));
 
 		await waitFor(() => expect(ifMatch).toBe('"tag-1"'));
 		expect(body).toEqual({ status: "RETIRED" });
@@ -442,11 +442,11 @@ describe("instance catalog routes", () => {
 		fireEvent.click(
 			await screen.findByRole(
 				"switch",
-				{ name: "Include Say what changed and why in new workspaces" },
+				{ name: "Offer Say what changed and why to workspaces" },
 				ROUTE_RENDER_WAIT,
 			),
 		);
-		fireEvent.click(screen.getByRole("button", { name: "Exclude practice" }));
+		fireEvent.click(screen.getByRole("button", { name: "Stop offering" }));
 		await waitFor(() => expect(latestTag).toBe("tag-2"));
 
 		fireEvent.click(await screen.findByRole("link", { name: practiceDefinition.name }));

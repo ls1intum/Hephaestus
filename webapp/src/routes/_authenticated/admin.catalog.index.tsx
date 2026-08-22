@@ -27,11 +27,11 @@ import {
 	reorderCuratedAreas,
 	reorderCuratedPractices,
 } from "@/components/admin/curated-catalog/curated-catalog-cache";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { Spinner } from "@/components/ui/spinner";
 import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
@@ -65,9 +65,7 @@ function AdminCuratedCatalogPage() {
 			invalidateCatalog();
 			toast.success(
 				successMessage ??
-					(offered
-						? "Practice included in new workspaces"
-						: "Practice excluded from new workspaces"),
+					(offered ? "Practice offered to workspaces" : "Practice is no longer offered"),
 			);
 		},
 		onError: (error: unknown) => {
@@ -85,9 +83,7 @@ function AdminCuratedCatalogPage() {
 		onSuccess: (catalog: Catalog) => {
 			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
 			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
-			toast.success(
-				offered ? "Area included in new workspaces" : "Area excluded from new workspaces",
-			);
+			toast.success(offered ? "Area offered to workspaces" : "Area is no longer offered");
 		},
 		onError: (error: unknown) => {
 			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
@@ -227,8 +223,8 @@ function AdminCuratedCatalogPage() {
 		<PageLayout>
 			<PageHeader
 				icon={<LibraryBig />}
-				title="Practice catalog"
-				description="Set what each new workspace starts with. Each Hephaestus default updates automatically until you customize that entry. Existing workspaces never change automatically."
+				title="Practice library"
+				description="Choose which areas and practices workspace administrators can add. Library changes never rewrite existing workspace practices."
 				actions={
 					<div className="flex flex-wrap gap-2">
 						{writePending ? (
@@ -268,9 +264,7 @@ function AdminCuratedCatalogPage() {
 			/>
 
 			{catalogQuery.isPending ? (
-				<div className="flex h-64 items-center justify-center">
-					<Spinner className="size-8" />
-				</div>
+				<LoadingBlock size="lg" label="Loading the practice library" />
 			) : catalogQuery.isError ? (
 				<QueryErrorAlert
 					error={catalogQuery.error}

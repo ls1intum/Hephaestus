@@ -1,9 +1,12 @@
-import { Link, useBlocker } from "@tanstack/react-router";
+import { Link } from "@tanstack/react-router";
+import deepEqual from "fast-deep-equal";
 import { ArrowLeft, ClipboardPenLine, ListPlus, RotateCcw } from "lucide-react";
 import { useState } from "react";
 import type { CatalogEntryStatus, CuratedAreaRequest } from "@/api/types.gen";
 import { AreaVisualPicker } from "@/components/admin/practice-catalog/AreaVisualPicker";
 import { generateSlug, isValidSlug } from "@/components/admin/practice-catalog/constants";
+import { FormActionBar } from "@/components/common/FormActionBar";
+import { type FormError, FormErrorSummary } from "@/components/common/FormErrorSummary";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -22,6 +25,7 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/c
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useUnsavedChanges } from "@/hooks/use-unsaved-changes";
 import { cn } from "@/lib/utils";
 import { canUseHephaestusVersion } from "./curated-entry-state";
 import { HephaestusVersionPanel } from "./HephaestusVersionPanel";
@@ -89,14 +93,14 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	} = props;
 	const [resetOpen, setResetOpen] = useState(false);
 	const [form, setForm] = useState<FormState>(() => initialState(initialData));
-	const [submitted, setSubmitted] = useState(false);
+	const [refusals, setRefusals] = useState(0);
 	const formDisabled = isPending || isResetPending || isKeepPending;
-	const isDirty = JSON.stringify(form) !== JSON.stringify(initialState(initialData));
-	const blocker = useBlocker({
-		shouldBlockFn: () => isDirty,
-		enableBeforeUnload: isDirty,
-		disabled: !isDirty || formDisabled,
-		withResolver: true,
+	// `deepEqual`, not `JSON.stringify`: the latter reports a difference between two equal objects
+	// whose keys happen to have been inserted in a different order, which armed the guard for edits
+	// the reader never made.
+	const unsavedChanges = useUnsavedChanges({
+		isDirty: !deepEqual(form, initialState(initialData)),
+		disabled: formDisabled,
 	});
 
 	const slugWasEdited = mode === "create" && form.slug !== generateSlug(form.name);
@@ -108,21 +112,31 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	};
 
 	const nameError =
-		submitted && form.name.trim().length < 3 ? "Name must be at least 3 characters." : undefined;
+		refusals > 0 && form.name.trim().length < 3 ? "Name must be at least 3 characters." : undefined;
 	const slugError =
-		submitted && mode === "create" && !isValidSlug(form.slug)
+		refusals > 0 && mode === "create" && !isValidSlug(form.slug)
 			? "Use 3–64 lowercase letters, numbers and single hyphens."
 			: undefined;
-	const valid = form.name.trim().length >= 3 && (mode === "edit" || isValidSlug(form.slug));
+	const errorSummary: FormError[] = [
+		form.name.trim().length < 3 && {
+			fieldId: "area-name",
+			message: "Give the area a name of at least three characters.",
+		},
+		mode === "create" &&
+			!isValidSlug(form.slug) && {
+				fieldId: "area-slug",
+				message: "The identifier must be 3–64 lowercase letters, numbers and single hyphens.",
+			},
+	].filter((entry): entry is FormError => Boolean(entry));
+	const valid = errorSummary.length === 0;
 	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
 	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 
 	const submit = (event: React.FormEvent) => {
 		event.preventDefault();
-		setSubmitted(true);
 		if (!valid) {
-			const firstInvalidId = form.name.trim().length < 3 ? "area-name" : "area-slug";
-			requestAnimationFrame(() => document.getElementById(firstInvalidId)?.focus());
+			setRefusals((count) => count + 1);
+			requestAnimationFrame(() => document.getElementById(errorSummary[0].fieldId)?.focus());
 			return;
 		}
 		onSubmit({
@@ -142,8 +156,8 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 						<AlertDialogTitle>{resetLabel}?</AlertDialogTitle>
 						<AlertDialogDescription>
 							This replaces the customization and discards unsaved changes. It does not change
-							whether the area is included in new workspaces. Existing workspaces remain unchanged.
-							Future updates apply automatically until the area is customized again.
+							whether workspace administrators can add the area. Existing workspace copies remain
+							unchanged. Future updates apply automatically until the area is customized again.
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -161,29 +175,12 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 				</AlertDialogContent>
 			</AlertDialog>
 
-			<AlertDialog
-				open={blocker.status === "blocked"}
-				onOpenChange={(open, eventDetails) => {
-					if (!open && eventDetails.reason === "escape-key") {
-						blocker.reset?.();
-					}
-				}}
-			>
-				<AlertDialogContent>
-					<AlertDialogHeader>
-						<AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
-						<AlertDialogDescription>
-							Your draft will be lost if you leave this page.
-						</AlertDialogDescription>
-					</AlertDialogHeader>
-					<AlertDialogFooter>
-						<AlertDialogCancel onClick={blocker.reset}>Keep editing</AlertDialogCancel>
-						<AlertDialogAction variant="destructive" onClick={blocker.proceed}>
-							Discard changes
-						</AlertDialogAction>
-					</AlertDialogFooter>
-				</AlertDialogContent>
-			</AlertDialog>
+			{unsavedChanges.dialog}
+			<FormErrorSummary
+				key={refusals}
+				errors={refusals > 0 ? errorSummary : []}
+				className="max-w-3xl"
+			/>
 
 			<Link
 				from="/admin/catalog"
@@ -192,15 +189,15 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 				className={cn(buttonVariants({ variant: "ghost", size: "sm" }), "-ml-3 w-fit")}
 			>
 				<ArrowLeft className="size-4" aria-hidden />
-				Practice catalog
+				Practice library
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
 				title={mode === "create" ? "Create area" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Use areas to group related practices in the instance catalog."
-						: "Saving updates the instance catalog. Existing workspaces will not change."
+						? "Use areas to group related practices in the instance library."
+						: "Saving updates the instance library. Existing workspace copies will not change."
 				}
 			/>
 
@@ -358,15 +355,19 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 					</div>
 				</fieldset>
 
-				<div className="flex max-w-3xl justify-between border-t pt-4">
-					<Link
-						from="/admin/catalog"
-						to="/admin/catalog"
-						search={(previous) => previous}
-						className={buttonVariants({ variant: "outline" })}
-					>
-						Cancel
-					</Link>
+				<FormActionBar
+					className="max-w-3xl"
+					secondary={
+						<Link
+							from="/admin/catalog"
+							to="/admin/catalog"
+							search={(previous) => previous}
+							className={buttonVariants({ variant: "outline" })}
+						>
+							Cancel
+						</Link>
+					}
+				>
 					<Button type="submit" disabled={formDisabled || conflict}>
 						{isPending && <Spinner className="size-4" />}
 						{isPending
@@ -377,7 +378,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 								? "Create area"
 								: "Save changes"}
 					</Button>
-				</div>
+				</FormActionBar>
 			</form>
 		</PageLayout>
 	);

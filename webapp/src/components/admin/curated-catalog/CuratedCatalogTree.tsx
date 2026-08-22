@@ -1,7 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { GripVertical, MoreHorizontal } from "lucide-react";
 import type { CuratedArea, CuratedPracticeSummary } from "@/api/types.gen";
-import { getAreaVisual } from "@/components/admin/practice-catalog/area-visuals";
+import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { automatedReviewLimitationLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import {
 	type CatalogEntryMoveActions,
@@ -26,7 +26,6 @@ import { Item, ItemContent, ItemDescription, ItemTitle } from "@/components/ui/i
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { cn } from "@/lib/utils";
 import { CuratedEntryBadges } from "./CuratedEntryBadges";
 
 type TreeArea = CuratedArea & { displayOrder: number; name: string };
@@ -139,19 +138,13 @@ export function CuratedCatalogTree({
 }
 
 function AreaIcon({ area }: { area: TreeArea }) {
-	const { Icon, pill } = getAreaVisual(
-		area.slug,
-		area.definition.name,
-		area.definition.icon,
-		area.definition.color,
-	);
 	return (
-		<span
-			className={cn("flex size-8 shrink-0 items-center justify-center rounded-md", pill)}
-			aria-hidden
-		>
-			<Icon className="size-4" />
-		</span>
+		<AreaPill
+			slug={area.slug}
+			name={area.definition.name}
+			icon={area.definition.icon}
+			color={area.definition.color}
+		/>
 	);
 }
 
@@ -181,7 +174,7 @@ function AreaActions({
 				onCheckedChange={(offered) => (offered ? onStatusChange(area, true) : onExclude(area))}
 				disabled={disabled}
 				aria-busy={pending}
-				aria-label={`Include ${area.definition.name} in new workspaces`}
+				aria-label={`Offer ${area.definition.name} to workspaces`}
 			/>
 			<DropdownMenu>
 				<DropdownMenuTrigger
@@ -223,11 +216,11 @@ function AreaActions({
 					<DropdownMenuSeparator />
 					{area.status.offered ? (
 						<DropdownMenuItem variant="destructive" onClick={() => onExclude(area)}>
-							Exclude from new workspaces
+							Stop offering
 						</DropdownMenuItem>
 					) : (
 						<DropdownMenuItem onClick={() => onStatusChange(area, true)}>
-							Include in new workspaces
+							Offer to workspaces
 						</DropdownMenuItem>
 					)}
 				</DropdownMenuContent>
@@ -294,14 +287,14 @@ function PracticeActions({
 		? "Move to Unassigned or an included area first"
 		: parentUnavailable
 			? "Include when its area is included"
-			: "Include in new workspaces";
+			: "Offer to workspaces";
 	const switchLabel = practice.missingAreaSlug
 		? `${practice.name} cannot be included until it is moved out of the missing area`
 		: parentUnavailable
 			? practice.status.offered
 				? `${practice.name} is excluded because its area is excluded`
-				: `${practice.name} is excluded from new workspaces`
-			: `Include ${practice.name} in new workspaces`;
+				: `${practice.name} is not offered to workspaces`
+			: `Offer ${practice.name} to workspaces`;
 	const persistedPractice = practice.missingAreaSlug
 		? { ...practice, areaSlug: practice.missingAreaSlug }
 		: practice;
@@ -391,7 +384,7 @@ function PracticeActions({
 					<DropdownMenuSeparator />
 					{practice.status.offered ? (
 						<DropdownMenuItem variant="destructive" onClick={() => onExclude(persistedPractice)}>
-							Exclude from new workspaces
+							Stop offering
 						</DropdownMenuItem>
 					) : (
 						<DropdownMenuItem

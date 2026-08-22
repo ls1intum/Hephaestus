@@ -17,20 +17,16 @@ import java.util.List;
 import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.task.TaskExecutionAutoConfiguration;
 import org.springframework.context.event.EventListener;
-import org.springframework.core.task.AsyncTaskExecutor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionOperations;
 
-/** Installs the effective instance catalog once; workspace copies remain independent afterwards. */
 @Component
 @ConditionalOnServerRole
-class DefaultPracticeCatalogSeeder {
+class PracticeCatalogInstallationManager {
 
-    private static final Logger log = LoggerFactory.getLogger(DefaultPracticeCatalogSeeder.class);
+    private static final Logger log = LoggerFactory.getLogger(PracticeCatalogInstallationManager.class);
 
     private final boolean enabled;
     private final PracticeAreaService areaService;
@@ -41,11 +37,10 @@ class DefaultPracticeCatalogSeeder {
     private final CuratedCatalogLock catalogLock;
     private final PracticeCatalogInstallationRepository installationRepository;
     private final WorkspaceRepository workspaceRepository;
-    private final AsyncTaskExecutor taskExecutor;
     private final TransactionOperations transactionOperations;
     private final Clock clock;
 
-    DefaultPracticeCatalogSeeder(
+    PracticeCatalogInstallationManager(
         @Value("${hephaestus.practices.seed-default-catalog:true}") boolean enabled,
         PracticeAreaService areaService,
         PracticeService practiceService,
@@ -55,7 +50,6 @@ class DefaultPracticeCatalogSeeder {
         CuratedCatalogLock catalogLock,
         PracticeCatalogInstallationRepository installationRepository,
         WorkspaceRepository workspaceRepository,
-        @Qualifier(TaskExecutionAutoConfiguration.APPLICATION_TASK_EXECUTOR_BEAN_NAME) AsyncTaskExecutor taskExecutor,
         TransactionOperations transactionOperations,
         Clock clock
     ) {
@@ -68,13 +62,12 @@ class DefaultPracticeCatalogSeeder {
         this.catalogLock = catalogLock;
         this.installationRepository = installationRepository;
         this.workspaceRepository = workspaceRepository;
-        this.taskExecutor = taskExecutor;
         this.transactionOperations = transactionOperations;
         this.clock = clock;
     }
 
     @EventListener(WorkspacesInitializedEvent.class)
-    public void seed() {
+    public void repairIncompleteInstallations() {
         if (!enabled) {
             return;
         }
@@ -83,7 +76,7 @@ class DefaultPracticeCatalogSeeder {
                 .findAll()
                 .stream()
                 .sorted(Comparator.comparing(Workspace::getId, Comparator.nullsLast(Long::compareTo)))
-                .forEach(this::seedCatalogSafely);
+                .forEach(this::repairCatalogSafely);
         } catch (RuntimeException exception) {
             log.error("Could not load workspaces for default practice catalog installation", exception);
         }
@@ -91,39 +84,27 @@ class DefaultPracticeCatalogSeeder {
 
     @EventListener(WorkspaceCreatedEvent.class)
     public void onWorkspaceCreated(WorkspaceCreatedEvent event) {
-        if (!enabled) {
+        transactionOperations.executeWithoutResult(ignored -> markCatalogReady(event.workspaceId()));
+    }
+
+    private void markCatalogReady(Long workspaceId) {
+        Workspace workspace = workspaceRepository.findByIdForUpdate(workspaceId).orElse(null);
+        if (workspace == null || installationRepository.existsById(workspaceId)) {
             return;
         }
+        Instant now = clock.instant();
+        installationRepository.save(new PracticeCatalogInstallation(workspaceId, now, now));
+    }
+
+    private void repairCatalogSafely(Workspace workspace) {
         try {
-            taskExecutor.execute(() -> {
-                try {
-                    workspaceRepository.findById(event.workspaceId()).ifPresent(this::seedCatalogSafely);
-                } catch (RuntimeException exception) {
-                    log.error(
-                        "Could not load workspace {} for default practice catalog seeding",
-                        event.workspaceId(),
-                        exception
-                    );
-                }
-            });
+            transactionOperations.executeWithoutResult(ignored -> repairCatalog(workspace));
         } catch (RuntimeException exception) {
-            log.error(
-                "Could not schedule default practice catalog seeding: workspaceId={}",
-                event.workspaceId(),
-                exception
-            );
+            log.error("Default practice catalog repair failed: workspaceId={}", workspace.getId(), exception);
         }
     }
 
-    private void seedCatalogSafely(Workspace workspace) {
-        try {
-            transactionOperations.executeWithoutResult(ignored -> seedCatalog(workspace));
-        } catch (RuntimeException exception) {
-            log.error("Default practice catalog seeding failed: workspaceId={}", workspace.getId(), exception);
-        }
-    }
-
-    private void seedCatalog(Workspace workspace) {
+    private void repairCatalog(Workspace workspace) {
         catalogLock.acquire();
         Workspace lockedWorkspace = workspaceRepository.findByIdForUpdate(workspace.getId()).orElse(null);
         if (lockedWorkspace == null || installationRepository.existsById(lockedWorkspace.getId())) {

@@ -6,35 +6,41 @@ to maintain the catalog.
 
 ## Sources and ownership
 
-The effective catalog combines three scopes:
+The effective catalog combines three scopes, and definitions only ever flow one way:
 
-| Scope               | Source                                            | Owner                    | Effect                                 |
-| ------------------- | ------------------------------------------------- | ------------------------ | -------------------------------------- |
-| Hephaestus defaults | `default-catalog.json` and its precompute scripts | repository maintainers   | provides bundled definitions and order |
-| Instance catalog    | bundled defaults plus sparse database overrides   | instance administrators  | defines what new workspaces receive    |
-| Workspace practices | independent database copies                       | workspace administrators | defines reviews in one workspace       |
+```mermaid
+flowchart LR
+    accTitle: The three scopes a practice definition passes through
+    accDescr: Bundled defaults in the repository upgrade the instance catalog unless an administrator customized the entry. The instance catalog decides what workspaces may adopt. Adoption produces an independent workspace copy that no later change rewrites.
+    Bundled[Bundled defaults<br/>default-catalog.json] -->|release upgrade,<br/>unless customized| Instance[Instance catalog<br/>bundled + sparse overrides]
+    Instance -->|adoption,<br/>by an administrator| Workspace[Workspace practice<br/>independent copy]
+```
 
-The same definition fields are used at all three scopes. What changes is who owns the value and when
-it propagates:
+| Scope | Owner | Stored as | Decides |
+|---|---|---|---|
+| Hephaestus defaults | repository maintainers | `default-catalog.json` + precompute scripts | the bundled definition and order |
+| Instance catalog | instance administrators | sparse override rows | what workspaces may adopt |
+| Workspace practices | workspace administrators | full database copies | reviews in one workspace |
 
-| Decision                                                                       | Hephaestus defaults                                                                     | Instance catalog                                        | Workspace practices                                                                         |
-| ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Name, criteria, and guidance                                                   | maintained in the repository                                                            | inherited or customized by an instance administrator    | copied at workspace creation, then owned by the workspace                                   |
-| Binding — the one occasion a practice is reviewed on and the evidence it reads | declared as `on` in the bundled catalog; optional precompute input is explicit          | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
-| Review frame — contract version, review mode, known limitations                | taken from the artifact kind's default; not written per practice in the bundled catalog | inherited or customized in the practice form            | copied, then customizable in the same practice form                                         |
-| Included in new workspaces                                                     | default is included                                                                     | instance administrator can include or exclude           | not applicable after installation                                                           |
-| Practice autonomy                                                              | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator controls it; a practice Hephaestus cannot review is forced to `OFF` |
-| Review scope                                                                   | not a repository setting                                                                | not a curated-catalog setting                           | workspace administrator sets it once for the whole workspace                                |
-| Area and order                                                                 | JSON array order                                                                        | inherited or changed with drag-and-drop or move actions | copied, then independently managed                                                          |
+All three scopes use the same definition fields. What differs is who owns the value:
 
-This is a one-way lifecycle: a repository update can update an uncustomized instance definition, and
-an instance definition can seed a new workspace. Neither step silently rewrites a customized instance
-definition or an existing workspace.
+- **Definition, binding, and review frame** — maintained in the repository, inherited or customized
+  on the instance, then owned outright by a workspace once adopted.
+- **Inclusion** — an instance decision only. Excluding an entry removes it from what workspaces may
+  adopt and changes nothing that is already adopted.
+- **Autonomy and review scope** — workspace decisions only. A curator never sets either, and a
+  practice Hephaestus cannot review is forced to `OFF`.
+- **Area and order** — repository array order, overridable on the instance, then independent per
+  workspace.
+
+Neither step silently rewrites a customized instance definition or an existing workspace practice.
+The badge tables an administrator reads for both scopes live in the
+[Practice Library admin guide](https://ls1intum.github.io/Hephaestus/admin/practice-library).
 
 | Stakeholder                | Primary task                                                                                                               | Deliberately not their task                      |
 | -------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | Practice author            | Define the habit, guidance, and responsible mentoring support                                                              | Authorize collection or certify review accuracy  |
-| Instance administrator     | Curate the defaults offered to new workspaces                                                                              | Rewrite existing workspace practices             |
+| Instance administrator     | Curate the library workspaces may adopt from                                                                               | Rewrite existing workspace practices             |
 | Workspace administrator    | Adapt practices, set the workspace default autonomy and override it per area or practice, and scope which work is reviewed | Authorize a new data source for the instance     |
 | Instance operator          | Approve source purposes, privacy, retention, and erasure coverage                                                          | Decide that connected evidence proves a practice |
 | Developer, peer, or mentor | Use observations and available human context in a review                                                                   | Supply hidden context to Hephaestus implicitly   |
@@ -108,20 +114,35 @@ bundled definition and order apply. See
 [ADR 0028](https://github.com/ls1intum/Hephaestus/blob/main/docs/decisions/0028-source-synced-practice-catalog.md)
 for the architectural decision.
 
-## Durable invariants
+## Workspace adoption lifecycle
 
-- **Slug is identity.** It participates in provenance and observation recurrence. Change the display name
-  freely; rename a slug only with an explicit remapping strategy.
+- **Slug identifies a workspace practice.** It participates in provenance and observation recurrence.
+  Changing a slug requires an explicit remapping strategy; changing a display name does not.
 - **Definitions and order are independent.** Reordering does not create a definition override or an
   audit event. **Use Hephaestus order** removes custom positions.
-- **Workspace installation happens once.** Later instance changes never rewrite workspace copies.
+- **Automatic installation is keyed on the installation record, not on age.** At startup, a workspace
+  with no `practice_catalog_installation` row receives the whole effective catalogue once. Recording
+  that row is what makes a workspace start empty, and only workspaces created through the workspace
+  API record it today — see [#1362](https://github.com/ls1intum/Hephaestus/issues/1362).
+- **Adoption is deliberate.** Workspace administrators can show the instance library alongside their
+  workspace configuration, inspect a complete effective definition, and add either one practice or all
+  available practices in an area as independent copies. Area adoption is one transaction. Both flows
+  fail when the reviewed definition or resulting workspace configuration has changed.
+- **Area removal is explicit.** Administrators choose whether an area's practices move to Unassigned or
+  are deleted with the area. The library can restore a removed catalog area by moving its matching,
+  unassigned workspace copies back without replacing local edits. Practices deliberately placed in a
+  different area are never moved implicitly.
+- **Adoption does not authorize automatic sending.** A reviewable practice starts at `HUMAN_APPROVAL`
+  (**Review before sending**), while a practice Hephaestus cannot review remains `OFF`. Moving to **Send
+  automatically** is a separate administrator decision; validation evidence does not make that
+  authorization implicitly.
 - **Provenance is descriptive, not referential.** Matched workspace copies retain the source slug and
   comparison fingerprint without a foreign key. A bundled source may have no database row and may
   disappear in a later release.
 - **Unmatched migrated copies remain unlinked.** Backfill links only definitions that still match the
   bundled review rules or area details.
-- **Exclusion affects future workspaces only.** Excluding an area also excludes its practices from new
-  installations; existing workspaces do not change.
+- **Exclusion controls adoption availability.** Excluding an area also removes its practices from the
+  adoption catalogue; existing workspace copies do not change.
 
 Array order in `default-catalog.json` is the bundled order. Until an administrator reorders a list,
 bundled entries continue to follow repository order and instance-created entries append. The first

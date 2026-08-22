@@ -256,3 +256,28 @@ wiring is lost.
 | `/composition-patterns` | Compound components, render props, React 19 API shape |
 | `/web-design-guidelines` | UI accessibility review, UX patterns |
 | `/react-best-practices` | Performance (~40% Next.js-specific — check applicability) |
+
+## Drawer or route
+
+A detail surface goes in a `DetailDrawerStack` level (`src/components/core/detail-drawer/`) only when
+**all four** hold. Fail one and it is a route.
+
+1. **Contextual** — the covered page is why the reader is here, and the column the stack leaves
+   showing is doing work.
+2. **Bounded** — fits in roughly 1.5 viewport-heights at **320 CSS px**, with no lazily-loaded
+   fixed-height widget. Drawer chrome alone costs ~125px, which at the WCAG 1.4.10 reference
+   condition (320×256) leaves ~131px of body.
+3. **Single-decision** — one primary action, reachable without scrolling to the end of the content.
+4. **Cheap to abandon** — dismissal destroys nothing that costs more than a few seconds to recreate.
+   Remember a drawer is dismissed by Escape, by a press on the page, and by a rightward swipe, and
+   that most controls (`Input`, `Textarea`, `Switch`, `Checkbox`) do not claim Escape — so Escape in
+   a text field dismisses the *drawer*.
+
+**The one-question tell: if Escape must ever show a confirmation, it is a route.** A surface whose
+dismissal needs permission is not a dismissible surface. That is why `PracticeDefinitionForm` — ~68
+controls, >=816px of fixed-minimum field height, and a `useBlocker` discard guard — is a route and
+must stay one.
+
+Related trap: `useBlocker`'s `shouldBlockFn` sees `routeId`/`pathname`/`search`, and every drawer
+navigation on one surface shares a route. A guard written as `() => isDirty` will block navigations
+that do **not** unmount the form, so "Discard changes" discards nothing.

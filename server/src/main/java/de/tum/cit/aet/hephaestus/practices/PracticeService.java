@@ -189,12 +189,22 @@ public class PracticeService {
 
     @Transactional
     public Practice createPractice(WorkspaceContext ctx, CreatePracticeRequestDTO request) {
-        return createPractice(ctx, request.slug(), definition(request), null, null);
+        return createPractice(ctx, request.slug(), definition(request), null, null, null);
     }
 
     @Transactional
     public Practice createPracticeFromCatalog(WorkspaceContext ctx, String slug, PracticeDefinition definition) {
-        return createPractice(ctx, slug, definition, slug, definition.provenanceFingerprint(slug));
+        return createPractice(ctx, slug, definition, slug, definition.provenanceFingerprint(slug), null);
+    }
+
+    @Transactional
+    public Practice adoptPracticeFromCatalog(
+        WorkspaceContext ctx,
+        String slug,
+        PracticeDefinition definition,
+        PracticeAutonomy initialAutonomy
+    ) {
+        return createPractice(ctx, slug, definition, slug, definition.provenanceFingerprint(slug), initialAutonomy);
     }
 
     private Practice createPractice(
@@ -202,7 +212,8 @@ public class PracticeService {
         String slug,
         PracticeDefinition definition,
         @Nullable String sourceCuratedSlug,
-        @Nullable String sourceCuratedFingerprint
+        @Nullable String sourceCuratedFingerprint,
+        @Nullable PracticeAutonomy initialAutonomy
     ) {
         if (practiceRepository.existsByWorkspaceIdAndSlug(ctx.id(), slug)) {
             throw new PracticeSlugConflictException(
@@ -234,7 +245,7 @@ public class PracticeService {
         // explicitly, since that's a fact about the practice, not a preference to inherit over.
         practice.setAutonomy(
             definition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()
-                ? null
+                ? initialAutonomy
                 : PracticeAutonomy.OFF
         );
         definitionValidator.validate(definition);
@@ -259,6 +270,16 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
+        if (initialAutonomy != null) {
+            configAudit.record(
+                ConfigAuditEntry.created(
+                    ConfigAuditEntityType.PRACTICE_USAGE,
+                    practice.getId(),
+                    ctx.id(),
+                    new PracticeUsageSnapshot(practice.getAutonomy())
+                )
+            );
+        }
 
         log.info("Created practice '{}' (slug={}) in workspace {}", practice.getName(), practice.getSlug(), ctx.slug());
         return practice;
@@ -331,7 +352,7 @@ public class PracticeService {
         if (request.area() != null) {
             practiceAreaService.applyBinding(ctx, practice, request.area().areaSlug());
         }
-        PracticeAutonomy tierBefore = practice.getAutonomy();
+        PracticeAutonomy autonomyBefore = practice.getAutonomy();
         applyDefinition(practice, afterDefinition);
         if (!afterDefinition.automatedReviewPolicy().automatedReview().canAttemptAutomatedReview()) {
             practice.setAutonomy(PracticeAutonomy.OFF);
@@ -348,13 +369,13 @@ public class PracticeService {
                 PracticeDefinitionSnapshot.of(practice, revisionNumber)
             )
         );
-        if (tierBefore != practice.getAutonomy()) {
+        if (autonomyBefore != practice.getAutonomy()) {
             configAudit.record(
                 ConfigAuditEntry.updated(
                     ConfigAuditEntityType.PRACTICE_USAGE,
                     practice.getId(),
                     ctx.id(),
-                    new PracticeUsageSnapshot(tierBefore),
+                    new PracticeUsageSnapshot(autonomyBefore),
                     new PracticeUsageSnapshot(practice.getAutonomy())
                 )
             );

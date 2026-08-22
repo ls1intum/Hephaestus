@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fn, screen, within } from "storybook/test";
+import { expect, fn, screen, waitFor, within } from "storybook/test";
 import { StatefulPatch } from "@/stories/stateful";
 import { ReviewRunFilters } from "./ReviewRunFilters";
 import type { RunsSearch } from "./review-search";
@@ -95,6 +95,10 @@ export const ChoosingAStatus: Story = {
 
 		await expect(args.onPatch).toHaveBeenCalledWith({ status: "FAILED" });
 		await expect(canvas.getByRole("combobox")).toHaveTextContent("Failed");
+		// Wait for the popup to finish leaving. The accessibility check runs when the play function
+		// returns, and a listbox caught mid-exit has already been detached from the label that names
+		// it — which under a loaded test pool is long enough to be audited.
+		await waitFor(() => expect(screen.queryByRole("listbox")).not.toBeInTheDocument());
 	},
 };
 

@@ -32,6 +32,7 @@ import {
 	DEFAULT_REVIEW_SECTION,
 	reviewSearchSchema,
 } from "@/components/admin/practices/review/review-sections";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
@@ -133,11 +134,7 @@ function HowMuchSection({
 	});
 
 	if (settingsQuery.isPending || rollupQuery.isPending || practicesQuery.isPending) {
-		return (
-			<div className="flex h-64 items-center justify-center">
-				<Spinner className="size-8" />
-			</div>
-		);
+		return <LoadingBlock size="lg" label="Loading review settings" />;
 	}
 
 	const error = settingsQuery.error ?? rollupQuery.error ?? practicesQuery.error;

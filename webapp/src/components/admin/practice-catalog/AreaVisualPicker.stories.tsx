@@ -3,6 +3,7 @@ import { useState } from "react";
 import { expect, fn, screen, userEvent } from "storybook/test";
 import { Button } from "@/components/ui/button";
 import { StatefulPatch } from "@/stories/stateful";
+import { expectGenuinelyDisabled } from "@/test/controls";
 import { AreaVisualPicker, type AreaVisualPickerProps } from "./AreaVisualPicker";
 
 const meta = {
@@ -68,12 +69,16 @@ export const DisabledWhileOpen: Story = {
 		await userEvent.click(
 			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
 		);
+		await userEvent.click(await screen.findByRole("button", { name: "amber" }));
+		await expect(args.onChange).toHaveBeenCalledTimes(1);
 		await userEvent.click(canvas.getByRole("button", { name: "Disable picker" }));
 
-		await expect(
+		await expectGenuinelyDisabled(
 			canvas.getByRole("button", { name: "Edit the icon and color for Code quality" }),
-		).toBeDisabled();
-		await expect(screen.queryByRole("searchbox", { name: "Search icons" })).not.toBeInTheDocument();
-		await expect(args.onChange).not.toHaveBeenCalled();
+		);
+		await expect(screen.queryByRole("textbox", { name: "Search icons" })).not.toBeInTheDocument();
+		// Counted, not merely absent: nothing in this play could reach a swatch, so a bare
+		// "never called" would pass even if disabling did nothing.
+		await expect(args.onChange).toHaveBeenCalledTimes(1);
 	},
 };

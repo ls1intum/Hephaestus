@@ -12,9 +12,9 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { CuratedArea } from "@/api/types.gen";
 import { CuratedAreaForm } from "@/components/admin/curated-catalog/CuratedAreaForm";
+import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageLayout } from "@/components/core/PageLayout";
-import { Spinner } from "@/components/ui/spinner";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
@@ -30,9 +30,7 @@ function EditCuratedAreaPage() {
 	if (areaQuery.isPending) {
 		return (
 			<PageLayout>
-				<div className="flex h-64 items-center justify-center">
-					<Spinner className="size-8" />
-				</div>
+				<LoadingBlock size="lg" label="Loading this area" />
 			</PageLayout>
 		);
 	}
