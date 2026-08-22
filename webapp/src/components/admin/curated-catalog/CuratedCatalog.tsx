@@ -62,7 +62,7 @@ export interface CuratedCatalogProps {
 }
 
 type StatusFilter = "OFFERED" | "NOT_OFFERED" | "ALL";
-type ArtifactFilter = WorkArtifact | "ALL";
+type ArtifactFilter = WorkArtifact;
 
 const STATUS_FILTERS = [
 	{ value: "ALL", label: "All" },

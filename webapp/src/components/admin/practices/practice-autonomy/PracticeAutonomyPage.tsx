@@ -494,7 +494,7 @@ function PracticeAutonomyRow({
 					checked={selected}
 					disabled={!reviewable}
 					aria-label={`Select ${practice.name}`}
-					onCheckedChange={(checked) => onToggle(practice.slug, checked === true)}
+					onCheckedChange={(checked) => onToggle(practice.slug, checked)}
 				/>
 			</ItemMedia>
 			<ItemContent className="min-w-0 gap-0.5">

@@ -85,7 +85,7 @@ export function useAllFeatureFlags(...flags: FeatureFlagName[]) {
 	const { data, isLoading } = useFeatureFlagsQuery();
 
 	return {
-		enabled: data !== undefined && flags.every((f) => data[f] === true),
+		enabled: data !== undefined && flags.every((f) => data[f]),
 		isLoading,
 	};
 }
@@ -102,7 +102,7 @@ export function useAnyFeatureFlags(...flags: FeatureFlagName[]) {
 	const { data, isLoading } = useFeatureFlagsQuery();
 
 	return {
-		enabled: data !== undefined && flags.some((f) => data[f] === true),
+		enabled: data !== undefined && flags.some((f) => data[f]),
 		isLoading,
 	};
 }

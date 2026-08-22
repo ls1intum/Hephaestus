@@ -168,11 +168,7 @@ function DataExportRow() {
 						Download
 					</Button>
 				) : (
-					<Button
-						variant="outline"
-						onClick={() => requestExport.mutate({})}
-						disabled={Boolean(isPreparing)}
-					>
+					<Button variant="outline" onClick={() => requestExport.mutate({})} disabled={isPreparing}>
 						{isPreparing ? <Spinner className="mr-1.5" /> : null}
 						{isFailed ? "Retry export" : "Request export"}
 					</Button>

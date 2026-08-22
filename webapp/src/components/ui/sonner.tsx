@@ -10,7 +10,7 @@ import { useTheme } from "@/integrations/theme";
 
 /** Every toast announces politely, `toast.error` included: sonner exposes no assertive path. */
 const Toaster = ({ ...props }: ToasterProps) => {
-	const { theme = "system" } = useTheme();
+	const { theme } = useTheme();
 
 	return (
 		<Sonner

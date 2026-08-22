@@ -60,7 +60,7 @@ export function ActivityMonitorConfiguration({
 									<Checkbox
 										id={id}
 										checked={filters.repositoryIds.includes(repository.id)}
-										onCheckedChange={(checked) => toggleRepository(repository.id, checked === true)}
+										onCheckedChange={(checked) => toggleRepository(repository.id, checked)}
 									/>
 									<span className="truncate">{repository.nameWithOwner}</span>
 								</Label>

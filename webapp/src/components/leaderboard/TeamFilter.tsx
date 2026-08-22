@@ -20,7 +20,7 @@ export interface TeamFilterProps {
 	selectedTeam?: string;
 }
 
-export function TeamFilter({ options = [], onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
+export function TeamFilter({ options, onTeamChange, selectedTeam = "all" }: TeamFilterProps) {
 	const items = useMemo(() => [{ value: "all", label: "All Teams" }, ...options], [options]);
 
 	return (

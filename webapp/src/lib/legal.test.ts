@@ -93,7 +93,8 @@ describe("resolveLegalContent", () => {
 	) {
 		(globalThis.fetch as ReturnType<typeof vi.fn>).mockImplementation(
 			async (input: RequestInfo | URL) => {
-				const url = typeof input === "string" ? input : input.toString();
+				const url =
+					typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
 				const { status, body = "", contentType = "text/markdown" } = urlMatcher(url);
 				return {
 					ok: status >= 200 && status < 300,

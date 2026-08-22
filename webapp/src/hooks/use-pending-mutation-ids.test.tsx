@@ -44,7 +44,7 @@ function Harness({ releaseFast }: { releaseFast: Promise<void> }) {
 			<button type="button" onClick={() => generated.mutate({ id: 3 })}>
 				start generated
 			</button>
-			<output>{[...pending].sort().join(",")}</output>
+			<output>{[...pending].sort((a, b) => a - b).join(",")}</output>
 		</>
 	);
 }

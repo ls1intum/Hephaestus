@@ -78,14 +78,18 @@ function displayValue(
 		return field === "areaSlug" ? "Unassigned" : "Not set";
 	}
 	if (field === "artifactKind") {
-		return artifactKindLabel(String(value));
+		return artifactKindLabel(typeof value === "string" ? value : JSON.stringify(value));
 	}
 	if (field === "areaSlug" && typeof value === "string") {
 		return areaNames[value] ?? "Area no longer exists";
 	}
 	if ((field === "icon" || field === "color") && typeof value === "string")
 		return humanizeToken(value);
-	return Array.isArray(value) ? value.join("\n") : String(value);
+	if (Array.isArray(value)) return value.join("\n");
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	// A nested object has no readable `toString`; show its shape rather than "[object Object]".
+	return JSON.stringify(value) ?? "Not set";
 }
 
 export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {

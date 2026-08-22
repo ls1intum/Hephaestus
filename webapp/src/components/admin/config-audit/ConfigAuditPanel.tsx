@@ -95,7 +95,7 @@ export function WorkspaceConfigAuditPanel({
 	return <ConfigAuditView search={search} onSearchChange={onSearchChange} listQuery={listQuery} />;
 }
 
-type ConfigAuditListQuery = UseInfiniteQueryResult<InfiniteData<PageConfigAuditEntryView>, Error>;
+type ConfigAuditListQuery = UseInfiniteQueryResult<InfiniteData<PageConfigAuditEntryView>>;
 
 function ConfigAuditView({
 	search,

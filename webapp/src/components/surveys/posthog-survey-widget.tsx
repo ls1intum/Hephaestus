@@ -135,16 +135,16 @@ export function PostHogSurveyWidget({
 		window.addEventListener("popstate", checkUrlChange);
 
 		// Listen to pushState and replaceState (client-side navigation)
-		const originalPushState = window.history.pushState;
-		const originalReplaceState = window.history.replaceState;
+		const originalPushState = window.history.pushState.bind(window.history);
+		const originalReplaceState = window.history.replaceState.bind(window.history);
 
 		window.history.pushState = (...args) => {
-			originalPushState.apply(window.history, args);
+			originalPushState(...args);
 			checkUrlChange();
 		};
 
 		window.history.replaceState = (...args) => {
-			originalReplaceState.apply(window.history, args);
+			originalReplaceState(...args);
 			checkUrlChange();
 		};
 
@@ -481,7 +481,7 @@ const transformResponseValue = (question: SurveyQuestion, response: SurveyRespon
 		}
 		default:
 			if (Array.isArray(response)) {
-				return response.map((value) => value.toString());
+				return response.map((value) => value);
 			}
 			return String(response);
 	}

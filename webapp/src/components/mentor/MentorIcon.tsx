@@ -157,7 +157,9 @@ export function MentorIcon({
 					<circle
 						className={
 							animated
-								? `${streaming ? `mentor-ping-fast-${uniqueId}` : `mentor-ping-${uniqueId}`}`
+								? streaming
+									? `mentor-ping-fast-${uniqueId}`
+									: `mentor-ping-${uniqueId}`
 								: undefined
 						}
 						cx="12"

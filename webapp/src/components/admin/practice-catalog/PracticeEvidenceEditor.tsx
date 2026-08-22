@@ -293,7 +293,7 @@ function AbsenceClaim({ source, role, controlId, disabled, onRoleChange }: Absen
 				id={checkboxId}
 				disabled={disabled}
 				checked={claimed}
-				onCheckedChange={(checked) => onRoleChange(checked === true ? "EXHAUSTIVE" : "REQUIRED")}
+				onCheckedChange={(checked) => onRoleChange(checked ? "EXHAUSTIVE" : "REQUIRED")}
 				aria-describedby={scopeId}
 			/>
 			{/* Label and description are siblings, never nested: a `<label>` takes phrasing content only,

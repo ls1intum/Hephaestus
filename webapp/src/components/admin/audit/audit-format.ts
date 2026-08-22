@@ -79,8 +79,10 @@ export function humanizeDetails(details: string | undefined): string | null {
 
 function stringify(value: unknown): string {
 	if (value === null || value === undefined) return "—";
-	if (typeof value === "object") return JSON.stringify(value);
-	return String(value);
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	// Anything else is decoded JSON: an object or array, whose default `toString` is "[object Object]".
+	return JSON.stringify(value) ?? "—";
 }
 
 const SEVERITY_DOT: Record<AuditSeverity, string> = {

@@ -172,7 +172,7 @@ export function AuthAuditPanel({
 				isError={listQuery.isError}
 				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
-				hasNextPage={Boolean(listQuery.hasNextPage)}
+				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
 				onLoadMore={() => listQuery.fetchNextPage()}
 				onRetry={() => listQuery.refetch()}

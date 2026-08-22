@@ -29,7 +29,7 @@ export const WORK_ARTIFACT_FILTER_OPTIONS = [
  * because a Base UI `Select` must hold one, and it is the sentinel the URL already carries.
  */
 export const WORK_ARTIFACT_FILTER_ITEMS: {
-	value: "ALL" | ArtifactKindId;
+	value: ArtifactKindId;
 	label: string;
 }[] = [{ value: "ALL", label: "All work types" }, ...WORK_ARTIFACT_FILTER_OPTIONS];
 

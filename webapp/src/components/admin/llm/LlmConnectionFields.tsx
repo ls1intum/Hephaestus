@@ -165,7 +165,7 @@ export function LlmConnectionFields({
 						<Checkbox
 							id={responsesApiId}
 							checked={value.useResponsesApi}
-							onCheckedChange={(checked) => update({ useResponsesApi: checked === true })}
+							onCheckedChange={(checked) => update({ useResponsesApi: checked })}
 						/>
 						<FieldContent>
 							<FieldLabel htmlFor={responsesApiId} className="font-normal">
@@ -245,7 +245,7 @@ export function LlmConnectionFields({
 							id={clearApiKeyId}
 							checked={value.clearApiKey}
 							onCheckedChange={(checked) =>
-								update({ clearApiKey: checked === true, ...(checked === true && { apiKey: "" }) })
+								update({ clearApiKey: checked, ...(checked && { apiKey: "" }) })
 							}
 						/>
 						<FieldContent>
