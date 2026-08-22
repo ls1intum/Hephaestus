@@ -57,8 +57,6 @@ class PracticeAreaTrendControllerIntegrationTest extends AbstractWorkspaceIntegr
         practice.setSlug("small-functions");
         practice.setName("Keep functions small");
         practice.setCriteria("Keep functions focused on one concern.");
-        practice.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        practice.setActive(true);
         practiceRepository.save(practice);
     }
 

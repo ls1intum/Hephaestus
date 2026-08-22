@@ -271,9 +271,7 @@ public class GitHubGraphQlConfig {
 
                     if (status.is5xxServerError() || status.value() == 429) {
                         // Release the body to prevent a resource leak on the discarded response
-                        return response
-                            .releaseBody()
-                            .then(Mono.<ClientResponse>error(new RetryableException(status.value())));
+                        return response.releaseBody().then(Mono.error(new RetryableException(status.value())));
                     }
 
                     return Mono.just(response);

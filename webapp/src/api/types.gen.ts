@@ -3260,7 +3260,7 @@ export type PracticeAreaTrend = {
 };
 
 /**
- * A developer's derived qualitative standing for one practice area
+ * A developer's derived qualitative standing for one Area including 1<=n<many practices
  */
 export type PracticeAreaStatus = {
     /**
@@ -3314,7 +3314,7 @@ export type PracticeAreaStatus = {
  */
 export type FeedbackSourceCount = {
     /**
-     * Distinct artifacts of this kind in the window
+     * Distinct artifacts of this kind in the selected time period
      */
     count: number;
     /**

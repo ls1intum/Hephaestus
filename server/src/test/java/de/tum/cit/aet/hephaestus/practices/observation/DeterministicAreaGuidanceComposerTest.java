@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import java.util.List;
@@ -54,10 +56,7 @@ class DeterministicAreaGuidanceComposerTest {
     }
 
     @ParameterizedTest
-    @EnumSource(
-        value = PracticeAreaStatusDTO.AreaStatus.class,
-        names = { "NOT_OBSERVED", "NO_OPPORTUNITY", "LOW_CONFIDENCE" }
-    )
+    @EnumSource(value = PracticeAreaStatusDTO.AreaStatus.class, names = { "NOT_OBSERVED", "NO_OPPORTUNITY" })
     void shouldReturnNoGuidanceForEveryNonVerdictStatus(PracticeAreaStatusDTO.AreaStatus status) {
         assertThat(DeterministicAreaGuidanceComposer.compose(status, List.of())).isNull();
     }
@@ -115,6 +114,15 @@ class DeterministicAreaGuidanceComposerTest {
     }
 
     private static ReflectionItemDTO item() {
-        return new ReflectionItemDTO(UUID.randomUUID(), "Finding", null, null, ArtifactKinds.PULL_REQUEST, 1L, null);
+        return new ReflectionItemDTO(
+            UUID.randomUUID(),
+            "Finding",
+            null,
+            null,
+            ArtifactKinds.PULL_REQUEST,
+            1L,
+            null,
+            ObservationOrigin.LIVE
+        );
     }
 }

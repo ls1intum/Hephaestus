@@ -2,14 +2,14 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
@@ -19,12 +19,17 @@ import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrendService;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendProperties;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaults;
+import de.tum.cit.aet.hephaestus.practices.review.WorkspaceReviewDefaultsProvider;
+import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -54,10 +59,16 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     private FeedbackObservationRepository feedbackObservationRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private CurrentDeveloperLookup currentDeveloperLookup;
 
     @Mock
     private PracticeRepository practiceRepository;
+
+    @Mock
+    private ObservationVisibilityPolicy visibilityPolicy;
+
+    @Mock
+    private WorkspaceReviewDefaultsProvider workspaceReviewDefaultsProvider;
 
     @Mock
     private Clock clock;
@@ -66,17 +77,28 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
 
     @BeforeEach
     void setUp() {
-        User user = new User();
-        user.setId(USER_ID);
-        when(userRepository.getCurrentUser()).thenReturn(Optional.of(user));
+        when(currentDeveloperLookup.currentDeveloperId()).thenReturn(Optional.of(USER_ID));
         when(clock.instant()).thenReturn(NOW);
+        // Consent is decided elsewhere and has its own tests; here every observation is permitted so the
+        // sort under test sees the full set. Echoing the argument keeps a filtered-out fixture impossible.
+        lenient()
+            .when(visibilityPolicy.permitsAll(anyLong(), any(), any()))
+            .thenAnswer(invocation -> {
+                Collection<Observation> observations = invocation.getArgument(1);
+                return observations.stream().map(Observation::getId).collect(Collectors.toSet());
+            });
+        lenient()
+            .when(workspaceReviewDefaultsProvider.forWorkspace(WORKSPACE_ID))
+            .thenReturn(WorkspaceReviewDefaults.UNSET);
         // The trend service is REAL, not a mock: the standing rule reads the recent-evidence streak off its
         // result, so a stub would assert the mock's shape instead of the rule.
         practiceReflectionService = new PracticeReflectionService(
             observationRepository,
             feedbackObservationRepository,
-            userRepository,
+            currentDeveloperLookup,
+            visibilityPolicy,
             practiceRepository,
+            workspaceReviewDefaultsProvider,
             new PracticeTrendService(new TrendProperties(), clock),
             clock
         );
@@ -109,11 +131,10 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             .artifactId(artifactId)
             .agentJobId(runOf(artifactId))
             .observedAt(observedAtOf(artifactId))
-            .title("a problem")
+            .summary("a problem")
             .presence(Presence.ABSENT)
             .assessment(Assessment.BAD)
             .severity(severity)
-            .confidence(confidence)
             .recurrenceKey(recurrenceKey)
             .build();
     }
@@ -127,10 +148,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
             .artifactId(artifactId)
             .agentJobId(runOf(artifactId))
             .observedAt(observedAtOf(artifactId))
-            .title("a strength")
+            .summary("a strength")
             .presence(Presence.PRESENT)
             .assessment(Assessment.GOOD)
-            .confidence(0.9f)
             .build();
     }
 
@@ -167,7 +187,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, Severity.MAJOR, 0.9f, 41L), good(practice, 42L), good(practice, 43L)));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -190,7 +212,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, Severity.MAJOR, 0.9f, 41L), good(practice, 42L)));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -214,7 +238,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(bad(practice, null), bad(practice, Severity.CRITICAL)));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -246,7 +272,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(lowConfCritical, confidentMinor));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -275,7 +303,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(q1, q2));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -300,7 +330,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(minorTargetB, criticalTargetA));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -328,7 +360,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(lowConfLocusA, confidentLocusB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 
@@ -358,7 +392,9 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
                 any(Pageable.class)
             )
         ).thenReturn(List.of(locusOnA, locusOnB));
-        when(feedbackObservationRepository.findLatestAdviceBodiesByObservationIds(any())).thenReturn(List.of());
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
 
         List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
 

@@ -2,8 +2,8 @@ package de.tum.cit.aet.hephaestus.practices.feedback;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.core.exception.EntityNotFoundException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.dto.FeedbackHelpfulnessVoteDTO;
+import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +17,7 @@ public class FeedbackHelpfulnessVoteService {
 
     private final FeedbackRepository feedbackRepository;
     private final FeedbackHelpfulnessVoteRepository voteRepository;
-    private final UserRepository userRepository;
+    private final CurrentDeveloperLookup currentDeveloperLookup;
 
     @Transactional
     public FeedbackHelpfulnessVoteDTO upsert(WorkspaceContext workspaceContext, UUID feedbackId, boolean helpful) {
@@ -39,7 +39,7 @@ public class FeedbackHelpfulnessVoteService {
         Feedback feedback = feedbackRepository
             .findByIdAndWorkspaceId(feedbackId, workspaceContext.id())
             .orElseThrow(() -> new EntityNotFoundException("Feedback", feedbackId.toString()));
-        Long currentUserId = userRepository.getCurrentUserElseThrow().getId();
+        Long currentUserId = currentDeveloperLookup.currentDeveloperIdElseThrow();
         if (!feedback.getRecipientUserId().equals(currentUserId)) {
             throw new AccessForbiddenException("Only the feedback recipient can rate its usefulness");
         }

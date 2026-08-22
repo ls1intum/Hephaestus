@@ -10,13 +10,13 @@ import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
 /**
- * The current developer's derived standing for one practice area — the area's reflection feedback
+ * The current developer's derived standing for one area. The area's reflection feedback
  * aggregated to a single qualitative status, with the supporting items so the status stays traceable
  * to real findings rather than an opaque grade. Like the reflection surface it is a learner-facing
  * read model, NOT a scoreboard: no raw score, no observation enums, no criteria. The feedback span
  * and trajectory are provenance about the derivation, not scores about the developer.
  */
-@Schema(description = "A developer's derived qualitative standing for one practice area")
+@Schema(description = "A developer's derived qualitative standing for one Area including 1<=n<many practices")
 public record PracticeAreaStatusDTO(
     @NonNull @Schema(description = "Area slug") String areaSlug,
     @NonNull @Schema(description = "Area name") String areaName,

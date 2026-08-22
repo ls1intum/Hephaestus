@@ -8,8 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
-import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
+import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import de.tum.cit.aet.hephaestus.workspace.context.WorkspaceContext;
 import java.time.Instant;
@@ -33,14 +32,14 @@ class FeedbackHelpfulnessVoteServiceTest extends BaseUnitTest {
     private FeedbackHelpfulnessVoteRepository voteRepository;
 
     @Mock
-    private UserRepository userRepository;
+    private CurrentDeveloperLookup currentDeveloperLookup;
 
     private FeedbackHelpfulnessVoteService service;
     private WorkspaceContext workspaceContext;
 
     @BeforeEach
     void setUp() {
-        service = new FeedbackHelpfulnessVoteService(feedbackRepository, voteRepository, userRepository);
+        service = new FeedbackHelpfulnessVoteService(feedbackRepository, voteRepository, currentDeveloperLookup);
         workspaceContext = new WorkspaceContext(
             WORKSPACE_ID,
             "test-workspace",
@@ -56,11 +55,10 @@ class FeedbackHelpfulnessVoteServiceTest extends BaseUnitTest {
     @Test
     void shouldStoreHelpfulnessWhenFeedbackIsDeliveredToCurrentUser() {
         Feedback feedback = deliveredFeedback(RECIPIENT_ID);
-        User currentUser = user(RECIPIENT_ID);
         FeedbackHelpfulnessVote storedVote = mock(FeedbackHelpfulnessVote.class);
         Instant updatedAt = Instant.parse("2026-08-17T08:00:00Z");
         when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(Optional.of(feedback));
-        when(userRepository.getCurrentUserElseThrow()).thenReturn(currentUser);
+        when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(RECIPIENT_ID);
         when(voteRepository.findById(FEEDBACK_ID)).thenReturn(Optional.of(storedVote));
         when(storedVote.getFeedbackId()).thenReturn(FEEDBACK_ID);
         when(storedVote.getHelpful()).thenReturn(true);
@@ -79,7 +77,7 @@ class FeedbackHelpfulnessVoteServiceTest extends BaseUnitTest {
         when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
             Optional.of(deliveredFeedback(RECIPIENT_ID))
         );
-        when(userRepository.getCurrentUserElseThrow()).thenReturn(user(99L));
+        when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(99L);
 
         assertThatThrownBy(() -> service.upsert(workspaceContext, FEEDBACK_ID, false))
             .isInstanceOf(AccessForbiddenException.class)
@@ -96,7 +94,7 @@ class FeedbackHelpfulnessVoteServiceTest extends BaseUnitTest {
             .deliveryState(FeedbackDeliveryState.SUPPRESSED)
             .build();
         when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(Optional.of(feedback));
-        when(userRepository.getCurrentUserElseThrow()).thenReturn(user(RECIPIENT_ID));
+        when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(RECIPIENT_ID);
 
         assertThatThrownBy(() -> service.upsert(workspaceContext, FEEDBACK_ID, true))
             .isInstanceOf(IllegalArgumentException.class)
@@ -109,7 +107,7 @@ class FeedbackHelpfulnessVoteServiceTest extends BaseUnitTest {
         when(feedbackRepository.findByIdAndWorkspaceId(FEEDBACK_ID, WORKSPACE_ID)).thenReturn(
             Optional.of(deliveredFeedback(RECIPIENT_ID))
         );
-        when(userRepository.getCurrentUserElseThrow()).thenReturn(user(RECIPIENT_ID));
+        when(currentDeveloperLookup.currentDeveloperIdElseThrow()).thenReturn(RECIPIENT_ID);
 
         service.delete(workspaceContext, FEEDBACK_ID);
 
@@ -123,11 +121,5 @@ class FeedbackHelpfulnessVoteServiceTest extends BaseUnitTest {
             .recipientUserId(recipientId)
             .deliveryState(FeedbackDeliveryState.DELIVERED)
             .build();
-    }
-
-    private User user(Long id) {
-        User user = new User();
-        user.setId(id);
-        return user;
     }
 }

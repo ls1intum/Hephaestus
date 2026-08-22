@@ -374,6 +374,13 @@ erDiagram
         TIMESTAMPTZ decided_at "NOT NULL"
     }
 
+    FeedbackHelpfulnessVote {
+        UUID feedback_id PK,FK
+        BOOLEAN helpful "NOT NULL"
+        TIMESTAMPTZ created_at "NOT NULL"
+        TIMESTAMPTZ updated_at "NOT NULL"
+    }
+
     FeedbackObservation {
         UUID feedback_id PK,FK
         UUID observation_id PK,FK
@@ -1430,6 +1437,7 @@ erDiagram
     %% One-to-One relationships
     ChatMessage ||--|| ChatMessageVote : has
     DiscussionComment ||--|| Discussion : references
+    Feedback ||--|| FeedbackHelpfulnessVote : has
     PracticeRevision ||--|| Practice : references
     Workspace ||--|| PracticeCatalogInstallation : has
     PullRequestReviewComment ||--|| PullRequestReviewThread : reviewed

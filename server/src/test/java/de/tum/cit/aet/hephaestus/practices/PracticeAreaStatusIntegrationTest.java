@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackDeliveryState;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSource;
+import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.observation.AreaGuidanceProvider;
@@ -102,8 +103,6 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         p.setSlug(slug);
         p.setName(name);
         p.setCriteria("Description for " + slug);
-        p.setTriggerEvents(OBJECT_MAPPER.valueToTree(List.of("PullRequestCreated")));
-        p.setActive(true);
         p.setArea(boundArea);
         return practiceRepository.save(p);
     }
@@ -190,11 +189,11 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
             presence,
             "PRESENT".equals(presence) ? "GOOD" : "BAD",
             severity,
-            confidence,
             null,
             "Test reasoning for " + title,
             null,
-            observedAt
+            observedAt,
+            "LIVE"
         );
         return id;
     }
@@ -627,7 +626,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         @WithUser
         @DisplayName("returns statuses for active areas only")
         void shouldReturnStatusesForActiveAreasOnly() {
-            area.setActive(false);
+            area.setVisibleInPracticeDashboards(false);
             areaRepository.saveAndFlush(area);
 
             webTestClient

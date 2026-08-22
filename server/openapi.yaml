@@ -9468,7 +9468,7 @@ components:
         count:
           type: integer
           format: int64
-          description: Distinct artifacts of this kind in the window
+          description: Distinct artifacts of this kind in the selected time period
         source:
           type: string
           description: The kind of work the feedback came from
@@ -11176,7 +11176,8 @@ components:
       - reviewedAt
     PracticeAreaStatus:
       type: object
-      description: A developer's derived qualitative standing for one practice area
+      description: A developer's derived qualitative standing for one Area including
+        1<=n<many practices
       properties:
         areaName:
           type: string
