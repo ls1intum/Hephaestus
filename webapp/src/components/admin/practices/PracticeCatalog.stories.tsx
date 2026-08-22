@@ -235,10 +235,15 @@ export const PracticeLibraryLoading: Story = {
 		library: { open: true, onOpenChange: fn(), state: { status: "loading" } },
 	},
 	play: async ({ canvas }) => {
-		// Scoped to the section: the page carries other live regions, and LoadingBlock puts its
-		// label in the region's content rather than in an accessible name.
+		// A skeleton, not a spinner: the region holds the shape the rows will take, so nothing jumps
+		// when they arrive. It is `aria-hidden`, so the assertion is on the DOM rather than a role.
 		const library = within(canvas.getByRole("region", { name: "Practice library" }));
-		await expect(library.getByRole("status")).toHaveTextContent("Loading the practice library");
+		await expect(library.queryByRole("status")).not.toBeInTheDocument();
+		await expect(
+			canvas
+				.getByRole("region", { name: "Practice library" })
+				.querySelectorAll('[data-slot="skeleton"]').length,
+		).toBeGreaterThan(0);
 	},
 };
 

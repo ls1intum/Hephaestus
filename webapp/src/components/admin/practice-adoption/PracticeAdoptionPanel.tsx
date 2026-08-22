@@ -2,9 +2,8 @@ import { CircleAlert, Copy, ShieldCheck } from "lucide-react";
 import type { CatalogPracticePreview, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
-import { PracticeAutomatedReviewValidationBadge } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { DetailRow } from "@/components/common/DetailRow";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
@@ -99,30 +98,31 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 					</Alert>
 				)}
 
-				{!unavailable && (
-					<Section size="sm" title="Adding this practice will">
-						<ItemGroup className="gap-2">
-							<Item variant="muted" size="sm" role="listitem">
-								<ItemMedia variant="icon">
-									<Copy />
-								</ItemMedia>
-								<ItemContent>
-									<ItemTitle>Create a copy this workspace owns</ItemTitle>
-									<ItemDescription>Edit it without changing the catalog.</ItemDescription>
-								</ItemContent>
-							</Item>
-							<AreaOutcome preview={preview} />
-							<AutonomyOutcome preview={preview} />
-						</ItemGroup>
-						<PracticeAutomatedReviewValidationBadge
-							validation={preview.definition.automatedReviewValidation}
-						/>
-					</Section>
-				)}
-
-				<Separator />
-
 				<PracticeDefinitionPreview definition={preview.definition} options={definitionOptions} />
+
+				{!unavailable && (
+					<>
+						<Separator />
+						<Section size="sm" title="Adding this practice will">
+							<ItemGroup className="gap-2">
+								<Item variant="muted" size="sm" role="listitem">
+									<ItemMedia variant="icon">
+										<Copy />
+									</ItemMedia>
+									<ItemContent>
+										<ItemTitle>Create a copy this workspace owns</ItemTitle>
+										<ItemDescription>
+											Edit it freely. Later catalog changes never reach it, and yours never reach
+											the catalog.
+										</ItemDescription>
+									</ItemContent>
+								</Item>
+								<AreaOutcome preview={preview} />
+								<AutonomyOutcome preview={preview} />
+							</ItemGroup>
+						</Section>
+					</>
+				)}
 
 				<Accordion aria-label="Catalog provenance">
 					<AccordionItem value="catalog-details">
@@ -177,7 +177,7 @@ function PracticeAdoptionPlaceholder({
 			</DetailDrawerHeader>
 			<DrawerBody>
 				{state.status === "loading" ? (
-					<LoadingBlock size="sm" label="Loading adoption preview" />
+					<PracticeDefinitionSkeleton />
 				) : (
 					<QueryErrorAlert
 						error={state.error}

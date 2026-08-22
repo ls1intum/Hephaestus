@@ -11,7 +11,7 @@ import {
 	CuratedPracticeForm,
 	type CuratedPracticeFormValue,
 } from "@/components/admin/curated-catalog/CuratedPracticeForm";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageLayout } from "@/components/core/PageLayout";
 import { instanceAdminHead } from "@/lib/page-title";
@@ -41,7 +41,7 @@ function NewCuratedPracticePage() {
 	if (catalogQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PageLayout>
-				<LoadingBlock size="lg" label="Loading the practice form" />
+				<PracticeDefinitionSkeleton />
 			</PageLayout>
 		);
 	}

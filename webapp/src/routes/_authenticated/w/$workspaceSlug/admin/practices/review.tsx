@@ -25,6 +25,7 @@ import {
 	type PracticeReviewWorkspaceUpdate,
 } from "@/components/admin/practices/PracticeReviewSettings";
 import { PracticeReviewSweepSchedule } from "@/components/admin/practices/PracticeReviewSweepSchedule";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { PracticeAutonomyPage } from "@/components/admin/practices/practice-autonomy/PracticeAutonomyPage";
 import { ReviewPage } from "@/components/admin/practices/review/ReviewPage";
 import type { ReviewRunningState } from "@/components/admin/practices/review/review-readiness";
@@ -32,7 +33,6 @@ import {
 	DEFAULT_REVIEW_SECTION,
 	reviewSearchSchema,
 } from "@/components/admin/practices/review/review-sections";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Spinner } from "@/components/ui/spinner";
@@ -134,7 +134,7 @@ function HowMuchSection({
 	});
 
 	if (settingsQuery.isPending || rollupQuery.isPending || practicesQuery.isPending) {
-		return <LoadingBlock size="lg" label="Loading review settings" />;
+		return <PracticeDefinitionSkeleton />;
 	}
 
 	const error = settingsQuery.error ?? rollupQuery.error ?? practicesQuery.error;

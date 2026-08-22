@@ -78,7 +78,9 @@ export const UpdateChangesReviewBehavior: Story = {
 		await expect(canvas.getAllByText("· captured whole").length).toBeGreaterThan(0);
 		expect(canvas.getAllByText("AI-supported mentoring").length).toBeGreaterThan(0);
 		await expect(canvas.getAllByText("Pull request details").length).toBeGreaterThan(0);
-		await expect(canvas.getByText("Not independently validated")).toBeVisible();
+		await expect(
+			canvas.getByText(/Nobody has measured how often this practice is right/),
+		).toBeVisible();
 		await expect(
 			canvas.getByText("Repository evidence does not establish behavior in a deployed runtime."),
 		).toBeVisible();

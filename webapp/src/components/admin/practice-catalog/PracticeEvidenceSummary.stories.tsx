@@ -37,7 +37,9 @@ type Story = StoryObj<typeof meta>;
  */
 export const AuthorDeclared: Story = {
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("Not independently validated")).toBeVisible();
+		await expect(
+			canvas.getByText(/Nobody has measured how often this practice is right/),
+		).toBeVisible();
 		await expect(canvas.getByText(/^Rules/)).toHaveTextContent(
 			"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
 		);

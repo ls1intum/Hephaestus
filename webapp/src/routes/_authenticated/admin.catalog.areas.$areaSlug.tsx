@@ -12,7 +12,7 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { CuratedArea } from "@/api/types.gen";
 import { CuratedAreaForm } from "@/components/admin/curated-catalog/CuratedAreaForm";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageLayout } from "@/components/core/PageLayout";
 import { instanceAdminHead } from "@/lib/page-title";
@@ -30,7 +30,7 @@ function EditCuratedAreaPage() {
 	if (areaQuery.isPending) {
 		return (
 			<PageLayout>
-				<LoadingBlock size="lg" label="Loading this area" />
+				<PracticeDefinitionSkeleton />
 			</PageLayout>
 		);
 	}

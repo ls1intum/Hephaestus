@@ -27,7 +27,7 @@ import {
 	reorderCuratedAreas,
 	reorderCuratedPractices,
 } from "@/components/admin/curated-catalog/curated-catalog-cache";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { PracticeTreeSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
@@ -264,7 +264,7 @@ function AdminCuratedCatalogPage() {
 			/>
 
 			{catalogQuery.isPending ? (
-				<LoadingBlock size="lg" label="Loading the practice library" />
+				<PracticeTreeSkeleton areas={3} practicesPerArea={3} />
 			) : catalogQuery.isError ? (
 				<QueryErrorAlert
 					error={catalogQuery.error}

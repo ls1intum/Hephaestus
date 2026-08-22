@@ -30,6 +30,9 @@ export function useDetailStack(stack: DetailStackEntry[]): DetailStackControls {
 				detail: encodeDetailStack(next),
 			}),
 			state: (previous) => ({ ...previous, detailPush }),
+			// The stack is UI state on the same page. Without this the router treats a search-only push
+			// as a new location and scrolls to the top, so opening a panel from row 40 loses your place.
+			resetScroll: false,
 		});
 	};
 

@@ -21,7 +21,7 @@ import {
 	SortableCatalogTree,
 	UNASSIGNED_CATALOG_BUCKET,
 } from "@/components/admin/practice-catalog/SortableCatalogTree";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Section } from "@/components/core/Section";
@@ -180,7 +180,7 @@ export function PracticeCatalog({
 							existingAreaSlugs={new Set(areas.map((area) => area.slug))}
 						/>
 					) : (
-						<LoadingBlock size="sm" label="Loading the practice library" />
+						<PracticeListSkeleton rows={4} />
 					)}
 				</Section>
 			)}

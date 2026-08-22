@@ -7,6 +7,7 @@ import {
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
+import { realPracticeDefinition } from "@/mocks/fixtures/practice-catalog";
 import { PracticeDefinitionPreview } from "./PracticeDefinitionPreview";
 
 const definition: CuratedPracticeDefinition = {
@@ -26,14 +27,22 @@ const meta = {
 	title: "Workspace admin/Practice adoption/Definition preview",
 	component: PracticeDefinitionPreview,
 	parameters: { layout: "padded", chromatic: { viewports: [320, 1440] } },
-	args: { definition, options: mockPracticeDefinitionOptions },
+	// The real thing by default: a 511-character rationale and a 5,049-character composed rule. The
+	// short invented copy is kept as `Minimal`, because it is the case, not the norm.
+	args: { definition: realPracticeDefinition, options: mockPracticeDefinitionOptions },
 	tags: ["autodocs"],
 } satisfies Meta<typeof PracticeDefinitionPreview>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+/** The short end of the range — the shape still has to hold when a practice says little. */
+export const Minimal: Story = {
+	args: { definition },
+};
+
 export const Complete: Story = {
+	args: { definition },
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByText("Pull request details")).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/hasDescription/)).not.toBeInTheDocument();
@@ -106,10 +115,10 @@ export const CriteriaIsMarkdown: Story = {
  */
 export const RationaleLeadsTheRuleFollows: Story = {
 	play: async ({ canvas }) => {
-		const rationale = canvas.getByText(definition.whyItMatters as string);
+		const rationale = canvas.getByText(realPracticeDefinition.whyItMatters as string);
 		await expect(rationale).toBeVisible();
 		// Collapsed, so none of the rule's text is in the accessible tree until it is asked for.
-		await expect(canvas.queryByText(/Confirm the pull request explains/)).not.toBeInTheDocument();
+		await expect(canvas.queryByText(/## The standard/)).not.toBeInTheDocument();
 		// ...and the rationale precedes every disclosure in document order.
 		const rule = canvas.getByRole("button", { name: "How it decides" });
 		await expect(
@@ -120,9 +129,9 @@ export const RationaleLeadsTheRuleFollows: Story = {
 
 /** A practice may carry only one of the two guidance fields; nothing above may collapse without it. */
 export const RationaleOnly: Story = {
-	args: { definition: { ...definition, whatGoodLooksLike: undefined } },
+	args: { definition: { ...realPracticeDefinition, whatGoodLooksLike: undefined } },
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText(definition.whyItMatters as string)).toBeVisible();
+		await expect(canvas.getByText(realPracticeDefinition.whyItMatters as string)).toBeVisible();
 		await expect(
 			canvas.queryByRole("heading", { name: "What good looks like" }),
 		).not.toBeInTheDocument();

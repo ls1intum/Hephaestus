@@ -62,7 +62,7 @@ export function PracticeDefinitionPreview({ definition, options }: PracticeDefin
 							sources={workType?.allowedSources ?? []}
 							signals={workType?.signals ?? []}
 							workTypeLabel={artifactKindLabel(definition.artifactKind)}
-							showValidation={false}
+							showValidation
 						/>
 					</AccordionContent>
 				</AccordionItem>

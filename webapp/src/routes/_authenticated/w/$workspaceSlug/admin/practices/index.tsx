@@ -1,5 +1,5 @@
 import { useMutation, useQueries, useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, retainSearchParams, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, retainSearchParams } from "@tanstack/react-router";
 import { ListChecks } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -24,13 +24,13 @@ import { AreaAdoptionPanel } from "@/components/admin/practice-adoption/AreaAdop
 import { PracticeAdoptionPanel } from "@/components/admin/practice-adoption/PracticeAdoptionPanel";
 import { generateSlug } from "@/components/admin/practice-catalog/constants";
 import { type FocusFilter, PracticeCatalog } from "@/components/admin/practices/PracticeCatalog";
+import { PracticeTreeSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import {
 	type DETAIL_LEVEL_KINDS,
 	PRACTICE_SEARCH_PARAMS,
 	practiceSetupSearchSchema,
 } from "@/components/admin/practices/practice-search";
 import { WorkspacePracticePanel } from "@/components/admin/practices/WorkspacePracticePanel";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerStack } from "@/components/core/detail-drawer/DetailDrawerStack";
 import { detailStackKey, parseDetailStack } from "@/components/core/detail-drawer/detail-stack";
@@ -51,6 +51,7 @@ import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { workspaceAdminHead } from "@/lib/page-title";
 import { problemStatusOf } from "@/lib/problem-detail";
+import { useSearchState } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/practices/")({
 	head: workspaceAdminHead("Practices"),
@@ -62,7 +63,7 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/admin/pra
 function PracticeCatalogRoute() {
 	const { workspaceSlug } = Route.useParams();
 	const { focus, library, detail } = Route.useSearch();
-	const navigate = useNavigate({ from: Route.fullPath });
+	const setSearch = useSearchState();
 
 	const [deletingArea, setDeletingArea] = useState<PracticeArea | null>(null);
 	const [deletingPractice, setDeletingPractice] = useState<Practice | null>(null);
@@ -184,7 +185,7 @@ function PracticeCatalogRoute() {
 				}
 			/>
 			{areasQuery.isPending || practicesQuery.isPending || definitionOptionsQuery.isPending ? (
-				<LoadingBlock size="lg" label="Loading practices" />
+				<PracticeTreeSkeleton areas={3} practicesPerArea={3} />
 			) : areasQuery.isError || practicesQuery.isError || definitionOptionsQuery.isError ? (
 				<QueryErrorAlert
 					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
@@ -213,9 +214,7 @@ function PracticeCatalogRoute() {
 					library={{
 						open: library === true,
 						onOpenChange: (open) =>
-							navigate({
-								search: (previous) => ({ ...previous, library: open || undefined }),
-							}),
+							setSearch((previous) => ({ ...previous, library: open || undefined })),
 						state: catalogQuery.isError
 							? {
 									status: "error",
@@ -227,12 +226,10 @@ function PracticeCatalogRoute() {
 								: { status: "loading" },
 					}}
 					onFocusFilterChange={(next: FocusFilter) =>
-						navigate({
-							search: (previous) => ({
-								...previous,
-								focus: next === "ALL" ? undefined : next,
-							}),
-						})
+						setSearch((previous) => ({
+							...previous,
+							focus: next === "ALL" ? undefined : next,
+						}))
 					}
 					onCreateArea={async ({ name, icon, color }) => {
 						try {

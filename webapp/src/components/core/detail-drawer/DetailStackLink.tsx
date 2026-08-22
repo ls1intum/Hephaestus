@@ -1,7 +1,8 @@
 import { Link, type LinkComponentProps } from "@tanstack/react-router";
 import { type DetailStackEntry, detailStackKey } from "./detail-stack";
 
-export interface DetailStackLinkProps extends Omit<LinkComponentProps<"a">, "to" | "search"> {
+export interface DetailStackLinkProps
+	extends Omit<LinkComponentProps<"a">, "to" | "search" | "resetScroll"> {
 	entry: DetailStackEntry;
 }
 
@@ -20,6 +21,9 @@ export function DetailStackLink({ entry, ...props }: DetailStackLinkProps) {
 			})}
 			// See `useDetailStack`: marks the entry as this visit's, so a dismiss can go back.
 			state={(previous) => ({ ...previous, detailPush: true })}
+			// Omitted from the props above too: opening a panel must never move the page underneath it,
+			// and a caller that could pass this could reintroduce that.
+			resetScroll={false}
 			{...props}
 		/>
 	);

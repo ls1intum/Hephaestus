@@ -9,11 +9,11 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { CreatePracticeRequest, Practice } from "@/api/types.gen";
 import { PracticeForm, PracticeFormShell } from "@/components/admin/practices/PracticeForm";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import {
 	PRACTICE_SEARCH_PARAMS,
 	practiceSearchSchema,
 } from "@/components/admin/practices/practice-search";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { practiceCatalogStructureScope, upsertPractice } from "@/hooks/practice-catalog-cache";
 import { workspaceAdminHead } from "@/lib/page-title";
@@ -76,7 +76,7 @@ function CreatePracticeContainer() {
 	if (areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="create" workspaceSlug={workspaceSlug}>
-				<LoadingBlock size="lg" label="Loading the practice form" />
+				<PracticeDefinitionSkeleton />
 			</PracticeFormShell>
 		);
 	}

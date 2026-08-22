@@ -11,12 +11,22 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { evidenceSourceLabel, mentoringSupportLabel } from "./evidence-presentation";
 
-/** Total over the wire union, so a status the API learns to send cannot arrive unlabelled. */
+/**
+ * Total over the wire union, so a status the API learns to send cannot arrive unlabelled.
+ *
+ * `AUTHOR_DECLARED` is currently the only value the server can produce, so this reads the same on
+ * every practice. A badge that never varies is not information — it is rendered as a sentence that
+ * says what to do about it, not as a chip that looks like a warning.
+ */
 const VALIDATION_DEFS: Record<
 	PracticeAutomatedReviewValidation["status"],
-	{ label: string; variant: ComponentProps<typeof Badge>["variant"] }
+	{ sentence: string; variant: ComponentProps<typeof Badge>["variant"] }
 > = {
-	AUTHOR_DECLARED: { label: "Not independently validated", variant: "outline" },
+	AUTHOR_DECLARED: {
+		sentence:
+			"Nobody has measured how often this practice is right. Its author described what it checks; that description has not been tested against real work. This is why a practice starts by asking you to approve each piece of feedback.",
+		variant: "outline",
+	},
 };
 
 function signalLabel(signal: string, signals: readonly PracticeSignalOption[]) {
@@ -101,11 +111,13 @@ export interface PracticeAutomatedReviewValidationSummaryProps {
 	validation: PracticeAutomatedReviewValidation;
 }
 
-export function PracticeAutomatedReviewValidationBadge({
+/** Says what the reader should do about the accuracy of this practice, in a sentence. */
+export function PracticeAutomatedReviewValidationNote({
 	validation,
 }: PracticeAutomatedReviewValidationSummaryProps) {
-	const def = VALIDATION_DEFS[validation.status];
-	return <Badge variant={def.variant}>{def.label}</Badge>;
+	return (
+		<p className="text-muted-foreground text-sm">{VALIDATION_DEFS[validation.status].sentence}</p>
+	);
 }
 
 export function PracticeAutomatedReviewValidationSummary({
@@ -113,7 +125,7 @@ export function PracticeAutomatedReviewValidationSummary({
 }: PracticeAutomatedReviewValidationSummaryProps) {
 	return (
 		<div className="space-y-1 text-sm">
-			<PracticeAutomatedReviewValidationBadge validation={validation} />
+			<PracticeAutomatedReviewValidationNote validation={validation} />
 			{/* Monospaced and breakable: nobody reads a digest, they compare one against another. */}
 			<p className="text-muted-foreground text-xs">
 				Rules <code className="break-all">{validation.reviewRuleFingerprint}</code> · policy{" "}
@@ -176,13 +188,13 @@ export function PracticeEvidenceSummary({
 				</dd>
 			</div>
 			{showValidation && (
-				<div>
-					<dt className="font-medium">AI mentoring validation</dt>
+				<div className="sm:col-span-2">
+					<dt className="font-medium">How reliable this is</dt>
 					<dd>
 						{showValidationDetails ? (
 							<PracticeAutomatedReviewValidationSummary validation={validation} />
 						) : (
-							<PracticeAutomatedReviewValidationBadge validation={validation} />
+							<PracticeAutomatedReviewValidationNote validation={validation} />
 						)}
 					</dd>
 				</div>

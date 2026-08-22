@@ -281,3 +281,27 @@ must stay one.
 Related trap: `useBlocker`'s `shouldBlockFn` sees `routeId`/`pathname`/`search`, and every drawer
 navigation on one surface shares a route. A guard written as `() => isDirty` will block navigations
 that do **not** unmount the form, so "Discard changes" discards nothing.
+
+## Loading and errors
+
+Choose by **region**, not by feel.
+
+| The thing that is loading | Show |
+|---|---|
+| A region whose shape you know at author time — list, table, card grid, form, page body, drawer body | A skeleton mirroring that shape, inside the region's real container |
+| A control the reader just activated — button, switch, row action | `<Spinner />` inside the control, with the label changing ("Saving…") |
+| Anything under ~1s | Nothing. Gate it: `useSpinDelay(query.isPending)` |
+| A whole route transition | The router's `pendingComponent`; it already delays 1000ms with a 500ms floor |
+
+Below 1s a reader perceives the result as immediate and
+[needs no feedback at all](https://www.nngroup.com/articles/response-times-3-important-limits/) — a
+state that appears and vanishes inside that window reads as a fault.
+[Polaris](https://polaris.shopify.com/components/feedback-indicators/spinner) restricts spinners to
+"content that can't be represented with skeleton loading components".
+
+**Never** — a bare centred spinner standing in for a region · `min-h-*` on a loading wrapper (that
+guarantees the jump the skeleton exists to prevent — take a row count from the caller instead, see
+`PracticeSkeletons.tsx`) · `role="status"` on a container that mounts with its text already inside
+([ARIA22](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA22) needs the role to exist *before* the
+message) · `role` or `aria-label` on `<Spinner>` — pass `label` if it genuinely needs announcing, and
+never inside a control, where a live region corrupts the button's own accessible name.

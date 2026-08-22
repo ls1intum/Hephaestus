@@ -150,7 +150,9 @@ export const NothingToChange: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Loading area preview"));
+		const panel = document.querySelector<HTMLElement>('[data-slot="drawer-popup"]');
+		await expectSettledVisible(panel as HTMLElement);
+		await expect(panel?.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 		// The header cannot invent an area colour for a slug that has not loaded.
 		await expect(screen.getByRole("heading", { name: "Practice area" })).toBeVisible();
 	},

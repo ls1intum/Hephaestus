@@ -83,7 +83,12 @@ export const Unassigned: Story = {
 export const Loading: Story = {
 	args: { state: { status: "loading" } },
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Loading practice"));
+		// A skeleton holding the shape the definition will take, so nothing jumps when it lands.
+		// It is `aria-hidden`, so the proof is the DOM, not a role.
+		const panel = document.querySelector<HTMLElement>('[data-slot="drawer-popup"]');
+		await expectSettledVisible(panel as HTMLElement);
+		await expect(panel?.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
+		await expect(screen.queryByRole("status")).not.toBeInTheDocument();
 	},
 };
 

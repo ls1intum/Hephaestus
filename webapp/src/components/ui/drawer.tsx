@@ -101,7 +101,7 @@ const drawerContentVariants = cva("", {
 			 * a covered panel keeps on screen is the reason to stack rather than replace.
 			 */
 			detail:
-				"[--peek:2.5rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:min(44rem,92vw)] data-[swipe-axis=x]:xl:[--drawer-content-width:min(62rem,75vw)]",
+				"[--peek:4rem] data-[swipe-axis=x]:[--drawer-content-width:100%] data-[swipe-axis=x]:sm:[--drawer-content-width:min(44rem,92vw)] data-[swipe-axis=x]:xl:[--drawer-content-width:min(62rem,75vw)]",
 		},
 	},
 	defaultVariants: { size: "default" },
@@ -140,7 +140,12 @@ function DrawerContent({
 					data-snap-points={hasSnapPoints ? "" : undefined}
 					className={cn(
 						// Base.
-						"group/drawer-popup pointer-events-auto fixed z-50 m-(--drawer-inset,0px) flex h-(--drawer-content-height) max-h-(--drawer-content-max-height,none) min-h-0 w-(--drawer-content-width,auto) transform-[translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale))] flex-col bg-popover text-popover-foreground shadow-lg transition-[transform,height,opacity,filter] duration-450 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform outline-none select-none [interpolate-size:allow-keywords]",
+						// `height` is transitioned only on the y axis. Base UI releases a parent's pinned height on the
+						// exact frame its child's exit completes, so a side panel that animates height jumps at that
+						// frame; on the x axis it is `inset-y-0` and its height never legitimately changes.
+						"group/drawer-popup pointer-events-auto fixed z-50 m-(--drawer-inset,0px) flex max-h-(--drawer-content-max-height,none) min-h-0 w-(--drawer-content-width,auto) transform-[translate3d(var(--translate-x,0px),var(--translate-y,0px),0)_scale(var(--stack-scale))] flex-col bg-popover text-popover-foreground shadow-lg ease-(--drawer-ease) will-change-transform outline-none select-none",
+						"data-[swipe-axis=y]:h-(--drawer-content-height) data-[swipe-axis=y]:transition-[transform,height,opacity,filter] data-[swipe-axis=y]:[interpolate-size:allow-keywords]",
+						"data-[swipe-axis=x]:transition-[transform,opacity,filter]",
 						// Nested.
 						"data-nested-drawer-open:overflow-hidden data-nested-drawer-open:brightness-95",
 						// Bleed — paints past the anchored edge so an overscrolled drawer shows no gap.
@@ -148,10 +153,14 @@ function DrawerContent({
 						// Sizing.
 						"[--drawer-content-height:var(--drawer-height,auto)] data-[swipe-axis=y]:[--drawer-content-max-height:calc(100dvh-6rem)] data-[swipe-axis=y]:data-snap-points:[--drawer-content-height:100dvh]",
 						drawerContentVariants({ size }),
+						// Reduced motion: keep the panel, drop what triggers vestibular symptoms. The scale and
+						// the step-back go to zero and the panel fades instead of travelling its own width.
+						"motion-reduce:[--stack-step:0] motion-reduce:[--peek:0px] motion-reduce:[--closed-transform:none] motion-reduce:data-ending-style:opacity-0 motion-reduce:data-starting-style:opacity-0",
 						// Stack — each nested drawer steps the ones behind it back by `--stack-step`.
 						"[--bleed:3rem] [--peek:1rem] [--stack-height:var(--drawer-frontmost-height,var(--drawer-height,0px))] [--stack-peek-offset:max(0px,calc((var(--nested-drawers)-var(--stack-progress))*var(--peek)))] [--stack-progress:clamp(0,var(--drawer-swipe-progress),1)] [--stack-scale-base:max(0,calc(1-(var(--nested-drawers)*var(--stack-step))))] [--stack-scale:clamp(0,calc(var(--stack-scale-base)+(var(--stack-step)*var(--stack-progress))),1)] [--stack-shrink:calc(1-var(--stack-scale))] [--stack-step:0.05]",
 						// Transitions.
-						"data-ending-style:transform-(--closed-transform) data-ending-style:opacity-[0.9999] data-ending-style:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-nested-drawer-swiping:duration-0 data-ending-style:data-nested-drawer-swiping:duration-[calc(var(--drawer-swipe-strength)*400ms)] data-starting-style:transform-(--closed-transform) data-swiping:duration-0 data-ending-style:data-swiping:duration-[calc(var(--drawer-swipe-strength)*400ms)]",
+						"[--drawer-ease:cubic-bezier(0.05,0.7,0.1,1)] [--drawer-enter:280ms] [--drawer-exit:calc(var(--drawer-swipe-strength)*200ms)] duration-(--drawer-enter)",
+						"data-ending-style:transform-(--closed-transform) data-ending-style:opacity-[0.9999] data-ending-style:duration-(--drawer-exit) data-ending-style:[--drawer-ease:cubic-bezier(0.2,0,0.38,0.9)] data-nested-drawer-swiping:duration-0 data-ending-style:data-nested-drawer-swiping:duration-(--drawer-exit) data-starting-style:transform-(--closed-transform) data-swiping:duration-0 data-ending-style:data-swiping:duration-(--drawer-exit)",
 						// Axis: y.
 						"data-[swipe-axis=y]:inset-x-0 data-[swipe-axis=y]:data-nested-drawer-open:h-(--stack-height)",
 						// Axis: x.

@@ -15,7 +15,7 @@ import {
 	EmptyMedia,
 	EmptyTitle,
 } from "@/components/ui/empty";
-import { Spinner } from "@/components/ui/spinner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { ReviewArtifactLink } from "./ReviewArtifact";
 import { ReviewBreadcrumbs } from "./ReviewBreadcrumbs";
 import { ReviewDetailHeader } from "./ReviewDetailHeader";
@@ -96,8 +96,19 @@ export function ReviewRunDetailPage({
 		return (
 			<article className="min-w-0 max-w-4xl space-y-8">
 				{breadcrumbs}
-				<div className="flex min-h-64 items-center justify-center">
-					<Spinner className="size-7" />
+				{/* The shape the run resolves into, not a centred spinner in a fixed-height box: that box
+				    is a guaranteed jump, because nothing about 16rem matches what arrives. */}
+				<div className="space-y-6" aria-hidden>
+					<div className="space-y-2">
+						<Skeleton className="h-7 w-full max-w-md" />
+						<Skeleton className="h-4 w-full max-w-sm" />
+					</div>
+					<div className="grid gap-3 sm:grid-cols-3">
+						{Array.from({ length: 3 }, (_, index) => (
+							<Skeleton key={index} className="h-16" />
+						))}
+					</div>
+					<Skeleton className="h-40 w-full" />
 				</div>
 			</article>
 		);

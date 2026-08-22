@@ -12,11 +12,11 @@ import {
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice, UpdatePracticeRequest } from "@/api/types.gen";
 import { PracticeForm, PracticeFormShell } from "@/components/admin/practices/PracticeForm";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import {
 	PRACTICE_SEARCH_PARAMS,
 	practiceSearchSchema,
 } from "@/components/admin/practices/practice-search";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import {
 	patchPractice,
@@ -104,7 +104,7 @@ function EditPracticeContainer() {
 	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {
 		return (
 			<PracticeFormShell mode="edit" workspaceSlug={workspaceSlug}>
-				<LoadingBlock size="lg" label="Loading this practice" />
+				<PracticeDefinitionSkeleton />
 			</PracticeFormShell>
 		);
 	}

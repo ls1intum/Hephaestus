@@ -1,7 +1,7 @@
 import { ChevronRight, CircleAlert } from "lucide-react";
 import type { CatalogAreaAdoptionPreview } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { PracticeListSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import {
@@ -93,7 +93,7 @@ export function AreaAdoptionPanel({
 						</AlertDescription>
 					</Alert>
 				)}
-				{state.status === "loading" && <LoadingBlock size="sm" label="Loading area preview" />}
+				{state.status === "loading" && <PracticeListSkeleton rows={4} />}
 				{state.status === "error" && (
 					<QueryErrorAlert
 						error={state.error}

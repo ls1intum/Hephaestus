@@ -4,7 +4,7 @@ import type { Practice, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeDefinitionPreview } from "@/components/admin/practice-adoption/PracticeDefinitionPreview";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBadge";
-import { LoadingBlock } from "@/components/common/LoadingBlock";
+import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
@@ -55,7 +55,7 @@ export function WorkspacePracticePanel({
 				</DetailDrawerHeader>
 				<DrawerBody>
 					{state.status === "loading" ? (
-						<LoadingBlock size="sm" label="Loading practice" />
+						<PracticeDefinitionSkeleton />
 					) : (
 						<QueryErrorAlert
 							error={state.error}
