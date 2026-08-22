@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -12,6 +13,10 @@ import de.tum.cit.aet.hephaestus.agent.job.AgentJobRepository;
 import de.tum.cit.aet.hephaestus.agent.job.AgentJobStatus;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import java.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,13 +37,50 @@ class SandboxReconcilerTest extends BaseUnitTest {
     @Mock
     private SandboxNetworkManager networkManager;
 
+    private static final Instant NOW = Instant.parse("2026-08-21T10:00:00Z");
+    /** Older than the grace window, so a fixture is reapable unless it opts out. */
+    private static final Instant LONG_AGO = NOW.minus(Duration.ofDays(1));
+
     private SandboxReconciler reconciler;
     private SimpleMeterRegistry meterRegistry;
 
     @BeforeEach
     void setUp() {
         meterRegistry = new SimpleMeterRegistry();
-        reconciler = new SandboxReconciler(jobRepository, containerManager, networkManager, meterRegistry);
+        reconciler = new SandboxReconciler(
+            jobRepository,
+            containerManager,
+            networkManager,
+            meterRegistry,
+            Clock.fixed(NOW, ZoneOffset.UTC)
+        );
+    }
+
+    private static DockerOperations.ContainerInfo container(String id, UUID jobId, Instant createdAt) {
+        return new DockerOperations.ContainerInfo(
+            id,
+            "test",
+            Map.of(SandboxLabels.MANAGED, "true", SandboxLabels.JOB_ID, jobId.toString()),
+            "running",
+            createdAt
+        );
+    }
+
+    private static DockerOperations.ContainerInfo mentorContainer(String id, UUID sessionId) {
+        return new DockerOperations.ContainerInfo(
+            id,
+            "test",
+            Map.of(
+                SandboxLabels.MANAGED,
+                "true",
+                SandboxLabels.KIND,
+                SandboxLabels.KIND_INTERACTIVE,
+                SandboxLabels.SESSION_ID,
+                sessionId.toString()
+            ),
+            "running",
+            LONG_AGO
+        );
     }
 
     @Nested
@@ -68,14 +110,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
 
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(
-                List.of(
-                    new DockerOperations.ContainerInfo(
-                        "orphaned-ctr",
-                        "test",
-                        Map.of("hephaestus.job-id", orphanedJobId.toString()),
-                        "exited"
-                    )
-                )
+                List.of(container("orphaned-ctr", orphanedJobId, LONG_AGO))
             );
             when(networkManager.listOrphanedNetworks()).thenReturn(
                 List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
@@ -96,14 +131,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
             // containerId NOT set — label-based matching should still find the container
 
             when(containerManager.listManagedContainers()).thenReturn(
-                List.of(
-                    new DockerOperations.ContainerInfo(
-                        "active-container",
-                        "test",
-                        Map.of("hephaestus.managed", "true", "hephaestus.job-id", jobId.toString()),
-                        "running"
-                    )
-                )
+                List.of(container("active-container", jobId, LONG_AGO))
             );
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of(activeJob));
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
@@ -136,14 +164,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
 
             when(containerManager.listManagedContainers()).thenReturn(
-                List.of(
-                    new DockerOperations.ContainerInfo(
-                        orphanedContainerId,
-                        "test",
-                        Map.of("hephaestus.job-id", orphanedJobId.toString()),
-                        "exited"
-                    )
-                )
+                List.of(container(orphanedContainerId, orphanedJobId, LONG_AGO))
             );
 
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
@@ -168,14 +189,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of(activeJob));
 
             when(containerManager.listManagedContainers()).thenReturn(
-                List.of(
-                    new DockerOperations.ContainerInfo(
-                        containerId,
-                        "test",
-                        Map.of("hephaestus.job-id", activeJobId.toString()),
-                        "running"
-                    )
-                )
+                List.of(container(containerId, activeJobId, LONG_AGO))
             );
 
             when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
@@ -215,20 +229,7 @@ class SandboxReconcilerTest extends BaseUnitTest {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
 
             when(containerManager.listManagedContainers()).thenReturn(
-                List.of(
-                    new DockerOperations.ContainerInfo(
-                        "ctr-1",
-                        "t1",
-                        Map.of("hephaestus.job-id", jobId1.toString()),
-                        "exited"
-                    ),
-                    new DockerOperations.ContainerInfo(
-                        "ctr-2",
-                        "t2",
-                        Map.of("hephaestus.job-id", jobId2.toString()),
-                        "exited"
-                    )
-                )
+                List.of(container("ctr-1", jobId1, LONG_AGO), container("ctr-2", jobId2, LONG_AGO))
             );
 
             doThrow(new RuntimeException("stuck container")).when(containerManager).forceRemove("ctr-1");
@@ -241,47 +242,144 @@ class SandboxReconcilerTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldContinueNetworkCleanupOnContainerScanFailure() {
-            UUID orphanedJobId = UUID.randomUUID();
-
+        void shouldReapNoNetworksWhenTheContainerInventoryCannotBeRead() {
             when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
-
             when(containerManager.listManagedContainers()).thenThrow(new RuntimeException("Docker unreachable"));
-
-            when(networkManager.listOrphanedNetworks()).thenReturn(
-                List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
-            );
+            // Orphaned by the job set alone; only the unreadable inventory can spare it.
+            lenient()
+                .when(networkManager.listOrphanedNetworks())
+                .thenReturn(List.of(new DockerOperations.NetworkInfo("net-live", "agent-net-" + UUID.randomUUID())));
 
             reconciler.periodicReconciliation();
 
-            verify(networkManager).removeNetwork("net-1");
+            verify(networkManager, never()).removeNetwork(any());
+            assertThat(meterRegistry.counter("sandbox.reconciler.sweeps", "outcome", "skipped").count()).isEqualTo(1.0);
         }
 
         @Test
-        void shouldRemoveEvenRunningContainersWhenTheDbQueryFails() {
-            UUID orphanedJobId = UUID.randomUUID();
+        void shouldReapNothingWhenTheActiveJobSetCannotBeRead() {
+            UUID jobId = UUID.randomUUID();
 
+            // Resources that a sweep running on an empty job set would reap, so the assertions below
+            // distinguish "stood down" from "ran and found nothing".
             when(jobRepository.findByStatusIn(any())).thenThrow(new RuntimeException("DB unreachable"));
+            lenient()
+                .when(containerManager.listManagedContainers())
+                .thenReturn(List.of(container("ctr-live", jobId, LONG_AGO)));
+            lenient()
+                .when(networkManager.listOrphanedNetworks())
+                .thenReturn(List.of(new DockerOperations.NetworkInfo("net-live", "agent-net-" + jobId)));
 
+            reconciler.periodicReconciliation();
+
+            verify(containerManager, never()).forceRemove(any());
+            verify(networkManager, never()).disconnectAppServer(any());
+            verify(networkManager, never()).removeNetwork(any());
+            assertThat(meterRegistry.counter("sandbox.reconciler.sweeps", "outcome", "skipped").count()).isEqualTo(1.0);
+        }
+
+        @Test
+        void shouldNotReapAContainerWhenItIsYoungerThanTheGraceWindow() {
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
             when(containerManager.listManagedContainers()).thenReturn(
-                List.of(
-                    new DockerOperations.ContainerInfo(
-                        "ctr-1",
-                        "test",
-                        Map.of("hephaestus.job-id", orphanedJobId.toString()),
-                        "running"
-                    )
-                )
+                List.of(container("ctr-young", UUID.randomUUID(), NOW.minus(Duration.ofSeconds(119))))
             );
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
 
+            reconciler.periodicReconciliation();
+
+            verify(containerManager, never()).forceRemove(any());
+        }
+
+        @Test
+        void shouldReapAContainerWhenItIsOlderThanTheGraceWindow() {
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(
+                List.of(container("ctr-old", UUID.randomUUID(), NOW.minus(Duration.ofSeconds(121))))
+            );
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
+
+            reconciler.periodicReconciliation();
+
+            verify(containerManager).forceRemove("ctr-old");
+        }
+
+        @Test
+        void shouldNotReapAContainerWhenTheDaemonReportedNoCreationTime() {
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(
+                List.of(container("ctr-ageless", UUID.randomUUID(), null))
+            );
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
+
+            reconciler.periodicReconciliation();
+
+            verify(containerManager, never()).forceRemove(any());
+        }
+
+        @Test
+        void shouldKeepANetworkWhenALiveMentorSessionOwnsIt() {
+            UUID sessionId = UUID.randomUUID();
+
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(
+                List.of(mentorContainer("ctr-mentor", sessionId))
+            );
             when(networkManager.listOrphanedNetworks()).thenReturn(
-                List.of(new DockerOperations.NetworkInfo("net-1", "agent-net-" + orphanedJobId))
+                List.of(new DockerOperations.NetworkInfo("net-mentor", "agent-net-" + sessionId))
             );
 
             reconciler.periodicReconciliation();
 
-            verify(containerManager).forceRemove("ctr-1");
-            verify(networkManager).removeNetwork("net-1");
+            verify(networkManager, never()).disconnectAppServer(any());
+            verify(networkManager, never()).removeNetwork(any());
+        }
+
+        @Test
+        void shouldKeepANetworkWhenItsContainerIsInsideTheGraceWindow() {
+            UUID jobId = UUID.randomUUID();
+
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(
+                List.of(container("ctr-young", jobId, NOW.minus(Duration.ofSeconds(30))))
+            );
+            when(networkManager.listOrphanedNetworks()).thenReturn(
+                List.of(new DockerOperations.NetworkInfo("net-young", "agent-net-" + jobId))
+            );
+
+            reconciler.periodicReconciliation();
+
+            verify(networkManager, never()).removeNetwork(any());
+        }
+
+        @Test
+        void shouldKeepANetworkWhenItsContainerCouldNotBeRemoved() {
+            UUID jobId = UUID.randomUUID();
+
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(List.of(container("ctr-stuck", jobId, LONG_AGO)));
+            doThrow(new RuntimeException("stuck container")).when(containerManager).forceRemove("ctr-stuck");
+            when(networkManager.listOrphanedNetworks()).thenReturn(
+                List.of(new DockerOperations.NetworkInfo("net-stuck", "agent-net-" + jobId))
+            );
+
+            reconciler.periodicReconciliation();
+
+            verify(networkManager, never()).removeNetwork(any());
+        }
+
+        @Test
+        void shouldCountASweepThatRanToCompletion() {
+            when(jobRepository.findByStatusIn(any())).thenReturn(List.of());
+            when(containerManager.listManagedContainers()).thenReturn(List.of());
+            when(networkManager.listOrphanedNetworks()).thenReturn(List.of());
+
+            reconciler.periodicReconciliation();
+
+            assertThat(meterRegistry.counter("sandbox.reconciler.sweeps", "outcome", "completed").count()).isEqualTo(
+                1.0
+            );
+            assertThat(meterRegistry.counter("sandbox.reconciler.sweeps", "outcome", "skipped").count()).isZero();
         }
 
         @Test

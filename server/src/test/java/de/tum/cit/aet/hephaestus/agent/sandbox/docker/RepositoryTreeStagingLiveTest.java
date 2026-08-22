@@ -98,7 +98,7 @@ class RepositoryTreeStagingLiveTest {
             DefaultDockerClientConfig.createDefaultConfigBuilder().build(),
             new ApacheDockerHttpClient.Builder().dockerHost(URI.create("unix:///var/run/docker.sock")).build()
         );
-        DockerClientOperations dockerOps = new DockerClientOperations(dockerClient);
+        DockerClientOperations dockerOps = new DockerClientOperations(dockerClient, dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
         containerManager = new SandboxContainerManager(dockerOps, image -> {}, properties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, properties);

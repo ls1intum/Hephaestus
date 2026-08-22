@@ -29,6 +29,7 @@ import {
 import { loadProviderConfig, registerHephaestusProvider } from "./pi-provider.mjs";
 import { addAssistantUsage, extractUsageFromSession, newUsageLedger } from "./pi-runner-usage.mjs";
 import { deriveTimeouts } from "./pi-runner-timings.mjs";
+import { undeliverableUnits } from "./pi-runner-composition.mjs";
 
 const OUTPUT = "/workspace/out";
 const CWD = "/workspace";
@@ -718,11 +719,20 @@ function leanObservations(observations) {
 }
 
 function persistComposedFeedback() {
+    for (const unit of undeliverableUnits(composedFeedback)) {
+        console.error(
+            `[pi-runner] composed feedback the server cannot deliver: ${unit.channel}/${unit.practiceSlug} ` +
+                `supersedes '${unit.supersedesThreadKey}', which this envelope does not list as staged`,
+        );
+    }
     writeFileSync(FEEDBACK_PATH, JSON.stringify(composedFeedback, null, 2));
 }
 
 // The composer references admitted observations; it cannot author verdicts, citations, or locations.
 function buildFeedbackTool(practiceSlugs, request, observations, preparedThreadKeys) {
+    // The reader resolves supersession against the envelope's copy of this list and drops any unit
+    // naming a thread outside it, so the vocabulary is recorded here, where it is decided.
+    composedFeedback.preparedThreadKeys = preparedThreadKeys;
     const enabledChannels = CHANNELS.filter((channel) => request.channels[channel].enabled);
     const placementKinds = request.inContextPlacementKinds || [];
     const usedPerChannel = Object.fromEntries(CHANNELS.map((channel) => [channel, 0]));
@@ -1063,9 +1073,13 @@ async function main() {
     }
 
     const compositionRequest = loadCompositionRequest();
-    const preparedThreadKeys = stagedPreparedThreadKeys();
     const feedbackTool = compositionRequest
-        ? buildFeedbackTool(composablePracticeSlugs(), compositionRequest, reviewState.observations, preparedThreadKeys)
+        ? buildFeedbackTool(
+              composablePracticeSlugs(),
+              compositionRequest,
+              reviewState.observations,
+              stagedPreparedThreadKeys(),
+          )
         : null;
     const { session, extensionsResult } = await createAgentSession({
         cwd: CWD,

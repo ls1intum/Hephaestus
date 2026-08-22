@@ -19,6 +19,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
         "pi-observation-normalize.mjs",
         "pi-runner-usage.mjs",
         "pi-runner-timings.mjs",
+        "pi-runner-composition.mjs",
         SandboxLayout.PROVIDER_HELPER_FILENAME
     );
 

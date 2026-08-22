@@ -25,7 +25,9 @@ RUN mkdir -p /opt/pi-sdk && \
     mkdir -p /home/agent /workspace && \
     chown -R 1000:1000 /home/agent /workspace
 
-# Bun runtime for precomputation scripts (static analysis before agent runs)
+# Bun runtime for precomputation scripts (static analysis before agent runs).
+# The sha256 pins below are per-version: a bump that does not refresh them fails the build.
+# renovate: datasource=github-releases depName=oven-sh/bun extractVersion=^bun-v(?<version>.*)$
 ARG BUN_VERSION=1.3.11
 RUN arch="${TARGETARCH:-$(dpkg --print-architecture)}" && \
     case "${arch}" in \

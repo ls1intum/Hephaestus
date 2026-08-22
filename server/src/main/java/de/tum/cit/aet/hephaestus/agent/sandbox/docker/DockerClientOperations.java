@@ -17,6 +17,8 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxInfrastructureException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -36,6 +38,9 @@ public class DockerClientOperations
     private static final Logger log = LoggerFactory.getLogger(DockerClientOperations.class);
     private static final int LOG_COLLECTION_TIMEOUT_SECONDS = 30;
 
+    /** A pull that has not finished by here is treated as failed; the RPC client's idle timeout sits above it. */
+    static final Duration IMAGE_PULL_TIMEOUT = Duration.ofMinutes(5);
+
     /**
      * Maximum log output to collect from a container (prevents OOM from runaway output). This is
      * the <em>collection</em> limit; see {@link DockerSandboxAdapter#MAX_LOG_EVENT_BYTES} for the
@@ -45,8 +50,12 @@ public class DockerClientOperations
 
     private final DockerClient dockerClient;
 
-    public DockerClientOperations(DockerClient dockerClient) {
+    /** `docker wait` is silent until the container exits, so it needs a socket timeout no RPC call wants. */
+    private final DockerClient streamingClient;
+
+    public DockerClientOperations(DockerClient dockerClient, DockerClient streamingClient) {
         this.dockerClient = dockerClient;
+        this.streamingClient = streamingClient;
     }
 
     @Override
@@ -82,10 +91,13 @@ public class DockerClientOperations
         try {
             log.info("Pulling Docker image: {}", image);
             long startMs = System.currentTimeMillis();
-            boolean completed = dockerClient.pullImageCmd(image).start().awaitCompletion(5, TimeUnit.MINUTES);
+            boolean completed = dockerClient
+                .pullImageCmd(image)
+                .start()
+                .awaitCompletion(IMAGE_PULL_TIMEOUT.toMillis(), TimeUnit.MILLISECONDS);
             long durationMs = System.currentTimeMillis() - startMs;
             if (!completed) {
-                log.warn("Docker pull timed out after 5 min: image={}", image);
+                log.warn("Docker pull timed out after {}: image={}", IMAGE_PULL_TIMEOUT, image);
                 return false;
             }
             log.info("Pulled Docker image in {} ms: {}", durationMs, image);
@@ -248,7 +260,7 @@ public class DockerClientOperations
     @Override
     public DockerOperations.WaitResult waitContainer(String containerId) {
         try {
-            var callback = dockerClient.waitContainerCmd(containerId).start();
+            var callback = streamingClient.waitContainerCmd(containerId).start();
             try {
                 int exitCode = callback.awaitStatusCode();
                 log.debug("Container {} exited with code {}", containerId, exitCode);
@@ -394,7 +406,8 @@ public class DockerClientOperations
                         c.getId(),
                         c.getNames() != null && c.getNames().length > 0 ? c.getNames()[0] : "",
                         c.getLabels() != null ? c.getLabels() : Map.of(),
-                        c.getState() != null ? c.getState() : "unknown"
+                        c.getState() != null ? c.getState() : "unknown",
+                        c.getCreated() != null ? Instant.ofEpochSecond(c.getCreated()) : null
                     )
                 )
                 .toList();
