@@ -5346,6 +5346,7 @@ export type CatalogPracticeSummary = {
     availability: 'AVAILABLE' | 'ADOPTED' | 'SLUG_CONFLICT';
     name: string;
     slug: string;
+    whyItMatters?: string;
 };
 
 export type CatalogPracticePreview = {

@@ -122,10 +122,14 @@ export const RestoreDeletedArea: Story = {
 			],
 		}),
 	},
-	play: async () => {
+	play: async ({ args }) => {
 		// Nothing is created, so the action is a restore rather than an add.
-		await expectSettledVisible(await screen.findByRole("button", { name: "Restore area" }));
+		const confirm = await screen.findByRole("button", { name: "Restore area" });
+		await expectSettledVisible(confirm);
 		await expect(screen.getAllByText("Moves back")).toHaveLength(2);
+		// The panel's primary action, which no story reached before.
+		await userEvent.click(confirm);
+		await expect(args.onConfirm).toHaveBeenCalledOnce();
 	},
 };
 

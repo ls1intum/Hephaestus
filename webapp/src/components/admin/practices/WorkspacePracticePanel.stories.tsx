@@ -22,6 +22,7 @@ const ready = (over: Partial<ReadyState> = {}): ReadyState => ({
 });
 
 const meta = {
+	title: "Workspace admin/Practices/Workspace practice",
 	component: WorkspacePracticePanel,
 	parameters: { layout: "fullscreen" },
 	decorators: [withPageBehind],

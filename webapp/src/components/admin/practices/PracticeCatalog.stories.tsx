@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, waitFor, within } from "storybook/test";
+import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
@@ -161,36 +162,43 @@ export const Populated: Story = {
 
 export const WithPracticeLibrary: Story = {
 	args: {
-		showLibrary: true,
-		onShowLibraryChange: fn(),
 		library: {
-			status: "ready",
-			practices: [
-				{
-					slug: "explain-change",
-					name: "Explain what changed and why",
-					artifactKind: "scm.pull_request",
-					areaSlug: "review-ready-work",
-					areaName: "Review-ready work",
-					availability: "AVAILABLE",
-					automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-				},
-				{
-					slug: practices[0].slug,
-					name: practices[0].name,
-					artifactKind: practices[0].artifactKind,
-					areaSlug: practices[0].areaSlug,
-					areaName: areas[0].name,
-					availability: "ADOPTED",
-					automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
-				},
-			],
+			open: true,
+			onOpenChange: fn(),
+			state: {
+				status: "ready",
+				practices: [
+					{
+						slug: "explain-change",
+						name: "Explain what changed and why",
+						artifactKind: "scm.pull_request",
+						whyItMatters:
+							"A reviewer who has to reconstruct intent from the diff reviews the code and not the decision.",
+						areaSlug: "review-ready-work",
+						areaName: "Review-ready work",
+						availability: "AVAILABLE",
+						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+					},
+					{
+						slug: practices[0].slug,
+						name: practices[0].name,
+						artifactKind: practices[0].artifactKind,
+						areaSlug: practices[0].areaSlug,
+						areaName: areas[0].name,
+						availability: "ADOPTED",
+						automatedReviewValidation: mockAuthorDeclaredEvidenceValidation,
+					},
+				],
+			},
 		},
 	},
 	play: async ({ canvas }) => {
 		canvas.getByRole("heading", { name: "Practice library" });
-		// The ordinary case carries no chip: `badged` is false for AVAILABLE in the registry.
-		await expect(canvas.queryByText("Added")).not.toBeInTheDocument();
+		// An already-added practice is not offered a second time, so the library lists only the one
+		// the workspace lacks.
+		await expect(
+			canvas.getAllByRole("link", { name: /Explain what changed and why/ }),
+		).toHaveLength(1);
 	},
 };
 
@@ -199,6 +207,41 @@ export const WithPracticeLibrary: Story = {
  * the catalogue rather than with the row it belongs to — which is what the narrow viewport here is
  * watching.
  */
+/** The library is a section of this page, so its failure must not take the tree down with it. */
+export const PracticeLibraryFailed: Story = {
+	args: {
+		library: {
+			open: true,
+			onOpenChange: fn(),
+			state: {
+				status: "error",
+				// 5xx is the classifier's retryable branch; a bare Error renders no Retry button.
+				error: { status: 503, detail: "Catalog service unavailable" },
+				onRetry: fn(),
+			},
+		},
+	},
+	play: async ({ args, canvas, userEvent }) => {
+		// The workspace's own practices are still readable beside the failed library.
+		await expect(canvas.getByRole("link", { name: practices[0].name })).toBeVisible();
+		await userEvent.click(canvas.getByRole("button", { name: "Retry" }));
+		const state = args.library?.state;
+		await expect(state?.status === "error" && state.onRetry).toHaveBeenCalledOnce();
+	},
+};
+
+export const PracticeLibraryLoading: Story = {
+	args: {
+		library: { open: true, onOpenChange: fn(), state: { status: "loading" } },
+	},
+	play: async ({ canvas }) => {
+		// Scoped to the section: the page carries other live regions, and LoadingBlock puts its
+		// label in the region's content rather than in an accessible name.
+		const library = within(canvas.getByRole("region", { name: "Practice library" }));
+		await expect(library.getByRole("status")).toHaveTextContent("Loading the practice library");
+	},
+};
+
 export const AtScale: Story = {
 	args: { areas: scaleAreas, practices: scalePractices },
 	parameters: { chromatic: { viewports: [320, 1440] } },
@@ -231,7 +274,13 @@ export const Filtered: Story = {
 	parameters: { chromatic: { viewports: [1440] } },
 	play: async ({ canvas }) => {
 		await expect(canvas.getByText("Clear the filter to reorder practices.")).toBeVisible();
-		await expect(canvas.queryByRole("button", { name: /Move practice/ })).not.toBeInTheDocument();
+		// Area handles stay — only entry handles are gated on the filter, so naming the practice is
+		// what makes this assertion about the thing the banner promises.
+		for (const practice of mockPractices) {
+			await expect(
+				canvas.queryByRole("button", { name: `Reorder ${practice.name}` }),
+			).not.toBeInTheDocument();
+		}
 	},
 };
 
@@ -559,14 +608,17 @@ export const AutonomyIsReadOnlyHere: Story = {
 		viewport: { defaultViewport: "desktop" },
 	},
 	play: async ({ canvas, userEvent }) => {
-		await expect(canvas.queryByRole("radiogroup")).not.toBeInTheDocument();
-
 		await userEvent.click(canvas.getByRole("button", { name: "More actions for Set here" }));
 		const menu = within(await screen.findByRole("menu"));
 		await expect(menu.getByRole("menuitem", { name: "Change on Review" })).toHaveAttribute(
 			"href",
 			"/w/demo/admin/practices/review",
 		);
-		await expect(menu.queryByRole("menuitem", { name: "Use the default" })).not.toBeInTheDocument();
+		// The menuitemradios in this menu are the "Move to" area picker. Autonomy is set on Review,
+		// so none of its levels may appear as a choice here.
+		for (const { label } of Object.values(AUTONOMY_DEFS)) {
+			await expect(menu.queryByRole("menuitemradio", { name: label })).not.toBeInTheDocument();
+			await expect(menu.queryByRole("menuitem", { name: label })).not.toBeInTheDocument();
+		}
 	},
 };

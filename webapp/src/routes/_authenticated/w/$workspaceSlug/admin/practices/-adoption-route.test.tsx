@@ -247,6 +247,9 @@ describe("catalog adoption over practice setup", () => {
 		// `role="alert"` announces the change without pulling focus off the action.
 		const changed = await screen.findByRole("alert");
 		expect(changed.textContent).toContain("The library changed while you were reading");
+		// The rule is what a 412 is about, so open the disclosure that holds it and check the panel
+		// is showing the refetched one rather than the plan that was just rejected.
+		fireEvent.click(await screen.findByRole("button", { name: "How it decides" }));
 		expect(await screen.findByText("Updated review rule that must be reviewed.")).not.toBeNull();
 	});
 

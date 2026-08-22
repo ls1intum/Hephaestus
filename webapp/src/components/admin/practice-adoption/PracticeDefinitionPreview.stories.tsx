@@ -37,9 +37,9 @@ export const Complete: Story = {
 	play: async ({ canvas }) => {
 		await expect(canvas.queryByText("Pull request details")).not.toBeInTheDocument();
 		await expect(canvas.queryByText(/hasDescription/)).not.toBeInTheDocument();
-		await userEvent.click(canvas.getByRole("button", { name: "How reviews work" }));
+		await userEvent.click(canvas.getByRole("button", { name: "What it reads" }));
 		await expect(canvas.getByText("Pull request details")).toBeVisible();
-		await userEvent.click(canvas.getByRole("button", { name: "Advanced: static analysis" }));
+		await userEvent.click(canvas.getByRole("button", { name: "What it measures first" }));
 		await expect(canvas.getByText(/hasDescription/)).toBeVisible();
 	},
 };
@@ -86,14 +86,34 @@ export const CriteriaIsMarkdown: Story = {
 			].join("\n"),
 		},
 	},
-	play: async ({ canvas }) => {
+	play: async ({ canvas, userEvent }) => {
+		await userEvent.click(canvas.getByRole("button", { name: "How it decides" }));
 		// Demoted to h4 by UntrustedMarkdown, so a practice cannot outrank the section it sits in.
-		const standard = canvas.getByRole("heading", { name: "The standard", level: 4 });
+		const standard = await canvas.findByRole("heading", { name: "The standard", level: 4 });
 		await expect(standard).toBeVisible();
 		await expect(canvas.getByRole("list")).toBeVisible();
 		await expect(canvas.getAllByRole("listitem")).toHaveLength(2);
 		await expect(canvas.getByText("end to end").tagName).toBe("EM");
 		// The literal syntax is gone, which is the whole point.
 		await expect(canvas.queryByText(/^## /)).not.toBeInTheDocument();
+	},
+};
+
+/**
+ * The decision being made is "do we want this habit", so the rationale leads. `criteria` answers a
+ * different question — how the model judges — in text addressed to the model, so it sits behind a
+ * disclosure with the precompute script rather than above the reason to adopt.
+ */
+export const RationaleLeadsTheRuleFollows: Story = {
+	play: async ({ canvas }) => {
+		const rationale = canvas.getByText(definition.whyItMatters as string);
+		await expect(rationale).toBeVisible();
+		// Collapsed, so none of the rule's text is in the accessible tree until it is asked for.
+		await expect(canvas.queryByText(/Confirm the pull request explains/)).not.toBeInTheDocument();
+		// ...and the rationale precedes every disclosure in document order.
+		const rule = canvas.getByRole("button", { name: "How it decides" });
+		await expect(
+			rationale.compareDocumentPosition(rule) & Node.DOCUMENT_POSITION_FOLLOWING,
+		).toBeTruthy();
 	},
 };

@@ -6,6 +6,7 @@ import { expectSettledVisible } from "@/test/overlay";
 import { AreaDetailsDialog } from "./AreaDetailsDialog";
 
 const meta = {
+	title: "Workspace admin/Practices/Area details",
 	component: AreaDetailsDialog,
 	parameters: { layout: "centered" },
 	args: {

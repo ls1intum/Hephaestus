@@ -1,4 +1,3 @@
-import { CircleCheck, Lightbulb } from "lucide-react";
 import type { CuratedPracticeDefinition, PracticeDefinitionOptions } from "@/api/types.gen";
 import { PracticeEvidenceSummary } from "@/components/admin/practice-catalog/PracticeEvidenceSummary";
 import { UNTRUSTED_MARKDOWN_PROSE, UntrustedMarkdown } from "@/components/common/UntrustedMarkdown";
@@ -18,73 +17,43 @@ export interface PracticeDefinitionPreviewProps {
 	options: PracticeDefinitionOptions;
 }
 
+/**
+ * A practice as the person deciding about it needs to read it: the habit first, the rule last.
+ *
+ * `whyItMatters` and `whatGoodLooksLike` are one short paragraph each, written to a human, and they
+ * answer the question being asked — is this a habit we want. `criteria` answers a different one, how
+ * the model judges, and it is not written to this reader: it addresses the model in the second
+ * person and spends its length on `PRESENT`/`ABSENT`/`MAJOR` and abstention rules. It is also long —
+ * a median of 8,722 characters once the server composes its work-type preamble in, and 20 of the 37
+ * bundled practices open with the same 5,426-character block.
+ *
+ * So it stays available — adopting an automated critic without being able to read its rule is worse
+ * — but behind a disclosure, next to the precompute script, which is the same kind of artefact.
+ */
 export function PracticeDefinitionPreview({ definition, options }: PracticeDefinitionPreviewProps) {
 	const workType = options.workTypes?.find(
 		(candidate) => candidate.artifactKind === definition.artifactKind,
 	);
 
 	return (
-		<div className="space-y-8">
-			<Section size="sm" level={3} title="What this practice checks">
-				{/* The editor promises "Markdown is supported", and criteria is the one definition field
-				    that uses it: headings, lists and emphasis across several paragraphs. */}
-				{/* `max-w-2xl` because the drawer reaches 62rem and criteria runs to several thousand
-				    characters: unconstrained, a line here is well past a comfortable measure. */}
-				<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-2xl")}>
-					<UntrustedMarkdown>{definition.criteria}</UntrustedMarkdown>
-				</div>
-			</Section>
+		<div className="space-y-6">
+			{definition.whyItMatters && (
+				<p className="max-w-2xl text-pretty text-lg leading-relaxed">{definition.whyItMatters}</p>
+			)}
 
-			{(definition.whyItMatters || definition.whatGoodLooksLike) && (
-				<div className="grid gap-4 sm:grid-cols-2">
-					{definition.whyItMatters && (
-						<Section
-							size="sm"
-							level={3}
-							className="rounded-xl bg-muted/50 p-4"
-							title={
-								<>
-									<Lightbulb
-										className="mb-3 block size-5 text-muted-foreground"
-										aria-hidden="true"
-									/>
-									Why it matters
-								</>
-							}
-						>
-							<p className="whitespace-pre-wrap text-sm text-muted-foreground">
-								{definition.whyItMatters}
-							</p>
-						</Section>
-					)}
-					{definition.whatGoodLooksLike && (
-						<Section
-							size="sm"
-							level={3}
-							className="rounded-xl bg-muted/50 p-4"
-							title={
-								<>
-									<CircleCheck
-										className="mb-3 block size-5 text-muted-foreground"
-										aria-hidden="true"
-									/>
-									What good looks like
-								</>
-							}
-						>
-							<p className="whitespace-pre-wrap text-sm text-muted-foreground">
-								{definition.whatGoodLooksLike}
-							</p>
-						</Section>
-					)}
-				</div>
+			{definition.whatGoodLooksLike && (
+				<Section size="sm" level={3} title="What good looks like">
+					<p className="max-w-2xl text-pretty text-muted-foreground">
+						{definition.whatGoodLooksLike}
+					</p>
+				</Section>
 			)}
 
 			<Separator />
 
 			<Accordion aria-label="Practice review details">
 				<AccordionItem value="review-mechanics">
-					<AccordionTrigger>How reviews work</AccordionTrigger>
+					<AccordionTrigger>What it reads</AccordionTrigger>
 					<AccordionContent className="pt-2">
 						<PracticeEvidenceSummary
 							policy={definition.automatedReviewPolicy}
@@ -97,9 +66,19 @@ export function PracticeDefinitionPreview({ definition, options }: PracticeDefin
 						/>
 					</AccordionContent>
 				</AccordionItem>
+				<AccordionItem value="review-rule">
+					<AccordionTrigger>How it decides</AccordionTrigger>
+					<AccordionContent>
+						{/* The editor promises "Markdown is supported", and this is the one definition field
+						    that uses it. `max-w-2xl` because the drawer reaches 62rem. */}
+						<div className={cn(UNTRUSTED_MARKDOWN_PROSE, "max-w-2xl")}>
+							<UntrustedMarkdown>{definition.criteria}</UntrustedMarkdown>
+						</div>
+					</AccordionContent>
+				</AccordionItem>
 				{definition.precomputeScript && (
 					<AccordionItem value="static-analysis">
-						<AccordionTrigger>Advanced: static analysis</AccordionTrigger>
+						<AccordionTrigger>What it measures first</AccordionTrigger>
 						<AccordionContent>
 							<pre className="max-h-80 overflow-auto rounded-md bg-muted p-3 text-xs">
 								<code>{definition.precomputeScript}</code>

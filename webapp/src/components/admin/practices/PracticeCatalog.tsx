@@ -73,6 +73,17 @@ export type LibraryState =
 	| { status: "error"; error: unknown; onRetry: () => void }
 	| { status: "ready"; practices: CatalogPracticeSummary[] };
 
+/**
+ * One prop, because `open` without a `state` was representable and rendered a loading block that
+ * never resolved — indistinguishable from a real fetch. Absent means the surface offers no library
+ * at all, which is a third thing again.
+ */
+export interface PracticeLibrary {
+	open: boolean;
+	onOpenChange: (open: boolean) => void;
+	state: LibraryState;
+}
+
 export interface PracticeCatalogProps {
 	workspaceSlug: string;
 	areas: PracticeArea[];
@@ -89,9 +100,7 @@ export interface PracticeCatalogProps {
 	onSetAreaVisual: (slug: string, patch: { icon?: string; color?: string }) => void;
 	onDeletePractice: (practice: Practice) => void;
 	onPlacePractice: (practiceSlug: string, areaSlug: string | null, position: number) => void;
-	library?: LibraryState;
-	showLibrary?: boolean;
-	onShowLibraryChange?: (show: boolean) => void;
+	library?: PracticeLibrary;
 }
 
 export function PracticeCatalog({
@@ -111,8 +120,6 @@ export function PracticeCatalog({
 	onDeletePractice,
 	onPlacePractice,
 	library,
-	showLibrary = false,
-	onShowLibraryChange,
 }: PracticeCatalogProps) {
 	// `null` while creating, an area while renaming; `namingArea !== undefined` is "open".
 	const [namingArea, setNamingArea] = useState<PracticeArea | null | undefined>(undefined);
@@ -122,8 +129,8 @@ export function PracticeCatalog({
 			.map((practice) => practice.slug),
 	);
 	const visibleCatalogPractices =
-		library?.status === "ready"
-			? library.practices.filter(
+		library?.state.status === "ready"
+			? library.state.practices.filter(
 					(practice) => focusFilter === "ALL" || practice.artifactKind === focusFilter,
 				)
 			: undefined;
@@ -152,21 +159,20 @@ export function PracticeCatalog({
 				onCreateArea={() => setNamingArea(null)}
 				creatingArea={pending.creatingArea}
 				areaStructurePending={pending.areaStructure}
-				showLibrary={showLibrary}
-				onShowLibraryChange={onShowLibraryChange}
+				library={library}
 			/>
-			{showLibrary && (
+			{library?.open && (
 				<Section
 					size="sm"
 					title="Practice library"
 					description="Add a practice as an independent workspace copy. You can change or remove it later."
 					className="rounded-lg border bg-muted/20 p-4"
 				>
-					{library?.status === "error" ? (
+					{library.state.status === "error" ? (
 						<QueryErrorAlert
-							error={library.error}
+							error={library.state.error}
 							title="Couldn't load the library"
-							onRetry={library.onRetry}
+							onRetry={library.state.onRetry}
 						/>
 					) : visibleCatalogPractices ? (
 						<AvailablePracticeList
@@ -298,8 +304,7 @@ function CatalogToolbar({
 	onCreateArea,
 	creatingArea,
 	areaStructurePending,
-	showLibrary,
-	onShowLibraryChange,
+	library,
 }: {
 	workspaceSlug: string;
 	focusFilter: FocusFilter;
@@ -307,8 +312,7 @@ function CatalogToolbar({
 	onCreateArea: () => void;
 	creatingArea: boolean;
 	areaStructurePending: boolean;
-	showLibrary: boolean;
-	onShowLibraryChange?: (show: boolean) => void;
+	library?: PracticeLibrary;
 }) {
 	return (
 		<div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -365,8 +369,8 @@ function CatalogToolbar({
 			<div className="grid gap-2 sm:flex">
 				<Toggle
 					variant="outline"
-					pressed={showLibrary}
-					onPressedChange={(pressed) => onShowLibraryChange?.(pressed)}
+					pressed={library?.open ?? false}
+					onPressedChange={(pressed) => library?.onOpenChange(pressed)}
 				>
 					<Library />
 					Show library

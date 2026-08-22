@@ -8116,6 +8116,8 @@ components:
           type: string
         slug:
           type: string
+        whyItMatters:
+          type: string
       required:
       - artifactKind
       - automatedReviewValidation

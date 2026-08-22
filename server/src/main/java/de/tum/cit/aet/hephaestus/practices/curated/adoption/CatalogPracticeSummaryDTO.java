@@ -9,6 +9,12 @@ public record CatalogPracticeSummaryDTO(
     @NonNull String slug,
     @NonNull String name,
     @NonNull ArtifactKind artifactKind,
+    /**
+     * The habit's rationale, so a row is triageable without opening it. Deliberately not
+     * {@code criteria}: that is the review rule, addressed to the model, and runs to a median of
+     * 8,722 characters once its preamble is composed in.
+     */
+    @Nullable String whyItMatters,
     @Nullable String areaSlug,
     @Nullable String areaName,
     @NonNull CatalogAdoptionAvailability availability,

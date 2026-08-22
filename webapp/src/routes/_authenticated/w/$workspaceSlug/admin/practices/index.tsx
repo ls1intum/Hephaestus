@@ -216,8 +216,13 @@ function PracticeCatalogRoute() {
 						creatingArea: catalog.createArea.isPending,
 					}}
 					focusFilter={focus ?? "ALL"}
-					library={
-						catalogQuery.isError
+					library={{
+						open: library === true,
+						onOpenChange: (open) =>
+							navigate({
+								search: (previous) => ({ ...previous, library: open || undefined }),
+							}),
+						state: catalogQuery.isError
 							? {
 									status: "error",
 									error: catalogQuery.error,
@@ -225,14 +230,8 @@ function PracticeCatalogRoute() {
 								}
 							: catalogQuery.data
 								? { status: "ready", practices: catalogQuery.data }
-								: { status: "loading" }
-					}
-					showLibrary={library === true}
-					onShowLibraryChange={(showLibrary) =>
-						navigate({
-							search: (previous) => ({ ...previous, library: showLibrary || undefined }),
-						})
-					}
+								: { status: "loading" },
+					}}
 					onFocusFilterChange={(next: FocusFilter) =>
 						navigate({
 							search: (previous) => ({

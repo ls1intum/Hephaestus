@@ -156,6 +156,13 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 				<ItemDescription className="line-clamp-none">
 					{artifactKindLabel(practice.artifactKind)}
 				</ItemDescription>
+				{/* Without this the rows differ only by name: 20 of the 37 bundled practices review a
+				    pull request, so the work type separates almost none of them. */}
+				{practice.whyItMatters && (
+					<ItemDescription className="line-clamp-2 text-pretty">
+						{practice.whyItMatters}
+					</ItemDescription>
+				)}
 			</ItemContent>
 			<ItemActions>
 				{def.badged && <StatusBadge def={def} />}

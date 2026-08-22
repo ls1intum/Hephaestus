@@ -3,6 +3,7 @@ import { expect } from "storybook/test";
 import { AreaPill } from "./AreaPill";
 
 const meta = {
+	title: "Shared/Practice catalog/Area pill",
 	component: AreaPill,
 	parameters: { layout: "centered" },
 	args: { slug: "review-ready-work", name: "Review-ready work" },

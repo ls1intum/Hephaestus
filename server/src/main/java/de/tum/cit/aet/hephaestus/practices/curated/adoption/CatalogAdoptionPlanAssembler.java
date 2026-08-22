@@ -45,6 +45,7 @@ class CatalogAdoptionPlanAssembler {
                     entry.slug(),
                     entry.effective().name(),
                     entry.effective().artifactKind(),
+                    entry.effective().whyItMatters(),
                     entry.effective().areaSlug(),
                     areaNames.get(entry.effective().areaSlug()),
                     availability(entry.slug(), workspacePractices.get(entry.slug())),
