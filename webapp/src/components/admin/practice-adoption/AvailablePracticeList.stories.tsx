@@ -78,7 +78,7 @@ export const DeletedAreaStillHasSomethingToAdd: Story = {
 	play: async ({ canvas }) => {
 		// The area is gone, so its adopted practice is listed again — but one entry is still available,
 		// so the area is offered as a review rather than a pure restore.
-		await expect(canvas.getByRole("link", { name: /Review area · 1 practice/ })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: /Review group · 1 practice/ })).toBeVisible();
 		// An added practice opens the workspace copy as a drawer level too, so nothing in the library
 		// navigates away from the library.
 		await expect(
@@ -91,7 +91,7 @@ export const DeletedAreaCanOnlyBeRestored: Story = {
 	args: { practices: [practices[1]], existingAreaSlugs: new Set() },
 	play: async ({ canvas }) => {
 		// Nothing left to add, so putting the area back is the only thing on offer.
-		await expect(canvas.getByRole("link", { name: /Restore area · 1 practice/ })).toBeVisible();
+		await expect(canvas.getByRole("link", { name: /Restore group · 1 practice/ })).toBeVisible();
 	},
 };
 

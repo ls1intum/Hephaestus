@@ -153,7 +153,7 @@ export const UnassignedAndOff: Story = {
 		}),
 	},
 	play: async () => {
-		await expectSettledVisible(await screen.findByText("Belong to no area"));
+		await expectSettledVisible(await screen.findByText("Stay unassigned"));
 		await expect(screen.getByText("Off")).toBeVisible();
 	},
 };

@@ -119,7 +119,7 @@ function PracticeCatalogRoute() {
 				result.added.length > 0 && `${result.added.length} added`,
 				result.moved.length > 0 && `${result.moved.length} moved`,
 			].filter(Boolean);
-			toast.success("Area updated", { description: changes.join(", ") });
+			toast.success("Group updated", { description: changes.join(", ") });
 		},
 		onError: () => toast.error("Couldn't add the area. Nothing was changed."),
 	});
@@ -326,7 +326,7 @@ function PracticeCatalogRoute() {
 										if (problemStatusOf(error) !== 412) return;
 										const refreshed = await query.refetch();
 										if (refreshed.isSuccess) setStaleLevelKey(detailStackKey(entry));
-										else toast.error("The area plan changed but couldn't be refreshed");
+										else toast.error("The group plan changed but couldn't be refreshed");
 									}
 								}}
 							/>
@@ -437,7 +437,7 @@ function PracticeCatalogRoute() {
 								);
 							}}
 						>
-							{catalog.deleteArea.isPending ? "Deleting…" : "Delete area and practices"}
+							{catalog.deleteArea.isPending ? "Deleting…" : "Delete group and practices"}
 						</AlertDialogAction>
 					</AlertDialogFooter>
 				</AlertDialogContent>

@@ -31,7 +31,7 @@ export function CuratedCatalogSummary({
 				<Badge variant="warning">
 					{summary.updatesChangingDetection}{" "}
 					{summary.updatesChangingDetection === 1 ? "update would" : "updates would"} change review
-					behavior
+					rules
 				</Badge>
 			)}
 			{summary.updatesChangingWordingOnly > 0 && (
@@ -44,8 +44,8 @@ export function CuratedCatalogSummary({
 			{summary.updatesChangingPresentation > 0 && (
 				<Badge variant="secondary">
 					{summary.updatesChangingPresentation}{" "}
-					{summary.updatesChangingPresentation === 1 ? "update would" : "updates would"} change area
-					appearance
+					{summary.updatesChangingPresentation === 1 ? "update would" : "updates would"} change
+					group appearance
 				</Badge>
 			)}
 			{removedDefaultsToReview > 0 && (

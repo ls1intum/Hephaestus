@@ -19,7 +19,7 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/areas/$areaSlug")({
-	head: instanceAdminHead("Edit area"),
+	head: instanceAdminHead("Edit group"),
 	component: EditCuratedAreaPage,
 });
 
@@ -39,7 +39,7 @@ function EditCuratedAreaPage() {
 			<PageLayout>
 				<QueryErrorAlert
 					error={areaQuery.error}
-					title="Couldn't load the area"
+					title="Couldn't load the group"
 					onRetry={() => areaQuery.refetch()}
 				/>
 			</PageLayout>
@@ -73,7 +73,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 		onSuccess: (updated: CuratedArea) => {
 			queryClient.setQueryData(detailQueryKey, updated);
 			invalidateCatalog();
-			toast.success("Area updated");
+			toast.success("Group updated");
 			navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) => {
@@ -81,7 +81,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 				setConflict(true);
 				return;
 			}
-			toast.error("Couldn't update the area", { description: problemDetailOf(error) });
+			toast.error("Couldn't update the group", { description: problemDetailOf(error) });
 		},
 	});
 	const deleteOverride = useMutation({
@@ -101,7 +101,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
 				toast.error(
-					"The catalog changed before this action was saved. Reopen the area to see the latest version.",
+					"The catalog changed before this action was saved. Reopen the group to see the latest version.",
 				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				invalidateCatalog();
@@ -119,14 +119,14 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 			setConflict(false);
 			toast.success(
 				baseArea.status.state === "NO_LONGER_SHIPPED"
-					? "Saved area is now custom"
+					? "Saved group is now custom"
 					: "Saved version kept",
 			);
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
 				toast.error(
-					"The catalog changed before this action was saved. Reopen the area to see the latest version.",
+					"The catalog changed before this action was saved. Reopen the group to see the latest version.",
 				);
 				void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 				invalidateCatalog();

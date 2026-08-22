@@ -7,14 +7,15 @@ import { CatalogOriginBadge } from "@/components/admin/practices/CatalogOriginBa
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
+import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { buttonVariants } from "@/components/ui/button";
 import { DrawerBody, DrawerDescription, DrawerFooter, DrawerTitle } from "@/components/ui/drawer";
 import { Item, ItemContent, ItemDescription, ItemGroup, ItemTitle } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
-import { artifactKindLabel } from "@/lib/artifact-kinds";
-import { inheritedAutonomySourceSentence } from "@/lib/practice-autonomy";
+import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 
 export type WorkspacePracticeState =
@@ -70,7 +71,7 @@ export function WorkspacePracticePanel({
 
 	const { practice, definitionOptions, areaName } = state;
 	const autonomy = AUTONOMY_DEFS[practice.autonomy.effective];
-	const follows = inheritedAutonomySourceSentence(practice.autonomy, areaName ?? null);
+	const autonomySource = autonomySourceOf(practice.autonomy, areaName ?? null);
 
 	return (
 		<>
@@ -78,7 +79,9 @@ export function WorkspacePracticePanel({
 				<AreaPill size="lg" slug={practice.areaSlug} name={areaName} />
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<DrawerTitle className="break-words">{practice.name}</DrawerTitle>
-					<DrawerDescription>{artifactKindLabel(practice.artifactKind)}</DrawerDescription>
+					<DrawerDescription>
+						<WorkTypeLabel artifactKind={practice.artifactKind} />
+					</DrawerDescription>
 				</div>
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</DetailDrawerHeader>
@@ -87,12 +90,14 @@ export function WorkspacePracticePanel({
 				<ItemGroup className="gap-2">
 					<Item variant="muted" size="sm" role="listitem">
 						<ItemContent>
-							<ItemTitle>
+							<ItemTitle className="flex flex-wrap items-center gap-2">
 								<StatusBadge def={autonomy} />
+								<AutonomySourceNote
+									source={autonomySource}
+									className="text-muted-foreground text-xs font-normal"
+								/>
 							</ItemTitle>
-							<ItemDescription className="line-clamp-none">
-								{follows ? `${follows}. ${autonomy.description}` : autonomy.description}
-							</ItemDescription>
+							<ItemDescription className="line-clamp-none">{autonomy.description}</ItemDescription>
 						</ItemContent>
 					</Item>
 				</ItemGroup>

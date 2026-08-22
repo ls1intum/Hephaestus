@@ -194,7 +194,7 @@ export function CuratedCatalog({
 							</EmptyMedia>
 							<EmptyTitle>The catalog is empty</EmptyTitle>
 							<EmptyDescription>
-								Create an area or practice, then offer it to workspace administrators.
+								Create a group or practice, then include it for workspace administrators.
 							</EmptyDescription>
 						</EmptyHeader>
 						<EmptyContent>
@@ -278,11 +278,11 @@ export function CuratedCatalog({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Stop offering “{excludingPractice?.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>Exclude “{excludingPractice?.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{excludingPractice?.effectivelyOffered === false
 								? "Its area is already not offered. This keeps the practice unavailable if the area is offered again. Existing workspace copies will not change."
-								: "Workspace administrators will no longer be able to add this practice. Existing workspace copies will not change. You can offer it again later."}
+								: "Workspace administrators will no longer be able to add this practice. Existing workspace copies will not change. You can include it again later."}
 						</AlertDialogDescription>
 					</AlertDialogHeader>
 					<AlertDialogFooter>
@@ -307,7 +307,7 @@ export function CuratedCatalog({
 			>
 				<AlertDialogContent>
 					<AlertDialogHeader>
-						<AlertDialogTitle>Stop offering “{excludingArea?.definition.name}”?</AlertDialogTitle>
+						<AlertDialogTitle>Exclude “{excludingArea?.definition.name}”?</AlertDialogTitle>
 						<AlertDialogDescription>
 							{practicesExcludedWithArea.length === 0
 								? "Workspace administrators will no longer be able to add this area. No additional practices are affected. Existing workspace copies will not change."

@@ -23,13 +23,15 @@ export function CatalogOriginBadge({ origin, kind }: CatalogOriginBadgeProps) {
 	if (!origin) {
 		return null;
 	}
-	const subject = kind === "practice" ? "review rules" : "area details";
+	// `kind` is the code word; these are the two words the reader sees.
+	const subject = kind === "practice" ? "review rules" : "group details";
+	const noun = kind === "practice" ? "practice" : "group";
 
 	if (!origin.sourceOffered) {
 		return (
 			<OriginBadge
 				label="No longer in the catalog"
-				explanation={`New workspaces no longer receive this ${kind}. Yours keeps working exactly as it is.`}
+				explanation={`New workspaces no longer receive this ${noun}. Yours keeps working exactly as it is.`}
 			/>
 		);
 	}

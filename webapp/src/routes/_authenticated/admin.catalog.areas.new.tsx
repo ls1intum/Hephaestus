@@ -10,7 +10,7 @@ import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
 export const Route = createFileRoute("/_authenticated/admin/catalog/areas/new")({
-	head: instanceAdminHead("Create area"),
+	head: instanceAdminHead("Create group"),
 	component: NewCuratedAreaPage,
 });
 
@@ -21,11 +21,11 @@ function NewCuratedAreaPage() {
 		...adminCreateCuratedAreaMutation(),
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
-			toast.success("Area created");
+			toast.success("Group created");
 			navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) =>
-			toast.error("Couldn't create the area", { description: problemDetailOf(error) }),
+			toast.error("Couldn't create the group", { description: problemDetailOf(error) }),
 	});
 
 	return (

@@ -205,7 +205,7 @@ export const AreaOverride: Story = {
 		await expect(args.onSetAreaAutonomy).toHaveBeenCalledWith("testing", "AUTOMATIC");
 
 		// The bucket for practices in no area holds no autonomy of its own — it is not a row anywhere.
-		const unassigned = canvas.getByText("Not in an area").closest('[data-slot="accordion-item"]');
+		const unassigned = canvas.getByText("Unassigned").closest('[data-slot="accordion-item"]');
 		if (!(unassigned instanceof HTMLElement)) throw new Error("No-area group not rendered");
 		await expect(within(unassigned).getByText("Follows the workspace default")).toBeVisible();
 		await expect(

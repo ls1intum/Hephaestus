@@ -41,9 +41,9 @@ export const UpdatesWaiting: Story = {
 		},
 	},
 	play: async ({ canvas }) => {
-		await expect(canvas.getByText("2 updates would change review behavior")).toBeVisible();
+		await expect(canvas.getByText("2 updates would change review rules")).toBeVisible();
 		await expect(canvas.getByText("5 updates would change wording or guidance")).toBeVisible();
-		await expect(canvas.getByText("1 update would change area appearance")).toBeVisible();
+		await expect(canvas.getByText("1 update would change group appearance")).toBeVisible();
 		await expect(canvas.getByText("8 Hephaestus changes need review")).toBeVisible();
 		await expect(canvas.getByRole("button", { name: "Review changes" })).toBeVisible();
 	},

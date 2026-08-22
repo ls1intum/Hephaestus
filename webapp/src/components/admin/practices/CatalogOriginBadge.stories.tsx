@@ -90,7 +90,7 @@ export const AreaChanged: Story = {
 	play: async ({ canvas }) => {
 		const status = canvas.getByRole("button", { name: "Catalog changed, yours did not" });
 		status.focus();
-		const tooltip = await within(document.body).findByText(/different area details/);
+		const tooltip = await within(document.body).findByText(/different group details/);
 		await waitFor(() => expect(tooltip).toBeVisible());
 	},
 };

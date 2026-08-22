@@ -11,6 +11,7 @@ import { Section } from "@/components/core/Section";
 import { AUTONOMY_DEFS } from "@/components/practice-vocabulary/autonomy-defs";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import {
 	Accordion,
 	AccordionContent,
@@ -29,7 +30,6 @@ import {
 	ItemTitle,
 } from "@/components/ui/item";
 import { Separator } from "@/components/ui/separator";
-import { artifactKindLabel } from "@/lib/artifact-kinds";
 import { cn } from "@/lib/utils";
 
 export type PracticeAdoptionState =
@@ -74,7 +74,7 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<DrawerTitle className="break-words">{preview.definition.name}</DrawerTitle>
 					<DrawerDescription>
-						{artifactKindLabel(preview.definition.artifactKind)}
+						<WorkTypeLabel artifactKind={preview.definition.artifactKind} />
 					</DrawerDescription>
 				</div>
 				{availability.badged && <StatusBadge def={availability} className="mt-0.5" />}
@@ -231,7 +231,7 @@ function AutonomyOutcome({ preview }: { preview: CatalogPracticePreview }) {
 }
 
 function areaTitle(preview: CatalogPracticePreview): string {
-	if (preview.area.disposition === "UNASSIGNED") return "Belong to no area";
+	if (preview.area.disposition === "UNASSIGNED") return "Stay unassigned";
 	const name = preview.area.definition?.name ?? preview.area.slug ?? "catalog area";
 	if (preview.area.disposition === "REUSE_EXISTING_AREA") return `Join “${name}”`;
 	return `Create “${name}”`;

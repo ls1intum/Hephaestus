@@ -5,6 +5,7 @@ import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink
 import { Section } from "@/components/core/Section";
 import { CATALOG_AVAILABILITY_DEFS } from "@/components/practice-vocabulary/catalog-availability-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { buttonVariants } from "@/components/ui/button";
 import {
 	Empty,
@@ -22,7 +23,6 @@ import {
 	ItemMedia,
 	ItemTitle,
 } from "@/components/ui/item";
-import { artifactKindLabel } from "@/lib/artifact-kinds";
 
 export interface AvailablePracticeListProps {
 	practices: CatalogPracticeSummary[];
@@ -60,7 +60,7 @@ export function AvailablePracticeList({
 					<EmptyDescription>
 						{allAdded
 							? "This workspace already has every practice the catalog currently includes."
-							: "The instance catalog does not currently offer any practices to this workspace."}
+							: "The instance catalog includes no practices for this workspace yet."}
 					</EmptyDescription>
 				</EmptyHeader>
 			</Empty>
@@ -90,7 +90,7 @@ export function AvailablePracticeList({
 						title={
 							<span className="flex items-center gap-2">
 								<AreaPill size="sm" slug={areaSlug} name={first.areaName} />
-								{first.areaName ?? "No area"}
+								{first.areaName ?? "Unassigned"}
 							</span>
 						}
 						actions={
@@ -100,10 +100,10 @@ export function AvailablePracticeList({
 									className={buttonVariants({ size: "sm", variant: "outline" })}
 								>
 									{areaMissing && available === 0
-										? `Restore area · ${countLabel(restorable)}`
+										? `Restore group · ${countLabel(restorable)}`
 										: existingAreaSlugs.has(areaSlug)
 											? `Review ${countLabel(available)}`
-											: `Review area · ${countLabel(available)}`}
+											: `Review group · ${countLabel(available)}`}
 								</DetailStackLink>
 							) : (
 								<span className="text-xs text-muted-foreground">{countLabel(entries.length)}</span>
@@ -154,7 +154,7 @@ function PracticeRow({ practice }: { practice: CatalogPracticeSummary }) {
 					<span className="sr-only">, {def.action}</span>
 				</ItemTitle>
 				<ItemDescription className="line-clamp-none">
-					{artifactKindLabel(practice.artifactKind)}
+					<WorkTypeLabel artifactKind={practice.artifactKind} />
 				</ItemDescription>
 				{/* Without this the rows differ only by name: 20 of the 37 bundled practices review a
 				    pull request, so the work type separates almost none of them. */}

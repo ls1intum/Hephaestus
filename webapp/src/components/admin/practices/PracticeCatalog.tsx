@@ -26,8 +26,10 @@ import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { DetailStackLink } from "@/components/core/detail-drawer/DetailStackLink";
 import { Section } from "@/components/core/Section";
 import { AutonomyBadge } from "@/components/practice-vocabulary/AutonomyBadge";
+import { AutonomySourceNote } from "@/components/practice-vocabulary/AutonomySourceNote";
 import { DASHBOARD_VISIBILITY_DEFS } from "@/components/practice-vocabulary/dashboard-visibility-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { WorkTypeLabel } from "@/components/practice-vocabulary/WorkTypeLabel";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -53,8 +55,8 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ARTIFACT_KIND, artifactKindLabel, type KnownArtifactKind } from "@/lib/artifact-kinds";
-import { inheritedAutonomySourceSentence } from "@/lib/practice-autonomy";
+import { ARTIFACT_KIND, type KnownArtifactKind } from "@/lib/artifact-kinds";
+import { autonomySourceOf } from "@/lib/practice-autonomy";
 import { cn } from "@/lib/utils";
 import { CatalogOriginBadge } from "./CatalogOriginBadge";
 
@@ -167,7 +169,7 @@ export function PracticeCatalog({
 				<Section
 					size="sm"
 					title="Instance catalog"
-					description="Practices this instance offers. Adding one gives you a copy you own — later catalog changes never reach it."
+					description="Practices this instance includes. Adding one gives you a copy you own — later catalog changes never reach it."
 					// Arrives rather than appears: the toggle is above it, so a section that simply exists
 					// on the next frame gives no clue where it came from. Short, and off under
 					// `prefers-reduced-motion`, where the arrival is the information and the travel is not.
@@ -274,7 +276,7 @@ export function PracticeCatalog({
 				)}
 				getEmptyLabel={(areaSlug, total) => {
 					if (total > 0) return "No matching practices.";
-					return areaSlug === null ? "No unassigned practices." : "No practices in this area.";
+					return areaSlug === null ? "Nothing unassigned." : "No practices here.";
 				}}
 			/>
 
@@ -282,9 +284,7 @@ export function PracticeCatalog({
 				<Empty className="border">
 					<EmptyHeader>
 						<EmptyTitle>No practices yet</EmptyTitle>
-						<EmptyDescription>
-							Create a practice, then group related practices into areas.
-						</EmptyDescription>
+						<EmptyDescription>Create a practice, then group related practices.</EmptyDescription>
 					</EmptyHeader>
 				</Empty>
 			)}
@@ -600,14 +600,14 @@ function PracticeRowDetails({
 		practice.automatedReviewPolicy,
 		supportedModes,
 	);
-	const follows = inheritedAutonomySourceSentence(practice.autonomy, inheritedFrom);
+	const autonomySource = autonomySourceOf(practice.autonomy, inheritedFrom);
 	return (
 		<ItemContent className="min-w-0">
 			<ItemTitle className="w-full min-w-0 line-clamp-none">{title}</ItemTitle>
 			<ItemDescription className="flex flex-wrap items-center gap-1.5">
-				<span>{artifactKindLabel(practice.artifactKind)}</span>
+				<WorkTypeLabel artifactKind={practice.artifactKind} />
 				<AutonomyBadge autonomy={practice.autonomy.effective} />
-				<span>{follows ?? "Set for this practice"}</span>
+				<AutonomySourceNote source={autonomySource} />
 				{unavailableLabel && <Badge variant="warning">{unavailableLabel}</Badge>}
 				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</ItemDescription>

@@ -450,7 +450,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							</Field>
 
 							<Field>
-								<FieldLabel htmlFor="practice-area">Practice area</FieldLabel>
+								<FieldLabel htmlFor="practice-area">Practice group</FieldLabel>
 								<Select
 									items={areaItems}
 									value={form.areaSlug}
@@ -470,7 +470,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									</SelectContent>
 								</Select>
 								<FieldDescription id="practice-area-description">
-									Group this practice under an area.
+									Put this practice in a group.
 								</FieldDescription>
 							</Field>
 						</FieldGroup>
@@ -527,7 +527,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 								maxLength={2_000}
 							/>
 							<FieldDescription>
-								Shown to developers; it does not change review behavior.
+								Shown to developers; it does not change review rules.
 							</FieldDescription>
 						</Field>
 						<Field>

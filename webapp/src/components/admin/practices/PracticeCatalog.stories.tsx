@@ -406,9 +406,9 @@ export const EmptyDestinations: Story = {
 		for (const area of mockAreas) {
 			const areaSection = canvas.getByText(area.name).closest('[data-slot="accordion-item"]');
 			if (!(areaSection instanceof HTMLElement)) throw new Error(`Area ${area.name} not rendered`);
-			await expect(within(areaSection).getByText("No practices in this area.")).toBeVisible();
+			await expect(within(areaSection).getByText("No practices here.")).toBeVisible();
 		}
-		await expect(canvas.getByText("No unassigned practices.")).toBeVisible();
+		await expect(canvas.getByText("Nothing unassigned.")).toBeVisible();
 		await expectNoPageOverflow();
 	},
 };
@@ -426,7 +426,7 @@ export const CrossAreaDrag: Story = {
 			.getByText(mockAreas[1].name)
 			.closest('[data-slot="accordion-item"]');
 		if (!(destinationArea instanceof HTMLElement)) throw new Error("Destination area not rendered");
-		const destination = within(destinationArea).getByText("No practices in this area.");
+		const destination = within(destinationArea).getByText("No practices here.");
 		const sourceRow = handle.closest('[data-slot="item"]');
 		if (!(sourceRow instanceof HTMLElement)) throw new Error("Practice row not rendered");
 		const start = handle.getBoundingClientRect();
@@ -524,7 +524,7 @@ export const BlockedDestinationDrag: Story = {
 			.getByText(mockAreas[1].name)
 			.closest<HTMLElement>('[data-slot="accordion-item"]');
 		if (!destinationArea) throw new Error("Blocked destination area not rendered");
-		const destination = within(destinationArea).getByText("No practices in this area.");
+		const destination = within(destinationArea).getByText("No practices here.");
 		const start = handle.getBoundingClientRect();
 		const end = destination.getBoundingClientRect();
 

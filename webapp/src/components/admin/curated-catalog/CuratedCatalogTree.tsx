@@ -131,7 +131,7 @@ export function CuratedCatalogTree({
 			renderEntryPreview={(practice) => <PracticeDragPreview practice={practice} />}
 			getEmptyLabel={(areaSlug, total) => {
 				if (total > 0) return "No matching practices.";
-				return areaSlug === null ? "No unassigned practices." : "No practices in this area.";
+				return areaSlug === null ? "Nothing unassigned." : "No practices here.";
 			}}
 		/>
 	);
@@ -252,8 +252,8 @@ function PracticeDetails({ practice }: { practice: TreePractice }) {
 				{parentUnavailable && (
 					<Badge variant="outline">
 						{practice.missingAreaSlug
-							? "Area no longer exists"
-							: "Excluded because its area is excluded"}
+							? "Group no longer exists"
+							: "Excluded because its group is excluded"}
 					</Badge>
 				)}
 				<CuratedEntryBadges status={practice.status} kind="practice" />
@@ -284,10 +284,10 @@ function PracticeActions({
 		: undefined;
 	const parentUnavailable = Boolean(practice.missingAreaSlug) || area?.status.offered === false;
 	const includeLabel = practice.missingAreaSlug
-		? "Move to Unassigned or an included area first"
+		? "Move to Unassigned or an included group first"
 		: parentUnavailable
-			? "Include when its area is included"
-			: "Offer to workspaces";
+			? "Include when its group is included"
+			: "Include for workspaces";
 	const switchLabel = practice.missingAreaSlug
 		? `${practice.name} cannot be included until it is moved out of the missing area`
 		: parentUnavailable

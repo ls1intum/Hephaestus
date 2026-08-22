@@ -82,7 +82,7 @@ describe("instance catalog routes", () => {
 		renderRouteAt("/admin/catalog");
 
 		await screen.findByText("1 Hephaestus change needs review", undefined, ROUTE_RENDER_WAIT);
-		screen.getByText("1 update would change review behavior");
+		screen.getByText("1 update would change review rules");
 		fireEvent.click(screen.getByRole("button", { name: "Review changes" }));
 		expect(await screen.findByRole("button", { name: "Show all entries" })).toBeTruthy();
 	});
@@ -102,9 +102,9 @@ describe("instance catalog routes", () => {
 		mockCatalog();
 		renderRouteAt("/admin/catalog");
 
-		fireEvent.click(await screen.findByRole("link", { name: "Create area" }, ROUTE_RENDER_WAIT));
+		fireEvent.click(await screen.findByRole("link", { name: "Create group" }, ROUTE_RENDER_WAIT));
 
-		await screen.findByRole("heading", { name: "Create area" }, ROUTE_RENDER_WAIT);
+		await screen.findByRole("heading", { name: "Create group" }, ROUTE_RENDER_WAIT);
 	});
 
 	it("reorders areas with the catalog tag", async () => {
@@ -286,7 +286,7 @@ describe("instance catalog routes", () => {
 
 		fireEvent.click(await screen.findByRole("link", { name: practiceDefinition.name }));
 		expect(
-			(await screen.findByRole("combobox", { name: "Practice area" }, ROUTE_RENDER_WAIT))
+			(await screen.findByRole("combobox", { name: "Practice group" }, ROUTE_RENDER_WAIT))
 				.textContent,
 		).toContain("Delivery");
 	});
@@ -371,7 +371,9 @@ describe("instance catalog routes", () => {
 		expect(
 			screen.getByRole("button", { name: "Use Hephaestus order" }).hasAttribute("disabled"),
 		).toBe(true);
-		expect(screen.getByRole("button", { name: "Create area" }).hasAttribute("disabled")).toBe(true);
+		expect(screen.getByRole("button", { name: "Create group" }).hasAttribute("disabled")).toBe(
+			true,
+		);
 		expect(screen.getByRole("button", { name: "Create practice" }).hasAttribute("disabled")).toBe(
 			true,
 		);

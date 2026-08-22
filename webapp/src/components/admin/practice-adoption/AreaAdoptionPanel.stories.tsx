@@ -127,7 +127,7 @@ export const RestoreDeletedArea: Story = {
 	},
 	play: async ({ args }) => {
 		// Nothing is created, so the action is a restore rather than an add.
-		const confirm = await screen.findByRole("button", { name: "Restore area" });
+		const confirm = await screen.findByRole("button", { name: "Restore group" });
 		await expectSettledVisible(confirm);
 		await expect(screen.getAllByText("Moves back")).toHaveLength(2);
 		// The panel's primary action, which no story reached before.
@@ -154,7 +154,7 @@ export const Loading: Story = {
 		await expectSettledVisible(panel as HTMLElement);
 		await expect(panel?.querySelectorAll('[data-slot="skeleton"]').length).toBeGreaterThan(0);
 		// The header cannot invent an area colour for a slug that has not loaded.
-		await expect(screen.getByRole("heading", { name: "Practice area" })).toBeVisible();
+		await expect(screen.getByRole("heading", { name: "Practice group" })).toBeVisible();
 	},
 };
 

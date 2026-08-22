@@ -81,7 +81,7 @@ function displayValue(
 		return artifactKindLabel(String(value));
 	}
 	if (field === "areaSlug" && typeof value === "string") {
-		return areaNames[value] ?? "Area no longer exists";
+		return areaNames[value] ?? "Group no longer exists";
 	}
 	if ((field === "icon" || field === "color") && typeof value === "string")
 		return humanizeToken(value);

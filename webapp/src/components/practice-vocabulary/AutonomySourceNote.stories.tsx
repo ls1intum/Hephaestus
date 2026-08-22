@@ -1,0 +1,39 @@
+import type { Meta, StoryObj } from "@storybook/react-vite";
+import { expect } from "storybook/test";
+import { AutonomySourceNote } from "./AutonomySourceNote";
+
+/**
+ * Where a practice's autonomy came from. Both states are named: silence for the chosen case is what
+ * let three surfaces disagree about what it meant.
+ */
+const meta = {
+	title: "Shared/Practice vocabulary/Autonomy source",
+	component: AutonomySourceNote,
+	parameters: { layout: "padded" },
+	tags: ["autodocs"],
+	args: { source: { kind: "inherited", from: "the workspace default" } },
+} satisfies Meta<typeof AutonomySourceNote>;
+
+export default meta;
+type Story = StoryObj<typeof meta>;
+
+export const FromTheWorkspace: Story = {
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Follows the workspace default")).toBeVisible();
+	},
+};
+
+export const FromItsGroup: Story = {
+	args: { source: { kind: "inherited", from: "Review-ready work" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Follows Review-ready work")).toBeVisible();
+	},
+};
+
+/** The state that used to render as nothing at all in one surface and a bare sentence in another. */
+export const ChosenHere: Story = {
+	args: { source: { kind: "chosen" } },
+	play: async ({ canvas }) => {
+		await expect(canvas.getByText("Set for this practice")).toBeVisible();
+	},
+};

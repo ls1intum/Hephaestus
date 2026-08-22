@@ -120,7 +120,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	const errorSummary: FormError[] = [
 		form.name.trim().length < 3 && {
 			fieldId: "area-name",
-			message: "Give the area a name of at least three characters.",
+			message: "Give the group a name of at least three characters.",
 		},
 		mode === "create" &&
 			!isValidSlug(form.slug) && {
@@ -193,10 +193,10 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 			</Link>
 			<PageHeader
 				icon={mode === "create" ? <ListPlus /> : <ClipboardPenLine />}
-				title={mode === "create" ? "Create area" : `Edit: ${initialData.name}`}
+				title={mode === "create" ? "Create group" : `Edit: ${initialData.name}`}
 				description={
 					mode === "create"
-						? "Use areas to group related practices in the instance catalog."
+						? "Groups keep related practices together in the instance catalog."
 						: "Saving updates the instance catalog. Existing workspace copies will not change."
 				}
 			/>
@@ -222,7 +222,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 				<div className="max-w-3xl space-y-2">
 					<Alert variant="warning">
 						<RotateCcw />
-						<AlertTitle>This area changed while you were editing</AlertTitle>
+						<AlertTitle>This group changed while you were editing</AlertTitle>
 						<AlertDescription>
 							Your draft is safe. Continue with it and save to replace the latest changes, or leave
 							this page and reopen the area to see them.
@@ -319,7 +319,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 										aria-describedby="area-description-help"
 									/>
 									<FieldDescription id="area-description-help">
-										What this area develops, in the words a developer would use.
+										What this group develops, in the words a developer would use.
 									</FieldDescription>
 								</Field>
 							</FieldGroup>
@@ -375,7 +375,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 								? "Creating…"
 								: "Saving…"
 							: mode === "create"
-								? "Create area"
+								? "Create group"
 								: "Save changes"}
 					</Button>
 				</FormActionBar>

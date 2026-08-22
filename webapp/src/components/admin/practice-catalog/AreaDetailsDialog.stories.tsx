@@ -25,7 +25,7 @@ type Story = StoryObj<typeof meta>;
 
 export const Creating: Story = {
 	play: async ({ args }) => {
-		await expectSettledVisible(await screen.findByRole("heading", { name: "Create area" }));
+		await expectSettledVisible(await screen.findByRole("heading", { name: "Create group" }));
 		await userEvent.type(screen.getByLabelText("Name"), "Documentation");
 		await userEvent.click(screen.getByRole("button", { name: "Create" }));
 		await expect(args.onSubmit).toHaveBeenCalledWith({
@@ -41,7 +41,7 @@ export const Renaming: Story = {
 	play: async ({ args }) => {
 		const field = await screen.findByLabelText("Name");
 		await expectSettledVisible(field);
-		await expect(screen.getByRole("heading", { name: "Edit area" })).toBeVisible();
+		await expect(screen.getByRole("heading", { name: "Edit group" })).toBeVisible();
 		await userEvent.clear(field);
 		await userEvent.type(field, "Review-ready work");
 		await userEvent.click(screen.getByRole("button", { name: "Save" }));

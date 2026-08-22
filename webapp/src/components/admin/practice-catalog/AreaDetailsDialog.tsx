@@ -92,7 +92,7 @@ function AreaDetailsForm({
 			}}
 		>
 			<DialogHeader>
-				<DialogTitle>{editing ? "Edit area" : "Create area"}</DialogTitle>
+				<DialogTitle>{editing ? "Edit group" : "Create group"}</DialogTitle>
 			</DialogHeader>
 			<DialogBody className="py-1">
 				<FieldGroup>
@@ -117,7 +117,7 @@ function AreaDetailsForm({
 								id={fieldId}
 								value={name}
 								onChange={(event) => setName(event.target.value)}
-								placeholder={editing ? undefined : "New area name…"}
+								placeholder={editing ? undefined : "New group name…"}
 								autoComplete="off"
 								disabled={pending}
 								aria-describedby={helpId}
@@ -125,7 +125,7 @@ function AreaDetailsForm({
 							/>
 						</div>
 						<FieldDescription id={helpId}>
-							The icon and colour appear on this area's chip. Left alone, both follow the name.
+							The icon and colour appear on this group's chip. Left alone, both follow the name.
 						</FieldDescription>
 					</Field>
 				</FieldGroup>

@@ -71,13 +71,13 @@ export function AreaAdoptionPanel({
 				)}
 				<div className="min-w-0 flex-1 space-y-0.5">
 					<DrawerTitle className="break-words">
-						{preview?.definition.name ?? "Practice area"}
+						{preview?.definition.name ?? "Practice group"}
 					</DrawerTitle>
 					{preview && (
 						<DrawerDescription>
 							{preview.disposition === "CREATE_CATALOG_AREA"
-								? "Creates this area in the workspace."
-								: "Uses the existing workspace area without changing it."}
+								? "Creates this group in the workspace."
+								: "Uses the existing workspace group without changing it."}
 						</DrawerDescription>
 					)}
 				</div>
@@ -89,7 +89,7 @@ export function AreaAdoptionPanel({
 						<CircleAlert />
 						<AlertTitle>The catalog changed while you were reading</AlertTitle>
 						<AlertDescription>
-							This is the current plan for the area. Nothing was added.
+							This is the current plan for the group. Nothing was added.
 						</AlertDescription>
 					</Alert>
 				)}
@@ -97,7 +97,7 @@ export function AreaAdoptionPanel({
 				{state.status === "error" && (
 					<QueryErrorAlert
 						error={state.error}
-						title="Couldn't load the current area definition"
+						title="Couldn't load the current group definition"
 						onRetry={state.onRetry}
 					/>
 				)}
@@ -151,7 +151,7 @@ export function AreaAdoptionPanel({
 						{state.action === "adding"
 							? "Adding…"
 							: restoring
-								? "Restore area"
+								? "Restore group"
 								: `Add ${changes.length} ${changes.length === 1 ? "practice" : "practices"}`}
 					</Button>
 				</DrawerFooter>

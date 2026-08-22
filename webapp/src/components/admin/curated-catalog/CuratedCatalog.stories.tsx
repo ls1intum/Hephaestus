@@ -169,7 +169,7 @@ export const OnlyIncluded: Story = { args: { search: { status: "OFFERED" } } };
 export const APracticeWhoseAreaIsGone: Story = {
 	play: async ({ args, canvas }) => {
 		await canvas.findByText("Outlived the area it was filed under");
-		await canvas.findByText("Area no longer exists");
+		await canvas.findByText("Group no longer exists");
 		await expect(
 			canvas.getByRole("switch", {
 				name: "Outlived the area it was filed under cannot be included until it is moved out of the missing area",
@@ -182,7 +182,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 		);
 		await expect(
 			await screen.findByRole("menuitem", {
-				name: "Move to Unassigned or an included area first",
+				name: "Move to Unassigned or an included group first",
 			}),
 		).toHaveAttribute("aria-disabled", "true");
 		await userEvent.keyboard("{Escape}");

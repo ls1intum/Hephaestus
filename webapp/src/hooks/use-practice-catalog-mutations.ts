@@ -92,12 +92,12 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas) =>
 				areas ? upsertArea(areas, created) : areas,
 			);
-			toast.success("Area created");
+			toast.success("Group created");
 		},
 		onError: (error) => {
 			const status = problemStatusOf(error);
 			toast.error(
-				status === 409 ? "An area with that name already exists" : "Couldn't create the area",
+				status === 409 ? "An area with that name already exists" : "Couldn't create the group",
 			);
 		},
 		onSettled: invalidateAreasAfterLastWrite,
@@ -123,7 +123,7 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 					patchArea(areas, previous.slug, selectAreaPatch(previous, variables.body)),
 				);
 			}
-			toast.error("Couldn't update the area");
+			toast.error("Couldn't update the group");
 		},
 		onSuccess: (updated, variables) => {
 			queryClient.setQueryData<PracticeArea[]>(areasQueryKey, (areas = []) =>

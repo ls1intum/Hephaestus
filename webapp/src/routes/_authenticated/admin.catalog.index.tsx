@@ -83,15 +83,15 @@ function AdminCuratedCatalogPage() {
 		onSuccess: (catalog: Catalog) => {
 			queryClient.setQueryData(adminGetCuratedCatalogQueryKey(), catalog);
 			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
-			toast.success(offered ? "Area offered to workspaces" : "Area is no longer offered");
+			toast.success(offered ? "Group included for workspaces" : "Group is no longer included");
 		},
 		onError: (error: unknown) => {
 			queryClient.removeQueries({ queryKey: detailKey("area", slug), exact: true });
 			invalidateCatalog();
 			toast.error(
 				problemStatusOf(error) === 412
-					? "The catalog changed before this action was saved. We reloaded the area."
-					: "Couldn't update the area",
+					? "The catalog changed before this action was saved. We reloaded the group."
+					: "Couldn't update the group",
 				{ description: problemDetailOf(error) },
 			);
 		},
@@ -230,7 +230,7 @@ function AdminCuratedCatalogPage() {
 						{writePending ? (
 							<Button variant="outline" disabled>
 								<Plus className="mr-1.5 size-4" aria-hidden />
-								Create area
+								Create group
 							</Button>
 						) : (
 							<Link
@@ -240,7 +240,7 @@ function AdminCuratedCatalogPage() {
 								className={buttonVariants({ variant: "outline" })}
 							>
 								<Plus className="mr-1.5 size-4" aria-hidden />
-								Create area
+								Create group
 							</Link>
 						)}
 						{writePending ? (
@@ -290,8 +290,8 @@ function AdminCuratedCatalogPage() {
 							? parent
 								? parent.status.offered
 									? undefined
-									: "Practice will be included when its area is included"
-								: "Move the practice to an included area first"
+									: "Practice will be included when its group is included"
+								: "Move the practice to an included group first"
 							: undefined;
 						updatePracticeStatus.mutate(
 							{
