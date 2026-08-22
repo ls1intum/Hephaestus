@@ -62,9 +62,7 @@ export function useMentorChat({
 		}),
 		enabled: Boolean(threadId) && hasWorkspace,
 		initialData: () =>
-			hasWorkspace
-				? (queryClient.getQueryData(threadQueryKey) as ChatThreadDetail | undefined)
-				: undefined,
+			hasWorkspace ? queryClient.getQueryData<ChatThreadDetail>(threadQueryKey) : undefined,
 		// A function, not a call: `Date.now()` here would run on every render, and React Compiler
 		// treats an impure call during render as a bailout.
 		initialDataUpdatedAt: () => Date.now(),

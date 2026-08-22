@@ -121,6 +121,19 @@ interface ActiveEntryDrop extends CatalogDropTarget {
 	overType: CatalogDndData["type"];
 }
 
+/**
+ * dnd-kit types `data.current` as an open record, so every read of it was an assertion. This checks
+ * the discriminant instead, which means a payload that does not match is `undefined` rather than a
+ * lie the type checker believed.
+ */
+function isCatalogDndData(data: unknown): data is CatalogDndData {
+	if (typeof data !== "object" || data === null || !("type" in data)) return false;
+	return data.type === "area" || data.type === "bucket" || data.type === "entry";
+}
+
+const catalogDndData = (data: unknown): CatalogDndData | undefined =>
+	isCatalogDndData(data) ? data : undefined;
+
 const areaDndId = (slug: string) => `area:${slug}`;
 const bucketDndId = (areaSlug: string | null) => `bucket:${areaSlug ?? UNASSIGNED_CATALOG_BUCKET}`;
 const entryDndId = (slug: string) => `entry:${slug}`;
@@ -183,7 +196,7 @@ export function SortableCatalogTree<
 	const collisionDetection: CollisionDetection = (args) => {
 		const activeType = args.active.data.current?.type;
 		const droppableContainers = args.droppableContainers.filter(({ data }) => {
-			const target = data.current as CatalogDndData | undefined;
+			const target = catalogDndData(data.current);
 			if (
 				activeType === "entry" &&
 				target &&
@@ -217,8 +230,8 @@ export function SortableCatalogTree<
 		active,
 		over,
 	}: Pick<DragOverEvent, "active" | "over">): CatalogDropTarget | null => {
-		const activeData = active.data.current as CatalogDndData | undefined;
-		const overData = over?.data.current as CatalogDndData | undefined;
+		const activeData = catalogDndData(active.data.current);
+		const overData = catalogDndData(over?.data.current);
 		if (activeData?.type !== "entry" || !over || !overData) return null;
 		const areaSlug = overData.areaSlug;
 		if (blockedMoveDestinationSlugs.has(areaSlug ?? UNASSIGNED_CATALOG_BUCKET)) return null;
@@ -244,20 +257,20 @@ export function SortableCatalogTree<
 	};
 
 	const handleDragStart = ({ active }: DragStartEvent) => {
-		const data = active.data.current as CatalogDndData | undefined;
+		const data = catalogDndData(active.data.current);
 		if (data?.type === "area") setActiveDrag({ type: "area", slug: data.areaSlug });
 		if (data?.type === "entry") setActiveDrag({ type: "entry", slug: data.entrySlug });
 	};
 
 	const handleDragOver = (event: DragOverEvent) => {
 		const target = resolveEntryDropTarget(event);
-		const overData = event.over?.data.current as CatalogDndData | undefined;
+		const overData = catalogDndData(event.over?.data.current);
 		setDropTarget(target && overData ? { ...target, overType: overData.type } : null);
 	};
 
 	const handleDragEnd = (event: DragEndEvent) => {
-		const activeData = event.active.data.current as CatalogDndData | undefined;
-		const overData = event.over?.data.current as CatalogDndData | undefined;
+		const activeData = catalogDndData(event.active.data.current);
+		const overData = catalogDndData(event.over?.data.current);
 		const target = resolveEntryDropTarget(event);
 		resetDrag();
 		if (!event.over || !activeData || !overData) return;
@@ -289,12 +302,12 @@ export function SortableCatalogTree<
 	};
 	const announcements = {
 		onDragStart: ({ active }: Pick<DragStartEvent, "active">) => {
-			const data = active.data.current as CatalogDndData | undefined;
+			const data = catalogDndData(active.data.current);
 			return data ? `Picked up ${data.label}.` : undefined;
 		},
 		onDragOver: ({ active, over }: Pick<DragOverEvent, "active" | "over">) => {
-			const data = active.data.current as CatalogDndData | undefined;
-			const overData = over?.data.current as CatalogDndData | undefined;
+			const data = catalogDndData(active.data.current);
+			const overData = catalogDndData(over?.data.current);
 			if (data?.type === "area") {
 				return overData?.type === "area"
 					? `Moving ${data.label}, position ${sortedAreas.findIndex(({ slug }) => slug === overData.areaSlug) + 1} of ${sortedAreas.length}.`
@@ -307,14 +320,14 @@ export function SortableCatalogTree<
 				: undefined;
 		},
 		onDragEnd: ({ active, over }: Pick<DragEndEvent, "active" | "over">) => {
-			const data = active.data.current as CatalogDndData | undefined;
+			const data = catalogDndData(active.data.current);
 			if (data?.type === "entry") {
 				const target = resolveEntryDropTarget({ active, over });
 				return target
 					? `Moved ${data.label} to ${describeTarget(target, data.entrySlug)}.`
 					: "Move cancelled.";
 			}
-			const overData = over?.data.current as CatalogDndData | undefined;
+			const overData = catalogDndData(over?.data.current);
 			return data && overData?.type === "area"
 				? `Moved ${data.label} to position ${sortedAreas.findIndex(({ slug }) => slug === overData.areaSlug) + 1} of ${sortedAreas.length}.`
 				: "Move cancelled.";
@@ -667,7 +680,7 @@ function EntryBucket<TEntry extends SortableCatalogEntry>({
 		disabled:
 			reorderDisabled || blockedMoveDestinationSlugs.has(areaSlug ?? UNASSIGNED_CATALOG_BUCKET),
 	});
-	const activeData = active?.data.current as CatalogDndData | undefined;
+	const activeData = catalogDndData(active?.data.current);
 	const isEntryDrag = activeData?.type === "entry";
 	const activeEntrySlug = activeData?.type === "entry" ? activeData.entrySlug : undefined;
 	const destinationEntries = entries.filter((entry) => entry.slug !== activeEntrySlug);

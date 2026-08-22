@@ -1,3 +1,4 @@
+import { z } from "zod";
 /**
  * Cookie/tracking consent store (English-only, no external dependency).
  *
@@ -76,25 +77,32 @@ function emitChange() {
 let cachedRaw: string | null = null;
 let cachedConsent: CookieConsent | null = null;
 
+/** Shape-checked rather than asserted: this value comes from localStorage, which anything can write. */
+const storedConsentSchema = z.object({
+	analytics: z.boolean(),
+	errorMonitoring: z.boolean(),
+	decidedAt: z.string().optional(),
+	version: z.number(),
+});
+
 function parseConsent(raw: string): CookieConsent | null {
+	let json: unknown;
 	try {
-		const parsed = JSON.parse(raw) as Partial<CookieConsent>;
-		if (typeof parsed?.analytics !== "boolean" || typeof parsed?.errorMonitoring !== "boolean") {
-			return null;
-		}
-		// A decision from an older policy version is re-prompted (treated as no decision).
-		if (parsed.version !== CONSENT_VERSION) {
-			return null;
-		}
-		return {
-			analytics: parsed.analytics,
-			errorMonitoring: parsed.errorMonitoring,
-			decidedAt: typeof parsed.decidedAt === "string" ? parsed.decidedAt : new Date().toISOString(),
-			version: CONSENT_VERSION,
-		};
+		json = JSON.parse(raw);
 	} catch {
 		return null;
 	}
+	const parsed = storedConsentSchema.safeParse(json);
+	// A decision from an older policy version is re-prompted (treated as no decision).
+	if (!parsed.success || parsed.data.version !== CONSENT_VERSION) {
+		return null;
+	}
+	return {
+		analytics: parsed.data.analytics,
+		errorMonitoring: parsed.data.errorMonitoring,
+		decidedAt: parsed.data.decidedAt ?? new Date().toISOString(),
+		version: CONSENT_VERSION,
+	};
 }
 
 /** Read the stored consent, or `null` when no decision has been made yet. */

@@ -1,7 +1,110 @@
 {
+  ".storybook/preview.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "e2e/sync-observability.live.spec.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/achievements/AchievementNode.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/achievements/AchievementSidebar.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/achievements/AchievementTooltip.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/achievements/SkillTreeDesigner.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/achievements/story-mock-data.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/AdminAchievementsPage.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/ai/AgentBindingsPage.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/ai/ModelPicker.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/audit/AdminAuditTable.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/admin/audit/AuthAuditPanel.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/audit/audit-format.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/config-audit/ConfigAuditPanel.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/admin/config-audit/ConfigAuditTable.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/config-audit/config-audit-format.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 4
+    }
+  },
+  "src/components/admin/curated-catalog/CuratedCatalog.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/curated-catalog/HephaestusVersionPanel.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/llm/ModelAccessScopeChoice.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/llm/PriceModeEditor.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
   "src/components/admin/login-providers/LoginProviderFormDialog.tsx": {
     "react/set-state-in-effect": {
       "count": 1
+    },
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
     }
   },
   "src/components/admin/login-providers/LoginProvidersTable.tsx": {
@@ -9,8 +112,73 @@
       "count": 1
     }
   },
+  "src/components/admin/practice-catalog/PracticeEvidenceEditor.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-catalog/PracticeMentoringSupportEditor.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-catalog/SortableCatalogTree.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-reviews/ProposalReviewPage.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-reviews/ReviewArtifact.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practice-reviews/story-mock-data.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/admin/practices/PracticeCatalog.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practices/PracticeReviewSweepSchedule.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/admin/practices/practice-autonomy/AutonomyLadder.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practices/review/ReviewPage.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/practices/review/review-sections.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/admin/teams/TeamTree.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
   "src/components/admin/usage/MonthNavigator.tsx": {
     "react/refs": {
+      "count": 1
+    }
+  },
+  "src/components/common/FacetMultiSelect.tsx": {
+    "typescript/no-unsafe-type-assertion": {
       "count": 1
     }
   },
@@ -34,16 +202,57 @@
       "count": 1
     }
   },
+  "src/components/leaderboard/LeaderboardTable.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
   "src/components/leaderboard/TimeframeFilter.tsx": {
     "react-hooks/exhaustive-deps": {
       "count": 2
     },
     "react/set-state-in-effect": {
       "count": 1
+    },
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/mentor/Message.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 3
+    }
+  },
+  "src/components/mentor/Messages.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/practice-vocabulary/status-def.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/practice-vocabulary/withholding-defs.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
     }
   },
   "src/components/profile/ProfileTimeframePicker.tsx": {
     "react/set-state-in-effect": {
+      "count": 1
+    },
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/settings/LinkedAccountsSection.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/shared/EmptyState.tsx": {
+    "typescript/no-unsafe-type-assertion": {
       "count": 1
     }
   },
@@ -72,8 +281,51 @@
       "count": 1
     }
   },
+  "src/components/ui/input-group.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/ui/sidebar.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/components/ui/sonner.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/ui/toggle-group.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/create-workspace/ConfigureWorkspaceStep.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/create-workspace/ConnectGitLabStep.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/create-workspace/WizardStepIndicator.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/components/workspace/create-workspace/wizard-context.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
   "src/hooks/use-active-workspace.ts": {
     "react-hooks/exhaustive-deps": {
+      "count": 1
+    },
+    "typescript/no-unsafe-type-assertion": {
       "count": 1
     }
   },
@@ -82,9 +334,74 @@
       "count": 1
     }
   },
+  "src/hooks/use-pending-mutation-ids.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
   "src/hooks/use-sync-events.ts": {
     "react/set-state-in-effect": {
       "count": 1
+    }
+  },
+  "src/integrations/auth/guard.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/integrations/feature-flags/FeatureFlagDevTools.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/integrations/feature-flags/hooks.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/integrations/theme/ThemeContext.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/lib/admin-llm-model-save.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/lib/chat-validation.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 2
+    }
+  },
+  "src/lib/llm-form-validation.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/lib/problem-detail.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 3
+    }
+  },
+  "src/lib/provider/provider-terms.ts": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/routes/_authenticated/admin.audit.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/routes/_authenticated/w/$workspaceSlug/admin/achievement-designer.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 1
+    }
+  },
+  "src/routes/_authenticated/workspaces/new/gitlab.tsx": {
+    "typescript/no-unsafe-type-assertion": {
+      "count": 4
     }
   }
 }
