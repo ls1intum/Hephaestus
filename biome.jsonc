@@ -2,14 +2,14 @@
 	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
 	// Root of the Biome monorepo graph. `webapp/biome.json` is the one nested config; it declares
 	// `"root": false` and keeps its own rules, so nothing here changes how the webapp is linted.
-	// This file governs every other TypeScript/JavaScript tree in the repo:
+	// This file governs the TypeScript and JavaScript outside the webapp and the docs site:
 	//   - the Bun agent runtime          server/src/main/resources/agent/**
-	//   - its bun:test specs             server/src/test/resources/agent/**
+	//   - its runner specs               server/src/test/resources/agent/**
 	//   - the shipped precompute scripts server/src/main/resources/practices/precompute/**
 	//   - the precompute harness         docker/agents/precompute/**
 	//   - the repo tooling scripts       scripts/**
-	// The same set `tsconfig.agents.json` and `scripts/tsconfig.json` type-check, so lint, format
-	// and typecheck cover exactly one surface with no gap between them.
+	// `tsconfig.agents.json` and `scripts/tsconfig.json` type-check the .ts half of that set;
+	// `docs/` is a third workspace package with its own tooling and is covered by neither config.
 	"root": true,
 	"vcs": {
 		"enabled": true,

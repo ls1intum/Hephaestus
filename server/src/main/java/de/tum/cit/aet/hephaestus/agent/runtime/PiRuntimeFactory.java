@@ -99,7 +99,6 @@ public class PiRuntimeFactory {
             "/node_modules && " +
             spec.precomputeStep() +
             runtimeEnvFragment +
-            // Bun executes the TypeScript runner directly; there is no build step and no Node.
             "bun " +
             runtimeFlagsFragment +
             workspaceRoot +

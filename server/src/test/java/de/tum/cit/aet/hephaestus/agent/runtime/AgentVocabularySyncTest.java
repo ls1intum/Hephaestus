@@ -70,16 +70,11 @@ class AgentVocabularySyncTest extends BaseUnitTest {
     }
 
     @Test
-    void runnerImportsTheVocabulary() throws IOException {
+    void runnerOffersTheFusedOutcomeVocabulary() throws IOException {
         String body = Files.readString(RUNNER, StandardCharsets.UTF_8);
 
         assertThat(body)
-            .as("pi-runner.ts imports the shared vocabularies from pi-observation-normalize.ts")
-            .contains("PRESENCE_VALUES")
-            .contains("ASSESSMENT_VALUES")
-            .contains("SEVERITY_VALUES");
-
-        assertThat(body)
+            .as("pi-runner.ts offers the fused outcome vocabulary the parser resolves against")
             .contains("\"BEHAVIOR_PRESENT_GOOD\"")
             .contains("\"BEHAVIOR_ABSENT_BAD_MAJOR\"")
             .contains("\"NO_REVIEW_OCCASION\"")

@@ -3,7 +3,10 @@
 
 import assert from "node:assert/strict";
 import test from "node:test";
-import type { ComposedFeedbackUnit } from "../../../main/resources/agent/pi-runner-composition.ts";
+import type {
+	ComposedFeedbackEnvelope,
+	ComposedFeedbackUnit,
+} from "../../../main/resources/agent/pi-runner-composition.ts";
 import { undeliverableUnits } from "../../../main/resources/agent/pi-runner-composition.ts";
 
 const supersede = (threadKey: string): ComposedFeedbackUnit => ({
@@ -36,7 +39,7 @@ test("only the unit naming an unlisted thread is undeliverable", () => {
 });
 
 test("units that supersede nothing are unaffected by an empty thread list", () => {
-	const envelope = {
+	const envelope: ComposedFeedbackEnvelope = {
 		preparedThreadKeys: [],
 		units: [
 			{ action: "NEW", channel: "IN_APP", practiceSlug: "p" },
