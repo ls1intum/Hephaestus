@@ -123,10 +123,10 @@ Do not: call `fetch` · duplicate loading/error state in local state · hand-rol
 
 ## React Compiler
 
-`vite.config.ts` feeds `reactCompilerPreset()` through `@rolldown/plugin-babel`, so **do not add**
-`useMemo`, `useCallback` or
-`React.memo` to new code. Existing usages stay — removing them changes compiler output for no gain.
-Reach for manual memoization only when you need precise control over an effect's dependencies.
+`vite.shared.ts` turns it on for every build of app source, so **do not add** `useMemo`,
+`useCallback` or `React.memo` to new code. Existing usages stay — removing them changes compiler
+output for no gain. Reach for manual memoization only when you need precise control over an effect's
+dependencies.
 
 ## Name a component for the concept, not for the wire
 
@@ -209,6 +209,15 @@ at runtime, with `tsc` perfectly happy. Assert on plain values instead:
 
 The matchers **are** available in stories, because `expect` from `storybook/test` ships them. Copying
 an assertion out of a story into a route test is exactly how this bites.
+
+## TypeScript versions
+
+Type checking runs on TypeScript 7 through the `typescript7` alias, invoked by path because both it
+and `typescript` install a `tsc` bin and the winner is undefined. `typescript` itself stays on 6
+because `@hey-api/openapi-ts` calls the TypeScript compiler API at runtime and 7 ships none — its
+peer range accepts 7, so nothing warns you before the generator dies. A scoped `parent>typescript`
+pnpm override does **not** help: peers resolve from this package, not the override. Collapse both
+onto 7 when `openapi-ts` stops needing the old compiler API.
 
 ## Generated files (do not edit)
 

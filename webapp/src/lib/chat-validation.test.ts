@@ -21,8 +21,7 @@ describe("parseThreadMessages", () => {
 		]);
 		expect(result).toHaveLength(2);
 		expect(result?.[0].id).toBe(UUID);
-		// forward-compat passthrough: unknown part fields survive validation
-		expect((result?.[0].parts[0] as Record<string, unknown>).extra).toBe(1);
+		expect(result?.[0].parts[0]).toMatchObject({ extra: 1 });
 	});
 
 	it("rejects a non-UUID message id (the exact class that silently skipped hydration)", () => {

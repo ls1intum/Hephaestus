@@ -126,7 +126,7 @@ class DockerInteractiveSandboxLiveTest {
 
         dockerOps = new DockerClientOperations(dockerClient);
         dockerWaitExecutor = Executors.newCachedThreadPool();
-        containerManager = new SandboxContainerManager(dockerOps, sandboxProperties, dockerWaitExecutor);
+        containerManager = new SandboxContainerManager(dockerOps, image -> {}, sandboxProperties, dockerWaitExecutor);
         networkManager = new SandboxNetworkManager(dockerOps, sandboxProperties);
         workspaceManager = new SandboxWorkspaceManager(dockerOps);
         securityPolicy = new ContainerSecurityPolicy(sandboxProperties, null);

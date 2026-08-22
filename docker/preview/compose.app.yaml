@@ -115,8 +115,11 @@ services:
           -U hephaestus -d hephaestus \
           --exit-on-error --no-owner --no-privileges < /tmp/seed.dump
 
-        echo "Applying preview silence policy"
+        # Inline rather than a mounted .sql file: Coolify materialises a relative bind mount as an
+        # empty managed directory, which `psql <` reads as zero bytes and exits 0 on.
+        echo "Applying the preview policy"
         docker exec -i "$$PREVIEW_PG" psql -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus <<'SQL'
+        -- 1. Silence: a clone must not act.
         UPDATE workspace
            SET practice_review_auto_trigger_enabled = FALSE,
                practice_review_manual_trigger_enabled = FALSE;
@@ -152,10 +155,37 @@ services:
                heartbeat_at = NULL,
                error_summary = 'Cancelled when staging data was cloned into a preview.'
          WHERE status IN ('PENDING', 'RUNNING');
+
+        -- 2. Re-home: a clone must not keep the source instance's identity. login_provider and
+        -- jwt_signing_key are reseeded from this deployment's own config on boot; issued_jwt is
+        -- simply dropped. Accounts survive — identity_link keys on identity_provider.
+        DELETE FROM issued_jwt;
+        DELETE FROM jwt_signing_key;
+        DELETE FROM login_provider;
         SQL
 
+        # The marker promises the policy is in force, so verify against the database rather than
+        # against psql's exit code — see the bind-mount note above for why those differ.
+        echo "Verifying the preview policy took effect"
+        LIVE=$$(docker exec "$$PREVIEW_PG" psql -tAX -v ON_ERROR_STOP=1 -U hephaestus -d hephaestus -c "
+          SELECT (SELECT count(*) FROM workspace
+                   WHERE practice_review_auto_trigger_enabled OR practice_review_manual_trigger_enabled)
+               + (SELECT count(*) FROM workspace_agent_binding WHERE enabled AND purpose = 'PRACTICE_REVIEW')
+               + (SELECT count(*) FROM review_sweep_schedule WHERE enabled)
+               + (SELECT count(*) FROM agent_job WHERE status IN ('QUEUED', 'RUNNING'))
+               + (SELECT count(*) FROM agent_job
+                   WHERE status = 'COMPLETED' AND delivery_status = 'PENDING')
+               + (SELECT count(*) FROM sync_job WHERE status IN ('PENDING', 'RUNNING'))
+               + (SELECT count(*) FROM login_provider)
+               + (SELECT count(*) FROM jwt_signing_key)
+               + (SELECT count(*) FROM issued_jwt)")
+        if [ "$$LIVE" != "0" ]; then
+          echo "Preview policy did not take effect ($$LIVE rows still live); refusing to mark this preview seeded"
+          exit 1
+        fi
+
         docker exec "$$PREVIEW_PG" touch /var/lib/postgresql/data/.hephaestus-preview-seeded
-        echo "Seed loaded; every cloned workspace starts with practice reviews paused"
+        echo "Seed loaded; reviews are paused and the preview owns its login apps and signing key"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     restart: "no"
@@ -165,18 +195,20 @@ services:
           cpus: "0.5"
           memory: 512M
 
-  # Docker creates named volumes as root:root; the buildpack image runs as `cnb` (1002:1001) and
-  # needs to write git checkouts and Tomcat access logs. Every deploy gets fresh volumes, so the
-  # ownership fix has to run on every deploy too.
+  # A new named volume is created root-owned, and one created by an earlier image keeps that image's
+  # uid. The buildpack image runs as `cnb` (1002:1001), so nothing under /data/git-repos is writable
+  # until the ownership matches — and that surfaces when an agent job first writes there, not at
+  # startup. -h so a symlink inside a checkout is retargeted rather than followed out of the volume.
   volume-init:
-    image: alpine:3
+    image: alpine:3@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
     command:
       - sh
       - -c
-      - chown -R 1002:1001 /data/git-repos && chmod 0755 /data/git-repos
+      - "chown -Rh 1002:1001 /data/git-repos && chmod 0755 /data/git-repos"
     volumes:
       - git-repos:/data/git-repos
     restart: "no"
+    network_mode: none
 
   # The service name must stay dash-free. Coolify stores a service's configured domain under the
   # service name but looks it up with dashes replaced by underscores, so a dashed name never
@@ -232,6 +264,10 @@ services:
       # Per-deploy durable name, so base and previews get their own JetStream consumers instead of
       # competing for one and stealing each other's messages.
       NATS_DURABLE_CONSUMER_NAME: ${SERVICE_NAME_APPSERVER:-appserver}-consumer
+      # A preview is deleted, not shut down, so it never removes the durables it created on the
+      # shared stream. Long enough that a redeploy, or a testing session paused overnight, resumes
+      # on its own cursor instead of skipping ahead to the head of the stream.
+      HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:-72h}
       # Issuer is this deploy's own origin, so a preview's tokens validate against the deploy that
       # issued them (Hephaestus-native auth, ADR 0017).
       HEPHAESTUS_AUTH_ISSUER: https://${SERVICE_FQDN_WEBAPP}
@@ -310,6 +346,10 @@ services:
       WEBHOOK_EXTERNAL_URL: ${WEBHOOK_EXTERNAL_URL:-https://staging.hephaestus.aet.cit.tum.de}
       THC_PORT: "8080"
       THC_PATH: /actuator/health/liveness
+    # Joins the host's docker group so the unprivileged image can reach root:docker 0660
+    # /var/run/docker.sock. Host-specific — see DOCKER_GROUP_ID in .env.example.
+    group_add:
+      - "${DOCKER_GROUP_ID:-999}"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - git-repos:/data/git-repos

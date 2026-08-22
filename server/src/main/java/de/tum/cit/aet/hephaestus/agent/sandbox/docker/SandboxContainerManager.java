@@ -26,6 +26,7 @@ public class SandboxContainerManager {
     private static final int SIGKILL_EXIT_CODE = 137;
 
     private final DockerContainerOperations containerOps;
+    private final SandboxImageGuard imageGuard;
     private final SandboxProperties properties;
 
     /**
@@ -39,10 +40,12 @@ public class SandboxContainerManager {
 
     public SandboxContainerManager(
         DockerContainerOperations containerOps,
+        SandboxImageGuard imageGuard,
         SandboxProperties properties,
         ExecutorService dockerWaitExecutor
     ) {
         this.containerOps = containerOps;
+        this.imageGuard = imageGuard;
         this.properties = properties;
         this.dockerWaitExecutor = dockerWaitExecutor;
     }
@@ -53,6 +56,7 @@ public class SandboxContainerManager {
      * @return the container ID
      */
     public String createContainer(DockerOperations.ContainerSpec spec) {
+        imageGuard.ensurePresent(spec.image());
         return containerOps.createContainer(spec);
     }
 

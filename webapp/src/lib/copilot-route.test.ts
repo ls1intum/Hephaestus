@@ -15,13 +15,10 @@ describe("isCopilotExcludedRoute", () => {
 		expect(isCopilotExcludedRoute(pathname)).toBe(true);
 	});
 
-	it.each([
-		"/",
-		"/administrator",
-		"/w/acme",
-		"/w/acme/user/ada",
-		"/w/acme/achievements",
-	])("allows %s", (pathname) => {
-		expect(isCopilotExcludedRoute(pathname)).toBe(false);
-	});
+	it.each(["/", "/administrator", "/w/acme", "/w/acme/user/ada", "/w/acme/achievements"])(
+		"allows %s",
+		(pathname) => {
+			expect(isCopilotExcludedRoute(pathname)).toBe(false);
+		},
+	);
 });

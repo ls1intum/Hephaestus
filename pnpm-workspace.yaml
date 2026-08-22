@@ -36,9 +36,9 @@ overrides:
   # rendered as an error on the docs site. Fixed upstream in 11.16.1; pinned here until Docusaurus
   # floors it, and pinned rather than ranged so the diagram cannot regress on a transitive bump.
   mermaid: 11.16.1
-  vitest: 4.1.6
-  '@vitest/browser': 4.1.6
-  '@vitest/runner': 4.1.6
+  vitest: 4.1.11
+  '@vitest/browser': 4.1.11
+  '@vitest/runner': 4.1.11
   dompurify: 3.4.4
   lodash: 4.18.1
   lodash-es: 4.18.1

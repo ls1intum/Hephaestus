@@ -12,6 +12,7 @@ import de.tum.cit.aet.hephaestus.agent.sandbox.SandboxProperties;
 import de.tum.cit.aet.hephaestus.agent.sandbox.spi.SandboxException;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
@@ -28,13 +29,14 @@ class SandboxContainerManagerTest extends BaseUnitTest {
     private DockerContainerOperations containerOps;
 
     private SandboxContainerManager manager;
+    private SandboxProperties properties;
     private ExecutorService executor;
 
     private static final String CONTAINER_ID = "abc123";
 
     @BeforeEach
     void setUp() {
-        SandboxProperties properties = new SandboxProperties(
+        properties = new SandboxProperties(
             "unix:///var/run/docker.sock",
             false,
             null,
@@ -49,12 +51,43 @@ class SandboxContainerManagerTest extends BaseUnitTest {
             null
         );
         executor = Executors.newSingleThreadExecutor();
-        manager = new SandboxContainerManager(containerOps, properties, executor);
+        manager = new SandboxContainerManager(containerOps, image -> {}, properties, executor);
     }
 
     @AfterEach
     void tearDown() {
         executor.shutdownNow();
+    }
+
+    @Nested
+    class CreateContainer {
+
+        @Test
+        void shouldEnsureImageIsPresentWhenCreatingContainer() {
+            List<String> guarded = new ArrayList<>();
+            SandboxContainerManager guardedManager = new SandboxContainerManager(
+                containerOps,
+                guarded::add,
+                properties,
+                executor
+            );
+            DockerOperations.ContainerSpec spec = new DockerOperations.ContainerSpec(
+                "ghcr.io/example/agent:latest",
+                List.of("true"),
+                Map.of(),
+                null,
+                null,
+                null,
+                Map.of(),
+                null,
+                List.of()
+            );
+            when(containerOps.createContainer(spec)).thenReturn(CONTAINER_ID);
+
+            guardedManager.createContainer(spec);
+
+            assertThat(guarded).containsExactly("ghcr.io/example/agent:latest");
+        }
     }
 
     @Nested
