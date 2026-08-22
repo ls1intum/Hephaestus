@@ -4,6 +4,17 @@ import { expect, fn } from "storybook/test";
 import type { AuthEventView } from "@/api/types.gen";
 import { AuthAuditPanel } from "./AuthAuditPanel";
 
+const failedLogin: AuthEventView = {
+	id: 2,
+	eventType: "LOGIN_FAILED",
+	result: "FAILURE",
+	failureReason: "Bad credentials",
+	occurredAt: new Date("2026-07-24T08:02:11Z"),
+	accountId: 7,
+	account: { id: 7, displayName: "Ada Lovelace", email: "ada@example.com" },
+	ipAddress: "203.0.113.7",
+};
+
 const events: AuthEventView[] = [
 	{
 		id: 3,
@@ -15,16 +26,7 @@ const events: AuthEventView[] = [
 		ipAddress: "203.0.113.7",
 		userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/140.0 Safari/537.36",
 	},
-	{
-		id: 2,
-		eventType: "LOGIN_FAILED",
-		result: "FAILURE",
-		failureReason: "Bad credentials",
-		occurredAt: new Date("2026-07-24T08:02:11Z"),
-		accountId: 7,
-		account: { id: 7, displayName: "Ada Lovelace", email: "ada@example.com" },
-		ipAddress: "203.0.113.7",
-	},
+	failedLogin,
 	{
 		id: 1,
 		eventType: "APP_ROLE_CHANGED",
@@ -93,7 +95,7 @@ export const FilteredToNothing: Story = {
 
 export const FiltersFromUrl: Story = {
 	args: { search: { tab: "signins", eventType: ["LOGIN_FAILED"], outcome: ["FAILURE"] } },
-	parameters: { msw: { handlers: handlers([events[1]]) } },
+	parameters: { msw: { handlers: handlers([failedLogin]) } },
 };
 
 export const LoadFailed: Story = {

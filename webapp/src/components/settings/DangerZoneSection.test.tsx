@@ -77,11 +77,10 @@ describe("DangerZoneSection — account deletion", () => {
 		let sentHeader: string | null = null;
 		server.use(
 			http.delete("*/user", ({ request }) => {
+				// The real server rejects a mismatched header with a 400; the assertion on `sentHeader`
+				// below names the value that was actually sent, which a bare 400 would not.
 				sentHeader = request.headers.get("X-Confirm-Delete");
-				// Enforce the real server contract: header must equal the account id.
-				return sentHeader === String(currentUser.id)
-					? new HttpResponse(null, { status: 204 })
-					: new HttpResponse(null, { status: 400 });
+				return new HttpResponse(null, { status: 204 });
 			}),
 		);
 

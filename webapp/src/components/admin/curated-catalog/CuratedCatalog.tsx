@@ -398,7 +398,7 @@ function CatalogFilters({
 				>
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Filter by inclusion in new workspaces">
 					{STATUS_FILTERS.map((filter) => (
 						<SelectItem key={filter.value} value={filter.value}>
 							{filter.label}
@@ -443,7 +443,7 @@ function CatalogFilters({
 				<SelectTrigger className="w-full lg:w-52" aria-label="Filter by work type">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Filter by work type">
 					{WORK_ARTIFACT_FILTER_ITEMS.map(({ value, label }) => (
 						<SelectItem key={value} value={value}>
 							{label}

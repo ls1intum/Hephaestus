@@ -1,7 +1,7 @@
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http, type PathParams } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { buildAutonomyFixture } from "@/components/admin/practices/practice-autonomy/story-mock-data";
 import { server } from "@/mocks/server";
 import { ROUTE_RENDER_WAIT, renderRouteAt, renderRouteAtWithRouter } from "@/test/router-harness";
@@ -146,7 +146,7 @@ describe("review route", () => {
 		const area = await screen.findByRole("button", { name: /Hygiene/ }, ROUTE_RENDER_WAIT);
 		await userEvent.click(area);
 		const row = (await screen.findByText("Links the issue")).closest("li");
-		if (!(row instanceof HTMLElement)) throw new Error("Practice row not rendered");
+		assert(row instanceof HTMLElement, "Practice row not rendered");
 
 		// `hidden: true`: jsdom runs no layout, so Base UI leaves the opened accordion panel carrying
 		// the attribute it strips once the panel has a height. The browser-run story covers the state a
@@ -159,7 +159,9 @@ describe("review route", () => {
 		);
 
 		await waitFor(() => expect(bodies).toHaveLength(1));
-		expect(bodies[0]).toEqual({});
-		expect("autonomy" in bodies[0]).toBe(false);
+		const [body] = bodies;
+		assert(body);
+		expect(body).toStrictEqual({});
+		expect("autonomy" in body).toBe(false);
 	});
 });

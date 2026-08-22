@@ -1,6 +1,11 @@
 import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
-import type { AdminWorkspaceLlmUsage, FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
+import { assert, describe, expect, it, vi } from "vitest";
+import type {
+	AdminWorkspaceLlmUsage,
+	FxRateInfo,
+	LlmUsageByDay,
+	WorkspaceLlmUsageReport,
+} from "@/api/types.gen";
 import { AdminInstanceLlmUsageTable } from "./AdminInstanceLlmUsageTable";
 
 const workspace: AdminWorkspaceLlmUsage = {
@@ -14,6 +19,14 @@ const workspace: AdminWorkspaceLlmUsage = {
 	ownProviderBudgetVerdict: "WITHIN",
 	ownProviderPaused: false,
 	events: 3,
+};
+
+const julyFifth: LlmUsageByDay = {
+	day: new Date("2026-07-05T00:00:00.000Z"),
+	instanceTotalCostUsd: 4.25,
+	ownProviderTotalCostUsd: 1.75,
+	unpricedEventCount: 0,
+	events: 1,
 };
 
 const detailReport: WorkspaceLlmUsageReport = {
@@ -41,15 +54,7 @@ const detailReport: WorkspaceLlmUsageReport = {
 			events: 2,
 		},
 	],
-	byDay: [
-		{
-			day: new Date("2026-07-05T00:00:00.000Z"),
-			instanceTotalCostUsd: 4.25,
-			ownProviderTotalCostUsd: 1.75,
-			unpricedEventCount: 0,
-			events: 1,
-		},
-	],
+	byDay: [julyFifth],
 };
 
 function renderTable(
@@ -74,8 +79,20 @@ function renderTable(
 	);
 }
 
-function firstDataRow() {
-	return screen.getAllByRole("row")[1];
+function firstDataRow(): HTMLElement {
+	const [, dataRow] = screen.getAllByRole("row");
+	assert(dataRow, "The table rendered its header but no workspace row.");
+	return dataRow;
+}
+
+/**
+ * What a screen reader announces for each control in the workspace row, in DOM order — the label
+ * where one is set, the visible text otherwise. Which controls a row offers is the assertion.
+ */
+function rowControlNames() {
+	return within(firstDataRow())
+		.getAllByRole("button")
+		.map((button) => button.getAttribute("aria-label") ?? button.textContent);
 }
 
 describe("AdminInstanceLlmUsageTable", () => {
@@ -180,10 +197,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 			{ ...workspace, ownProviderMonthlyBudgetUsd: 10, ownProviderBudgetVerdict: "WITHIN" },
 		]);
 
-		const buttons = within(firstDataRow())
-			.getAllByRole("button")
-			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
-		expect(buttons).toEqual([
+		expect(rowControlNames()).toStrictEqual([
 			"View usage details for Example Workspace",
 			"Set budget for Example Workspace (shared models)",
 		]);
@@ -192,10 +206,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 	it("withdraws the budget editor on a closed month and says why, once, above the table", () => {
 		renderTable([workspace], { isCurrentMonth: false });
 
-		const buttons = within(firstDataRow())
-			.getAllByRole("button")
-			.map((button) => button.getAttribute("aria-label") ?? button.textContent);
-		expect(buttons).toEqual(["View usage details for Example Workspace"]);
+		expect(rowControlNames()).toStrictEqual(["View usage details for Example Workspace"]);
 		screen.getByText(/applies from the moment it is saved/i);
 	});
 
@@ -309,7 +320,7 @@ describe("AdminInstanceLlmUsageTable", () => {
 						...detailReport,
 						fx: { ...eur, currencyCode: "GBP", ratePerUsd: 0.5 },
 						byDay: [
-							detailReport.byDay[0],
+							julyFifth,
 							{
 								day: new Date("2026-07-06T00:00:00.000Z"),
 								instanceTotalCostUsd: 4.25,

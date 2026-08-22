@@ -35,6 +35,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
+import { firstNonBlank } from "@/lib/text";
 
 const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITHUB: GithubIcon,
@@ -216,7 +217,8 @@ export function LinkedAccountsSection({
 								const identityId = identity.id;
 								const Icon = getProviderIcon(identity.providerType);
 								const name =
-									identity.displayName || identity.username || identity.subject || "Account";
+									firstNonBlank(identity.displayName, identity.username, identity.subject) ??
+									"Account";
 								const lastLogin = formatLastLogin(identity.lastLoginAt);
 
 								return (
@@ -262,7 +264,8 @@ export function LinkedAccountsSection({
 							{linkOnlyProviders.map((provider) => {
 								const type = provider.providerType?.toUpperCase() ?? "";
 								const Icon = getProviderIcon(type);
-								const label = provider.displayName || getProviderLabel(type, "this account");
+								const label =
+									firstNonBlank(provider.displayName) ?? getProviderLabel(type, "this account");
 								const registrationId = provider.registrationId;
 								return (
 									<Item key={registrationId} variant="outline" role="listitem">
@@ -300,7 +303,8 @@ export function LinkedAccountsSection({
 							<div className="flex flex-wrap gap-2 pt-1">
 								{signInProviders.map((provider) => {
 									const Icon = getProviderIcon(provider.providerType);
-									const label = provider.displayName || provider.registrationId || "provider";
+									const label =
+										firstNonBlank(provider.displayName, provider.registrationId) ?? "provider";
 									return (
 										<Button
 											key={provider.registrationId ?? label}

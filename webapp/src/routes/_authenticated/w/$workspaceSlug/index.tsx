@@ -24,6 +24,7 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { firstNonBlank } from "@/lib/text";
 import {
 	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
@@ -73,9 +74,9 @@ function LeaderboardContainer() {
 	const getSchedule = (): LeaderboardSchedule => {
 		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
 
-		const scheduledTime = workspaceQuery.data.leaderboardScheduleTime || "9:00";
+		const scheduledTime = firstNonBlank(workspaceQuery.data.leaderboardScheduleTime) ?? "9:00";
 		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
-		const [hours, minutes] = scheduledTime
+		const [hours = Number.NaN, minutes = Number.NaN] = scheduledTime
 			.split(":")
 			.map((part: string) => Number.parseInt(part, 10));
 
@@ -130,7 +131,7 @@ function LeaderboardContainer() {
 	});
 
 	const userProfileOptions = getUserProfileOptions({
-		path: { workspaceSlug: workspaceSlug ?? "", login: username || "" },
+		path: { workspaceSlug: workspaceSlug ?? "", login: username ?? "" },
 		query: {
 			after: parsedAfter,
 			before: parsedBefore,
@@ -144,7 +145,7 @@ function LeaderboardContainer() {
 	});
 	const currentUserEntry = username
 		? leaderboardQuery.data?.find(
-				(entry) => entry.user?.login?.toLowerCase() === username.toLowerCase(),
+				(entry) => entry.user?.login.toLowerCase() === username.toLowerCase(),
 			)
 		: undefined;
 
@@ -170,20 +171,20 @@ function LeaderboardContainer() {
 		return names.reverse().join(" / ");
 	};
 
-	const teamLabelsById = teamsList.reduce<Record<number, string>>((acc, team) => {
-		const label = makeLabel(team);
-		acc[team.id] = label.length > 0 ? label : team.name;
+	const teamLabelsById = teamsList.reduce<Record<number, string>>((acc, candidate) => {
+		const label = makeLabel(candidate);
+		acc[candidate.id] = label.length > 0 ? label : candidate.name;
 		return acc;
 	}, {});
 
 	const visibleTeamEntries = teamsList
 		.filter((t) => !t.hidden)
-		.map((team) => ({ team, label: teamLabelsById[team.id] }));
+		.map((candidate) => ({ team: candidate, label: teamLabelsById[candidate.id] }));
 
 	const visibleTeams = visibleTeamEntries.map((entry) => entry.label);
 
 	const teamOptions = visibleTeamEntries
-		.map(({ label }) => ({ value: label, label }))
+		.flatMap(({ label }) => (label ? [{ value: label, label }] : []))
 		.sort((a, b) => a.label.localeCompare(b.label));
 
 	useEffect(() => {
@@ -227,7 +228,7 @@ function LeaderboardContainer() {
 
 	const leagueStatsQuery = useQuery({
 		...computeUserLeagueStatsOptions({
-			path: { workspaceSlug: slug, login: username || "" },
+			path: { workspaceSlug: slug, login: username ?? "" },
 			query: {
 				after: parsedAfter ?? new Date(),
 				before: parsedBefore ?? new Date(),
@@ -274,20 +275,20 @@ function LeaderboardContainer() {
 		);
 	}
 
-	const handleTeamChange = (team: string) => {
+	const handleTeamChange = (nextTeam: string) => {
 		void navigate({
 			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
-				team,
+				team: nextTeam,
 			}),
 		});
 	};
 
-	const handleSortChange = (sort: LeaderboardSortType) => {
+	const handleSortChange = (nextSort: LeaderboardSortType) => {
 		void navigate({
 			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
-				sort,
+				sort: nextSort,
 			}),
 		});
 	};
@@ -316,7 +317,7 @@ function LeaderboardContainer() {
 	return (
 		<LeaderboardPage
 			providerType={providerType}
-			leaderboard={leaderboardQuery.data || []}
+			leaderboard={leaderboardQuery.data ?? []}
 			isLoading={
 				isWorkspaceLoading ||
 				teamsQuery.isPending ||
@@ -324,7 +325,7 @@ function LeaderboardContainer() {
 			}
 			currentUser={userProfileQuery.data?.userInfo}
 			currentUserEntry={currentUserEntry}
-			leaguePoints={userProfileQuery.data?.userInfo?.leaguePoints}
+			leaguePoints={userProfileQuery.data?.userInfo.leaguePoints}
 			leaguePointsChange={leagueStatsQuery.data?.leaguePointsChange}
 			teamOptions={teamOptions}
 			teamLabelsById={teamLabelsById}
@@ -337,10 +338,10 @@ function LeaderboardContainer() {
 			onTeamChange={handleTeamChange}
 			onSortChange={handleSortChange}
 			onTimeframeChange={handleTimeframeChange}
-			renderUserLink={(username, children) => (
+			renderUserLink={(rowUsername, children) => (
 				<Link
 					to="/w/$workspaceSlug/user/$username"
-					params={{ workspaceSlug: slug, username }}
+					params={{ workspaceSlug: slug, username: rowUsername }}
 					className="inline-flex rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
 				>
 					{children}

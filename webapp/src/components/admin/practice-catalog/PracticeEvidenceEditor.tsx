@@ -235,9 +235,7 @@ function SourceRow({ source, role, idPrefix, disabled, onRoleChange }: SourceRow
 				disabled={disabled}
 				aria-label={`How ${source.displayName} is used`}
 				value={selectedRole(role)}
-				onValueChange={(next) => {
-					if (next) onRoleChange(next);
-				}}
+				onValueChange={(next) => onRoleChange(next)}
 			>
 				{EVIDENCE_ROLE_OPTIONS.map((option) => (
 					<label

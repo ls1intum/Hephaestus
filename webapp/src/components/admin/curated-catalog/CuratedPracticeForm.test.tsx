@@ -1,11 +1,12 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPracticeDefinitionOptions,
 	mockPullRequestBinding,
 	mockPullRequestPolicy,
+	mockPullRequestWorkType,
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
 import { bindingsProblem } from "../practice-catalog/bindings";
@@ -68,9 +69,7 @@ function occasion() {
  * name, so the name is matched by prefix rather than in full.
  */
 function moment(signal: string) {
-	const option = mockPracticeDefinitionOptions.workTypes[0].signals.find(
-		(candidate) => candidate.signal === signal,
-	);
+	const option = mockPullRequestWorkType.signals.find((candidate) => candidate.signal === signal);
 	if (!option) throw new Error(`No signal option for ${signal}`);
 	return new RegExp(`^${option.displayName}`);
 }
@@ -137,9 +136,7 @@ describe("CuratedPracticeForm", () => {
 		});
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
-		expect(
-			await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }),
-		).toBeTruthy();
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
 		fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
 		await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
 		screen.getByDisplayValue("A new practice");
@@ -214,9 +211,12 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		const submitted = onSubmit.mock.calls[0]?.[0];
+		assert(submitted);
 		expect(submitted.bindings).toHaveLength(1);
+		const [occasionSubmitted] = submitted.bindings;
+		assert(occasionSubmitted);
 		// Sorted the way the server stores them, so an untouched practice is not dirty on the way back.
-		expect(submitted.bindings[0].signals).toEqual(
+		expect(occasionSubmitted.signals).toStrictEqual(
 			["scm.pull_request.merged", ...mockPullRequestBinding.signals].sort(),
 		);
 	});
@@ -297,12 +297,13 @@ describe("CuratedPracticeForm", () => {
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
 		const submitted = onSubmit.mock.calls[0]?.[0];
-		expect(submitted.bindings.map((binding) => binding.needs)).toEqual([[]]);
-		expect(submitted.automatedReviewPolicy.automatedReview).toEqual({
+		assert(submitted);
+		expect(submitted.bindings.map((binding) => binding.needs)).toStrictEqual([[]]);
+		expect(submitted.automatedReviewPolicy.automatedReview).toStrictEqual({
 			mode: "NONE",
 			evidenceSufficiency: "NONE",
 		});
-		expect(submitted.automatedReviewPolicy.knownLimitations).toEqual([]);
+		expect(submitted.automatedReviewPolicy.knownLimitations).toStrictEqual([]);
 		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
 		expect(screen.queryByText("Static analysis")).toBeNull();
 	});
@@ -319,12 +320,11 @@ describe("CuratedPracticeForm", () => {
 		// Saveable, not merely non-empty: a list of purely contextual sources is longer than zero and
 		// still refused, so what has to hold is the rule the form itself enforces.
 		const submitted = onSubmit.mock.calls[0]?.[0];
+		assert(submitted);
+		const [resumed] = submitted.bindings;
+		assert(resumed);
 		expect(
-			bindingsProblem(
-				submitted.bindings[0],
-				submitted.automatedReviewPolicy,
-				mockPracticeDefinitionOptions.workTypes[0],
-			),
+			bindingsProblem(resumed, submitted.automatedReviewPolicy, mockPullRequestWorkType),
 		).toBeUndefined();
 	});
 
@@ -343,8 +343,9 @@ describe("CuratedPracticeForm", () => {
 
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 		const submitted = onSubmit.mock.calls[0]?.[0];
-		expect(submitted?.precomputeScript).toBeUndefined();
-		expect(submitted?.automatedReviewPolicy.automatedReview).toEqual({
+		assert(submitted);
+		expect(submitted.precomputeScript).toBeUndefined();
+		expect(submitted.automatedReviewPolicy.automatedReview).toStrictEqual({
 			mode: "LANGUAGE_MODEL",
 			evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
 		});

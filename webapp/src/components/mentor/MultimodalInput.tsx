@@ -1,7 +1,6 @@
 import { ArrowDown, ArrowUp, Paperclip, Square } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
-import type React from "react";
-import { type ChangeEvent, useEffect, useRef, useState } from "react";
+import { type ChangeEvent, type RefObject, useEffect, useRef, useState } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -62,7 +61,7 @@ export function MultimodalInput({
 		textarea.style.height = `${textarea.scrollHeight + 2}px`;
 	}, []);
 
-	const handleInput = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+	const handleInput = (event: ChangeEvent<HTMLTextAreaElement>) => {
 		setInput(event.target.value);
 		event.currentTarget.style.height = "auto";
 		event.currentTarget.style.height = `${event.currentTarget.scrollHeight + 2}px`;
@@ -83,7 +82,7 @@ export function MultimodalInput({
 	};
 
 	const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-		const files = Array.from(event.target.files || []);
+		const files = Array.from(event.target.files ?? []);
 		if (files.length === 0) return;
 
 		setUploadQueue(files.map((file) => file.name));
@@ -233,7 +232,7 @@ function AttachmentsButton({
 	status,
 	readonly,
 }: {
-	fileInputRef: React.RefObject<HTMLInputElement | null>;
+	fileInputRef: RefObject<HTMLInputElement | null>;
 	status: "ready" | "submitted" | "error";
 	readonly: boolean;
 }) {

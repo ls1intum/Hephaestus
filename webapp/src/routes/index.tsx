@@ -45,7 +45,7 @@ function LandingContainer() {
 
 	return (
 		<LandingPage
-			onSignIn={(idpHint) => void login(idpHint, "/")}
+			onSignIn={(idpHint) => login(idpHint, "/")}
 			onGoToDashboard={handleGoToDashboard}
 			isSignedIn={isAuthenticated}
 		/>

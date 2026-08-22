@@ -1,5 +1,4 @@
-import type { Node, NodeProps } from "@xyflow/react";
-import { Handle, Position } from "@xyflow/react";
+import { Handle, type Node, type NodeProps, Position } from "@xyflow/react";
 import { useState } from "react";
 import { AchievementTooltip } from "@/components/achievements/AchievementTooltip";
 import { CENTERED_HANDLE_STYLE } from "@/components/achievements/handle-style";
@@ -38,7 +37,9 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 	const [isHovered, setIsHovered] = useState(false);
 	const Icon = achievement.icon;
 	const isMythic = achievement.rarity === "mythic";
-	const showAura = data.forceAura || achievement.forceAura;
+	// Two independent grants, not a default and an override: the graph can force an aura onto any
+	// node, and a definition can declare one it always wears.
+	const showAura = data.forceAura === true || achievement.forceAura === true;
 
 	return (
 		<div>
@@ -89,7 +90,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 
 						{/* Progress indicator for available achievements */}
 						{achievement.status === "available" &&
-							achievement.progressData?.type === "LinearAchievementProgress" && (
+							achievement.progressData.type === "LinearAchievementProgress" && (
 								<svg
 									className={cn("absolute inset-0 w-full h-full", !isMythic && "-rotate-90")}
 									viewBox="0 0 100 100"
@@ -111,7 +112,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 												fill="none"
 												stroke="currentColor"
 												strokeWidth="4"
-												strokeDasharray={`${achievement.progressData.target > 0 ? ((achievement.progressData.current ?? 0) / achievement.progressData.target) * 240 : 0} 240`}
+												strokeDasharray={`${achievement.progressData.target > 0 ? (achievement.progressData.current / achievement.progressData.target) * 240 : 0} 240`}
 												className="text-foreground/70"
 												strokeLinecap="round"
 											/>
@@ -136,7 +137,7 @@ export function AchievementNode({ data }: NodeProps<AchievementNode>) {
 												fill="none"
 												stroke="currentColor"
 												strokeWidth="4"
-												strokeDasharray={`${achievement.progressData.target > 0 ? ((achievement.progressData.current ?? 0) / achievement.progressData.target) * 289 : 0} 289`}
+												strokeDasharray={`${achievement.progressData.target > 0 ? (achievement.progressData.current / achievement.progressData.target) * 289 : 0} 289`}
 												className="text-foreground/70"
 												strokeLinecap="round"
 											/>

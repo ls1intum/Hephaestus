@@ -7,6 +7,13 @@ import { expectNoPageOverflow } from "@/test/reflow";
 import { tracedArtifactPage, tracedArtifacts } from "./story-mock-data";
 import { TRACE_PAGE_SIZE, TraceListPage } from "./TraceListPage";
 
+/** Looked up by id rather than indexed, so a fixture row added above cannot repoint a story. */
+function tracedArtifact(artifactId: number) {
+	const match = tracedArtifacts.find((candidate) => candidate.artifactId === artifactId);
+	if (!match) throw new Error(`No traced-artifact fixture with id ${artifactId}`);
+	return match;
+}
+
 /**
  * The member-facing list of everything this workspace recorded. The route asks for the page; this
  * screen only shows it, so every state below is a prop rather than a mocked response.
@@ -63,7 +70,7 @@ export const Default: Story = {
 };
 
 export const UnlinkableArtifact: Story = {
-	args: { artifacts: tracedArtifactPage([tracedArtifacts[3]]) },
+	args: { artifacts: tracedArtifactPage([tracedArtifact(88)]) },
 	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("1 piece of work.")).toBeVisible();
 		await expect(canvas.getByText("1 moment recorded · 0 started a review")).toBeVisible();
@@ -71,7 +78,7 @@ export const UnlinkableArtifact: Story = {
 };
 
 export const EveryKindIsNamed: Story = {
-	play: async ({ canvas, userEvent }) => {
+	play: async ({ canvas }) => {
 		await expect(await canvas.findByText("Onboarding: your first week")).toBeVisible();
 		await expect(canvas.queryByText("docs.document")).not.toBeInTheDocument();
 
@@ -105,7 +112,7 @@ export const FilteredToOneKind: Story = {
 	args: {
 		search: { kind: "scm.issue" },
 		onSearchChange: fn(),
-		artifacts: tracedArtifactPage([tracedArtifacts[2]]),
+		artifacts: tracedArtifactPage([tracedArtifact(1430)]),
 	},
 	play: async ({ args, canvas }) => {
 		await expect(await canvas.findByRole("combobox", { name: "Show" })).toHaveTextContent("Issues");

@@ -92,6 +92,6 @@ describe("WorkspaceLlmModelFormDialog", () => {
 		);
 		screen.getByText("Work on this model stops immediately");
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		expect(onUpdate.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ enabled: false }));
+		expect(onUpdate.mock.calls[0]?.[1]).toStrictEqual(expect.objectContaining({ enabled: false }));
 	});
 });

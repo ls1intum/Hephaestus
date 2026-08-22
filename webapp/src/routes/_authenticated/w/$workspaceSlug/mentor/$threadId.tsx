@@ -107,7 +107,7 @@ function ThreadContainer() {
 		);
 	}
 
-	if (!mentorChat.threadDetail && !mentorChat.isThreadLoading) {
+	if (!mentorChat.threadDetail) {
 		return (
 			<div className="h-full flex items-center justify-center p-6">
 				<div className="text-center">

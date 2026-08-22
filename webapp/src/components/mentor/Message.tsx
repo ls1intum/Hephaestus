@@ -50,7 +50,7 @@ export function PreviewMessage({
 }: MessageProps) {
 	const [mode, setMode] = useState<"view" | "edit">(initialEditMode ? "edit" : "view");
 
-	const attachmentsFromMessage = message.parts?.filter((part) => part.type === "file") ?? [];
+	const attachmentsFromMessage = message.parts.filter((part) => part.type === "file");
 
 	const isArtifact = variant === "artifact";
 
@@ -78,9 +78,7 @@ export function PreviewMessage({
 						},
 					)}
 				>
-					{message.role === "assistant" && (
-						<MentorAvatar streaming={isLoading && message.role === "assistant"} />
-					)}
+					{message.role === "assistant" && <MentorAvatar streaming={isLoading} />}
 
 					<div className="flex flex-col gap-4 w-full">
 						{attachmentsFromMessage.length > 0 && (
@@ -98,7 +96,7 @@ export function PreviewMessage({
 							</div>
 						)}
 
-						{message.parts?.map((part, index) => {
+						{message.parts.map((part, index) => {
 							const { type } = part;
 							const key = `message-${message.id}-part-${index}`;
 
@@ -120,23 +118,21 @@ export function PreviewMessage({
 									);
 								}
 
-								if (mode === "edit") {
-									return (
-										<div key={key} className="flex flex-row gap-2 items-start">
-											<div className="size-8" />
+								return (
+									<div key={key} className="flex flex-row gap-2 items-start">
+										<div className="size-8" />
 
-											<MessageEditor
-												key={message.id}
-												initialContent={part.text}
-												onCancel={() => setMode("view")}
-												onSend={(content) => {
-													onMessageEdit?.(message.id, content);
-													setMode("view");
-												}}
-											/>
-										</div>
-									);
-								}
+										<MessageEditor
+											key={message.id}
+											initialContent={part.text}
+											onCancel={() => setMode("view")}
+											onSend={(content) => {
+												onMessageEdit?.(message.id, content);
+												setMode("view");
+											}}
+										/>
+									</div>
+								);
 							}
 
 							if (isStaticToolUIPart<ChatTools>(part)) {
@@ -158,12 +154,10 @@ export function PreviewMessage({
 							<MessageActions
 								className="-mt-3"
 								key={`action-${message.id}`}
-								messageContentToCopy={
-									message.parts
-										?.filter((p) => p.type === "text")
-										?.map((p) => p.text)
-										?.join("\n") ?? ""
-								}
+								messageContentToCopy={message.parts
+									.filter((p) => p.type === "text")
+									.map((p) => p.text)
+									.join("\n")}
 								messageRole={message.role}
 								vote={vote}
 								isLoading={isLoading}

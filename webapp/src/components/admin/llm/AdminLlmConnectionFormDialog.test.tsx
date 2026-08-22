@@ -1,5 +1,5 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { LlmConnection } from "@/api/types.gen";
 import { validateLlmConnectionForm } from "@/lib/llm-form-validation";
 import {
@@ -62,7 +62,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 		expect(onProbe).not.toHaveBeenCalled();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		const update = onUpdate.mock.calls[0]?.[1];
-		expect(update).toEqual({ displayName: "Custom endpoint" });
+		expect(update).toStrictEqual({ displayName: "Custom endpoint" });
 	});
 
 	it("tests a replacement credential instead of reporting the old saved credential", () => {
@@ -97,7 +97,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 			displayName: "Gateway",
 			baseUrl: "https://gw.example.com/v1?api-key=SECRET",
 		}).baseUrl;
-		if (rejection === undefined) throw new Error("A base URL carrying a secret must be rejected");
+		assert(rejection, "A base URL carrying a secret must be rejected");
 		screen.getByText(rejection);
 		expect(onCreate).not.toHaveBeenCalled();
 	});
@@ -125,6 +125,7 @@ describe("AdminLlmConnectionFormDialog", () => {
 		renderDialog({ onProbe, onProbed });
 		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
 		const callbacks = onProbe.mock.calls[0]?.[1];
+		assert(callbacks);
 
 		fireEvent.change(screen.getByLabelText("Base URL"), {
 			target: { value: "https://different.example.test/v1" },

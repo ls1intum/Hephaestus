@@ -27,9 +27,9 @@ export function RepositoryCard({
 }: RepositoryCardProps) {
 	const repoLabels = useMemo(() => {
 		const byName = new Map<string, LabelInfo>();
-		for (const label of team.labels ?? []) {
+		for (const label of team.labels) {
 			if (label.repository?.id !== repository.id) continue;
-			const key = (label.name ?? "").toLowerCase();
+			const key = label.name.toLowerCase();
 			if (key && !byName.has(key)) byName.set(key, label);
 		}
 		return [...byName.values()];

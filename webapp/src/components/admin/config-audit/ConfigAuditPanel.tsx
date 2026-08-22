@@ -139,9 +139,13 @@ function ConfigAuditView({
 	);
 	const total = listQuery.data?.pages[0]?.totalElements;
 	const query = toQuery(search);
-	const hasAppliedFilter = Boolean(
-		query.entityType || query.action || query.actorId !== undefined || query.from,
-	);
+	// A facet whose URL values were all rejected by the allowlist narrows nothing, so it does not
+	// count as applied.
+	const hasAppliedFilter =
+		(query.entityType?.length ?? 0) > 0 ||
+		(query.action?.length ?? 0) > 0 ||
+		query.actorId !== undefined ||
+		query.from !== undefined;
 
 	const reset = () =>
 		onSearchChange({

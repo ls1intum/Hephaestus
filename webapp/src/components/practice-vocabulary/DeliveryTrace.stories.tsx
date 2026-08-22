@@ -147,7 +147,7 @@ export const ManyInlineNotes: Story = {
 		canvas.getByText(/As a summary comment on the work/);
 		// Counted over the whole trace rather than queried: a repeat would render inside the same
 		// paragraph and still satisfy a `getByText`.
-		const inlinePhrases = canvasElement.textContent?.match(/As an inline note on the work/g) ?? [];
+		const inlinePhrases = canvasElement.textContent.match(/As an inline note on the work/g) ?? [];
 		await expect(inlinePhrases).toHaveLength(1);
 	},
 };

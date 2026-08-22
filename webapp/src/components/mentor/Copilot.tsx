@@ -39,8 +39,8 @@ export function Copilot({
 	const [internalOpen, setInternalOpen] = useState(defaultOpen);
 
 	// Use controlled state if provided, otherwise use internal state
-	const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen;
-	const setIsOpen = onOpenChange || setInternalOpen;
+	const isOpen = controlledOpen ?? internalOpen;
+	const setIsOpen = onOpenChange ?? setInternalOpen;
 
 	// Handle trigger click
 	const handleTriggerClick = () => {

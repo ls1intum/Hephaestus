@@ -32,9 +32,10 @@ export interface ObservationSortSelectProps {
  */
 export function ObservationSortSelect({ value, onChange }: ObservationSortSelectProps) {
 	const sortId = useId();
+	const sortLabelId = useId();
 	return (
 		<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
-			<FieldLabel htmlFor={sortId} className="text-muted-foreground">
+			<FieldLabel id={sortLabelId} htmlFor={sortId} className="text-muted-foreground">
 				Sort
 			</FieldLabel>
 			<Select
@@ -48,7 +49,7 @@ export function ObservationSortSelect({ value, onChange }: ObservationSortSelect
 					<ArrowDownWideNarrowIcon aria-hidden className="text-muted-foreground" />
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-labelledby={sortLabelId}>
 					{SORT_ITEMS.map((item) => (
 						<SelectItem key={item.value} value={item.value}>
 							{item.label}

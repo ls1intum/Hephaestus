@@ -95,7 +95,7 @@ describe("instance AI usage route", () => {
 		await renderUsageRoute("/admin/usage?month=2999-01");
 
 		screen.getByText(formatMonthLabel(MONTH));
-		expect(requestedMonths).toEqual([MONTH]);
+		expect(requestedMonths).toStrictEqual([MONTH]);
 	});
 
 	// The row and the panel are fed by two endpoints, and the panel stays mounted across the write.

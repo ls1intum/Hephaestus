@@ -94,9 +94,7 @@ export function ObservationDetailPage({
 			</article>
 		);
 	}
-	const artifactSlug = observation.artifact
-		? reviewArtifactTypeSlug(observation.artifact.type)
-		: undefined;
+	const artifactSlug = reviewArtifactTypeSlug(observation.artifact.type);
 
 	return (
 		<article className="min-w-0 max-w-4xl space-y-8">

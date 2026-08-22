@@ -57,7 +57,7 @@ describe("WorkspaceLlmConnectionFormDialog", () => {
 		expect(screen.queryByLabelText("Slug")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		const update = onUpdate.mock.calls[0]?.[1];
-		expect(update).toEqual({
+		expect(update).toStrictEqual({
 			displayName: "Custom endpoint",
 			enabled: true,
 		});

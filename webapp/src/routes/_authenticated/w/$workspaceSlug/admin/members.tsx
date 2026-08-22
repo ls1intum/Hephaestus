@@ -92,13 +92,13 @@ function AdminMembersContainer() {
 		});
 	};
 
-	const users = (usersData?.map(adaptApiUserTeams) || [])
+	const users = (usersData?.map(adaptApiUserTeams) ?? [])
 		.map((user) => ({
 			...user,
-			teams: [...(user.teams || [])].sort((a, b) => a.name.localeCompare(b.name)),
+			teams: [...user.teams].sort((a, b) => a.name.localeCompare(b.name)),
 		}))
 		.sort((a, b) => a.user.name.localeCompare(b.user.name));
-	const teams = [...(teamsData || [])].sort((a, b) => a.name.localeCompare(b.name));
+	const teams = [...(teamsData ?? [])].sort((a, b) => a.name.localeCompare(b.name));
 	const isLoading = isWorkspaceLoading || usersLoading || teamsLoading;
 	const selectedTeam =
 		search.team && teams.some((team) => team.id.toString() === search.team) ? search.team : "all";

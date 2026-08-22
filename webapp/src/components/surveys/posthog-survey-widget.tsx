@@ -1,8 +1,9 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { Survey as PostHogSurveyRaw } from "posthog-js";
-import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef, useState } from "react";
-
+import { usePostHogClient } from "@/integrations/posthog/use-posthog-client";
+import { randomId } from "@/lib/random-id";
+import { firstNonBlank } from "@/lib/text";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import {
 	normalisePostHogSurvey,
@@ -18,7 +19,7 @@ import { SURVEY_LAYOUT_ID } from "./survey-notification-button";
  * Replicates PostHog's internal URL matching logic
  */
 function checkUrlMatch(currentUrl: string, pattern: string, matchType?: string): boolean {
-	const type = matchType || "icontains";
+	const type = firstNonBlank(matchType) ?? "icontains";
 
 	switch (type) {
 		case "icontains":
@@ -57,7 +58,7 @@ export function PostHogSurveyWidget({
 	autoOpen = true,
 	reloadOnComplete = false,
 }: PostHogSurveyWidgetProps) {
-	const posthog = usePostHog();
+	const posthog = usePostHogClient();
 
 	// Zustand store for persistent survey notifications
 	const setPendingSurvey = useSurveyNotificationStore((s) => s.setPendingSurvey);
@@ -189,11 +190,14 @@ export function PostHogSurveyWidget({
 			return;
 		}
 
-		let isActive = true;
+		let active = true;
+		// Read through a call: a plain boolean would stay narrowed by the previous check and stop
+		// reflecting a cleanup that happened while an `await` below was in flight.
+		const isActive = () => active;
 		let latestRequestId = 0;
 
 		const resolveSurvey = async (surveys: PostHogSurveyRaw[]) => {
-			if (!isActive) {
+			if (!isActive()) {
 				return;
 			}
 
@@ -203,7 +207,7 @@ export function PostHogSurveyWidget({
 				: eligible;
 
 			if (candidates.length === 0) {
-				if (!isActive) {
+				if (!isActive()) {
 					return;
 				}
 				setIsVisible(false);
@@ -219,7 +223,7 @@ export function PostHogSurveyWidget({
 				try {
 					const reason = await posthog.canRenderSurveyAsync(candidate.id);
 
-					if (!isActive || requestId !== latestRequestId) {
+					if (!isActive() || requestId !== latestRequestId) {
 						return;
 					}
 
@@ -254,13 +258,13 @@ export function PostHogSurveyWidget({
 				} catch (error) {
 					console.error("[PostHogSurveyWidget] Error checking survey:", error);
 
-					if (!isActive || requestId !== latestRequestId) {
+					if (!isActive() || requestId !== latestRequestId) {
 						return;
 					}
 				}
 			}
 
-			if (!isActive || requestId !== latestRequestId) {
+			if (!isActive() || requestId !== latestRequestId) {
 				return;
 			}
 
@@ -271,7 +275,7 @@ export function PostHogSurveyWidget({
 		};
 
 		const unsubscribe = posthog.onSurveysLoaded(() => {
-			if (!isActive) {
+			if (!isActive()) {
 				return;
 			}
 			posthog.getSurveys((updatedSurveys) => {
@@ -280,7 +284,7 @@ export function PostHogSurveyWidget({
 		});
 
 		const initTimeout = setTimeout(() => {
-			if (!isActive) {
+			if (!isActive()) {
 				return;
 			}
 
@@ -290,9 +294,9 @@ export function PostHogSurveyWidget({
 		}, 100);
 
 		return () => {
-			isActive = false;
+			active = false;
 			clearTimeout(initTimeout);
-			unsubscribe?.();
+			unsubscribe();
 		};
 	}, [autoOpen, posthog, surveyId]);
 
@@ -319,9 +323,7 @@ export function PostHogSurveyWidget({
 		if (submissionId) {
 			return submissionId;
 		}
-		// Through `globalThis` so this stays safe where `crypto` is not declared at all — a bare
-		// `crypto?.` would still throw a ReferenceError there, which is what the `typeof` guarded.
-		const generated = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}`;
+		const generated = randomId();
 		setSubmissionId(generated);
 		return generated;
 	};

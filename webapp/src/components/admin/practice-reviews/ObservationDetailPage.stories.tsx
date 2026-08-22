@@ -138,7 +138,9 @@ export const CannotTellWhichRulesApplied: Story = {
 export const PracticeSaysWhatItIs: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		const errorsCarryContext = workspacePractices[2];
+		const errorsCarryContext = workspacePractices.find((p) => p.slug === "errors-carry-context");
+		if (!errorsCarryContext)
+			throw new Error("The practice fixtures no longer cover errors-carry-context");
 		await userEvent.hover(await canvas.findByRole("link", { name: /Errors carry their context/ }));
 		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
 		await screen.findByText(errorsCarryContext.whyItMatters ?? "");

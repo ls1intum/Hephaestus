@@ -72,7 +72,10 @@ export const handlers = [
 	http.get("*/admin/users", () => HttpResponse.json(adminUsers)),
 	http.patch<PathParams, AdminUserPatch>("*/admin/users/:id", async ({ request, params }) => {
 		const body = await request.json().catch((): AdminUserPatch => ({}));
-		const existing = adminUsers.find((u) => String(u.id) === String(params.id)) ?? adminUsers[0];
+		// Any id echoes a user back, so a story can PATCH a row the fixture list does not carry.
+		const [fallback] = adminUsers;
+		const existing = adminUsers.find((u) => String(u.id) === String(params.id)) ?? fallback;
+		if (!existing) return new HttpResponse(null, { status: 404 });
 		return HttpResponse.json({ ...existing, appRole: body.appRole ?? existing.appRole });
 	}),
 

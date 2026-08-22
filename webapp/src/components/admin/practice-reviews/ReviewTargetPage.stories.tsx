@@ -36,7 +36,8 @@ const outputFor = <T extends { artifact?: ReviewArtifact }>(
 const empty = <T,>(): ReviewSectionState<T> => ({ status: "ready", items: [], total: 0 });
 
 /** The practice one of this work's observations names, and the one the card is read on. */
-const THIN_CONTROLLERS = workspacePractices[0];
+const THIN_CONTROLLERS = workspacePractices.find((p) => p.slug === "thin-controllers");
+if (!THIN_CONTROLLERS) throw new Error("The practice fixtures no longer cover thin-controllers");
 
 const argsFor = (artifact: ReviewArtifact) => {
 	// The page labels and links the kind, so a fixture on an unlabelled one would prove nothing.

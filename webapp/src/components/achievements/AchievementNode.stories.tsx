@@ -82,9 +82,6 @@ export const Unlocked: Story = {
 			{rarities.map((rarity) => {
 				const unlockedProgressData = (() => {
 					const raw = rarityMocks[rarity].progressData;
-					if (!raw) {
-						return { type: "BinaryAchievementProgress", unlocked: true } as const;
-					}
 
 					switch (raw.type) {
 						case "LinearAchievementProgress":
@@ -167,9 +164,6 @@ export const Locked: Story = {
 			{rarities.map((rarity) => {
 				const lockedProgressData = (() => {
 					const raw = rarityMocks[rarity].progressData;
-					if (!raw) {
-						return { type: "BinaryAchievementProgress", unlocked: false } as const;
-					}
 
 					switch (raw.type) {
 						case "LinearAchievementProgress":

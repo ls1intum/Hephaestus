@@ -87,7 +87,7 @@ function displayValue(
 	if (typeof value === "string") return value;
 	if (typeof value === "number" || typeof value === "boolean") return String(value);
 	// A nested object has no readable `toString`; show its shape rather than "[object Object]".
-	return JSON.stringify(value) ?? "Not set";
+	return JSON.stringify(value);
 }
 
 export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
@@ -112,8 +112,10 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 			: undefined;
 	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
-	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion;
-	const canKeep = canKeepCurrentDefinition(status) && onKeepCurrentDefinition;
+	// An action is offered only when the state allows it *and* the caller wired up somewhere for it
+	// to go.
+	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion !== undefined;
+	const canKeep = canKeepCurrentDefinition(status) && onKeepCurrentDefinition !== undefined;
 	const busy = isResetPending || isKeepPending || disabled;
 	const updateAvailable = status.state === "UPDATE_WAITING";
 	const viewLabel = updateAvailable ? "Review Hephaestus update" : "View Hephaestus default";

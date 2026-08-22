@@ -103,7 +103,7 @@ function WorkspaceLlmModelFormDialogContent({
 			priceNote: price.pricingMode === "NO_CHARGE" ? price.note?.trim() : undefined,
 		};
 
-		if (isEdit && editing) {
+		if (isEdit) {
 			onUpdate(editing.id, shared satisfies UpdateWorkspaceLlmModelRequest);
 			return;
 		}

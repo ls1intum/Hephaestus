@@ -1,5 +1,5 @@
 import { fireEvent, screen, within } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { FxRateInfo, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { renderWithRouter } from "@/test/router-harness";
 import { AdminLlmUsagePage } from "./AdminLlmUsagePage";
@@ -60,6 +60,18 @@ async function renderPage(
 		"/w/acme/admin/usage",
 	);
 	await screen.findByRole("heading", { name: "AI usage" });
+}
+
+/** The href the banner offers as the fix, or null where the reader is not the one who can apply it. */
+function fixLinkHref(banner: HTMLElement) {
+	return (
+		within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ?? null
+	);
+}
+
+/** The pace warning, or null where the page deliberately stays quiet. */
+function paceNote() {
+	return screen.queryByRole("status")?.textContent ?? null;
 }
 
 describe("AdminLlmUsagePage", () => {
@@ -151,14 +163,9 @@ describe("AdminLlmUsagePage", () => {
 				await renderPage({ ...baseReport, ...patch });
 
 				const banner = screen.getByText(title).closest("[role='alert']");
-				if (!(banner instanceof HTMLElement)) {
-					throw new Error(`Pause banner "${title}" not found`);
-				}
+				assert(banner instanceof HTMLElement, `Pause banner "${title}" not found`);
 				within(banner).getByText(body);
-				expect(
-					within(banner).queryByRole("link", { name: "Open AI models" })?.getAttribute("href") ??
-						null,
-				).toBe(href);
+				expect(fixLinkHref(banner)).toBe(href);
 			},
 		);
 
@@ -175,9 +182,7 @@ describe("AdminLlmUsagePage", () => {
 			);
 
 			const banner = screen.getByText("Your provider cap is reached").closest("[role='alert']");
-			if (!(banner instanceof HTMLElement)) {
-				throw new Error("Provider pause banner not found");
-			}
+			assert(banner instanceof HTMLElement, "Provider pause banner not found");
 			const adjust = within(banner).getByRole("button", { name: "Adjust cap" });
 
 			fireEvent.click(adjust);
@@ -224,7 +229,7 @@ describe("AdminLlmUsagePage", () => {
 		])("%s", async (_name, patch, now, pace) => {
 			await renderPage({ ...baseReport, unpricedEventCount: 0, ...patch }, { now });
 
-			expect(screen.queryByRole("status")?.textContent ?? null).toBe(pace);
+			expect(paceNote()).toBe(pace);
 		});
 	});
 

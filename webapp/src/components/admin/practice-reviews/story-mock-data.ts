@@ -1119,6 +1119,12 @@ export const reviewObservationDetail: ReviewObservationDetail = observationDetai
 // A page that does not fit on one page
 // ---------------------------------------------------------------------------------------------
 
+function cycled<T>(specs: readonly T[], index: number): T {
+	const spec = specs[index % specs.length];
+	if (!spec) throw new Error("A page cannot be filled from an empty list of specs.");
+	return spec;
+}
+
 /**
  * The fixture's observations restated across as many days as it takes to fill `count` rows. Cycling
  * the real specs keeps every row a record the server could have produced, unlike a generated
@@ -1127,7 +1133,7 @@ export const reviewObservationDetail: ReviewObservationDetail = observationDetai
 export function manyObservations(count: number): ReviewObservation[] {
 	const base = reviewObservations;
 	return Array.from({ length: count }, (_, index) => {
-		const source = base[index % base.length];
+		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
 		if (cycle === 0) return source;
 		return {
@@ -1144,7 +1150,7 @@ export function manyObservations(count: number): ReviewObservation[] {
  */
 export function manyMembers(count: number): WorkspaceMembership[] {
 	return Array.from({ length: count }, (_, index) => {
-		const source = workspaceMembers[index % workspaceMembers.length];
+		const source = cycled(workspaceMembers, index);
 		const cycle = Math.floor(index / workspaceMembers.length);
 		if (cycle === 0) return source;
 		return {
@@ -1159,7 +1165,7 @@ export function manyMembers(count: number): WorkspaceMembership[] {
 export function manyFeedback(count: number): ReviewFeedback[] {
 	const base = reviewFeedback;
 	return Array.from({ length: count }, (_, index) => {
-		const source = base[index % base.length];
+		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
 		if (cycle === 0) return source;
 		return {

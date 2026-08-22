@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { type ReactNode, useState } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@ai-sdk/react", () => ({
 	useChat: vi.fn(),
@@ -25,8 +25,7 @@ vi.mock("uuid", () => ({
 	v4: vi.fn(() => "mock-uuid-123"),
 }));
 
-import type { UseChatHelpers } from "@ai-sdk/react";
-import { useChat } from "@ai-sdk/react";
+import { type UseChatHelpers, useChat } from "@ai-sdk/react";
 import type { ChatInit } from "ai";
 import { getThreadQueryKey, listThreadsQueryKey } from "@/api/@tanstack/react-query.gen";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
@@ -193,7 +192,7 @@ describe("useMentorChat", () => {
 				wrapper: createWrapper(queryClient),
 			});
 
-			expect(result.current.messages).toEqual([]);
+			expect(result.current.messages).toStrictEqual([]);
 			expect(result.current.status).toBe("ready");
 			expect(result.current.error).toBeUndefined();
 			expect(result.current.currentThreadId).toBe(SELF_GENERATED_THREAD_ID);
@@ -217,7 +216,7 @@ describe("useMentorChat", () => {
 				wrapper: createWrapper(queryClient),
 			});
 
-			expect(result.current.messages).toEqual(initialMessages);
+			expect(result.current.messages).toStrictEqual(initialMessages);
 		});
 
 		it("should not enable thread query when workspace is loading", () => {
@@ -244,8 +243,10 @@ describe("useMentorChat", () => {
 			});
 
 			expect(result.current.messages).toHaveLength(1);
-			expect(result.current.messages[0].role).toBe("user");
-			expect(textOf(result.current.messages[0])).toBe("Hello AI!");
+			const [sent] = result.current.messages;
+			assert(sent);
+			expect(sent.role).toBe("user");
+			expect(textOf(sent)).toBe("Hello AI!");
 			expect(result.current.status).toBe("submitted");
 		});
 
@@ -261,7 +262,7 @@ describe("useMentorChat", () => {
 				result.current.sendMessage(text);
 			});
 
-			expect(result.current.messages).toEqual([]);
+			expect(result.current.messages).toStrictEqual([]);
 			expect(result.current.status).toBe("ready");
 		});
 
@@ -276,7 +277,7 @@ describe("useMentorChat", () => {
 				result.current.sendMessage("Hello");
 			});
 
-			expect(result.current.messages).toEqual([]);
+			expect(result.current.messages).toStrictEqual([]);
 			expect(result.current.status).toBe("ready");
 		});
 	});
@@ -390,11 +391,11 @@ describe("useMentorChat", () => {
 
 			expect(result.current.currentThreadId).toBe("thread-123");
 			await waitFor(() =>
-				expect(result.current.messages.map((message) => message.id)).toEqual(
+				expect(result.current.messages.map((message) => message.id)).toStrictEqual(
 					threadMessages.map((message) => message.id),
 				),
 			);
-			expect(result.current.messages.map(textOf)).toEqual([
+			expect(result.current.messages.map(textOf)).toStrictEqual([
 				"Previous message",
 				"Previous response",
 			]);
@@ -410,7 +411,7 @@ describe("useMentorChat", () => {
 
 			// The hydration effect keys on the thread detail, so once that is readable it has had its run.
 			await waitFor(() => expect(result.current.threadDetail?.messages).toBeDefined());
-			expect(result.current.messages).toEqual([]);
+			expect(result.current.messages).toStrictEqual([]);
 			expect(result.current.status).toBe("streaming");
 		});
 	});
@@ -443,7 +444,7 @@ describe("useMentorChat", () => {
 			});
 
 			const { transport } = chat.lastOptions;
-			if (!transport) throw new Error("The hook must configure a transport");
+			assert(transport, "The hook must configure a transport");
 
 			// A fresh Response per call: the transport consumes the body stream, so a shared one
 			// would already be locked by the queries the render kicked off.
@@ -462,7 +463,7 @@ describe("useMentorChat", () => {
 
 			// The render also issues the thread GETs, so pick the one write out of the traffic.
 			const posted = fetchMock.mock.calls.find(([, init]) => init?.method === "POST");
-			if (!posted) throw new Error("The hook sent no message");
+			assert(posted, "The hook sent no message");
 			const [url, init] = posted;
 			expect(url).toBe("http://localhost:8080/workspaces/test-workspace/mentor/chat");
 			// Only the newest message travels; the server rebuilds context from the thread id.

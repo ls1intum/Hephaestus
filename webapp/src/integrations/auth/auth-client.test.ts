@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, assert, describe, expect, it } from "vitest";
 import {
 	applyStateChangingHeaders,
 	authClient,
@@ -43,7 +43,7 @@ describe("toUserProfile", () => {
 		expect(profile.name).toBe("Ada Lovelace");
 		expect(profile.firstName).toBe("Ada");
 		expect(profile.lastName).toBe("Lovelace");
-		expect(profile.roles).toEqual(["user", "admin"]);
+		expect(profile.roles).toStrictEqual(["user", "admin"]);
 		expect(profile.identityProvider).toBe("GITHUB");
 	});
 
@@ -80,7 +80,7 @@ describe("toUserProfile", () => {
 		expect(profile.firstName).toBe("solo");
 		expect(profile.lastName).toBe("");
 		expect(profile.email).toBe("");
-		expect(profile.roles).toEqual([]);
+		expect(profile.roles).toStrictEqual([]);
 		expect(profile.identityProvider).toBeUndefined();
 		expect(profile.githubId).toBeUndefined();
 		expect(profile.gitlabId).toBeUndefined();
@@ -112,7 +112,9 @@ describe("authClient.login — returnTo forwarding (safeReturnTo guard)", () => 
 		const { assigned } = stubLocation();
 		authClient.login("gitlab", "/settings/account");
 		expect(assigned).toHaveLength(1);
-		const url = new URL(assigned[0]);
+		const [target] = assigned;
+		assert(target);
+		const url = new URL(target);
 		expect(`${url.origin}${url.pathname}`).toBe("http://localhost:8080/auth/login");
 		expect(url.searchParams.get("provider")).toBe("gitlab");
 		expect(url.searchParams.get("returnTo")).toBe("/settings/account");
@@ -121,14 +123,18 @@ describe("authClient.login — returnTo forwarding (safeReturnTo guard)", () => 
 	it("drops an unsafe (open-redirect) returnTo down to '/'", () => {
 		const { assigned } = stubLocation();
 		authClient.login("github", "//evil.example.com/phish");
-		const url = new URL(assigned[0]);
+		const [target] = assigned;
+		assert(target);
+		const url = new URL(target);
 		expect(url.searchParams.get("returnTo")).toBe("/");
 	});
 
 	it("defaults the provider to github when no idpHint is given", () => {
 		const { assigned } = stubLocation();
 		authClient.login(undefined, "/dashboard");
-		const url = new URL(assigned[0]);
+		const [target] = assigned;
+		assert(target);
+		const url = new URL(target);
 		expect(url.searchParams.get("provider")).toBe("github");
 		expect(url.searchParams.get("returnTo")).toBe("/dashboard");
 	});

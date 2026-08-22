@@ -78,8 +78,8 @@ function ToggleGroupItem({
 	return (
 		<TogglePrimitive
 			data-slot="toggle-group-item"
-			data-variant={context.variant || variant}
-			data-size={context.size || size}
+			data-variant={context.variant ?? variant}
+			data-size={context.size ?? size}
 			data-spacing={context.spacing}
 			// Match the axis on `data-orientation`, never on `data-horizontal`. Base UI derives its state
 			// attributes through `getStateAttributesProps`, which writes a non-boolean state as
@@ -94,8 +94,8 @@ function ToggleGroupItem({
 			className={cn(
 				"group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:last:rounded-b-lg shrink-0 focus:z-10 focus-visible:z-10 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-ml-px group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-mt-px",
 				toggleVariants({
-					variant: context.variant || variant,
-					size: context.size || size,
+					variant: context.variant ?? variant,
+					size: context.size ?? size,
 				}),
 				className,
 			)}

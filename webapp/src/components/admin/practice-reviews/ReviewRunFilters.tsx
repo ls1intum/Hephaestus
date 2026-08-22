@@ -35,7 +35,7 @@ function isReviewStatus(value: string | null): value is ReviewStatus {
  * the empty state offers to clear anything. Derived here so the toolbar and the page it sits above
  * cannot disagree about what "filtered" means. */
 export function hasRunFilter(search: RunsSearch): boolean {
-	return Boolean(search.status || search.from || search.to);
+	return search.status !== undefined || search.from !== undefined || search.to !== undefined;
 }
 
 /**
@@ -67,6 +67,7 @@ export interface ReviewRunFiltersProps {
 
 export function ReviewRunFilters({ search, onPatch, onReset, total }: ReviewRunFiltersProps) {
 	const statusId = useId();
+	const statusLabelId = useId();
 	// Derived, not taken as a prop: the caller has `search` and nothing else, so a `hasFilter` it
 	// computed could only ever be this same call — or a wrong one.
 	const hasFilter = hasRunFilter(search);
@@ -77,7 +78,7 @@ export function ReviewRunFilters({ search, onPatch, onReset, total }: ReviewRunF
 			actions={<ResultCount total={total} noun={["review", "reviews"]} hasFilter={hasFilter} />}
 		>
 			<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
-				<FieldLabel htmlFor={statusId} className="text-muted-foreground">
+				<FieldLabel id={statusLabelId} htmlFor={statusId} className="text-muted-foreground">
 					Status
 				</FieldLabel>
 				<Select
@@ -88,7 +89,7 @@ export function ReviewRunFilters({ search, onPatch, onReset, total }: ReviewRunF
 					<SelectTrigger id={statusId} size="sm" className="w-48 max-w-full">
 						<SelectValue>{(value: string) => <StatusItemLabel value={value} />}</SelectValue>
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby={statusLabelId}>
 						{STATUS_ITEMS.map((item) => (
 							<SelectItem key={item.value} value={item.value}>
 								<StatusItemLabel value={item.value} />

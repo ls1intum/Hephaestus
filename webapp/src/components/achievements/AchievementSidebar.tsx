@@ -15,8 +15,7 @@ import {
 	ZoomIn,
 	ZoomOut,
 } from "lucide-react";
-import type React from "react";
-import { useEffect, useState } from "react";
+import { type ElementType, useEffect, useState } from "react";
 import {
 	categoryMeta,
 	rarityAccentBackgrounds,
@@ -24,7 +23,11 @@ import {
 	rarityLabels,
 } from "@/components/achievements/styles";
 import type { AchievementCategory, UIAchievement, ViewMode } from "@/components/achievements/types";
-import { ACHIEVEMENT_CATEGORIES, calculateStats } from "@/components/achievements/utils";
+import {
+	ACHIEVEMENT_CATEGORIES,
+	calculateStats,
+	formatUnlockedAt,
+} from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
@@ -50,7 +53,7 @@ import { cn } from "@/lib/utils";
 
 const SIDEBAR_WIDTH = "20rem";
 
-const categoryIcons: Record<AchievementCategory, React.ElementType> = {
+const categoryIcons: Record<AchievementCategory, ElementType> = {
 	pull_requests: GitPullRequest,
 	commits: GitCommit,
 	communication: MessageSquare,
@@ -125,7 +128,7 @@ function SidebarBody({
 							<ToggleGroup
 								value={[viewMode]}
 								onValueChange={(value) => {
-									const newValue = value.length > 0 ? value[value.length - 1] : viewMode;
+									const newValue = value.at(-1) ?? viewMode;
 									if (newValue !== viewMode) onViewModeChange(newValue);
 								}}
 								role="toolbar"
@@ -224,7 +227,7 @@ function SidebarBody({
 						{ACHIEVEMENT_CATEGORIES.map((category) => {
 							const meta = categoryMeta[category];
 							const catStats = stats.byCategory[category];
-							if (!catStats || catStats.total === 0) return null;
+							if (catStats.total === 0) return null;
 							const Icon = categoryIcons[category];
 							const percentage = Math.round((catStats.unlocked / catStats.total) * 100);
 
@@ -266,15 +269,11 @@ function SidebarBody({
 					<SidebarGroupLabel>Recent Unlocks</SidebarGroupLabel>
 					<SidebarGroupContent className="space-y-1.5">
 						{[...achievements]
-							.filter(
-								(a): a is typeof a & { unlockedAt: Date } =>
-									a.status === "unlocked" && !!a.unlockedAt,
-							)
-							.sort((a, b) => new Date(b.unlockedAt).getTime() - new Date(a.unlockedAt).getTime())
+							.filter((a) => a.status === "unlocked")
+							.sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime())
 							.slice(0, 5)
 							.map((achievement) => {
-								const rarity = achievement.rarity ?? "common";
-								const unlockedDate = achievement.unlockedAt;
+								const rarity = achievement.rarity;
 								const Icon = achievement.icon;
 								return (
 									<div
@@ -295,9 +294,7 @@ function SidebarBody({
 												{achievement.name}
 											</p>
 											<p className="text-xs text-muted-foreground">
-												{unlockedDate
-													? new Date(unlockedDate).toLocaleDateString()
-													: "Recently unlocked"}
+												{formatUnlockedAt(achievement.unlockedAt, "Recently unlocked")}
 											</p>
 										</div>
 									</div>

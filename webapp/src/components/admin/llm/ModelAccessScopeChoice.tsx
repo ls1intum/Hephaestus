@@ -26,9 +26,7 @@ export function ModelAccessScopeChoice({
 	return (
 		<RadioGroup
 			value={value}
-			onValueChange={(next) => {
-				if (next) onChange(next);
-			}}
+			onValueChange={(next) => onChange(next)}
 			className="gap-3"
 			aria-label={label}
 		>

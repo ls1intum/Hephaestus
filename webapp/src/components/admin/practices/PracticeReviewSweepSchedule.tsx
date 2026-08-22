@@ -273,7 +273,9 @@ function AddScheduleForm({
 			</h3>
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="sweep-kind">Kind of work</FieldLabel>
+					<FieldLabel id="sweep-kind-label" htmlFor="sweep-kind">
+						Kind of work
+					</FieldLabel>
 					<FieldDescription>One schedule per kind.</FieldDescription>
 				</FieldContent>
 				<Select
@@ -284,7 +286,7 @@ function AddScheduleForm({
 					<SelectTrigger id="sweep-kind" className="w-56">
 						<SelectValue />
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby="sweep-kind-label">
 						{kindItems.map((kind) => (
 							<SelectItem key={kind.value} value={kind.value}>
 								{kind.label}
@@ -296,7 +298,9 @@ function AddScheduleForm({
 
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="sweep-cadence">How often</FieldLabel>
+					<FieldLabel id="sweep-cadence-label" htmlFor="sweep-cadence">
+						How often
+					</FieldLabel>
 					<FieldDescription>Runs on its own; there is nothing to start by hand.</FieldDescription>
 				</FieldContent>
 				<Select
@@ -307,7 +311,7 @@ function AddScheduleForm({
 					<SelectTrigger id="sweep-cadence" className="w-56">
 						<SelectValue />
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby="sweep-cadence-label">
 						{CADENCES.map((option) => (
 							<SelectItem key={option.value} value={option.value}>
 								{option.label}
@@ -319,7 +323,9 @@ function AddScheduleForm({
 
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="sweep-window">How far back each time</FieldLabel>
+					<FieldLabel id="sweep-window-label" htmlFor="sweep-window">
+						How far back each time
+					</FieldLabel>
 					<FieldDescription>
 						Overlapping on purpose: work missed once still gets a second chance, and work already
 						reviewed is never paid for twice.
@@ -333,7 +339,7 @@ function AddScheduleForm({
 					<SelectTrigger id="sweep-window" className="w-56">
 						<SelectValue />
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby="sweep-window-label">
 						{windowItems.map((option) => (
 							<SelectItem key={option.value} value={option.value}>
 								{option.label}

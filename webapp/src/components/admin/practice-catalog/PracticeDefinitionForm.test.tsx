@@ -107,9 +107,7 @@ describe("the unsaved-changes guard around a save", () => {
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
 		// The draft is still the only copy of this practice, so leaving has to be a decision again.
-		expect(
-			await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }),
-		).toBeTruthy();
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
 	});
 
 	it("is left exactly as it was by a caller that says nothing", async () => {
@@ -121,8 +119,6 @@ describe("the unsaved-changes guard around a save", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Create practice" }));
 		fireEvent.click(screen.getByRole("link", { name: "Cancel" }));
 
-		expect(
-			await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" }),
-		).toBeTruthy();
+		await screen.findByRole("alertdialog", { name: "Discard unsaved changes?" });
 	});
 });

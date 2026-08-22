@@ -83,7 +83,7 @@ function observationPage(
 			(query.subjectUserId === undefined || row.subject?.id === query.subjectUserId),
 	);
 	const ordered = query.sort === "ACTIONABILITY" ? [...rows].sort(byActionability) : rows;
-	const number = query.page ?? 0;
+	const number = query.page;
 	return {
 		content: ordered.slice(number * REVIEW_PAGE_SIZE, (number + 1) * REVIEW_PAGE_SIZE),
 		page: {
@@ -243,7 +243,7 @@ export const SortByActionability: Story = {
 		).findAllByRole("listitem");
 		await expect(rows[0]).toHaveTextContent("Invoice numbering leaks the ledger's table name");
 		await expect(rows[0]).toHaveTextContent("Critical");
-		const titles = rows.map((row) => row.textContent ?? "");
+		const titles = rows.map((row) => row.textContent);
 		const problems = titles.flatMap((text, index) =>
 			text.includes("Needs improvement") ? [index] : [],
 		);
@@ -285,8 +285,10 @@ export const PickADateRange: Story = {
 		// ancestor table carries, so the grid is the anchor rather than the cells.
 		const grid = await within(dialog).findByRole("grid");
 		const days = within(grid).getAllByRole("button");
-		await userEvent.click(days[4]);
-		await userEvent.click(days[10]);
+		const [rangeStart, rangeEnd] = [days[4], days[10]];
+		if (!rangeStart || !rangeEnd) throw new Error("The month grid rendered too few days");
+		await userEvent.click(rangeStart);
+		await userEvent.click(rangeEnd);
 		await canvas.findByText(/–/);
 	},
 };

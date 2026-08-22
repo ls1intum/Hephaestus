@@ -23,7 +23,7 @@ const config: StorybookConfig = {
 		options: {},
 	},
 	// Pre-bundling prevents Vite from reloading the page while browser-mode tests are running.
-	viteFinal: async (viteConfig) => {
+	viteFinal: (viteConfig) => {
 		viteConfig.optimizeDeps ??= {};
 		viteConfig.optimizeDeps.include = [
 			...(viteConfig.optimizeDeps.include ?? []),

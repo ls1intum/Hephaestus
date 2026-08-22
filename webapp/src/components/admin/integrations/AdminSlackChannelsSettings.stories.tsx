@@ -273,7 +273,9 @@ export const AddChannelPicker: Story = {
 		],
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
+		const [headerAddChannel] = canvas.getAllByRole("button", { name: /add channel/i });
+		if (!headerAddChannel) throw new Error("No control to add a channel was rendered");
+		await userEvent.click(headerAddChannel);
 		const dialog = await screen.findByRole("dialog");
 
 		// The options live in the combobox's popover — open it. (The popover is portalled, so
@@ -315,7 +317,9 @@ export const MutationError: Story = {
 	},
 	play: async ({ canvas }) => {
 		// Empty list ⇒ both a header button and an empty-state CTA; open via the header one.
-		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
+		const [headerAddChannel] = canvas.getAllByRole("button", { name: /add channel/i });
+		if (!headerAddChannel) throw new Error("No control to add a channel was rendered");
+		await userEvent.click(headerAddChannel);
 		const dialog = await screen.findByRole("dialog");
 		await userEvent.type(
 			within(dialog).getByLabelText(/paste a channel link or id/i),

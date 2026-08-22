@@ -128,7 +128,7 @@ function ProviderForm({ editing, isSubmitting, onCreate, onUpdate, onCancel }: P
 		if (!validate()) {
 			return;
 		}
-		if (isEdit && editing) {
+		if (isEdit) {
 			const body: UpdateLoginProviderRequest = {
 				displayName: displayName.trim() || undefined,
 				baseUrl: needsBaseUrl ? baseUrl.trim() || undefined : undefined,

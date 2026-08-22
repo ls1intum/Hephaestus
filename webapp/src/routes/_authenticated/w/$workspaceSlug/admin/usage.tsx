@@ -59,9 +59,9 @@ function AdminUsageContainer() {
 			);
 			editOwnProviderCap(false);
 		},
-		onError: (error) => {
+		onError: (saveError) => {
 			if (!isCapDialogOnScreenRef.current) {
-				toast.error("Couldn't save the cap", { description: problemDetailOf(error) });
+				toast.error("Couldn't save the cap", { description: problemDetailOf(saveError) });
 			}
 		},
 	});

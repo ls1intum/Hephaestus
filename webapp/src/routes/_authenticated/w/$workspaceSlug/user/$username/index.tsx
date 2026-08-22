@@ -16,6 +16,7 @@ import {
 	MAX_ACTIVITY_MONITOR_LIMIT,
 } from "@/lib/activity-monitor";
 import { toScmProviderType } from "@/lib/provider";
+import { firstNonBlank } from "@/lib/text";
 import {
 	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
@@ -81,9 +82,9 @@ function UserProfile() {
 	const getSchedule = (): LeaderboardSchedule => {
 		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
 
-		const scheduledTime = workspaceQuery.data.leaderboardScheduleTime || "9:00";
+		const scheduledTime = firstNonBlank(workspaceQuery.data.leaderboardScheduleTime) ?? "9:00";
 		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
-		const [hours, minutes] = scheduledTime
+		const [hours = Number.NaN, minutes = Number.NaN] = scheduledTime
 			.split(":")
 			.map((part: string) => Number.parseInt(part, 10));
 
@@ -182,8 +183,8 @@ function UserProfile() {
 			}}
 			onActivityMonitorFiltersChange={handleActivityMonitorFiltersChange}
 			isLoading={
-				(profileQuery.isPending && !profileQuery.data) ||
-				(workspaceQuery.isPending && !workspaceQuery.data) ||
+				profileQuery.isPending ||
+				workspaceQuery.isPending ||
 				(activityMonitorQuery.isPending && !activityMonitorQuery.data)
 			}
 			error={profileQuery.isError}

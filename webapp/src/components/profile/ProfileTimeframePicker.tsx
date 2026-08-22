@@ -106,7 +106,7 @@ export function ProfileTimeframePicker({
 
 		if (
 			lastEmittedRef.current?.after === range.after &&
-			lastEmittedRef.current?.before === range.before
+			lastEmittedRef.current.before === range.before
 		) {
 			return;
 		}
@@ -171,7 +171,7 @@ export function ProfileTimeframePicker({
 				<SelectTrigger className="w-65" aria-label="Timeframe">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Timeframe">
 					{enableAllActivity && (
 						<SelectItem value="all-activity">
 							<PresetIcon preset="all-activity" />

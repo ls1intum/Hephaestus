@@ -41,14 +41,14 @@ export function TeamTree({
 	return (
 		<TeamCard
 			team={team}
-			memberCount={(team.members ?? []).length}
+			memberCount={team.members.length}
 			headingLevel={headingLevel}
 			onToggleVisibility={(hidden) => void onToggleVisibility(team.id, hidden)}
 			getCatalogLabels={getCatalogLabels}
 		>
-			{(team.repositories ?? []).length > 0 ? (
+			{team.repositories.length > 0 ? (
 				<div className="space-y-3">
-					{[...(team.repositories ?? [])]
+					{[...team.repositories]
 						.sort((a, b) => a.nameWithOwner.localeCompare(b.nameWithOwner))
 						.map((repo) => (
 							<RepositoryCard

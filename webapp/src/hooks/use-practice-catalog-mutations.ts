@@ -301,14 +301,14 @@ export function usePracticeCatalogMutations(workspaceSlug: string) {
 			}
 		}
 	}
-	if (deleteArea.isPending && deleteArea.variables) {
+	if (deleteArea.isPending) {
 		const deletingAreaSlug = deleteArea.variables.path.areaSlug;
 		blockedPracticeOrderBuckets.add(deletingAreaSlug);
 		blockedPracticeOrderBuckets.add(UNASSIGNED);
 		blockedMoveDestinationSlugs.add(deletingAreaSlug);
 		blockedMoveDestinationSlugs.add(UNASSIGNED);
 	}
-	if (deletePractice.isPending && deletePractice.variables) {
+	if (deletePractice.isPending) {
 		const practice = practices.find(
 			({ slug }) => slug === deletePractice.variables.path.practiceSlug,
 		);

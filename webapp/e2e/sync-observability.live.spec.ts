@@ -1,3 +1,5 @@
+import assert from "node:assert/strict";
+import type { Response } from "@playwright/test";
 import { expect, loginAsDevAdmin, test } from "./fixtures";
 
 const LIVE_ENABLED = process.env.LIVE_INTEGRATION_E2E === "true";
@@ -6,10 +8,30 @@ const USERNAME = process.env.E2E_LIVE_USERNAME ?? "";
 const GITHUB_WORKSPACE = process.env.E2E_GITHUB_WORKSPACE ?? "";
 const GITLAB_WORKSPACE = process.env.E2E_GITLAB_WORKSPACE ?? "";
 const LIVE_CONFIGURED = Boolean(USERNAME && GITHUB_WORKSPACE && GITLAB_WORKSPACE);
+const LIVE_READY = LIVE_ENABLED && LIVE_CONFIGURED;
+
+/** The provider accepted the manual sync: a POST to the jobs endpoint answered 200 or 202. */
+function isAcceptedSyncJob(response: Response) {
+	return (
+		response.request().method() === "POST" &&
+		response.url().includes("/sync/jobs") &&
+		[200, 202].includes(response.status())
+	);
+}
+
+/** The id the job list is keyed by, or a failure naming the payload that carried none. */
+function acceptedJobId(job: unknown): number {
+	const id = typeof job === "object" && job !== null && "id" in job ? job.id : undefined;
+	assert.ok(
+		typeof id === "number",
+		`Expected the accepted sync job to carry a numeric id: ${JSON.stringify(job)}`,
+	);
+	return id;
+}
 
 test.describe("live integration operations", () => {
 	test.skip(
-		!LIVE_ENABLED || !LIVE_CONFIGURED,
+		!LIVE_READY,
 		"set LIVE_INTEGRATION_E2E, E2E_LIVE_USERNAME, E2E_GITHUB_WORKSPACE, and E2E_GITLAB_WORKSPACE",
 	);
 
@@ -37,23 +59,13 @@ test.describe("live integration operations", () => {
 		await loginAsDevAdmin(page, USERNAME);
 		await page.goto(`/w/${GITLAB_WORKSPACE}/admin/integrations/scm`);
 
-		const accepted = page.waitForResponse(
-			(response) =>
-				response.request().method() === "POST" &&
-				response.url().includes("/sync/jobs") &&
-				[200, 202].includes(response.status()),
-		);
+		const accepted = page.waitForResponse(isAcceptedSyncJob);
 		await page.getByRole("button", { name: "Sync now" }).click();
 
 		const acceptedResponse = await accepted;
 		expect([200, 202]).toContain(acceptedResponse.status());
-		const job: unknown = await acceptedResponse.json();
-		if (typeof job !== "object" || job === null || !("id" in job) || typeof job.id !== "number") {
-			throw new Error(
-				`Expected the accepted sync job to carry a numeric id: ${JSON.stringify(job)}`,
-			);
-		}
+		const jobId = acceptedJobId(await acceptedResponse.json());
 		await expect(page.getByText(/sync started/i)).toBeVisible();
-		await expect(page.locator(`[data-job-id="${job.id}"]`)).toBeVisible({ timeout: 15_000 });
+		await expect(page.locator(`[data-job-id="${jobId}"]`)).toBeVisible({ timeout: 15_000 });
 	});
 });

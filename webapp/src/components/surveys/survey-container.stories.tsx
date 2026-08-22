@@ -188,11 +188,11 @@ function InPagePopoverHarness(args: React.ComponentProps<typeof SurveyContainer>
 					<SurveyContainer
 						{...args}
 						onDismiss={(step) => {
-							args.onDismiss?.(step);
+							args.onDismiss(step);
 							setOpen(false);
 						}}
 						onComplete={(responses) => {
-							args.onComplete?.(responses);
+							args.onComplete(responses);
 							setOpen(false);
 						}}
 					/>

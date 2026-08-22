@@ -4,6 +4,19 @@ import { expect, fn } from "storybook/test";
 import type { ConfigAuditEntryView } from "@/api/types.gen";
 import { AdminConfigAuditPanel, WorkspaceConfigAuditPanel } from "./ConfigAuditPanel";
 
+const llmConnectionCreated: ConfigAuditEntryView = {
+	id: 2,
+	occurredAt: new Date("2026-07-23T14:02:00Z"),
+	action: "CREATED",
+	entityType: "WORKSPACE_LLM_CONNECTION",
+	entityId: "12",
+	actorKind: "USER",
+	actorAccountId: 7,
+	actor: { id: 7, displayName: "Ada Lovelace", email: "ada@example.com" },
+	workspaceId: 3,
+	newValue: JSON.stringify({ displayName: "Acme OpenAI", enabled: false }),
+};
+
 const entries: ConfigAuditEntryView[] = [
 	{
 		id: 3,
@@ -19,18 +32,7 @@ const entries: ConfigAuditEntryView[] = [
 		oldValue: JSON.stringify({ timeoutSeconds: 600 }),
 		newValue: JSON.stringify({ timeoutSeconds: 900 }),
 	},
-	{
-		id: 2,
-		occurredAt: new Date("2026-07-23T14:02:00Z"),
-		action: "CREATED",
-		entityType: "WORKSPACE_LLM_CONNECTION",
-		entityId: "12",
-		actorKind: "USER",
-		actorAccountId: 7,
-		actor: { id: 7, displayName: "Ada Lovelace", email: "ada@example.com" },
-		workspaceId: 3,
-		newValue: JSON.stringify({ displayName: "Acme OpenAI", enabled: false }),
-	},
+	llmConnectionCreated,
 	{
 		id: 1,
 		occurredAt: new Date("2026-07-22T06:00:00Z"),
@@ -108,7 +110,7 @@ export const FilteredToNothing: Story = {
 
 export const FiltersFromUrl: Story = {
 	args: { search: { action: ["CREATED"], entityType: ["WORKSPACE_LLM_CONNECTION"] } },
-	parameters: { msw: { handlers: handlers([entries[1]]) } },
+	parameters: { msw: { handlers: handlers([llmConnectionCreated]) } },
 };
 
 export const LoadFailed: Story = {

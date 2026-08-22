@@ -5,6 +5,7 @@ import { ActivityBadges } from "@/components/leaderboard/ActivityBadges";
 import { Button } from "@/components/ui/button";
 import { type ActivityMonitorFilters, MAX_ACTIVITY_MONITOR_LIMIT } from "@/lib/activity-monitor";
 import { getProviderTerms, getPullRequestStateIcon, type ProviderType } from "@/lib/provider";
+import { firstNonBlank } from "@/lib/text";
 import type { LeaderboardSchedule } from "@/lib/timeframe";
 import type { ReviewedPullRequest } from "../leaderboard/ReviewsPopover";
 import { EmptyState } from "../shared/EmptyState";
@@ -44,10 +45,13 @@ export function ProfileContent({
 	schedule,
 }: ProfileContentProps) {
 	const stats = activityMonitorData?.activityStats;
+	// How the empty states name whoever's page this is. A provider that stored no display name, or
+	// stored a blank one, still leaves the login to address them by.
+	const personLabel = firstNonBlank(displayName) ?? username;
 	const repositories = activityMonitorData?.repositories ?? [];
 
 	const reviewActivity = (activityMonitorData?.reviewActivity ?? []).filter(
-		(activity) => (activity.score ?? 0) > 0,
+		(activity) => activity.score > 0,
 	);
 	const pullRequests = activityMonitorData?.authoredPullRequests ?? [];
 	const totalReviewActivityCount = activityMonitorData?.totalReviewActivityCount ?? 0;
@@ -140,7 +144,7 @@ export function ProfileContent({
 								description={
 									currUserIsDashboardUser
 										? `No review activity that counts yet. Try a wider timeframe.`
-										: `${displayName || username} has no review activity that counts in this timeframe.`
+										: `${personLabel} has no review activity that counts in this timeframe.`
 								}
 							/>
 						)}
@@ -190,7 +194,7 @@ export function ProfileContent({
 								description={
 									currUserIsDashboardUser
 										? `${terms.pullRequests} you create will appear here.`
-										: `${displayName || username} doesn't have any open ${terms.pullRequests.toLowerCase()}.`
+										: `${personLabel} doesn't have any open ${terms.pullRequests.toLowerCase()}.`
 								}
 							/>
 						)}

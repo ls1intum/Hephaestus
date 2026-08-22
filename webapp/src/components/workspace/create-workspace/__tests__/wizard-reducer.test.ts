@@ -56,7 +56,7 @@ describe("wizardReducer", () => {
 				type: "SET_PREFLIGHT_RESULT",
 				result: validPreflight,
 			});
-			expect(result.preflightResult).toEqual(validPreflight);
+			expect(result.preflightResult).toStrictEqual(validPreflight);
 		});
 	});
 
@@ -67,7 +67,7 @@ describe("wizardReducer", () => {
 				groups: sampleGroups,
 			});
 			expect(result.step).toBe(2);
-			expect(result.groups).toEqual(sampleGroups);
+			expect(result.groups).toStrictEqual(sampleGroups);
 		});
 
 		it("rejects advancement from step 2 (guard)", () => {
@@ -87,7 +87,7 @@ describe("wizardReducer", () => {
 		it("selects a group on step 2", () => {
 			const state = stateAt(2);
 			const result = wizardReducer(state, { type: "SELECT_GROUP", group: sampleGroup });
-			expect(result.selectedGroup).toEqual(sampleGroup);
+			expect(result.selectedGroup).toStrictEqual(sampleGroup);
 		});
 
 		it("rejects selection from step 1 (guard)", () => {
@@ -187,7 +187,7 @@ describe("wizardReducer", () => {
 			const state = stateAt(2, { selectedGroup: sampleGroup });
 			const result = wizardReducer(state, { type: "GO_BACK" });
 			expect(result.step).toBe(1);
-			expect(result.groups).toEqual([]);
+			expect(result.groups).toStrictEqual([]);
 			expect(result.selectedGroup).toBeNull();
 			expect(result.displayName).toBe("");
 			expect(result.workspaceSlug).toBe("");
@@ -205,8 +205,8 @@ describe("wizardReducer", () => {
 			expect(result.workspaceSlug).toBe("");
 			expect(result.slugManuallyEdited).toBe(false);
 			// Groups and selectedGroup preserved
-			expect(result.groups).toEqual(sampleGroups);
-			expect(result.selectedGroup).toEqual(sampleGroup);
+			expect(result.groups).toStrictEqual(sampleGroups);
+			expect(result.selectedGroup).toStrictEqual(sampleGroup);
 		});
 	});
 
@@ -219,13 +219,13 @@ describe("wizardReducer", () => {
 				workspaceSlug: "test",
 			});
 			const result = wizardReducer(state, { type: "RESET" });
-			expect(result).toEqual(initialWizardState);
+			expect(result).toStrictEqual(initialWizardState);
 		});
 
 		it("returns to initial state from step 2", () => {
 			const state = stateAt(2, { selectedGroup: sampleGroup });
 			const result = wizardReducer(state, { type: "RESET" });
-			expect(result).toEqual(initialWizardState);
+			expect(result).toStrictEqual(initialWizardState);
 		});
 	});
 
@@ -258,7 +258,7 @@ describe("wizardReducer", () => {
 
 			state = wizardReducer(state, { type: "GO_BACK" });
 			expect(state.step).toBe(1);
-			expect(state.groups).toEqual([]);
+			expect(state.groups).toStrictEqual([]);
 			expect(state.selectedGroup).toBeNull();
 		});
 
@@ -287,7 +287,7 @@ describe("wizardReducer", () => {
 			const state = initialWizardState;
 			const result = wizardReducer(state, { type: "ADVANCE_TO_GROUPS", groups: [] });
 			expect(result.step).toBe(2);
-			expect(result.groups).toEqual([]);
+			expect(result.groups).toStrictEqual([]);
 		});
 	});
 });

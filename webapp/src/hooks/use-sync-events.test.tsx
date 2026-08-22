@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	getConnectionSyncStatusQueryKey,
 	getIntegrationCatalogQueryKey,
@@ -118,7 +118,7 @@ describe("useSyncEvents", () => {
 
 		expect(FakeEventSource.instances).toHaveLength(1);
 		expect(latestSource().url).toBe(`http://localhost:8080/workspaces/${WORKSPACE}/sync/events`);
-		expect(latestSource().options).toEqual({ withCredentials: true });
+		expect(latestSource().options).toStrictEqual({ withCredentials: true });
 	});
 
 	it("does not resync on the first open, because that would cancel the page's own mount fetches", () => {
@@ -146,7 +146,7 @@ describe("useSyncEvents", () => {
 
 		const filter = invalidate.mock.calls[0]?.[0]?.predicate;
 		expect(filter).toBeTypeOf("function");
-		if (!filter) throw new Error("Expected a scoped predicate");
+		assert(filter, "Expected a scoped predicate");
 
 		const included = listConnectionSyncJobsQueryKey({
 			path: { workspaceSlug: WORKSPACE, connectionId: CONNECTION_ID },
@@ -160,7 +160,7 @@ describe("useSyncEvents", () => {
 
 		const find = (key: readonly unknown[]) => {
 			const query = queryClient.getQueryCache().find({ queryKey: key, exact: true });
-			if (!query) throw new Error("Expected a cached query");
+			assert(query, "Expected a cached query");
 			return query;
 		};
 		expect(filter(find(included))).toBe(true);
@@ -365,12 +365,12 @@ describe("useSyncEvents", () => {
 
 		const predicate = invalidate.mock.calls[0]?.[0]?.predicate;
 		expect(predicate).toBeTypeOf("function");
-		if (!predicate) throw new Error("Expected a scoped predicate");
+		assert(predicate, "Expected a scoped predicate");
 
 		const workspaceKey = getWorkspaceQueryKey({ path: { workspaceSlug: WORKSPACE } });
 		queryClient.setQueryData(workspaceKey, {});
 		const query = queryClient.getQueryCache().find({ queryKey: workspaceKey, exact: true });
-		if (!query) throw new Error("Expected a cached query");
+		assert(query, "Expected a cached query");
 		expect(predicate(query)).toBe(true);
 	});
 

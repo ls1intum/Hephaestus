@@ -265,7 +265,7 @@ function CatalogToolbar({
 				<SelectTrigger className="w-full sm:hidden" aria-label="Filter by work type">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Filter by work type">
 					{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
 						<SelectItem key={filter.value} value={filter.value}>
 							{filter.label}

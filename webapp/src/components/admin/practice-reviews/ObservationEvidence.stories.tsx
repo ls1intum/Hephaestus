@@ -75,7 +75,9 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 };
 
 function citation(sourceKind: string, overrides: Partial<EvidenceCitation> = {}): EvidenceCitation {
-	const { path, quote } = CITATION_BY_KIND[sourceKind];
+	const sample = CITATION_BY_KIND[sourceKind];
+	if (!sample) throw new Error(`No sample passage is written for evidence source ${sourceKind}`);
+	const { path, quote } = sample;
 	const isDiff = sourceKind === "scm.pull-request.diff";
 	return {
 		sourceKind,

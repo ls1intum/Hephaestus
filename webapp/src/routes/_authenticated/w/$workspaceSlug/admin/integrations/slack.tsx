@@ -19,8 +19,10 @@ import {
 	updateConnectionSyncJobMutation,
 	updateSlackChannelConsentMutation,
 } from "@/api/@tanstack/react-query.gen";
-import type { SlackConsentState } from "@/components/admin/integrations/AdminSlackChannelsSettings";
-import { AdminSlackChannelsSettings } from "@/components/admin/integrations/AdminSlackChannelsSettings";
+import {
+	AdminSlackChannelsSettings,
+	type SlackConsentState,
+} from "@/components/admin/integrations/AdminSlackChannelsSettings";
 import { AdminSlackNotificationSettings } from "@/components/admin/integrations/AdminSlackNotificationSettings";
 import { ConnectionStateNotice } from "@/components/admin/integrations/ConnectionStateNotice";
 import { IntegrationCardHeading } from "@/components/admin/integrations/IntegrationCardHeading";
@@ -165,7 +167,7 @@ function SlackIntegrationPage() {
 	const updateSlackChannelConsent = useMutation({
 		...updateSlackChannelConsentMutation(),
 		onSuccess: (_data, variables) => {
-			if (variables.body?.consentState === "REVOKED") {
+			if (variables.body.consentState === "REVOKED") {
 				toast.success("Channel removed and its data erased");
 			} else {
 				toast.success("Channel updated");
@@ -178,7 +180,7 @@ function SlackIntegrationPage() {
 			});
 		},
 		onError: (e, variables) => {
-			if (variables.body?.consentState === "REVOKED") {
+			if (variables.body.consentState === "REVOKED") {
 				toast.error("Failed to remove channel", { description: problemDetailOf(e) });
 			} else {
 				toast.error("Failed to update channel", { description: problemDetailOf(e) });
@@ -262,7 +264,7 @@ function SlackIntegrationPage() {
 			)}
 
 			{!routeLoading && !routeError && hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry?.connectionState} displayName="Slack" />
+				<ConnectionStateNotice connectionState={entry.connectionState} displayName="Slack" />
 			)}
 
 			{!routeLoading && !routeError && status && (

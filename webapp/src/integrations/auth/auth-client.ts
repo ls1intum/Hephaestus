@@ -53,8 +53,8 @@ const serverUrl = () => environment.serverUrl.replace(/\/$/, "");
 
 /** Read a cookie value by name (used for the CSRF double-submit token). */
 function readCookie(name: string): string | undefined {
-	const match = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`));
-	return match ? decodeURIComponent(match[1]) : undefined;
+	const value = document.cookie.match(new RegExp(`(?:^|; )${name}=([^;]*)`))?.[1];
+	return value === undefined ? undefined : decodeURIComponent(value);
 }
 
 /** The CSRF header/cookie pair Spring Security's CookieCsrfTokenRepository expects. */
@@ -74,7 +74,7 @@ export function csrfHeaders(): Record<string, string> {
  * seam — see `main.tsx` for the wiring.
  */
 export function applyStateChangingHeaders(request: Request, writesEnabled: boolean): Request {
-	const method = (request.method ?? "GET").toUpperCase();
+	const method = request.method.toUpperCase();
 	if (method !== "GET" && method !== "HEAD" && method !== "OPTIONS") {
 		for (const [key, value] of Object.entries(csrfHeaders())) {
 			request.headers.set(key, value);
@@ -159,7 +159,7 @@ export const authClient = {
  */
 export function toUserProfile(user: CurrentUserView): UserProfile {
 	const name = user.displayName ?? user.username ?? "";
-	const [firstName, ...rest] = name.split(" ");
+	const [firstName = "", ...rest] = name.split(" ");
 	return {
 		id: String(user.id),
 		username: user.username ?? "",

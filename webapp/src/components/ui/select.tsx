@@ -3,6 +3,7 @@
 import { Select as SelectPrimitive } from "@base-ui/react/select";
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 import type * as React from "react";
+import type { AccessibleNameProps } from "@/components/ui/accessible-name";
 import { cn } from "@/lib/utils";
 
 /**
@@ -70,6 +71,20 @@ function SelectTrigger({
 	);
 }
 
+/**
+ * The popup, and the accessible name of the listbox inside it.
+ *
+ * The name is required rather than optional because `SelectPrimitive.List` — not the popup, not the
+ * trigger — is the element carrying `role="listbox"`, and a listbox that nobody named reads as an
+ * anonymous list of options to a screen reader while looking perfectly normal on screen.
+ */
+type SelectContentProps = Omit<SelectPrimitive.Popup.Props, "aria-label" | "aria-labelledby"> &
+	Pick<
+		SelectPrimitive.Positioner.Props,
+		"align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
+	> &
+	AccessibleNameProps;
+
 function SelectContent({
 	className,
 	children,
@@ -81,11 +96,7 @@ function SelectContent({
 	"aria-label": ariaLabel,
 	"aria-labelledby": ariaLabelledBy,
 	...props
-}: SelectPrimitive.Popup.Props &
-	Pick<
-		SelectPrimitive.Positioner.Props,
-		"align" | "alignOffset" | "side" | "sideOffset" | "alignItemWithTrigger"
-	>) {
+}: SelectContentProps) {
 	return (
 		<SelectPrimitive.Portal>
 			<SelectPrimitive.Positioner

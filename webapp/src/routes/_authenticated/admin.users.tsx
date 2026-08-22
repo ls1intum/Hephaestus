@@ -30,6 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { loadedPages } from "@/integrations/tanstack-query/spring-page";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -64,7 +65,7 @@ function AdminUsersPage() {
 			lastPage.length === PAGE_SIZE ? allPages.length : undefined,
 	});
 
-	const allUsers: AdminAccountView[] = listQuery.data?.pages.flat() ?? [];
+	const allUsers: AdminAccountView[] = loadedPages(listQuery.data).flat();
 
 	const { hasNextPage, isFetchingNextPage, fetchNextPage } = listQuery;
 	useEffect(() => {
@@ -103,7 +104,7 @@ function AdminUsersPage() {
 	const forceSignOut = useMutation({
 		...adminRevokeUserSessionsMutation(),
 		onSuccess: (data) => {
-			const count = data?.revoked ?? 0;
+			const count = data.revoked;
 			toast.success(
 				count === 0
 					? "No active sessions to sign out."

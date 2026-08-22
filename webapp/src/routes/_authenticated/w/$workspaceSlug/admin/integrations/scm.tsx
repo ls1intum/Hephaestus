@@ -193,7 +193,7 @@ function ScmIntegrationPage() {
 
 	const activeJob = status?.activeJob;
 
-	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables?.body?.type : undefined;
+	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables.body.type : undefined;
 	const triggeringType =
 		pendingTriggerType === "RECONCILIATION" || pendingTriggerType === "BACKFILL"
 			? pendingTriggerType
@@ -216,7 +216,7 @@ function ScmIntegrationPage() {
 			/>
 
 			{hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry?.connectionState} displayName={label} />
+				<ConnectionStateNotice connectionState={entry.connectionState} displayName={label} />
 			)}
 
 			<SyncStatusHeader

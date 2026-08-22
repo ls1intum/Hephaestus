@@ -49,7 +49,7 @@ function AdminTeamsContainer() {
 		onMutate: async (vars: Options<UpdateTeamVisibilityData>) => {
 			await queryClient.cancelQueries({ queryKey: teamsQueryKey });
 			const prev = queryClient.getQueryData<TeamInfo[]>(teamsQueryKey);
-			const teamId = vars.path?.id;
+			const teamId = vars.path.id;
 			const hidden = typeof vars.body === "boolean" ? vars.body : vars.query?.hidden;
 			if (prev && typeof teamId === "number" && typeof hidden === "boolean") {
 				const next = prev.map((t) => (t.id === teamId ? { ...t, hidden } : t));
@@ -86,8 +86,8 @@ function AdminTeamsContainer() {
 		onMutate: async (vars: Options<UpdateRepositoryVisibilityData>) => {
 			await queryClient.cancelQueries({ queryKey: teamsQueryKey });
 			const prev = queryClient.getQueryData<TeamInfo[]>(teamsQueryKey);
-			const teamId = vars.path?.teamId;
-			const repositoryId = vars.path?.repositoryId;
+			const teamId = vars.path.teamId;
+			const repositoryId = vars.path.repositoryId;
 			const hidden =
 				typeof vars.body === "boolean" ? vars.body : vars.query?.hiddenFromContributions;
 			if (
@@ -100,7 +100,7 @@ function AdminTeamsContainer() {
 					if (team.id !== teamId) return team;
 					return {
 						...team,
-						repositories: (team.repositories ?? []).map((repo) =>
+						repositories: team.repositories.map((repo) =>
 							repo.id === repositoryId ? { ...repo, hiddenFromContributions: hidden } : repo,
 						),
 					};
@@ -169,7 +169,7 @@ function AdminTeamsContainer() {
 
 	return (
 		<AdminTeamsTable
-			teams={teamsQuery.data || []}
+			teams={teamsQuery.data ?? []}
 			isLoading={isWorkspaceLoading || teamsQuery.isLoading || !workspaceSlug}
 			error={teamsQuery.error}
 			search={search.q ?? ""}

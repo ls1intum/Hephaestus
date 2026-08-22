@@ -165,7 +165,7 @@ export function TimeframeFilter({
 
 		if (
 			lastEmittedRef.current?.after === range.after &&
-			lastEmittedRef.current?.before === range.before
+			lastEmittedRef.current.before === range.before
 		) {
 			return;
 		}
@@ -226,7 +226,9 @@ export function TimeframeFilter({
 
 	return (
 		<div className="space-y-1.5">
-			<Label htmlFor="timeframe">Timeframe</Label>
+			<Label id="timeframe-label" htmlFor="timeframe">
+				Timeframe
+			</Label>
 			<Select
 				value={selectedPreset}
 				onValueChange={(value) => value && handlePresetChange(value)}
@@ -235,7 +237,7 @@ export function TimeframeFilter({
 				<SelectTrigger id="timeframe" className="w-full">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-labelledby="timeframe-label">
 					{enableAllActivityOption && (
 						<SelectItem value="all-activity">
 							<PresetIcon preset="all-activity" />

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	isSafeLegalHref,
 	isSafeLegalImageSrc,
@@ -79,8 +79,10 @@ describe("isSafeLegalHref / isSafeLegalImageSrc", () => {
 
 describe("resolveLegalContent", () => {
 	const originalFetch = globalThis.fetch;
+	let requestedUrls: string[] = [];
 
 	beforeEach(() => {
+		requestedUrls = [];
 		globalThis.fetch = vi.fn();
 	});
 
@@ -88,55 +90,62 @@ describe("resolveLegalContent", () => {
 		globalThis.fetch = originalFetch;
 	});
 
+	interface MockedFile {
+		status: number;
+		body?: string;
+		contentType?: string;
+	}
+
+	/**
+	 * Mounts `files` by exact URL and `directories` by path prefix. Anything neither names answers
+	 * 404 — what an unmounted legal file looks like in production, and what the cascade walks past.
+	 */
 	function mockResponses(
-		urlMatcher: (url: string) => { status: number; body?: string; contentType?: string },
+		files: Record<string, MockedFile>,
+		directories: Record<string, MockedFile> = {},
 	) {
 		vi.mocked(globalThis.fetch).mockImplementation(async (input) => {
 			const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
-			const { status, body = "", contentType = "text/markdown" } = urlMatcher(url);
+			requestedUrls.push(url);
+			const mounted = Object.entries(directories).find(([prefix]) => url.startsWith(prefix));
+			const {
+				status,
+				body = "",
+				contentType = "text/markdown",
+			} = files[url] ?? mounted?.[1] ?? { status: 404 };
 			return new Response(body, { status, headers: { "Content-Type": contentType } });
 		});
 	}
 
 	it("prefers the override when present", async () => {
-		mockResponses((url) => {
-			if (url === "/legal-overrides/privacy.md") return { status: 200, body: "# override privacy" };
-			return { status: 404 };
-		});
+		mockResponses({ "/legal-overrides/privacy.md": { status: 200, body: "# override privacy" } });
 		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("override");
 		expect(resolved.markdown).toContain("override privacy");
 	});
 
 	it("falls through to the profile when no override is mounted", async () => {
-		mockResponses((url) => {
-			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url === "/legal/profiles/tumaet/privacy.md")
-				return { status: 200, body: "# profile privacy" };
-			return { status: 404 };
+		mockResponses({
+			"/legal/profiles/tumaet/privacy.md": { status: 200, body: "# profile privacy" },
 		});
 		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("profile");
 	});
 
 	it("falls through to disclaimer when the profile has no file", async () => {
-		mockResponses((url) => {
-			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url.startsWith("/legal/profiles/")) return { status: 404 };
-			if (url === "/legal/_disclaimer/imprint.md") return { status: 200, body: "# fallback" };
-			return { status: 404 };
-		});
+		mockResponses({ "/legal/_disclaimer/imprint.md": { status: 200, body: "# fallback" } });
 		const resolved = await resolveLegalContent("imprint", { profile: "unknown-profile" });
 		expect(resolved.source).toBe("disclaimer");
 	});
 
 	it("rejects SPA-fallback HTML responses so the cascade continues", async () => {
-		mockResponses((url) => {
-			if (url === "/legal-overrides/privacy.md")
-				return { status: 200, body: "<!doctype html><html></html>", contentType: "text/html" };
-			if (url === "/legal/profiles/tumaet/privacy.md")
-				return { status: 200, body: "# real tumaet privacy" };
-			return { status: 404 };
+		mockResponses({
+			"/legal-overrides/privacy.md": {
+				status: 200,
+				body: "<!doctype html><html></html>",
+				contentType: "text/html",
+			},
+			"/legal/profiles/tumaet/privacy.md": { status: 200, body: "# real tumaet privacy" },
 		});
 		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("profile");
@@ -145,11 +154,9 @@ describe("resolveLegalContent", () => {
 	// Some reverse proxies rewrite misses to a 200 with an empty body instead of
 	// the SPA fallback. The cascade must keep walking or we'd render a blank page.
 	it("rejects empty/whitespace-only bodies so the cascade continues", async () => {
-		mockResponses((url) => {
-			if (url === "/legal-overrides/privacy.md") return { status: 200, body: "   \n\t\n  " };
-			if (url === "/legal/profiles/tumaet/privacy.md")
-				return { status: 200, body: "# real tumaet privacy" };
-			return { status: 404 };
+		mockResponses({
+			"/legal-overrides/privacy.md": { status: 200, body: "   \n\t\n  " },
+			"/legal/profiles/tumaet/privacy.md": { status: 200, body: "# real tumaet privacy" },
 		});
 		const resolved = await resolveLegalContent("privacy", { profile: "tumaet" });
 		expect(resolved.source).toBe("profile");
@@ -159,38 +166,32 @@ describe("resolveLegalContent", () => {
 		vi.mocked(globalThis.fetch).mockImplementation(async () => {
 			throw new DOMException("aborted", "AbortError");
 		});
-		await expect(resolveLegalContent("privacy", { profile: "tumaet" })).rejects.toSatisfy(
-			(err: unknown) => err instanceof DOMException && err.name === "AbortError",
+		const rejection: unknown = await resolveLegalContent("privacy", { profile: "tumaet" }).catch(
+			(error: unknown) => error,
 		);
+		assert(rejection instanceof DOMException);
+		expect(rejection.name).toBe("AbortError");
 	});
 
 	it("invalid profile values fall through to the disclaimer without constructing profile URLs", async () => {
-		const urls: string[] = [];
-		mockResponses((url) => {
-			urls.push(url);
-			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url === "/legal/_disclaimer/privacy.md") return { status: 200, body: "# fallback" };
-			return { status: 404 };
-		});
+		mockResponses({ "/legal/_disclaimer/privacy.md": { status: 200, body: "# fallback" } });
 		const resolved = await resolveLegalContent("privacy", { profile: "../etc" });
 		expect(resolved.source).toBe("disclaimer");
 		expect(resolved.profile).toBe("");
-		expect(urls.some((u) => u.startsWith("/legal/profiles/"))).toBe(false);
+		expect(requestedUrls.some((u) => u.startsWith("/legal/profiles/"))).toBe(false);
 	});
 
 	it("non-tumaet profiles must not leak TUM canonical identity markers", async () => {
-		const collected: string[] = [];
-		mockResponses((url) => {
-			collected.push(url);
-			if (url.startsWith("/legal-overrides/")) return { status: 404 };
-			if (url.startsWith("/legal/profiles/"))
-				return { status: 200, body: "<!doctype html>", contentType: "text/html" };
-			if (url === "/legal/_disclaimer/privacy.md")
-				return { status: 200, body: "# Privacy statement not configured" };
-			if (url === "/legal/_disclaimer/imprint.md")
-				return { status: 200, body: "# Imprint not configured" };
-			return { status: 404 };
-		});
+		mockResponses(
+			{
+				"/legal/_disclaimer/privacy.md": {
+					status: 200,
+					body: "# Privacy statement not configured",
+				},
+				"/legal/_disclaimer/imprint.md": { status: 200, body: "# Imprint not configured" },
+			},
+			{ "/legal/profiles/": { status: 200, body: "<!doctype html>", contentType: "text/html" } },
+		);
 		for (const page of ["privacy", "imprint"] as const) {
 			const resolved = await resolveLegalContent(page, { profile: "" });
 			expect(resolved.source).toBe("disclaimer");
@@ -198,6 +199,6 @@ describe("resolveLegalContent", () => {
 				expect(resolved.markdown).not.toContain(marker);
 			}
 		}
-		expect(collected.some((u) => u.startsWith("/legal-overrides/"))).toBe(true);
+		expect(requestedUrls.some((u) => u.startsWith("/legal-overrides/"))).toBe(true);
 	});
 });

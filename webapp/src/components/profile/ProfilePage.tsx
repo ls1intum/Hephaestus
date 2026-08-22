@@ -65,7 +65,7 @@ export function ProfilePage({
 				user={profileData?.userInfo}
 				firstContribution={profileData?.firstContribution}
 				contributedRepositories={profileData?.contributedRepositories}
-				leaguePoints={profileData?.userInfo?.leaguePoints}
+				leaguePoints={profileData?.userInfo.leaguePoints}
 				userXpRecord={profileData?.xpRecord}
 				isLoading={isLoading}
 				workspaceSlug={workspaceSlug}
@@ -80,7 +80,7 @@ export function ProfilePage({
 				onActivityMonitorFiltersChange={onActivityMonitorFiltersChange}
 				isLoading={isLoading}
 				username={username}
-				displayName={profileData?.userInfo?.name}
+				displayName={profileData?.userInfo.name}
 				currUserIsDashboardUser={currUserIsDashboardUser}
 				workspaceSlug={workspaceSlug}
 				afterDate={after}

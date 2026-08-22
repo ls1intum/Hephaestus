@@ -4,6 +4,7 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { artifactTrace } from "@/components/practice-trace/story-mock-data";
 import { server } from "@/mocks/server";
+import { respondInTurn } from "@/test/responses";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole app shell and its lazy modules.
@@ -69,20 +70,23 @@ describe("asking for a review by hand", () => {
 	 * absent from a page it was never on, which an implementation clearing nothing satisfies too.
 	 */
 	it("clears the refusal and re-reads the trace once an ask is accepted", async () => {
-		let asks = 0;
 		server.use(
-			http.post(REQUEST_PATH, () => {
-				asks += 1;
-				return HttpResponse.json(
-					asks === 1
-						? {
-								status: "REFUSED",
-								reason: "REQUEST_COOLDOWN_ACTIVE",
-								reasonDescription: COOLDOWN_SENTENCE,
-							}
-						: { status: "SUBMITTED", jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01" },
-				);
-			}),
+			http.post(
+				REQUEST_PATH,
+				respondInTurn(
+					() =>
+						HttpResponse.json({
+							status: "REFUSED",
+							reason: "REQUEST_COOLDOWN_ACTIVE",
+							reasonDescription: COOLDOWN_SENTENCE,
+						}),
+					() =>
+						HttpResponse.json({
+							status: "SUBMITTED",
+							jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
+						}),
+				),
+			),
 		);
 		renderRouteAt("/w/acme/reviews/scm.pull_request/1423");
 

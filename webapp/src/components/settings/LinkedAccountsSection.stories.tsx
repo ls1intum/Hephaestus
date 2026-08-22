@@ -91,11 +91,13 @@ export const Default: Story = {
 	play: async ({ args, canvas }) => {
 		const triggers = await canvas.findAllByRole("button", { name: /^disconnect /i });
 		await expect(triggers).toHaveLength(2);
-		await expect(triggers[0]).toBeEnabled();
+		const [firstTrigger] = triggers;
+		if (!firstTrigger) throw new Error("No linked account rendered a disconnect control");
+		await expect(firstTrigger).toBeEnabled();
 
 		// Drive the confirm flow: open the dialog, then confirm. The dialog renders in a portal,
 		// so query the whole document for its destructive "Disconnect" action.
-		await userEvent.click(triggers[0]);
+		await userEvent.click(firstTrigger);
 		const action = await screen.findByRole("button", { name: "Disconnect" });
 		await userEvent.click(action);
 		await expect(args.onUnlink).toHaveBeenCalledWith(1);

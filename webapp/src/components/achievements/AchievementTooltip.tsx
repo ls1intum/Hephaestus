@@ -3,6 +3,7 @@ import type { ReactElement } from "react";
 import { AchievementProgressDisplay } from "@/components/achievements/AchievementProgressDisplay";
 import { rarityBorderColors, rarityLabels, statusIcons } from "@/components/achievements/styles";
 import type { UIAchievement } from "@/components/achievements/types";
+import { formatUnlockedAt } from "@/components/achievements/utils";
 import { cn } from "@/lib/utils";
 
 export interface AchievementTooltipProps {
@@ -76,9 +77,9 @@ export function AchievementTooltip(props: AchievementTooltipProps) {
 									<AchievementProgressDisplay achievement={achievement} />
 								</div>
 
-								{achievement.unlockedAt && achievement.status === "unlocked" && (
+								{achievement.status === "unlocked" && (
 									<div className="mt-3 pt-2 border-t border-border/50 text-xs text-foreground/70">
-										Unlocked on {new Date(achievement.unlockedAt).toLocaleDateString()}
+										Unlocked on {formatUnlockedAt(achievement.unlockedAt, "an unknown date")}
 									</div>
 								)}
 							</div>

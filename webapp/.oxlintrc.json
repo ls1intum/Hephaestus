@@ -62,6 +62,10 @@
 		// and from an untyped `vi.fn()`, whose `mock.calls` made an assertion about a submitted value
 		// check nothing at all. Each one is a place where the checker stops working silently, so the
 		// fix is always to establish the type at the boundary rather than downstream.
+		// An `async` with nothing to await promises a completion the caller cannot wait for. Two auth
+		// helpers claimed `Promise<void>` around a synchronous redirect, which is why every call site
+		// wrote `void linkAccount(...)`.
+		"typescript/require-await": "error",
 		"typescript/no-unsafe-call": "error",
 		"typescript/no-unsafe-assignment": "error",
 		"typescript/no-unsafe-argument": "error",
@@ -91,6 +95,10 @@
 		"no-inner-declarations": "error",
 		"no-prototype-builtins": "error",
 		"no-self-compare": "error",
+		// A name that means one thing outside a callback and another inside it is how a value goes
+		// stale: the reader checks the outer binding and the code uses the inner one. `typescript/`
+		// spelling of this rule is inert here — the base rule is the one that fires.
+		"no-shadow": "error",
 		"no-throw-literal": "error",
 		"no-constructor-return": "error",
 		"no-promise-executor-return": "error",
@@ -200,8 +208,11 @@
 		"prefer-numeric-literals": "error",
 		"prefer-exponentiation-operator": "error",
 		"prefer-arrow-callback": "error",
-		// Imports and promises.
+		// Imports and promises. `import/no-duplicates` accepts a type-only import standing beside a
+		// value import from the same module; `no-duplicate-imports` does not, and merging the pair with
+		// an inline `type` keeps one list per module for a reader to check a symbol against.
 		"import/no-duplicates": "error",
+		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",
 		"import/no-named-default": "error",
 		"import/no-anonymous-default-export": "error",
@@ -273,10 +284,21 @@
 		// announced it rather than on the one that breaks the build.
 		"typescript/no-deprecated": "error",
 		"typescript/no-misused-spread": "error",
+		// `a || b` falls back on `0`, `""` and `false`; `a ?? b` falls back only on absence. Left at its
+		// defaults, `ignorePrimitives` included: where a blank string really should fall through, the
+		// question is asked by name (`hasText`/`firstNonBlank` in `@/lib/text`) rather than left to the
+		// operator, so switching the option on would only buy back the one case already spelled out.
+		"typescript/prefer-nullish-coalescing": "error",
 		"typescript/require-array-sort-compare": "error",
 		"typescript/prefer-promise-reject-errors": "error",
 		"typescript/no-meaningless-void-operator": "error",
 		"typescript/no-unnecessary-template-expression": "error",
+		// A check the types already settle. It only tells the truth with `noUncheckedIndexedAccess`
+		// on (`tsconfig.json`), which is what stops it skipping every array index. Its findings split
+		// three ways and only one of them is "delete the branch": a guard that cannot fire, a chain
+		// on a value that was never nullable, and — the one worth having — a type that claims more
+		// than the wire delivers, where the fix is the type and the guard stays.
+		"typescript/no-unnecessary-condition": "error",
 		// A `default` clause is how this repo says "the rest is deliberate", so it counts as exhaustive.
 		// Left at the rule's default, all nine existing switches would need a suppression and no bug
 		// would be found; with it, a switch that drops both a case and its `default` still fails.
@@ -336,11 +358,34 @@
 		"vitest/prefer-mock-promise-shorthand": "error",
 		"vitest/prefer-mock-return-shorthand": "error",
 		"vitest/consistent-vitest-vi": "error",
+		// `toEqual` ignores a property whose value is `undefined`, so it passes on an object that has
+		// one the expectation does not name. `toStrictEqual` also checks class identity and array
+		// sparseness. Every equality assertion here is against a value this codebase produces, so the
+		// looser matcher only ever hides a difference.
+		"vitest/prefer-strict-equal": "error",
+		// `toBeTruthy` on a boolean accepts `1` and `"no"` as well as `true`. The rule is untyped — it
+		// flags every `toBeTruthy`/`toBeFalsy`, including the ones wrapped around a Testing Library
+		// query — which is what makes it useful here: a query already throws, so wrapping it in
+		// `expect(...).toBeTruthy()` is ceremony, and the fix is to keep the query and drop the wrapper.
+		"vitest/prefer-strict-boolean-matchers": "error",
+		// A branch inside a test is a set of assertions that may not run, and a test that skipped its
+		// assertions still passes. This also reaches `&&`, `||`, `??` and `?.` inside the test body,
+		// which is where the same failure hides in miniature: `getAttribute("href") ?? ""` turns a
+		// missing attribute into an empty string the assertion then accepts. Setup that genuinely
+		// branches — a mock server answering different calls differently — belongs beside the handler
+		// rather than in the test, and `@/test/responses` is where that shape lives.
+		"vitest/no-conditional-in-test": "error",
 
 		// -- Off. Every reason below was read off this rule's own findings; re-derive with
 		// `pnpm exec oxlint -D <rule>` before trusting or changing one -------------------------------
 		// React 19's automatic JSX runtime.
 		"react/react-in-jsx-scope": "off",
+		// The exact inverse of `prefer-strict-boolean-matchers`, above: these two rewrite `toBe(true)`
+		// into `toBeTruthy()` and `toBe(false)` into `toBeFalsy()`, which is the weaker assertion —
+		// `toBeTruthy` passes on `1`, `"false"` and `{}`. Both cannot be on; the stricter one wins, and
+		// turning these on would mean loosening the 188 boolean assertions this repo already spells out.
+		"vitest/prefer-to-be-truthy": "off",
+		"vitest/prefer-to-be-falsy": "off",
 		// React Compiler's own effect check. Two of its three findings are effects whose whole point is
 		// to re-run on the dependency it calls extra, and clearing those changes when they fire.
 		// `react-hooks/exhaustive-deps` covers the extra-dependency half; the missing-dependency half
@@ -381,9 +426,6 @@
 		// A handler defined next to the JSX that uses it is the point. Some findings are genuinely
 		// hoistable helpers; the rule cannot tell the two apart.
 		"unicorn/consistent-function-scoping": "off",
-		// Shadowing a `workspace`/`practice` inside a callback reads fine. The dangerous case this
-		// forfeits is shadowing an import, which the rule has no option to isolate.
-		"no-shadow": "off",
 		// Server field names (`_id`), test hooks (`__resetSessionRecoveryForTests`), the runtime config
 		// global (`__ENV__`) and exhaustiveness bindings (`_exhaustive`) all read better with the prefix.
 		"no-underscore-dangle": "off",
@@ -538,6 +580,12 @@
 			"rules": {
 				"no-script-url": "off"
 			}
+		},
+		{
+			// A double for an async API is declared `async` so it returns a promise like the real thing;
+			// having nothing to await is the point, not an oversight.
+			"files": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "src/test/**", "src/mocks/**"],
+			"rules": { "typescript/require-await": "off" }
 		},
 		{
 			// Playwright, not React: its fixture callback takes the setup/teardown function positionally

@@ -156,7 +156,7 @@ export function FacetMultiSelect<TValue extends string | number>({
 							{selectedOptions.length > 0 && (
 								<span className="text-muted-foreground">
 									:{" "}
-									{selectedOptions.length === 1
+									{selectedOptions.length === 1 && selectedOptions[0]
 										? selectedOptions[0].label
 										: `${selectedOptions.length} selected`}
 								</span>

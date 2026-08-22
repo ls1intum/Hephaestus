@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { server } from "@/mocks/server";
+import { respondInTurn } from "@/test/responses";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "./outline/OutlineConnectCard";
@@ -189,7 +190,7 @@ describe("Outline integration — connect happy path", () => {
 
 		renderContainer();
 
-		expect(await screen.findByLabelText(/api token/i)).toBeTruthy();
+		await screen.findByLabelText(/api token/i);
 		expect(screen.queryByLabelText(/allow-list/i)).toBeNull();
 		expect(screen.queryByLabelText(/collections/i)).toBeNull();
 
@@ -207,19 +208,20 @@ describe("Outline integration — connect happy path", () => {
 		fireEvent.change(serverUrl, { target: { value: "https://wiki.acme.dev" } });
 		fireEvent.click(screen.getByRole("button", { name: /connect outline/i }));
 
-		await waitFor(() => expect(connectBody).toBeTruthy());
-		expect(connectBody).toEqual({
-			kind: "OUTLINE",
-			userInput: {
-				server_url: "https://wiki.acme.dev",
-				token: "ol_api_secret",
-			},
-		});
+		await waitFor(() =>
+			expect(connectBody).toStrictEqual({
+				kind: "OUTLINE",
+				userInput: {
+					server_url: "https://wiki.acme.dev",
+					token: "ol_api_secret",
+				},
+			}),
+		);
 
 		// The invalidated connections query refetches → the card flips to connected, showing written
 		// copy ("Outline connected") and the Sync control, not a raw status token.
-		expect(await screen.findByText(/outline connected/i)).toBeTruthy();
-		expect(await screen.findByRole("button", { name: /sync now/i })).toBeTruthy();
+		await screen.findByText(/outline connected/i);
+		await screen.findByRole("button", { name: /sync now/i });
 		expect(toast.success).toHaveBeenCalledWith("Outline connected");
 	});
 });
@@ -265,7 +267,7 @@ describe("Outline integration — add-collection round trip", () => {
 		fireEvent.click(within(dialog).getByRole("option", { name: /architecture decisions/i }));
 		fireEvent.click(within(dialog).getByRole("button", { name: /add 1 collection/i }));
 
-		await waitFor(() => expect(registerBody).toEqual({ collectionId: "col-arch" }));
+		await waitFor(() => expect(registerBody).toStrictEqual({ collectionId: "col-arch" }));
 
 		await screen.findByText("Architecture Decisions");
 	});
@@ -273,7 +275,6 @@ describe("Outline integration — add-collection round trip", () => {
 
 describe("Outline integration — pause / resume", () => {
 	it("pauses via the row menu and reflects the refetched PAUSED state, then resumes", async () => {
-		const pausedRow = { ...engineering, state: "PAUSED" };
 		const collectionsRef = { current: [engineering] as unknown[] };
 		const patchBodies: unknown[] = [];
 		useConnectedHandlers(collectionsRef);
@@ -283,7 +284,9 @@ describe("Outline integration — pause / resume", () => {
 				async ({ request, params }) => {
 					const body = await request.json();
 					patchBodies.push({ collectionId: params.collectionId, ...body });
-					const next = body.state === "PAUSED" ? pausedRow : engineering;
+					// The server echoes the row in its new state, so the refetch below is the only thing
+					// that can move the UI — a hard-coded row would let a dropped PATCH still look applied.
+					const next = { ...engineering, state: body.state };
 					collectionsRef.current = [next];
 					return HttpResponse.json(next);
 				},
@@ -291,7 +294,7 @@ describe("Outline integration — pause / resume", () => {
 		);
 
 		renderContainer();
-		expect(await screen.findByText("Engineering")).toBeTruthy();
+		await screen.findByText("Engineering");
 
 		fireEvent.click(screen.getByRole("button", { name: /actions for engineering/i }));
 		fireEvent.click(await screen.findByRole("menuitem", { name: /^pause$/i }));
@@ -299,7 +302,7 @@ describe("Outline integration — pause / resume", () => {
 		await waitFor(() =>
 			expect(patchBodies).toContainEqual({ collectionId: "col-eng", state: "PAUSED" }),
 		);
-		expect(await screen.findByText("Paused")).toBeTruthy();
+		await screen.findByText("Paused");
 
 		fireEvent.click(screen.getByRole("button", { name: /actions for engineering/i }));
 		fireEvent.click(await screen.findByRole("menuitem", { name: /^resume$/i }));
@@ -307,7 +310,7 @@ describe("Outline integration — pause / resume", () => {
 		await waitFor(() =>
 			expect(patchBodies).toContainEqual({ collectionId: "col-eng", state: "ENABLED" }),
 		);
-		expect(await screen.findByText("Mirroring")).toBeTruthy();
+		await screen.findByText("Mirroring");
 	});
 });
 
@@ -325,7 +328,7 @@ describe("Outline integration — remove with confirm", () => {
 		);
 
 		renderContainer();
-		expect(await screen.findByText("Engineering")).toBeTruthy();
+		await screen.findByText("Engineering");
 
 		fireEvent.click(screen.getByRole("button", { name: /actions for engineering/i }));
 		fireEvent.click(await screen.findByRole("menuitem", { name: /remove & erase/i }));
@@ -340,7 +343,7 @@ describe("Outline integration — remove with confirm", () => {
 		fireEvent.click(within(dialog).getByRole("button", { name: /remove & erase/i }));
 
 		await waitFor(() => expect(deletedId).toBe("col-eng"));
-		expect(await screen.findByText(/no collections mirrored yet/i)).toBeTruthy();
+		await screen.findByText(/no collections mirrored yet/i);
 		expect(toast.success).toHaveBeenCalledWith(
 			"Collection removed and its mirrored documents erased",
 		);
@@ -364,7 +367,7 @@ describe("Outline integration — sync now", () => {
 		await waitFor(() => expect(syncButton.disabled).toBe(false));
 		fireEvent.click(syncButton);
 
-		await waitFor(() => expect(syncRequestBody).toEqual({ type: "RECONCILIATION" }));
+		await waitFor(() => expect(syncRequestBody).toStrictEqual({ type: "RECONCILIATION" }));
 		await waitFor(() => expect(toast.success).toHaveBeenCalledWith("Sync started"));
 	});
 });
@@ -381,7 +384,7 @@ describe("Outline integration — token lifecycle", () => {
 
 		renderContainer();
 
-		expect(await screen.findByText(/^outline connected$/i)).toBeTruthy();
+		await screen.findByText(/^outline connected$/i);
 		expect(screen.queryByText(activeOutlineConnection.instanceKey)).toBeNull();
 	});
 
@@ -399,7 +402,7 @@ describe("Outline integration — token lifecycle", () => {
 
 		renderContainer();
 
-		expect(await screen.findByText(/we couldn't verify the outline token/i)).toBeTruthy();
+		await screen.findByText(/we couldn't verify the outline token/i);
 		screen.getByRole("button", { name: /retry/i });
 	});
 
@@ -414,7 +417,7 @@ describe("Outline integration — token lifecycle", () => {
 
 		renderContainer();
 
-		expect(await screen.findByText(/outline no longer accepts this token/i)).toBeTruthy();
+		await screen.findByText(/outline no longer accepts this token/i);
 		expect(screen.queryByText(/outline accepts this token/i)).toBeNull();
 	});
 
@@ -424,7 +427,7 @@ describe("Outline integration — token lifecycle", () => {
 
 		renderContainer();
 
-		expect(await screen.findByText(/outline accepts this token/i)).toBeTruthy();
+		await screen.findByText(/outline accepts this token/i);
 		screen.getByText(/Hephaestus mirror/);
 		screen.getByText(/…9f2c/);
 	});
@@ -446,14 +449,15 @@ describe("Outline integration — with live push down, polling keeps a running s
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
 		useConnectedHandlers(collectionsRef);
+		// The reconcile is running on the first read and finished by the second.
+		const respondWithStatus = respondInTurn(
+			() => HttpResponse.json({ ...healthyStatus, activeJob: runningJob }),
+			() => HttpResponse.json({ ...healthyStatus, activeJob: undefined }),
+		);
 		server.use(
 			http.get("*/workspaces/demo/connections/7/sync", () => {
 				statusReads += 1;
-				// The reconcile is running on the first read and finished by the second.
-				return HttpResponse.json({
-					...healthyStatus,
-					activeJob: statusReads < 2 ? runningJob : undefined,
-				});
+				return respondWithStatus();
 			}),
 		);
 
@@ -504,7 +508,7 @@ describe("Outline integration — Outline not enabled on this instance", () => {
 		fireEvent.click(screen.getByRole("button", { name: /connect outline/i }));
 
 		// The raw ProblemDetail is still shown; the hint is derived from it and added below.
-		expect(await screen.findByText(/outline may not be enabled on this instance/i)).toBeTruthy();
+		await screen.findByText(/outline may not be enabled on this instance/i);
 		screen.getByText(/no connectionstrategy registered for kind=outline/i);
 	});
 });
@@ -541,9 +545,9 @@ describe("Outline integration — per-collection sync ledger", () => {
 
 		// The class column is Outline's own, and the count comes from the sync API — not from the
 		// collections list the management card reads.
-		expect(await screen.findByRole("columnheader", { name: "Documents" })).toBeTruthy();
+		await screen.findByRole("columnheader", { name: "Documents" });
 		expect(screen.queryByRole("columnheader", { name: "Issues" })).toBeNull();
-		expect(await screen.findByText("Engineering")).toBeTruthy();
+		await screen.findByText("Engineering");
 		screen.getByText("12");
 		// The freshness column exists here and nowhere else on the page.
 		screen.getByRole("columnheader", { name: "Last synced" });
@@ -555,7 +559,7 @@ describe("Outline integration — collections plane is gated on the connection",
 		server.use(http.get("*/workspaces/demo/connections", () => HttpResponse.json([])));
 
 		renderContainer();
-		expect(await screen.findByRole("button", { name: /connect outline/i })).toBeTruthy();
+		await screen.findByRole("button", { name: /connect outline/i });
 		expect(screen.queryByText(/mirrored collections/i)).toBeNull();
 	});
 });

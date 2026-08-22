@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { SlackMonitoredChannel } from "@/api/types.gen";
 import { server } from "@/mocks/server";
+import { respondInTurn } from "@/test/responses";
 import { ChannelHistorySheet } from "./ChannelHistorySheet";
 
 function renderWithClient(node: ReactNode) {
@@ -27,10 +28,14 @@ const channel: SlackMonitoredChannel = {
 describe("ChannelHistorySheet — failed load offers a retry", () => {
 	it("shows a Retry button that re-issues the request after a failed load", async () => {
 		let requestCount = 0;
+		const respond = respondInTurn(
+			() => new HttpResponse(null, { status: 500 }),
+			() => HttpResponse.json([]),
+		);
 		server.use(
 			http.get("*/slack/channels/:slackChannelId/consent-events", () => {
 				requestCount += 1;
-				return requestCount === 1 ? new HttpResponse(null, { status: 500 }) : HttpResponse.json([]);
+				return respond();
 			}),
 		);
 
@@ -38,7 +43,7 @@ describe("ChannelHistorySheet — failed load offers a retry", () => {
 			<ChannelHistorySheet workspaceSlug="demo" channel={channel} onOpenChange={vi.fn()} />,
 		);
 
-		expect(await screen.findByText(/could not load the consent history/i)).toBeTruthy();
+		await screen.findByText(/could not load the consent history/i);
 		const retry = screen.getByRole("button", { name: /^retry$/i });
 
 		fireEvent.click(retry);

@@ -123,6 +123,7 @@ export function DesignerToolbar({
 
 			<div className="flex items-center gap-2">
 				<Label
+					id="achievement-edge-style-label"
 					htmlFor="achievement-edge-style"
 					className="text-xs text-muted-foreground mr-1 whitespace-nowrap"
 				>
@@ -138,7 +139,7 @@ export function DesignerToolbar({
 					<SelectTrigger id="achievement-edge-style" className="w-45 h-8 text-xs">
 						<SelectValue placeholder="Select Edge Style" />
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby="achievement-edge-style-label">
 						{EDGE_STYLE_ITEMS.map((item) => (
 							<SelectItem key={item.value} value={item.value}>
 								{item.label}

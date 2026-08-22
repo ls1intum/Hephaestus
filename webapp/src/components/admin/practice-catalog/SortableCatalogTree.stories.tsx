@@ -191,7 +191,7 @@ const openActions = async (canvas: Canvas, name: string) => {
 };
 
 const announcement = () =>
-	document.querySelector('[id^="DndLiveRegion"]')?.textContent?.trim() ?? "";
+	document.querySelector('[id^="DndLiveRegion"]')?.textContent.trim() ?? "";
 
 const rowOf = (canvas: Canvas, name: string) => {
 	const row = canvas.getByRole("button", { name: `Reorder ${name}` }).closest('[role="listitem"]');

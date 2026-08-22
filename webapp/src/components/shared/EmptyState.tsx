@@ -61,7 +61,7 @@ export function EmptyState({
 	};
 
 	return (
-		<Card className={`border-dashed ${height} ${className || ""}`}>
+		<Card className={`border-dashed ${height} ${className ?? ""}`}>
 			<CardContent className="flex flex-col items-center justify-center py-8 px-4 text-center h-full">
 				<div className="rounded-full bg-muted p-3 mb-3">{renderIcon()}</div>
 				<h3 className="font-medium text-lg mb-1">{title}</h3>

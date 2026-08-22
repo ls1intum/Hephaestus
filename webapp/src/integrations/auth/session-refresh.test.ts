@@ -29,7 +29,7 @@ describe("refreshAccessToken", () => {
 		]);
 		settle?.();
 
-		expect(await overlapping).toEqual([true, true, true]);
+		expect(await overlapping).toStrictEqual([true, true, true]);
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 

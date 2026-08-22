@@ -20,12 +20,17 @@ type ThemeProviderState = {
 	setTheme: (theme: Theme) => void;
 };
 
-const initialState: ThemeProviderState = {
+/**
+ * What a consumer reads outside a `ThemeProvider`: the system theme, and a `setTheme` that does
+ * nothing. Deliberately a fallback rather than a thrown invariant — theme-aware components are
+ * rendered on their own in tests and in isolation, where the surrounding shell is not mounted.
+ */
+const NO_PROVIDER: ThemeProviderState = {
 	theme: "system",
-	setTheme: () => null,
+	setTheme: () => {},
 };
 
-const ThemeProviderContext = createContext<ThemeProviderState>(initialState);
+const ThemeProviderContext = createContext<ThemeProviderState>(NO_PROVIDER);
 
 export function ThemeProvider({
 	children,
@@ -75,10 +80,4 @@ export function ThemeProvider({
 	);
 }
 
-export const useTheme = () => {
-	const context = useContext(ThemeProviderContext);
-
-	if (context === undefined) throw new Error("useTheme must be used within a ThemeProvider");
-
-	return context;
-};
+export const useTheme = () => useContext(ThemeProviderContext);

@@ -47,19 +47,26 @@ export function clearedObservationFilters(): Partial<ObservationsSearch> {
 	};
 }
 
-/** Whether anything above is set — read by the count's wording and by the empty state's copy. */
+/**
+ * Whether anything above is set — read by the count's wording and by the empty state's copy.
+ *
+ * <p>A facet parsed from a URL that named no value it could keep arrives as an empty array, which
+ * narrows nothing and so must not count as a filter. The scalars need only a presence check: the
+ * schema admits a uuid, a known artifact kind, a positive id or an ISO day, so none of them can be
+ * present and blank.
+ */
 export function hasObservationFilter(search: ObservationsSearch): boolean {
-	return Boolean(
-		search.areaSlug?.length ||
-			search.practiceSlug?.length ||
-			search.presence?.length ||
-			search.assessment?.length ||
-			search.severity?.length ||
-			search.agentJobId ||
-			search.artifactKind ||
-			search.subjectUserId ||
-			search.from ||
-			search.to,
+	return (
+		(search.areaSlug?.length ?? 0) > 0 ||
+		(search.practiceSlug?.length ?? 0) > 0 ||
+		(search.presence?.length ?? 0) > 0 ||
+		(search.assessment?.length ?? 0) > 0 ||
+		(search.severity?.length ?? 0) > 0 ||
+		search.agentJobId !== undefined ||
+		search.artifactKind !== undefined ||
+		search.subjectUserId !== undefined ||
+		search.from !== undefined ||
+		search.to !== undefined
 	);
 }
 

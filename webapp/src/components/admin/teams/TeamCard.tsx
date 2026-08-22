@@ -51,8 +51,7 @@ export function TeamCard({
 								{memberCount === 1 ? "member" : "members"}
 							</span>
 							<span>
-								{(team.repositories ?? []).length}{" "}
-								{(team.repositories ?? []).length === 1 ? "repo" : "repos"}
+								{team.repositories.length} {team.repositories.length === 1 ? "repo" : "repos"}
 							</span>
 						</div>
 					</div>

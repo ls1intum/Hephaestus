@@ -60,7 +60,7 @@ function LoginPage() {
 			title="Welcome to Hephaestus"
 			description="Your AI mentor for growing as a software engineer."
 			error={error}
-			onSignIn={(registrationId) => void login(registrationId, returnTo)}
+			onSignIn={(registrationId) => login(registrationId, returnTo)}
 			devReturnTo={returnTo}
 		/>
 	);

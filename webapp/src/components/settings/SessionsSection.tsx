@@ -184,7 +184,7 @@ export function SessionsSection() {
 						// Scope the pending state to the row actually being revoked so a single revoke
 						// doesn't disable/spin every other session's button.
 						const isRevokingThis =
-							revokeOne.isPending && revokeOne.variables?.path.jti === session.jti;
+							revokeOne.isPending && revokeOne.variables.path.jti === session.jti;
 						return (
 							<div
 								key={session.jti ?? `${session.userAgent}:${session.ip}`}

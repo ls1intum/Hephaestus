@@ -22,8 +22,11 @@ export type MockUIAchievement = UIAchievement & {
 	y?: number;
 };
 
-/** What the server sends for an achievement the user has not earned: `unlockedAt` is never absent. */
-const NEVER_UNLOCKED = new Date(0);
+/**
+ * What an achievement nobody has earned looks like on the client: the server omits `unlockedAt`,
+ * and the generated response transformer turns that absence into an invalid Date.
+ */
+const NEVER_UNLOCKED = new Date(Number.NaN);
 
 export const mockUser = {
 	name: "Hephaestus_Forge_Master",

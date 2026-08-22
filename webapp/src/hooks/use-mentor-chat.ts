@@ -1,5 +1,4 @@
-import type { UseChatHelpers } from "@ai-sdk/react";
-import { useChat } from "@ai-sdk/react";
+import { type UseChatHelpers, useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -56,15 +55,15 @@ export function useMentorChat({
 	const hasWorkspace = Boolean(workspaceSlug);
 
 	// Generate a stable chat ID for this hook lifecycle
-	const [stableThreadId] = useState(() => threadId || uuidv4());
+	const [stableThreadId] = useState(() => threadId ?? uuidv4());
 
 	// Fetch thread detail if threadId is provided; avoid immediate refetch on mount
 	const threadQueryKey = getThreadQueryKey({
-		path: { workspaceSlug: slug, threadId: threadId || "" },
+		path: { workspaceSlug: slug, threadId: threadId ?? "" },
 	});
 	const threadQuery = useQuery({
 		...getThreadOptions({
-			path: { workspaceSlug: slug, threadId: threadId || "" },
+			path: { workspaceSlug: slug, threadId: threadId ?? "" },
 		}),
 		enabled: Boolean(threadId) && hasWorkspace,
 		initialData: () =>
@@ -103,7 +102,7 @@ export function useMentorChat({
 
 	// A thread carries its own votes, so switching threads drops them. Keyed by the id the votes
 	// were cast against, which means a brand-new thread learning its id is not a switch.
-	const voteThreadId = threadId || stableThreadId;
+	const voteThreadId = threadId ?? stableThreadId;
 	const [votedThreadId, setVotedThreadId] = useState(voteThreadId);
 	if (votedThreadId !== voteThreadId) {
 		setVotedThreadId(voteThreadId);
@@ -158,7 +157,7 @@ export function useMentorChat({
 		if (threadId || stableThreadId) {
 			void queryClient.invalidateQueries({
 				queryKey: getThreadQueryKey({
-					path: { workspaceSlug: slug, threadId: threadId || stableThreadId || "" },
+					path: { workspaceSlug: slug, threadId: threadId ?? stableThreadId },
 				}),
 			});
 		}
@@ -303,7 +302,7 @@ export function useMentorChat({
 		threadError: threadError,
 		threads,
 		isThreadsLoading,
-		currentThreadId: threadId || id,
+		currentThreadId: threadId ?? id,
 
 		// Voting
 		voteMessage,

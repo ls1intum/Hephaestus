@@ -128,7 +128,8 @@ export const RenderedAndSource: Story = {
 export const PracticeSaysWhatItIs: Story = {
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		const productLanguage = workspacePractices[1];
+		const productLanguage = workspacePractices.find((p) => p.slug === "product-language");
+		if (!productLanguage) throw new Error("The practice fixtures no longer cover product-language");
 		await userEvent.hover(await canvas.findByRole("link", { name: /Product language/ }));
 		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
 		await screen.findByText(productLanguage.whyItMatters ?? "");

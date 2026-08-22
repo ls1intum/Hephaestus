@@ -25,11 +25,11 @@ describe("catalog tree drop target", () => {
 	];
 
 	it("places before or after a row in another area", () => {
-		expect(getCatalogDropTarget(entries, "source", "delivery", "after")).toEqual({
+		expect(getCatalogDropTarget(entries, "source", "delivery", "after")).toStrictEqual({
 			areaSlug: "delivery",
 			position: 1,
 		});
-		expect(getCatalogDropTarget(entries, "source", "delivery", "after", true)).toEqual({
+		expect(getCatalogDropTarget(entries, "source", "delivery", "after", true)).toStrictEqual({
 			areaSlug: "delivery",
 			position: 2,
 		});
@@ -40,11 +40,11 @@ describe("catalog tree drop target", () => {
 	 * end of the area, and the row would come back where it started.
 	 */
 	it("does not count the moving row when it stays in its own area", () => {
-		expect(getCatalogDropTarget(entries, "before", "delivery", "after", true)).toEqual({
+		expect(getCatalogDropTarget(entries, "before", "delivery", "after", true)).toStrictEqual({
 			areaSlug: "delivery",
 			position: 1,
 		});
-		expect(getCatalogDropTarget(entries, "before", "delivery", "after")).toEqual({
+		expect(getCatalogDropTarget(entries, "before", "delivery", "after")).toStrictEqual({
 			areaSlug: "delivery",
 			position: 0,
 		});
@@ -54,18 +54,18 @@ describe("catalog tree drop target", () => {
 	it("orders a displayOrder tie by name", () => {
 		const tied = [entry("beta", "delivery", 0), entry("alpha", "delivery", 0)];
 
-		expect(getCatalogDropTarget(tied, "source", "delivery", "beta")).toEqual({
+		expect(getCatalogDropTarget(tied, "source", "delivery", "beta")).toStrictEqual({
 			areaSlug: "delivery",
 			position: 1,
 		});
 	});
 
 	it("appends to empty areas and Unassigned", () => {
-		expect(getCatalogDropTarget(entries, "source", "empty")).toEqual({
+		expect(getCatalogDropTarget(entries, "source", "empty")).toStrictEqual({
 			areaSlug: "empty",
 			position: 0,
 		});
-		expect(getCatalogDropTarget(entries, "source", null)).toEqual({
+		expect(getCatalogDropTarget(entries, "source", null)).toStrictEqual({
 			areaSlug: null,
 			position: 0,
 		});

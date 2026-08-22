@@ -18,6 +18,7 @@
 		"noUnusedParameters": true,
 		"noFallthroughCasesInSwitch": true,
 		"noUncheckedSideEffectImports": true,
+		"noUncheckedIndexedAccess": true,
 		"noImplicitOverride": true,
 		"noImplicitReturns": true,
 		"allowUnreachableCode": false,

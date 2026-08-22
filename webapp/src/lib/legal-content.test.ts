@@ -62,7 +62,7 @@ describe("legal content layout", () => {
 	it("built-in disclaimer never presents TUM as the operator", () => {
 		for (const [file, body] of Object.entries(DISCLAIMER)) {
 			for (const marker of TUMAET_OPERATOR_IDENTITY_MARKERS) {
-				expect({ file, marker, found: body.includes(marker) }).toEqual({
+				expect({ file, marker, found: body.includes(marker) }).toStrictEqual({
 					file,
 					marker,
 					found: false,
@@ -79,7 +79,7 @@ describe("legal content layout", () => {
 
 	it("disclaimer points operators at the admin docs", () => {
 		for (const [file, body] of Object.entries(DISCLAIMER)) {
-			expect({ file, linked: body.includes("docs/admin/legal-pages") }).toEqual({
+			expect({ file, linked: body.includes("docs/admin/legal-pages") }).toStrictEqual({
 				file,
 				linked: true,
 			});

@@ -1,5 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import type { LlmModel } from "@/api/types.gen";
 import { validateLlmModelForm } from "@/lib/llm-form-validation";
 import { expectUnavailable } from "@/test/controls";
@@ -36,8 +36,9 @@ describe("AdminLlmModelFormDialog", () => {
 		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
 		const saved = onSave.mock.calls[0]?.[0];
+		assert(saved);
 		expect(saved.metadata.enabled).toBe(false);
-		expect(saved.sharing).toEqual({ visibility: "GRANTED", workspaceIds: [] });
+		expect(saved.sharing).toStrictEqual({ visibility: "GRANTED", workspaceIds: [] });
 	});
 
 	it("keeps the upstream model identity immutable", () => {
@@ -92,7 +93,7 @@ describe("AdminLlmModelFormDialog", () => {
 			per1mInputUsd: 0,
 			per1mOutputUsd: 0,
 		}).per1mInputUsd;
-		if (rejection === undefined) throw new Error("A priced model without a price must be rejected");
+		assert(rejection, "A priced model without a price must be rejected");
 		screen.getByText(rejection);
 		expect(onSave).not.toHaveBeenCalled();
 	});
@@ -115,11 +116,11 @@ describe("AdminLlmModelFormDialog", () => {
 			maxOutputTokens: "3000000000",
 			pricingMode: "UNPRICED",
 		});
-		expect(rejected.contextWindow).toBeTruthy();
+		expect(rejected.contextWindow).toMatch(/tokens or fewer/);
 		expect(onSave).not.toHaveBeenCalled();
 
 		const alerts = screen.getAllByRole("alert");
-		expect(alerts.map((alert) => alert.textContent)).toEqual([
+		expect(alerts.map((alert) => alert.textContent)).toStrictEqual([
 			rejected.contextWindow,
 			rejected.maxOutputTokens,
 		]);
@@ -178,6 +179,8 @@ describe("AdminLlmModelFormDialog", () => {
 		);
 		screen.getByText("Work on this model stops immediately, in every workspace");
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-		expect(onSave.mock.calls[0]?.[0].metadata).toEqual(expect.objectContaining({ enabled: false }));
+		expect(onSave.mock.calls[0]?.[0].metadata).toStrictEqual(
+			expect.objectContaining({ enabled: false }),
+		);
 	});
 });

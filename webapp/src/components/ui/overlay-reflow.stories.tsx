@@ -183,7 +183,7 @@ export const SelectOverlay = reflowStory(
 				<SelectTrigger aria-label="Autonomy" className="w-full">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Autonomy">
 					<SelectItem value="propose">Propose feedback for a reviewer</SelectItem>
 					<SelectItem value="deliver">{optionLabel}</SelectItem>
 				</SelectContent>
@@ -205,7 +205,7 @@ export const ComboboxOverlay = reflowStory(
 				</ComboboxTrigger>
 				{/* `min-w-72` is the widest the app asks for. */}
 				<ComboboxContent align="start" className="min-w-72" aria-label="Autonomy modes">
-					<ComboboxList>
+					<ComboboxList aria-label="Autonomy modes">
 						{(item: string) => (
 							<ComboboxItem key={item} value={item}>
 								{item}

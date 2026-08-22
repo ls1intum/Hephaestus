@@ -142,7 +142,7 @@ function PracticeCatalogRoute() {
 						})
 					}
 					onDeleteArea={(areaSlug) =>
-						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
+						setDeletingArea(areasQuery.data.find((area) => area.slug === areaSlug) ?? null)
 					}
 					onReorderAreas={(orderedSlugs) =>
 						catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })

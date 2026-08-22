@@ -21,24 +21,26 @@ import { WizardStepIndicator } from "@/components/workspace/create-workspace/Wiz
 import {
 	createInitialWizardState,
 	WizardContext,
+	type WizardStep,
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { isRecord } from "@/lib/is-record";
+import { firstNonBlank } from "@/lib/text";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
 	component: GitLabWizardPage,
 });
 
-const STEP_META = [
-	{
+const STEP_META: Record<WizardStep, { title: string; description: string }> = {
+	1: {
 		title: "Connect to GitLab",
 		description: "Enter your GitLab instance URL and access token.",
 	},
-	{ title: "Select a Group", description: "Choose the GitLab group to monitor." },
-	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
-] as const;
+	2: { title: "Select a Group", description: "Choose the GitLab group to monitor." },
+	3: { title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
+};
 
 interface GitLabProvider {
 	registrationId: string;
@@ -96,7 +98,7 @@ function GitLabLinkPrompt({
 }: {
 	providers: GitLabProvider[];
 	linkedServerUrls: Set<string>;
-	linkAccount: (alias: string) => Promise<void>;
+	linkAccount: (alias: string) => void;
 }) {
 	const multiple = providers.length > 1;
 	return (
@@ -119,7 +121,7 @@ function GitLabLinkPrompt({
 								key={provider.registrationId}
 								variant={linked ? "outline" : "default"}
 								disabled={linked}
-								onClick={() => void linkAccount(provider.registrationId)}
+								onClick={() => linkAccount(provider.registrationId)}
 							>
 								{linked
 									? `${provider.displayName} — already linked`
@@ -159,7 +161,7 @@ function GitLabWizardPage() {
 		return [
 			{
 				registrationId: p.registrationId,
-				displayName: p.displayName || p.registrationId,
+				displayName: firstNonBlank(p.displayName) ?? p.registrationId,
 				baseUrl: p.baseUrl ?? "",
 			},
 		];
@@ -179,7 +181,7 @@ function GitLabWizardPage() {
 	const { setSelectedSlug } = useWorkspaceStore();
 	const headingRef = useRef<HTMLHeadingElement>(null);
 
-	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step - 1].title}`;
+	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step].title}`;
 
 	const listGroups = useMutation({
 		...listGitLabGroupsMutation(),
@@ -275,7 +277,7 @@ function GitLabWizardPage() {
 		});
 	};
 
-	const meta = STEP_META[state.step - 1];
+	const meta = STEP_META[state.step];
 	const wizardContextValue = { state, dispatch };
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;

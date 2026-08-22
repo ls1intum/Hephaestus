@@ -9,8 +9,8 @@ import {
 	areaSeed,
 	COLOR_KEYS,
 	getAreaVisual,
-	ICON_COMPONENTS,
 	ICON_NAMES,
+	iconComponent,
 	iconLabel,
 	iconSearchText,
 	PILL,
@@ -134,7 +134,7 @@ export function AreaVisualPicker({
 								className="grid max-h-44 w-full grid-cols-7 gap-1 overflow-y-auto pr-1"
 							>
 								{filteredIcons.map((iconName) => {
-									const Icon = ICON_COMPONENTS[iconName];
+									const Icon = iconComponent(iconName);
 									return (
 										<ToggleGroupItem
 											key={iconName}

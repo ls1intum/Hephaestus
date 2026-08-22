@@ -57,10 +57,10 @@ export function Messages({
 	const isArtifact = variant === "artifact";
 
 	const hasVisibleContent = (message: ChatMessage): boolean => {
-		const parts = message?.parts ?? [];
+		const parts = message.parts;
 		if (parts.length === 0) return false;
 		for (const p of parts) {
-			if (p.type === "text" && (p.text ?? "").trim().length > 0) return true;
+			if (p.type === "text" && p.text.trim().length > 0) return true;
 			if (p.type === "file") return true;
 			if (isStaticToolUIPart<ChatTools>(p) && VISIBLE_TOOL_STATES.includes(p.state)) return true;
 		}
@@ -116,8 +116,8 @@ export function Messages({
 				{showThinking &&
 					(status === "submitted" || status === "streaming") &&
 					(() => {
-						if (messages.length === 0) return <ThinkingMessage />;
-						const last = messages[messages.length - 1];
+						const last = messages.at(-1);
+						if (!last) return <ThinkingMessage />;
 						const isUser = last.role === "user";
 						const assistantHasVisible = last.role === "assistant" && hasVisibleContent(last);
 						return isUser || !assistantHasVisible ? <ThinkingMessage /> : null;

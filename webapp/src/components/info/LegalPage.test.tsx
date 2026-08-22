@@ -1,5 +1,5 @@
 import { render, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/environment", () => ({
 	default: { legal: { profile: "" } },
@@ -73,7 +73,7 @@ describe("LegalPage — XSS guardrail", () => {
 
 		const article = await waitFor(() => {
 			const el = container.querySelector("article");
-			if (!el) throw new Error("article not rendered yet");
+			assert(el, "article not rendered yet");
 			return el;
 		});
 
@@ -88,15 +88,17 @@ describe("LegalPage — XSS guardrail", () => {
 
 		const anchors = Array.from(article.querySelectorAll("a"));
 		expect(anchors.length).toBeGreaterThan(0);
-		for (const a of anchors) {
-			const href = a.getAttribute("href") ?? "";
-			expect({ href, safe: isSafeLegalHref(href) }).toEqual({ href, safe: true });
+		// The raw attribute, not a `?? ""` stand-in: a rendered link with no href at all is its own
+		// failure, and both guards reject anything that is not a string.
+		for (const anchor of anchors) {
+			const href = anchor.getAttribute("href");
+			expect({ href, safe: isSafeLegalHref(href) }).toStrictEqual({ href, safe: true });
 		}
 
 		const images = Array.from(article.querySelectorAll("img"));
-		for (const img of images) {
-			const src = img.getAttribute("src") ?? "";
-			expect({ src, safe: isSafeLegalImageSrc(src) }).toEqual({ src, safe: true });
+		for (const image of images) {
+			const src = image.getAttribute("src");
+			expect({ src, safe: isSafeLegalImageSrc(src) }).toStrictEqual({ src, safe: true });
 		}
 
 		// Markdown titles (`[x](u "title")`, `![x](u "title")`) are a UI-spoof
@@ -120,10 +122,12 @@ describe("LegalPage — XSS guardrail", () => {
 		);
 		const article = await waitFor(() => {
 			const el = container.querySelector("article");
-			if (!el) throw new Error("not rendered");
+			assert(el, "article not rendered");
 			return el;
 		});
 		const [ext, int] = Array.from(article.querySelectorAll("a"));
+		assert(ext);
+		assert(int);
 		expect(ext.getAttribute("target")).toBe("_blank");
 		expect(ext.getAttribute("rel")).toBe("noopener noreferrer");
 		expect(int.getAttribute("target")).toBeNull();

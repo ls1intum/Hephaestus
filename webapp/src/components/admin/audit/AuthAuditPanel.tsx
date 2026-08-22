@@ -22,7 +22,7 @@ import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { ResultCount } from "@/components/common/ResultCount";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { springPageParams } from "@/integrations/tanstack-query/spring-page";
+import { loadedPages, springPageParams } from "@/integrations/tanstack-query/spring-page";
 import { dedupeById } from "@/lib/dedupe-by-id";
 import { narrowToEnum, nonEmpty } from "@/lib/search-params";
 
@@ -95,17 +95,17 @@ export function AuthAuditPanel({
 		...springPageParams,
 	});
 
-	const events: AuthEventView[] = dedupeById(
-		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
-	);
-	const total = listQuery.data?.pages[0]?.totalElements;
-	const hasAppliedFilter = Boolean(
-		filters.eventType ||
-			filters.result ||
-			filters.accountId !== undefined ||
-			filters.actingAccountId !== undefined ||
-			filters.from,
-	);
+	const pages = loadedPages(listQuery.data);
+	const events: AuthEventView[] = dedupeById(pages.flatMap((p) => p.content ?? []));
+	const total = pages[0]?.totalElements;
+	// A facet whose URL values were all rejected by the allowlist narrows nothing, so it does not
+	// count as applied.
+	const hasAppliedFilter =
+		(filters.eventType?.length ?? 0) > 0 ||
+		(filters.result?.length ?? 0) > 0 ||
+		filters.accountId !== undefined ||
+		filters.actingAccountId !== undefined ||
+		filters.from !== undefined;
 
 	const reset = () =>
 		onSearchChange({

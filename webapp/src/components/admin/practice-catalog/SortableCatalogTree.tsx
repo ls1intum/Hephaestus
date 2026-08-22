@@ -441,7 +441,9 @@ export function SortableCatalogTree<
 					multiple
 					value={sortedAreas
 						.map((area) => area.slug)
-						.filter((slug) => forceOpenAreaSlugs?.has(slug) || !collapsedAreas.includes(slug))}
+						.filter(
+							(slug) => (forceOpenAreaSlugs?.has(slug) ?? false) || !collapsedAreas.includes(slug),
+						)}
 					onValueChange={(open) =>
 						setCollapsedAreas(
 							sortedAreas.map((area) => area.slug).filter((slug) => !open.includes(slug)),

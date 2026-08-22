@@ -39,10 +39,10 @@ export function AdminAchievementsPage({
 	const recalculateMutation = useMutation(recalculateUserAchievementsMutation());
 	const reloadMutation = useMutation(reloadAchievementsMutation());
 
-	const handleReload = async () => {
+	const handleReload = () => {
 		toast.promise(
 			reloadMutation.mutateAsync({
-				path: { workspaceSlug, login: username || "" },
+				path: { workspaceSlug, login: username ?? "" },
 			}),
 			{
 				loading: "Reloading achievement definitions...",
@@ -97,20 +97,20 @@ export function AdminAchievementsPage({
 		}
 	};
 
-	const handleRecalculateSingle = async (username: string) => {
-		setRecalculatingUsers((prev) => new Set(prev).add(username));
+	const handleRecalculateSingle = (targetUsername: string) => {
+		setRecalculatingUsers((prev) => new Set(prev).add(targetUsername));
 		toast.promise(
 			recalculateMutation.mutateAsync({
-				path: { workspaceSlug, login: username },
+				path: { workspaceSlug, login: targetUsername },
 			}),
 			{
-				loading: `Recalculating achievements for ${username}...`,
-				success: `Successfully dispatched recalculation for ${username}`,
-				error: `Failed to recalculate achievements for ${username}`,
+				loading: `Recalculating achievements for ${targetUsername}...`,
+				success: `Successfully dispatched recalculation for ${targetUsername}`,
+				error: `Failed to recalculate achievements for ${targetUsername}`,
 				finally: () => {
 					setRecalculatingUsers((prev) => {
 						const newSet = new Set(prev);
-						newSet.delete(username);
+						newSet.delete(targetUsername);
 						return newSet;
 					});
 				},
@@ -128,7 +128,7 @@ export function AdminAchievementsPage({
 					<>
 						<Button
 							variant="outline"
-							onClick={() => void handleReload()}
+							onClick={() => handleReload()}
 							disabled={isLoading || reloadMutation.isPending}
 							className="w-full sm:w-auto"
 						>
@@ -172,7 +172,7 @@ export function AdminAchievementsPage({
 					users={users}
 					isLoading={isLoading}
 					workspaceSlug={workspaceSlug}
-					onRecalculate={(username) => void handleRecalculateSingle(username)}
+					onRecalculate={(targetUsername) => handleRecalculateSingle(targetUsername)}
 					recalculatingUsers={recalculatingUsers}
 				/>
 			)}

@@ -60,8 +60,8 @@ export function SilentModeStatusCard({
 						<Badge variant="destructive">Silent mode engaged</Badge>
 						<p className="text-sm text-muted-foreground">
 							Workspace delivery is blocked
-							{settings?.silentModeChangedBy ? ` — engaged by ${settings.silentModeChangedBy}` : ""}
-							{settings?.silentModeChangedAt ? (
+							{settings.silentModeChangedBy ? ` — engaged by ${settings.silentModeChangedBy}` : ""}
+							{settings.silentModeChangedAt ? (
 								<>
 									{" "}
 									<RelativeTime value={settings.silentModeChangedAt} tooltip={false} />

@@ -150,7 +150,7 @@ export function AgentBindingsPage({
 			/>
 
 			<div className="max-w-4xl space-y-6">
-				{(usage?.ownProviderPaused || usage?.instancePaused) && (
+				{(usage?.ownProviderPaused === true || usage?.instancePaused === true) && (
 					<div className="space-y-3">
 						{usage.ownProviderPaused && (
 							<BudgetExhaustedAlert
@@ -330,11 +330,12 @@ function AgentPurposeCard({
 				<CardContent className="space-y-4">
 					<FieldGroup>
 						<Field data-invalid={Boolean(modelError)}>
-							<FieldLabel htmlFor={`${meta.purpose}-model`}>
+							<FieldLabel id={`${meta.purpose}-model-label`} htmlFor={`${meta.purpose}-model`}>
 								{PURPOSE_TITLES[meta.purpose]} model
 							</FieldLabel>
 							<ModelPicker
 								id={`${meta.purpose}-model`}
+								aria-labelledby={`${meta.purpose}-model-label`}
 								availableModels={availableModels}
 								value={selection}
 								onChange={setSelection}

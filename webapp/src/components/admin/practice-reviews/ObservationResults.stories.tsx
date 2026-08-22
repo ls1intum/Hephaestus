@@ -5,8 +5,11 @@ import { expectNoPageOverflow } from "@/test/reflow";
 import { ObservationResults } from "./ObservationResults";
 import { reviewObservations, workspacePractices } from "./story-mock-data";
 
+const [firstObservation] = reviewObservations;
+if (!firstObservation) throw new Error("The review fixtures must contain an observation");
+
 const longContent = {
-	...reviewObservations[0],
+	...firstObservation,
 	id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
 	summary:
 		"The review keeps every boundary visible even when the observation needs enough words to wrap across a narrow screen twice over",
@@ -21,7 +24,8 @@ const longContent = {
 const clearFilters = fn();
 
 /** The practice several of the fixture's observations name, and the one the hover card is read on. */
-const THIN_CONTROLLERS = workspacePractices[0];
+const THIN_CONTROLLERS = workspacePractices.find((p) => p.slug === "thin-controllers");
+if (!THIN_CONTROLLERS) throw new Error("The practice fixtures no longer cover thin-controllers");
 
 const meta = {
 	title: "Workspace admin/Practice reviews/Building blocks/Observation results",
@@ -73,7 +77,9 @@ export const PracticeOpensItsDefinition: Story = {
 			await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
 		}
 		// The card is a portal, so it is looked for on the whole screen rather than in the canvas.
-		await userEvent.hover(links[0]);
+		const [firstLink] = links;
+		if (!firstLink) throw new Error("No row named the practice");
+		await userEvent.hover(firstLink);
 		await screen.findByText(THIN_CONTROLLERS.whyItMatters ?? "");
 		await screen.findByText(THIN_CONTROLLERS.whatGoodLooksLike ?? "");
 	},
@@ -88,7 +94,8 @@ export const WithoutPracticeRecords: Story = {
 	args: { practices: undefined },
 	parameters: { chromatic: { disableSnapshot: true } },
 	play: async ({ canvas, userEvent }) => {
-		const link = (await canvas.findAllByRole("link", { name: /Thin controllers/ }))[0];
+		const [link] = await canvas.findAllByRole("link", { name: /Thin controllers/ });
+		if (!link) throw new Error("No row named the practice");
 		await expect(link).toHaveAttribute("href", "/w/demo/admin/practices/thin-controllers");
 		await userEvent.hover(link);
 		await expect(screen.queryByText(THIN_CONTROLLERS.whyItMatters ?? "")).not.toBeInTheDocument();

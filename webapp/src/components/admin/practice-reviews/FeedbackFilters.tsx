@@ -46,17 +46,20 @@ export function clearedFeedbackFilters(): Partial<FeedbackSearch> {
 	};
 }
 
-/** Whether anything above is set — read by the count's wording and by the empty state's copy. */
+/**
+ * Whether anything above is set — read by the count's wording and by the empty state's copy. Empty
+ * arrays and absent scalars alike are "not filtered"; see the note on `hasObservationFilter`.
+ */
 export function hasFeedbackFilter(search: FeedbackSearch): boolean {
-	return Boolean(
-		search.deliveryState?.length ||
-			search.withheldFamily?.length ||
-			search.channel?.length ||
-			search.agentJobId ||
-			search.artifactKind ||
-			search.recipientUserId ||
-			search.from ||
-			search.to,
+	return (
+		(search.deliveryState?.length ?? 0) > 0 ||
+		(search.withheldFamily?.length ?? 0) > 0 ||
+		(search.channel?.length ?? 0) > 0 ||
+		search.agentJobId !== undefined ||
+		search.artifactKind !== undefined ||
+		search.recipientUserId !== undefined ||
+		search.from !== undefined ||
+		search.to !== undefined
 	);
 }
 

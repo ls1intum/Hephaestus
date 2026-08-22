@@ -162,14 +162,7 @@ function addArrayResponses(
 		return;
 	}
 
-	const asStrings = values
-		.map((value) => {
-			if (typeof value === "string") {
-				return value;
-			}
-			return value != null ? String(value) : "";
-		})
-		.filter((value): value is string => value.length > 0);
+	const asStrings = values.filter((value) => value.length > 0);
 
 	for (const item of asStrings) {
 		addWithVariants(item);

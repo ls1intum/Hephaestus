@@ -16,8 +16,16 @@ import type { ChatMessage } from "@/lib/types";
  * A part is anything carrying a `type`. Unknown keys survive validation: the mentor streams part
  * kinds this client does not model, and stripping their payload here would leave the renderer
  * nothing to narrow.
+ *
+ * A text part is the one shape whose payload is checked, because the renderer reads `text`
+ * unguarded — the AI SDK types it as always present, so a part that omits it would reach
+ * `String.prototype.replaceAll` and take the whole conversation down.
  */
-const messagePartSchema = z.looseObject({ type: z.string() });
+const messagePartSchema = z
+	.looseObject({ type: z.string() })
+	.refine((part) => part.type !== "text" || typeof part.text === "string", {
+		message: "A text part must carry its text",
+	});
 
 /**
  * Mirrors the `ThreadDetail.messages` structure. Unknown keys survive here too, because the AI SDK

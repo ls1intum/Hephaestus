@@ -23,6 +23,12 @@ export interface ModelPickerProps {
 	disabled?: boolean;
 	invalid?: boolean;
 	"aria-describedby"?: string;
+	/**
+	 * Ids the caller's visible label. Required, and a label id rather than a literal, because the
+	 * picker owns a popup listbox but not the words beside it: only the caller can say what the open
+	 * list is a list of, and only its label keeps that name in step with what the reader sees.
+	 */
+	"aria-labelledby": string;
 }
 
 function encode(scope: ModelSelection["scope"], id: number): string {
@@ -69,6 +75,7 @@ export function ModelPicker({
 	disabled = false,
 	invalid = false,
 	"aria-describedby": ariaDescribedBy,
+	"aria-labelledby": ariaLabelledBy,
 }: ModelPickerProps) {
 	const shared = availableModels.filter((model) => model.scope === "SHARED");
 	const own = availableModels.filter((model) => model.scope === "WORKSPACE");
@@ -94,7 +101,7 @@ export function ModelPicker({
 			>
 				<SelectValue placeholder="Select a model…" />
 			</SelectTrigger>
-			<SelectContent>
+			<SelectContent aria-labelledby={ariaLabelledBy}>
 				{shared.length > 0 && (
 					<SelectGroup>
 						<SelectLabel>Shared models</SelectLabel>

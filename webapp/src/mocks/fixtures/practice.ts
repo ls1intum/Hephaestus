@@ -4,6 +4,7 @@ import type {
 	PracticeBinding,
 	PracticeDefinitionOptions,
 	PracticeEvidenceSourceOption,
+	PracticeWorkTypeDefinitionOptions,
 } from "@/api/types.gen";
 
 export const mockAuthorDeclaredEvidenceValidation = {
@@ -382,8 +383,16 @@ export const mockPracticeDefinitionOptions = {
 	],
 } satisfies PracticeDefinitionOptions;
 
-/** Named rather than indexed, so a work type added here cannot silently repoint a story. */
-export const mockPullRequestWorkType = mockPracticeDefinitionOptions.workTypes[0];
-export const mockIssueWorkType = mockPracticeDefinitionOptions.workTypes[1];
-export const mockConversationWorkType = mockPracticeDefinitionOptions.workTypes[2];
-export const mockDocumentWorkType = mockPracticeDefinitionOptions.workTypes[3];
+/** Looked up by kind rather than indexed, so a work type added above cannot repoint a story. */
+function workTypeOf(artifactKind: string): PracticeWorkTypeDefinitionOptions {
+	const workType = mockPracticeDefinitionOptions.workTypes.find(
+		(candidate) => candidate.artifactKind === artifactKind,
+	);
+	if (!workType) throw new Error(`No work type fixture for ${artifactKind}`);
+	return workType;
+}
+
+export const mockPullRequestWorkType = workTypeOf("scm.pull_request");
+export const mockIssueWorkType = workTypeOf("scm.issue");
+export const mockConversationWorkType = workTypeOf("chat.conversation_thread");
+export const mockDocumentWorkType = workTypeOf("docs.document");

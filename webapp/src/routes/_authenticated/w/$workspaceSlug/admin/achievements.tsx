@@ -35,7 +35,7 @@ function AdminAchievementsContainer() {
 		enabled: Boolean(workspaceSlug) && (usersQueryOptions.enabled ?? true),
 	});
 
-	const users = (usersData?.map(adaptApiUserTeams) || []).sort((a, b) =>
+	const users = (usersData?.map(adaptApiUserTeams) ?? []).sort((a, b) =>
 		a.user.name.localeCompare(b.user.name),
 	);
 	const isLoading = isWorkspaceLoading || usersLoading;

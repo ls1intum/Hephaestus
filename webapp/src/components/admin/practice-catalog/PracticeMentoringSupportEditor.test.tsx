@@ -3,15 +3,14 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { PracticeAutomatedReviewPolicy } from "@/api/types.gen";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { mockPullRequestWorkType } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
 import {
 	PracticeMentoringSupportEditor,
 	practicePolicyError,
 } from "./PracticeMentoringSupportEditor";
 
-const options = mockPracticeDefinitionOptions.workTypes[0];
-const recommended = options.recommendedPolicy;
+const recommended = mockPullRequestWorkType.recommendedPolicy;
 
 function Controlled({ initial = recommended }: { initial?: PracticeAutomatedReviewPolicy }) {
 	const [value, setValue] = useState(initial);
@@ -25,7 +24,7 @@ function Controlled({ initial = recommended }: { initial?: PracticeAutomatedRevi
 			<PracticeMentoringSupportEditor
 				value={value}
 				recommended={recommended}
-				supportedAutomatedReviewModes={options.supportedAutomatedReviewModes}
+				supportedAutomatedReviewModes={mockPullRequestWorkType.supportedAutomatedReviewModes}
 				onChange={setValue}
 			/>
 		</>
@@ -97,7 +96,7 @@ describe("PracticeMentoringSupportEditor", () => {
 					<PracticeMentoringSupportEditor
 						value={value}
 						recommended={recommended}
-						supportedAutomatedReviewModes={options.supportedAutomatedReviewModes}
+						supportedAutomatedReviewModes={mockPullRequestWorkType.supportedAutomatedReviewModes}
 						onChange={setValue}
 					/>
 				</>

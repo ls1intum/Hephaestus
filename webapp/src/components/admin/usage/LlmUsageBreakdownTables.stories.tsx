@@ -15,19 +15,21 @@ const eur: FxRateInfo = {
 	source: "ECB",
 };
 
+const pullRequestReviewRow: LlmUsageByJobType = {
+	jobType: "PULL_REQUEST_REVIEW",
+	events: 128,
+	inputTokens: 4_210_000,
+	outputTokens: 318_000,
+	cacheReadTokens: 1_900_000,
+	cacheWriteTokens: 210_000,
+	totalCalls: 402,
+	instanceTotalCostUsd: 12.4,
+	ownProviderTotalCostUsd: 0,
+	unpricedEventCount: 0,
+};
+
 const jobTypeRows: LlmUsageByJobType[] = [
-	{
-		jobType: "PULL_REQUEST_REVIEW",
-		events: 128,
-		inputTokens: 4_210_000,
-		outputTokens: 318_000,
-		cacheReadTokens: 1_900_000,
-		cacheWriteTokens: 210_000,
-		totalCalls: 402,
-		instanceTotalCostUsd: 12.4,
-		ownProviderTotalCostUsd: 0,
-		unpricedEventCount: 0,
-	},
+	pullRequestReviewRow,
 	{
 		jobType: "MENTOR_TURN",
 		events: 61,
@@ -108,7 +110,7 @@ export const ByJobType: Story = {
 };
 
 export const SingleRowHasNoTotals: Story = {
-	args: { report: report({ byJobType: [jobTypeRows[0]] }) },
+	args: { report: report({ byJobType: [pullRequestReviewRow] }) },
 };
 
 export const Loading: Story = {

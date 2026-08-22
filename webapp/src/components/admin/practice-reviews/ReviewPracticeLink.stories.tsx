@@ -3,7 +3,8 @@ import { expect, screen } from "storybook/test";
 import { ReviewPracticeLink } from "./ReviewPracticeLink";
 import { workspacePractices } from "./story-mock-data";
 
-const thinControllers = workspacePractices[0];
+const thinControllers = workspacePractices.find((p) => p.slug === "thin-controllers");
+if (!thinControllers) throw new Error("The practice fixtures no longer cover thin-controllers");
 
 /**
  * The review read models carry a practice's slug, name and area but not its prose, so the hover card

@@ -84,10 +84,10 @@ export function generateSkillTreeData(
 			y: 0,
 		},
 		data: {
-			level: user?.level ?? 0,
-			leaguePoints: user?.leaguePoints ?? 0,
-			avatarUrl: user?.avatarUrl ?? "",
-			name: user?.name ?? "",
+			level: user.level,
+			leaguePoints: user.leaguePoints,
+			avatarUrl: user.avatarUrl,
+			name: user.name,
 			className: undefined,
 		},
 		type: "avatar",
@@ -334,12 +334,9 @@ export function calculateStats(achievementList: Achievement[]) {
 		if (a.status === "unlocked") unlocked++;
 		else if (a.status === "available") available++;
 
-		const cat = a.category ?? "milestones";
-		const entry = byCategory[cat];
-		if (entry) {
-			entry.total++;
-			if (a.status === "unlocked") entry.unlocked++;
-		}
+		const entry = byCategory[a.category];
+		entry.total++;
+		if (a.status === "unlocked") entry.unlocked++;
 	}
 
 	return {
@@ -349,4 +346,15 @@ export function calculateStats(achievementList: Achievement[]) {
 		percentage: total > 0 ? Math.round((unlocked / total) * 100) : 0,
 		byCategory,
 	};
+}
+
+/**
+ * The date an achievement was unlocked, or a placeholder when there is none.
+ *
+ * The server omits `unlockedAt` entirely for an achievement nobody has earned, and the generated
+ * response transformer feeds that absence to `new Date(...)` — so the field arrives as an *invalid*
+ * Date rather than as null. Validity, not presence, is what distinguishes the two cases.
+ */
+export function formatUnlockedAt(unlockedAt: Date, placeholder: string): string {
+	return Number.isNaN(unlockedAt.getTime()) ? placeholder : unlockedAt.toLocaleDateString();
 }

@@ -250,7 +250,7 @@ export function AdminAchievementsTable({
 									</div>
 								</TableCell>
 							</TableRow>
-						) : table.getRowModel().rows?.length > 0 ? (
+						) : table.getRowModel().rows.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									key={row.id}
@@ -293,7 +293,11 @@ export function AdminAchievementsTable({
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<Label htmlFor="achievement-rows-per-page" className="whitespace-nowrap">
+						<Label
+							id="achievement-rows-per-page-label"
+							htmlFor="achievement-rows-per-page"
+							className="whitespace-nowrap"
+						>
 							Rows per page
 						</Label>
 						<Select
@@ -306,7 +310,7 @@ export function AdminAchievementsTable({
 							<SelectTrigger id="achievement-rows-per-page" className="h-8 w-17.5">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent side="top">
+							<SelectContent side="top" aria-labelledby="achievement-rows-per-page-label">
 								{[10, 20, 30, 40, 50].map((pageSize) => (
 									<SelectItem key={pageSize} value={`${pageSize}`}>
 										{pageSize}

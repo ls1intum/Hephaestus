@@ -202,12 +202,12 @@ function GlobalCopilot() {
 
 	return (
 		<Copilot
-			hasMessages={(mentorChat.messages?.length ?? 0) > 0}
+			hasMessages={mentorChat.messages.length > 0}
 			onNewChat={() => {
 				mentorChat.setMessages([]);
 			}}
 			onOpenFullChat={() => {
-				const threadId = mentorChat.currentThreadId || mentorChat.id;
+				const threadId = mentorChat.currentThreadId ?? mentorChat.id;
 				if (threadId && workspaceSlug) {
 					void router.navigate({
 						to: "/w/$workspaceSlug/mentor/$threadId",
@@ -270,7 +270,7 @@ function HeaderContainer() {
 			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
 			workspaceSlug={workspaceSlug}
-			onLogin={(idpHint) => void login(idpHint)}
+			onLogin={(idpHint) => login(idpHint)}
 			onLogout={() => void logout()}
 		/>
 	);

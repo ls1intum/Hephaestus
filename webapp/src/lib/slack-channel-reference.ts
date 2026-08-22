@@ -15,12 +15,9 @@ export function parseSlackChannelReference(value: string): SlackChannelReference
 		return { channelId: trimmed };
 	}
 
-	const mention = SLACK_MENTION.exec(trimmed);
-	if (mention) {
-		return {
-			channelId: mention[1],
-			channelName: mention[2],
-		};
+	const [, mentionId, mentionName] = SLACK_MENTION.exec(trimmed) ?? [];
+	if (mentionId !== undefined) {
+		return { channelId: mentionId, channelName: mentionName };
 	}
 
 	const id = SLACK_CHANNEL_ID_IN_TEXT.exec(trimmed)?.[1];

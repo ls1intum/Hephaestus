@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listWorkspacesQueryKey } from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
+import { respondInTurn } from "@/test/responses";
 import { renderWithRouter } from "@/test/router-harness";
 import { AdminDangerZoneSettings } from "./AdminDangerZoneSettings";
 
@@ -37,8 +38,13 @@ function deleteButton() {
 	return screen.getByRole("button", { name: /^delete workspace$/i });
 }
 
+/** Resolves only once the permission check has come back and the owner-only control is on screen. */
+function findDeleteButton() {
+	return screen.findByRole("button", { name: /^delete workspace$/i }, WAIT);
+}
+
 async function openDialog() {
-	await waitFor(() => expect(deleteButton()).toBeTruthy(), WAIT);
+	await findDeleteButton();
 	fireEvent.click(deleteButton());
 	return screen.findByLabelText(/to confirm/i);
 }
@@ -69,7 +75,7 @@ describe("AdminDangerZoneSettings", () => {
 		fireEvent.click(confirmButton());
 
 		await waitFor(() => expect(router.state.location.pathname).toBe("/"), WAIT);
-		expect(queryClient.getQueryData(listWorkspacesQueryKey())).toEqual([
+		expect(queryClient.getQueryData(listWorkspacesQueryKey())).toStrictEqual([
 			{ workspaceSlug: "other", displayName: "Other" },
 		]);
 		expect(toast.success).toHaveBeenCalledWith("Workspace deleted");
@@ -114,7 +120,7 @@ describe("AdminDangerZoneSettings", () => {
 				}),
 			WAIT,
 		);
-		expect(screen.queryByRole("alertdialog")).toBeTruthy();
+		screen.getByRole("alertdialog");
 	});
 
 	it("does not guess the role while permissions load", async () => {
@@ -134,25 +140,25 @@ describe("AdminDangerZoneSettings", () => {
 		screen.getByText(/checking your permissions/i);
 
 		resolveRole();
-		await waitFor(() => expect(deleteButton()).toBeTruthy(), WAIT);
+		await findDeleteButton();
 	});
 
 	it("retries a failed permission check", async () => {
-		let reads = 0;
 		server.use(
-			http.get("*/workspaces/demo/members/me", () => {
-				reads += 1;
-				return reads === 1
-					? HttpResponse.json({ status: 403, detail: "Forbidden" }, { status: 403 })
-					: HttpResponse.json({ role: "OWNER", userLogin: "ada" });
-			}),
+			http.get(
+				"*/workspaces/demo/members/me",
+				respondInTurn(
+					() => HttpResponse.json({ status: 403, detail: "Forbidden" }, { status: 403 }),
+					() => HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
+				),
+			),
 		);
 		await renderContainer();
 
 		const retry = await screen.findByRole("button", { name: /^retry$/i }, WAIT);
 		fireEvent.click(retry);
 
-		await waitFor(() => expect(deleteButton()).toBeTruthy(), WAIT);
+		await findDeleteButton();
 		expect(screen.queryByRole("button", { name: /^retry$/i })).toBeNull();
 	});
 
@@ -160,7 +166,7 @@ describe("AdminDangerZoneSettings", () => {
 		server.use(membershipHandler("ADMIN"));
 		await renderContainer();
 
-		await waitFor(() => expect(screen.queryByText(/only the workspace owner/i)).toBeTruthy(), WAIT);
+		await screen.findByText(/only the workspace owner/i, undefined, WAIT);
 		expect(screen.queryByRole("button", { name: /^delete workspace$/i })).toBeNull();
 	});
 });

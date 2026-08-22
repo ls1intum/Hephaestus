@@ -1,7 +1,7 @@
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { reviewFeedbackDetail } from "@/components/admin/practice-reviews/story-mock-data";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
@@ -26,20 +26,22 @@ function proposalWire(deliveryState: "AWAITING_APPROVAL" | "PREPARED") {
 
 describe("feedback proposal route", () => {
 	it("shows the exact proposal and sends an approval through the generated operation", async () => {
-		let decided = false;
+		// The GET reports whatever the approval PUT last left behind, so the page's re-read after the
+		// decision is what has to show PREPARED — not a fixture the test swapped in by hand.
+		let deliveryState: "AWAITING_APPROVAL" | "PREPARED" = "AWAITING_APPROVAL";
 		let requestBody: unknown;
 		server.use(
 			http.get("*/workspaces/:workspaceSlug/members/me", () =>
 				HttpResponse.json({ role: "ADMIN", userId: 1, userLogin: "ada", userName: "Ada" }),
 			),
 			http.get("*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId", () =>
-				HttpResponse.json(proposalWire(decided ? "PREPARED" : "AWAITING_APPROVAL")),
+				HttpResponse.json(proposalWire(deliveryState)),
 			),
 			http.put(
 				"*/workspaces/:workspaceSlug/practices/reviews/feedback/:feedbackId/approval",
 				async ({ request }) => {
 					requestBody = await request.json();
-					decided = true;
+					deliveryState = "PREPARED";
 					return HttpResponse.json({ feedbackId: FEEDBACK_ID, decision: "APPROVED" });
 				},
 			),
@@ -50,13 +52,13 @@ describe("feedback proposal route", () => {
 
 		await screen.findByRole("heading", { name: /Feedback for/ }, ROUTE_RENDER_WAIT);
 		expect(screen.getByText(/Please keep the cache scoped/)).not.toBeNull();
-		expect(
-			screen.getByRole("link", { name: reviewFeedbackDetail.observations[0].summary }),
-		).not.toBeNull();
+		const [firstObservation] = reviewFeedbackDetail.observations;
+		assert(firstObservation);
+		expect(screen.getByRole("link", { name: firstObservation.summary })).not.toBeNull();
 
 		await userEvent.click(screen.getByRole("button", { name: "Approve and send" }));
 		await screen.findByRole("heading", { name: /Feedback for/ }, ROUTE_RENDER_WAIT);
-		expect(requestBody).toEqual({ decision: "APPROVED" });
+		expect(requestBody).toStrictEqual({ decision: "APPROVED" });
 	});
 
 	it("sends the selected rejection category and reviewer context", async () => {
@@ -89,7 +91,7 @@ describe("feedback proposal route", () => {
 		);
 		await userEvent.click(within(dialog).getByRole("button", { name: "Reject feedback" }));
 
-		expect(requestBody).toEqual({
+		expect(requestBody).toStrictEqual({
 			decision: "REJECTED",
 			rejectionReason: "MISSING_CONTEXT",
 			rejectionNote: "The fallback path was not considered.",

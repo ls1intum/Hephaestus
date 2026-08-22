@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 import { sessions } from "@/mocks/fixtures/auth";
 import { noSessions, sessionsError } from "@/mocks/handlers";
 import { server } from "@/mocks/server";
+import { respondInTurn } from "@/test/responses";
 import { SessionsSection } from "./SessionsSection";
 
 function renderWithClient(node: ReactNode) {
@@ -41,16 +42,16 @@ describe("SessionsSection", () => {
 	});
 
 	it("revokes a non-current session and refetches the list (the row disappears)", async () => {
-		// First GET returns all 3 sessions; after the DELETE-driven invalidation the refetch
-		// returns the list without the revoked row, proving the cache was refreshed end-to-end.
-		let listCalls = 0;
 		server.use(
-			http.get("*/user/sessions", () => {
-				listCalls += 1;
-				const remaining =
-					listCalls === 1 ? sessions : sessions.filter((s) => s.jti !== "sess-other-002");
-				return HttpResponse.json(remaining);
-			}),
+			http.get(
+				"*/user/sessions",
+				respondInTurn(
+					// The first GET returns all 3 sessions; after the DELETE-driven invalidation the refetch
+					// returns the list without the revoked row, proving the cache was refreshed end-to-end.
+					() => HttpResponse.json(sessions),
+					() => HttpResponse.json(sessions.filter((s) => s.jti !== "sess-other-002")),
+				),
+			),
 			http.delete("*/user/sessions/:jti", () => new HttpResponse(null, { status: 204 })),
 		);
 

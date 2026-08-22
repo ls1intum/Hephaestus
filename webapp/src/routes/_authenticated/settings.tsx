@@ -27,6 +27,7 @@ import type { SlackPreferencesSectionProps } from "@/components/settings/SlackPr
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { analyticsConfigured } from "@/integrations/consent";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { hasText } from "@/lib/text";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,
@@ -67,9 +68,7 @@ function RouteComponent() {
 				queryKey: userSettingsQueryKey,
 			});
 			const previousSettings = queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
-			if (variables.body) {
-				queryClient.setQueryData(userSettingsQueryKey, variables.body);
-			}
+			queryClient.setQueryData(userSettingsQueryKey, variables.body);
 			return { previousSettings };
 		},
 		onError: (error, _variables, context) => {
@@ -161,7 +160,7 @@ function RouteComponent() {
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
-		onLink: (registrationId) => void linkAccount(registrationId, "/settings"),
+		onLink: (registrationId) => linkAccount(registrationId, "/settings"),
 		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
 		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a
 		// second DELETE against the already-removed row.
@@ -170,7 +169,7 @@ function RouteComponent() {
 				unlinkMutation.mutate({ path: { id } });
 			}
 		},
-		unlinkingId: unlinkMutation.isPending ? (unlinkMutation.variables?.path?.id ?? null) : null,
+		unlinkingId: unlinkMutation.isPending ? unlinkMutation.variables.path.id : null,
 		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 		error: linkedIdentitiesQuery.error ?? identityProvidersQuery.error,
@@ -186,7 +185,7 @@ function RouteComponent() {
 	const slackIdentity = linkedIdentitiesQuery.data?.find(
 		(identity) => identity.providerType?.toUpperCase() === "SLACK",
 	);
-	const slackAvailable = Boolean(slackProvider?.registrationId || slackIdentity);
+	const slackAvailable = hasText(slackProvider?.registrationId) || slackIdentity !== undefined;
 
 	const slackPreferencesQuery = useQuery({
 		...getSlackUserPreferencesOptions({}),
@@ -200,7 +199,7 @@ function RouteComponent() {
 		canConnectSlack: Boolean(slackProvider?.registrationId),
 		onConnectSlack: () => {
 			if (slackProvider?.registrationId) {
-				void linkAccount(slackProvider.registrationId, "/settings");
+				linkAccount(slackProvider.registrationId, "/settings");
 			}
 		},
 		onToggleChannelMessages: (workspaceSlug, channelMessagesAllowed) => {
@@ -210,7 +209,7 @@ function RouteComponent() {
 			});
 		},
 		updatingWorkspaceSlug: updateSlackPreferencesMutation.isPending
-			? (updateSlackPreferencesMutation.variables?.path.workspaceSlug ?? null)
+			? updateSlackPreferencesMutation.variables.path.workspaceSlug
 			: null,
 		isLoading:
 			linkedIdentitiesQuery.isLoading ||

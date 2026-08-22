@@ -175,7 +175,7 @@ export function PracticeMentoringSupportEditor({
 
 			<RadioGroup
 				value={support}
-				onValueChange={(next) => next && updateSupport(next)}
+				onValueChange={(next) => updateSupport(next)}
 				className="gap-3"
 				aria-label="How this practice is mentored"
 			>

@@ -205,7 +205,7 @@ describe("nothing to convert renders no node", () => {
 
 describe("the live hint under a cap field", () => {
 	it("rounds to whole units, like every other cap figure", () => {
-		expect(fxCapHint(50, eur, true)).toEqual({
+		expect(fxCapHint(50, eur, true)).toStrictEqual({
 			conversion: { text: "≈ €44", label: "approximately 44 euros" },
 			tail: " at today's rate.",
 		});

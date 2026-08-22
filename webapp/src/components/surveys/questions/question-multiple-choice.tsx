@@ -129,16 +129,16 @@ export function QuestionMultipleChoice({
 			/>
 			<FieldGroup data-slot="checkbox-group">
 				{baseChoices.map((choice, index) => {
-					const id = `${groupId}-choice-${index}`;
+					const choiceId = `${groupId}-choice-${index}`;
 					const isChecked = selectedValues.includes(choice);
 					return (
-						<FieldLabel key={id} htmlFor={id}>
+						<FieldLabel key={choiceId} htmlFor={choiceId}>
 							<Field orientation="horizontal">
 								<FieldContent>
 									<FieldTitle>{choice}</FieldTitle>
 								</FieldContent>
 								<Checkbox
-									id={id}
+									id={choiceId}
 									checked={isChecked}
 									onCheckedChange={(checked) => toggleChoice(choice, checked)}
 								/>

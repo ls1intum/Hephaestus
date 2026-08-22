@@ -102,11 +102,11 @@ export async function expectTargetSpacing(controls: HTMLElement[]) {
 		const rect = control.getBoundingClientRect();
 		return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 	});
-	for (let i = 0; i < centres.length; i++) {
-		for (let j = i + 1; j < centres.length; j++) {
-			const dx = centres[i].x - centres[j].x;
-			const dy = centres[i].y - centres[j].y;
-			await expect(Math.hypot(dx, dy)).toBeGreaterThanOrEqual(MIN_TARGET_PX);
+	for (const [index, centre] of centres.entries()) {
+		for (const other of centres.slice(index + 1)) {
+			await expect(Math.hypot(centre.x - other.x, centre.y - other.y)).toBeGreaterThanOrEqual(
+				MIN_TARGET_PX,
+			);
 		}
 	}
 }
@@ -152,16 +152,21 @@ export async function expectDialogBodyScrolls(popup: HTMLElement = openDialogPop
 		throw new Error("A dialog with no heading has nothing to keep pinned while its body scrolls.");
 	}
 
-	const scrollers = [popup, ...popup.querySelectorAll<HTMLElement>("*")].filter(
+	const [scroller, ...alsoScroll] = [popup, ...popup.querySelectorAll<HTMLElement>("*")].filter(
 		(node) =>
 			node.scrollHeight > node.clientHeight + LAYOUT_SLACK_PX &&
 			["auto", "scroll"].includes(getComputedStyle(node).overflowY),
 	);
-	await expect(scrollers.length).toBe(1);
+	if (scroller == null) {
+		throw new Error(
+			"Nothing in the dialog scrolls, so its body cannot grow under a pinned heading.",
+		);
+	}
+	await expect(alsoScroll).toHaveLength(0);
 
 	const before = heading.getBoundingClientRect().top;
-	scrollers[0].scrollTop = scrollers[0].scrollHeight;
-	await expect(scrollers[0].scrollTop).toBeGreaterThan(0);
+	scroller.scrollTop = scroller.scrollHeight;
+	await expect(scroller.scrollTop).toBeGreaterThan(0);
 	await expect(Math.abs(heading.getBoundingClientRect().top - before)).toBeLessThanOrEqual(
 		LAYOUT_SLACK_PX,
 	);

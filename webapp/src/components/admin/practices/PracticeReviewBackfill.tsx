@@ -172,7 +172,9 @@ function EstimateSection({
 			</div>
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="backfill-kind">Kind of work</FieldLabel>
+					<FieldLabel id="backfill-kind-label" htmlFor="backfill-kind">
+						Kind of work
+					</FieldLabel>
 					<FieldDescription>
 						One kind per backfill, so the estimate means one thing.
 					</FieldDescription>
@@ -189,7 +191,7 @@ function EstimateSection({
 					<SelectTrigger id="backfill-kind" className="w-56">
 						<SelectValue />
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby="backfill-kind-label">
 						{WORK_KIND_ITEMS.map((kind) => (
 							<SelectItem key={kind.value} value={kind.value}>
 								{kind.label}
@@ -201,14 +203,16 @@ function EstimateSection({
 
 			<Field orientation="horizontal">
 				<FieldContent>
-					<FieldLabel htmlFor="backfill-window">How far back</FieldLabel>
+					<FieldLabel id="backfill-window-label" htmlFor="backfill-window">
+						How far back
+					</FieldLabel>
 					<FieldDescription>Counted from when the work was opened.</FieldDescription>
 				</FieldContent>
 				<Select items={WINDOWS} value={days} onValueChange={(value) => setDays(value ?? days)}>
 					<SelectTrigger id="backfill-window" className="w-56">
 						<SelectValue />
 					</SelectTrigger>
-					<SelectContent>
+					<SelectContent aria-labelledby="backfill-window-label">
 						{WINDOWS.map((window) => (
 							<SelectItem key={window.value} value={window.value}>
 								{window.label}
