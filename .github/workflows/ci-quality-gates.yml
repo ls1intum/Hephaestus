@@ -79,6 +79,27 @@ jobs:
         if: steps.should_run.outputs.run == 'true' && matrix.check != 'database-migrations'
         uses: ./.github/actions/setup-pnpm-node
 
+      # The agent runtime is Bun, so its tests and typecheck must run on the Bun the sandbox ships.
+      # The image pins the version alongside the per-arch digests that are only valid for it.
+      - name: Resolve the agent image's Bun version
+        id: bun
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
+        run: |
+          # Fail closed: an empty output would make setup-bun fall back to `latest`, which is the
+          # unpinned install this job exists to avoid.
+          version=$(sed -nE 's/^ARG[[:space:]]+BUN_VERSION=["'"'"']?([^"'"'"'[:space:]]+).*/\1/p' docker/agents/pi/Dockerfile | head -1)
+          if [ -z "$version" ]; then
+            echo "::error::No ARG BUN_VERSION in docker/agents/pi/Dockerfile — refusing to install an unpinned Bun."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Bun
+        if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with:
+          bun-version: ${{ steps.bun.outputs.version }}
+
       - name: Setup caches
         if: steps.should_run.outputs.run == 'true' && matrix.check != 'database-migrations'
         uses: ./.github/actions/setup-caches
@@ -86,21 +107,20 @@ jobs:
           cache-type: ${{ matrix.check }}
           os: ${{ runner.os }}
 
-      - name: Application-server formatting + Pi extension typecheck + runner smoke
+      - name: Application-server formatting + agent runtime + contracts
         if: steps.should_run.outputs.run == 'true' && matrix.check == 'application-server-quality'
         run: |
           pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
-          FMT_OK=true; RUNNER_OK=true; CONTRACTS_OK=true
+          FMT_OK=true; TESTS_OK=true; TYPES_OK=true; CONTRACTS_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
-          node --test \
-            server/src/test/resources/agent/pi-mentor-runner.spec.mjs \
-            server/src/test/resources/agent/pi-observation-normalize.spec.mjs \
-            server/src/test/resources/agent/pi-runner-timings.spec.mjs \
-            server/src/test/resources/agent/pi-runner-usage.spec.mjs \
-            || { RUNNER_OK=false; ISSUES_FOUND+=("Pi runner test(s) failed. Run: node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs server/src/test/resources/agent/pi-observation-normalize.spec.mjs server/src/test/resources/agent/pi-runner-timings.spec.mjs server/src/test/resources/agent/pi-runner-usage.spec.mjs"); }
+          # Directory arguments, not a file list: a new spec is picked up without editing this file.
+          pnpm run test:agents \
+            || { TESTS_OK=false; ISSUES_FOUND+=("Agent runtime test(s) failed. Run: pnpm run test:agents"); }
+          pnpm run typecheck:agents \
+            || { TYPES_OK=false; ISSUES_FOUND+=("Agent TypeScript errors. Run: pnpm run typecheck:agents"); }
           pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
@@ -108,7 +128,8 @@ jobs:
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
-            [[ "$RUNNER_OK" == "false" ]] && echo "| Pi mentor runner smoke | :x: Failed | \`node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TESTS_OK" == "false" ]] && echo "| Agent runtime tests | :x: Failed | \`pnpm run test:agents\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$TYPES_OK" == "false" ]] && echo "| Agent typecheck | :x: Failed | \`pnpm run typecheck:agents\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1

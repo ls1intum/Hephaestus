@@ -8,7 +8,7 @@
 // Wired into CI via `.github/workflows/ci-quality-gates.yml` (application-server-quality
 // step). Non-zero exit fails the gate, so a regression to framing or concurrent-prompt
 // rejection logic blocks merge. Run locally with:
-//   node --test server/src/test/resources/agent/pi-mentor-runner.spec.mjs
+//   pnpm run test:agents
 
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";

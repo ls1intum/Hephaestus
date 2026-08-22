@@ -13,8 +13,11 @@ feedback to the developer in-context, in a reflection page, or in conversation.
   See `webapp/AGENTS.md`.
 - `docs/` — contributor docs published to GitHub Pages, including the generated ERD.
 
-Node is pinned in `.node-version`; the repo is pnpm 11 workspaces and `webapp` is the only TypeScript
-package. JDK 21, and Docker for the database helpers.
+Node is pinned in `.node-version`; the repo is pnpm 11 workspaces. `webapp` is the TypeScript package;
+the agent precompute scripts under `docker/agents/precompute/` and
+`server/src/main/resources/practices/precompute/` are type-checked separately via
+`tsconfig.agents.json` and run on Bun, whose version the agent image pins. JDK 21, and Docker for the
+database helpers.
 
 ## Skills
 
@@ -37,8 +40,9 @@ reflect the final state. Document any skipped gate in the PR description.
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | The full gate: format + lint + typecheck + `check:stories` + `check:components` + `check:diagrams` + `check:env` + `check:contracts` |
+| `pnpm run check` | The full gate: format + lint + typecheck + `check:stories` + `check:components` + `check:diagrams` + `check:env` + `check:contracts` + `typecheck:scripts` + `typecheck:agents` |
 | `pnpm run test:webapp` | Vitest |
+| `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
 | `mvn test -P'!quick'` | Server unit tests — see `server/AGENTS.md` for the four tiers and why `!quick` is mandatory |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the

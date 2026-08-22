@@ -71,6 +71,7 @@ Before any release, code must pass:
 | Java formatting | Prettier (`prettier-plugin-java`) | Code style |
 | Java lint       | PMD         | Static analysis      |
 | TypeScript      | Biome + tsc | Lint + typecheck     |
+| Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships |
 
 ## 🔒 Security
 
@@ -171,14 +172,16 @@ CI only runs jobs for components that actually changed:
 | Component            | Triggers On                                                   |
 | -------------------- | ------------------------------------------------------------- |
 | Webapp               | `webapp/**`, `docs/images/readme/**`, `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.npmrc`, `.node-version` |
-| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008) |
+| Application Server   | `server/**`, `scripts/**` (includes webhook receiver — ADR 0008), `docker/agents/**`, `tsconfig.agents.json` |
 | Agent images         | `docker/agents/**`                                            |
 | Docs                 | `docs/**`                                                     |
 | CI Config            | `.github/workflows/**`, `.github/actions/**` → runs all jobs  |
 
 The whole of `scripts/` counts as application-server change, not just the database helper: the
 contract validator and the changelog-immutability guard live there, and a PR editing only a guard
-would otherwise skip the workflow that runs it.
+would otherwise skip the workflow that runs it. `docker/agents/**` appears twice for the same reason
+— it builds the agent images, and `test:agents` and `typecheck:agents` cover the precompute tree
+inside it, so a PR editing only a precompute script must still run those gates.
 
 **Benefits:**
 
@@ -244,6 +247,10 @@ pnpm run test:webapp           # Unit tests
 # Application Server (Java) — includes the integration.core.webhook receiver
 pnpm run format:java:check     # Check formatting
 cd server && ./mvnw test -P'!quick'  # Unit tests — see the testing guide for why `!quick` is mandatory
+
+# Agent runtime (Bun) — the Pi runner and the practice precompute scripts
+pnpm run test:agents           # Runner + precompute specs
+pnpm run typecheck:agents      # Precompute TypeScript
 ```
 
 ### Common Issues
