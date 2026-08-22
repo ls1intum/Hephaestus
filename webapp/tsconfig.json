@@ -24,7 +24,9 @@
 		"allowUnreachableCode": false,
 		"allowUnusedLabels": false,
 		/* Only syntax a type-stripping runtime can erase: no enums, namespaces or parameter
-		   properties. Keeps `node --experimental-strip-types` viable for anything in this tree. */
+		   properties. Node runs a `.ts` file by deleting its types, never by compiling them, so a file
+		   this rule rejects is one Node cannot run at all — and the scripts here are handed straight to
+		   it, with no build step and no loader (`export:readme-assets` is `node <script>.ts`). */
 		"erasableSyntaxOnly": true,
 		"paths": {
 			"@/*": ["./src/*"]

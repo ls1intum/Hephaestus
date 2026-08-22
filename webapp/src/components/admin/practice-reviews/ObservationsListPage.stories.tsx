@@ -1,10 +1,9 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 import type { ListPracticeReviewObservationsResponse, ReviewObservation } from "@/api/types.gen";
 import type { FacetSource } from "@/components/common/FacetMultiSelect";
 import { withStandardPage, withWidePage } from "@/stories/decorators";
 import { StatefulPatch } from "@/stories/stateful";
-import type { Canvas } from "@/test/canvas";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { areaFacetOptions, practiceFacetOptions } from "./ObservationFilters";
 import { ObservationsListPage } from "./ObservationsListPage";
@@ -157,7 +156,7 @@ type Story = StoryObj<typeof meta>;
  * trigger is captured before the click because choosing an option renames it.
  */
 async function pickFacet(
-	canvas: Canvas,
+	canvas: StoryContext["canvas"],
 	userEvent: { click: (element: Element) => Promise<void> },
 	facet: string,
 	option: RegExp,

@@ -23,11 +23,7 @@ import {
 	rarityLabels,
 } from "@/components/achievements/styles";
 import type { AchievementCategory, UIAchievement, ViewMode } from "@/components/achievements/types";
-import {
-	ACHIEVEMENT_CATEGORIES,
-	calculateStats,
-	formatUnlockedAt,
-} from "@/components/achievements/utils";
+import { ACHIEVEMENT_CATEGORIES, calculateStats } from "@/components/achievements/utils";
 import { Button } from "@/components/ui/button";
 import { ProgressIndicator, ProgressTrack } from "@/components/ui/progress";
 import {
@@ -49,6 +45,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { asDate } from "@/lib/dates";
 import { cn } from "@/lib/utils";
 
 const SIDEBAR_WIDTH = "20rem";
@@ -294,7 +291,8 @@ function SidebarBody({
 												{achievement.name}
 											</p>
 											<p className="text-xs text-muted-foreground">
-												{formatUnlockedAt(achievement.unlockedAt, "Recently unlocked")}
+												{asDate(achievement.unlockedAt)?.toLocaleDateString() ??
+													"Recently unlocked"}
 											</p>
 										</div>
 									</div>

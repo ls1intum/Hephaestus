@@ -5,10 +5,8 @@
  * already opened, so each one puts an empty paragraph on the published page.
  *
  * The damage shows only on the rendered page, which nobody opens while writing the comment — one branch
- * reached twenty-five occurrences before anyone looked. This could be an oxlint rule now — its plugin API
- * exposes comments, which the GritQL implementation this predates could not reach. It does not live in
- * the Vitest suite either, because scanning the whole tree inside a worker starves the route tests
- * that share it.
+ * reached twenty-five occurrences before anyone looked. It is a script rather than a Vitest case because
+ * scanning the whole tree inside a worker starves the route tests that share it.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";

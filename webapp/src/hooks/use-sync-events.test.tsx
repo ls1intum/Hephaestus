@@ -395,6 +395,23 @@ describe("useSyncEvents", () => {
 		});
 	});
 
+	// Well-formed JSON carrying an ill-typed field is the shape a contract drift actually takes, and
+	// it is the dangerous one: the scope alone is enough to pick a branch, so an unchecked hint would
+	// refetch under a connection id that identifies nothing.
+	it("drops a hint whose connection id came over as a string instead of acting on half of it", () => {
+		const queryClient = new QueryClient();
+		const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+		const debug = vi.spyOn(console, "debug").mockImplementation(() => {});
+		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(queryClient) });
+
+		act(() => latestSource().emitRaw(JSON.stringify({ scope: "job", connectionId: "42" })));
+		flushHintDebounce();
+
+		expect(invalidate).not.toHaveBeenCalled();
+
+		debug.mockRestore();
+	});
+
 	it("swallows a malformed hint payload without throwing or invalidating anything", () => {
 		const queryClient = new QueryClient();
 		const invalidate = vi.spyOn(queryClient, "invalidateQueries");

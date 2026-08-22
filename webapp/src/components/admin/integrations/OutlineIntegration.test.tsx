@@ -8,7 +8,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useOutlineIntegration } from "@/hooks/use-outline-integration";
 import { SyncLivenessProvider } from "@/hooks/use-sync-liveness";
 import { server } from "@/mocks/server";
-import { respondInTurn } from "@/test/responses";
 import { ConnectionStateNotice } from "./ConnectionStateNotice";
 import { OutlineCollectionsSection } from "./outline/OutlineCollectionsSection";
 import { OutlineConnectCard } from "./outline/OutlineConnectCard";
@@ -450,14 +449,19 @@ describe("Outline integration — with live push down, polling keeps a running s
 		let statusReads = 0;
 		useConnectedHandlers(collectionsRef);
 		// The reconcile is running on the first read and finished by the second.
-		const respondWithStatus = respondInTurn(
-			() => HttpResponse.json({ ...healthyStatus, activeJob: runningJob }),
-			() => HttpResponse.json({ ...healthyStatus, activeJob: undefined }),
-		);
+		const SYNC_STATUS = "*/workspaces/demo/connections/7/sync";
 		server.use(
-			http.get("*/workspaces/demo/connections/7/sync", () => {
+			http.get(
+				SYNC_STATUS,
+				() => {
+					statusReads += 1;
+					return HttpResponse.json({ ...healthyStatus, activeJob: runningJob });
+				},
+				{ once: true },
+			),
+			http.get(SYNC_STATUS, () => {
 				statusReads += 1;
-				return respondWithStatus();
+				return HttpResponse.json({ ...healthyStatus, activeJob: undefined });
 			}),
 		);
 

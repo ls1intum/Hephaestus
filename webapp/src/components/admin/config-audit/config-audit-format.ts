@@ -159,7 +159,7 @@ function parseSnapshot(value: string | undefined): Record<string, unknown> | nul
 	if (!value) return null;
 	try {
 		const parsed: unknown = JSON.parse(value);
-		return isRecord(parsed) && !Array.isArray(parsed) ? parsed : null;
+		return isRecord(parsed) ? parsed : null;
 	} catch {
 		return null;
 	}
@@ -167,7 +167,7 @@ function parseSnapshot(value: string | undefined): Record<string, unknown> | nul
 
 function leafAt(obj: Record<string, unknown>, path: string): unknown {
 	return path.split(".").reduce<unknown>((acc, segment) => {
-		if (isRecord(acc) && !Array.isArray(acc)) {
+		if (isRecord(acc)) {
 			return acc[segment];
 		}
 		return undefined;

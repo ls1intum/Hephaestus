@@ -284,10 +284,12 @@ const mythicAchievements: MockUIAchievement[] = [
 	dionysusDeploy,
 ];
 
-/** Drops the story-only coordinates, for args typed as a plain `UIAchievement`. */
+/**
+ * Retypes a mock as a plain `UIAchievement`, for args declared as one. The object is returned
+ * untouched — the story-only coordinates are still on it at runtime, just no longer in its type.
+ */
 export function asUI(mock: MockUIAchievement): UIAchievement {
 	return mock;
 }
 
-/** For stories that accept UIAchievement[]. */
 export const mythicAchievementsUI: UIAchievement[] = mythicAchievements.map(asUI);

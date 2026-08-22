@@ -10,7 +10,6 @@ const outputDirectory = resolve(webappDirectory, "../docs/images/readme");
 const port = 6106;
 const storybookUrl = `http://127.0.0.1:${port}`;
 
-/** The two colour schemes every asset is exported in, one file each. */
 type Theme = "light" | "dark";
 
 /**

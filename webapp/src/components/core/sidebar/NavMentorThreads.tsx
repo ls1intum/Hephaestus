@@ -22,6 +22,9 @@ interface ThreadGroupData {
 	threads: ChatThreadSummary[];
 }
 
+/** Named so the record is total over them and the lookup below needs no fallback. */
+type BucketName = "Today" | "Yesterday" | "Last 7 days" | "Last 30 days" | "Older";
+
 /**
  * Group thread summaries by their createdAt bucket: Today, Yesterday,
  * Last 7 days, Last 30 days, Older. Preserves arrival order (newest first
@@ -29,9 +32,6 @@ interface ThreadGroupData {
  *
  * The Pi mentor returns a flat list, so we bucket locally for the same UX.
  */
-/** Named so the record is total over them and the lookup below needs no fallback. */
-type BucketName = "Today" | "Yesterday" | "Last 7 days" | "Last 30 days" | "Older";
-
 function bucketThreads(threads: ChatThreadSummary[]): ThreadGroupData[] {
 	const buckets: Record<BucketName, ChatThreadSummary[]> = {
 		Today: [],

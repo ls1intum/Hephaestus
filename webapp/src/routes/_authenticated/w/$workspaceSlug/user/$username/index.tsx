@@ -15,14 +15,9 @@ import {
 	DEFAULT_ACTIVITY_MONITOR_LIMIT,
 	MAX_ACTIVITY_MONITOR_LIMIT,
 } from "@/lib/activity-monitor";
+import { resolveLeaderboardSchedule } from "@/lib/leaderboard-schedule";
 import { toScmProviderType } from "@/lib/provider";
-import { firstNonBlank } from "@/lib/text";
-import {
-	DEFAULT_SCHEDULE,
-	formatDateRangeForApi,
-	getDateRangeForPreset,
-	type LeaderboardSchedule,
-} from "@/lib/timeframe";
+import { formatDateRangeForApi, getDateRangeForPreset } from "@/lib/timeframe";
 
 const profileSearchSchema = z.object({
 	after: z.string().optional(),
@@ -79,22 +74,7 @@ function UserProfile() {
 		enabled: Boolean(workspaceSlug),
 	});
 
-	const getSchedule = (): LeaderboardSchedule => {
-		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
-
-		const scheduledTime = firstNonBlank(workspaceQuery.data.leaderboardScheduleTime) ?? "9:00";
-		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
-		const [hours = Number.NaN, minutes = Number.NaN] = scheduledTime
-			.split(":")
-			.map((part: string) => Number.parseInt(part, 10));
-
-		return {
-			day: scheduledDay,
-			hour: Number.isNaN(hours) ? 9 : hours,
-			minute: Number.isNaN(minutes) ? 0 : minutes,
-		};
-	};
-	const schedule = getSchedule();
+	const schedule = resolveLeaderboardSchedule(workspaceQuery.data);
 
 	const getEffectiveDates = () => {
 		if (after) {

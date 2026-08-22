@@ -4,7 +4,6 @@ import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { describe, expect, it } from "vitest";
 import { server } from "@/mocks/server";
-import { respondInTurn } from "@/test/responses";
 import { useSessionKeepAlive } from "./use-session-keep-alive";
 
 // Real behaviour, no mocks of our own code: the hook fetches /user through the actual client + query
@@ -43,14 +42,18 @@ describe("useSessionKeepAlive", () => {
 		// First load: expiry ~61s out → renewal due in ~1s. After the first rotation the refetched
 		// /user reports a far-future expiry, so the scheduler settles and the test sees exactly one
 		// proactive refresh (proving it renews early — and doesn't storm).
-		const respondWithUser = respondInTurn(
-			() => HttpResponse.json(userPayload(61)),
-			() => HttpResponse.json(userPayload(3600)),
-		);
 		server.use(
+			http.get(
+				"*/user",
+				() => {
+					userCalls += 1;
+					return HttpResponse.json(userPayload(61));
+				},
+				{ once: true },
+			),
 			http.get("*/user", () => {
 				userCalls += 1;
-				return respondWithUser();
+				return HttpResponse.json(userPayload(3600));
 			}),
 			http.post("*/auth/refresh", () => {
 				refreshCalls += 1;

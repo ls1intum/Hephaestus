@@ -2,7 +2,6 @@ import assert from "node:assert/strict";
 import type { Response } from "@playwright/test";
 import { expect, loginAsDevAdmin, test } from "./fixtures";
 
-/** The write the switch issues — the one response that proves the CSRF double-submit worked. */
 function isReviewSettingsWrite(response: Response) {
 	return (
 		response.url().includes("/practices/review-settings") && response.request().method() === "PATCH"

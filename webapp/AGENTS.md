@@ -60,12 +60,10 @@ carries the reason beside it — read that before switching one back on.
   `jsPlugins` names a module it cannot load, or if `rules` names a rule no loaded plugin defines. That
   is what makes the house rules impossible to drop silently (oxc-project/oxc#25203), so keep them
   named in `rules`.
-- **`oxlint-suppressions.json` is the pre-existing debt**, almost all of it `react/set-state-in-effect`
-  — the pattern § Seeding a form from props already bans. Those rules are `error` for new code; the
-  file only excuses what was already there. Clear a file's entries, then
-  `pnpm exec oxlint --prune-suppressions`. **It records a count per file per rule, not a line**, so
-  fixing one violation and adding another in the same file nets to zero and CI stays green. Never run
-  `--suppress-all` to make a finding go away; if a count in a diff went up, that is a new bug.
+- **There is no baseline file.** Every enabled rule reports zero, so a finding is always new and is
+  always fixed rather than recorded. The only suppressions are a handful of `oxlint-disable-next-line`
+  directives, each naming its rules and its reason; `reportUnusedDisableDirectives` fails the build
+  when one stops suppressing anything.
 - **House rules live in `tools/oxlint/`**, in TypeScript, so `pnpm run typecheck` covers them, with a
   `RuleTester` suite beside each (`oxlint/plugins-dev`).
 - **These have no linter behind them and are on review**: an inline `<svg>` needs a `<title>`, an

@@ -3,7 +3,6 @@ import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
 import { describe, expect, it } from "vitest";
 import { server } from "@/mocks/server";
-import { respondInTurn } from "@/test/responses";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 const settings = (revision: number) => ({
@@ -50,13 +49,10 @@ describe("instance settings route", () => {
 	it("keeps release disabled when stale settings cannot be reloaded", async () => {
 		const user = userEvent.setup();
 		server.use(
-			http.get(
-				"*/admin/settings",
-				respondInTurn(
-					() => HttpResponse.json(settings(1)),
-					// The reload the 412 triggers is the one that has to fail.
-					() => HttpResponse.json({ title: "Unavailable" }, { status: 503 }),
-				),
+			http.get("*/admin/settings", () => HttpResponse.json(settings(1)), { once: true }),
+			// The reload the 412 triggers is the one that has to fail.
+			http.get("*/admin/settings", () =>
+				HttpResponse.json({ title: "Unavailable" }, { status: 503 }),
 			),
 			http.patch("*/admin/settings/silent-mode", () =>
 				HttpResponse.json({ status: 412, title: "Instance settings changed" }, { status: 412 }),

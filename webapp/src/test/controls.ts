@@ -1,5 +1,5 @@
+import type { StoryContext } from "@storybook/react-vite";
 import { expect } from "storybook/test";
-import type { Canvas } from "@/test/canvas";
 
 /**
  * A closed Base UI select shows the *label* for its value, looked up from the options.
@@ -10,7 +10,7 @@ import type { Canvas } from "@/test/canvas";
  * Worth stating because the fallback is silent: the control still renders, and still reads as filled.
  */
 export async function expectClosedSelectShows(
-	canvas: Canvas,
+	canvas: StoryContext["canvas"],
 	name: RegExp | string,
 	label: string,
 ) {

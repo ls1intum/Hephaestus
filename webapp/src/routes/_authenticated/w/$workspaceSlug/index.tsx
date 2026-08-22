@@ -24,13 +24,11 @@ import { NoWorkspace } from "@/components/workspace/NoWorkspace";
 import { useActiveWorkspaceSlug } from "@/hooks/use-active-workspace";
 import { useWorkspaceFeatures } from "@/hooks/use-workspace-features";
 import { useAuth } from "@/integrations/auth/AuthContext";
-import { firstNonBlank } from "@/lib/text";
+import { resolveLeaderboardSchedule } from "@/lib/leaderboard-schedule";
 import {
-	DEFAULT_SCHEDULE,
 	formatDateRangeForApi,
 	getLeaderboardWeekEnd,
 	getLeaderboardWeekStart,
-	type LeaderboardSchedule,
 } from "@/lib/timeframe";
 
 const leaderboardSearchSchema = z.object({
@@ -71,22 +69,7 @@ function LeaderboardContainer() {
 		enabled: hasWorkspace,
 	});
 
-	const getSchedule = (): LeaderboardSchedule => {
-		if (!workspaceQuery.data) return DEFAULT_SCHEDULE;
-
-		const scheduledTime = firstNonBlank(workspaceQuery.data.leaderboardScheduleTime) ?? "9:00";
-		const scheduledDay = workspaceQuery.data.leaderboardScheduleDay ?? 2;
-		const [hours = Number.NaN, minutes = Number.NaN] = scheduledTime
-			.split(":")
-			.map((part: string) => Number.parseInt(part, 10));
-
-		return {
-			day: scheduledDay,
-			hour: Number.isNaN(hours) ? 9 : hours,
-			minute: Number.isNaN(minutes) ? 0 : minutes,
-		};
-	};
-	const schedule = getSchedule();
+	const schedule = resolveLeaderboardSchedule(workspaceQuery.data);
 
 	const getEffectiveDates = () => {
 		if (after) {

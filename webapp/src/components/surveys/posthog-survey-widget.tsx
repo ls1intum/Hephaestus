@@ -1,8 +1,8 @@
 import { AnimatePresence, motion } from "motion/react";
 import type { Survey as PostHogSurveyRaw } from "posthog-js";
 import { useEffect, useRef, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { usePostHogClient } from "@/integrations/posthog/use-posthog-client";
-import { randomId } from "@/lib/random-id";
 import { firstNonBlank } from "@/lib/text";
 import { useSurveyNotificationStore } from "@/stores/survey-notification-store";
 import {
@@ -323,7 +323,7 @@ export function PostHogSurveyWidget({
 		if (submissionId) {
 			return submissionId;
 		}
-		const generated = randomId();
+		const generated = uuidv4();
 		setSubmissionId(generated);
 		return generated;
 	};

@@ -2,7 +2,6 @@
  * Chat message validation utilities.
  *
  * Provides runtime validation for chat messages received from the server.
- * Uses Zod schemas to safely parse and validate data before it reaches the chat UI.
  */
 
 import { z } from "zod";
@@ -44,11 +43,7 @@ const chatMessagesArraySchema = z.array(chatMessageSchema);
 // Validation Functions
 // ─────────────────────────────────────────────────────────────────────────────
 
-/**
- * The part union stays open — the mentor streams part kinds the client ignores — so the schema
- * checks the envelope every consumer relies on (id, role, and a `type` on each part) and the
- * renderers narrow each part before reading its fields.
- */
+/** False for anything the schema rejects, logging the reason it was rejected. */
 function isChatMessageArray(value: unknown): value is ChatMessage[] {
 	const result = chatMessagesArraySchema.safeParse(value);
 	if (!result.success) {

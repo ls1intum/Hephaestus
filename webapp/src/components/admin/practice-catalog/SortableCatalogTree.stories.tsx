@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,6 @@ import {
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import type { Canvas } from "@/test/canvas";
 import {
 	type SortableCatalogArea,
 	type SortableCatalogEntry,
@@ -182,7 +181,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const openActions = async (canvas: Canvas, name: string) => {
+const openActions = async (canvas: StoryContext["canvas"], name: string) => {
 	// A menu left over from a previous step outlives the click that dismissed it by a frame, and
 	// `findByRole("menu")` would hand back that one.
 	await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
@@ -193,7 +192,7 @@ const openActions = async (canvas: Canvas, name: string) => {
 const announcement = () =>
 	document.querySelector('[id^="DndLiveRegion"]')?.textContent.trim() ?? "";
 
-const rowOf = (canvas: Canvas, name: string) => {
+const rowOf = (canvas: StoryContext["canvas"], name: string) => {
 	const row = canvas.getByRole("button", { name: `Reorder ${name}` }).closest('[role="listitem"]');
 	if (!(row instanceof HTMLElement)) throw new Error(`No row for ${name}`);
 	return row;

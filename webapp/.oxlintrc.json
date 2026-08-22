@@ -57,15 +57,15 @@
 		"operator-assignment": "error",
 		"typescript/prefer-for-of": "error",
 		"typescript/no-explicit-any": "error",
+		// An `async` with nothing to await promises a completion the caller cannot wait for. Two auth
+		// helpers claimed `Promise<void>` around a synchronous redirect, which is why every call site
+		// wrote `void linkAccount(...)`.
+		"typescript/require-await": "error",
 		// `no-explicit-any` only catches the `any` this repo writes. These five catch the `any` that
 		// arrives — from a library that types a prop or a callback argument as `any`, from `JSON.parse`,
 		// and from an untyped `vi.fn()`, whose `mock.calls` made an assertion about a submitted value
 		// check nothing at all. Each one is a place where the checker stops working silently, so the
 		// fix is always to establish the type at the boundary rather than downstream.
-		// An `async` with nothing to await promises a completion the caller cannot wait for. Two auth
-		// helpers claimed `Promise<void>` around a synchronous redirect, which is why every call site
-		// wrote `void linkAccount(...)`.
-		"typescript/require-await": "error",
 		"typescript/no-unsafe-call": "error",
 		"typescript/no-unsafe-assignment": "error",
 		"typescript/no-unsafe-argument": "error",
@@ -180,10 +180,9 @@
 		"oxc/no-const-enum": "error",
 		"oxc/bad-bitwise-operator": "error",
 		"promise/catch-or-return": "error",
-		// Same again for `style`, which holds 215 rules of which 94 fire here — the category is not
-		// adoptable (it contains `sort-keys` and both `no-named-export` and `prefer-default-export`),
-		// but these report zero and each guards a bug rather than a preference.
-		// Bug classes the `style` bucket happens to hold.
+		// Same again for `style`, which is not adoptable as a category (it contains `sort-keys` and both
+		// `no-named-export` and `prefer-default-export`), but these report zero and each guards a bug
+		// rather than a preference.
 		"no-template-curly-in-string": "error",
 		"no-new-func": "error",
 		"no-return-assign": "error",
@@ -300,8 +299,9 @@
 		// than the wire delivers, where the fix is the type and the guard stays.
 		"typescript/no-unnecessary-condition": "error",
 		// A `default` clause is how this repo says "the rest is deliberate", so it counts as exhaustive.
-		// Left at the rule's default, all nine existing switches would need a suppression and no bug
-		// would be found; with it, a switch that drops both a case and its `default` still fails.
+		// Left at the rule's default, the `default`-carrying switches already here would each need a
+		// suppression and no bug would be found; with it, a switch that drops both a case and its
+		// `default` still fails.
 		"typescript/switch-exhaustiveness-check": [
 			"error",
 			{ "considerDefaultExhaustiveForUnions": true }
@@ -383,13 +383,11 @@
 		// The exact inverse of `prefer-strict-boolean-matchers`, above: these two rewrite `toBe(true)`
 		// into `toBeTruthy()` and `toBe(false)` into `toBeFalsy()`, which is the weaker assertion —
 		// `toBeTruthy` passes on `1`, `"false"` and `{}`. Both cannot be on; the stricter one wins, and
-		// turning these on would mean loosening the 188 boolean assertions this repo already spells out.
+		// turning these on would mean loosening every boolean assertion this repo already spells out.
 		"vitest/prefer-to-be-truthy": "off",
 		"vitest/prefer-to-be-falsy": "off",
-		// React Compiler's own effect check. Two of its three findings are effects whose whole point is
-		// to re-run on the dependency it calls extra, and clearing those changes when they fire.
-		// `react-hooks/exhaustive-deps` covers the extra-dependency half; the missing-dependency half
-		// (`mentor/Copilot.tsx`) is on review.
+		// React Compiler's own effect check. What it reports here are effects whose whole point is to
+		// re-run on the dependency it calls extra, so clearing them changes when they fire.
 		"react/exhaustive-effect-dependencies": "off",
 		// shadcn primitives over Base UI set `role` themselves.
 		"jsx-a11y/prefer-tag-over-role": "off",
@@ -404,9 +402,11 @@
 		"react/no-array-index-key": "off",
 		// `rows.length ? … : …` on a value that is only ever an array reads fine.
 		"unicorn/explicit-length-check": "off",
-		// Both want ES2023 `toSorted`/`toReversed`, which `tsconfig.json`'s `lib` does not declare. Every
-		// site already copies first — `[...x].sort(…)`, `.filter(…).sort(…)`, `.slice().sort(…)` — so the
-		// mutation these rules exist to catch cannot happen at any of them.
+		// Both want ES2023 `toSorted`/`toReversed`, which `tsconfig.json`'s `lib` does not declare. The
+		// in-place mutation they exist to catch needs an array someone else can observe, and no site
+		// here has one: each either copies first (`[...x].sort(…)`, `.filter(…).sort(…)`) or sorts an
+		// array it just built itself in the same scope. Read the site before adding another — a `.sort()`
+		// on an array that arrived as a prop or came out of a cache is the bug these rules describe.
 		"unicorn/no-array-sort": "off",
 		"unicorn/no-array-reverse": "off",
 		// Its two shapes here are both wrong. An effect that bails early and otherwise returns a cleanup
@@ -416,7 +416,7 @@
 		// Wants a type parameter on every `vi.fn()`. It buys nothing here: `toHaveBeenCalledWith` is not
 		// type-narrowed by this Vitest/TS setup — a deliberately wrong argument against a
 		// `vi.fn<(open: boolean) => void>()` type-checks clean — so the parameter would be ceremony on
-		// all 122 call assertions and on every `onChange={vi.fn()}` prop.
+		// every call assertion and on every `onChange={vi.fn()}` prop.
 		"vitest/require-mock-type-parameters": "off",
 		// Flags `const Icon = iconFor(kind)` as creating a component during render. Those helpers return
 		// one of a fixed set of module-level icons, so the identity it warns about is already stable —
@@ -488,9 +488,11 @@
 			// Layering, encoded while it still holds. None of these fires today; each exists so the first
 			// edge that would invert the dependency is rejected instead of becoming precedent.
 			//
-			// One entry per directory, never two that overlap: where two overrides match the same file,
-			// the later one's copy of a rule REPLACES the earlier one's options rather than merging, so a
-			// broad `src/components/**` entry would silently drop the narrower rules below.
+			// Never configure one rule for the same file from two entries: where two overrides match a
+			// file, the later one's copy of a rule REPLACES the earlier one's options rather than merging
+			// with them, so a broad `src/components/**` entry would silently drop the narrower
+			// `no-restricted-imports` patterns below. Entries whose globs overlap but set *different*
+			// rules are fine and this file has several.
 			"files": ["src/lib/**", "src/stores/**"],
 			"rules": {
 				"no-restricted-imports": [

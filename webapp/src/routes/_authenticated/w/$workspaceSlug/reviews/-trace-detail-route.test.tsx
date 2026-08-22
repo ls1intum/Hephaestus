@@ -4,7 +4,6 @@ import { HttpResponse, http } from "msw";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { artifactTrace } from "@/components/practice-trace/story-mock-data";
 import { server } from "@/mocks/server";
-import { respondInTurn } from "@/test/responses";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 // Mounting the real route pulls in the whole app shell and its lazy modules.
@@ -73,19 +72,19 @@ describe("asking for a review by hand", () => {
 		server.use(
 			http.post(
 				REQUEST_PATH,
-				respondInTurn(
-					() =>
-						HttpResponse.json({
-							status: "REFUSED",
-							reason: "REQUEST_COOLDOWN_ACTIVE",
-							reasonDescription: COOLDOWN_SENTENCE,
-						}),
-					() =>
-						HttpResponse.json({
-							status: "SUBMITTED",
-							jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
-						}),
-				),
+				() =>
+					HttpResponse.json({
+						status: "REFUSED",
+						reason: "REQUEST_COOLDOWN_ACTIVE",
+						reasonDescription: COOLDOWN_SENTENCE,
+					}),
+				{ once: true },
+			),
+			http.post(REQUEST_PATH, () =>
+				HttpResponse.json({
+					status: "SUBMITTED",
+					jobId: "0f2b7c1e-9a3d-4c5b-8e1f-2d6a7b8c9d01",
+				}),
 			),
 		);
 		renderRouteAt("/w/acme/reviews/scm.pull_request/1423");

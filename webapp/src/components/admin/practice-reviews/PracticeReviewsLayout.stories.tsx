@@ -1,8 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { PageLayout } from "@/components/core/PageLayout";
 import { withStandardPage } from "@/stories/decorators";
-import type { Canvas } from "@/test/canvas";
 import { PracticeReviewsHeader } from "./PracticeReviewsLayout";
 
 // `aria-current` draws the selected tab, and TanStack's `Link` also sets it on any link it considers
@@ -35,7 +34,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-async function expectOnlyCurrent(canvas: Canvas, name: string) {
+async function expectOnlyCurrent(canvas: StoryContext["canvas"], name: string) {
 	const nav = canvas.getByRole("navigation", {
 		name: "Practice review sections",
 	});

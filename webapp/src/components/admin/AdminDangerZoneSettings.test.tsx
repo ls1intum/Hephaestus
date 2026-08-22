@@ -5,7 +5,6 @@ import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { listWorkspacesQueryKey } from "@/api/@tanstack/react-query.gen";
 import { server } from "@/mocks/server";
-import { respondInTurn } from "@/test/responses";
 import { renderWithRouter } from "@/test/router-harness";
 import { AdminDangerZoneSettings } from "./AdminDangerZoneSettings";
 
@@ -147,10 +146,11 @@ describe("AdminDangerZoneSettings", () => {
 		server.use(
 			http.get(
 				"*/workspaces/demo/members/me",
-				respondInTurn(
-					() => HttpResponse.json({ status: 403, detail: "Forbidden" }, { status: 403 }),
-					() => HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
-				),
+				() => HttpResponse.json({ status: 403, detail: "Forbidden" }, { status: 403 }),
+				{ once: true },
+			),
+			http.get("*/workspaces/demo/members/me", () =>
+				HttpResponse.json({ role: "OWNER", userLogin: "ada" }),
 			),
 		);
 		await renderContainer();

@@ -52,14 +52,14 @@ export interface SortableCatalogEntry {
 	slug: string;
 }
 
+/** Restores focus to the row's action trigger after a reorder moves it. */
+export type ActionTriggerRef = (node: HTMLButtonElement | null) => void;
+
 /**
  * Reorder state for one row. Deliberately free of refs: the focus-restoring callback travels beside
  * this object rather than inside it, so a consumer reading `canMoveUp` during render is not reading
  * through a ref.
  */
-/** Restores focus to the row's action trigger after a reorder moves it. */
-export type ActionTriggerRef = (node: HTMLButtonElement | null) => void;
-
 export interface CatalogMoveActions {
 	canMoveDown: boolean;
 	canMoveUp: boolean;
@@ -122,9 +122,10 @@ interface ActiveEntryDrop extends CatalogDropTarget {
 }
 
 /**
- * dnd-kit types `data.current` as an open record, so every read of it was an assertion. This checks
- * the discriminant instead, which means a payload that does not match is `undefined` rather than a
- * lie the type checker believed.
+ * dnd-kit types `data.current` as an open record, so reading a field off it is a claim about a
+ * payload nothing has checked. Going through this guard instead makes a payload that does not match
+ * `undefined` at the call site, where it is handled, rather than a shape the type checker vouches
+ * for and the code then trips over.
  */
 function isCatalogDndData(data: unknown): data is CatalogDndData {
 	if (typeof data !== "object" || data === null || !("type" in data)) return false;

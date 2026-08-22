@@ -24,7 +24,6 @@ export const typedStoryMeta = defineRule({
 		},
 	},
 	create(context) {
-		/** True for a bare `Meta`, false for `Meta<typeof X>` and for any other type. */
 		const isBareMeta = (type: ESTree.TSType | null | undefined) =>
 			type?.type === "TSTypeReference" &&
 			type.typeName.type === "Identifier" &&

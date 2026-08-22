@@ -1,4 +1,11 @@
 /**
+ * What {@link asDate} accepts, and therefore the honest parameter type for anything that formats a
+ * date through it: a real `Date`, the raw ISO string that appears in its place when the transformer
+ * is not in the path, or nothing at all.
+ */
+export type DateLike = Date | string | undefined | null;
+
+/**
  * Normalises a date field to a `Date`, or to `undefined` when there is nothing usable to show.
  *
  * The generated client revives every `format: date-time` field in a *response* into a real `Date`
@@ -11,13 +18,6 @@
  * Returning `undefined` rather than an Invalid Date keeps a bad value from rendering as the string
  * "Invalid Date"; callers pick their own fallback.
  */
-/**
- * What {@link asDate} accepts, and therefore the honest parameter type for anything that formats a
- * date through it: a real `Date`, the raw ISO string that appears in its place when the transformer
- * is not in the path, or nothing at all.
- */
-export type DateLike = Date | string | undefined | null;
-
 export function asDate(value: DateLike): Date | undefined {
 	if (value == null) return undefined;
 	const date = value instanceof Date ? value : new Date(value);

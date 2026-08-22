@@ -10,7 +10,6 @@ const GITLAB_WORKSPACE = process.env.E2E_GITLAB_WORKSPACE ?? "";
 const LIVE_CONFIGURED = Boolean(USERNAME && GITHUB_WORKSPACE && GITLAB_WORKSPACE);
 const LIVE_READY = LIVE_ENABLED && LIVE_CONFIGURED;
 
-/** The provider accepted the manual sync: a POST to the jobs endpoint answered 200 or 202. */
 function isAcceptedSyncJob(response: Response) {
 	return (
 		response.request().method() === "POST" &&

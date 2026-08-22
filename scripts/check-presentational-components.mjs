@@ -11,11 +11,10 @@
  * siblings' Docs page while every isolated story, and therefore every test and every snapshot, stays
  * green. R3 keeps that page correct for whatever MSW stories remain.
  *
- * This could be an oxlint rule now — `overrides[].files` gives the path scoping the GritQL plugins
- * it predates could not. What keeps it here is the allowlist below: a linter reports per file and has
- * nowhere to hold a repo-wide census, so it cannot fail the build when an entry scans clean. Vitest
- * cannot carry it either — scanning the tree inside a worker starves the route tests sharing it.
- * Same reasoning, and the same vacuous-pass guard, as `check-story-prose.mjs`.
+ * This is a script rather than a lint rule because of the allowlist below: a linter reports per file
+ * and has nowhere to hold a repo-wide census, so it cannot fail the build when an entry scans clean.
+ * Vitest cannot carry it either — scanning the tree inside a worker starves the route tests sharing
+ * it. Same reasoning, and the same vacuous-pass guard, as `check-story-prose.mjs`.
  *
  * The allowlist is shrink-only: an entry that scans clean fails the build, so it cannot go stale.
  */

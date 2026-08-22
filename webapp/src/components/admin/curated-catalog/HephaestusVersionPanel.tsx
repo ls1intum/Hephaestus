@@ -112,8 +112,6 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 			: undefined;
 	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
-	// An action is offered only when the state allows it *and* the caller wired up somewhere for it
-	// to go.
 	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion !== undefined;
 	const canKeep = canKeepCurrentDefinition(status) && onKeepCurrentDefinition !== undefined;
 	const busy = isResetPending || isKeepPending || disabled;

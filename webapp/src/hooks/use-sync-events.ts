@@ -39,8 +39,9 @@ function isSyncEventScope(value: unknown): value is SyncEventScope {
 
 /**
  * A hint arrives over the network, so its shape is established rather than assumed. Anything that
- * does not match is dropped, which costs nothing: the periodic poll backstop refreshes the same
- * state a moment later.
+ * does not match is dropped, and dropping it is not free: with the stream healthy and no job
+ * running, `syncPollInterval` polls not at all, so the surface only catches up on the next poll or
+ * navigation. A change to the hint's shape must not reach here silently.
  */
 function parseHint(payload: string): SyncEventHint | undefined {
 	let decoded: unknown;
@@ -224,8 +225,10 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		};
 
 		/**
-		 * Detaching has to be per-connection, not per-hook: a stream that failed is torn down while its
-		 * replacement is already opening, and aborting the shared controller would deafen the new one.
+		 * One controller per connection, not one per hook: an `AbortSignal` is one-shot. A single
+		 * controller reused across reconnects is already aborted by the time the next `connect()` calls
+		 * `addEventListener(…, { signal })`, and an aborted signal makes that call attach nothing at
+		 * all — silently. Every stream after the first failure would be deaf.
 		 */
 		const controllers = new WeakMap<EventSource, AbortController>();
 

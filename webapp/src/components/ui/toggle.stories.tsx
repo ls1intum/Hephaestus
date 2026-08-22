@@ -1,8 +1,7 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import type { Canvas } from "@/test/canvas";
 
 /**
  * A toggle carries four states at once, and each one owns a different channel so that no two of them
@@ -79,7 +78,7 @@ function StateBoard() {
 	);
 }
 
-async function expectOneChannelPerState(canvas: Canvas) {
+async function expectOneChannelPerState(canvas: StoryContext["canvas"]) {
 	const toggleNamed = (name: string) => canvas.getByRole("button", { name });
 
 	const selected = getComputedStyle(toggleNamed("Selected"));
@@ -108,7 +107,7 @@ async function expectOneChannelPerState(canvas: Canvas) {
 	await expect(getComputedStyle(groupOff).opacity).toBe("0.5");
 }
 
-async function expectSegmentsJoinOnce(canvas: Canvas) {
+async function expectSegmentsJoinOnce(canvas: StoryContext["canvas"]) {
 	const toolbar = canvas.getByRole("toolbar", { name: "Filter practices" });
 	const [first, second, third] = within(toolbar).getAllByRole("button");
 	if (!first || !second || !third) throw new Error("The segmented run needs three segments");

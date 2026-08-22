@@ -249,7 +249,6 @@ function resolveIcon(name?: string | null): LucideIcon | undefined {
 	return name ? ICON_COMPONENTS[name] : undefined;
 }
 
-/** The icon for a name, or the neutral folder when the name is not one this build ships. */
 export function iconComponent(name: string): LucideIcon {
 	return ICON_COMPONENTS[name] ?? Folder;
 }

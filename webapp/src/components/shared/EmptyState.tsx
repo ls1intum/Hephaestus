@@ -20,7 +20,7 @@ function isIconComponent(
 }
 
 export interface EmptyStateProps {
-	/** The icon to display at the top of the empty state: an icon component or a rendered element */
+	/** The icon to display at the top of the empty state */
 	icon: ReactNode | ComponentType<IconProps>;
 	/** The title to display as the main message */
 	title: string;

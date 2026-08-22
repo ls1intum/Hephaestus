@@ -49,10 +49,6 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-/**
- * Named rather than an inline `component: () => …`, so the hooks below sit in something React
- * and its lint rules can both recognise as a component.
- */
 function RootLayout() {
 	const { pathname } = useLocation();
 	const surface = useMatches({

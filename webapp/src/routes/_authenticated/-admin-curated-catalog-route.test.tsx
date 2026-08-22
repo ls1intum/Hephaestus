@@ -11,7 +11,6 @@ import {
 	mockPullRequestPolicy,
 } from "@/mocks/fixtures/practice";
 import { server } from "@/mocks/server";
-import { respondInTurn } from "@/test/responses";
 import { ROUTE_RENDER_WAIT, renderRouteAt } from "@/test/router-harness";
 
 vi.setConfig({ testTimeout: 20_000 });
@@ -591,30 +590,32 @@ describe("instance catalog routes", () => {
 		mockCatalog();
 		let currentEtag = "tag-1";
 		let lastIfMatch: string | null = null;
-		const respondToSave = respondInTurn(
-			() => {
-				// Somebody else's write landed first, and it is their tag the reload has to pick up.
-				currentEtag = "tag-2";
-				return HttpResponse.json({ status: 412, title: "Stale" }, { status: 412 });
-			},
-			() =>
-				HttpResponse.json({
-					slug: "describe-what-and-why",
-					definition: { ...practiceDefinition, name: "My unsaved draft" },
-					status: status({ etag: "tag-3" }),
-				}),
-		);
+		const PRACTICE_PATH = "*/admin/practice-catalog/practices/:slug";
 		server.use(
-			http.get("*/admin/practice-catalog/practices/:slug", () =>
+			http.get(PRACTICE_PATH, () =>
 				HttpResponse.json({
 					slug: "describe-what-and-why",
 					definition: practiceDefinition,
 					status: status({ etag: currentEtag }),
 				}),
 			),
-			http.put("*/admin/practice-catalog/practices/:slug", ({ request }) => {
+			http.put(
+				PRACTICE_PATH,
+				({ request }) => {
+					lastIfMatch = request.headers.get("if-match");
+					// Somebody else's write landed first, and it is their tag the reload has to pick up.
+					currentEtag = "tag-2";
+					return HttpResponse.json({ status: 412, title: "Stale" }, { status: 412 });
+				},
+				{ once: true },
+			),
+			http.put(PRACTICE_PATH, ({ request }) => {
 				lastIfMatch = request.headers.get("if-match");
-				return respondToSave();
+				return HttpResponse.json({
+					slug: "describe-what-and-why",
+					definition: { ...practiceDefinition, name: "My unsaved draft" },
+					status: status({ etag: "tag-3" }),
+				});
 			}),
 		);
 		renderRouteAt("/admin/catalog/practices/describe-what-and-why");

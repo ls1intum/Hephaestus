@@ -40,6 +40,23 @@ describe("consent store", () => {
 		expect(getStoredConsent()).toBeNull();
 	});
 
+	// Anything can write this key, and what comes back out is what gates PostHog and Sentry. A
+	// complete-looking decision whose flags are strings must be re-asked, not read for truthiness —
+	// `"false"` is truthy, so trusting it would turn analytics on for someone who declined.
+	it("treats a decision whose flags are not booleans as no decision, rather than taking it as given", () => {
+		localStorage.setItem(
+			CONSENT_STORAGE_KEY,
+			JSON.stringify({
+				analytics: "false",
+				errorMonitoring: "true",
+				decidedAt: "x",
+				version: CONSENT_VERSION,
+			}),
+		);
+
+		expect(getStoredConsent()).toBeNull();
+	});
+
 	it("re-prompts (treats as no decision) when the stored consent version is older/missing", () => {
 		localStorage.setItem(
 			CONSENT_STORAGE_KEY,
