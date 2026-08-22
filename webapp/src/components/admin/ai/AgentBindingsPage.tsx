@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BrainCircuit, ChevronDown } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, type SubmitEvent, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentBinding,
 	AgentBindingRequest,
@@ -29,33 +29,35 @@ import { Switch } from "@/components/ui/switch";
 import { BudgetExhaustedAlert } from "./BudgetExhaustedAlert";
 import { ModelPicker, type ModelSelection } from "./ModelPicker";
 
-type Purpose = AgentBinding["purpose"];
+export type Purpose = AgentBinding["purpose"];
 
 interface PurposeMeta {
 	purpose: Purpose;
-	title: string;
 	description: string;
 	disabledLabel: string;
+}
+
+export const PURPOSE_TITLES = {
+	PRACTICE_REVIEW: "Practice reviews",
+	MENTOR: "Heph",
+} satisfies Record<Purpose, string>;
+
+export function isPurpose(value: string): value is Purpose {
+	return Object.hasOwn(PURPOSE_TITLES, value);
 }
 
 const PURPOSES: PurposeMeta[] = [
 	{
 		purpose: "PRACTICE_REVIEW",
-		title: "Practice reviews",
 		description: "Reviews connected project work and conversations.",
 		disabledLabel: "Practice reviews off",
 	},
 	{
 		purpose: "MENTOR",
-		title: "Heph",
 		description: "Powers conversations with Heph.",
 		disabledLabel: "Heph web chat off",
 	},
 ];
-
-export const PURPOSE_TITLES: Record<Purpose, string> = Object.fromEntries(
-	PURPOSES.map((meta) => [meta.purpose, meta.title]),
-) as Record<Purpose, string>;
 
 const MIN_TIMEOUT_SECONDS = 30;
 const MAX_TIMEOUT_SECONDS = 3600;
@@ -146,7 +148,7 @@ export function AgentBindingsPage({
 			/>
 
 			<div className="max-w-4xl space-y-6">
-				{(usage?.ownProviderPaused || usage?.instancePaused) && (
+				{(usage?.ownProviderPaused === true || usage?.instancePaused === true) && (
 					<div className="space-y-3">
 						{usage.ownProviderPaused && (
 							<BudgetExhaustedAlert
@@ -258,7 +260,7 @@ function AgentPurposeCard({
 		}
 	}, [submitAttempt]);
 
-	const handleSubmit = (event: FormEvent) => {
+	const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!selection || timeout.value == null || concurrency.value == null) {
 			setSubmitAttempt((attempt) => attempt + 1);
@@ -280,7 +282,7 @@ function AgentPurposeCard({
 			<CardHeader>
 				<div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
 					<div className="min-w-0 flex-1">
-						<CardTitle id={cardLabelId}>{meta.title}</CardTitle>
+						<CardTitle id={cardLabelId}>{PURPOSE_TITLES[meta.purpose]}</CardTitle>
 						<CardDescription>
 							{meta.description}
 							{!featureEnabled &&
@@ -326,9 +328,12 @@ function AgentPurposeCard({
 				<CardContent className="space-y-4">
 					<FieldGroup>
 						<Field data-invalid={Boolean(modelError)}>
-							<FieldLabel htmlFor={`${meta.purpose}-model`}>{meta.title} model</FieldLabel>
+							<FieldLabel id={`${meta.purpose}-model-label`} htmlFor={`${meta.purpose}-model`}>
+								{PURPOSE_TITLES[meta.purpose]} model
+							</FieldLabel>
 							<ModelPicker
 								id={`${meta.purpose}-model`}
+								aria-labelledby={`${meta.purpose}-model-label`}
 								availableModels={availableModels}
 								value={selection}
 								onChange={setSelection}

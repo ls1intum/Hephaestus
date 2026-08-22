@@ -44,13 +44,16 @@ function InputGroupAddon({
 	...props
 }: React.ComponentProps<"div"> & VariantProps<typeof inputGroupAddonVariants>) {
 	return (
+		// The click only forwards focus to the input, which is already a tab stop of its own, so a key
+		// handler would add a second way to reach nothing new.
+		// oxlint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions
 		<div
 			role="group"
 			data-slot="input-group-addon"
 			data-align={align}
 			className={cn(inputGroupAddonVariants({ align }), className)}
 			onClick={(e) => {
-				if ((e.target as HTMLElement).closest("button")) {
+				if (e.target instanceof Element && e.target.closest("button")) {
 					return;
 				}
 				e.currentTarget.parentElement?.querySelector("input")?.focus();

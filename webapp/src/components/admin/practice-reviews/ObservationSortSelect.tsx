@@ -27,14 +27,15 @@ export interface ObservationSortSelectProps {
 /**
  * A list has no sortable column headers, so the ordering has to be offered explicitly.
  *
- * <p>`NEWEST` is reported as `undefined` rather than as the string: it is the server's default, so
+ * `NEWEST` is reported as `undefined` rather than as the string: it is the server's default, so
  * writing it into the URL would put a parameter in every link that changes nothing.
  */
 export function ObservationSortSelect({ value, onChange }: ObservationSortSelectProps) {
 	const sortId = useId();
+	const sortLabelId = useId();
 	return (
 		<Field orientation="horizontal" className="w-auto max-w-full flex-wrap text-sm">
-			<FieldLabel htmlFor={sortId} className="text-muted-foreground">
+			<FieldLabel id={sortLabelId} htmlFor={sortId} className="text-muted-foreground">
 				Sort
 			</FieldLabel>
 			<Select
@@ -48,7 +49,7 @@ export function ObservationSortSelect({ value, onChange }: ObservationSortSelect
 					<ArrowDownWideNarrowIcon aria-hidden className="text-muted-foreground" />
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-labelledby={sortLabelId}>
 					{SORT_ITEMS.map((item) => (
 						<SelectItem key={item.value} value={item.value}>
 							{item.label}

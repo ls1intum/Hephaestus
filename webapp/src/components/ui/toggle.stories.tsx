@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { expect, within } from "storybook/test";
 import { Toggle } from "@/components/ui/toggle";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -78,7 +78,7 @@ function StateBoard() {
 	);
 }
 
-async function expectOneChannelPerState(canvas: ReturnType<typeof within>) {
+async function expectOneChannelPerState(canvas: StoryContext["canvas"]) {
 	const toggleNamed = (name: string) => canvas.getByRole("button", { name });
 
 	const selected = getComputedStyle(toggleNamed("Selected"));
@@ -107,9 +107,10 @@ async function expectOneChannelPerState(canvas: ReturnType<typeof within>) {
 	await expect(getComputedStyle(groupOff).opacity).toBe("0.5");
 }
 
-async function expectSegmentsJoinOnce(canvas: ReturnType<typeof within>) {
+async function expectSegmentsJoinOnce(canvas: StoryContext["canvas"]) {
 	const toolbar = canvas.getByRole("toolbar", { name: "Filter practices" });
 	const [first, second, third] = within(toolbar).getAllByRole("button");
+	if (!first || !second || !third) throw new Error("The segmented run needs three segments");
 
 	// One pixel of overlap per seam, so two neighbouring one-pixel borders read as one line rather
 	// than as a two-pixel rule, and the selected segment keeps a border on all four sides.

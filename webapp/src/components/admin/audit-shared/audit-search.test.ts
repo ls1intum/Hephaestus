@@ -43,7 +43,7 @@ describe("toDateRange", () => {
 
 describe("auditSearchSchema", () => {
 	it("opens the log rather than erroring on a hand-typed or stale link", () => {
-		expect(auditSearchSchema.parse({ tab: "nope", accountId: "abc", from: 5 })).toEqual({
+		expect(auditSearchSchema.parse({ tab: "nope", accountId: "abc", from: 5 })).toStrictEqual({
 			tab: "signins",
 			accountId: undefined,
 			from: undefined,
@@ -51,6 +51,6 @@ describe("auditSearchSchema", () => {
 	});
 
 	it("accepts a single value where the API accepts repeated ones", () => {
-		expect(auditSearchSchema.parse({ action: "CREATED" }).action).toEqual(["CREATED"]);
+		expect(auditSearchSchema.parse({ action: "CREATED" }).action).toStrictEqual(["CREATED"]);
 	});
 });

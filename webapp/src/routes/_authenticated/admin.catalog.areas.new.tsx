@@ -22,7 +22,7 @@ function NewCuratedAreaPage() {
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 			toast.success("Area created");
-			navigate({ to: "/admin/catalog" });
+			void navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) =>
 			toast.error("Couldn't create the area", { description: problemDetailOf(error) }),

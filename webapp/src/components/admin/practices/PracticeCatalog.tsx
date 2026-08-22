@@ -7,6 +7,7 @@ import { WORK_ARTIFACT_FILTER_ITEMS } from "@/components/admin/practice-catalog/
 import { automatedReviewUnavailableLabel } from "@/components/admin/practice-catalog/evidence-presentation";
 import { PracticeDetailHoverCard } from "@/components/admin/practice-catalog/PracticeDetailHoverCard";
 import {
+	type ActionTriggerRef,
 	type CatalogEntryMoveActions,
 	type CatalogMoveActions,
 	SortableCatalogTree,
@@ -164,10 +165,11 @@ export function PracticeCatalog({
 						<CatalogOriginBadge origin={area.catalogOrigin} kind="area" />
 					</>
 				)}
-				renderAreaActions={(area, move) => (
+				renderAreaActions={(area, move, actionTriggerRef) => (
 					<AreaActions
 						area={area}
 						move={move}
+						actionTriggerRef={actionTriggerRef}
 						pending={pending.areaSlugs.has(area.slug)}
 						structurePending={pending.areaStructure}
 						onRename={() => setRenamingArea(area)}
@@ -193,12 +195,13 @@ export function PracticeCatalog({
 						}
 					/>
 				)}
-				renderEntryActions={(practice, move) => (
+				renderEntryActions={(practice, move, actionTriggerRef) => (
 					<PracticeActions
 						practice={practice}
 						workspaceSlug={workspaceSlug}
 						areas={areas}
 						move={move}
+						actionTriggerRef={actionTriggerRef}
 						pending={pending.practiceSlugs.has(practice.slug)}
 						onDelete={onDeletePractice}
 					/>
@@ -257,12 +260,12 @@ function CatalogToolbar({
 			<Select
 				items={WORK_ARTIFACT_FILTER_ITEMS}
 				value={focusFilter}
-				onValueChange={(value) => value && onFocusFilterChange(value as FocusFilter)}
+				onValueChange={(value) => value && onFocusFilterChange(value)}
 			>
 				<SelectTrigger className="w-full sm:hidden" aria-label="Filter by work type">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Filter by work type">
 					{WORK_ARTIFACT_FILTER_ITEMS.map((filter) => (
 						<SelectItem key={filter.value} value={filter.value}>
 							{filter.label}
@@ -276,7 +279,7 @@ function CatalogToolbar({
 			<ToggleGroup
 				role="toolbar"
 				value={[focusFilter]}
-				onValueChange={(value) => value[0] && onFocusFilterChange(value[0] as FocusFilter)}
+				onValueChange={(value) => value[0] && onFocusFilterChange(value[0])}
 				variant="outline"
 				size="sm"
 				aria-label="Filter by work type"
@@ -326,6 +329,7 @@ function CatalogToolbar({
 function AreaActions({
 	area,
 	move,
+	actionTriggerRef,
 	pending,
 	structurePending,
 	onRename,
@@ -334,6 +338,7 @@ function AreaActions({
 }: {
 	area: PracticeArea;
 	move: CatalogMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	structurePending: boolean;
 	onRename: () => void;
@@ -355,7 +360,7 @@ function AreaActions({
 				<DropdownMenuTrigger
 					render={
 						<Button
-							ref={move.actionTriggerRef}
+							ref={actionTriggerRef}
 							variant="ghost"
 							size="icon-sm"
 							aria-label={`More actions for ${area.name}`}
@@ -406,6 +411,7 @@ function PracticeActions({
 	workspaceSlug,
 	areas,
 	move,
+	actionTriggerRef,
 	pending,
 	onDelete,
 }: {
@@ -413,6 +419,7 @@ function PracticeActions({
 	workspaceSlug: string;
 	areas: PracticeArea[];
 	move: CatalogEntryMoveActions;
+	actionTriggerRef: ActionTriggerRef;
 	pending: boolean;
 	onDelete: (practice: Practice) => void;
 }) {
@@ -421,7 +428,7 @@ function PracticeActions({
 			<DropdownMenuTrigger
 				render={
 					<Button
-						ref={move.actionTriggerRef}
+						ref={actionTriggerRef}
 						variant="ghost"
 						size="icon-sm"
 						aria-label={`More actions for ${practice.name}`}
@@ -515,6 +522,10 @@ function RenameAreaDialog({
 	onRename: (slug: string, name: string) => Promise<boolean>;
 	pending: boolean;
 }) {
+	const rename = async (slug: string, name: string) => {
+		if (await onRename(slug, name)) onClose();
+	};
+
 	return (
 		<Dialog open={area !== null} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className="sm:max-w-sm">
@@ -522,7 +533,7 @@ function RenameAreaDialog({
 					<DialogTitle>Rename area</DialogTitle>
 				</DialogHeader>
 				<form
-					onSubmit={async (event) => {
+					onSubmit={(event) => {
 						event.preventDefault();
 						// `namedItem` answers with a RadioNodeList when a name is shared, so narrow rather
 						// than cast.
@@ -533,7 +544,7 @@ function RenameAreaDialog({
 							onClose();
 							return;
 						}
-						if (await onRename(area.slug, name)) onClose();
+						void rename(area.slug, name);
 					}}
 					className="space-y-4"
 				>
@@ -628,6 +639,10 @@ function CreateAreaButton({
 	disabled: boolean;
 }) {
 	const [open, setOpen] = useState(false);
+	const create = async (name: string) => {
+		if (await onCreate(name)) setOpen(false);
+	};
+
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger
@@ -640,12 +655,12 @@ function CreateAreaButton({
 			/>
 			<PopoverContent align="end" className="w-72">
 				<form
-					onSubmit={async (event) => {
+					onSubmit={(event) => {
 						event.preventDefault();
 						const input = event.currentTarget.elements.namedItem("areaName");
 						if (!(input instanceof HTMLInputElement)) return;
 						const name = input.value.trim();
-						if (name && (await onCreate(name))) setOpen(false);
+						if (name) void create(name);
 					}}
 					className="flex items-center gap-2"
 				>

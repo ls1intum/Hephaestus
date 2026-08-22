@@ -21,7 +21,7 @@ function AdminAuditPage() {
 	const navigate = useNavigate({ from: Route.fullPath });
 
 	const patchSearch = (patch: Partial<AuditSearch>) =>
-		navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
+		void navigate({ search: (prev) => ({ ...prev, ...patch }), replace: true });
 
 	const workspacesQuery = useQuery(adminListWorkspacesOptions());
 	const workspaceNames = new Map(
@@ -41,9 +41,11 @@ function AdminAuditPage() {
 				className="gap-4"
 				value={search.tab}
 				onValueChange={(value) =>
-					navigate({
+					void navigate({
 						search: (prev) => ({
-							tab: value as AuditSearch["tab"],
+							// The tab component hands back an untyped value; the schema's `.catch` decides
+							// what a stray one becomes.
+							tab: auditSearchSchema.shape.tab.parse(value),
 							actorId: prev.actorId,
 							from: prev.from,
 							to: prev.to,

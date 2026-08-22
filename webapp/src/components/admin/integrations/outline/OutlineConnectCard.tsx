@@ -21,6 +21,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
+import { hasText } from "@/lib/text";
 import { IntegrationCardHeading } from "../IntegrationCardHeading";
 import { CONNECTION_STATE_LABEL, type ConnectionState } from "../sync-format";
 
@@ -284,7 +285,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 					<KeyRoundIcon className="size-4 text-success" aria-hidden />
 					Outline accepts this token
 				</span>
-				{hasMetadata && (tokenStatus.name || tokenStatus.last4) && (
+				{hasMetadata && (hasText(tokenStatus.name) || hasText(tokenStatus.last4)) && (
 					<span>
 						{tokenStatus.name ?? "API key"}
 						{tokenStatus.last4 ? ` (…${tokenStatus.last4})` : ""}
@@ -308,7 +309,7 @@ function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
 				<Alert variant="warning">
 					<TriangleAlertIcon />
 					<AlertTitle>
-						{daysLeft != null && daysLeft <= 0
+						{daysLeft <= 0
 							? `This API key expired on ${format(expiresAt, "d MMM yyyy")}`
 							: `This API key expires in ${daysLeft} day${daysLeft === 1 ? "" : "s"} (on ${format(expiresAt, "d MMM yyyy")})`}
 					</AlertTitle>

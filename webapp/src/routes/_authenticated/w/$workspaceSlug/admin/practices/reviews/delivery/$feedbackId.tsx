@@ -74,7 +74,7 @@ function FeedbackDetailRoute() {
 			feedback={feedback}
 			isLoading={feedbackQueryResult.isLoading}
 			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
-			onRetry={() => feedbackQueryResult.refetch()}
+			onRetry={() => void feedbackQueryResult.refetch()}
 			practices={practicesQuery.data}
 		/>
 	);

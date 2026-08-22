@@ -112,13 +112,14 @@ export const WithOptOuts: Story = {
 	play: async ({ canvas }) => {
 		// Scope each count to its own row (via the deterministic action-button label): a bare
 		// getByText("2") would be satisfied by a stray "2" rendered anywhere in the table.
-		const activeRow = canvas
-			.getByRole("button", { name: "Actions for team-standup" })
-			.closest("tr");
-		const pendingRow = canvas.getByRole("button", { name: "Actions for team-intro" }).closest("tr");
-		within(activeRow as HTMLElement).getByText("2");
+		const rowFor = (channel: string) => {
+			const row = canvas.getByRole("button", { name: `Actions for ${channel}` }).closest("tr");
+			if (!row) throw new Error(`The actions button for ${channel} is not inside a row.`);
+			return row;
+		};
+		within(rowFor("team-standup")).getByText("2");
 		// 0 is rendered as a trust signal rather than blanked out.
-		within(pendingRow as HTMLElement).getByText("0");
+		within(rowFor("team-intro")).getByText("0");
 	},
 };
 
@@ -272,7 +273,9 @@ export const AddChannelPicker: Story = {
 		],
 	},
 	play: async ({ args, canvas }) => {
-		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
+		const [headerAddChannel] = canvas.getAllByRole("button", { name: /add channel/i });
+		if (!headerAddChannel) throw new Error("No control to add a channel was rendered");
+		await userEvent.click(headerAddChannel);
 		const dialog = await screen.findByRole("dialog");
 
 		// The options live in the combobox's popover — open it. (The popover is portalled, so
@@ -314,7 +317,9 @@ export const MutationError: Story = {
 	},
 	play: async ({ canvas }) => {
 		// Empty list ⇒ both a header button and an empty-state CTA; open via the header one.
-		await userEvent.click(canvas.getAllByRole("button", { name: /add channel/i })[0]);
+		const [headerAddChannel] = canvas.getAllByRole("button", { name: /add channel/i });
+		if (!headerAddChannel) throw new Error("No control to add a channel was rendered");
+		await userEvent.click(headerAddChannel);
 		const dialog = await screen.findByRole("dialog");
 		await userEvent.type(
 			within(dialog).getByLabelText(/paste a channel link or id/i),

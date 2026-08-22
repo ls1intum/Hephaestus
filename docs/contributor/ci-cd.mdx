@@ -70,7 +70,7 @@ Before any release, code must pass:
 | OpenAPI sync    | Diff check  | Client ↔ Server sync |
 | Java formatting | Prettier (`prettier-plugin-java`) | Code style |
 | Java lint       | PMD         | Static analysis      |
-| Webapp TypeScript | Biome (`webapp/biome.json`) + tsc | Lint + format + typecheck |
+| Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
 | Agent + scripts TypeScript | Biome (`biome.jsonc`) + tsc | Lint + format + typecheck for the Bun runtime, its specs, both precompute trees and `scripts/**` |
 | Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships |
 

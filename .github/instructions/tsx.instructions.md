@@ -45,7 +45,7 @@ Follow the [general coding guidelines](./general-coding.instructions.md) in addi
 ## Tooling integrations
 - Keep stories colocated (`Component.stories.tsx`) and represent the real UI states that Chromatic validates.
 - The React Compiler is enabled in `webapp/vite.shared.ts`. Write pure components, avoid conditional hooks, and remove hand-written memoization unless profiling demands it. Use `'use no memo'` only while debugging.
-- Format and lint with Biome (`pnpm run check`) before pushing. Fix warnings or explain them in the pull request.
+- Format with Biome and lint with oxlint (`pnpm run check`) before pushing. Fix warnings or explain them in the pull request.
 - Keep Vitest configs minimal. Suites that need a browser runtime get their own config, as `vitest.config.storybook.ts` does.
 
 ## Testing and stories

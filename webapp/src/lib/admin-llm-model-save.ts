@@ -47,23 +47,22 @@ export async function saveAdminLlmModelSafely({
 	operations,
 }: SaveAdminLlmModelOptions): Promise<void> {
 	let modelId: number | undefined;
-	const shouldEnable = body.metadata.enabled === true;
+	const { metadata } = body;
+	const shouldEnable = metadata.enabled === true;
 
 	try {
 		if (!editing) {
 			if (!body.sharing) throw new Error("Workspace access is required when creating a model");
-			const created = await operations.create(connectionId, {
-				...(body.metadata as CreateLlmModelRequest),
-				enabled: false,
-			});
+			// Only the create shape names an upstream model, and the catalog cannot create without one.
+			if (!("upstreamModelId" in metadata)) {
+				throw new Error("The upstream model id is required when creating a model");
+			}
+			const created = await operations.create(connectionId, { ...metadata, enabled: false });
 			modelId = created.id;
 		} else {
 			modelId = editing.id;
 			if (editing.enabled) {
-				await operations.updateMetadata(
-					editing.id,
-					shouldEnable ? { enabled: false } : (body.metadata as UpdateLlmModelRequest),
-				);
+				await operations.updateMetadata(editing.id, shouldEnable ? { enabled: false } : metadata);
 			}
 		}
 
@@ -73,7 +72,7 @@ export async function saveAdminLlmModelSafely({
 		if (!editing && shouldEnable) {
 			await operations.updateMetadata(modelId, { enabled: true });
 		} else if (editing && (!editing.enabled || shouldEnable)) {
-			await operations.updateMetadata(editing.id, body.metadata as UpdateLlmModelRequest);
+			await operations.updateMetadata(editing.id, metadata);
 		}
 	} catch (error) {
 		if (modelId == null) throw error;

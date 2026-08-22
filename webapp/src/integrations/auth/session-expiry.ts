@@ -84,11 +84,9 @@ let lastRefreshRecoveryAt = 0;
  * invalidations.
  */
 function recoverOrLogout(queryClient: QueryClient, currentPath: string): Promise<void> {
-	if (!recovery) {
-		recovery = doRecoverOrLogout(queryClient, currentPath).finally(() => {
-			recovery = null;
-		});
-	}
+	recovery ??= doRecoverOrLogout(queryClient, currentPath).finally(() => {
+		recovery = null;
+	});
 	return recovery;
 }
 

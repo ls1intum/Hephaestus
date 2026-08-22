@@ -8,7 +8,7 @@ export const connectionSchema = z.object({
 		.pipe(
 			z.union([
 				z.literal(""),
-				z.string().url("Must be a valid URL").startsWith("https://", "Must use HTTPS"),
+				z.url("Must be a valid URL").startsWith("https://", "Must use HTTPS"),
 			]),
 		),
 	personalAccessToken: z

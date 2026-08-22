@@ -132,17 +132,17 @@ function ScmIntegrationPage() {
 
 	const invalidateSyncState = () => {
 		if (connectionId == null) return;
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: getConnectionSyncStatusQueryKey({
 				path: { workspaceSlug: slug, connectionId },
 			}),
 		});
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: listConnectionSyncJobsQueryKey({
 				path: { workspaceSlug: slug, connectionId },
 			}),
 		});
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: listConnectionSyncResourcesQueryKey({
 				path: { workspaceSlug: slug, connectionId },
 			}),
@@ -150,7 +150,7 @@ function ScmIntegrationPage() {
 	};
 
 	const onRepositorySetChanged = () => {
-		queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
 		invalidateSyncState();
 	};
 
@@ -193,7 +193,7 @@ function ScmIntegrationPage() {
 
 	const activeJob = status?.activeJob;
 
-	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables?.body?.type : undefined;
+	const pendingTriggerType = triggerSync.isPending ? triggerSync.variables.body.type : undefined;
 	const triggeringType =
 		pendingTriggerType === "RECONCILIATION" || pendingTriggerType === "BACKFILL"
 			? pendingTriggerType
@@ -216,7 +216,7 @@ function ScmIntegrationPage() {
 			/>
 
 			{hasConnection && !isConnectionActive && (
-				<ConnectionStateNotice connectionState={entry?.connectionState} displayName={label} />
+				<ConnectionStateNotice connectionState={entry.connectionState} displayName={label} />
 			)}
 
 			<SyncStatusHeader
@@ -241,9 +241,9 @@ function ScmIntegrationPage() {
 				}
 				isCancelling={cancelJob.isPending}
 				onRetry={() => {
-					workspaceQuery.refetch();
-					catalogQuery.refetch();
-					statusQuery.refetch();
+					void workspaceQuery.refetch();
+					void catalogQuery.refetch();
+					void statusQuery.refetch();
 				}}
 				onSync={() => {
 					if (connectionId == null) return;
@@ -279,7 +279,7 @@ function ScmIntegrationPage() {
 							isLoading={isResourcesLoading}
 							isError={isResourcesError}
 							error={resourcesError}
-							onRetry={() => refetchResources()}
+							onRetry={() => void refetchResources()}
 							resourceNoun="repository"
 							resourceNounPlural="repositories"
 							syncIntervalSeconds={status?.syncIntervalSeconds}
@@ -294,8 +294,8 @@ function ScmIntegrationPage() {
 					repositories={(repositories ?? []).map((repo) => ({ nameWithOwner: repo }))}
 					providerLabel={label}
 					isLoading={isLoadingRepositories}
-					error={repositoriesError as Error | null}
-					addRepositoryError={addRepository.error as Error | null}
+					error={repositoriesError}
+					addRepositoryError={addRepository.error}
 					isAddingRepository={addRepository.isPending}
 					isRemovingRepository={removeRepository.isPending}
 					onAddRepository={(nameWithOwner) => {
@@ -304,7 +304,7 @@ function ScmIntegrationPage() {
 					onRemoveRepository={(nameWithOwner) => {
 						removeRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
 					}}
-					onRetry={() => refetchRepositories()}
+					onRetry={() => void refetchRepositories()}
 				/>
 			)}
 
@@ -314,7 +314,7 @@ function ScmIntegrationPage() {
 					isLoading={isJobsLoading}
 					isError={isJobsError}
 					error={jobsError}
-					onRetry={() => refetchJobs()}
+					onRetry={() => void refetchJobs()}
 					page={jobsPage}
 					totalPages={jobsPageData?.totalPages ?? 1}
 					onPageChange={setJobsPage}

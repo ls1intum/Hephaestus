@@ -6,7 +6,7 @@ import type {
 	PracticeReviewSettings,
 } from "@/api/types.gen";
 import { mockReviewSettings } from "@/components/admin/practices/story-mock-data";
-import { PRACTICE_AUTONOMY_ORDER, type PracticeAutonomy } from "@/lib/practice-autonomy";
+import type { PracticeAutonomy } from "@/lib/practice-autonomy";
 import {
 	mockAuthorDeclaredEvidenceValidation,
 	mockPullRequestBinding,
@@ -45,8 +45,11 @@ export interface AutonomyFixture {
 	practices: Practice[];
 }
 
-const emptyCounts = (): Record<string, number> =>
-	Object.fromEntries(PRACTICE_AUTONOMY_ORDER.map((autonomy) => [autonomy, 0]));
+const emptyCounts = (): Record<PracticeAutonomy, number> => ({
+	OFF: 0,
+	HUMAN_APPROVAL: 0,
+	AUTOMATIC: 0,
+});
 
 function assignment(
 	override: PracticeAutonomy | undefined,

@@ -29,7 +29,7 @@ describe("safeReturnTo", () => {
 			["javascript scheme", "javascript:alert(1)"],
 			["data scheme", "data:text/html,evil"],
 		])("%s -> /", (_label, input) => {
-			expect(safeReturnTo(input as string | undefined)).toBe("/");
+			expect(safeReturnTo(input)).toBe("/");
 		});
 
 		it("rejects embedded control characters (NUL, newline, tab, CR, DEL)", () => {

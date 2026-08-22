@@ -159,7 +159,7 @@ function AdminLlmConnectionFormDialogContent({
 		);
 	};
 
-	const handleSubmit = (event: React.FormEvent) => {
+	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const found = validateConnectionFields(fields, isEdit);
 		setErrors(found);

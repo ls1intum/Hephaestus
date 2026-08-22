@@ -1,18 +1,16 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import { mockPullRequestWorkType } from "@/mocks/fixtures/practice";
 import { Stateful } from "@/stories/stateful";
 import { PracticeMentoringSupportEditor } from "./PracticeMentoringSupportEditor";
-
-const pullRequests = mockPracticeDefinitionOptions.workTypes[0];
 
 const meta = {
 	title: "Workspace admin/Practices/AI mentoring",
 	component: PracticeMentoringSupportEditor,
 	args: {
-		value: pullRequests.recommendedPolicy,
-		recommended: pullRequests.recommendedPolicy,
-		supportedAutomatedReviewModes: pullRequests.supportedAutomatedReviewModes,
+		value: mockPullRequestWorkType.recommendedPolicy,
+		recommended: mockPullRequestWorkType.recommendedPolicy,
+		supportedAutomatedReviewModes: mockPullRequestWorkType.supportedAutomatedReviewModes,
 		onChange: fn(),
 	},
 	parameters: { layout: "padded" },
@@ -41,7 +39,7 @@ export const AiSupported: Story = {};
 export const HumanReviewReasonIsNotALimitation: Story = {
 	args: {
 		value: {
-			...pullRequests.recommendedPolicy,
+			...mockPullRequestWorkType.recommendedPolicy,
 			automatedReview: {
 				mode: "LANGUAGE_MODEL",
 				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",
@@ -68,7 +66,7 @@ export const HumanReviewReasonIsNotALimitation: Story = {
 export const GuidanceOnly: Story = {
 	args: {
 		value: {
-			...pullRequests.recommendedPolicy,
+			...mockPullRequestWorkType.recommendedPolicy,
 			automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
 			knownLimitations: [],
 		},
@@ -89,7 +87,7 @@ export const AiReviewUnavailable: Story = {
 export const Invalid: Story = {
 	args: {
 		value: {
-			...pullRequests.recommendedPolicy,
+			...mockPullRequestWorkType.recommendedPolicy,
 			automatedReview: {
 				mode: "LANGUAGE_MODEL",
 				evidenceSufficiency: "DECLARED_EVIDENCE_INSUFFICIENT",

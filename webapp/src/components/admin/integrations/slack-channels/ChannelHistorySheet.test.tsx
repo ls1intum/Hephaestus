@@ -27,10 +27,19 @@ const channel: SlackMonitoredChannel = {
 describe("ChannelHistorySheet — failed load offers a retry", () => {
 	it("shows a Retry button that re-issues the request after a failed load", async () => {
 		let requestCount = 0;
+		const CONSENT_EVENTS = "*/slack/channels/:slackChannelId/consent-events";
 		server.use(
-			http.get("*/slack/channels/:slackChannelId/consent-events", () => {
+			http.get(
+				CONSENT_EVENTS,
+				() => {
+					requestCount += 1;
+					return new HttpResponse(null, { status: 500 });
+				},
+				{ once: true },
+			),
+			http.get(CONSENT_EVENTS, () => {
 				requestCount += 1;
-				return requestCount === 1 ? new HttpResponse(null, { status: 500 }) : HttpResponse.json([]);
+				return HttpResponse.json([]);
 			}),
 		);
 
@@ -38,7 +47,7 @@ describe("ChannelHistorySheet — failed load offers a retry", () => {
 			<ChannelHistorySheet workspaceSlug="demo" channel={channel} onOpenChange={vi.fn()} />,
 		);
 
-		expect(await screen.findByText(/could not load the consent history/i)).toBeTruthy();
+		await screen.findByText(/could not load the consent history/i);
 		const retry = screen.getByRole("button", { name: /^retry$/i });
 
 		fireEvent.click(retry);

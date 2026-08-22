@@ -75,7 +75,9 @@ const CITATION_BY_KIND: Record<string, { path: string; quote: string }> = {
 };
 
 function citation(sourceKind: string, overrides: Partial<EvidenceCitation> = {}): EvidenceCitation {
-	const { path, quote } = CITATION_BY_KIND[sourceKind];
+	const sample = CITATION_BY_KIND[sourceKind];
+	if (!sample) throw new Error(`No sample passage is written for evidence source ${sourceKind}`);
+	const { path, quote } = sample;
 	const isDiff = sourceKind === "scm.pull-request.diff";
 	return {
 		sourceKind,
@@ -141,7 +143,7 @@ export const EverySource: Story = {
 	play: async ({ canvas }) => {
 		// Compared whole rather than one `getByRole` per label, so a kind that arrives without words
 		// fails as an id this table does not list rather than going unasserted.
-		expect(
+		await expect(
 			canvas
 				.getAllByRole("heading", { level: 4 })
 				.map((heading) => heading.textContent)

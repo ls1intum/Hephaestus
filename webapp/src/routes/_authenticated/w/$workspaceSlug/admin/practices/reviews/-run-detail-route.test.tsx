@@ -1,7 +1,7 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, assert, beforeEach, describe, expect, it, vi } from "vitest";
 import { reviewJob } from "@/components/admin/practice-reviews/story-mock-data";
 import { reviewHandlers } from "@/components/admin/practice-reviews/story-mock-server";
 import { server } from "@/mocks/server";
@@ -89,7 +89,9 @@ describe("review detail route", () => {
 		await userEvent.click(trigger);
 		// The dialog's confirm carries the same words as the trigger that opened it.
 		const buttons = await screen.findAllByRole("button", { name: "Cancel review" });
-		await userEvent.click(buttons[buttons.length - 1]);
+		const confirm = buttons.at(-1);
+		assert(confirm);
+		await userEvent.click(confirm);
 
 		await screen.findByText("Cancelled", {}, ROUTE_RENDER_WAIT);
 		expect(

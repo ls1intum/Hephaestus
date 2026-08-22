@@ -50,25 +50,29 @@ export const FullPagePreview: Story = {
 	render: () => {
 		const Demo = () => {
 			const [visible, setVisible] = useState(false);
-			const shouldShow = useSurveyNotificationStore((s) => s.shouldShowSurvey);
 			const pending = useSurveyNotificationStore((s) => s.pendingSurvey);
 			const setPending = useSurveyNotificationStore((s) => s.setPendingSurvey);
 			const clear = useSurveyNotificationStore((s) => s.clearPendingSurvey);
-			const clearSignal = useSurveyNotificationStore((s) => s.clearShowSignal);
 
 			useEffect(() => {
-				if (!pending) {
-					const t = setTimeout(() => setVisible(true), 400);
-					return () => clearTimeout(t);
-				}
+				if (pending) return;
+				const t = setTimeout(() => setVisible(true), 400);
+				return () => clearTimeout(t);
 			}, [pending]);
 
 			useEffect(() => {
-				if (shouldShow) {
-					clearSignal();
+				const consumeShowSignal = () => {
+					const { shouldShowSurvey, clearShowSignal } = useSurveyNotificationStore.getState();
+					if (!shouldShowSurvey) {
+						return;
+					}
+					clearShowSignal();
 					setVisible(true);
-				}
-			}, [shouldShow, clearSignal]);
+				};
+
+				consumeShowSignal();
+				return useSurveyNotificationStore.subscribe(consumeShowSignal);
+			}, []);
 
 			return (
 				<div className="min-h-screen bg-background">

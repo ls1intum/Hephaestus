@@ -1,9 +1,9 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import type { Practice, PracticeBinding } from "@/api/types.gen";
 import {
 	chosenAutonomy,
 	inheritedAutonomy,
-	mockPractices,
+	mockPractice,
 } from "@/components/admin/practices/story-mock-data";
 import {
 	applyDisplayOrder,
@@ -14,9 +14,14 @@ import {
 	unassignPractices,
 } from "./practice-catalog-cache";
 
+/** A second edit landing on one row, which a structural rollback must leave alone. */
+function withAutonomy(practices: Practice[], slug: string, autonomy: Practice["autonomy"]) {
+	return practices.map((item) => (item.slug === slug ? { ...item, autonomy } : item));
+}
+
 function practice(slug: string, areaSlug: string | undefined, displayOrder: number): Practice {
 	return {
-		...mockPractices[0],
+		...mockPractice,
 		id: displayOrder + 1,
 		name: slug,
 		slug,
@@ -35,7 +40,7 @@ describe("practice catalog cache updates", () => {
 
 		const result = applyDisplayOrder(practices, ["second", "first"]);
 
-		expect(result.map(({ slug, displayOrder }) => [slug, displayOrder])).toEqual([
+		expect(result.map(({ slug, displayOrder }) => [slug, displayOrder])).toStrictEqual([
 			["first", 1],
 			["second", 0],
 			["elsewhere", 0],
@@ -58,7 +63,7 @@ describe("practice catalog cache updates", () => {
 				.filter(({ areaSlug }) => areaSlug === "quality")
 				.sort((a, b) => a.displayOrder - b.displayOrder)
 				.map(({ slug, displayOrder }) => [slug, displayOrder]),
-		).toEqual([
+		).toStrictEqual([
 			["first", 0],
 			["last", 1],
 		]);
@@ -67,7 +72,7 @@ describe("practice catalog cache updates", () => {
 				.filter(({ areaSlug }) => areaSlug === "delivery")
 				.sort((a, b) => a.displayOrder - b.displayOrder)
 				.map(({ slug, displayOrder }) => [slug, displayOrder]),
-		).toEqual([
+		).toStrictEqual([
 			["before", 0],
 			["moving", 1],
 			["after", 2],
@@ -86,7 +91,7 @@ describe("practice catalog cache updates", () => {
 
 		expect(
 			result.map(({ slug, areaSlug, displayOrder }) => [slug, areaSlug, displayOrder]),
-		).toEqual([
+		).toStrictEqual([
 			["existing", undefined, 0],
 			["first", undefined, 1],
 			["second", undefined, 2],
@@ -100,8 +105,10 @@ describe("practice catalog cache updates", () => {
 			practice("remaining", "quality", 1),
 		];
 		const snapshot = practicePlacementSnapshot(practices, "moving", null);
-		const moved = placePractice(practices, "moving", null, 0).map((item) =>
-			item.slug === "moving" ? { ...item, autonomy: chosenAutonomy("OFF") } : item,
+		const moved = withAutonomy(
+			placePractice(practices, "moving", null, 0),
+			"moving",
+			chosenAutonomy("OFF"),
 		);
 
 		const restored = applyPracticePlacements(moved, snapshot);
@@ -121,27 +128,29 @@ describe("practice catalog cache updates", () => {
 			name: "Updated",
 		};
 
-		expect(selectPracticePatch(updated, { name: "Updated" })).toEqual({ name: "Updated" });
+		expect(selectPracticePatch(updated, { name: "Updated" })).toStrictEqual({ name: "Updated" });
 		expect(
 			selectPracticePatch(updated, {
 				area: { areaSlug: "delivery" },
 			}),
-		).toEqual({ areaSlug: "delivery", displayOrder: 4 });
+		).toStrictEqual({ areaSlug: "delivery", displayOrder: 4 });
 		expect(
 			selectPracticePatch({ ...updated, whyItMatters: undefined }, { clear: ["WHY_IT_MATTERS"] }),
-		).toEqual({ whyItMatters: undefined });
+		).toStrictEqual({ whyItMatters: undefined });
 		expect(
 			selectPracticePatch(updated, {
 				automatedReviewPolicy: updated.automatedReviewPolicy,
 			}),
-		).toEqual({
+		).toStrictEqual({
 			automatedReviewPolicy: updated.automatedReviewPolicy,
 			automatedReviewValidation: updated.automatedReviewValidation,
 		});
 		// Replacing the occasion can move the practice to a different kind of work, and with it to that
 		// kind's recommended review settings — so the optimistic patch carries those too.
-		const occasion: [PracticeBinding] = [updated.bindings[0]];
-		expect(selectPracticePatch(updated, { bindings: occasion })).toEqual({
+		const [replacement] = updated.bindings;
+		assert(replacement);
+		const occasion: [PracticeBinding] = [replacement];
+		expect(selectPracticePatch(updated, { bindings: occasion })).toStrictEqual({
 			bindings: occasion,
 			artifactKind: updated.artifactKind,
 			automatedReviewPolicy: updated.automatedReviewPolicy,

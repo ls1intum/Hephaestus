@@ -21,6 +21,6 @@ function TeamsContainer() {
 	}
 
 	return (
-		<TeamsPage teams={teamsQuery.data || []} isLoading={teamsQuery.isLoading || !workspaceSlug} />
+		<TeamsPage teams={teamsQuery.data ?? []} isLoading={teamsQuery.isLoading || !workspaceSlug} />
 	);
 }

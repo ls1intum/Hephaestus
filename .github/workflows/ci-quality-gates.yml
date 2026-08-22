@@ -160,14 +160,14 @@ jobs:
           cd webapp
 
           ISSUES_FOUND=()
-          BIOME_OK=true
+          LINT_OK=true
           TYPES_OK=true
           # The webapp-scoped tree gates run here as well as in the pre-push hook, because a hook is
           # skippable and a merge is not. check:env stays out: it reads server files this leg omits.
           COMPONENTS_OK=true
           STORIES_OK=true
 
-          pnpm run check || { BIOME_OK=false; ISSUES_FOUND+=("Biome checks failed. Run: cd webapp && pnpm run check -- --write"); }
+          pnpm run check || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed. Run: cd webapp && pnpm run check:fix"); }
           pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
           node ../scripts/check-presentational-components.mjs || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
           node ../scripts/check-story-prose.mjs || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
@@ -176,7 +176,7 @@ jobs:
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
-            [[ "$BIOME_OK" == "false" ]] && echo "| Biome (lint + format) | :x: Failed | \`cd webapp && pnpm run check -- --write\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (oxlint + Biome) | :x: Failed | \`cd webapp && pnpm run check:fix\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`pnpm run check:components\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`pnpm run check:stories\` |" >> $GITHUB_STEP_SUMMARY

@@ -4,6 +4,10 @@ import { z } from "zod";
  * The ids are in the URL, so they are part of the contract with anyone's bookmarks and with the
  * redirects that point here. Renaming one is a breaking change to a link.
  */
+const REVIEW_SECTION_IDS = ["how-much", "when-and-where", "past-work"] as const;
+
+export type ReviewSectionId = (typeof REVIEW_SECTION_IDS)[number];
+
 export const REVIEW_SECTIONS = [
 	{
 		id: "how-much",
@@ -22,9 +26,7 @@ export const REVIEW_SECTIONS = [
 		description:
 			"Catch up on work that was already there before reviews were switched on. You get an estimate first, then decide whether to run it.",
 	},
-] as const;
-
-export type ReviewSectionId = (typeof REVIEW_SECTIONS)[number]["id"];
+] as const satisfies readonly { id: ReviewSectionId; label: string; description: string }[];
 
 export const DEFAULT_REVIEW_SECTION: ReviewSectionId = "how-much";
 
@@ -33,10 +35,7 @@ export const DEFAULT_REVIEW_SECTION: ReviewSectionId = "how-much";
  * open the page, not a router error.
  */
 export const reviewSearchSchema = z.object({
-	section: z
-		.enum(REVIEW_SECTIONS.map((section) => section.id) as [ReviewSectionId, ...ReviewSectionId[]])
-		.optional()
-		.catch(undefined),
+	section: z.enum(REVIEW_SECTION_IDS).optional().catch(undefined),
 	overrides: z.boolean().optional().catch(undefined),
 });
 

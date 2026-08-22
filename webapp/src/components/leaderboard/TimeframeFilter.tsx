@@ -81,22 +81,20 @@ export function TimeframeFilter({
 	openEndedPresets = false,
 	enableAllActivityOption = false,
 }: TimeframeFilterProps) {
-	// Convert the leaderboardSchedule prop to the LeaderboardSchedule type
-	const schedule: LeaderboardSchedule = leaderboardSchedule
-		? {
-				day: leaderboardSchedule.day,
-				hour: leaderboardSchedule.hour,
-				minute: leaderboardSchedule.minute,
-			}
-		: DEFAULT_SCHEDULE;
-
-	// Track whether the user has manually selected a timeframe
-	const [userInteracted, setUserInteracted] = useState(false);
-
-	// Initial preset - captured on first render only via initializer
-	const [selectedPreset, setSelectedPreset] = useState<TimeframePreset>(() =>
-		detectPresetFromDates(initialAfterDate, initialBeforeDate, schedule, enableAllActivityOption),
+	// Callers pass an inline object, so the memo keys on the fields rather than on the caller's render.
+	const scheduleDay = leaderboardSchedule?.day ?? DEFAULT_SCHEDULE.day;
+	const scheduleHour = leaderboardSchedule?.hour ?? DEFAULT_SCHEDULE.hour;
+	const scheduleMinute = leaderboardSchedule?.minute ?? DEFAULT_SCHEDULE.minute;
+	const schedule = useMemo<LeaderboardSchedule>(
+		() => ({ day: scheduleDay, hour: scheduleHour, minute: scheduleMinute }),
+		[scheduleDay, scheduleHour, scheduleMinute],
 	);
+
+	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
+
+	const selectedPreset =
+		chosenPreset ??
+		detectPresetFromDates(initialAfterDate, initialBeforeDate, schedule, enableAllActivityOption);
 
 	const [customRange, setCustomRange] = useState<DateRange | undefined>(() => {
 		if (selectedPreset === "custom" && initialAfterDate) {
@@ -109,8 +107,8 @@ export function TimeframeFilter({
 
 	const lastEmittedRef = useRef<{ after: string; before?: string } | null>(null);
 
-	const items = useMemo(() => {
-		const baseItems = [
+	const items = useMemo<{ value: TimeframePreset; label: string }[]>(() => {
+		const baseItems: { value: TimeframePreset; label: string }[] = [
 			{ value: "this-week", label: formatDropdownLabel("this-week") },
 			{ value: "last-week", label: formatDropdownLabel("last-week") },
 			{ value: "this-month", label: formatDropdownLabel("this-month") },
@@ -122,27 +120,6 @@ export function TimeframeFilter({
 		}
 		return baseItems;
 	}, [enableAllActivityOption]);
-
-	// Sync preset from external date changes (when user hasn't interacted yet)
-	useEffect(() => {
-		if (userInteracted) return;
-		const detected = detectPresetFromDates(
-			initialAfterDate,
-			initialBeforeDate,
-			schedule,
-			enableAllActivityOption,
-		);
-		if (detected !== selectedPreset) {
-			setSelectedPreset(detected);
-		}
-	}, [
-		initialAfterDate,
-		initialBeforeDate,
-		schedule,
-		enableAllActivityOption,
-		userInteracted,
-		selectedPreset,
-	]);
 
 	// Emit changes when preset or custom range changes
 	useEffect(() => {
@@ -185,7 +162,7 @@ export function TimeframeFilter({
 
 		if (
 			lastEmittedRef.current?.after === range.after &&
-			lastEmittedRef.current?.before === range.before
+			lastEmittedRef.current.before === range.before
 		) {
 			return;
 		}
@@ -194,10 +171,8 @@ export function TimeframeFilter({
 		onTimeframeChange(range.after, range.before, selectedPreset);
 	}, [selectedPreset, customRange, schedule, onTimeframeChange, openEndedPresets]);
 
-	const handlePresetChange = (value: string) => {
-		const preset = value as TimeframePreset;
-		setUserInteracted(true);
-		setSelectedPreset(preset);
+	const handlePresetChange = (preset: TimeframePreset) => {
+		setChosenPreset(preset);
 
 		if (preset === "custom" && !customRange?.from) {
 			const now = new Date();
@@ -221,7 +196,7 @@ export function TimeframeFilter({
 
 	const handleCustomRangeChange = (range: DateRange | undefined) => {
 		if (range) {
-			setUserInteracted(true);
+			setChosenPreset("custom");
 			setCustomRange(range);
 		}
 	};
@@ -247,7 +222,9 @@ export function TimeframeFilter({
 
 	return (
 		<div className="space-y-1.5">
-			<Label htmlFor="timeframe">Timeframe</Label>
+			<Label id="timeframe-label" htmlFor="timeframe">
+				Timeframe
+			</Label>
 			<Select
 				value={selectedPreset}
 				onValueChange={(value) => value && handlePresetChange(value)}
@@ -256,7 +233,7 @@ export function TimeframeFilter({
 				<SelectTrigger id="timeframe" className="w-full">
 					<SelectValue placeholder="Select timeframe" />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-labelledby="timeframe-label">
 					{enableAllActivityOption && (
 						<SelectItem value="all-activity">
 							<PresetIcon preset="all-activity" />

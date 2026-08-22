@@ -30,19 +30,30 @@ function userPayload(expiresInSec: number) {
 	};
 }
 
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number) =>
+	new Promise((resolve) => {
+		setTimeout(resolve, ms);
+	});
 
 describe("useSessionKeepAlive", () => {
 	it("proactively rotates the access cookie before it expires while the user is active", async () => {
 		let userCalls = 0;
 		let refreshCalls = 0;
+		// First load: expiry ~61s out → renewal due in ~1s. After the first rotation the refetched
+		// /user reports a far-future expiry, so the scheduler settles and the test sees exactly one
+		// proactive refresh (proving it renews early — and doesn't storm).
 		server.use(
+			http.get(
+				"*/user",
+				() => {
+					userCalls += 1;
+					return HttpResponse.json(userPayload(61));
+				},
+				{ once: true },
+			),
 			http.get("*/user", () => {
 				userCalls += 1;
-				// First load: expiry ~61s out → renewal due in ~1s. After the first rotation the refetched
-				// /user reports a far-future expiry, so the scheduler settles and the test sees exactly one
-				// proactive refresh (proving it renews early — and doesn't storm).
-				return HttpResponse.json(userPayload(userCalls <= 1 ? 61 : 3600));
+				return HttpResponse.json(userPayload(3600));
 			}),
 			http.post("*/auth/refresh", () => {
 				refreshCalls += 1;

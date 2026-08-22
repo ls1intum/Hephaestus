@@ -10,8 +10,10 @@ import {
 	retryAgentJobDeliveryMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { AgentJob, ReviewFeedback, ReviewObservation } from "@/api/types.gen";
-import type { ReviewSectionState } from "@/components/admin/practice-reviews/ReviewOutputSections";
-import { REVIEW_PREVIEW_SIZE } from "@/components/admin/practice-reviews/ReviewOutputSections";
+import {
+	REVIEW_PREVIEW_SIZE,
+	type ReviewSectionState,
+} from "@/components/admin/practice-reviews/ReviewOutputSections";
 import { ACTIVE_REVIEW_POLL_MS } from "@/components/admin/practice-reviews/review-search";
 import { problemDetailOf } from "@/lib/problem-detail";
 
@@ -96,7 +98,7 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	 */
 	const updateJob = (job: AgentJob) => {
 		queryClient.setQueryData(getAgentJobQueryKey({ path: { workspaceSlug, jobId } }), job);
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: listPracticeReviewsQueryKey({ path: { workspaceSlug } }),
 		});
 	};

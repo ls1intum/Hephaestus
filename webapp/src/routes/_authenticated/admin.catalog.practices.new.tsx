@@ -32,7 +32,7 @@ function NewCuratedPracticePage() {
 		onSuccess: () => {
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 			toast.success("Practice created");
-			navigate({ to: "/admin/catalog" });
+			void navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) =>
 			toast.error("Couldn't create the practice", { description: problemDetailOf(error) }),
@@ -54,8 +54,8 @@ function NewCuratedPracticePage() {
 					error={catalogQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load the practice editor"
 					onRetry={() => {
-						catalogQuery.refetch();
-						definitionOptionsQuery.refetch();
+						void catalogQuery.refetch();
+						void definitionOptionsQuery.refetch();
 					}}
 				/>
 			</PageLayout>

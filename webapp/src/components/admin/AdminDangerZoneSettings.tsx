@@ -38,8 +38,8 @@ export function AdminDangerZoneSettings({ workspaceSlug }: AdminDangerZoneSettin
 			queryClient.setQueryData(listWorkspacesQueryKey(), (workspaces?: ListWorkspacesResponse) =>
 				workspaces?.filter((workspace) => workspace.workspaceSlug !== workspaceSlug),
 			);
-			navigate({ to: "/", replace: true });
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
+			void navigate({ to: "/", replace: true });
+			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 		},
 		onError: (e) => toast.error("Failed to delete workspace", { description: problemDetailOf(e) }),
 	});
@@ -95,7 +95,7 @@ export function AdminDangerZoneSettings({ workspaceSlug }: AdminDangerZoneSettin
 								variant="outline"
 								className="w-full shrink-0 sm:mt-1 sm:w-auto"
 								disabled={isRoleFetching}
-								onClick={() => refetchRole()}
+								onClick={() => void refetchRole()}
 							>
 								{isRoleFetching && <Spinner aria-hidden />}
 								{isRoleFetching ? "Retrying…" : "Retry"}

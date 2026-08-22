@@ -1,5 +1,5 @@
 import type { FxRateInfo } from "@/api/types.gen";
-import { asDate } from "@/lib/dates";
+import { asDate, type DateLike } from "@/lib/dates";
 
 /**
  * Display-only conversion for the AI-usage surfaces. USD stays authoritative — spend is metered,
@@ -15,7 +15,8 @@ const SPEND_DIGITS = 2;
 const CAP_DIGITS = 0;
 const RATE_DIGITS = 3;
 
-export type Fx = FxRateInfo | null | undefined;
+/** `source` is wider than the generated literal: a newer server can name a publisher this build has never heard of. */
+export type Fx = (Omit<FxRateInfo, "source"> & { source: string }) | null | undefined;
 
 type CurrencyDisplay = "symbol" | "code" | "name";
 
@@ -128,7 +129,7 @@ export function spendOfCapConversion(
 	};
 }
 
-function formatRateDate(value: FxRateInfo["rateDate"]): string {
+function formatRateDate(value: DateLike): string {
 	const date = asDate(value);
 	if (!date) return "–";
 	return date.toLocaleDateString(undefined, {
@@ -139,13 +140,13 @@ function formatRateDate(value: FxRateInfo["rateDate"]): string {
 	});
 }
 
-const SOURCE_NAMES: Record<FxRateInfo["source"], string> = {
+const SOURCE_NAMES: Record<string, string | undefined> = {
 	ECB: "European Central Bank",
-};
+} satisfies Record<FxRateInfo["source"], string>;
 
 /** A newer server can send a source this spec does not know; unattributed beats the wrong bank. */
-function publisherOf(source: FxRateInfo["source"]): string | undefined {
-	return (SOURCE_NAMES as Record<string, string | undefined>)[source];
+function publisherOf(source: string): string | undefined {
+	return SOURCE_NAMES[source];
 }
 
 interface DisclosureParts {

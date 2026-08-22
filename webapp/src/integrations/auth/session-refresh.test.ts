@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { refresh } from "@/api/sdk.gen";
 import { refreshAccessToken } from "./session-refresh";
 
 vi.mock("@/api/sdk.gen", () => ({ refresh: vi.fn() }));
 
-const refreshMock = refresh as unknown as Mock;
+const refreshMock = vi.mocked(refresh);
+
+/** A rotation the server accepted — the generated client reports failure via `error`, not by throwing. */
+const rotated = { data: undefined, error: undefined };
 
 describe("refreshAccessToken", () => {
 	beforeEach(() => {
@@ -12,10 +15,10 @@ describe("refreshAccessToken", () => {
 	});
 
 	it("collapses callers that overlap a rotation onto one POST /auth/refresh", async () => {
-		let settle: ((value: { error?: unknown }) => void) | undefined;
+		let settle: (() => void) | undefined;
 		refreshMock.mockReturnValue(
-			new Promise((resolve) => {
-				settle = resolve;
+			new Promise<typeof rotated>((resolve) => {
+				settle = () => resolve(rotated);
 			}),
 		);
 
@@ -24,14 +27,14 @@ describe("refreshAccessToken", () => {
 			refreshAccessToken(),
 			refreshAccessToken(),
 		]);
-		settle?.({ error: undefined });
+		settle?.();
 
-		expect(await overlapping).toEqual([true, true, true]);
+		expect(await overlapping).toStrictEqual([true, true, true]);
 		expect(refreshMock).toHaveBeenCalledTimes(1);
 	});
 
 	it("rotates again once the previous rotation has settled", async () => {
-		refreshMock.mockResolvedValue({ error: undefined });
+		refreshMock.mockResolvedValue(rotated);
 
 		await refreshAccessToken();
 		await refreshAccessToken();

@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { ProviderType } from "../provider-terms";
-import { getProviderSlug, getProviderTerms } from "../provider-terms";
+import { getProviderSlug, getProviderTerms, type ProviderType } from "../provider-terms";
 
 describe("getProviderTerms", () => {
 	it("returns GitHub terminology", () => {
@@ -29,10 +28,9 @@ describe("getProviderTerms", () => {
 
 	it("GitHub and GitLab terms differ for all keys", () => {
 		const github = getProviderTerms("GITHUB");
-		const gitlab = getProviderTerms("GITLAB");
-		for (const key of Object.keys(github) as (keyof typeof github)[]) {
-			expect(github[key]).not.toBe(gitlab[key]);
-		}
+		const gitlab = new Map(Object.entries(getProviderTerms("GITLAB")));
+		const shared = Object.entries(github).filter(([term, wording]) => gitlab.get(term) === wording);
+		expect(shared).toStrictEqual([]);
 	});
 
 	it("covers all provider types", () => {

@@ -27,6 +27,7 @@ import type { SlackPreferencesSectionProps } from "@/components/settings/SlackPr
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { analyticsConfigured } from "@/integrations/consent";
 import { problemDetailOf } from "@/lib/problem-detail";
+import { hasText } from "@/lib/text";
 
 export const Route = createFileRoute("/_authenticated/settings")({
 	component: RouteComponent,
@@ -67,9 +68,7 @@ function RouteComponent() {
 				queryKey: userSettingsQueryKey,
 			});
 			const previousSettings = queryClient.getQueryData<UserSettings>(userSettingsQueryKey);
-			if (variables.body) {
-				queryClient.setQueryData(userSettingsQueryKey, variables.body);
-			}
+			queryClient.setQueryData(userSettingsQueryKey, variables.body);
 			return { previousSettings };
 		},
 		onError: (error, _variables, context) => {
@@ -83,7 +82,7 @@ function RouteComponent() {
 			queryClient.setQueryData(userSettingsQueryKey, data);
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: userSettingsQueryKey,
 			});
 		},
@@ -115,9 +114,9 @@ function RouteComponent() {
 	const unlinkMutation = useMutation({
 		...unlinkIdentityMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: listLinkedIdentitiesQueryKey({}) });
+			void queryClient.invalidateQueries({ queryKey: listLinkedIdentitiesQueryKey({}) });
 			// The primary identity (avatar, username) the app shows may have been the one removed.
-			queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
 			toast.success("Account disconnected.");
 		},
 		onError: (error: DefaultError) => {
@@ -145,7 +144,7 @@ function RouteComponent() {
 						: [...workspaces, updatedWorkspace],
 				};
 			});
-			queryClient.invalidateQueries({ queryKey: slackPreferencesQueryKey });
+			void queryClient.invalidateQueries({ queryKey: slackPreferencesQueryKey });
 			toast.success(
 				updatedWorkspace.channelMessagesAllowed
 					? "Slack channel-message use is on."
@@ -170,13 +169,13 @@ function RouteComponent() {
 				unlinkMutation.mutate({ path: { id } });
 			}
 		},
-		unlinkingId: unlinkMutation.isPending ? (unlinkMutation.variables?.path?.id ?? null) : null,
+		unlinkingId: unlinkMutation.isPending ? unlinkMutation.variables.path.id : null,
 		isLoading: linkedIdentitiesQuery.isLoading || identityProvidersQuery.isLoading,
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 		error: linkedIdentitiesQuery.error ?? identityProvidersQuery.error,
 		onRetry: () => {
-			linkedIdentitiesQuery.refetch();
-			identityProvidersQuery.refetch();
+			void linkedIdentitiesQuery.refetch();
+			void identityProvidersQuery.refetch();
 		},
 	};
 
@@ -186,7 +185,7 @@ function RouteComponent() {
 	const slackIdentity = linkedIdentitiesQuery.data?.find(
 		(identity) => identity.providerType?.toUpperCase() === "SLACK",
 	);
-	const slackAvailable = Boolean(slackProvider?.registrationId || slackIdentity);
+	const slackAvailable = hasText(slackProvider?.registrationId) || slackIdentity !== undefined;
 
 	const slackPreferencesQuery = useQuery({
 		...getSlackUserPreferencesOptions({}),
@@ -210,7 +209,7 @@ function RouteComponent() {
 			});
 		},
 		updatingWorkspaceSlug: updateSlackPreferencesMutation.isPending
-			? (updateSlackPreferencesMutation.variables?.path.workspaceSlug ?? null)
+			? updateSlackPreferencesMutation.variables.path.workspaceSlug
 			: null,
 		isLoading:
 			linkedIdentitiesQuery.isLoading ||
@@ -218,14 +217,14 @@ function RouteComponent() {
 			(slackAvailable && slackPreferencesQuery.isLoading),
 		isError: slackAvailable && slackPreferencesQuery.isError,
 		error: slackPreferencesQuery.error,
-		onRetry: () => slackPreferencesQuery.refetch(),
+		onRetry: () => void slackPreferencesQuery.refetch(),
 	};
 
 	return (
 		<SettingsPage
 			isLoading={isLoading}
 			settingsError={settingsError}
-			onRetrySettings={() => refetchSettings()}
+			onRetrySettings={() => void refetchSettings()}
 			practiceFeedbackProps={{
 				practiceFeedbackDeliveryEnabled: settings?.practiceFeedbackDeliveryEnabled ?? true,
 				onTogglePracticeFeedback: handlePracticeFeedbackToggle,

@@ -9,13 +9,11 @@ let inFlight: Promise<boolean> | null = null;
  * Resolves to whether the session is now valid. Never throws.
  */
 export function refreshAccessToken(): Promise<boolean> {
-	if (!inFlight) {
-		inFlight = refresh()
-			.then(({ error }) => !error)
-			.catch(() => false)
-			.finally(() => {
-				inFlight = null;
-			});
-	}
+	inFlight ??= refresh()
+		.then(({ error }) => !error)
+		.catch(() => false)
+		.finally(() => {
+			inFlight = null;
+		});
 	return inFlight;
 }

@@ -41,10 +41,10 @@ export function AchievementsView({
 	useAchievementNotifications(isOwnProfile ? uiAchievements : []);
 
 	const user = {
-		name: profileQuery.data?.userInfo?.name ?? fallbackName ?? targetUsername,
-		avatarUrl: profileQuery.data?.userInfo?.avatarUrl ?? fallbackAvatarUrl ?? "",
-		level: profileQuery.data?.xpRecord?.currentLevel ?? 1,
-		leaguePoints: profileQuery.data?.userInfo?.leaguePoints ?? 0,
+		name: profileQuery.data?.userInfo.name ?? fallbackName ?? targetUsername,
+		avatarUrl: profileQuery.data?.userInfo.avatarUrl ?? fallbackAvatarUrl ?? "",
+		level: profileQuery.data?.xpRecord.currentLevel ?? 1,
+		leaguePoints: profileQuery.data?.userInfo.leaguePoints ?? 0,
 	};
 
 	return (

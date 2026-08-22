@@ -4,6 +4,9 @@ import { expectNoPageOverflow } from "@/test/reflow";
 import { FeedbackResults } from "./FeedbackResults";
 import { reviewFeedback } from "./story-mock-data";
 
+const [firstFeedback] = reviewFeedback;
+if (!firstFeedback) throw new Error("The review fixtures must contain a piece of feedback");
+
 /** Storybook resets a spy that appears in `args` between runs, so one instance is enough. */
 const clearFilters = fn();
 
@@ -69,7 +72,7 @@ export const Mobile: Story = {
 		viewport: { defaultViewport: "reflow" },
 	},
 	play: async ({ canvas }) => {
-		expect(canvas.getAllByText("Withheld")).toHaveLength(4);
+		await expect(canvas.getAllByText("Withheld")).toHaveLength(4);
 		await expectNoPageOverflow();
 	},
 };
@@ -78,7 +81,7 @@ export const WithoutAPreview: Story = {
 	args: {
 		state: {
 			status: "ready",
-			feedback: [{ ...reviewFeedback[0], bodyPreview: undefined, bodyTruncated: false }],
+			feedback: [{ ...firstFeedback, bodyPreview: undefined, bodyTruncated: false }],
 		},
 	},
 	parameters: { chromatic: { viewports: [1440] } },

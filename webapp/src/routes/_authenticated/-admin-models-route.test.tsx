@@ -100,10 +100,10 @@ describe("instance AI models route", () => {
 			"true",
 		);
 		expect(
-			(screen.getByRole("button", { name: "Delete Slow provider" }) as HTMLButtonElement).disabled,
+			screen.getByRole<HTMLButtonElement>("button", { name: "Delete Slow provider" }).disabled,
 		).toBe(true);
 		expect(
-			(screen.getByRole("button", { name: "Delete Fast provider" }) as HTMLButtonElement).disabled,
+			screen.getByRole<HTMLButtonElement>("button", { name: "Delete Fast provider" }).disabled,
 		).toBe(false);
 
 		releaseSlowToggle?.();
@@ -143,7 +143,7 @@ describe("instance AI models route", () => {
 		await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
 		// The request was not cancelled, so the row stays disabled: no second save behind a dismissal.
 		expect(
-			(screen.getByRole("button", { name: "Manage access for GPT Test" }) as HTMLButtonElement)
+			screen.getByRole<HTMLButtonElement>("button", { name: "Manage access for GPT Test" })
 				.disabled,
 		).toBe(true);
 

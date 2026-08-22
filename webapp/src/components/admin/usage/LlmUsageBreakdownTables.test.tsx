@@ -1,8 +1,16 @@
 import { render, screen, within } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { describe, expect, it } from "vitest";
-import type { WorkspaceLlmUsageReport } from "@/api/types.gen";
+import type { LlmUsageByDay, WorkspaceLlmUsageReport } from "@/api/types.gen";
 import { LlmUsageByDayTable, LlmUsageByJobTypeTable } from "./LlmUsageBreakdownTables";
+
+const julyFifth: LlmUsageByDay = {
+	day: new Date("2026-07-05T00:00:00.000Z"),
+	instanceTotalCostUsd: 4.5,
+	ownProviderTotalCostUsd: 1.5,
+	unpricedEventCount: 1,
+	events: 10,
+};
 
 /**
  * Deliberately inconsistent with its own rows, which is the only way to see which number a footer is
@@ -18,13 +26,7 @@ const report: WorkspaceLlmUsageReport = {
 	ownProviderPaused: false,
 	unpricedEventCount: 3,
 	byDay: [
-		{
-			day: new Date("2026-07-05T00:00:00.000Z"),
-			instanceTotalCostUsd: 4.5,
-			ownProviderTotalCostUsd: 1.5,
-			unpricedEventCount: 1,
-			events: 10,
-		},
+		julyFifth,
 		{
 			day: new Date("2026-07-06T00:00:00.000Z"),
 			instanceTotalCostUsd: 4.5,
@@ -90,7 +92,7 @@ describe("usage breakdown totals", () => {
 	});
 
 	it("drops the footer for a single row rather than restating the line above it", () => {
-		render(<LlmUsageByDayTable report={{ ...report, byDay: [report.byDay[0]] }} />);
+		render(<LlmUsageByDayTable report={{ ...report, byDay: [julyFifth] }} />);
 
 		const table = screen.getByRole("table", { name: "AI spend by day" });
 		expect(within(table).queryByRole("row", { name: /^Total/ })).toBeNull();

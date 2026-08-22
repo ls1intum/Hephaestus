@@ -1,6 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn } from "storybook/test";
-import { mockPracticeDefinitionOptions } from "@/mocks/fixtures/practice";
+import {
+	mockConversationWorkType,
+	mockPracticeDefinitionOptions,
+	mockPullRequestWorkType,
+} from "@/mocks/fixtures/practice";
 import { withStandardPage } from "@/stories/decorators";
 import { expectNoPageOverflow } from "@/test/reflow";
 import { PracticeForm } from "./PracticeForm";
@@ -117,10 +121,10 @@ export const ValidationAndSubmit: Story = {
 							"scm.pull_request.ready",
 							"scm.pull_request.synchronized",
 						],
-						needs: mockPracticeDefinitionOptions.workTypes[0].recommendedNeeds,
+						needs: mockPullRequestWorkType.recommendedNeeds,
 					},
 				],
-				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[0].recommendedPolicy,
+				automatedReviewPolicy: mockPullRequestWorkType.recommendedPolicy,
 			},
 			null,
 		);
@@ -149,10 +153,10 @@ export const ConversationPractice: Story = {
 				bindings: [
 					{
 						signals: ["chat.conversation_thread.settled"],
-						needs: mockPracticeDefinitionOptions.workTypes[2].recommendedNeeds,
+						needs: mockConversationWorkType.recommendedNeeds,
 					},
 				],
-				automatedReviewPolicy: mockPracticeDefinitionOptions.workTypes[2].recommendedPolicy,
+				automatedReviewPolicy: mockConversationWorkType.recommendedPolicy,
 			},
 			null,
 		);

@@ -266,7 +266,9 @@ export function AdminSlackNotificationSettings({
 
 							<div className="grid grid-cols-2 gap-4">
 								<Field>
-									<FieldLabel htmlFor="slack-day">Day</FieldLabel>
+									<FieldLabel id="slack-day-label" htmlFor="slack-day">
+										Day
+									</FieldLabel>
 									<Select
 										items={DAYS}
 										value={dayInput}
@@ -278,7 +280,7 @@ export function AdminSlackNotificationSettings({
 										<SelectTrigger id="slack-day">
 											<SelectValue />
 										</SelectTrigger>
-										<SelectContent>
+										<SelectContent aria-labelledby="slack-day-label">
 											{DAYS.map((d) => (
 												<SelectItem key={d.value} value={d.value}>
 													{d.label}

@@ -58,9 +58,9 @@ describe("DangerZoneSection — account deletion", () => {
 		openDeleteDialog();
 
 		const dialog = await screen.findByRole("alertdialog");
-		const confirmButton = within(dialog).getByRole("button", {
+		const confirmButton = within(dialog).getByRole<HTMLButtonElement>("button", {
 			name: "Delete account",
-		}) as HTMLButtonElement;
+		});
 		expect(confirmButton.disabled).toBe(true);
 
 		const input = within(dialog).getByLabelText("Confirmation phrase");
@@ -77,11 +77,9 @@ describe("DangerZoneSection — account deletion", () => {
 		let sentHeader: string | null = null;
 		server.use(
 			http.delete("*/user", ({ request }) => {
+				// Captured rather than rejected with a 400, so the assertion names the value actually sent.
 				sentHeader = request.headers.get("X-Confirm-Delete");
-				// Enforce the real server contract: header must equal the account id.
-				return sentHeader === String(currentUser.id)
-					? new HttpResponse(null, { status: 204 })
-					: new HttpResponse(null, { status: 400 });
+				return new HttpResponse(null, { status: 204 });
 			}),
 		);
 
@@ -89,9 +87,9 @@ describe("DangerZoneSection — account deletion", () => {
 		openDeleteDialog();
 
 		const dialog = await screen.findByRole("alertdialog");
-		const confirmButton = within(dialog).getByRole("button", {
+		const confirmButton = within(dialog).getByRole<HTMLButtonElement>("button", {
 			name: "Delete account",
-		}) as HTMLButtonElement;
+		});
 		fireEvent.change(within(dialog).getByLabelText("Confirmation phrase"), {
 			target: { value: "  Delete My Account  " }, // trimmed + case-insensitive match
 		});

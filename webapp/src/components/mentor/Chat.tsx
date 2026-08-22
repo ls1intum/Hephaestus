@@ -56,7 +56,7 @@ export function Chat({
 	const { containerRef, endRef, isAtBottom, scrollToBottom } = useScrollToBottom();
 
 	const actualIsAtBottom = parentScrollToBottom ? parentIsAtBottom : isAtBottom;
-	const actualScrollToBottom = parentScrollToBottom || scrollToBottom;
+	const actualScrollToBottom = parentScrollToBottom ?? scrollToBottom;
 
 	return (
 		<div className={cn("relative h-full", className)}>

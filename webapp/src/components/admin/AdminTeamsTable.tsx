@@ -106,7 +106,7 @@ export function AdminTeamsTable({
 	const repoLabelCatalog = useMemo(() => {
 		const map = new Map<number, Map<number, LabelInfo>>();
 		for (const t of teams) {
-			for (const repo of t.repositories ?? []) {
+			for (const repo of t.repositories) {
 				const byId = map.get(repo.id) ?? new Map<number, LabelInfo>();
 				for (const lbl of repo.labels ?? []) {
 					byId.set(lbl.id, lbl);

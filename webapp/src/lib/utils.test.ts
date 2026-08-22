@@ -4,7 +4,7 @@ import { cn, sanitizeText } from "./utils";
 describe("utils", () => {
 	it("cn merges class names and deduplicates conflicts", () => {
 		expect(cn("p-2", "p-2", "text-sm")).toContain("p-2");
-		expect(cn("text-sm", false && "text-lg")).toContain("text-sm");
+		expect(cn("text-sm", false)).toContain("text-sm");
 	});
 
 	it("sanitizeText removes special function call marker", () => {

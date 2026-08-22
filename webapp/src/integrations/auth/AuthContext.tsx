@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { ReactNode } from "react";
-import { createContext, useContext } from "react";
+import { createContext, type ReactNode, useContext } from "react";
 import { authClient, toUserProfile, type UserProfile } from "./auth-client";
 import { isAppAdmin as computeIsAppAdmin, currentUserQueryOptions } from "./guard";
 
@@ -16,11 +15,11 @@ export interface AuthContextType {
 	/** True when the current account is an application super-admin (appRole === "APP_ADMIN"). */
 	isAppAdmin: boolean;
 	userProfile: UserProfile | undefined;
-	login: (idpHint?: string, returnTo?: string) => Promise<void>;
-	linkAccount: (providerAlias: string, returnTo?: string) => Promise<void>;
+	login: (idpHint?: string, returnTo?: string) => void;
+	linkAccount: (providerAlias: string, returnTo?: string) => void;
 	logout: () => Promise<void>;
 	hasRole: (role: string) => boolean;
-	isCurrentUser: (login?: string) => boolean;
+	isCurrentUser: (candidateLogin?: string) => boolean;
 	getUserId: () => string | undefined;
 	getGitProviderId: () => string | undefined;
 	getUserProfilePictureUrl: () => string;
@@ -74,11 +73,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 	const isAppAdmin = computeIsAppAdmin(user);
 
-	const login = async (idpHint?: string, returnTo?: string) => {
+	const login = (idpHint?: string, returnTo?: string) => {
 		authClient.login(idpHint, returnTo);
 	};
 
-	const linkAccount = async (providerAlias: string, returnTo?: string) => {
+	const linkAccount = (providerAlias: string, returnTo?: string) => {
 		// Thread `returnTo` so a link initiated from settings returns to settings (defaulting to
 		// the current page), rather than dumping the user back on `/` after the OAuth dance.
 		const destination =
@@ -92,8 +91,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
 	const hasRole = (role: string) => (user?.roles ?? []).includes(role);
 
-	const isCurrentUser = (login?: string) =>
-		!!login && !!user?.username && user.username.toLowerCase() === login.toLowerCase();
+	const isCurrentUser = (candidateLogin?: string) =>
+		!!candidateLogin &&
+		!!user?.username &&
+		user.username.toLowerCase() === candidateLogin.toLowerCase();
 
 	// Return undefined (never the string "undefined" / a value that coerces to NaN) until the
 	// user is loaded, so callers like `Number(getUserId())` get `NaN` only when there genuinely

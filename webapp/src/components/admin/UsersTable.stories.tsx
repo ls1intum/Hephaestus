@@ -4,71 +4,76 @@ import type { TeamInfo } from "@/api/types.gen";
 import type { ExtendedUserTeams } from "./types";
 import { UsersTable } from "./UsersTable";
 
-const mockTeams: TeamInfo[] = [
-	{
-		id: 1,
-		name: "Frontend Team",
-		hidden: false,
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
+const frontendTeam: TeamInfo = {
+	id: 1,
+	name: "Frontend Team",
+	hidden: false,
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+};
+
+const backendTeam: TeamInfo = {
+	id: 2,
+	name: "Backend Team",
+	hidden: false,
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+};
+
+const devopsTeam: TeamInfo = {
+	id: 3,
+	name: "DevOps Team",
+	hidden: false,
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+};
+
+const qaTeam: TeamInfo = {
+	id: 4,
+	name: "QA Team",
+	hidden: false,
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+};
+
+const mockTeams: TeamInfo[] = [frontendTeam, backendTeam, devopsTeam, qaTeam];
+
+const aliceOnTwoTeams: ExtendedUserTeams = {
+	id: 1,
+	login: "alice",
+	name: "Alice Johnson",
+	hidden: false,
+	url: "https://github.com/alice",
+	teams: [frontendTeam, devopsTeam],
+	user: {
+		id: "user-1",
+		name: "Alice Johnson",
+		login: "alice",
+		email: "alice@example.com",
 	},
-	{
-		id: 2,
-		name: "Backend Team",
-		hidden: false,
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
-	},
-	{
-		id: 3,
-		name: "DevOps Team",
-		hidden: false,
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
-	},
-	{
-		id: 4,
-		name: "QA Team",
-		hidden: false,
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
-	},
-];
+};
 
 const mockUsers: ExtendedUserTeams[] = [
-	{
-		id: 1,
-		login: "alice",
-		name: "Alice Johnson",
-		hidden: false,
-		url: "https://github.com/alice",
-		teams: [mockTeams[0], mockTeams[2]],
-		user: {
-			id: "user-1",
-			name: "Alice Johnson",
-			login: "alice",
-			email: "alice@example.com",
-		},
-	},
+	aliceOnTwoTeams,
 	{
 		id: 2,
 		login: "bob",
 		name: "Bob Smith",
 		hidden: false,
 		url: "https://github.com/bob",
-		teams: [mockTeams[1]],
+		teams: [backendTeam],
 		user: {
 			id: "user-2",
 			name: "Bob Smith",
@@ -82,7 +87,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		name: "Charlie Brown",
 		hidden: false,
 		url: "https://github.com/charlie",
-		teams: [mockTeams[0], mockTeams[1], mockTeams[3]],
+		teams: [frontendTeam, backendTeam, qaTeam],
 		user: {
 			id: "user-3",
 			name: "Charlie Brown",
@@ -110,7 +115,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		name: "Ethan Hunt",
 		hidden: false,
 		url: "https://github.com/ethan",
-		teams: [mockTeams[2], mockTeams[3]],
+		teams: [devopsTeam, qaTeam],
 		user: {
 			id: "user-5",
 			name: "Ethan Hunt",
@@ -155,7 +160,7 @@ export const EmptyState: Story = {
 
 export const SingleUser: Story = {
 	args: {
-		users: [mockUsers[0]],
+		users: [aliceOnTwoTeams],
 	},
 };
 

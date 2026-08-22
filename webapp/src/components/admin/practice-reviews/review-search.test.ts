@@ -27,7 +27,7 @@ describe("practice review search", () => {
 		// IN_APP survives now that the in-app lane has a producer and the toolbar offers the place:
 		// a filter the toolbar cannot show would be applied with nothing on screen saying so and no way
 		// to clear it short of a full reset, which is why `made-up` still goes.
-		expect(feedback.channel).toEqual(["IN_APP", "IN_CHAT"]);
+		expect(feedback.channel).toStrictEqual(["IN_APP", "IN_CHAT"]);
 		expect(feedback.from).toBeUndefined();
 		expect(feedback.page).toBeUndefined();
 		expect(findings).toMatchObject({ assessment: ["GOOD"], severity: ["MAJOR"] });

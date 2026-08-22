@@ -6,7 +6,7 @@ import { ConfigAuditDetailSheet } from "./ConfigAuditDetailSheet";
 
 const baseEntry: ConfigAuditEntryView = {
 	id: 91,
-	occurredAt: "2026-07-24T09:14:32Z" as unknown as Date,
+	occurredAt: new Date("2026-07-24T09:14:32Z"),
 	action: "UPDATED",
 	entityType: "AGENT_BINDING",
 	entityId: "PRACTICE_REVIEW",

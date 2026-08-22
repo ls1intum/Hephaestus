@@ -1,5 +1,4 @@
-import type { UseChatHelpers } from "@ai-sdk/react";
-import { useChat } from "@ai-sdk/react";
+import { type UseChatHelpers, useChat } from "@ai-sdk/react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { DefaultChatTransport } from "ai";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -25,7 +24,13 @@ interface UseMentorChatOptions {
 	onError?: (error: Error) => void;
 }
 
-interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
+/**
+ * `addToolResult` is dropped alongside the re-typed `sendMessage`: it is the AI SDK's older name for
+ * `addToolOutput`, which is forwarded, and carrying both would let a caller settle a tool call
+ * through a name the SDK is retiring.
+ */
+interface UseMentorChatReturn
+	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage" | "addToolResult"> {
 	sendMessage: (text: string) => void;
 	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;
@@ -50,22 +55,22 @@ export function useMentorChat({
 	const hasWorkspace = Boolean(workspaceSlug);
 
 	// Generate a stable chat ID for this hook lifecycle
-	const [stableThreadId] = useState(() => threadId || uuidv4());
+	const [stableThreadId] = useState(() => threadId ?? uuidv4());
 
 	// Fetch thread detail if threadId is provided; avoid immediate refetch on mount
 	const threadQueryKey = getThreadQueryKey({
-		path: { workspaceSlug: slug, threadId: threadId || "" },
+		path: { workspaceSlug: slug, threadId: threadId ?? "" },
 	});
 	const threadQuery = useQuery({
 		...getThreadOptions({
-			path: { workspaceSlug: slug, threadId: threadId || "" },
+			path: { workspaceSlug: slug, threadId: threadId ?? "" },
 		}),
 		enabled: Boolean(threadId) && hasWorkspace,
 		initialData: () =>
-			hasWorkspace
-				? (queryClient.getQueryData(threadQueryKey) as ChatThreadDetail | undefined)
-				: undefined,
-		initialDataUpdatedAt: Date.now(),
+			hasWorkspace ? queryClient.getQueryData<ChatThreadDetail>(threadQueryKey) : undefined,
+		// A function, not a call: `Date.now()` here would run on every render, and React Compiler
+		// treats an impure call during render as a bailout.
+		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
 		refetchOnWindowFocus: false,
@@ -80,10 +85,8 @@ export function useMentorChat({
 		...listThreadsOptions({ path: { workspaceSlug: slug } }),
 		enabled: hasWorkspace,
 		initialData: () =>
-			hasWorkspace
-				? (queryClient.getQueryData(threadsKey) as ChatThreadSummary[] | undefined)
-				: undefined,
-		initialDataUpdatedAt: Date.now(),
+			hasWorkspace ? queryClient.getQueryData<ChatThreadSummary[]>(threadsKey) : undefined,
+		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
 		refetchOnWindowFocus: false,
@@ -93,8 +96,25 @@ export function useMentorChat({
 	// Vote message mutation
 	const voteMessageMut = useMutation(voteMutation());
 
-	// Optimistic votes state: messageId -> isUpvoted
-	const [voteState, setVoteState] = useState<Record<string, boolean | undefined>>({});
+	// Votes cast here, kept apart from the server's record and laid over it: an entry wins while
+	// its mutation is in flight, and dropping it on failure falls straight back to the server.
+	const [castVotes, setCastVotes] = useState<Record<string, boolean>>({});
+
+	// A thread carries its own votes, so switching threads drops them. Keyed by the id the votes
+	// were cast against, which means a brand-new thread learning its id is not a switch.
+	const voteThreadId = threadId ?? stableThreadId;
+	const [votedThreadId, setVotedThreadId] = useState(voteThreadId);
+	if (votedThreadId !== voteThreadId) {
+		setVotedThreadId(voteThreadId);
+		setCastVotes({});
+	}
+
+	const voteState: Record<string, boolean | undefined> = {};
+	for (const vote of extractVotesFromThreadDetail(threadDetail)) {
+		if (vote.messageId) voteState[vote.messageId] = vote.isUpvoted;
+	}
+	Object.assign(voteState, castVotes);
+
 	const votes: ChatMessageVote[] = Object.entries(voteState)
 		.filter((entry): entry is [string, boolean] => entry[1] !== undefined)
 		.map(([messageId, isUpvoted]) => ({
@@ -130,14 +150,14 @@ export function useMentorChat({
 
 	const handleFinish = useCallback(() => {
 		if (hasWorkspace) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			});
 		}
 		if (threadId || stableThreadId) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getThreadQueryKey({
-					path: { workspaceSlug: slug, threadId: threadId || stableThreadId || "" },
+					path: { workspaceSlug: slug, threadId: threadId ?? stableThreadId },
 				}),
 			});
 		}
@@ -161,7 +181,6 @@ export function useMentorChat({
 		clearError,
 		setMessages,
 		resumeStream,
-		addToolResult,
 		addToolOutput,
 		addToolApprovalResponse,
 		id,
@@ -199,31 +218,13 @@ export function useMentorChat({
 		hydratedRef.current = threadId;
 	}, [threadId, threadDetail?.messages, status, setMessages]);
 
-	// Hydrate votes from server thread detail when available
-	const hydratedVotesRef = useRef<string | null>(null);
-	useEffect(() => {
-		if (!threadId) return; // only hydrate for existing threads
-		if (hydratedVotesRef.current === threadId) return;
-
-		// Safely extract and validate votes from thread detail
-		const serverVotes = extractVotesFromThreadDetail(threadDetail);
-		if (serverVotes.length === 0) return;
-
-		const next: Record<string, boolean | undefined> = {};
-		for (const v of serverVotes) {
-			if (v?.messageId) next[v.messageId] = v.isUpvoted ?? undefined;
-		}
-		setVoteState(next);
-		hydratedVotesRef.current = threadId;
-	}, [threadId, threadDetail]);
-
 	// Send message function
 	const sendMessage = (text: string) => {
 		if (!text.trim() || !hasWorkspace) {
 			return;
 		}
 
-		originalSendMessage({ text });
+		void originalSendMessage({ text });
 	};
 
 	// The new-thread "Hi! I'm your mentor" greeting is rendered statically by the route
@@ -237,32 +238,31 @@ export function useMentorChat({
 		if (!hasWorkspace) {
 			return;
 		}
-		const effectiveThreadId = threadId || stableThreadId;
-		if (!effectiveThreadId) {
+		if (!voteThreadId) {
 			return;
 		}
 		// Optimistically set local vote state
-		setVoteState((prev) => ({ ...prev, [messageId]: isUpvoted }));
+		setCastVotes((prev) => ({ ...prev, [messageId]: isUpvoted }));
 		voteMessageMut.mutate(
 			{
-				path: { workspaceSlug: slug, threadId: effectiveThreadId, messageId },
+				path: { workspaceSlug: slug, threadId: voteThreadId, messageId },
 				body: { isUpvoted },
 			},
 			{
 				onError: () => {
 					// Rollback optimistic update on error
-					setVoteState((prev) => {
+					setCastVotes((prev) => {
 						const next = { ...prev };
 						delete next[messageId];
 						return next;
 					});
 				},
 				onSettled: () => {
-					queryClient.invalidateQueries({
+					void queryClient.invalidateQueries({
 						queryKey: getThreadQueryKey({
 							path: {
 								workspaceSlug: slug,
-								threadId: effectiveThreadId,
+								threadId: voteThreadId,
 							},
 						}),
 					});
@@ -288,7 +288,6 @@ export function useMentorChat({
 		regenerate,
 		setMessages,
 		resumeStream,
-		addToolResult,
 		addToolOutput,
 		addToolApprovalResponse,
 		id,
@@ -300,10 +299,10 @@ export function useMentorChat({
 		// Thread management
 		threadDetail,
 		isThreadLoading,
-		threadError: threadError as Error | null,
+		threadError: threadError,
 		threads,
 		isThreadsLoading,
-		currentThreadId: threadId || id,
+		currentThreadId: threadId ?? id,
 
 		// Voting
 		voteMessage,

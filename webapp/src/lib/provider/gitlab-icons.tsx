@@ -1,3 +1,4 @@
+import { hasText } from "@/lib/text";
 /**
  * React wrapper components for GitLab SVG icons from `@gitlab/svgs`.
  *
@@ -20,9 +21,10 @@ export interface GitLabIconProps extends Omit<SVGProps<SVGSVGElement>, "children
 
 function createGitLabIcon(pathData: string, displayName: string) {
 	const Icon = forwardRef<SVGSVGElement, GitLabIconProps>(({ size = 16, ...rest }, ref) => {
-		const labelled = rest["aria-label"] || rest["aria-labelledby"];
+		const labelled = hasText(rest["aria-label"]) || hasText(rest["aria-labelledby"]);
 		return (
-			// biome-ignore lint/a11y/noSvgWithoutTitle: accessibility handled conditionally — aria-hidden for decorative, role="img" + aria-label for labelled
+			// Accessibility is handled conditionally below: `aria-hidden` when decorative,
+			// `role="img"` + `aria-label` when labelled. No linter checks this.
 			<svg
 				ref={ref}
 				width={size}

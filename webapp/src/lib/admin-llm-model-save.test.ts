@@ -38,7 +38,7 @@ describe("saveAdminLlmModelSafely", () => {
 			body,
 			operations: operations(order),
 		});
-		expect(order).toEqual(["create", "price", "sharing", "activate"]);
+		expect(order).toStrictEqual(["create", "price", "sharing", "activate"]);
 	});
 
 	it("revokes an active model before changing its price", async () => {
@@ -49,7 +49,7 @@ describe("saveAdminLlmModelSafely", () => {
 			body: { ...body, metadata: { ...body.metadata, enabled: false } },
 			operations: operations(order),
 		});
-		expect(order).toEqual(["metadata", "price"]);
+		expect(order).toStrictEqual(["metadata", "price"]);
 	});
 
 	it("temporarily disables an active model while updating it", async () => {
@@ -60,7 +60,7 @@ describe("saveAdminLlmModelSafely", () => {
 			body,
 			operations: operations(order),
 		});
-		expect(order).toEqual(["metadata", "price", "activate"]);
+		expect(order).toStrictEqual(["metadata", "price", "activate"]);
 	});
 
 	it("does not activate when pricing fails", async () => {
@@ -70,6 +70,6 @@ describe("saveAdminLlmModelSafely", () => {
 		await expect(
 			saveAdminLlmModelSafely({ connectionId: 7, editing: null, body, operations: ops }),
 		).rejects.toThrow("pricing failed");
-		expect(order).toEqual(["create"]);
+		expect(order).toStrictEqual(["create"]);
 	});
 });

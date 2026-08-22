@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { listTracedArtifactsOptions } from "@/api/@tanstack/react-query.gen";
 import { TRACE_PAGE_SIZE, TraceListPage } from "@/components/practice-trace/TraceListPage";
 import { type TraceSearch, traceSearchSchema } from "@/components/practice-trace/trace-search";
+import { pageParam } from "@/lib/search-params";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/reviews/")({
 	validateSearch: traceSearchSchema,
@@ -14,10 +15,10 @@ function ReviewActivityListRoute() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const updateSearch = (patch: Partial<TraceSearch>) =>
-		navigate({
+		void navigate({
 			search: (previous) => {
 				const next = { ...previous, ...patch };
-				return { ...next, page: next.page || undefined };
+				return { ...next, page: pageParam(next.page) };
 			},
 			replace: true,
 		});

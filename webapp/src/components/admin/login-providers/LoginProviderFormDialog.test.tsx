@@ -91,7 +91,7 @@ describe("LoginProviderFormDialog", () => {
 		);
 
 		// Outline is self-hosted per instance → the base URL field is present and pre-filled.
-		const baseUrl = screen.getByLabelText("Instance base URL") as HTMLInputElement;
+		const baseUrl = screen.getByLabelText<HTMLInputElement>("Instance base URL");
 		expect(baseUrl.value).toBe("https://outline.acme.test");
 
 		fireEvent.change(screen.getByLabelText("Client ID"), { target: { value: "outline-client" } });

@@ -2,9 +2,13 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
 import { listWorkspacesOptions } from "@/api/@tanstack/react-query.gen";
+import type { WorkspaceListItem } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
 import { toScmProviderType } from "@/lib/provider";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+/** Shared so an unloaded query keeps the same `workspaces` identity across renders. */
+const NO_WORKSPACES: WorkspaceListItem[] = [];
 
 /**
  * Returns the active workspace slug, the available workspaces and a setter to switch between them.
@@ -24,7 +28,7 @@ export function useActiveWorkspaceSlug() {
 		staleTime: 30_000, // 30 seconds
 		refetchOnWindowFocus: true,
 	});
-	const workspaces = Array.isArray(query.data) ? query.data : [];
+	const workspaces = Array.isArray(query.data) ? query.data : NO_WORKSPACES;
 	const location = useLocation();
 	const workspaceSelectionLoading = isAuthenticated && !authLoading && !hasHydrated;
 
@@ -58,7 +62,6 @@ export function useActiveWorkspaceSlug() {
 	// Reset redirect tracking when location or workspaces change meaningfully
 	// Also reset when workspaces list changes (e.g., after server restart or query refetch)
 	const workspaceSlugs = workspaces.map((ws) => ws.workspaceSlug).join(",");
-	// biome-ignore lint/correctness/useExhaustiveDependencies: deps trigger re-run to reset flag
 	useEffect(() => {
 		hasAttemptedRedirect.current = false;
 	}, [slugFromPath, workspaceSlugs]);
@@ -85,13 +88,15 @@ export function useActiveWorkspaceSlug() {
 				// Redirect to the same relative path under a different workspace
 				const remainder = location.pathname.replace(/^\/w\/[^/]+/, "");
 				setSelectedSlug(fallbackSlug);
-				navigate({
-					to: `/w/${fallbackSlug}${remainder || "/"}` as never,
+				// `href` is how the router takes a path built at runtime; a relative one still
+				// navigates in-app, only an absolute URL would reload the document.
+				void navigate({
+					href: `/w/${fallbackSlug}${remainder || "/"}`,
 					replace: true,
 				});
 			} else {
 				// No workspaces available, redirect to home
-				navigate({
+				void navigate({
 					to: "/",
 					replace: true,
 				});
@@ -135,6 +140,6 @@ export function useActiveWorkspaceSlug() {
 		providerType: toScmProviderType(activeWorkspace?.providerType),
 		selectWorkspace: setSelectedSlug,
 		isLoading: query.isLoading || workspaceSelectionLoading,
-		error: query.error as Error | null,
+		error: query.error,
 	};
 }

@@ -11,8 +11,7 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
-import type { ComponentProps, ReactElement } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { TablePagination } from "@/components/common/TablePagination";
 import { Button } from "@/components/ui/button";
@@ -144,7 +143,7 @@ export function UsersTable({
 		() =>
 			users.filter((user) => {
 				if (view.team === "all") return true;
-				return user.teams?.some((team) => team.id.toString() === view.team) || false;
+				return user.teams.some((team) => team.id.toString() === view.team);
 			}),
 		[users, view.team],
 	);
@@ -167,6 +166,7 @@ export function UsersTable({
 		label: `${size}`,
 	}));
 
+	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency, and React Compiler opts this component out entirely
 	const table = useReactTable({
 		data: filteredData,
 		columns,
@@ -230,7 +230,7 @@ export function UsersTable({
 							<Filter className="mr-2 h-4 w-4" />
 							<SelectValue placeholder="Filter by team" />
 						</SelectTrigger>
-						<SelectContent>
+						<SelectContent aria-label="Filter members by team">
 							<SelectItem value="all">
 								<div className="flex items-center space-x-2">
 									<div className="w-3 h-3 rounded-full bg-muted" />
@@ -275,7 +275,7 @@ export function UsersTable({
 												key={column.id}
 												className="capitalize"
 												checked={column.getIsVisible()}
-												onCheckedChange={(value) => column.toggleVisibility(!!value)}
+												onCheckedChange={(value) => column.toggleVisibility(value)}
 											>
 												{column.id}
 											</DropdownMenuCheckboxItem>
@@ -314,7 +314,7 @@ export function UsersTable({
 									</div>
 								</TableCell>
 							</TableRow>
-						) : table.getRowModel().rows?.length > 0 ? (
+						) : table.getRowModel().rows.length > 0 ? (
 							table.getRowModel().rows.map((row) => (
 								<TableRow
 									key={row.id}
@@ -357,7 +357,11 @@ export function UsersTable({
 				</div>
 				<div className="flex flex-col sm:flex-row items-center space-y-4 sm:space-y-0 sm:space-x-6 lg:space-x-8 order-1 sm:order-2">
 					<div className="flex items-center space-x-2">
-						<Label htmlFor="member-rows-per-page" className="whitespace-nowrap">
+						<Label
+							id="member-rows-per-page-label"
+							htmlFor="member-rows-per-page"
+							className="whitespace-nowrap"
+						>
 							Rows per page
 						</Label>
 						<Select
@@ -370,7 +374,7 @@ export function UsersTable({
 							<SelectTrigger id="member-rows-per-page" className="h-8 w-[70px]">
 								<SelectValue />
 							</SelectTrigger>
-							<SelectContent side="top">
+							<SelectContent side="top" aria-labelledby="member-rows-per-page-label">
 								{[10, 20, 30, 40, 50].map((pageSize) => (
 									<SelectItem key={pageSize} value={`${pageSize}`}>
 										{pageSize}

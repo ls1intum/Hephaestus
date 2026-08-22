@@ -1,13 +1,25 @@
 import type { UseChatHelpers } from "@ai-sdk/react";
+import { isStaticToolUIPart } from "ai";
 import { motion } from "motion/react";
 import type { RefObject } from "react";
 import type { ChatMessageVote } from "@/api/types.gen";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import type { ChatMessage } from "@/lib/types";
+import type { ChatMessage, ChatTools } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Greeting } from "./Greeting";
 import { PreviewMessage, ThinkingMessage } from "./Message";
-import type { PartRendererMap } from "./renderers/types";
+import type { PartRendererMap, ToolPartState } from "./renderers/types";
+
+/** Every tool state renders something, so a tool part in any of them counts as visible content. */
+const VISIBLE_TOOL_STATES: ToolPartState[] = [
+	"input-streaming",
+	"input-available",
+	"approval-requested",
+	"approval-responded",
+	"output-available",
+	"output-error",
+	"output-denied",
+];
 
 export interface MessagesProps {
 	messages: ChatMessage[];
@@ -45,24 +57,12 @@ export function Messages({
 	const isArtifact = variant === "artifact";
 
 	const hasVisibleContent = (message: ChatMessage): boolean => {
-		const parts = message?.parts ?? [];
+		const parts = message.parts;
 		if (parts.length === 0) return false;
 		for (const p of parts) {
-			if (p.type === "text" && (p.text ?? "").trim().length > 0) return true;
+			if (p.type === "text" && p.text.trim().length > 0) return true;
 			if (p.type === "file") return true;
-			if (typeof p.type === "string" && p.type.startsWith("tool-")) {
-				const state = (p as { state?: string }).state;
-				const visibleStates = [
-					"input-streaming",
-					"input-available",
-					"approval-requested",
-					"approval-responded",
-					"output-available",
-					"output-error",
-					"output-denied",
-				];
-				if (state && visibleStates.includes(state)) return true;
-			}
+			if (isStaticToolUIPart<ChatTools>(p) && VISIBLE_TOOL_STATES.includes(p.state)) return true;
 		}
 		return false;
 	};
@@ -116,8 +116,8 @@ export function Messages({
 				{showThinking &&
 					(status === "submitted" || status === "streaming") &&
 					(() => {
-						if (messages.length === 0) return <ThinkingMessage />;
-						const last = messages[messages.length - 1];
+						const last = messages.at(-1);
+						if (!last) return <ThinkingMessage />;
 						const isUser = last.role === "user";
 						const assistantHasVisible = last.role === "assistant" && hasVisibleContent(last);
 						return isUser || !assistantHasVisible ? <ThinkingMessage /> : null;

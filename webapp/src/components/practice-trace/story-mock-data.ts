@@ -370,6 +370,12 @@ export const documentArtifactTrace = {
 	],
 } satisfies ArtifactTrace;
 
+export function tracedArtifact(artifactId: number) {
+	const match = tracedArtifacts.find((candidate) => candidate.artifactId === artifactId);
+	if (!match) throw new Error(`No traced-artifact fixture with id ${artifactId}`);
+	return match;
+}
+
 export function tracedArtifactPage(
 	content: TracedArtifact[] = tracedArtifacts,
 	size = 20,

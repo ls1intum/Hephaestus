@@ -2,18 +2,21 @@ import { CheckIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { WizardStep } from "./wizard-context";
 
-const STEPS = [{ label: "Connect" }, { label: "Select Group" }, { label: "Configure" }] as const;
+const STEPS = [
+	{ number: 1, label: "Connect" },
+	{ number: 2, label: "Select Group" },
+	{ number: 3, label: "Configure" },
+] as const satisfies readonly { number: WizardStep; label: string }[];
 
 export function WizardStepIndicator({ currentStep }: { currentStep: WizardStep }) {
 	return (
 		<ol aria-label="Wizard progress" className="flex items-center gap-2">
-			{STEPS.map((step, index) => {
-				const stepNumber = (index + 1) as WizardStep;
+			{STEPS.map(({ number: stepNumber, label }, index) => {
 				const isCompleted = stepNumber < currentStep;
 				const isCurrent = stepNumber === currentStep;
 				return (
 					<li
-						key={step.label}
+						key={label}
 						className="flex items-center gap-2"
 						aria-current={isCurrent ? "step" : undefined}
 					>
@@ -31,14 +34,14 @@ export function WizardStepIndicator({ currentStep }: { currentStep: WizardStep }
 								<>
 									<CheckIcon className="size-3.5" aria-hidden="true" />
 									<span className="sr-only">
-										Step {stepNumber}: {step.label}, completed
+										Step {stepNumber}: {label}, completed
 									</span>
 								</>
 							) : (
 								<>
 									<span aria-hidden="true">{stepNumber}</span>
 									<span className="sr-only">
-										Step {stepNumber}: {step.label}
+										Step {stepNumber}: {label}
 										{isCurrent ? ", current" : ""}
 									</span>
 								</>
@@ -50,7 +53,7 @@ export function WizardStepIndicator({ currentStep }: { currentStep: WizardStep }
 								isCurrent ? "font-medium text-foreground" : "text-muted-foreground",
 							)}
 						>
-							{step.label}
+							{label}
 						</span>
 						{index < STEPS.length - 1 && (
 							<span

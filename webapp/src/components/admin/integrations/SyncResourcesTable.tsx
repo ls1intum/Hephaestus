@@ -228,7 +228,7 @@ function SortableHeadCell({
 	onSort?: (key: SortKey) => void;
 }) {
 	const active = sortState?.key === sortKey;
-	const ariaSort = active ? (sortState?.dir === "asc" ? "ascending" : "descending") : "none";
+	const ariaSort = active ? (sortState.dir === "asc" ? "ascending" : "descending") : "none";
 
 	if (!onSort) {
 		return (
@@ -239,7 +239,7 @@ function SortableHeadCell({
 	}
 
 	const SortIcon = active
-		? sortState?.dir === "asc"
+		? sortState.dir === "asc"
 			? ArrowUpIcon
 			: ArrowDownIcon
 		: ChevronsUpDownIcon;

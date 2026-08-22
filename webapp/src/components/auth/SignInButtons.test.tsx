@@ -32,9 +32,11 @@ describe("SignInButtons", () => {
 
 		renderWithClient(<SignInButtons onSignIn={vi.fn()} />);
 
-		// findByRole throws if no enabled "Continue with GitHub" button is rendered.
-		const button = await screen.findByRole("button", { name: /continue with github/i });
-		expect(button).toBeTruthy();
+		// `disabled` decides whether the OAuth path is reachable at all, and no role query checks it.
+		const button = await screen.findByRole<HTMLButtonElement>("button", {
+			name: /continue with github/i,
+		});
+		expect(button.disabled).toBe(false);
 	});
 
 	it("shows a neutral error state — and NO provider button — when discovery fails", async () => {
@@ -49,7 +51,7 @@ describe("SignInButtons", () => {
 		renderWithClient(<SignInButtons onSignIn={vi.fn()} />);
 
 		// findByText throws if the neutral message never appears (jest-dom matchers aren't set up here).
-		expect(await screen.findByText(/Couldn't load sign-in options/i)).toBeTruthy();
+		await screen.findByText(/Couldn't load sign-in options/i);
 		expect(screen.queryByRole("button", { name: /continue with/i })).toBeNull();
 	});
 
@@ -62,7 +64,7 @@ describe("SignInButtons", () => {
 
 		renderWithClient(<SignInButtons onSignIn={vi.fn()} />);
 
-		expect(await screen.findByRole("button", { name: /continue with github/i })).toBeTruthy();
+		await screen.findByRole("button", { name: /continue with github/i });
 		expect(screen.queryByRole("button", { name: /continue with slack/i })).toBeNull();
 	});
 });

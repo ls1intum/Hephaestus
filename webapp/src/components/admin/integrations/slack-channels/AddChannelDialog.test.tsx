@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { assert, describe, expect, it, vi } from "vitest";
 import { AddChannelDialog } from "./AddChannelDialog";
 
 describe("AddChannelDialog — form submit", () => {
@@ -9,7 +9,9 @@ describe("AddChannelDialog — form submit", () => {
 
 		const input = screen.getByLabelText(/paste a channel link or id/i);
 		fireEvent.change(input, { target: { value: "C0974LJBPBK" } });
-		fireEvent.submit(input.closest("form") as HTMLFormElement);
+		const form = input.closest("form");
+		assert(form);
+		fireEvent.submit(form);
 
 		await waitFor(() =>
 			expect(onSubmit).toHaveBeenCalledWith({
@@ -22,7 +24,7 @@ describe("AddChannelDialog — form submit", () => {
 	it("does not trim the pasted-reference field on every keystroke (no cursor jump)", () => {
 		render(<AddChannelDialog open onOpenChange={vi.fn()} onSubmit={vi.fn()} />);
 
-		const input = screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement;
+		const input = screen.getByLabelText<HTMLInputElement>(/paste a channel link or id/i);
 		fireEvent.change(input, { target: { value: "  C0974LJBPBK  " } });
 
 		// The raw value (including interior/leading/trailing whitespace) is kept in state; only
@@ -35,7 +37,7 @@ describe("AddChannelDialog — form submit", () => {
 		const onOpenChange = vi.fn();
 		render(<AddChannelDialog open onOpenChange={onOpenChange} onSubmit={vi.fn()} />);
 
-		const input = screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement;
+		const input = screen.getByLabelText<HTMLInputElement>(/paste a channel link or id/i);
 		fireEvent.change(input, { target: { value: "C0974LJBPBK" } });
 		expect(input.value).toBe("C0974LJBPBK");
 
@@ -44,8 +46,6 @@ describe("AddChannelDialog — form submit", () => {
 		fireEvent.click(screen.getByRole("button", { name: /^cancel$/i }));
 
 		expect(onOpenChange).toHaveBeenCalledWith(false);
-		expect((screen.getByLabelText(/paste a channel link or id/i) as HTMLInputElement).value).toBe(
-			"",
-		);
+		expect(screen.getByLabelText<HTMLInputElement>(/paste a channel link or id/i).value).toBe("");
 	});
 });

@@ -5,7 +5,7 @@
  *   1. the exact pin in the root package.json      — what a fresh install resolves
  *   2. the binary pnpm actually installed          — what CI and the pre-push hook run
  *   3. the $schema URL in biome.jsonc              — what an editor validates against
- *   4. the $schema URL in webapp/biome.json        —  "
+ *   4. the $schema URL in webapp/biome.jsonc       —  "
  *
  * A stale $schema is the dangerous one: `pnpm install --frozen-lockfile` already refuses a
  * package.json/lockfile disagreement, but an editor pointed at another release's schema
@@ -16,7 +16,7 @@
 import { readFileSync } from "node:fs";
 
 const PIN_PATH = "package.json";
-const CONFIGS = ["biome.jsonc", "webapp/biome.json"];
+const CONFIGS = ["biome.jsonc", "webapp/biome.jsonc"];
 const SCHEMA_RE = /"\$schema"\s*:\s*"https:\/\/biomejs\.dev\/schemas\/([^/]+)\/schema\.json"/;
 
 const pinned = JSON.parse(readFileSync(PIN_PATH, "utf8")).devDependencies?.["@biomejs/biome"];

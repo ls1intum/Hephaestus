@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getWorkspaceAvatarUrl } from "@/lib/provider";
+import { firstNonBlank } from "@/lib/text";
 
 export function WorkspaceSwitcher({
 	workspaces,
@@ -45,10 +46,9 @@ export function WorkspaceSwitcher({
 			if (event.metaKey || event.ctrlKey) {
 				const keyNum = Number.parseInt(event.key, 10);
 				if (!Number.isNaN(keyNum) && keyNum >= 1 && keyNum <= 9) {
-					const workspaceIndex = keyNum - 1;
-					if (workspaceIndex < workspaces.length) {
+					const selectedWorkspace = workspaces[keyNum - 1];
+					if (selectedWorkspace) {
 						event.preventDefault();
-						const selectedWorkspace = workspaces[workspaceIndex];
 						onWorkspaceChange?.(selectedWorkspace);
 					}
 				}
@@ -138,7 +138,10 @@ export function WorkspaceSwitcher({
 									alt={activeWorkspace?.displayName}
 								/>
 								<AvatarFallback className="rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-									{(activeWorkspace?.displayName || activeWorkspace?.workspaceSlug || "WS")
+									{(
+										firstNonBlank(activeWorkspace?.displayName, activeWorkspace?.workspaceSlug) ??
+										"WS"
+									)
 										.slice(0, 2)
 										.toUpperCase()}
 								</AvatarFallback>

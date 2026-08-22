@@ -42,7 +42,7 @@ function EditCuratedAreaPage() {
 				<QueryErrorAlert
 					error={areaQuery.error}
 					title="Couldn't load the area"
-					onRetry={() => areaQuery.refetch()}
+					onRetry={() => void areaQuery.refetch()}
 				/>
 			</PageLayout>
 		);
@@ -76,7 +76,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 			queryClient.setQueryData(detailQueryKey, updated);
 			invalidateCatalog();
 			toast.success("Area updated");
-			navigate({ to: "/admin/catalog" });
+			void navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
@@ -138,6 +138,21 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 		},
 	});
 
+	const continueWithDraft = async () => {
+		try {
+			await queryClient.invalidateQueries({
+				queryKey: detailQueryKey,
+				exact: true,
+				refetchType: "none",
+			});
+			const latest: CuratedArea = await queryClient.fetchQuery(detailOptions);
+			setBaseArea(latest);
+			setConflict(false);
+		} catch (error) {
+			toast.error("Couldn't load the current version", { description: problemDetailOf(error) });
+		}
+	};
+
 	return (
 		<CuratedAreaForm
 			key={`${areaSlug}-${formGeneration}`}
@@ -155,22 +170,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
-			onContinueWithDraft={async () => {
-				try {
-					await queryClient.invalidateQueries({
-						queryKey: detailQueryKey,
-						exact: true,
-						refetchType: "none",
-					});
-					const latest: CuratedArea = await queryClient.fetchQuery(detailOptions);
-					setBaseArea(latest);
-					setConflict(false);
-				} catch (error) {
-					toast.error("Couldn't load the current version", {
-						description: problemDetailOf(error),
-					});
-				}
-			}}
+			onContinueWithDraft={() => void continueWithDraft()}
 			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({

@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { expect, it, vi } from "vitest";
+import { assert, expect, it, vi } from "vitest";
 import { listWorkspacesQueryKey, updateFeaturesMutation } from "@/api/@tanstack/react-query.gen";
 import type { Workspace, WorkspaceListItem } from "@/api/types.gen";
 import { useUpdateWorkspaceFeatures } from "./use-update-workspace-features";
@@ -76,5 +76,9 @@ it("updates workspace features immediately and rolls them back on failure", asyn
 	rejectRequest(new Error("rejected"));
 
 	await waitFor(() => expect(result.current.isError).toBe(true));
-	expect(queryClient.getQueryData<WorkspaceListItem[]>(queryKey)?.[0].practicesEnabled).toBe(false);
+	const cached = queryClient.getQueryData<WorkspaceListItem[]>(queryKey);
+	assert(cached);
+	const [rolledBack] = cached;
+	assert(rolledBack);
+	expect(rolledBack.practicesEnabled).toBe(false);
 });

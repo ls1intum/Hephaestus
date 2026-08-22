@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import {
 	momentBands,
 	momentDef,
@@ -32,7 +32,9 @@ describe("momentBands", () => {
 	it("reads a pull request as start, churn, and two ways to end", () => {
 		const bands = momentBands(mockPullRequestWorkType.signals);
 
-		expect(bands.map((band) => [band.phase, band.moments.map((moment) => moment.signal)])).toEqual([
+		expect(
+			bands.map((band) => [band.phase, band.moments.map((moment) => moment.signal)]),
+		).toStrictEqual([
 			["start", ["scm.pull_request.opened"]],
 			[
 				"during",
@@ -45,7 +47,7 @@ describe("momentBands", () => {
 	it("gives a document its own three moments under the same three bands", () => {
 		const bands = momentBands(mockDocumentWorkType.signals);
 
-		expect(bands.map((band) => band.moments.map((moment) => moment.signal))).toEqual([
+		expect(bands.map((band) => band.moments.map((moment) => moment.signal))).toStrictEqual([
 			["docs.document.published"],
 			["docs.document.updated"],
 			["docs.document.archived"],
@@ -56,7 +58,9 @@ describe("momentBands", () => {
 		const bands = momentBands(mockConversationWorkType.signals);
 
 		expect(bands).toHaveLength(1);
-		expect(bands[0].phase).toBe("end");
+		const [only] = bands;
+		assert(only);
+		expect(only.phase).toBe("end");
 	});
 });
 
@@ -67,7 +71,7 @@ describe("withdrawnMoments", () => {
 				"scm.pull_request.opened",
 				"scm.pull_request.merged",
 			]),
-		).toEqual([]);
+		).toStrictEqual([]);
 	});
 
 	it("keeps a saved hand-asked review visible, under the name the wire gives it", () => {
@@ -78,7 +82,7 @@ describe("withdrawnMoments", () => {
 				"scm.pull_request.opened",
 				"scm.pull_request.manual_review",
 			]),
-		).toEqual([
+		).toStrictEqual([
 			{
 				signal: "scm.pull_request.manual_review",
 				displayName: "Review requested by hand",
@@ -88,7 +92,7 @@ describe("withdrawnMoments", () => {
 	});
 
 	it("names a moment nothing on the wire explains by its id, which is at least searchable", () => {
-		expect(withdrawnMoments(mockDocumentWorkType, ["docs.document.forked"])).toEqual([
+		expect(withdrawnMoments(mockDocumentWorkType, ["docs.document.forked"])).toStrictEqual([
 			{ signal: "docs.document.forked", displayName: "docs.document.forked", recommended: false },
 		]);
 	});

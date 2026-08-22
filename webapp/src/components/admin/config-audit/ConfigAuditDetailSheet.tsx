@@ -10,6 +10,7 @@ import {
 	SheetHeader,
 	SheetTitle,
 } from "@/components/ui/sheet";
+import { hasText } from "@/lib/text";
 import { prettyJson } from "../audit-shared/pretty-json";
 import { formatTimestamp } from "../audit-shared/time-format";
 import {
@@ -148,7 +149,7 @@ export function ConfigAuditDetailSheet({
 							)}
 						</div>
 
-						{(oldRaw || newRaw) && (
+						{(hasText(oldRaw) || hasText(newRaw)) && (
 							<Collapsible key={entry.id}>
 								<CollapsibleTrigger
 									render={

@@ -33,7 +33,7 @@ function AdminLayout() {
 		<QueryErrorAlert
 			error={settingsQuery.error}
 			title="Couldn't load the instance delivery state"
-			onRetry={() => settingsQuery.refetch()}
+			onRetry={() => void settingsQuery.refetch()}
 		/>
 	) : null;
 	return (

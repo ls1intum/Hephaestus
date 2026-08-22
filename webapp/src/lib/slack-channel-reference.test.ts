@@ -3,20 +3,22 @@ import { parseSlackChannelReference } from "./slack-channel-reference";
 
 describe("parseSlackChannelReference", () => {
 	it("accepts raw Slack channel ids", () => {
-		expect(parseSlackChannelReference(" C0974LJBPBK ")).toEqual({
+		expect(parseSlackChannelReference(" C0974LJBPBK ")).toStrictEqual({
 			channelId: "C0974LJBPBK",
 		});
 	});
 
 	it("extracts ids and names from Slack channel mentions", () => {
-		expect(parseSlackChannelReference("<#C0974LJBPBK|team-standup>")).toEqual({
+		expect(parseSlackChannelReference("<#C0974LJBPBK|team-standup>")).toStrictEqual({
 			channelId: "C0974LJBPBK",
 			channelName: "team-standup",
 		});
 	});
 
 	it("extracts ids from Slack channel URLs", () => {
-		expect(parseSlackChannelReference("https://example.slack.com/archives/C0974LJBPBK")).toEqual({
+		expect(
+			parseSlackChannelReference("https://example.slack.com/archives/C0974LJBPBK"),
+		).toStrictEqual({
 			channelId: "C0974LJBPBK",
 		});
 	});
@@ -24,7 +26,7 @@ describe("parseSlackChannelReference", () => {
 	it("extracts ids from an archive URL pasted alongside other text", () => {
 		expect(
 			parseSlackChannelReference("here it is: https://example.slack.com/archives/G0974LJBPBK/p123"),
-		).toEqual({ channelId: "G0974LJBPBK" });
+		).toStrictEqual({ channelId: "G0974LJBPBK" });
 	});
 
 	it("rejects names that do not carry the stable Slack id", () => {

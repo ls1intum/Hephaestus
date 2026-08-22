@@ -1,16 +1,16 @@
 import { useQuery } from "@tanstack/react-query";
-import { usePostHog } from "posthog-js/react";
 import { useEffect, useRef } from "react";
 
 import { getUserSettingsOptions } from "@/api/@tanstack/react-query.gen";
 import { useAuth } from "../auth";
 import { isPosthogEnabled } from "./config";
+import { usePostHogClient } from "./use-posthog-client";
 
 /**
  * Handles user identification and consent-aware tracking with PostHog.
  */
 export function PostHogIdentity() {
-	const posthog = usePostHog();
+	const posthog = usePostHogClient();
 	const { isAuthenticated, isLoading, userProfile, getUserId } = useAuth();
 	const hasIdentified = useRef(false);
 
@@ -54,8 +54,8 @@ export function PostHogIdentity() {
 		if (shouldDenyTracking) {
 			posthog.opt_out_capturing();
 			posthog.reset();
-			posthog.stopSessionRecording?.();
-			posthog.getActiveMatchingSurveys?.(() => {}, true);
+			posthog.stopSessionRecording();
+			posthog.getActiveMatchingSurveys(() => {}, true);
 			hasIdentified.current = false;
 			return;
 		}

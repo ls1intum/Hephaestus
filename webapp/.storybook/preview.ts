@@ -1,11 +1,7 @@
 import { withThemeByClassName, withThemeFromJSXProvider } from "@storybook/addon-themes";
 import type { Decorator, Preview } from "@storybook/react-vite";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-	createRootRoute,
-	createRouter,
-	RouterProvider,
-} from "@tanstack/react-router";
+import { createRootRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { isCommonAssetRequest } from "msw";
 import { initialize, mswLoader } from "msw-storybook-addon";
 import React from "react";
@@ -111,7 +107,8 @@ const StorybookThemeProvider = ({
 		ThemeProvider,
 		{
 			key: theme,
-			defaultTheme: theme as "light" | "dark",
+			// The toolbar only offers the two themes configured below; light is the default there too.
+			defaultTheme: theme === "dark" ? "dark" : "light",
 			storageKey: "storybook-theme",
 		},
 		children,
@@ -211,11 +208,10 @@ const preview: Preview = {
 				dark: { name: "dark" },
 			},
 			defaultTheme: "light",
-			Provider: ({ theme, children }) =>
-				React.createElement(StorybookThemeProvider, {
-					theme: theme.name,
-					children,
-				}),
+			// The addon types `Provider` as `any` and hands it whichever entry of `themes` above the
+			// toolbar selected, so the shape it is called with is declared here.
+			Provider: ({ theme, children }: { theme: { name: string }; children: React.ReactNode }) =>
+				React.createElement(StorybookThemeProvider, { theme: theme.name }, children),
 		}),
 	],
 };

@@ -2,22 +2,11 @@
 /**
  * Components under `webapp/src/components/**` are presentational: they take data as props and never
  * fetch. Fetching lives in the route file (or a `src/hooks/use-*.ts` it calls), which passes plain
- * props down. A component that fetches cannot be rendered in Storybook without a network mock, and a
- * story that needs a network mock is a story that can break for reasons the component does not own.
+ * props down. Their stories carry the second half of the rule: no MSW.
  *
- * Story files carry the second half of the rule: no MSW. Storybook's autodocs page mounts every story
- * of a file into one document, and `msw-storybook-addon` installs handlers on a single global worker,
- * so the last story's handlers answer for the whole page — an error story silently breaks its
- * siblings' Docs page while every isolated story, and therefore every test and every snapshot, stays
- * green. R3 keeps that page correct for whatever MSW stories remain.
- *
- * Biome cannot carry this: its plugins register globally over `files.includes` while this rule is
- * path-scoped (routes and hooks *must* import the query layer), and the repo has already recorded
- * GritQL silently degrading a plugin to an advisory `info` that exits 0. Vitest cannot carry it
- * either — scanning the tree inside a worker starves the route tests sharing it. Same reasoning, and
- * the same vacuous-pass guard, as `check-story-prose.mjs`.
- *
- * The allowlist is shrink-only: an entry that scans clean fails the build, so it cannot go stale.
+ * A script rather than a lint rule because the allowlist below is repo-wide, and a linter reporting
+ * per file cannot fail the build when an entry scans clean. Vitest cannot carry it either — scanning
+ * the tree inside a worker starves the route tests sharing it.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
@@ -46,10 +35,7 @@ const QUERY_HOOKS = [
 ];
 const MOCK_MODULES = ["msw", "msw-storybook-addon", "story-mock-server", "@/mocks/handlers"];
 
-/**
- * Every violator as of the gate landing. Shrink only: refactor a file, delete its line. Nothing may
- * be added — a new entry means a new component fetches, which is the thing this script forbids.
- */
+/** Shrink only: refactor a file, delete its line. An entry that scans clean fails the build. */
 const ALLOWLIST = {
 	fetching: [
 		"webapp/src/components/achievements/AchievementsView.tsx",
@@ -62,7 +48,7 @@ const ALLOWLIST = {
 		"webapp/src/components/admin/integrations/outline/AddCollectionDialog.tsx",
 		"webapp/src/components/admin/integrations/slack-channels/ChannelHistorySheet.tsx",
 		"webapp/src/components/auth/ImpersonationBanner.tsx",
-		"webapp/src/components/auth/LandingSignInCTA.tsx",
+		"webapp/src/components/auth/LandingSignInCta.tsx",
 		"webapp/src/components/auth/SignInButtons.tsx",
 		"webapp/src/components/settings/DangerZoneSection.tsx",
 		"webapp/src/components/settings/SessionsSection.tsx",

@@ -220,7 +220,7 @@ export function LlmModelFields({
 				<Checkbox
 					id={`${idPrefix}-supports-reasoning`}
 					checked={value.supportsReasoning}
-					onCheckedChange={(checked) => update({ supportsReasoning: checked === true })}
+					onCheckedChange={(checked) => update({ supportsReasoning: checked })}
 				/>
 				<FieldContent>
 					<FieldLabel htmlFor={`${idPrefix}-supports-reasoning`} className="font-normal">

@@ -8,8 +8,7 @@ import {
 	type ActivityBadgeMetadata,
 	getActivityBadgeMetadata,
 } from "./activity-badge-metadata";
-import type { ReviewedPullRequest } from "./ReviewsPopover";
-import { ReviewsPopover } from "./ReviewsPopover";
+import { type ReviewedPullRequest, ReviewsPopover } from "./ReviewsPopover";
 
 export interface ActivityBadgesProps {
 	reviewedPullRequests?: readonly ReviewedPullRequest[];

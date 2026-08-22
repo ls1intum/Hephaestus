@@ -213,7 +213,9 @@ export const RegisteringSequentially: Story = {
 	parameters: { msw: { handlers: [candidatesHandler(candidates)] } },
 	args: {
 		onRegister: fn(async () => {
-			await new Promise((resolve) => setTimeout(resolve, 400));
+			await new Promise((resolve) => {
+				setTimeout(resolve, 400);
+			});
 		}),
 	},
 	play: async () => {

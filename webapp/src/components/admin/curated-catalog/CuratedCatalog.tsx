@@ -62,7 +62,7 @@ export interface CuratedCatalogProps {
 }
 
 type StatusFilter = "OFFERED" | "NOT_OFFERED" | "ALL";
-type ArtifactFilter = WorkArtifact | "ALL";
+type ArtifactFilter = WorkArtifact;
 
 const STATUS_FILTERS = [
 	{ value: "ALL", label: "All" },
@@ -388,7 +388,7 @@ function CatalogFilters({
 					value &&
 					onSearchChange({
 						...search,
-						status: value === "ALL" ? undefined : (value as "OFFERED" | "NOT_OFFERED"),
+						status: value === "ALL" ? undefined : value,
 					})
 				}
 			>
@@ -398,7 +398,7 @@ function CatalogFilters({
 				>
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Filter by inclusion in new workspaces">
 					{STATUS_FILTERS.map((filter) => (
 						<SelectItem key={filter.value} value={filter.value}>
 							{filter.label}
@@ -416,7 +416,7 @@ function CatalogFilters({
 					value[0] &&
 					onSearchChange({
 						...search,
-						status: value[0] === "ALL" ? undefined : (value[0] as "OFFERED" | "NOT_OFFERED"),
+						status: value[0] === "ALL" ? undefined : value[0],
 					})
 				}
 				variant="outline"
@@ -443,7 +443,7 @@ function CatalogFilters({
 				<SelectTrigger className="w-full lg:w-52" aria-label="Filter by work type">
 					<SelectValue />
 				</SelectTrigger>
-				<SelectContent>
+				<SelectContent aria-label="Filter by work type">
 					{WORK_ARTIFACT_FILTER_ITEMS.map(({ value, label }) => (
 						<SelectItem key={value} value={value}>
 							{label}

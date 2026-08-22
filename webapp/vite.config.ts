@@ -83,7 +83,7 @@ export default defineConfig(({ command }) => {
 			},
 		},
 		server: {
-			port: parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
+			port: Number.parseInt(process.env.WEBAPP_PORT ?? "", 10) || 4200,
 			strictPort: true,
 			fs: {
 				allow: [resolve(__dirname, "..")],

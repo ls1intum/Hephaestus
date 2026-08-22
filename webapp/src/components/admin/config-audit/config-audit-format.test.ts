@@ -10,6 +10,8 @@ import {
 	subjectLabel,
 } from "./config-audit-format";
 
+const SNAPSHOT = '{"name":"Primary","enabled":true}';
+
 function entry(over: Partial<ConfigAuditEntryView>): ConfigAuditEntryView {
 	return {
 		id: 1,
@@ -52,7 +54,7 @@ describe("fieldChanges", () => {
 				newValue: '{"cooldownMinutes":10,"skipDrafts":true}',
 			}),
 		);
-		expect(changes).toEqual([{ path: "cooldownMinutes", before: "30", after: "10" }]);
+		expect(changes).toStrictEqual([{ path: "cooldownMinutes", before: "30", after: "10" }]);
 	});
 
 	it("renders a cleared override as 'not set', not an absent field", () => {
@@ -63,7 +65,7 @@ describe("fieldChanges", () => {
 				newValue: '{"cooldownMinutes":null}',
 			}),
 		);
-		expect(change).toEqual({ path: "cooldownMinutes", before: "30", after: "not set" });
+		expect(change).toStrictEqual({ path: "cooldownMinutes", before: "30", after: "not set" });
 	});
 
 	it("resolves nested dot-paths to the leaf, not the container", () => {
@@ -74,7 +76,7 @@ describe("fieldChanges", () => {
 				newValue: '{"volumeCaps":{"perPullRequest":3}}',
 			}),
 		);
-		expect(change).toEqual({ path: "volumeCaps.perPullRequest", before: "5", after: "3" });
+		expect(change).toStrictEqual({ path: "volumeCaps.perPullRequest", before: "5", after: "3" });
 	});
 
 	it("masks a credential boolean end-to-end through fieldChanges, not just in formatLeaf isolation", () => {
@@ -87,7 +89,7 @@ describe("fieldChanges", () => {
 					newValue: '{"llmApiKeySet":true}',
 				}),
 			),
-		).toEqual([{ path: "llmApiKeySet", before: "not set", after: "••••••" }]);
+		).toStrictEqual([{ path: "llmApiKeySet", before: "not set", after: "••••••" }]);
 		expect(
 			fieldChanges(
 				entry({
@@ -96,24 +98,18 @@ describe("fieldChanges", () => {
 					newValue: '{"publicKey":true}',
 				}),
 			),
-		).toEqual([{ path: "publicKey", before: "false", after: "true" }]);
+		).toStrictEqual([{ path: "publicKey", before: "false", after: "true" }]);
 	});
 
-	it.each<["CREATED" | "DELETED", "before" | "after"]>([
-		["CREATED", "before"],
-		["DELETED", "after"],
-	])("gives a %s row no %s side", (action, absentSide) => {
-		const snapshot = '{"name":"Primary","enabled":true}';
-		const changes = fieldChanges(
-			entry({
-				action,
-				changedKeys: ["name", "enabled"],
-				oldValue: action === "DELETED" ? snapshot : undefined,
-				newValue: action === "CREATED" ? snapshot : undefined,
-			}),
-		);
+	it.each<
+		["CREATED" | "DELETED", "before" | "after", Pick<ConfigAuditEntryView, "oldValue" | "newValue">]
+	>([
+		["CREATED", "before", { newValue: SNAPSHOT }],
+		["DELETED", "after", { oldValue: SNAPSHOT }],
+	])("gives a %s row no %s side", (action, absentSide, snapshot) => {
+		const changes = fieldChanges(entry({ action, changedKeys: ["name", "enabled"], ...snapshot }));
 		expect(changes.every((change) => change[absentSide] === null)).toBe(true);
-		expect(changes.map((change) => change.path).sort()).toEqual(["enabled", "name"]);
+		expect(changes.map((change) => change.path).sort()).toStrictEqual(["enabled", "name"]);
 	});
 });
 
@@ -172,12 +168,12 @@ describe("subjectLabel", () => {
 					newValue: '{"name":"GPT-5 reviewer"}',
 				}),
 			),
-		).toEqual({ label: 'Agent config "GPT-5 reviewer"', hint: "Agent config #42" });
+		).toStrictEqual({ label: 'Agent config "GPT-5 reviewer"', hint: "Agent config #42" });
 	});
 	it("falls back to type + identifier without inventing a name", () => {
 		expect(
 			subjectLabel(entry({ entityType: "AGENT_CONFIG", entityId: "42", newValue: "{}" })),
-		).toEqual({
+		).toStrictEqual({
 			label: "Agent config #42",
 		});
 	});
@@ -186,7 +182,7 @@ describe("subjectLabel", () => {
 			subjectLabel(
 				entry({ entityType: "AGENT_BINDING", entityId: "practice-config", newValue: "{}" }),
 			),
-		).toEqual({ label: "AI binding practice-config" });
+		).toStrictEqual({ label: "AI binding practice-config" });
 	});
 });
 
@@ -196,10 +192,10 @@ describe("actorDisplay", () => {
 			actorDisplay(
 				entry({ actorKind: "USER", actorAccountId: 7, actor: { id: 7, displayName: "Grace" } }),
 			),
-		).toEqual({ kind: "USER", primary: "Grace", primaryEmail: undefined, filterId: 7 });
+		).toStrictEqual({ kind: "USER", primary: "Grace", primaryEmail: undefined, filterId: 7 });
 	});
 	it("labels a background actor 'System'", () => {
-		expect(actorDisplay(entry({ actorKind: "SYSTEM", actor: undefined }))).toEqual({
+		expect(actorDisplay(entry({ actorKind: "SYSTEM", actor: undefined }))).toStrictEqual({
 			kind: "SYSTEM",
 			primary: "System",
 		});
@@ -215,7 +211,7 @@ describe("actorDisplay", () => {
 					actingActor: { id: 7, displayName: "Grace" },
 				}),
 			),
-		).toEqual({
+		).toStrictEqual({
 			kind: "IMPERSONATED",
 			primary: "Grace",
 			primaryEmail: undefined,
@@ -228,7 +224,7 @@ describe("actorDisplay", () => {
 describe("degrading on unusable data", () => {
 	it("treats an unparseable snapshot as absent rather than blanking the row", () => {
 		const broken = entry({ action: "UPDATED", oldValue: "{not json", newValue: "{also not json" });
-		expect(fieldChanges(broken)).toEqual([]);
+		expect(fieldChanges(broken)).toStrictEqual([]);
 		expect(changeSummary(broken)).toBe("");
 	});
 });

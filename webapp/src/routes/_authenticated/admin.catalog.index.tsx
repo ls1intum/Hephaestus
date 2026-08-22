@@ -32,7 +32,7 @@ import { PageHeader } from "@/components/core/PageHeader";
 import { PageLayout } from "@/components/core/PageLayout";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathString, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { instanceAdminHead } from "@/lib/page-title";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
@@ -207,13 +207,11 @@ function AdminCuratedCatalogPage() {
 		onError: structureError,
 		onSettled: invalidateStructure,
 	});
-	const pendingPracticeSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
-		PRACTICE_STATUS_KEY,
-		(variables) => variables.path.slug,
+	const pendingPracticeSlugs = usePendingMutationIds(PRACTICE_STATUS_KEY, (variables) =>
+		pathString(variables, "slug"),
 	);
-	const pendingAreaSlugs = usePendingMutationIds<{ path: { slug: string } }, string>(
-		AREA_STATUS_KEY,
-		(variables) => variables.path.slug,
+	const pendingAreaSlugs = usePendingMutationIds(AREA_STATUS_KEY, (variables) =>
+		pathString(variables, "slug"),
 	);
 	const structurePending =
 		reorderAreas.isPending ||
@@ -275,7 +273,7 @@ function AdminCuratedCatalogPage() {
 				<QueryErrorAlert
 					error={catalogQuery.error}
 					title="Couldn't load the practice catalog"
-					onRetry={() => catalogQuery.refetch()}
+					onRetry={() => void catalogQuery.refetch()}
 				/>
 			) : (
 				<CuratedCatalog
@@ -287,7 +285,7 @@ function AdminCuratedCatalogPage() {
 					pendingPracticeSlugs={pendingPracticeSlugs}
 					pendingAreaSlugs={pendingAreaSlugs}
 					writePending={writePending}
-					onSearchChange={(next) => navigate({ search: next, replace: true })}
+					onSearchChange={(next) => void navigate({ search: next, replace: true })}
 					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
 						const parent = practice.areaSlug
 							? catalogQuery.data.areas.find((area) => area.slug === practice.areaSlug)

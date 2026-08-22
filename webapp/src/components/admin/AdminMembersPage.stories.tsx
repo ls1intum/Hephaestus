@@ -23,38 +23,40 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const mockTeams: TeamInfo[] = [
-	{
-		id: 1,
-		name: "Frontend",
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
-		hidden: false,
-	},
-	{
-		id: 2,
-		name: "Backend",
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
-		hidden: false,
-	},
-	{
-		id: 3,
-		name: "DevOps",
-		membershipCount: 0,
-		repoPermissionCount: 0,
-		repositories: [],
-		labels: [],
-		members: [],
-		hidden: false,
-	},
-];
+const frontendTeam: TeamInfo = {
+	id: 1,
+	name: "Frontend",
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+	hidden: false,
+};
+
+const backendTeam: TeamInfo = {
+	id: 2,
+	name: "Backend",
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+	hidden: false,
+};
+
+const devopsTeam: TeamInfo = {
+	id: 3,
+	name: "DevOps",
+	membershipCount: 0,
+	repoPermissionCount: 0,
+	repositories: [],
+	labels: [],
+	members: [],
+	hidden: false,
+};
+
+const mockTeams: TeamInfo[] = [frontendTeam, backendTeam, devopsTeam];
 
 const mockUsers: ExtendedUserTeams[] = [
 	{
@@ -63,7 +65,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		name: "Alice Smith",
 		hidden: false,
 		url: "https://github.com/alice.smith",
-		teams: [mockTeams[0]],
+		teams: [frontendTeam],
 		user: {
 			id: 1,
 			name: "Alice Smith",
@@ -78,7 +80,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		name: "Bob Johnson",
 		hidden: false,
 		url: "https://github.com/bob.johnson",
-		teams: [mockTeams[1], mockTeams[2]],
+		teams: [backendTeam, devopsTeam],
 		user: {
 			id: 2,
 			name: "Bob Johnson",
@@ -93,7 +95,7 @@ const mockUsers: ExtendedUserTeams[] = [
 		name: "Carol Williams",
 		hidden: false,
 		url: "https://github.com/carol.williams",
-		teams: [mockTeams[0], mockTeams[1]],
+		teams: [frontendTeam, backendTeam],
 		user: {
 			id: 3,
 			name: "Carol Williams",

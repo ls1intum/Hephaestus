@@ -138,10 +138,10 @@ type AreaSlug = keyof typeof areaNames;
 
 const area = (slug: AreaSlug) => ({ slug, name: areaNames[slug] });
 
-export const practiceAreas = (Object.keys(areaNames) as AreaSlug[]).map((slug, index) => ({
+export const practiceAreas = Object.entries(areaNames).map(([slug, name], index) => ({
 	id: index + 1,
 	slug,
-	name: areaNames[slug],
+	name,
 	active: true,
 	displayOrder: index,
 	createdAt: new Date("2026-01-01T00:00:00Z"),
@@ -873,19 +873,28 @@ function feedbackFor(observationId: string) {
 		.sort((a, b) => b.item.composedAt.localeCompare(a.item.composedAt));
 }
 
-function disposition(observationId: string) {
-	const counts = { delivered: 0, failed: 0, prepared: 0, superseded: 0, suppressed: 0 };
+type Disposition = "delivered" | "failed" | "prepared" | "superseded" | "suppressed";
+
+const DISPOSITION_OF: Record<ReviewFeedback["deliveryState"], Disposition> = {
+	AWAITING_APPROVAL: "prepared",
+	DELIVERED: "delivered",
+	DISCARDED: "suppressed",
+	FAILED: "failed",
+	PREPARED: "prepared",
+	SUPERSEDED: "superseded",
+	SUPPRESSED: "suppressed",
+};
+
+function disposition(observationId: string): Record<Disposition, number> {
+	const counts: Record<Disposition, number> = {
+		delivered: 0,
+		failed: 0,
+		prepared: 0,
+		superseded: 0,
+		suppressed: 0,
+	};
 	for (const { item } of feedbackFor(observationId)) {
-		const key = {
-			AWAITING_APPROVAL: "prepared",
-			DELIVERED: "delivered",
-			DISCARDED: "suppressed",
-			FAILED: "failed",
-			PREPARED: "prepared",
-			SUPERSEDED: "superseded",
-			SUPPRESSED: "suppressed",
-		}[item.outcome] as keyof typeof counts;
-		counts[key] += 1;
+		counts[DISPOSITION_OF[item.outcome]] += 1;
 	}
 	return counts;
 }
@@ -1109,6 +1118,12 @@ export const reviewObservationDetail: ReviewObservationDetail = observationDetai
 // A page that does not fit on one page
 // ---------------------------------------------------------------------------------------------
 
+function cycled<T>(specs: readonly T[], index: number): T {
+	const spec = specs[index % specs.length];
+	if (!spec) throw new Error("A page cannot be filled from an empty list of specs.");
+	return spec;
+}
+
 /**
  * The fixture's observations restated across as many days as it takes to fill `count` rows. Cycling
  * the real specs keeps every row a record the server could have produced, unlike a generated
@@ -1117,7 +1132,7 @@ export const reviewObservationDetail: ReviewObservationDetail = observationDetai
 export function manyObservations(count: number): ReviewObservation[] {
 	const base = reviewObservations;
 	return Array.from({ length: count }, (_, index) => {
-		const source = base[index % base.length];
+		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
 		if (cycle === 0) return source;
 		return {
@@ -1134,7 +1149,7 @@ export function manyObservations(count: number): ReviewObservation[] {
  */
 export function manyMembers(count: number): WorkspaceMembership[] {
 	return Array.from({ length: count }, (_, index) => {
-		const source = workspaceMembers[index % workspaceMembers.length];
+		const source = cycled(workspaceMembers, index);
 		const cycle = Math.floor(index / workspaceMembers.length);
 		if (cycle === 0) return source;
 		return {
@@ -1149,7 +1164,7 @@ export function manyMembers(count: number): WorkspaceMembership[] {
 export function manyFeedback(count: number): ReviewFeedback[] {
 	const base = reviewFeedback;
 	return Array.from({ length: count }, (_, index) => {
-		const source = base[index % base.length];
+		const source = cycled(base, index);
 		const cycle = Math.floor(index / base.length);
 		if (cycle === 0) return source;
 		return {

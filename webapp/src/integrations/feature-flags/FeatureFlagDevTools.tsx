@@ -38,23 +38,25 @@ export function FeatureFlagDevToolsPanel({ flags, isLoading }: FeatureFlagDevToo
 							</div>
 						) : (
 							<div className="space-y-1">
-								{(Object.keys(flags) as FeatureFlagName[]).sort().map((name) => (
-									<div
-										key={name}
-										className="flex items-center justify-between rounded px-2 py-1 text-xs hover:bg-muted"
-									>
-										<span className="font-mono text-foreground">{name}</span>
-										<span
-											className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
-												flags[name]
-													? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
-													: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
-											}`}
+								{Object.entries(flags)
+									.sort(([a], [b]) => a.localeCompare(b))
+									.map(([name, enabled]) => (
+										<div
+											key={name}
+											className="flex items-center justify-between rounded px-2 py-1 text-xs hover:bg-muted"
 										>
-											{flags[name] ? "ON" : "OFF"}
-										</span>
-									</div>
-								))}
+											<span className="font-mono text-foreground">{name}</span>
+											<span
+												className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium ${
+													enabled
+														? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300"
+														: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300"
+												}`}
+											>
+												{enabled ? "ON" : "OFF"}
+											</span>
+										</div>
+									))}
 							</div>
 						)}
 					</div>

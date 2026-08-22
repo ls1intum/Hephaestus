@@ -6,7 +6,7 @@ import { adminListAuthEventsInfiniteOptions } from "@/api/@tanstack/react-query.
 import { adminExportAuthEvents } from "@/api/sdk.gen";
 import type { AuthEventView } from "@/api/types.gen";
 import { AdminAuditTable } from "@/components/admin/audit/AdminAuditTable";
-import { type AuthEventType, EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
+import { EVENT_TYPE_LABELS } from "@/components/admin/audit/audit-format";
 import {
 	type AuditSearch,
 	dayAfterInstant,
@@ -22,20 +22,19 @@ import { ReferenceFilterPill } from "@/components/common/ReferenceFilterPill";
 import { ResultCount } from "@/components/common/ResultCount";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import { springPageParams } from "@/integrations/tanstack-query/spring-page";
+import { loadedPages, springPageParams } from "@/integrations/tanstack-query/spring-page";
 import { dedupeById } from "@/lib/dedupe-by-id";
 import { narrowToEnum, nonEmpty } from "@/lib/search-params";
 
 const PAGE_SIZE = 50;
 
 const EVENT_TYPE_OPTIONS = toFacetOptions(EVENT_TYPE_LABELS);
+const EVENT_TYPES = EVENT_TYPE_OPTIONS.map((option) => option.value);
 
 const OUTCOME_OPTIONS = [
 	{ value: "SUCCESS", label: "Success" },
 	{ value: "FAILURE", label: "Failure" },
 ];
-
-const EVENT_TYPES = Object.keys(EVENT_TYPE_LABELS) as AuthEventType[];
 const OUTCOMES: ("SUCCESS" | "FAILURE")[] = ["SUCCESS", "FAILURE"];
 
 export interface AuthAuditPanelProps {
@@ -66,17 +65,15 @@ export function AuthAuditPanel({
 		...springPageParams,
 	});
 
-	const events: AuthEventView[] = dedupeById(
-		listQuery.data?.pages.flatMap((p) => p.content ?? []) ?? [],
-	);
-	const total = listQuery.data?.pages[0]?.totalElements;
-	const hasAppliedFilter = Boolean(
-		filters.eventType ||
-			filters.result ||
-			filters.accountId !== undefined ||
-			filters.actingAccountId !== undefined ||
-			filters.from,
-	);
+	const pages = loadedPages(listQuery.data);
+	const events: AuthEventView[] = dedupeById(pages.flatMap((p) => p.content ?? []));
+	const total = pages[0]?.totalElements;
+	const hasAppliedFilter =
+		(filters.eventType?.length ?? 0) > 0 ||
+		(filters.result?.length ?? 0) > 0 ||
+		filters.accountId !== undefined ||
+		filters.actingAccountId !== undefined ||
+		filters.from !== undefined;
 
 	const reset = () =>
 		onSearchChange({
@@ -121,7 +118,7 @@ export function AuthAuditPanel({
 						variant="outline"
 						size="sm"
 						className="h-8"
-						onClick={handleExport}
+						onClick={() => void handleExport()}
 						disabled={exporting || events.length === 0}
 					>
 						{exporting ? <Spinner className="size-3.5" /> : <DownloadIcon aria-hidden />}
@@ -172,10 +169,10 @@ export function AuthAuditPanel({
 				isError={listQuery.isError}
 				hasFilter={hasAppliedFilter}
 				onResetFilters={reset}
-				hasNextPage={Boolean(listQuery.hasNextPage)}
+				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => listQuery.fetchNextPage()}
-				onRetry={() => listQuery.refetch()}
+				onLoadMore={() => void listQuery.fetchNextPage()}
+				onRetry={() => void listQuery.refetch()}
 				onFilterAccount={(accountId) => onSearchChange({ accountId })}
 				onFilterActor={(actorId) => onSearchChange({ actorId })}
 				resolveWorkspaceName={resolveWorkspaceName}

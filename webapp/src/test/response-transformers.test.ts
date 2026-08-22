@@ -1,5 +1,5 @@
 import { HttpResponse, http } from "msw";
-import { describe, expect, it } from "vitest";
+import { assert, describe, expect, it } from "vitest";
 import { adminListAuthEvents, listBackfillRuns } from "@/api/sdk.gen";
 import { server } from "@/mocks/server";
 
@@ -30,10 +30,10 @@ describe("generated SDK response transformers", () => {
 		const { data } = await adminListAuthEvents();
 		const occurredAt = data?.content?.[0]?.occurredAt;
 
-		// Not `toBeInstanceOf` alone: a transformer that fabricated `new Date()` would satisfy that
-		// while losing the instant the server sent.
-		expect(occurredAt).toBeInstanceOf(Date);
-		expect((occurredAt as Date).toISOString()).toBe(ISO);
+		// Not `instanceof` alone: a transformer that fabricated `new Date()` would satisfy that while
+		// losing the instant the server sent.
+		assert(occurredAt instanceof Date);
+		expect(occurredAt.toISOString()).toBe(ISO);
 	});
 
 	it("revives dates nested in a list payload, where the recursion could quietly stop", async () => {

@@ -19,9 +19,7 @@ import {
 	curatedEntryCopy,
 } from "./curated-entry-state";
 
-type ShippedDefinition = Partial<
-	Record<keyof CuratedPracticeDefinition | keyof CuratedAreaRequest, unknown>
->;
+type ShippedDefinition = Readonly<Record<string, unknown>>;
 
 interface HephaestusVersionPanelBaseProps {
 	status: CatalogEntryStatus;
@@ -65,10 +63,6 @@ const PRACTICE_FIELDS = {
 	string
 >;
 
-function fieldEntries(fields: Record<string, string>): Array<[keyof ShippedDefinition, string]> {
-	return Object.entries(fields) as Array<[keyof ShippedDefinition, string]>;
-}
-
 function displayValue(
 	field: string,
 	value: unknown,
@@ -78,14 +72,18 @@ function displayValue(
 		return field === "areaSlug" ? "Unassigned" : "Not set";
 	}
 	if (field === "artifactKind") {
-		return artifactKindLabel(String(value));
+		return artifactKindLabel(typeof value === "string" ? value : JSON.stringify(value));
 	}
 	if (field === "areaSlug" && typeof value === "string") {
 		return areaNames[value] ?? "Area no longer exists";
 	}
 	if ((field === "icon" || field === "color") && typeof value === "string")
 		return humanizeToken(value);
-	return Array.isArray(value) ? value.join("\n") : String(value);
+	if (Array.isArray(value)) return value.join("\n");
+	if (typeof value === "string") return value;
+	if (typeof value === "number" || typeof value === "boolean") return String(value);
+	// A nested object has no readable `toString`; show its shape rather than "[object Object]".
+	return JSON.stringify(value);
 }
 
 export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
@@ -110,8 +108,8 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 			: undefined;
 	const headingId = useId();
 	const copy = curatedEntryCopy(status, kind);
-	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion;
-	const canKeep = canKeepCurrentDefinition(status) && onKeepCurrentDefinition;
+	const canReset = canUseHephaestusVersion(status) && onUseHephaestusVersion !== undefined;
+	const canKeep = canKeepCurrentDefinition(status) && onKeepCurrentDefinition !== undefined;
 	const busy = isResetPending || isKeepPending || disabled;
 	const updateAvailable = status.state === "UPDATE_WAITING";
 	const viewLabel = updateAvailable ? "Review Hephaestus update" : "View Hephaestus default";
@@ -148,7 +146,7 @@ export function HephaestusVersionPanel(props: HephaestusVersionPanelProps) {
 								render={<dl />}
 								className="mt-2 space-y-3 rounded-md border bg-muted/40 p-3"
 							>
-								{fieldEntries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
+								{Object.entries(kind === "area" ? AREA_FIELDS : PRACTICE_FIELDS).map(
 									([field, label]) => (
 										<div key={field} className="space-y-1">
 											<dt className="font-medium text-xs">{label}</dt>

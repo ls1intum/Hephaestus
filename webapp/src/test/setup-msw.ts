@@ -33,7 +33,11 @@ if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
 			matches: false,
 			media: query,
 			onchange: null,
+			// `MediaQueryList` still declares the pre-`addEventListener` pair, and library code
+			// feature-detects it, so the stand-in has to answer to it as well.
+			// oxlint-disable-next-line typescript/no-deprecated -- a polyfill has to implement the interface it stands in for
 			addListener: () => {},
+			// oxlint-disable-next-line typescript/no-deprecated -- a polyfill has to implement the interface it stands in for
 			removeListener: () => {},
 			addEventListener: () => {},
 			removeEventListener: () => {},

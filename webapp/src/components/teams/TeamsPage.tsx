@@ -18,7 +18,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	}, [teams]);
 
 	const sortMembers = (team: TeamInfo) => {
-		return [...(team.members ?? [])].sort((a, b) => a.name.localeCompare(b.name));
+		return [...team.members].sort((a, b) => a.name.localeCompare(b.name));
 	};
 
 	const allTeamsById = useMemo(() => {
@@ -67,7 +67,7 @@ export function TeamsPage({ teams, isLoading }: TeamsPageProps) {
 	const membersByTeamId = useMemo(() => {
 		const m = new Map<number, Set<number>>();
 		visibleTeams.forEach((t) => {
-			const ids = new Set<number>((t.members ?? []).map((mm) => mm.id));
+			const ids = new Set<number>(t.members.map((mm) => mm.id));
 			m.set(t.id, ids);
 		});
 		return m;

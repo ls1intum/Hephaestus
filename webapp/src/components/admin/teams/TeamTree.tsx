@@ -2,11 +2,19 @@ import type { LabelInfo, TeamInfo } from "@/api/types.gen";
 import { RepositoryCard } from "./RepositoryCard";
 import { TeamCard } from "./TeamCard";
 
+const HEADING_LEVELS = [2, 3, 4, 5, 6] as const;
+
+type HeadingLevel = (typeof HEADING_LEVELS)[number];
+
+/** One rank below the parent's heading, clamped at the last rank HTML has. */
+const nestedHeadingLevel = (level: HeadingLevel): HeadingLevel =>
+	HEADING_LEVELS[HEADING_LEVELS.indexOf(level) + 1] ?? level;
+
 export interface TeamTreeProps {
 	team: TeamInfo;
 	childrenMap: Map<number, TeamInfo[]>;
 	displaySet: Set<number>;
-	headingLevel?: 2 | 3 | 4 | 5 | 6;
+	headingLevel?: HeadingLevel;
 	onToggleVisibility: (teamId: number, hidden: boolean) => void | Promise<void>;
 	onToggleRepositoryVisibility: (
 		teamId: number,
@@ -33,14 +41,14 @@ export function TeamTree({
 	return (
 		<TeamCard
 			team={team}
-			memberCount={(team.members ?? []).length}
+			memberCount={team.members.length}
 			headingLevel={headingLevel}
-			onToggleVisibility={(hidden) => onToggleVisibility(team.id, hidden)}
+			onToggleVisibility={(hidden) => void onToggleVisibility(team.id, hidden)}
 			getCatalogLabels={getCatalogLabels}
 		>
-			{(team.repositories ?? []).length > 0 ? (
+			{team.repositories.length > 0 ? (
 				<div className="space-y-3">
-					{[...(team.repositories ?? [])]
+					{[...team.repositories]
 						.sort((a, b) => a.nameWithOwner.localeCompare(b.nameWithOwner))
 						.map((repo) => (
 							<RepositoryCard
@@ -70,7 +78,7 @@ export function TeamTree({
 							team={child}
 							childrenMap={childrenMap}
 							displaySet={displaySet}
-							headingLevel={Math.min(headingLevel + 1, 6) as 2 | 3 | 4 | 5 | 6}
+							headingLevel={nestedHeadingLevel(headingLevel)}
 							onToggleVisibility={onToggleVisibility}
 							onToggleRepositoryVisibility={onToggleRepositoryVisibility}
 							onAddLabel={onAddLabel}

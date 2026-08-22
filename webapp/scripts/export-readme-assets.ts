@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { type Browser, chromium } from "playwright";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const webappDirectory = resolve(scriptDirectory, "..");
@@ -10,7 +10,28 @@ const outputDirectory = resolve(webappDirectory, "../docs/images/readme");
 const port = 6106;
 const storybookUrl = `http://127.0.0.1:${port}`;
 
-const exportsToCapture = [
+type Theme = "light" | "dark";
+
+type Breakpoint = "desktop" | "tablet" | "mobile";
+
+interface CaptureConfig {
+	storyId: string;
+	selector: string;
+	viewportWidth: number;
+	/** Asserted after render; a mismatch fails the export instead of committing a resized image. */
+	expectedWidth: number;
+}
+
+interface AssetExport {
+	name: string;
+	desktop: CaptureConfig;
+	tablet?: CaptureConfig;
+	mobile: CaptureConfig;
+}
+
+const themes: Theme[] = ["light", "dark"];
+
+const exportsToCapture: AssetExport[] = [
 	{
 		name: "landing-feedback-preview",
 		desktop: {
@@ -49,7 +70,7 @@ const exportsToCapture = [
 	},
 ];
 
-async function waitForStorybook() {
+async function waitForStorybook(): Promise<void> {
 	for (let attempt = 0; attempt < 120; attempt += 1) {
 		try {
 			const response = await fetch(`${storybookUrl}/index.json`);
@@ -57,12 +78,20 @@ async function waitForStorybook() {
 		} catch {
 			// Storybook is still starting.
 		}
-		await new Promise((resolveDelay) => setTimeout(resolveDelay, 500));
+		await new Promise((resolveDelay) => {
+			setTimeout(resolveDelay, 500);
+		});
 	}
 	throw new Error("Storybook did not start within 60 seconds.");
 }
 
-async function capture(browser, theme, name, mode, config) {
+async function capture(
+	browser: Browser,
+	theme: Theme,
+	name: string,
+	mode: Breakpoint,
+	config: CaptureConfig,
+): Promise<void> {
 	const page = await browser.newPage({
 		viewport: { width: config.viewportWidth, height: 800 },
 		deviceScaleFactor: 2,
@@ -114,7 +143,7 @@ try {
 	await waitForStorybook();
 	const browser = await chromium.launch();
 	try {
-		for (const theme of ["light", "dark"]) {
+		for (const theme of themes) {
 			for (const asset of exportsToCapture) {
 				await capture(browser, theme, asset.name, "desktop", asset.desktop);
 				if (asset.tablet) {

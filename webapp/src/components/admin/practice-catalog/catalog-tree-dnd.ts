@@ -3,10 +3,8 @@ export interface CatalogDropTarget {
 	position: number;
 }
 
-export function getCatalogDropTarget<
-	T extends { areaSlug?: string; displayOrder: number; name: string; slug: string },
->(
-	entries: readonly T[],
+export function getCatalogDropTarget(
+	entries: readonly { areaSlug?: string; displayOrder: number; name: string; slug: string }[],
 	activeSlug: string,
 	areaSlug: string | null,
 	anchorSlug?: string,

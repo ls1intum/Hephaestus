@@ -71,7 +71,7 @@ Before fixing anything, categorize every failure into this table.
 | Priority | Category | Symptoms | Fix Command |
 |----------|----------|----------|-------------|
 | 1 | Formatting | "Formatting failed", biome/prettier diff | `pnpm run format` |
-| 2 | Lint | Biome lint errors | `pnpm run check:fix` |
+| 2 | Lint | oxlint errors | `pnpm run check:webapp:fix` |
 | 3 | TypeScript | TS2xxx errors, type mismatch | Fix the type error in source |
 | 4 | Build failure | Compilation errors, missing exports | Fix imports/exports, verify with `pnpm run build:webapp` |
 | 5 | Webapp tests | "FAIL" in webapp test output | Fix test or source, verify with `pnpm run test:webapp` |

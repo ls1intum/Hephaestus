@@ -51,9 +51,10 @@ export function MarkdownCode({
 	const code = codeText(children);
 	const language = className?.match(LANGUAGE_PATTERN)?.[1] ?? "";
 	const meta =
-		typeof node?.properties?.metastring === "string" ? node.properties.metastring : undefined;
-	const startLineMatch = meta?.match(START_LINE_PATTERN);
-	const parsedStartLine = startLineMatch ? Number.parseInt(startLineMatch[1], 10) : undefined;
+		typeof node?.properties.metastring === "string" ? node.properties.metastring : undefined;
+	const startLineDigits = meta?.match(START_LINE_PATTERN)?.[1];
+	const parsedStartLine =
+		startLineDigits === undefined ? undefined : Number.parseInt(startLineDigits, 10);
 	const startLine = parsedStartLine && parsedStartLine >= 1 ? parsedStartLine : undefined;
 	const lineNumbers = !meta || !NO_LINE_NUMBERS_PATTERN.test(meta);
 

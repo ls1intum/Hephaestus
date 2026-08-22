@@ -372,7 +372,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		!bindingsError &&
 		(mode === "edit" || isValidSlug(form.slug));
 
-	const handleSubmit = (event: React.FormEvent) => {
+	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setSubmitted(true);
 		if (!valid) {
@@ -476,7 +476,9 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 							</Field>
 
 							<Field>
-								<FieldLabel htmlFor="practice-area">Practice area</FieldLabel>
+								<FieldLabel id="practice-area-label" htmlFor="practice-area">
+									Practice area
+								</FieldLabel>
 								<Select
 									items={areaItems}
 									value={form.areaSlug}
@@ -487,7 +489,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 									<SelectTrigger id="practice-area" aria-describedby="practice-area-description">
 										<SelectValue />
 									</SelectTrigger>
-									<SelectContent>
+									<SelectContent aria-labelledby="practice-area-label">
 										{areaItems.map((item) => (
 											<SelectItem key={item.value} value={item.value}>
 												{item.label}

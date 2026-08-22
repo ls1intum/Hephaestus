@@ -93,6 +93,7 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
 
 function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
 	return (
+		// oxlint-disable-next-line jsx-a11y/label-has-associated-control -- a pass-through wrapper; the `htmlFor` or nested control arrives from its own caller, which the same rule checks
 		<Label
 			data-slot="field-label"
 			className={cn(
@@ -182,7 +183,7 @@ function FieldError({
 
 		const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()];
 
-		if (uniqueErrors?.length === 1) {
+		if (uniqueErrors.length === 1) {
 			return uniqueErrors[0]?.message;
 		}
 

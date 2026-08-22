@@ -34,21 +34,18 @@ describe("SessionsSection", () => {
 		// The current session is badged and offers a disabled "Current" control, not a Revoke one.
 		const currentRow = rowByDevice("Chrome 124 on macOS");
 		within(currentRow).getByText("This device");
-		const currentButton = within(currentRow).getByRole("button", { name: "Current session" });
-		expect((currentButton as HTMLButtonElement).disabled).toBe(true);
+		const currentButton = within(currentRow).getByRole<HTMLButtonElement>("button", {
+			name: "Current session",
+		});
+		expect(currentButton.disabled).toBe(true);
 	});
 
 	it("revokes a non-current session and refetches the list (the row disappears)", async () => {
-		// First GET returns all 3 sessions; after the DELETE-driven invalidation the refetch
-		// returns the list without the revoked row, proving the cache was refreshed end-to-end.
-		let listCalls = 0;
 		server.use(
-			http.get("*/user/sessions", () => {
-				listCalls += 1;
-				const remaining =
-					listCalls === 1 ? sessions : sessions.filter((s) => s.jti !== "sess-other-002");
-				return HttpResponse.json(remaining);
-			}),
+			http.get("*/user/sessions", () => HttpResponse.json(sessions), { once: true }),
+			http.get("*/user/sessions", () =>
+				HttpResponse.json(sessions.filter((s) => s.jti !== "sess-other-002")),
+			),
 			http.delete("*/user/sessions/:jti", () => new HttpResponse(null, { status: 204 })),
 		);
 
@@ -85,12 +82,12 @@ describe("SessionsSection", () => {
 
 		const clickedRow = rowByDevice("Firefox 126 on Ubuntu");
 		const otherRow = rowByDevice("Mobile Safari on iOS 18");
-		const clickedBtn = within(clickedRow).getByRole("button", {
+		const clickedBtn = within(clickedRow).getByRole<HTMLButtonElement>("button", {
 			name: "Revoke this session",
-		}) as HTMLButtonElement;
-		const otherBtn = within(otherRow).getByRole("button", {
+		});
+		const otherBtn = within(otherRow).getByRole<HTMLButtonElement>("button", {
 			name: "Revoke this session",
-		}) as HTMLButtonElement;
+		});
 
 		fireEvent.click(clickedBtn);
 

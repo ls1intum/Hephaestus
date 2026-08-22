@@ -26,12 +26,9 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 	const groupedAchievements = achievements.reduce<
 		Partial<Record<AchievementCategory, UIAchievement[]>>
 	>((acc, achievement) => {
-		const category = achievement.category;
-		if (!category) return acc;
-		if (!acc[category]) {
-			acc[category] = [];
-		}
-		acc[category]?.push(achievement);
+		const bucket = acc[achievement.category] ?? [];
+		bucket.push(achievement);
+		acc[achievement.category] = bucket;
 		return acc;
 	}, {});
 
@@ -117,7 +114,7 @@ export function AchievementsListView({ achievements }: AchievementListViewProps)
 												</TableCell>
 												<TableCell>
 													<div>
-														<div className="font-medium">{achievement.name ?? "Unknown"}</div>
+														<div className="font-medium">{achievement.name}</div>
 														<div className="text-sm text-muted-foreground">
 															{achievement.description}
 														</div>

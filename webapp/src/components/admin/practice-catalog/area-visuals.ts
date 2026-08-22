@@ -99,8 +99,11 @@ import {
 	Wrench,
 	Zap,
 } from "lucide-react";
+import { hasText } from "@/lib/text";
 
 export type AreaVisual = { Icon: LucideIcon; pill: string };
+
+const SLATE_PILL = "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
 
 // Tailwind requires complete class names in source to include them in the generated CSS.
 export const PILL: Record<string, string> = {
@@ -121,7 +124,7 @@ export const PILL: Record<string, string> = {
 	fuchsia: "bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-950 dark:text-fuchsia-200",
 	pink: "bg-pink-100 text-pink-700 dark:bg-pink-950 dark:text-pink-200",
 	rose: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-200",
-	slate: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200",
+	slate: SLATE_PILL,
 	gray: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-200",
 	zinc: "bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-200",
 	stone: "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-200",
@@ -245,6 +248,18 @@ function resolveIcon(name?: string | null): LucideIcon | undefined {
 	return name ? ICON_COMPONENTS[name] : undefined;
 }
 
+export function iconComponent(name: string): LucideIcon {
+	return ICON_COMPONENTS[name] ?? Folder;
+}
+
+function pillFor(color?: string | null): string | undefined {
+	return hasText(color) ? PILL[color] : undefined;
+}
+
+export function pillClasses(color?: string | null): string {
+	return pillFor(color) ?? SLATE_PILL;
+}
+
 type Seed = { icon: string; color: string };
 
 const AREA_SEEDS: Record<string, Seed> = {
@@ -292,7 +307,7 @@ export function getAreaVisual(
 	color?: string | null,
 ): AreaVisual {
 	const seed = seedFor(slug, name);
-	const Icon = resolveIcon(icon) ?? ICON_COMPONENTS[seed.icon] ?? Folder;
-	const pill = (color && PILL[color]) || PILL[seed.color] || PILL.slate;
+	const Icon = resolveIcon(icon) ?? iconComponent(seed.icon);
+	const pill = pillFor(color) ?? pillClasses(seed.color);
 	return { Icon, pill };
 }

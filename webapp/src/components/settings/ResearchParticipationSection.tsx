@@ -25,7 +25,7 @@ export function ResearchParticipationSection({
 	onToggleResearch,
 	isLoading = false,
 }: ResearchParticipationSectionProps) {
-	const pending = Boolean(isLoading);
+	const pending = isLoading;
 
 	return (
 		<section className="space-y-4" aria-labelledby="research-heading">

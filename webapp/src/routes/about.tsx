@@ -31,11 +31,10 @@ function AboutContainer() {
 	});
 
 	// Filter out the project manager and bots
-	const otherContributors =
-		contributors?.filter(
-			(contributor) =>
-				contributor.id !== PROJECT_MANAGER_DATA.id && !contributor.login.includes("[bot]"),
-		) || [];
+	const otherContributors = contributors.filter(
+		(contributor) =>
+			contributor.id !== PROJECT_MANAGER_DATA.id && !contributor.login.includes("[bot]"),
+	);
 
 	return (
 		<AboutPage

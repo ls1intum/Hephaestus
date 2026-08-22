@@ -53,7 +53,7 @@ describe("areaVisuals", () => {
 
 	it("matches icons by a word fragment of their split name", () => {
 		const hits = ICON_NAMES.filter((n) => iconSearchText(n).includes("git"));
-		expect(hits).toEqual(expect.arrayContaining(["GitBranch", "GitPullRequest", "GitMerge"]));
+		expect(hits).toStrictEqual(expect.arrayContaining(["GitBranch", "GitPullRequest", "GitMerge"]));
 		expect(hits).not.toContain("ShieldX");
 	});
 });

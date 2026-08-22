@@ -143,9 +143,9 @@ export const MobileReflow: Story = {
 		...Default.args,
 		username: "avery-long-provider-username-that-must-remain-readable",
 		profileData: {
-			...Default.args?.profileData,
+			...Default.args.profileData,
 			userInfo: {
-				...Default.args?.profileData?.userInfo,
+				...Default.args.profileData?.userInfo,
 				id: 99,
 				login: "avery-long-provider-username-that-must-remain-readable",
 				name: "A deliberately long contributor name that wraps cleanly",
@@ -153,14 +153,14 @@ export const MobileReflow: Story = {
 				htmlUrl: "https://github.com/avery-long-provider-username-that-must-remain-readable",
 				leaguePoints: 150,
 			},
-			xpRecord: Default.args?.profileData?.xpRecord ?? {
+			xpRecord: Default.args.profileData?.xpRecord ?? {
 				currentLevel: 5,
 				currentLevelXP: 450,
 				xpNeeded: 1000,
 				totalXP: 5450,
 			},
-			firstContribution: Default.args?.profileData?.firstContribution,
-			contributedRepositories: Default.args?.profileData?.contributedRepositories ?? [],
+			firstContribution: Default.args.profileData?.firstContribution,
+			contributedRepositories: Default.args.profileData?.contributedRepositories ?? [],
 		},
 	},
 	parameters: {

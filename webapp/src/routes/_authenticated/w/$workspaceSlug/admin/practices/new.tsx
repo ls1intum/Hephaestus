@@ -70,7 +70,7 @@ function CreatePracticeContainer() {
 			queryKey: practicesQueryKey,
 		});
 		toast.success("Practice created");
-		navigate({ to: ".." });
+		void navigate({ to: ".." });
 	};
 
 	if (areasQuery.isPending || definitionOptionsQuery.isPending) {
@@ -90,8 +90,8 @@ function CreatePracticeContainer() {
 						error={areasQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice editor"
 						onRetry={() => {
-							areasQuery.refetch();
-							definitionOptionsQuery.refetch();
+							void areasQuery.refetch();
+							void definitionOptionsQuery.refetch();
 						}}
 					/>
 				</div>

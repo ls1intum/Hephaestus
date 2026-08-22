@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
-import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
+import {
+	WorkspaceLlmConnectionFormDialog,
+	type WorkspaceLlmConnectionFormDialogProps,
+} from "./WorkspaceLlmConnectionFormDialog";
 
 const connection: WorkspaceLlmConnection = {
 	id: 7,
@@ -16,7 +19,7 @@ const connection: WorkspaceLlmConnection = {
 	createdAt: new Date("2026-07-01T00:00:00Z"),
 };
 
-function renderDialog(onUpdate = vi.fn()) {
+function renderDialog(onUpdate = vi.fn<WorkspaceLlmConnectionFormDialogProps["onUpdate"]>()) {
 	render(
 		<WorkspaceLlmConnectionFormDialog
 			open
@@ -49,12 +52,12 @@ describe("WorkspaceLlmConnectionFormDialog", () => {
 
 	it("keeps endpoint routing immutable after creation", () => {
 		const onUpdate = renderDialog();
-		expect((screen.getByLabelText("Base URL") as HTMLInputElement).disabled).toBe(true);
+		expect(screen.getByLabelText<HTMLInputElement>("Base URL").disabled).toBe(true);
 		expect(screen.queryByRole("combobox", { name: "Endpoint preset" })).toBeNull();
 		expect(screen.queryByLabelText("Slug")).toBeNull();
 		fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
 		const update = onUpdate.mock.calls[0]?.[1];
-		expect(update).toEqual({
+		expect(update).toStrictEqual({
 			displayName: "Custom endpoint",
 			enabled: true,
 		});

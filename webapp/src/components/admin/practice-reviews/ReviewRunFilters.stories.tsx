@@ -2,7 +2,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, fn, screen, within } from "storybook/test";
 import { StatefulPatch } from "@/stories/stateful";
 import { ReviewRunFilters } from "./ReviewRunFilters";
-import type { RunsSearch } from "./review-search";
 
 /**
  * The toolbar above the Reviews list: a status, a requested-on window, and the count of what they
@@ -27,7 +26,7 @@ const meta = {
 	// Nothing here recomputes "is anything filtered" — the toolbar derives that from the `search` it
 	// is already given, so a story cannot hand it a search and a contradicting answer about it.
 	render: (args) => (
-		<StatefulPatch initial={args.search as RunsSearch}>
+		<StatefulPatch initial={args.search}>
 			{(search, onPatch) => (
 				<ReviewRunFilters
 					{...args}

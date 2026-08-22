@@ -37,7 +37,6 @@ import { FeatureFlagDevTools, useFeatureFlag } from "@/integrations/feature-flag
 import { isPosthogEnabled } from "@/integrations/posthog/config";
 import { isCopilotExcludedRoute } from "@/lib/copilot-route";
 import { getProviderSlug } from "@/lib/provider";
-import type { ChatMessage } from "@/lib/types";
 
 interface MyRouterContext {
 	queryClient: QueryClient;
@@ -50,92 +49,94 @@ declare module "@tanstack/react-router" {
 	}
 }
 
-export const Route = createRootRouteWithContext<MyRouterContext>()({
-	// Fallback tab title; the deepest match that sets its own `head` wins.
-	head: () => ({ meta: [{ title: "Hephaestus" }] }),
-	component: () => {
-		const { pathname } = useLocation();
-		const surface = useMatches({
-			select: (matches) => {
-				for (let index = matches.length - 1; index >= 0; index -= 1) {
-					const matchSurface = matches[index]?.staticData.surface;
-					if (matchSurface) return matchSurface;
-				}
-				return "standard";
-			},
-		});
-		const { isAuthenticated, isLoading } = useAuth();
-		const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
-		const { data: userSettings, isError: userSettingsError } = useQuery({
-			...getUserSettingsOptions({}),
-			enabled: isAuthenticated && isPosthogEnabled,
-			retry: 1,
-		});
-		const allowSurveys =
-			isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
-		const showCopilot =
-			!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
+function RootLayout() {
+	const { pathname } = useLocation();
+	const surface = useMatches({
+		select: (matches) => {
+			for (let index = matches.length - 1; index >= 0; index -= 1) {
+				const matchSurface = matches[index]?.staticData.surface;
+				if (matchSurface) return matchSurface;
+			}
+			return "standard";
+		},
+	});
+	const { isAuthenticated, isLoading } = useAuth();
+	const { enabled: hasMentorAccess } = useFeatureFlag("MENTOR_ACCESS");
+	const { data: userSettings, isError: userSettingsError } = useQuery({
+		...getUserSettingsOptions({}),
+		enabled: isAuthenticated && isPosthogEnabled,
+		retry: 1,
+	});
+	const allowSurveys =
+		isPosthogEnabled && !userSettingsError && (userSettings?.participateInResearch ?? true);
+	const showCopilot =
+		!isLoading && isAuthenticated && hasMentorAccess && !isCopilotExcludedRoute(pathname);
 
-		if (surface === "auth") {
-			return (
-				<>
-					<HeadContent />
-					<CookieConsentBanner />
-					<ProviderColorScope>
-						<main>
-							<Outlet />
-						</main>
-					</ProviderColorScope>
-					<Toaster />
-				</>
-			);
-		}
-
+	if (surface === "auth") {
 		return (
 			<>
 				<HeadContent />
-				{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
 				<CookieConsentBanner />
-				<ImpersonationBanner />
 				<ProviderColorScope>
-					<SidebarProvider>
-						<AppSidebarContainer />
-						<SidebarInset
-							className="min-w-0"
-							style={{ marginRight: "var(--right-sidebar-width, 0)" }}
-						>
-							<HeaderContainer />
-							<div className="flex min-h-0 flex-1 flex-col">
-								{surface === "standard" ? (
-									<StandardPageSurface className="flex-1">
-										<Outlet />
-									</StandardPageSurface>
-								) : (
-									<div
-										className={
-											surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
-										}
-									>
-										<Outlet />
-									</div>
-								)}
-								{surface !== "fullscreen" && (
-									<Footer
-										buildInfo={environment.buildInfo}
-										isProduction={environment.deployment.isProduction}
-									/>
-								)}
-							</div>
-						</SidebarInset>
-					</SidebarProvider>
+					<main>
+						<Outlet />
+					</main>
 				</ProviderColorScope>
 				<Toaster />
-				{showCopilot && <GlobalCopilot />}
-				{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
-				<FeatureFlagDevTools />
 			</>
 		);
-	},
+	}
+
+	return (
+		<>
+			<HeadContent />
+			{/* Rendered early so keyboard/AT users reach the consent region before the app chrome. */}
+			<CookieConsentBanner />
+			<ImpersonationBanner />
+			<ProviderColorScope>
+				<SidebarProvider>
+					<AppSidebarContainer />
+					<SidebarInset
+						className="min-w-0"
+						style={{ marginRight: "var(--right-sidebar-width, 0)" }}
+					>
+						<HeaderContainer />
+						<div className="flex min-h-0 flex-1 flex-col">
+							{surface === "standard" ? (
+								<StandardPageSurface className="flex-1">
+									<Outlet />
+								</StandardPageSurface>
+							) : (
+								<div
+									className={
+										surface === "fullscreen" ? "flex min-h-0 min-w-0 flex-1 flex-col" : "flex-1"
+									}
+								>
+									<Outlet />
+								</div>
+							)}
+							{surface !== "fullscreen" && (
+								<Footer
+									buildInfo={environment.buildInfo}
+									isProduction={environment.deployment.isProduction}
+								/>
+							)}
+						</div>
+					</SidebarInset>
+				</SidebarProvider>
+			</ProviderColorScope>
+			<Toaster />
+			{showCopilot && <GlobalCopilot />}
+			{!isLoading && isAuthenticated && allowSurveys && <PostHogSurveyWidget />}
+			<FeatureFlagDevTools />
+		</>
+	);
+}
+
+export const Route = createRootRouteWithContext<MyRouterContext>()({
+	// Fallback tab title; the deepest match that sets its own `head` wins.
+	head: () => ({ meta: [{ title: "Hephaestus" }] }),
+	component: RootLayout,
 	notFoundComponent: () => (
 		<div className="mx-auto flex w-full max-w-2xl flex-col items-center justify-center py-16 text-center">
 			<h2 className="text-3xl font-bold mb-4">Page Not Found</h2>
@@ -179,7 +180,7 @@ function GlobalCopilot() {
 	};
 
 	const handleCopy = (content: string) => {
-		navigator.clipboard.writeText(content).catch((error) => {
+		navigator.clipboard.writeText(content).catch((error: unknown) => {
 			console.error("Failed to copy to clipboard:", error);
 		});
 	};
@@ -197,14 +198,14 @@ function GlobalCopilot() {
 
 	return (
 		<Copilot
-			hasMessages={(mentorChat.messages?.length ?? 0) > 0}
+			hasMessages={mentorChat.messages.length > 0}
 			onNewChat={() => {
 				mentorChat.setMessages([]);
 			}}
 			onOpenFullChat={() => {
-				const threadId = mentorChat.currentThreadId || mentorChat.id;
+				const threadId = mentorChat.currentThreadId ?? mentorChat.id;
 				if (threadId && workspaceSlug) {
-					router.navigate({
+					void router.navigate({
 						to: "/w/$workspaceSlug/mentor/$threadId",
 						params: { threadId, workspaceSlug },
 					});
@@ -212,14 +213,14 @@ function GlobalCopilot() {
 			}}
 		>
 			<Chat
-				messages={mentorChat.messages as ChatMessage[]}
+				messages={mentorChat.messages}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}
 				attachments={[]}
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
-				onStop={mentorChat.stop}
+				onStop={() => void mentorChat.stop()}
 				onFileUpload={() => Promise.resolve([])}
 				onAttachmentsChange={() => {}}
 				onCopy={handleCopy}
@@ -265,8 +266,8 @@ function HeaderContainer() {
 			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
 			workspaceSlug={workspaceSlug}
-			onLogin={login}
-			onLogout={logout}
+			onLogin={(idpHint) => login(idpHint)}
+			onLogout={() => void logout()}
 		/>
 	);
 }
@@ -331,11 +332,11 @@ function AppSidebarContainer() {
 		selectWorkspace(ws.workspaceSlug);
 		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
 		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		navigate({ href: target, replace: true });
+		void navigate({ href: target, replace: true });
 	};
 
 	const handleAddWorkspace = () => {
-		navigate({ to: "/workspaces/new" });
+		void navigate({ to: "/workspaces/new" });
 	};
 
 	return (

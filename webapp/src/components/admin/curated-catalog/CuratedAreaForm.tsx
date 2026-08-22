@@ -117,7 +117,7 @@ export function CuratedAreaForm(props: CuratedAreaFormProps) {
 	const updateAvailable = mode === "edit" && initialData.status.state === "UPDATE_WAITING";
 	const resetLabel = updateAvailable ? "Apply Hephaestus update" : "Restore Hephaestus default";
 
-	const submit = (event: React.FormEvent) => {
+	const submit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setSubmitted(true);
 		if (!valid) {

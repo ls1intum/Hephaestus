@@ -9,13 +9,11 @@ interface LabelBadgeProps extends React.ComponentPropsWithoutRef<typeof Badge> {
 const HEX_COLOR = /^[0-9a-f]{6}$/i;
 
 function relativeLuminance(hex: string): number {
-	const channels = [0, 2, 4].map(
-		(offset) => Number.parseInt(hex.slice(offset, offset + 2), 16) / 255,
-	);
-	const [red, green, blue] = channels.map((channel) =>
-		channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4,
-	);
-	return red * 0.2126 + green * 0.7152 + blue * 0.0722;
+	const linearise = (offset: number) => {
+		const channel = Number.parseInt(hex.slice(offset, offset + 2), 16) / 255;
+		return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+	};
+	return linearise(0) * 0.2126 + linearise(2) * 0.7152 + linearise(4) * 0.0722;
 }
 
 function labelColors(color?: string): React.CSSProperties | undefined {

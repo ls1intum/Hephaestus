@@ -38,7 +38,8 @@ const NOTHING: ReviewSectionState<never> = { status: "ready", items: [], total: 
 const NOT_YET: ReviewSectionState<never> = { status: "pending" };
 
 /** The practice one of the completed run's observations names, and the one the card is read on. */
-const THIN_CONTROLLERS = workspacePractices[0];
+const THIN_CONTROLLERS = workspacePractices.find((p) => p.slug === "thin-controllers");
+if (!THIN_CONTROLLERS) throw new Error("The practice fixtures no longer cover thin-controllers");
 
 /**
  * One review, end to end: what it looked at, what it concluded, what it said, and how it ran.

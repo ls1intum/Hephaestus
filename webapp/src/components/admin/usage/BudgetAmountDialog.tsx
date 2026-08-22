@@ -1,4 +1,4 @@
-import { type FormEvent, type ReactNode, useId, useState } from "react";
+import { type ReactNode, type SubmitEvent, useId, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
 	Dialog,
@@ -103,7 +103,7 @@ function BudgetAmountDialogContent({
 	const isInvalid = errorMessage != null;
 	const fxHint = fxCapHint(isValid ? parsed : null, fx, isCurrentMonth);
 
-	const handleSubmit = (event: FormEvent) => {
+	const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!isValid) {
 			// The submit button stays enabled precisely so this reveals *why* the value is rejected.

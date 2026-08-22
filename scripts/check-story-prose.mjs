@@ -2,12 +2,11 @@
 /**
  * Storybook publishes the comment above `meta` and above each exported story as that component's Docs
  * page, rendering it through `markdown-to-jsx`. A Java-style `<p>` opens a paragraph the renderer has
- * already opened, so each one puts an empty paragraph on the published page.
+ * already opened, so each one puts an empty paragraph on the published page — visible only there,
+ * which is why this needs a gate at all.
  *
- * The damage shows only on the rendered page, which nobody opens while writing the comment — one branch
- * reached twenty-five occurrences before anyone looked. Biome cannot carry the rule: its GritQL
- * implementation has no comment node to match on. It does not live in the Vitest suite either, because
- * scanning the whole tree inside a worker starves the route tests that share it.
+ * A script rather than a Vitest case: scanning the whole tree inside a worker starves the route tests
+ * that share it.
  */
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";

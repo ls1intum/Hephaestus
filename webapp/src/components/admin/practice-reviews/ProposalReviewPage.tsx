@@ -238,7 +238,7 @@ function RejectFeedbackPopover({
 				</PopoverHeader>
 				<RadioGroup
 					value={reason}
-					onValueChange={(value) => setReason(value as ProposalRejectionReason)}
+					onValueChange={(value) => setReason(value)}
 					aria-label="Rejection category"
 					className="gap-1"
 				>

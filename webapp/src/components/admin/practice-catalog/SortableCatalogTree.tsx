@@ -52,8 +52,10 @@ export interface SortableCatalogEntry {
 	slug: string;
 }
 
+/** Restores focus to the row's action trigger after a reorder moves it. */
+export type ActionTriggerRef = (node: HTMLButtonElement | null) => void;
+
 export interface CatalogMoveActions {
-	actionTriggerRef: (node: HTMLButtonElement | null) => void;
 	canMoveDown: boolean;
 	canMoveUp: boolean;
 	moveDown: () => void;
@@ -84,9 +86,17 @@ export interface SortableCatalogTreeProps<
 	onPlaceEntry: (entrySlug: string, areaSlug: string | null, position: number) => void;
 	renderAreaLeading?: (area: TArea) => ReactNode;
 	renderAreaMeta?: (area: TArea) => ReactNode;
-	renderAreaActions: (area: TArea, actions: CatalogMoveActions) => ReactNode;
+	renderAreaActions: (
+		area: TArea,
+		actions: CatalogMoveActions,
+		actionTriggerRef: ActionTriggerRef,
+	) => ReactNode;
 	renderEntryContent: (entry: TEntry) => ReactNode;
-	renderEntryActions: (entry: TEntry, actions: CatalogEntryMoveActions) => ReactNode;
+	renderEntryActions: (
+		entry: TEntry,
+		actions: CatalogEntryMoveActions,
+		actionTriggerRef: ActionTriggerRef,
+	) => ReactNode;
 	renderEntryPreview?: (entry: TEntry) => ReactNode;
 	getEmptyLabel: (areaSlug: string | null, total: number) => ReactNode;
 	unassignedLabel?: string;
@@ -105,6 +115,15 @@ interface ActiveDrag {
 interface ActiveEntryDrop extends CatalogDropTarget {
 	overType: CatalogDndData["type"];
 }
+
+/** dnd-kit types `data.current` as an open record, so the payload is checked rather than asserted. */
+function isCatalogDndData(data: unknown): data is CatalogDndData {
+	if (typeof data !== "object" || data === null || !("type" in data)) return false;
+	return data.type === "area" || data.type === "bucket" || data.type === "entry";
+}
+
+const catalogDndData = (data: unknown): CatalogDndData | undefined =>
+	isCatalogDndData(data) ? data : undefined;
 
 const areaDndId = (slug: string) => `area:${slug}`;
 const bucketDndId = (areaSlug: string | null) => `bucket:${areaSlug ?? UNASSIGNED_CATALOG_BUCKET}`;
@@ -166,9 +185,9 @@ export function SortableCatalogTree<
 	);
 
 	const collisionDetection: CollisionDetection = (args) => {
-		const activeType = args.active.data.current?.type;
+		const activeType = catalogDndData(args.active.data.current)?.type;
 		const droppableContainers = args.droppableContainers.filter(({ data }) => {
-			const target = data.current as CatalogDndData | undefined;
+			const target = catalogDndData(data.current);
 			if (
 				activeType === "entry" &&
 				target &&
@@ -185,10 +204,8 @@ export function SortableCatalogTree<
 			for (const type of ["entry", "bucket", "area"] as const) {
 				const collision = collisions.find(
 					({ id }) =>
-						(
-							droppableContainers.find((container) => container.id === id)?.data.current as
-								| CatalogDndData
-								| undefined
+						catalogDndData(
+							droppableContainers.find((container) => container.id === id)?.data.current,
 						)?.type === type,
 				);
 				if (collision) return [collision];
@@ -202,8 +219,8 @@ export function SortableCatalogTree<
 		active,
 		over,
 	}: Pick<DragOverEvent, "active" | "over">): CatalogDropTarget | null => {
-		const activeData = active.data.current as CatalogDndData | undefined;
-		const overData = over?.data.current as CatalogDndData | undefined;
+		const activeData = catalogDndData(active.data.current);
+		const overData = catalogDndData(over?.data.current);
 		if (activeData?.type !== "entry" || !over || !overData) return null;
 		const areaSlug = overData.areaSlug;
 		if (blockedMoveDestinationSlugs.has(areaSlug ?? UNASSIGNED_CATALOG_BUCKET)) return null;
@@ -229,20 +246,20 @@ export function SortableCatalogTree<
 	};
 
 	const handleDragStart = ({ active }: DragStartEvent) => {
-		const data = active.data.current as CatalogDndData | undefined;
+		const data = catalogDndData(active.data.current);
 		if (data?.type === "area") setActiveDrag({ type: "area", slug: data.areaSlug });
 		if (data?.type === "entry") setActiveDrag({ type: "entry", slug: data.entrySlug });
 	};
 
 	const handleDragOver = (event: DragOverEvent) => {
 		const target = resolveEntryDropTarget(event);
-		const overData = event.over?.data.current as CatalogDndData | undefined;
+		const overData = catalogDndData(event.over?.data.current);
 		setDropTarget(target && overData ? { ...target, overType: overData.type } : null);
 	};
 
 	const handleDragEnd = (event: DragEndEvent) => {
-		const activeData = event.active.data.current as CatalogDndData | undefined;
-		const overData = event.over?.data.current as CatalogDndData | undefined;
+		const activeData = catalogDndData(event.active.data.current);
+		const overData = catalogDndData(event.over?.data.current);
 		const target = resolveEntryDropTarget(event);
 		resetDrag();
 		if (!event.over || !activeData || !overData) return;
@@ -274,12 +291,12 @@ export function SortableCatalogTree<
 	};
 	const announcements = {
 		onDragStart: ({ active }: Pick<DragStartEvent, "active">) => {
-			const data = active.data.current as CatalogDndData | undefined;
+			const data = catalogDndData(active.data.current);
 			return data ? `Picked up ${data.label}.` : undefined;
 		},
 		onDragOver: ({ active, over }: Pick<DragOverEvent, "active" | "over">) => {
-			const data = active.data.current as CatalogDndData | undefined;
-			const overData = over?.data.current as CatalogDndData | undefined;
+			const data = catalogDndData(active.data.current);
+			const overData = catalogDndData(over?.data.current);
 			if (data?.type === "area") {
 				return overData?.type === "area"
 					? `Moving ${data.label}, position ${sortedAreas.findIndex(({ slug }) => slug === overData.areaSlug) + 1} of ${sortedAreas.length}.`
@@ -292,14 +309,14 @@ export function SortableCatalogTree<
 				: undefined;
 		},
 		onDragEnd: ({ active, over }: Pick<DragEndEvent, "active" | "over">) => {
-			const data = active.data.current as CatalogDndData | undefined;
+			const data = catalogDndData(active.data.current);
 			if (data?.type === "entry") {
 				const target = resolveEntryDropTarget({ active, over });
 				return target
 					? `Moved ${data.label} to ${describeTarget(target, data.entrySlug)}.`
 					: "Move cancelled.";
 			}
-			const overData = over?.data.current as CatalogDndData | undefined;
+			const overData = catalogDndData(over?.data.current);
 			return data && overData?.type === "area"
 				? `Moved ${data.label} to position ${sortedAreas.findIndex(({ slug }) => slug === overData.areaSlug) + 1} of ${sortedAreas.length}.`
 				: "Move cancelled.";
@@ -334,7 +351,6 @@ export function SortableCatalogTree<
 			);
 		};
 		return {
-			actionTriggerRef: registerActionTrigger(focusKey),
 			canMoveUp: !disabled && index > 0,
 			canMoveDown: !disabled && index < sortedAreas.length - 1,
 			moveUp: () => move(-1),
@@ -357,7 +373,6 @@ export function SortableCatalogTree<
 			onPlaceEntry(entry.slug, currentAreaSlug, position);
 		};
 		return {
-			actionTriggerRef: registerActionTrigger(focusKey),
 			canMoveUp: !reorderDisabled && index > 0,
 			canMoveDown: !reorderDisabled && index >= 0 && index < ordered.length - 1,
 			moveUp: () => moveToPosition(index - 1),
@@ -417,7 +432,9 @@ export function SortableCatalogTree<
 					multiple
 					value={sortedAreas
 						.map((area) => area.slug)
-						.filter((slug) => forceOpenAreaSlugs?.has(slug) || !collapsedAreas.includes(slug))}
+						.filter(
+							(slug) => (forceOpenAreaSlugs?.has(slug) ?? false) || !collapsedAreas.includes(slug),
+						)}
 					onValueChange={(open) =>
 						setCollapsedAreas(
 							sortedAreas.map((area) => area.slug).filter((slug) => !open.includes(slug)),
@@ -440,11 +457,19 @@ export function SortableCatalogTree<
 							renderLeading={renderAreaLeading}
 							renderMeta={renderAreaMeta}
 							renderActions={(candidate) =>
-								renderAreaActions(candidate, areaMoveActions(candidate))
+								renderAreaActions(
+									candidate,
+									areaMoveActions(candidate),
+									registerActionTrigger(areaDndId(candidate.slug)),
+								)
 							}
 							renderEntryContent={renderEntryContent}
 							renderEntryActions={(candidate) =>
-								renderEntryActions(candidate, entryMoveActions(candidate))
+								renderEntryActions(
+									candidate,
+									entryMoveActions(candidate),
+									registerActionTrigger(entryDndId(candidate.slug)),
+								)
 							}
 							emptyLabel={getEmptyLabel(area.slug, totalByArea.get(area.slug) ?? 0)}
 						/>
@@ -469,7 +494,13 @@ export function SortableCatalogTree<
 							dropTarget={dropTarget}
 							showEntryReorderHandles={showEntryReorderHandles}
 							renderContent={renderEntryContent}
-							renderActions={(entry) => renderEntryActions(entry, entryMoveActions(entry))}
+							renderActions={(entry) =>
+								renderEntryActions(
+									entry,
+									entryMoveActions(entry),
+									registerActionTrigger(entryDndId(entry.slug)),
+								)
+							}
 							emptyLabel={getEmptyLabel(null, totalByArea.get(UNASSIGNED_CATALOG_BUCKET) ?? 0)}
 						/>
 					</div>
@@ -640,7 +671,7 @@ function EntryBucket<TEntry extends SortableCatalogEntry>({
 		disabled:
 			reorderDisabled || blockedMoveDestinationSlugs.has(areaSlug ?? UNASSIGNED_CATALOG_BUCKET),
 	});
-	const activeData = active?.data.current as CatalogDndData | undefined;
+	const activeData = catalogDndData(active?.data.current);
 	const isEntryDrag = activeData?.type === "entry";
 	const activeEntrySlug = activeData?.type === "entry" ? activeData.entrySlug : undefined;
 	const destinationEntries = entries.filter((entry) => entry.slug !== activeEntrySlug);

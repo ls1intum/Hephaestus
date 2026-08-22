@@ -88,9 +88,9 @@ function PracticeCatalogRoute() {
 					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
-						areasQuery.refetch();
-						practicesQuery.refetch();
-						definitionOptionsQuery.refetch();
+						void areasQuery.refetch();
+						void practicesQuery.refetch();
+						void definitionOptionsQuery.refetch();
 					}}
 				/>
 			) : (
@@ -109,7 +109,7 @@ function PracticeCatalogRoute() {
 					}}
 					focusFilter={focus ?? "ALL"}
 					onFocusFilterChange={(next: FocusFilter) =>
-						navigate({
+						void navigate({
 							search: { focus: next === "ALL" ? undefined : next },
 						})
 					}
@@ -142,7 +142,7 @@ function PracticeCatalogRoute() {
 						})
 					}
 					onDeleteArea={(areaSlug) =>
-						setDeletingArea(areasQuery.data?.find((area) => area.slug === areaSlug) ?? null)
+						setDeletingArea(areasQuery.data.find((area) => area.slug === areaSlug) ?? null)
 					}
 					onReorderAreas={(orderedSlugs) =>
 						catalog.reorderAreas.mutate({ path: { workspaceSlug }, body: { orderedSlugs } })

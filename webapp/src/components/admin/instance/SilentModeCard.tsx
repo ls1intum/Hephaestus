@@ -1,5 +1,5 @@
 import { Volume2, VolumeX } from "lucide-react";
-import { type FormEvent, useState } from "react";
+import { type SubmitEvent, useState } from "react";
 import type { InstanceSettings } from "@/api/types.gen";
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -71,7 +71,7 @@ export function SilentModeCard({
 		setReleaseOpen(true);
 	};
 
-	const confirmRelease = (event: FormEvent) => {
+	const confirmRelease = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (releaseDisabled) return;
 		if (confirmWord.trim() !== RELEASE_CONFIRM_WORD) {

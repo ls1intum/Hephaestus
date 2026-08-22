@@ -126,7 +126,7 @@ export function SynthwaveEdge(props: EdgeProps<SynthwaveEdge>) {
 						targetY,
 						layer.amplitude,
 						layer.frequency,
-						phases[i] + layer.phaseOffset,
+						(phases[i] ?? 0) + layer.phaseOffset,
 						layer.harmonic,
 						layer.harmonicAmp,
 					)}

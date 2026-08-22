@@ -1,5 +1,5 @@
-import type { LlmUsageByDay, LlmUsageByJobType } from "@/api/types.gen";
-import { asDate } from "@/lib/dates";
+import type { LlmUsageByJobType } from "@/api/types.gen";
+import { asDate, type DateLike } from "@/lib/dates";
 
 export type LlmJobType = LlmUsageByJobType["jobType"];
 
@@ -41,7 +41,7 @@ export function formatMonthLabel(month: string): string {
 }
 
 /** A day bucket as `Jul 22`. An unparseable day renders a dash rather than `Invalid Date`. */
-export function formatUsageDay(value: LlmUsageByDay["day"]): string {
+export function formatUsageDay(value: DateLike): string {
 	const date = asDate(value);
 	if (!date) return "–";
 	return date.toLocaleDateString(undefined, {

@@ -3,7 +3,6 @@ import { Chat } from "@/components/mentor/Chat";
 import { defaultPartRenderers } from "@/components/mentor/renderers";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMentorChat } from "@/hooks/use-mentor-chat";
-import type { ChatMessage } from "@/lib/types";
 
 export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$threadId")({
 	component: ThreadContainer,
@@ -29,7 +28,7 @@ function ThreadContainer() {
 	};
 
 	const handleCopy = (content: string) => {
-		navigator.clipboard.writeText(content).catch((error) => {
+		navigator.clipboard.writeText(content).catch((error: unknown) => {
 			console.error("Failed to copy to clipboard:", error);
 		});
 	};
@@ -108,7 +107,7 @@ function ThreadContainer() {
 		);
 	}
 
-	if (!mentorChat.threadDetail && !mentorChat.isThreadLoading) {
+	if (!mentorChat.threadDetail) {
 		return (
 			<div className="h-full flex items-center justify-center p-6">
 				<div className="text-center">
@@ -121,17 +120,17 @@ function ThreadContainer() {
 	return (
 		<div className="flex flex-col flex-1 min-h-0">
 			<Chat
-				messages={mentorChat.messages as unknown as ChatMessage[]}
+				messages={mentorChat.messages}
 				votes={mentorChat.votes}
 				status={mentorChat.status}
 				readonly={false}
 				attachments={[]}
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
-				onStop={mentorChat.stop}
+				onStop={() => void mentorChat.stop()}
 				onReload={() => {
 					mentorChat.clearError();
-					mentorChat.regenerate();
+					void mentorChat.regenerate();
 				}}
 				onFileUpload={() => Promise.resolve([])}
 				onAttachmentsChange={() => {}}

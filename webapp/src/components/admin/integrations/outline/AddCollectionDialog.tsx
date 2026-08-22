@@ -135,7 +135,7 @@ export function AddCollectionDialog({
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
-						submit();
+						void submit();
 					}}
 				>
 					{isLoading ? (
@@ -149,7 +149,7 @@ export function AddCollectionDialog({
 							error={error}
 							title="Could not reach Outline"
 							onRetry={() => {
-								refetch();
+								void refetch();
 							}}
 						/>
 					) : all.length === 0 ? (

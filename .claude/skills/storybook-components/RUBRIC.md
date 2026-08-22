@@ -71,7 +71,7 @@ is a **pass condition, not an achievement**.
 ## Dimension 4 — Do the Controls drive the real component?
 
 - **D** — `meta` names a `component` but is typed bare `Meta`. (Already a build failure:
-  `webapp/.biome/typed-story-meta.grit`.)
+  `hephaestus/typed-story-meta`.)
 - **C** — `render: () => <Thing fixed={…} />` — the args object is ignored, so the Controls panel edits
   nothing and `autodocs` publishes an API nobody can exercise.
 - **B** — Every story is `args`-driven, or `render: (args) => <Harness {...args} />`; at least one story
@@ -113,8 +113,8 @@ gap. They are vendored shadcn and editing them is forbidden. Do not open that as
 
 ## Dimension 6 — Can the play function fail?
 
-- **D** — `expect(canvas.getByRole(…)).toBeInTheDocument()` or a bare `await expect(getBy(…))`. (Already
-  a build failure: `webapp/.biome/no-redundant-in-the-document.grit`.)
+- **D** — `expect(canvas.getByRole(…)).toBeInTheDocument()` (`hephaestus/no-redundant-in-the-document`)
+  or a bare `await expect(getBy(…))` (`vitest/valid-expect`). Both are already build failures.
 - **C** — The play renders and asserts presence of text the story itself supplied — true whatever the
   component does with it.
 - **B** — The assertion names a value the component **derived**: a label the registry produced, a count it
@@ -183,10 +183,10 @@ have one.
 
 - **D** — A new rule added to prose that contradicts existing code, with no migration and no gate.
 - **C** — Rule in prose, no gate.
-- **B** — Rule in prose plus a mechanical check — a GritQL plugin in `webapp/.biome/`, or a node gate in
-  `scripts/` wired into `pnpm run check`.
+- **B** — Rule in prose plus a mechanical check — an oxlint rule in `webapp/tools/oxlint/rules/`, or a
+  node gate in `scripts/` wired into `pnpm run check`.
 - **A** — B, and the gate's own comment explains the two neighbouring shapes it deliberately does *not*
-  match, so nobody widens it into a nuisance (both existing plugins do this).
+  match, so nobody widens it into a nuisance (all three house rules do this).
 - **A+** — The gate is shrink-only: an allowlist entry that scans clean fails the build, so it cannot go
   stale (`scripts/check-presentational-components.mjs`).
 

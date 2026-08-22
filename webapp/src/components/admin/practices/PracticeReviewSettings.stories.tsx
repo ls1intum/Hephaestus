@@ -70,10 +70,10 @@ type Story = StoryObj<typeof meta>;
 async function expectSwitchSitsBesideItsLabel(control: HTMLElement) {
 	const field = control.closest<HTMLElement>('[data-slot="field"]');
 	const content = field?.querySelector<HTMLElement>('[data-slot="field-content"]');
-	await expect(content, "The switch is not in a Field with a FieldContent.").not.toBeNull();
+	if (!content) throw new Error("The switch is not in a Field with a FieldContent.");
 
 	const controlBox = control.getBoundingClientRect();
-	const contentBox = (content as HTMLElement).getBoundingClientRect();
+	const contentBox = content.getBoundingClientRect();
 	await expect(controlBox.left).toBeGreaterThanOrEqual(contentBox.right);
 	await expect(controlBox.top).toBeGreaterThanOrEqual(contentBox.top);
 	await expect(controlBox.top).toBeLessThan(contentBox.bottom);

@@ -1,9 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { GitLabMergeRequestIcon } from "./gitlab-icons";
-import type { PullRequestState } from "./provider-icons";
-import { getPullRequestStateIcon } from "./provider-icons";
-import type { ProviderType } from "./provider-terms";
-import { getProviderSlug, getProviderTerms } from "./provider-terms";
+import { getPullRequestStateIcon, type PullRequestState } from "./provider-icons";
+import { getProviderSlug, getProviderTerms, type ProviderType } from "./provider-terms";
 
 /**
  * Visual reference for all provider-specific pull request / merge request icons.

@@ -20,7 +20,7 @@ export function RedirectToWorkspace() {
 		const targetSlug = workspaceSlug ?? workspaces[0]?.workspaceSlug;
 		if (targetSlug) {
 			selectWorkspace(targetSlug);
-			navigate({
+			void navigate({
 				to: "/w/$workspaceSlug",
 				params: { workspaceSlug: targetSlug },
 				replace: true,

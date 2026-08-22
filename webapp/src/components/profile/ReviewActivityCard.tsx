@@ -8,6 +8,13 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { getPullRequestStateIcon, type IconComponent, type ProviderType } from "@/lib/provider";
 import { cn } from "@/lib/utils";
 
+const UNKNOWN_STATE_STYLE = {
+	icon: null,
+	color: "text-provider-muted-foreground",
+	skeletonColor: "bg-provider-muted-foreground/30",
+	tooltip: "Reviewed",
+};
+
 const REVIEW_STATE_STYLES: Record<
 	string,
 	{
@@ -35,12 +42,7 @@ const REVIEW_STATE_STYLES: Record<
 		skeletonColor: "bg-provider-muted-foreground/30",
 		tooltip: "Commented",
 	},
-	UNKNOWN: {
-		icon: null,
-		color: "text-provider-muted-foreground",
-		skeletonColor: "bg-provider-muted-foreground/30",
-		tooltip: "Reviewed",
-	},
+	UNKNOWN: UNKNOWN_STATE_STYLE,
 	PENDING: {
 		icon: null,
 		color: "text-provider-muted-foreground",
@@ -89,7 +91,7 @@ export function ReviewActivityCard({
 	score,
 	providerType = "GITHUB",
 }: ReviewActivityCardProps) {
-	const stateStyle = REVIEW_STATE_STYLES[state] || REVIEW_STATE_STYLES.UNKNOWN;
+	const stateStyle = REVIEW_STATE_STYLES[state] ?? UNKNOWN_STATE_STYLE;
 	const StateIcon = stateStyle.icon ?? getPullRequestStateIcon(providerType, "OPEN").icon;
 
 	const relativeTime = submittedAt

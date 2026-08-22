@@ -103,7 +103,7 @@ export function AddChannelDialog({
 				<form
 					onSubmit={(e) => {
 						e.preventDefault();
-						submit();
+						void submit();
 					}}
 				>
 					<FieldGroup>

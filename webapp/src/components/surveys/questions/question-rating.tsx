@@ -62,12 +62,12 @@ export function QuestionRating({
 
 	const handleNumericChange = (nextValue: readonly string[]) => {
 		// Base UI ToggleGroup uses array-based API - take the last selected value
-		const value = nextValue[nextValue.length - 1];
-		if (!value) {
+		const picked = nextValue[nextValue.length - 1];
+		if (!picked) {
 			return;
 		}
 
-		const parsed = Number(value);
+		const parsed = Number(picked);
 		if (!Number.isNaN(parsed)) {
 			onChange(parsed);
 		}

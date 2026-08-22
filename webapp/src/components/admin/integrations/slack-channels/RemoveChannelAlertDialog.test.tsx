@@ -33,7 +33,7 @@ describe("RemoveChannelAlertDialog — resets on close", () => {
 		expect(onOpenChange).toHaveBeenCalledWith(false);
 
 		// Same instance persists (no `key`-driven remount) — the fields reset synchronously.
-		expect((screen.getByLabelText(/to confirm/i) as HTMLInputElement).value).toBe("");
-		expect((screen.getByLabelText(/reason/i) as HTMLTextAreaElement).value).toBe("");
+		expect(screen.getByLabelText<HTMLInputElement>(/to confirm/i).value).toBe("");
+		expect(screen.getByLabelText<HTMLTextAreaElement>(/reason/i).value).toBe("");
 	});
 });

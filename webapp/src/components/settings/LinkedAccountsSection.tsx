@@ -35,6 +35,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
+import { firstNonBlank } from "@/lib/text";
 
 const PROVIDER_ICONS: Record<string, LucideIcon> = {
 	GITHUB: GithubIcon,
@@ -45,6 +46,8 @@ const PROVIDER_ICONS: Record<string, LucideIcon> = {
 
 /** Providers that can only be *linked* from Settings — they are never a sign-in method. */
 const LINK_ONLY_PROVIDER_TYPES = new Set(["SLACK", "OUTLINE"]);
+
+type LinkableProvider = IdentityProviderView & { registrationId: string };
 
 /**
  * Why each link-only account is worth connecting. Both are linked, never signed in with, so the copy
@@ -138,9 +141,9 @@ export function LinkedAccountsSection({
 	// either (Outline is unique on (type, base_url), one row per deployment), so this is a list and
 	// never a single `find(...)` match; each unconnected one is named by its display name.
 	const linkOnlyProviders = linkableProviders.filter(
-		(provider) =>
+		(provider): provider is LinkableProvider =>
 			LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? "") &&
-			provider.registrationId,
+			Boolean(provider.registrationId),
 	);
 	const signInProviders = linkableProviders.filter(
 		(provider) => !LINK_ONLY_PROVIDER_TYPES.has(provider.providerType?.toUpperCase() ?? ""),
@@ -213,7 +216,8 @@ export function LinkedAccountsSection({
 								const identityId = identity.id;
 								const Icon = getProviderIcon(identity.providerType);
 								const name =
-									identity.displayName || identity.username || identity.subject || "Account";
+									firstNonBlank(identity.displayName, identity.username, identity.subject) ??
+									"Account";
 								const lastLogin = formatLastLogin(identity.lastLoginAt);
 
 								return (
@@ -259,8 +263,9 @@ export function LinkedAccountsSection({
 							{linkOnlyProviders.map((provider) => {
 								const type = provider.providerType?.toUpperCase() ?? "";
 								const Icon = getProviderIcon(type);
-								const label = provider.displayName || getProviderLabel(type, "this account");
-								const registrationId = provider.registrationId as string;
+								const label =
+									firstNonBlank(provider.displayName) ?? getProviderLabel(type, "this account");
+								const registrationId = provider.registrationId;
 								return (
 									<Item key={registrationId} variant="outline" role="listitem">
 										<ItemMedia variant="icon">
@@ -297,7 +302,8 @@ export function LinkedAccountsSection({
 							<div className="flex flex-wrap gap-2 pt-1">
 								{signInProviders.map((provider) => {
 									const Icon = getProviderIcon(provider.providerType);
-									const label = provider.displayName || provider.registrationId || "provider";
+									const label =
+										firstNonBlank(provider.displayName, provider.registrationId) ?? "provider";
 									return (
 										<Button
 											key={provider.registrationId ?? label}

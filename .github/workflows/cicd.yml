@@ -324,8 +324,8 @@ jobs:
               echo "|-------|-------------|" >> $GITHUB_STEP_SUMMARY
               echo "| Formatting errors | \`pnpm run format\` |" >> $GITHUB_STEP_SUMMARY
               echo "| TypeScript errors | \`pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Biome lint errors (webapp) | \`pnpm run lint:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
-              echo "| Biome lint errors (agent runtime + scripts) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Lint errors (agent runtime + scripts) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
               echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY

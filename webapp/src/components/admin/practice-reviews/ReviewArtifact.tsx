@@ -4,6 +4,7 @@ import type { ReviewArtifact as ReviewArtifactData, ReviewRunTarget } from "@/ap
 import { GithubIcon, GitlabIcon, OutlineIcon, SlackIcon } from "@/components/icons/brand";
 import {
 	ARTIFACT_KIND,
+	ARTIFACT_KIND_VALUES,
 	artifactKindIcon,
 	artifactKindLabel,
 	artifactKindPluralLabel,
@@ -32,8 +33,7 @@ export function reviewArtifactTypeSlug(kind: string): ReviewArtifactTypeSlug | u
 }
 
 export function reviewArtifactTypeFromSlug(slug: string): KnownArtifactKind | undefined {
-	const entry = Object.entries(ARTIFACT_KIND_SLUGS).find(([, value]) => value === slug);
-	return entry?.[0] as KnownArtifactKind | undefined;
+	return ARTIFACT_KIND_VALUES.find((kind) => ARTIFACT_KIND_SLUGS[kind] === slug);
 }
 
 type ArtifactGlyph = ComponentType<{ className?: string; "aria-hidden"?: boolean }>;

@@ -1,9 +1,9 @@
 import { ClockIcon, GitBranchIcon, GitCommitIcon } from "@primer/octicons-react";
 import { Link } from "@tanstack/react-router";
-
 import { RelativeTime } from "@/components/common/RelativeTime";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { optionalIntegrationsAvailable, requestConsentReopen } from "@/integrations/consent";
+import { hasText } from "@/lib/text";
 import { cn } from "@/lib/utils";
 
 export interface FooterProps {
@@ -18,7 +18,8 @@ export interface FooterProps {
 
 export default function Footer({ className, isProduction, buildInfo }: FooterProps) {
 	const showBuildInfo =
-		!isProduction && (buildInfo?.branch || buildInfo?.commit || buildInfo?.deployedAt);
+		!isProduction &&
+		(hasText(buildInfo?.branch) || hasText(buildInfo?.commit) || hasText(buildInfo?.deployedAt));
 
 	return (
 		<footer className={cn("border-t border-sidebar-border bg-sidebar py-2", className)}>
@@ -95,7 +96,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 
 					{showBuildInfo && (
 						<div className="hidden items-center gap-2 border-l border-sidebar-border pl-4 font-mono text-xs text-muted-foreground xl:flex">
-							{buildInfo?.branch && (
+							{buildInfo.branch && (
 								<Tooltip>
 									<TooltipTrigger
 										render={
@@ -115,7 +116,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 								</Tooltip>
 							)}
 
-							{buildInfo?.commit && (
+							{buildInfo.commit && (
 								<Tooltip>
 									<TooltipTrigger
 										render={
@@ -135,7 +136,7 @@ export default function Footer({ className, isProduction, buildInfo }: FooterPro
 								</Tooltip>
 							)}
 
-							{buildInfo?.deployedAt && (
+							{buildInfo.deployedAt && (
 								<span className="flex items-center gap-1">
 									<ClockIcon size={12} aria-hidden />
 									<RelativeTime value={buildInfo.deployedAt} />

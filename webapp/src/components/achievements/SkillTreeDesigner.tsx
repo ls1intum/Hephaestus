@@ -35,6 +35,10 @@ import {
 	getMiniMapNodeColor,
 } from "@/components/achievements/utils";
 
+function isRegisteredAchievementId(id: string): id is AchievementId {
+	return Object.hasOwn(ACHIEVEMENT_REGISTRY, id);
+}
+
 const FIT_VIEW_OPTIONS = { padding: 0.15 } as const;
 const PRO_OPTIONS = { hideAttribution: true } as const;
 
@@ -124,18 +128,21 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				status: "unlocked" as const,
 			}));
 		} else {
-			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).map(
-				([id, def]) =>
-					({
-						...def,
-						id: id as AchievementId,
-						status: "unlocked" as const,
-						category: "milestones" as const,
-						rarity: "common" as const,
-						isHidden: false,
-						progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
-						unlockedAt: new Date(),
-					}) satisfies UIAchievement,
+			displayAchievements = Object.entries(ACHIEVEMENT_REGISTRY).flatMap(([id, def]) =>
+				isRegisteredAchievementId(id)
+					? [
+							{
+								...def,
+								id,
+								status: "unlocked" as const,
+								category: "milestones" as const,
+								rarity: "common" as const,
+								isHidden: false,
+								progressData: { type: "BinaryAchievementProgress" as const, unlocked: true },
+								unlockedAt: new Date(),
+							} satisfies UIAchievement,
+						]
+					: [],
 			);
 		}
 
@@ -163,25 +170,25 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				onSnapSizeChange={setSnapSize}
 				showTooltips={showTooltips}
 				onShowTooltipsChange={setShowTooltips}
-				onSave={saveLayout}
+				onSave={() => void saveLayout()}
 				edgeDisplayMode={edgeDisplayMode}
 				onEdgeDisplayModeChange={setEdgeDisplayMode}
 			/>
 
 			<ReactFlow
 				nodes={nodes.map((n) => {
-					if (n.type === "categoryLabel") return n;
-					return {
-						...n,
-						data: { ...n.data, showTooltips },
-					} as AchievementNode | AvatarNode;
+					// One branch per node kind: spreading the union merges the two `data` shapes into one
+					// that fits neither.
+					if (n.type === "achievement") return { ...n, data: { ...n.data, showTooltips } };
+					if (n.type === "avatar") return { ...n, data: { ...n.data, showTooltips } };
+					return n;
 				})}
 				edges={edges}
 				onNodesChange={handleNodesChange}
 				onEdgesChange={onEdgesChange}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
-				onInit={(instance) => instance.fitView(FIT_VIEW_OPTIONS)}
+				onInit={(instance) => void instance.fitView(FIT_VIEW_OPTIONS)}
 				fitView={true}
 				fitViewOptions={FIT_VIEW_OPTIONS}
 				minZoom={0.15}

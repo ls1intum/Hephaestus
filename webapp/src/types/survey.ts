@@ -1,8 +1,8 @@
-import type {
-	SurveyQuestion as PostHogSurveyQuestion,
-	Survey as PostHogSurveyRaw,
+import {
+	type SurveyQuestion as PostHogSurveyQuestion,
+	type Survey as PostHogSurveyRaw,
+	SurveyQuestionBranchingType,
 } from "posthog-js";
-import { SurveyQuestionBranchingType } from "posthog-js";
 
 export type SurveyQuestionType = "open" | "link" | "rating" | "single_choice" | "multiple_choice";
 
@@ -58,7 +58,7 @@ export const normalisePostHogSurvey = (survey: PostHogSurveyRaw): PostHogSurvey 
 	const questions = survey.questions.map((question, index) =>
 		normalizeQuestion({
 			question,
-			questionId: normalizedIds[index],
+			questionId: normalizedIds[index] ?? `${survey.id}-question-${index + 1}`,
 			allQuestions: survey.questions,
 			normalizedIds,
 		}),
@@ -120,10 +120,10 @@ const normalizeQuestion = ({
 				descriptionContentType: question.descriptionContentType ?? "text",
 				required: !(question.optional ?? false),
 				buttonText: question.buttonText ?? undefined,
-				scale: question.scale ?? 5,
-				display: question.display ?? "number",
-				lowerBoundLabel: question.lowerBoundLabel ?? undefined,
-				upperBoundLabel: question.upperBoundLabel ?? undefined,
+				scale: question.scale,
+				display: question.display,
+				lowerBoundLabel: question.lowerBoundLabel,
+				upperBoundLabel: question.upperBoundLabel,
 				branching,
 			};
 		case "single_choice":
@@ -136,7 +136,7 @@ const normalizeQuestion = ({
 				descriptionContentType: question.descriptionContentType ?? "text",
 				required: !(question.optional ?? false),
 				buttonText: question.buttonText ?? undefined,
-				choices: [...(question.choices ?? [])],
+				choices: [...question.choices],
 				hasOpenChoice: question.hasOpenChoice ?? false,
 				shuffleOptions: question.shuffleOptions ?? undefined,
 				skipSubmitButton: question.skipSubmitButton ?? undefined,

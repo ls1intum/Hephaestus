@@ -147,7 +147,11 @@ export function RemoveChannelAlertDialog({
 
 				<AlertDialogFooter>
 					<AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-					<AlertDialogAction variant="destructive" disabled={submitting} onClick={confirm}>
+					<AlertDialogAction
+						variant="destructive"
+						disabled={submitting}
+						onClick={() => void confirm()}
+					>
 						{submitting ? "Removing…" : nothingCollected ? "Remove" : "Remove & erase"}
 					</AlertDialogAction>
 				</AlertDialogFooter>

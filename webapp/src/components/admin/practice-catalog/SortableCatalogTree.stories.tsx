@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react-vite";
+import type { Meta, StoryContext, StoryObj } from "@storybook/react-vite";
 import { useState } from "react";
 import { expect, fn, screen, userEvent, waitFor, within } from "storybook/test";
 import { Button } from "@/components/ui/button";
@@ -111,11 +111,11 @@ function CatalogTreeHarness({
 			showEntryReorderHandles
 			onReorderAreas={onReorderAreas}
 			onPlaceEntry={place}
-			renderAreaActions={(area, move) => (
+			renderAreaActions={(area, move, actionTriggerRef) => (
 				<Button
 					variant="outline"
 					size="sm"
-					ref={move.actionTriggerRef}
+					ref={actionTriggerRef}
 					aria-disabled={!move.canMoveDown}
 					aria-label={`Move ${area.name} down`}
 					onClick={move.moveDown}
@@ -124,12 +124,12 @@ function CatalogTreeHarness({
 				</Button>
 			)}
 			renderEntryContent={(entry) => <span className="min-w-0 truncate">{entry.name}</span>}
-			renderEntryActions={(entry, move) => (
+			renderEntryActions={(entry, move, actionTriggerRef) => (
 				<DropdownMenu>
 					<DropdownMenuTrigger
 						render={
 							<Button
-								ref={move.actionTriggerRef}
+								ref={actionTriggerRef}
 								variant="ghost"
 								size="sm"
 								aria-label={`More actions for ${entry.name}`}
@@ -181,7 +181,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const openActions = async (canvas: ReturnType<typeof within>, name: string) => {
+const openActions = async (canvas: StoryContext["canvas"], name: string) => {
 	// A menu left over from a previous step outlives the click that dismissed it by a frame, and
 	// `findByRole("menu")` would hand back that one.
 	await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
@@ -190,9 +190,9 @@ const openActions = async (canvas: ReturnType<typeof within>, name: string) => {
 };
 
 const announcement = () =>
-	document.querySelector('[id^="DndLiveRegion"]')?.textContent?.trim() ?? "";
+	document.querySelector('[id^="DndLiveRegion"]')?.textContent.trim() ?? "";
 
-const rowOf = (canvas: ReturnType<typeof within>, name: string) => {
+const rowOf = (canvas: StoryContext["canvas"], name: string) => {
 	const row = canvas.getByRole("button", { name: `Reorder ${name}` }).closest('[role="listitem"]');
 	if (!(row instanceof HTMLElement)) throw new Error(`No row for ${name}`);
 	return row;

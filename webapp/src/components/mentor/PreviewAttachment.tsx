@@ -18,7 +18,7 @@ export const PreviewAttachment = ({
 						<img
 							key={url}
 							src={url}
-							alt={name ?? "An image attachment"}
+							alt={name || "An image attachment"}
 							className="rounded-md size-full object-cover"
 						/>
 					) : (

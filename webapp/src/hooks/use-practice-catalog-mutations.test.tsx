@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { assert, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	deleteAreaMutation,
 	deletePracticeMutation,
@@ -11,7 +11,11 @@ import {
 	placePracticeMutation,
 } from "@/api/@tanstack/react-query.gen";
 import type { Practice } from "@/api/types.gen";
-import { mockAreas, mockPractices } from "@/components/admin/practices/story-mock-data";
+import {
+	mockAreas,
+	mockPractice,
+	mockPractices,
+} from "@/components/admin/practices/story-mock-data";
 import { usePracticeCatalogMutations } from "./use-practice-catalog-mutations";
 
 vi.mock("@/api/@tanstack/react-query.gen", async (importOriginal) => {
@@ -28,9 +32,15 @@ const WORKSPACE = "acme";
 const queryKey = listPracticesQueryKey({ path: { workspaceSlug: WORKSPACE } });
 const areasQueryKey = listAreasQueryKey({ path: { workspaceSlug: WORKSPACE } });
 
+/** A second optimistic write landing on one row while a placement is still in flight. */
+function deactivating(slug: string) {
+	return (current: Practice[] = []) =>
+		current.map((item) => (item.slug === slug ? { ...item, active: false } : item));
+}
+
 function practice(slug: string, areaSlug: string | undefined, displayOrder: number): Practice {
 	return {
-		...mockPractices[0],
+		...mockPractice,
 		id: displayOrder + 1,
 		name: slug,
 		slug,
@@ -39,9 +49,9 @@ function practice(slug: string, areaSlug: string | undefined, displayOrder: numb
 	};
 }
 
-function wrapper(queryClient: QueryClient) {
+function wrapper(client: QueryClient) {
 	return function QueryWrapper({ children }: { children: ReactNode }) {
-		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
+		return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
 	};
 }
 
@@ -58,18 +68,16 @@ describe("usePracticeCatalogMutations", () => {
 
 	it("optimistically places a practice in another bucket and updates its detail cache", async () => {
 		const client = queryClient();
-		const practices = [
-			practice("first", "quality", 0),
-			practice("moving", "quality", 1),
-			practice("last", "quality", 2),
-			practice("destination", "delivery", 0),
-		];
-		client.setQueryData(queryKey, practices);
+		const first = practice("first", "quality", 0);
+		const moving = practice("moving", "quality", 1);
+		const last = practice("last", "quality", 2);
+		const destination = practice("destination", "delivery", 0);
+		client.setQueryData(queryKey, [first, moving, last, destination]);
 		client.setQueryData(
 			getPracticeQueryKey({
 				path: { workspaceSlug: WORKSPACE, practiceSlug: "moving" },
 			}),
-			practices[1],
+			moving,
 		);
 		let resolveRequest: (value: Practice[]) => void = () => {};
 		vi.mocked(placePracticeMutation).mockReturnValue({
@@ -106,13 +114,13 @@ describe("usePracticeCatalogMutations", () => {
 				.getQueryData<Practice[]>(queryKey)
 				?.filter(({ areaSlug }) => areaSlug === "quality")
 				.map(({ displayOrder }) => displayOrder),
-		).toEqual([0, 1]);
+		).toStrictEqual([0, 1]);
 
 		resolveRequest([
-			practices[0],
-			{ ...practices[2], displayOrder: 1 },
-			{ ...practices[1], areaSlug: "delivery", displayOrder: 0 },
-			{ ...practices[3], displayOrder: 1 },
+			first,
+			{ ...last, displayOrder: 1 },
+			{ ...moving, areaSlug: "delivery", displayOrder: 0 },
+			{ ...destination, displayOrder: 1 },
 		]);
 		await waitFor(() => expect(result.current.placePractice.isSuccess).toBe(true));
 	});
@@ -138,12 +146,14 @@ describe("usePracticeCatalogMutations", () => {
 				body: { position: 0 },
 			});
 		});
-		await waitFor(() =>
-			expect(client.getQueryData<Practice[]>(queryKey)?.[0].areaSlug).toBeUndefined(),
-		);
-		client.setQueryData<Practice[]>(queryKey, (current = []) =>
-			current.map((item) => (item.slug === "moving" ? { ...item, active: false } : item)),
-		);
+		await waitFor(() => {
+			const cached = client.getQueryData<Practice[]>(queryKey);
+			assert(cached);
+			const [moved] = cached;
+			assert(moved);
+			expect(moved.areaSlug).toBeUndefined();
+		});
+		client.setQueryData<Practice[]>(queryKey, deactivating("moving"));
 		rejectRequest(new Error("rejected"));
 
 		await waitFor(() => expect(result.current.placePractice.isError).toBe(true));
@@ -183,10 +193,10 @@ describe("usePracticeCatalogMutations", () => {
 
 		await waitFor(() => expect(result.current.placePractice.isPending).toBe(true));
 		expect(result.current.areaStructurePending).toBe(true);
-		expect(result.current.blockedPracticeOrderBuckets).toEqual(
+		expect(result.current.blockedPracticeOrderBuckets).toStrictEqual(
 			new Set(["__unassigned__", "quality"]),
 		);
-		expect(result.current.blockedMoveDestinationSlugs).toEqual(
+		expect(result.current.blockedMoveDestinationSlugs).toStrictEqual(
 			new Set(["__unassigned__", "quality"]),
 		);
 		resolveFirst([practice("second", "quality", 0), practice("first", "quality", 1)]);
@@ -217,8 +227,8 @@ describe("usePracticeCatalogMutations", () => {
 		});
 
 		await waitFor(() => expect(result.current.deletePractice.isPending).toBe(true));
-		expect(result.current.blockedPracticeOrderBuckets).toEqual(new Set(["quality"]));
-		expect(result.current.blockedMoveDestinationSlugs).toEqual(new Set(["quality"]));
+		expect(result.current.blockedPracticeOrderBuckets).toStrictEqual(new Set(["quality"]));
+		expect(result.current.blockedMoveDestinationSlugs).toStrictEqual(new Set(["quality"]));
 		resolveDelete();
 		await waitFor(() => expect(result.current.deletePractice.isSuccess).toBe(true));
 	});
@@ -245,7 +255,7 @@ describe("usePracticeCatalogMutations", () => {
 		});
 
 		await waitFor(() => expect(result.current.deleteArea.isPending).toBe(true));
-		expect(result.current.blockedMoveDestinationSlugs).toEqual(
+		expect(result.current.blockedMoveDestinationSlugs).toStrictEqual(
 			new Set(["quality", "__unassigned__"]),
 		);
 		resolveDelete();

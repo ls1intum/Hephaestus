@@ -63,8 +63,8 @@ function AdminInstanceUsagePage() {
 	const updateBudget = useMutation({
 		...adminUpdateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
-			queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
+			void queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({
 					path: { workspaceSlug: variables.path.workspaceSlug },
 				}),
@@ -124,12 +124,12 @@ function AdminInstanceUsagePage() {
 				isCurrentMonth={isCurrentMonth}
 				isLoading={listQuery.isLoading}
 				error={listQuery.error}
-				onRetry={() => listQuery.refetch()}
+				onRetry={() => void listQuery.refetch()}
 				expandedWorkspaceSlug={expanded?.workspaceSlug ?? null}
 				detailReport={detailQuery.data}
 				isDetailLoading={detailQuery.isLoading}
 				detailError={detailQuery.error}
-				onRetryDetail={() => detailQuery.refetch()}
+				onRetryDetail={() => void detailQuery.refetch()}
 				onToggleDetails={(workspace) =>
 					setExpanded((current) =>
 						current?.workspaceSlug === workspace.workspaceSlug ? null : workspace,

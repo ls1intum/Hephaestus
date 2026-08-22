@@ -53,9 +53,9 @@ function EditCuratedPracticePage() {
 					error={practiceQuery.error ?? catalogQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load the practice"
 					onRetry={() => {
-						practiceQuery.refetch();
-						catalogQuery.refetch();
-						definitionOptionsQuery.refetch();
+						void practiceQuery.refetch();
+						void catalogQuery.refetch();
+						void definitionOptionsQuery.refetch();
 					}}
 				/>
 			</PageLayout>
@@ -99,7 +99,7 @@ function LoadedEditCuratedPracticePage({
 			queryClient.setQueryData(detailQueryKey, updated);
 			void queryClient.invalidateQueries({ queryKey: adminGetCuratedCatalogQueryKey() });
 			toast.success("Practice updated");
-			navigate({ to: "/admin/catalog" });
+			void navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {
@@ -197,7 +197,7 @@ function LoadedEditCuratedPracticePage({
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
-			onContinueWithDraft={continueWithDraft}
+			onContinueWithDraft={() => void continueWithDraft()}
 			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({

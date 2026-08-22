@@ -1,4 +1,12 @@
+import assert from "node:assert/strict";
+import type { Response } from "@playwright/test";
 import { expect, loginAsDevAdmin, test } from "./fixtures";
+
+function isReviewSettingsWrite(response: Response) {
+	return (
+		response.url().includes("/practices/review-settings") && response.request().method() === "PATCH"
+	);
+}
 
 /** Requires the seeded `e2e` workspace and a member account to sign in as — see e2e/seed.sql. */
 test("dev-login then configure practice review settings (read + mutate over http)", async ({
@@ -15,12 +23,11 @@ test("dev-login then configure practice review settings (read + mutate over http
 	// The PATCH proves the CSRF double-submit works over plain http.
 	const skipDrafts = page.getByRole("switch", { name: /skip drafts/i });
 	const before = await skipDrafts.getAttribute("aria-checked");
+	assert.ok(before, "The switch must report an aria-checked state before it is clicked.");
 	const [response] = await Promise.all([
-		page.waitForResponse(
-			(r) => r.url().includes("/practices/review-settings") && r.request().method() === "PATCH",
-		),
+		page.waitForResponse(isReviewSettingsWrite),
 		skipDrafts.click(),
 	]);
 	expect(response.status()).toBe(200);
-	await expect(skipDrafts).not.toHaveAttribute("aria-checked", before ?? "");
+	await expect(skipDrafts).not.toHaveAttribute("aria-checked", before);
 });

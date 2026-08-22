@@ -21,23 +21,26 @@ import { WizardStepIndicator } from "@/components/workspace/create-workspace/Wiz
 import {
 	createInitialWizardState,
 	WizardContext,
+	type WizardStep,
 	wizardReducer,
 } from "@/components/workspace/create-workspace/wizard-context";
 import { useAuth } from "@/integrations/auth/AuthContext";
+import { isRecord } from "@/lib/is-record";
+import { firstNonBlank } from "@/lib/text";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export const Route = createFileRoute("/_authenticated/workspaces/new/gitlab")({
 	component: GitLabWizardPage,
 });
 
-const STEP_META = [
-	{
+const STEP_META: Record<WizardStep, { title: string; description: string }> = {
+	1: {
 		title: "Connect to GitLab",
 		description: "Enter your GitLab instance URL and access token.",
 	},
-	{ title: "Select a Group", description: "Choose the GitLab group to monitor." },
-	{ title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
-] as const;
+	2: { title: "Select a Group", description: "Choose the GitLab group to monitor." },
+	3: { title: "Configure Workspace", description: "Set a name and URL slug for your workspace." },
+};
 
 interface GitLabProvider {
 	registrationId: string;
@@ -95,7 +98,7 @@ function GitLabLinkPrompt({
 }: {
 	providers: GitLabProvider[];
 	linkedServerUrls: Set<string>;
-	linkAccount: (alias: string) => Promise<void>;
+	linkAccount: (alias: string) => void;
 }) {
 	const multiple = providers.length > 1;
 	return (
@@ -152,17 +155,18 @@ function GitLabWizardPage() {
 		...listIdentityProvidersOptions(),
 		staleTime: 5 * 60 * 1000,
 	});
-	const gitlabProviders: GitLabProvider[] = (identityProviders ?? [])
-		.filter((p) => p.providerType === "GITLAB" && !!p.registrationId)
-		.map((p) => ({
-			registrationId: p.registrationId as string,
-			displayName: p.displayName || (p.registrationId as string),
-			baseUrl: p.baseUrl ?? "",
-		}));
+	const gitlabProviders: GitLabProvider[] = (identityProviders ?? []).flatMap((p) => {
+		if (p.providerType !== "GITLAB" || !p.registrationId) return [];
+		return [
+			{
+				registrationId: p.registrationId,
+				displayName: firstNonBlank(p.displayName) ?? p.registrationId,
+				baseUrl: p.baseUrl ?? "",
+			},
+		];
+	});
 	const linkedGitlabServerUrls = new Set(
-		linkedProviders
-			.filter((p) => p.type === "GITLAB" && p.serverUrl)
-			.map((p) => p.serverUrl as string),
+		linkedProviders.flatMap((p) => (p.type === "GITLAB" && p.serverUrl ? [p.serverUrl] : [])),
 	);
 
 	const gitlabEnabled = !!providers?.gitlab;
@@ -176,7 +180,7 @@ function GitLabWizardPage() {
 	const { setSelectedSlug } = useWorkspaceStore();
 	const headingRef = useRef<HTMLHeadingElement>(null);
 
-	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step - 1].title}`;
+	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step].title}`;
 
 	const listGroups = useMutation({
 		...listGitLabGroupsMutation(),
@@ -193,7 +197,7 @@ function GitLabWizardPage() {
 		onSuccess: (data) => {
 			setSelectedSlug(data.workspaceSlug);
 			toast.success(`Workspace "${data.displayName}" created`);
-			navigate({
+			void navigate({
 				to: "/w/$workspaceSlug",
 				params: { workspaceSlug: data.workspaceSlug },
 			});
@@ -204,16 +208,13 @@ function GitLabWizardPage() {
 				serverUrl: state.serverUrl,
 				message: error instanceof Error ? error.message : "Unknown error",
 			});
-			const rawError =
-				typeof error === "object" && error !== null && "error" in error
-					? (error as Record<string, unknown>).error
-					: undefined;
+			const rawError = isRecord(error) ? error.error : undefined;
 			toast.error(
 				typeof rawError === "string" ? rawError : "Failed to create workspace. Please try again.",
 			);
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 		},
 	});
 
@@ -228,7 +229,7 @@ function GitLabWizardPage() {
 			workspaceSlug: state.workspaceSlug,
 		}).success;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: state.step is an intentional trigger to refocus heading on step change
+	// Focus moves to the new step's heading so a screen reader announces where the wizard now is.
 	useEffect(() => {
 		headingRef.current?.focus();
 	}, [state.step]);
@@ -275,7 +276,7 @@ function GitLabWizardPage() {
 		});
 	};
 
-	const meta = STEP_META[state.step - 1];
+	const meta = STEP_META[state.step];
 	const wizardContextValue = { state, dispatch };
 	const isTransitioning = listGroups.isPending;
 	const isCreating = createWorkspace.isPending;

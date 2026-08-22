@@ -37,7 +37,7 @@ import {
 	EmptyTitle,
 } from "@/components/ui/empty";
 import { Spinner } from "@/components/ui/spinner";
-import { filedUnder, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
+import { filedUnder, pathNumber, usePendingMutationIds } from "@/hooks/use-pending-mutation-ids";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
 import { WorkspaceLlmModelFormDialog } from "./WorkspaceLlmModelFormDialog";
@@ -103,7 +103,7 @@ export function WorkspaceLlmProviderPanel({
 	const createConnection = useMutation({
 		...workspaceCreateLlmConnectionMutation(),
 		onSuccess: () => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Provider connected");
 		},
@@ -115,7 +115,7 @@ export function WorkspaceLlmProviderPanel({
 	const updateConnection = useMutation({
 		...filedUnder(connectionWriteKey, workspaceUpdateLlmConnectionMutation()),
 		onSuccess: () => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Provider updated");
 		},
@@ -125,8 +125,8 @@ export function WorkspaceLlmProviderPanel({
 	const deleteConnection = useMutation({
 		...filedUnder(connectionWriteKey, workspaceDeleteLlmConnectionMutation()),
 		onSuccess: () => {
-			invalidateConnections();
-			invalidateModels();
+			void invalidateConnections();
+			void invalidateModels();
 			toast.success("Provider disconnected");
 		},
 		onError: (error) =>
@@ -155,19 +155,17 @@ export function WorkspaceLlmProviderPanel({
 			}));
 		},
 	});
-	const probingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
-		probeKey,
-		(variables) => variables.path.id,
+	const probingConnectionIds = usePendingMutationIds(probeKey, (variables) =>
+		pathNumber(variables, "id"),
 	);
-	const writingConnectionIds = usePendingMutationIds<{ path: { id: number } }>(
-		connectionWriteKey,
-		(variables) => variables.path.id,
+	const writingConnectionIds = usePendingMutationIds(connectionWriteKey, (variables) =>
+		pathNumber(variables, "id"),
 	);
 
 	const createModel = useMutation({
 		...workspaceCreateLlmModelMutation(),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			setModelDialogOpen(false);
 			toast.success("Model added");
 		},
@@ -179,7 +177,7 @@ export function WorkspaceLlmProviderPanel({
 	const updateModel = useMutation({
 		...filedUnder(modelWriteKey, workspaceUpdateLlmModelMutation()),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			setModelDialogOpen(false);
 			toast.success("Model updated");
 		},
@@ -189,15 +187,14 @@ export function WorkspaceLlmProviderPanel({
 	const deleteModel = useMutation({
 		...filedUnder(modelWriteKey, workspaceDeleteLlmModelMutation()),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			toast.success("Model deleted");
 		},
 		onError: (error) =>
 			toast.error("Couldn't delete the model", { description: problemDetailOf(error) }),
 	});
-	const mutatingModelIds = usePendingMutationIds<{ path: { id: number } }>(
-		modelWriteKey,
-		(variables) => variables.path.id,
+	const mutatingModelIds = usePendingMutationIds(modelWriteKey, (variables) =>
+		pathNumber(variables, "id"),
 	);
 
 	if (connectionsQuery.isError) {
@@ -205,7 +202,7 @@ export function WorkspaceLlmProviderPanel({
 			<QueryErrorAlert
 				error={connectionsQuery.error}
 				title="Could not load your AI providers"
-				onRetry={() => connectionsQuery.refetch()}
+				onRetry={() => void connectionsQuery.refetch()}
 			/>
 		);
 	}
@@ -221,7 +218,7 @@ export function WorkspaceLlmProviderPanel({
 			<QueryErrorAlert
 				error={modelsQuery.error}
 				title="Could not load your provider models"
-				onRetry={() => modelsQuery.refetch()}
+				onRetry={() => void modelsQuery.refetch()}
 			/>
 		);
 	}

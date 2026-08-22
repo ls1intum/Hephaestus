@@ -3,7 +3,6 @@ import {
 	CONSENT_STORAGE_KEY,
 	CONSENT_VERSION,
 	closeConsentReopen,
-	consumeReopenSeed,
 	getStoredConsent,
 	isConsentReopenRequested,
 	requestConsentReopen,
@@ -18,7 +17,6 @@ describe("consent store", () => {
 		localStorage.clear();
 		getStoredConsent();
 		closeConsentReopen(); // drain any reopen flag so it can't leak between tests
-		consumeReopenSeed();
 	});
 	afterEach(() => localStorage.clear());
 
@@ -39,6 +37,23 @@ describe("consent store", () => {
 		localStorage.setItem(CONSENT_STORAGE_KEY, "not json");
 		expect(getStoredConsent()).toBeNull();
 		localStorage.setItem(CONSENT_STORAGE_KEY, JSON.stringify({ analytics: true }));
+		expect(getStoredConsent()).toBeNull();
+	});
+
+	// Anything can write this key, and what comes back out is what gates PostHog and Sentry. A
+	// complete-looking decision whose flags are strings must be re-asked, not read for truthiness —
+	// `"false"` is truthy, so trusting it would turn analytics on for someone who declined.
+	it("treats a decision whose flags are not booleans as no decision, rather than taking it as given", () => {
+		localStorage.setItem(
+			CONSENT_STORAGE_KEY,
+			JSON.stringify({
+				analytics: "false",
+				errorMonitoring: "true",
+				decidedAt: "x",
+				version: CONSENT_VERSION,
+			}),
+		);
+
 		expect(getStoredConsent()).toBeNull();
 	});
 
@@ -67,24 +82,20 @@ describe("consent store", () => {
 		expect(getStoredConsent()).toBe(getStoredConsent());
 	});
 
-	it("requestConsentReopen opens edit mode and pre-seeds from the prior decision", () => {
+	it("requestConsentReopen opens edit mode until the next decision is recorded", () => {
 		setStoredConsent({ analytics: true, errorMonitoring: false });
 		expect(isConsentReopenRequested()).toBe(false);
 
 		requestConsentReopen();
 		expect(isConsentReopenRequested()).toBe(true);
-		// Seed mirrors the stored choice and is consumed once.
-		expect(consumeReopenSeed()).toEqual({ analytics: true, errorMonitoring: false });
-		expect(consumeReopenSeed()).toBeNull();
 
 		// Saving (or cancelling) closes edit mode.
 		setStoredConsent({ analytics: false, errorMonitoring: false });
 		expect(isConsentReopenRequested()).toBe(false);
 	});
 
-	it("a passive first visit does not request reopen or a seed", () => {
+	it("a passive first visit does not request reopen", () => {
 		expect(isConsentReopenRequested()).toBe(false);
-		expect(consumeReopenSeed()).toBeNull();
 	});
 
 	it("notifies subscribers on set and on reopen", () => {
