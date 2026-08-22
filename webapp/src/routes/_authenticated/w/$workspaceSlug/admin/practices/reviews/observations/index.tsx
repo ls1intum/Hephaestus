@@ -31,7 +31,7 @@ function ObservationsListRoute() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const updateSearch = (patch: Partial<ObservationsSearch>) =>
-		navigate({
+		void navigate({
 			search: (previous) => {
 				const next = { ...previous, ...patch };
 				return { ...next, page: next.page || undefined };
@@ -61,7 +61,7 @@ function ObservationsListRoute() {
 			observations={observationsQueryResult.data}
 			isLoading={observationsQueryResult.isLoading}
 			error={observationsQueryResult.isError ? observationsQueryResult.error : undefined}
-			onRetry={() => observationsQueryResult.refetch()}
+			onRetry={() => void observationsQueryResult.refetch()}
 			areas={{
 				options: areaFacetOptions(areasQuery.data),
 				isLoading: areasQuery.isLoading,

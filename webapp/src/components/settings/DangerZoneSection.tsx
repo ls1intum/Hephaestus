@@ -163,7 +163,7 @@ function DataExportRow() {
 			</div>
 			<div className="mt-1 flex shrink-0 gap-2">
 				{isReady ? (
-					<Button variant="outline" onClick={handleDownload} disabled={isDownloading}>
+					<Button variant="outline" onClick={() => void handleDownload()} disabled={isDownloading}>
 						{isDownloading ? <Spinner className="mr-1.5" /> : null}
 						Download
 					</Button>

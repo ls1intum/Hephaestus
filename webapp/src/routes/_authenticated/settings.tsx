@@ -161,7 +161,7 @@ function RouteComponent() {
 	const linkedAccountsProps: LinkedAccountsSectionProps = {
 		identities: linkedIdentitiesQuery.data ?? [],
 		providers: identityProvidersQuery.data ?? [],
-		onLink: (registrationId) => linkAccount(registrationId, "/settings"),
+		onLink: (registrationId) => void linkAccount(registrationId, "/settings"),
 		// Guard against a double-submit: the trigger uses aria-disabled (kept focusable for the
 		// busy announcement), which does not block clicks, so a mid-flight re-confirm would fire a
 		// second DELETE against the already-removed row.
@@ -218,14 +218,14 @@ function RouteComponent() {
 			(slackAvailable && slackPreferencesQuery.isLoading),
 		isError: slackAvailable && slackPreferencesQuery.isError,
 		error: slackPreferencesQuery.error,
-		onRetry: () => slackPreferencesQuery.refetch(),
+		onRetry: () => void slackPreferencesQuery.refetch(),
 	};
 
 	return (
 		<SettingsPage
 			isLoading={isLoading}
 			settingsError={settingsError}
-			onRetrySettings={() => refetchSettings()}
+			onRetrySettings={() => void refetchSettings()}
 			practiceFeedbackProps={{
 				practiceFeedbackDeliveryEnabled: settings?.practiceFeedbackDeliveryEnabled ?? true,
 				onTogglePracticeFeedback: handlePracticeFeedbackToggle,

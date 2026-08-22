@@ -224,7 +224,7 @@ function GlobalCopilot() {
 				attachments={[]}
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
-				onStop={mentorChat.stop}
+				onStop={() => void mentorChat.stop()}
 				onFileUpload={() => Promise.resolve([])}
 				onAttachmentsChange={() => {}}
 				onCopy={handleCopy}
@@ -270,8 +270,8 @@ function HeaderContainer() {
 			username={effectiveUsername}
 			avatarUrl={getUserProfilePictureUrl()}
 			workspaceSlug={workspaceSlug}
-			onLogin={login}
-			onLogout={logout}
+			onLogin={(idpHint) => void login(idpHint)}
+			onLogout={() => void logout()}
 		/>
 	);
 }

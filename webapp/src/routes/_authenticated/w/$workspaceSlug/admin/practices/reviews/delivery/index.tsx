@@ -23,7 +23,7 @@ function FeedbackListRoute() {
 	const search = Route.useSearch();
 	const navigate = useNavigate({ from: Route.fullPath });
 	const updateSearch = (patch: Partial<FeedbackSearch>) =>
-		navigate({
+		void navigate({
 			search: (previous) => {
 				const next = { ...previous, ...patch };
 				return { ...next, page: next.page || undefined };
@@ -53,7 +53,7 @@ function FeedbackListRoute() {
 			feedback={feedbackQueryResult.data}
 			isLoading={feedbackQueryResult.isLoading}
 			error={feedbackQueryResult.isError ? feedbackQueryResult.error : undefined}
-			onRetry={() => feedbackQueryResult.refetch()}
+			onRetry={() => void feedbackQueryResult.refetch()}
 			people={people}
 		/>
 	);

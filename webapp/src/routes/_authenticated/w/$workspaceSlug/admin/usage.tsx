@@ -79,7 +79,7 @@ function AdminUsageContainer() {
 				report={report}
 				isLoading={isLoading}
 				error={error}
-				onRetry={() => refetch()}
+				onRetry={() => void refetch()}
 				onEditOwnProviderCap={() => editOwnProviderCap(true)}
 			/>
 			<SetOwnProviderBudgetDialog

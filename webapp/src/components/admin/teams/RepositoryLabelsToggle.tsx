@@ -57,7 +57,7 @@ export function RepositoryLabelsToggle({
 							<Toggle
 								key={`${label.id}-${label.name}`}
 								pressed={isActive}
-								onPressedChange={() => handleToggle(label)}
+								onPressedChange={() => void handleToggle(label)}
 								aria-label={`${isActive ? "Remove" : "Add"} ${label.name} label`}
 								className="h-auto min-w-0 rounded-full p-0 data-pressed:ring-2 data-pressed:ring-primary data-pressed:ring-offset-1"
 							>

@@ -150,7 +150,7 @@ export function AuthAuditPanel({
 						variant="outline"
 						size="sm"
 						className="h-8"
-						onClick={handleExport}
+						onClick={() => void handleExport()}
 						disabled={exporting || events.length === 0}
 					>
 						{exporting ? <Spinner className="size-3.5" /> : <DownloadIcon aria-hidden />}
@@ -203,8 +203,8 @@ export function AuthAuditPanel({
 				onResetFilters={reset}
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => listQuery.fetchNextPage()}
-				onRetry={() => listQuery.refetch()}
+				onLoadMore={() => void listQuery.fetchNextPage()}
+				onRetry={() => void listQuery.refetch()}
 				onFilterAccount={(accountId) => onSearchChange({ accountId })}
 				onFilterActor={(actorId) => onSearchChange({ actorId })}
 				resolveWorkspaceName={resolveWorkspaceName}

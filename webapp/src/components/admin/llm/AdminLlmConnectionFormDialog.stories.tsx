@@ -3,7 +3,10 @@ import { expect, fn, screen, userEvent } from "storybook/test";
 import type { LlmConnection } from "@/api/types.gen";
 import { expectSettledVisible } from "@/test/overlay";
 import { expectDialogFitsViewport } from "@/test/reflow";
-import { AdminLlmConnectionFormDialog } from "./AdminLlmConnectionFormDialog";
+import {
+	AdminLlmConnectionFormDialog,
+	type AdminLlmConnectionFormDialogProps,
+} from "./AdminLlmConnectionFormDialog";
 
 const mockConnection: LlmConnection = {
 	id: 1,
@@ -50,7 +53,7 @@ export const Probing: Story = {
 
 export const DiscoveryUnsupported: Story = {
 	args: {
-		onProbe: fn((_request, callbacks) =>
+		onProbe: fn<AdminLlmConnectionFormDialogProps["onProbe"]>((_request, callbacks) =>
 			callbacks.onSuccess({ reachable: false, models: [], message: "Connection timed out" }),
 		),
 	},

@@ -257,7 +257,7 @@ function SlackIntegrationPage() {
 				<QueryErrorAlert
 					error={statusQuery.error}
 					title="We couldn't load Slack sync status"
-					onRetry={() => statusQuery.refetch()}
+					onRetry={() => void statusQuery.refetch()}
 				/>
 			)}
 
@@ -272,7 +272,7 @@ function SlackIntegrationPage() {
 					isConnectionActive={isConnectionActive}
 					triggeringType={triggerSync.isPending ? "RECONCILIATION" : null}
 					isCancelling={cancelJob.isPending}
-					onRetry={() => statusQuery.refetch()}
+					onRetry={() => void statusQuery.refetch()}
 					onSync={() => {
 						if (connectionId == null) return;
 						triggerSync.mutate({
@@ -302,7 +302,7 @@ function SlackIntegrationPage() {
 							isLoading={isResourcesLoading}
 							isError={isResourcesError}
 							error={resourcesError}
-							onRetry={() => refetchResources()}
+							onRetry={() => void refetchResources()}
 							resourceNoun="channel"
 							resourceNounPlural="channels"
 							syncIntervalSeconds={status?.syncIntervalSeconds}
@@ -393,7 +393,7 @@ function SlackIntegrationPage() {
 					isLoading={isJobsLoading}
 					isError={isJobsError}
 					error={jobsError}
-					onRetry={() => refetchJobs()}
+					onRetry={() => void refetchJobs()}
 					page={jobsPage}
 					totalPages={jobsPageData?.totalPages ?? 1}
 					onPageChange={setJobsPage}

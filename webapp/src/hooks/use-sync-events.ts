@@ -25,6 +25,36 @@ interface SyncEventHint {
 	connectionId: number;
 }
 
+/** Spelled out so a scope added to the union is rejected here until it is also accepted off the wire. */
+const SYNC_EVENT_SCOPES = {
+	job: true,
+	resources: true,
+	connection: true,
+	activity: true,
+} satisfies Record<SyncEventScope, true>;
+
+function isSyncEventScope(value: unknown): value is SyncEventScope {
+	return typeof value === "string" && Object.hasOwn(SYNC_EVENT_SCOPES, value);
+}
+
+/**
+ * A hint arrives over the network, so its shape is established rather than assumed. Anything that
+ * does not match is dropped, which costs nothing: the periodic poll backstop refreshes the same
+ * state a moment later.
+ */
+function parseHint(payload: string): SyncEventHint | undefined {
+	let decoded: unknown;
+	try {
+		decoded = JSON.parse(payload);
+	} catch {
+		return undefined;
+	}
+	if (!isRecord(decoded)) return undefined;
+	const { scope, connectionId } = decoded;
+	if (!isSyncEventScope(scope) || typeof connectionId !== "number") return undefined;
+	return { scope, connectionId };
+}
+
 /** Backoff ladder for manual reconnects: 1s, 2s, 4s … capped, each scaled by 0.5–1.0× jitter. */
 const RECONNECT_BASE_MS = 1_000;
 const RECONNECT_CAP_MS = 30_000;
@@ -173,11 +203,8 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		};
 
 		const handleHint = (event: MessageEvent<string>) => {
-			let hint: SyncEventHint;
-			try {
-				hint = JSON.parse(event.data);
-			} catch {
-				// A malformed hint is safely ignored: the periodic poll backstop still refreshes state.
+			const hint = parseHint(event.data);
+			if (!hint) {
 				console.debug("Ignoring malformed sync-event hint payload");
 				return;
 			}

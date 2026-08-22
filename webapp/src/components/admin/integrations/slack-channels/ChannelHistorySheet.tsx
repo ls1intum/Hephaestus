@@ -70,7 +70,7 @@ export function ChannelHistorySheet({
 						<QueryErrorAlert
 							error={error}
 							title="Could not load the consent history"
-							onRetry={() => refetch()}
+							onRetry={() => void refetch()}
 						/>
 					)}
 

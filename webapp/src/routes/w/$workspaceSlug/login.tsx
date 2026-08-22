@@ -51,7 +51,7 @@ function WorkspaceLoginPage() {
 			title={heading}
 			description="Sign in to continue to this workspace."
 			error={error}
-			onSignIn={(registrationId) => login(registrationId, `/w/${workspaceSlug}`)}
+			onSignIn={(registrationId) => void login(registrationId, `/w/${workspaceSlug}`)}
 			devReturnTo={`/w/${workspaceSlug}`}
 		/>
 	);

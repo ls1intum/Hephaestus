@@ -128,7 +128,7 @@ export function AdminAchievementsPage({
 					<>
 						<Button
 							variant="outline"
-							onClick={handleReload}
+							onClick={() => void handleReload()}
 							disabled={isLoading || reloadMutation.isPending}
 							className="w-full sm:w-auto"
 						>
@@ -145,7 +145,7 @@ export function AdminAchievementsPage({
 							)}
 						</Button>
 						<Button
-							onClick={handleRecalculateAll}
+							onClick={() => void handleRecalculateAll()}
 							disabled={isLoading || isRecalculatingAll || users.length === 0}
 							className="w-full sm:w-auto"
 						>
@@ -172,7 +172,7 @@ export function AdminAchievementsPage({
 					users={users}
 					isLoading={isLoading}
 					workspaceSlug={workspaceSlug}
-					onRecalculate={handleRecalculateSingle}
+					onRecalculate={(username) => void handleRecalculateSingle(username)}
 					recalculatingUsers={recalculatingUsers}
 				/>
 			)}

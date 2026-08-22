@@ -43,7 +43,7 @@ export function TeamTree({
 			team={team}
 			memberCount={(team.members ?? []).length}
 			headingLevel={headingLevel}
-			onToggleVisibility={(hidden) => onToggleVisibility(team.id, hidden)}
+			onToggleVisibility={(hidden) => void onToggleVisibility(team.id, hidden)}
 			getCatalogLabels={getCatalogLabels}
 		>
 			{(team.repositories ?? []).length > 0 ? (

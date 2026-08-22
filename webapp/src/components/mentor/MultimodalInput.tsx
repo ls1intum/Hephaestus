@@ -145,7 +145,7 @@ export function MultimodalInput({
 					ref={fileInputRef}
 					multiple
 					aria-label="Attach files"
-					onChange={handleFileChange}
+					onChange={(event) => void handleFileChange(event)}
 					tabIndex={-1}
 				/>
 			)}

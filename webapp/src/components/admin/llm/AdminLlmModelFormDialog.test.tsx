@@ -3,9 +3,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { LlmModel } from "@/api/types.gen";
 import { validateLlmModelForm } from "@/lib/llm-form-validation";
 import { expectUnavailable } from "@/test/controls";
-import { AdminLlmModelFormDialog } from "./AdminLlmModelFormDialog";
+import {
+	AdminLlmModelFormDialog,
+	type AdminLlmModelFormDialogProps,
+} from "./AdminLlmModelFormDialog";
 
-function renderDialog(onSave = vi.fn()) {
+function renderDialog(onSave = vi.fn<AdminLlmModelFormDialogProps["onSave"]>()) {
 	render(
 		<AdminLlmModelFormDialog
 			open
@@ -32,16 +35,13 @@ describe("AdminLlmModelFormDialog", () => {
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "GPT-5" } });
 		fireEvent.change(screen.getByLabelText("Upstream model id"), { target: { value: "gpt-5" } });
 		fireEvent.click(screen.getByRole("button", { name: "Add model" }));
-		expect(onSave).toHaveBeenCalledWith(
-			expect.objectContaining({
-				metadata: expect.objectContaining({ enabled: false }),
-				sharing: { visibility: "GRANTED", workspaceIds: [] },
-			}),
-		);
+		const saved = onSave.mock.calls[0]?.[0];
+		expect(saved.metadata.enabled).toBe(false);
+		expect(saved.sharing).toEqual({ visibility: "GRANTED", workspaceIds: [] });
 	});
 
 	it("keeps the upstream model identity immutable", () => {
-		const onSave = vi.fn();
+		const onSave = vi.fn<AdminLlmModelFormDialogProps["onSave"]>();
 		const editing: LlmModel = {
 			id: 1,
 			slug: "gpt-5",
@@ -138,7 +138,7 @@ describe("AdminLlmModelFormDialog", () => {
 	});
 
 	it("turns an active model off when its price becomes unknown", () => {
-		const onSave = vi.fn();
+		const onSave = vi.fn<AdminLlmModelFormDialogProps["onSave"]>();
 		const editing: LlmModel = {
 			id: 2,
 			slug: "gpt-5-active",

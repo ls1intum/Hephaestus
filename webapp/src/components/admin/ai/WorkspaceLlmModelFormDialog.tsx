@@ -82,7 +82,7 @@ function WorkspaceLlmModelFormDialogContent({
 	);
 	const [errors, setErrors] = useState<FieldErrors<LlmModelFormField>>({});
 
-	const handleSubmit = (event: React.FormEvent) => {
+	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		const found = validateModelFields(fields, isEdit);
 		setErrors(found);

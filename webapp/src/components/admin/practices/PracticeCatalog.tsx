@@ -522,6 +522,11 @@ function RenameAreaDialog({
 	onRename: (slug: string, name: string) => Promise<boolean>;
 	pending: boolean;
 }) {
+	// The dialog stays open when the rename is rejected, so the reader keeps the name they typed.
+	const rename = async (slug: string, name: string) => {
+		if (await onRename(slug, name)) onClose();
+	};
+
 	return (
 		<Dialog open={area !== null} onOpenChange={(open) => !open && onClose()}>
 			<DialogContent className="sm:max-w-sm">
@@ -529,7 +534,7 @@ function RenameAreaDialog({
 					<DialogTitle>Rename area</DialogTitle>
 				</DialogHeader>
 				<form
-					onSubmit={async (event) => {
+					onSubmit={(event) => {
 						event.preventDefault();
 						// `namedItem` answers with a RadioNodeList when a name is shared, so narrow rather
 						// than cast.
@@ -540,7 +545,7 @@ function RenameAreaDialog({
 							onClose();
 							return;
 						}
-						if (await onRename(area.slug, name)) onClose();
+						void rename(area.slug, name);
 					}}
 					className="space-y-4"
 				>
@@ -635,6 +640,11 @@ function CreateAreaButton({
 	disabled: boolean;
 }) {
 	const [open, setOpen] = useState(false);
+	// The popover stays open when creation is rejected, so the reader keeps the name they typed.
+	const create = async (name: string) => {
+		if (await onCreate(name)) setOpen(false);
+	};
+
 	return (
 		<Popover open={open} onOpenChange={setOpen}>
 			<PopoverTrigger
@@ -647,12 +657,12 @@ function CreateAreaButton({
 			/>
 			<PopoverContent align="end" className="w-72">
 				<form
-					onSubmit={async (event) => {
+					onSubmit={(event) => {
 						event.preventDefault();
 						const input = event.currentTarget.elements.namedItem("areaName");
 						if (!(input instanceof HTMLInputElement)) return;
 						const name = input.value.trim();
-						if (name && (await onCreate(name))) setOpen(false);
+						if (name) void create(name);
 					}}
 					className="flex items-center gap-2"
 				>

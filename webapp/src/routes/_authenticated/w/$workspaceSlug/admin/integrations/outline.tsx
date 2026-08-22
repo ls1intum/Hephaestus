@@ -123,7 +123,7 @@ function OutlineIntegrationPage() {
 					isLoading={isJobsLoading}
 					isError={isJobsError}
 					error={jobsError}
-					onRetry={() => refetchJobs()}
+					onRetry={() => void refetchJobs()}
 					page={jobsPage}
 					totalPages={jobsPageData?.totalPages ?? 1}
 					onPageChange={setJobsPage}

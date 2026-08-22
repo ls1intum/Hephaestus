@@ -127,7 +127,7 @@ function ThreadContainer() {
 				attachments={[]}
 				onMessageSubmit={handleMessageSubmit}
 				onMessageEdit={handleMessageEdit}
-				onStop={mentorChat.stop}
+				onStop={() => void mentorChat.stop()}
 				onReload={() => {
 					mentorChat.clearError();
 					void mentorChat.regenerate();

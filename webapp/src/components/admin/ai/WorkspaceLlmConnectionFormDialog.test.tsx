@@ -1,7 +1,10 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { WorkspaceLlmConnection } from "@/api/types.gen";
-import { WorkspaceLlmConnectionFormDialog } from "./WorkspaceLlmConnectionFormDialog";
+import {
+	WorkspaceLlmConnectionFormDialog,
+	type WorkspaceLlmConnectionFormDialogProps,
+} from "./WorkspaceLlmConnectionFormDialog";
 
 const connection: WorkspaceLlmConnection = {
 	id: 7,
@@ -16,7 +19,7 @@ const connection: WorkspaceLlmConnection = {
 	createdAt: new Date("2026-07-01T00:00:00Z"),
 };
 
-function renderDialog(onUpdate = vi.fn()) {
+function renderDialog(onUpdate = vi.fn<WorkspaceLlmConnectionFormDialogProps["onUpdate"]>()) {
 	render(
 		<WorkspaceLlmConnectionFormDialog
 			open

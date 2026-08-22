@@ -208,7 +208,9 @@ const preview: Preview = {
 				dark: { name: "dark" },
 			},
 			defaultTheme: "light",
-			Provider: ({ theme, children }) =>
+			// The addon types `Provider` as `any` and hands it whichever entry of `themes` above the
+			// toolbar selected, so the shape it is called with is declared here.
+			Provider: ({ theme, children }: { theme: { name: string }; children: React.ReactNode }) =>
 				React.createElement(StorybookThemeProvider, { theme: theme.name }, children),
 		}),
 	],

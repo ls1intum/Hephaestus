@@ -18,9 +18,13 @@ function newRouter(url?: string) {
 	});
 }
 
-const adminUrls = Object.values(newRouter().routesById)
-	.filter((route) => route.fullPath?.startsWith("/admin/"))
-	.map((route) => route.fullPath);
+// `looseRoutesById` is `routesById` under a map type: the generated id-keyed interface has no index
+// signature, so `Object.values` over it widens to `any`. A route's own `fullPath` is untyped either
+// way, so it is checked on the way out rather than trusted.
+const adminUrls = Object.values(newRouter().looseRoutesById)
+	.map((route): unknown => route.fullPath)
+	.filter((fullPath): fullPath is string => typeof fullPath === "string")
+	.filter((fullPath) => fullPath.startsWith("/admin/"));
 
 function mockAppRole(appRole: "APP_ADMIN" | "APP_USER") {
 	server.use(http.get("*/user", () => HttpResponse.json({ ...currentUser, appRole })));

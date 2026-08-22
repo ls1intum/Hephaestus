@@ -9,7 +9,11 @@ import {
 } from "@/mocks/fixtures/practice";
 import { renderWithRouter } from "@/test/router-harness";
 import { bindingsProblem } from "../practice-catalog/bindings";
-import { CuratedPracticeForm, type CuratedPracticeFormInitialValue } from "./CuratedPracticeForm";
+import {
+	CuratedPracticeForm,
+	type CuratedPracticeFormInitialValue,
+	type CuratedPracticeFormValue,
+} from "./CuratedPracticeForm";
 
 vi.mock("@/components/shared/CodeEditor", () => ({
 	CodeEditor: () => <div data-testid="code-editor" />,
@@ -30,7 +34,18 @@ const initialData: CuratedPracticeFormInitialValue = {
 	},
 };
 
-function renderForm(overrides: Partial<CuratedPracticeFormInitialValue> = {}, onSubmit = vi.fn()) {
+/**
+ * What the form hands back is most of what these tests assert on, so the spy carries the form's
+ * signature and every claim about a submitted value is checked against the real shape.
+ */
+function submitSpy() {
+	return vi.fn<(value: CuratedPracticeFormValue) => void>();
+}
+
+function renderForm(
+	overrides: Partial<CuratedPracticeFormInitialValue> = {},
+	onSubmit = submitSpy(),
+) {
 	return renderWithRouter(
 		<CuratedPracticeForm
 			mode="edit"
@@ -189,7 +204,7 @@ describe("CuratedPracticeForm", () => {
 
 	it("submits the one occasion the practice is reviewed on", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		// Nothing adds a second: a practice that would read different evidence at a different moment is
@@ -208,7 +223,7 @@ describe("CuratedPracticeForm", () => {
 
 	it("sends focus to the moments when none is chosen, not to the top of the form", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		for (const signal of mockPullRequestBinding.signals) {
@@ -226,7 +241,7 @@ describe("CuratedPracticeForm", () => {
 
 	it("lets the review claim something is absent from a source it reads whole", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		await user.click(
@@ -275,28 +290,26 @@ describe("CuratedPracticeForm", () => {
 
 	it("strips the occasion's evidence when the practice stops being reviewed", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
 		await user.click(screen.getByRole("button", { name: "Save changes" }));
 
-		expect(onSubmit).toHaveBeenCalledWith(
-			expect.objectContaining({
-				bindings: [expect.objectContaining({ needs: [] })],
-				automatedReviewPolicy: expect.objectContaining({
-					automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" },
-					knownLimitations: [],
-				}),
-			}),
-		);
+		const submitted = onSubmit.mock.calls[0]?.[0];
+		expect(submitted.bindings.map((binding) => binding.needs)).toEqual([[]]);
+		expect(submitted.automatedReviewPolicy.automatedReview).toEqual({
+			mode: "NONE",
+			evidenceSufficiency: "NONE",
+		});
+		expect(submitted.automatedReviewPolicy.knownLimitations).toEqual([]);
 		await user.click(screen.getByRole("button", { name: /Technical settings/ }));
 		expect(screen.queryByText("Static analysis")).toBeNull();
 	});
 
 	it("gives the occasion its evidence back when review resumes", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({}, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Guidance only/ }));
@@ -317,7 +330,7 @@ describe("CuratedPracticeForm", () => {
 
 	it("does not schedule mentoring when a practice needs human review", async () => {
 		const user = userEvent.setup();
-		const onSubmit = vi.fn();
+		const onSubmit = submitSpy();
 		await renderForm({ precomputeScript: "export default {};" }, onSubmit);
 
 		await user.click(screen.getByRole("radio", { name: /Human review needed/ }));

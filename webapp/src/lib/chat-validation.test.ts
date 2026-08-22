@@ -14,7 +14,7 @@ function msg(id: string, role: string) {
 }
 
 describe("parseThreadMessages", () => {
-	it("accepts well-formed messages and preserves passthrough part fields", () => {
+	it("accepts well-formed messages and preserves part fields the schema does not name", () => {
 		const result = parseThreadMessages([
 			{ id: UUID, role: "user", parts: [{ type: "text", text: "hi", extra: 1 }] },
 			msg(UUID2, "assistant"),

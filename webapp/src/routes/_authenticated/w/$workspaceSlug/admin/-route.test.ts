@@ -23,9 +23,14 @@ function newRouter(url?: string) {
 	});
 }
 
-const adminUrls = Object.values(newRouter().routesById)
-	.filter((route) => route.fullPath?.startsWith("/w/$workspaceSlug/admin/"))
-	.map((route) => route.fullPath.replace("$workspaceSlug", "acme"));
+// `looseRoutesById` is `routesById` under a map type: the generated id-keyed interface has no index
+// signature, so `Object.values` over it widens to `any`. A route's own `fullPath` is untyped either
+// way, so it is checked on the way out rather than trusted.
+const adminUrls = Object.values(newRouter().looseRoutesById)
+	.map((route): unknown => route.fullPath)
+	.filter((fullPath): fullPath is string => typeof fullPath === "string")
+	.filter((fullPath) => fullPath.startsWith("/w/$workspaceSlug/admin/"))
+	.map((fullPath) => fullPath.replace("$workspaceSlug", "acme"));
 
 function mockMembership(role: WorkspaceRole | null) {
 	server.use(

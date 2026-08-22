@@ -13,23 +13,22 @@ import type { ChatMessage } from "@/lib/types";
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * Message part schema with passthrough for forward compatibility.
- * Allows any part with a `type` field through.
+ * A part is anything carrying a `type`. Unknown keys survive validation: the mentor streams part
+ * kinds this client does not model, and stripping their payload here would leave the renderer
+ * nothing to narrow.
  */
-const messagePartSchema = z.object({ type: z.string() }).passthrough();
+const messagePartSchema = z.looseObject({ type: z.string() });
 
 /**
- * Chat message schema matching the ThreadDetail.messages structure.
- * Uses passthrough at the message level for additional AI SDK fields.
+ * Mirrors the `ThreadDetail.messages` structure. Unknown keys survive here too, because the AI SDK
+ * hangs its own bookkeeping off a message and the chat UI passes those fields straight back.
  */
-const chatMessageSchema = z
-	.object({
-		id: z.string().uuid(),
-		role: z.enum(["system", "user", "assistant"]),
-		parts: z.array(messagePartSchema),
-		createdAt: z.string().datetime().optional(),
-	})
-	.passthrough();
+const chatMessageSchema = z.looseObject({
+	id: z.uuid(),
+	role: z.enum(["system", "user", "assistant"]),
+	parts: z.array(messagePartSchema),
+	createdAt: z.iso.datetime().optional(),
+});
 
 const chatMessagesArraySchema = z.array(chatMessageSchema);
 
@@ -70,7 +69,7 @@ export function parseThreadMessages(messages: unknown): ChatMessage[] | undefine
  * Vote schema for validating votes from thread detail.
  */
 const voteSchema = z.object({
-	messageId: z.string().uuid().optional(),
+	messageId: z.uuid().optional(),
 	isUpvoted: z.boolean().optional(),
 });
 

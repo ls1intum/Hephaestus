@@ -25,7 +25,13 @@ interface UseMentorChatOptions {
 	onError?: (error: Error) => void;
 }
 
-interface UseMentorChatReturn extends Omit<UseChatHelpers<ChatMessage>, "sendMessage"> {
+/**
+ * `addToolResult` is dropped alongside the re-typed `sendMessage`: it is the AI SDK's older name for
+ * `addToolOutput`, which is forwarded, and carrying both would let a caller settle a tool call
+ * through a name the SDK is retiring.
+ */
+interface UseMentorChatReturn
+	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage" | "addToolResult"> {
 	sendMessage: (text: string) => void;
 	threadDetail: ChatThreadDetail | undefined;
 	isThreadLoading: boolean;
@@ -176,7 +182,6 @@ export function useMentorChat({
 		clearError,
 		setMessages,
 		resumeStream,
-		addToolResult,
 		addToolOutput,
 		addToolApprovalResponse,
 		id,
@@ -284,7 +289,6 @@ export function useMentorChat({
 		regenerate,
 		setMessages,
 		resumeStream,
-		addToolResult,
 		addToolOutput,
 		addToolApprovalResponse,
 		id,

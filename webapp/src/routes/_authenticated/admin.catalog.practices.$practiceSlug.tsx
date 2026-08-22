@@ -197,7 +197,7 @@ function LoadedEditCuratedPracticePage({
 			isResetPending={deleteOverride.isPending}
 			isKeepPending={keepCurrentDefinition.isPending}
 			conflict={conflict}
-			onContinueWithDraft={continueWithDraft}
+			onContinueWithDraft={() => void continueWithDraft()}
 			onUseHephaestusVersion={() => {
 				setConflict(false);
 				deleteOverride.mutate({

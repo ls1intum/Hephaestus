@@ -194,7 +194,7 @@ export function SortableCatalogTree<
 	);
 
 	const collisionDetection: CollisionDetection = (args) => {
-		const activeType = args.active.data.current?.type;
+		const activeType = catalogDndData(args.active.data.current)?.type;
 		const droppableContainers = args.droppableContainers.filter(({ data }) => {
 			const target = catalogDndData(data.current);
 			if (

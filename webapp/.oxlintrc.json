@@ -57,6 +57,16 @@
 		"operator-assignment": "error",
 		"typescript/prefer-for-of": "error",
 		"typescript/no-explicit-any": "error",
+		// `no-explicit-any` only catches the `any` this repo writes. These five catch the `any` that
+		// arrives — from a library that types a prop or a callback argument as `any`, from `JSON.parse`,
+		// and from an untyped `vi.fn()`, whose `mock.calls` made an assertion about a submitted value
+		// check nothing at all. Each one is a place where the checker stops working silently, so the
+		// fix is always to establish the type at the boundary rather than downstream.
+		"typescript/no-unsafe-call": "error",
+		"typescript/no-unsafe-assignment": "error",
+		"typescript/no-unsafe-argument": "error",
+		"typescript/no-unsafe-return": "error",
+		"typescript/no-unsafe-member-access": "error",
 		// Paired with `no-unsafe-type-assertion`: without it, `!` stays an unchecked way to make the
 		// same claim, and every assertion the other rule rejects can be laundered through it.
 		"typescript/no-non-null-assertion": "error",
@@ -252,6 +262,16 @@
 		"vitest/prefer-to-have-been-called-times": "error",
 		"vitest/no-large-snapshots": "error",
 
+		// The half of the promise story `no-floating-promises` cannot see: a promise handed to a
+		// position typed `void`, where nothing downstream will ever await it or observe its rejection.
+		// Left at its defaults, including `checksVoidReturn.attributes` — the JSX bucket is the majority
+		// of the findings here and the fix is the `void` this repo already writes, so keeping the
+		// sub-check on costs nothing and keeps a real failure mode in view.
+		"typescript/no-misused-promises": "error",
+		// A dependency's `@deprecated` is the only warning shipped before the removal, and it is
+		// invisible outside an editor. Reading it here means the migration happens on the upgrade that
+		// announced it rather than on the one that breaks the build.
+		"typescript/no-deprecated": "error",
 		"typescript/no-misused-spread": "error",
 		"typescript/require-array-sort-compare": "error",
 		"typescript/prefer-promise-reject-errors": "error",
@@ -422,6 +442,89 @@
 	},
 
 	"overrides": [
+		{
+			// Layering, encoded while it still holds. None of these fires today; each exists so the first
+			// edge that would invert the dependency is rejected instead of becoming precedent.
+			//
+			// One entry per directory, never two that overlap: where two overrides match the same file,
+			// the later one's copy of a rule REPLACES the earlier one's options rather than merging, so a
+			// broad `src/components/**` entry would silently drop the narrower rules below.
+			"files": ["src/lib/**", "src/stores/**"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["@/components/**"],
+								"message": "Logic and state must not reach into the view layer."
+							},
+							{
+								"group": ["@/routes/**"],
+								"message": "Logic and state must not reach into the router."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			"files": ["src/components/ui/**"],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["@/routes/**"],
+								"message": "A UI primitive cannot depend on a route. Take what it needs as a prop."
+							},
+							{
+								"group": ["@/components/**", "!@/components/ui/**"],
+								"message": "A UI primitive cannot depend on a feature component; the dependency runs the other way."
+							}
+						]
+					}
+				]
+			}
+		},
+		{
+			// Every feature directory named, because a `src/components/**` glob would also match
+			// `ui/**` and replace the narrower entry above rather than adding to it.
+			"files": [
+				"src/components/achievements/**",
+				"src/components/admin/**",
+				"src/components/auth/**",
+				"src/components/common/**",
+				"src/components/consent/**",
+				"src/components/core/**",
+				"src/components/icons/**",
+				"src/components/info/**",
+				"src/components/leaderboard/**",
+				"src/components/mentor/**",
+				"src/components/practice-trace/**",
+				"src/components/practice-vocabulary/**",
+				"src/components/profile/**",
+				"src/components/settings/**",
+				"src/components/shared/**",
+				"src/components/surveys/**",
+				"src/components/teams/**",
+				"src/components/workspace/**"
+			],
+			"rules": {
+				"no-restricted-imports": [
+					"error",
+					{
+						"patterns": [
+							{
+								"group": ["@/routes/**"],
+								"message": "A component cannot import a route; routes compose components."
+							}
+						]
+					}
+				]
+			}
+		},
 		{
 			// The directories this repo writes by hand. `AGENTS.md` § File naming is the rule itself.
 			"files": ["src/components/**", "src/lib/**", "src/hooks/**", "src/integrations/**"],

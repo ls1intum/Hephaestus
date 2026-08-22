@@ -202,7 +202,7 @@ export function WorkspaceLlmProviderPanel({
 			<QueryErrorAlert
 				error={connectionsQuery.error}
 				title="Could not load your AI providers"
-				onRetry={() => connectionsQuery.refetch()}
+				onRetry={() => void connectionsQuery.refetch()}
 			/>
 		);
 	}
@@ -218,7 +218,7 @@ export function WorkspaceLlmProviderPanel({
 			<QueryErrorAlert
 				error={modelsQuery.error}
 				title="Could not load your provider models"
-				onRetry={() => modelsQuery.refetch()}
+				onRetry={() => void modelsQuery.refetch()}
 			/>
 		);
 	}

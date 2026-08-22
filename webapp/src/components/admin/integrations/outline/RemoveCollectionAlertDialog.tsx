@@ -76,7 +76,11 @@ export function RemoveCollectionAlertDialog({
 				</AlertDialogHeader>
 				<AlertDialogFooter>
 					<AlertDialogCancel disabled={submitting}>Cancel</AlertDialogCancel>
-					<AlertDialogAction variant="destructive" disabled={submitting} onClick={confirm}>
+					<AlertDialogAction
+						variant="destructive"
+						disabled={submitting}
+						onClick={() => void confirm()}
+					>
 						{submitting ? "Removing…" : "Remove & erase"}
 					</AlertDialogAction>
 				</AlertDialogFooter>

@@ -372,7 +372,7 @@ export function PracticeDefinitionForm(props: PracticeDefinitionFormProps) {
 		!bindingsError &&
 		(mode === "edit" || isValidSlug(form.slug));
 
-	const handleSubmit = (event: React.FormEvent) => {
+	const handleSubmit = (event: React.SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		setSubmitted(true);
 		if (!valid) {

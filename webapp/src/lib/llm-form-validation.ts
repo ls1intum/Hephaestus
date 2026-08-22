@@ -44,21 +44,21 @@ const baseUrlSchema = z
 			url = new URL(value);
 		} catch {
 			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
+				code: "custom",
 				message: "Enter a full URL, including https:// — for example https://api.openai.com/v1.",
 			});
 			return;
 		}
 		if (url.protocol !== "https:" && url.protocol !== "http:") {
 			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
+				code: "custom",
 				message: "Enter a full URL, including https:// — for example https://api.openai.com/v1.",
 			});
 			return;
 		}
 		if (url.username !== "" || url.password !== "" || url.search !== "" || url.hash !== "") {
 			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
+				code: "custom",
 				message: "Remove any credentials, query string or fragment from the URL.",
 			});
 		}
@@ -163,14 +163,14 @@ const llmModelFormSchema = z
 			];
 			if (value.per1mInputUsd == null) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: "custom",
 					path: ["per1mInputUsd"],
 					message: "Required when the model has a price.",
 				});
 			}
 			if (value.per1mOutputUsd == null) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: "custom",
 					path: ["per1mOutputUsd"],
 					message: "Required when the model has a price.",
 				});
@@ -179,7 +179,7 @@ const llmModelFormSchema = z
 			const inputRateAlreadyFlagged = value.per1mInputUsd == null;
 			if (everyRateIsZero && !inputRateAlreadyFlagged) {
 				ctx.addIssue({
-					code: z.ZodIssueCode.custom,
+					code: "custom",
 					path: ["per1mInputUsd"],
 					message: "At least one rate must be above zero. For a free model, pick the free option.",
 				});
@@ -187,7 +187,7 @@ const llmModelFormSchema = z
 		}
 		if (value.pricingMode === "NO_CHARGE" && !value.note?.trim()) {
 			ctx.addIssue({
-				code: z.ZodIssueCode.custom,
+				code: "custom",
 				path: ["note"],
 				message: "Explain why no metered API rate applies.",
 			});

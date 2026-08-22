@@ -65,7 +65,7 @@ function AdminWorkspacesPage() {
 					placeholder="Search by name, slug, owner, provider, or status…"
 					value={search}
 					onChange={(event) =>
-						navigate({
+						void navigate({
 							search: { q: event.target.value || undefined },
 							replace: true,
 						})

@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { BrainCircuit, ChevronDown } from "lucide-react";
-import { type FormEvent, type ReactNode, useEffect, useId, useRef, useState } from "react";
+import { type ReactNode, type SubmitEvent, useEffect, useId, useRef, useState } from "react";
 import type {
 	AgentBinding,
 	AgentBindingRequest,
@@ -262,7 +262,7 @@ function AgentPurposeCard({
 		}
 	}, [submitAttempt]);
 
-	const handleSubmit = (event: FormEvent) => {
+	const handleSubmit = (event: SubmitEvent<HTMLFormElement>) => {
 		event.preventDefault();
 		if (!selection || timeout.value == null || concurrency.value == null) {
 			setSubmitAttempt((attempt) => attempt + 1);

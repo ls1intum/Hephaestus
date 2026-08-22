@@ -66,7 +66,7 @@ function AdminOverviewPage() {
 				events={eventsQuery.data?.content ?? []}
 				isLoading={eventsQuery.isLoading}
 				error={eventsQuery.isError ? eventsQuery.error : undefined}
-				onRetry={() => eventsQuery.refetch()}
+				onRetry={() => void eventsQuery.refetch()}
 			/>
 		</PageLayout>
 	);

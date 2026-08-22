@@ -78,7 +78,7 @@ function AdminSettings() {
 					<QueryErrorAlert
 						error={workspaceQuery.error}
 						title="Couldn't load workspace settings"
-						onRetry={() => workspaceQuery.refetch()}
+						onRetry={() => void workspaceQuery.refetch()}
 					/>
 				</div>
 			) : (

@@ -273,7 +273,7 @@ function AdminCuratedCatalogPage() {
 				<QueryErrorAlert
 					error={catalogQuery.error}
 					title="Couldn't load the practice catalog"
-					onRetry={() => catalogQuery.refetch()}
+					onRetry={() => void catalogQuery.refetch()}
 				/>
 			) : (
 				<CuratedCatalog
@@ -285,7 +285,7 @@ function AdminCuratedCatalogPage() {
 					pendingPracticeSlugs={pendingPracticeSlugs}
 					pendingAreaSlugs={pendingAreaSlugs}
 					writePending={writePending}
-					onSearchChange={(next) => navigate({ search: next, replace: true })}
+					onSearchChange={(next) => void navigate({ search: next, replace: true })}
 					onPracticeStatusChange={(practice: CuratedPracticeSummary, offered) => {
 						const parent = practice.areaSlug
 							? catalogQuery.data.areas.find((area) => area.slug === practice.areaSlug)

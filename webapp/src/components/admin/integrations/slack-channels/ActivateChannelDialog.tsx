@@ -76,7 +76,7 @@ export function ActivateChannelDialog({
 					<DialogClose render={<Button variant="outline" disabled={submitting} />}>
 						Cancel
 					</DialogClose>
-					<Button onClick={confirm} disabled={submitting}>
+					<Button onClick={() => void confirm()} disabled={submitting}>
 						{submitting ? "Activating…" : "Activate monitoring"}
 					</Button>
 				</DialogFooter>

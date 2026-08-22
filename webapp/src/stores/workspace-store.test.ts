@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { isRecord } from "@/lib/is-record";
 import { useWorkspaceStore } from "./workspace-store";
 
 const STORAGE_KEY = "hephaestus-workspace-selection";
@@ -17,7 +18,8 @@ describe("workspace-store", () => {
 	it("persists the selected workspace slug in localStorage", () => {
 		useWorkspaceStore.getState().setSelectedSlug("prompt-edu");
 
-		const persisted = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+		const persisted: unknown = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}");
+		if (!isRecord(persisted)) throw new Error("Nothing was written under the storage key.");
 
 		expect(persisted.state).toEqual({ selectedSlug: "prompt-edu" });
 	});

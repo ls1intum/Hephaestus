@@ -244,7 +244,7 @@ function AdminLlmPage() {
 				isLoading={connectionsQuery.isLoading}
 				isError={connectionsQuery.isError}
 				error={connectionsQuery.error}
-				onRetry={() => connectionsQuery.refetch()}
+				onRetry={() => void connectionsQuery.refetch()}
 				mutatingIds={mutatingConnectionIds}
 				selectedId={selectedConnection?.id ?? null}
 				onSelect={(connection) => {
@@ -273,7 +273,7 @@ function AdminLlmPage() {
 					<QueryErrorAlert
 						error={modelsQuery.error}
 						title="Could not load models"
-						onRetry={() => modelsQuery.refetch()}
+						onRetry={() => void modelsQuery.refetch()}
 					/>
 				) : modelsQuery.isLoading ? (
 					<div
@@ -309,7 +309,7 @@ function AdminLlmPage() {
 				<QueryErrorAlert
 					error={settingsQuery.error}
 					title="Could not load AI policy"
-					onRetry={() => settingsQuery.refetch()}
+					onRetry={() => void settingsQuery.refetch()}
 				/>
 			) : (
 				<InstanceLlmSettingsCard
@@ -369,7 +369,7 @@ function AdminLlmPage() {
 						: []
 				}
 				isSubmitting={isModelSaving}
-				onSave={handleSaveModel}
+				onSave={(body) => void handleSaveModel(body)}
 			/>
 
 			<AdminLlmModelAccessDialog
@@ -381,7 +381,7 @@ function AdminLlmPage() {
 				workspaceOptions={workspaceOptions}
 				isLoadingWorkspaces={workspacesQuery.isLoading}
 				workspacesError={workspacesQuery.error}
-				onRetryWorkspaces={() => workspacesQuery.refetch()}
+				onRetryWorkspaces={() => void workspacesQuery.refetch()}
 				isSubmitting={updateSharing.isPending}
 				onSave={(body) => {
 					if (!accessModel) return;

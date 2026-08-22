@@ -160,7 +160,7 @@ function AdminUsersPage() {
 					placeholder="Search by name, email, role, or status…"
 					value={search}
 					onChange={(event) =>
-						navigate({
+						void navigate({
 							search: { q: event.target.value || undefined },
 							replace: true,
 						})
@@ -178,7 +178,7 @@ function AdminUsersPage() {
 				currentUserId={currentUserId}
 				hasNextPage={listQuery.hasNextPage}
 				isFetchingNextPage={listQuery.isFetchingNextPage}
-				onLoadMore={() => listQuery.fetchNextPage()}
+				onLoadMore={() => void listQuery.fetchNextPage()}
 				onChangeRole={(user) => {
 					updateRole.reset();
 					setRoleTarget({ user });

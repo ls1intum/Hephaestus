@@ -171,7 +171,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				onSnapSizeChange={setSnapSize}
 				showTooltips={showTooltips}
 				onShowTooltipsChange={setShowTooltips}
-				onSave={saveLayout}
+				onSave={() => void saveLayout()}
 				edgeDisplayMode={edgeDisplayMode}
 				onEdgeDisplayModeChange={setEdgeDisplayMode}
 			/>
@@ -189,7 +189,7 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 				onEdgesChange={onEdgesChange}
 				nodeTypes={nodeTypes}
 				edgeTypes={edgeTypes}
-				onInit={(instance) => instance.fitView(FIT_VIEW_OPTIONS)}
+				onInit={(instance) => void instance.fitView(FIT_VIEW_OPTIONS)}
 				fitView={true}
 				fitViewOptions={FIT_VIEW_OPTIONS}
 				minZoom={0.15}

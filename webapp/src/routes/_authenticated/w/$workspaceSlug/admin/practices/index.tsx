@@ -109,7 +109,7 @@ function PracticeCatalogRoute() {
 					}}
 					focusFilter={focus ?? "ALL"}
 					onFocusFilterChange={(next: FocusFilter) =>
-						navigate({
+						void navigate({
 							search: { focus: next === "ALL" ? undefined : next },
 						})
 					}

@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { chromium } from "playwright";
+import { type Browser, chromium } from "playwright";
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const webappDirectory = resolve(scriptDirectory, "..");
@@ -10,7 +10,36 @@ const outputDirectory = resolve(webappDirectory, "../docs/images/readme");
 const port = 6106;
 const storybookUrl = `http://127.0.0.1:${port}`;
 
-const exportsToCapture = [
+/** The two colour schemes every asset is exported in, one file each. */
+type Theme = "light" | "dark";
+
+/**
+ * Breakpoints an asset can be exported at. `desktop` and `mobile` are mandatory because the README
+ * shows both; `tablet` only exists for assets whose layout has a third state.
+ */
+type Breakpoint = "desktop" | "tablet" | "mobile";
+
+interface CaptureConfig {
+	storyId: string;
+	selector: string;
+	viewportWidth: number;
+	/**
+	 * The width the surface must measure once rendered. A mismatch means the story's layout moved out
+	 * from under the README, so the export fails rather than silently committing a resized image.
+	 */
+	expectedWidth: number;
+}
+
+interface AssetExport {
+	name: string;
+	desktop: CaptureConfig;
+	tablet?: CaptureConfig;
+	mobile: CaptureConfig;
+}
+
+const themes: Theme[] = ["light", "dark"];
+
+const exportsToCapture: AssetExport[] = [
 	{
 		name: "landing-feedback-preview",
 		desktop: {
@@ -49,7 +78,7 @@ const exportsToCapture = [
 	},
 ];
 
-async function waitForStorybook() {
+async function waitForStorybook(): Promise<void> {
 	for (let attempt = 0; attempt < 120; attempt += 1) {
 		try {
 			const response = await fetch(`${storybookUrl}/index.json`);
@@ -64,7 +93,13 @@ async function waitForStorybook() {
 	throw new Error("Storybook did not start within 60 seconds.");
 }
 
-async function capture(browser, theme, name, mode, config) {
+async function capture(
+	browser: Browser,
+	theme: Theme,
+	name: string,
+	mode: Breakpoint,
+	config: CaptureConfig,
+): Promise<void> {
 	const page = await browser.newPage({
 		viewport: { width: config.viewportWidth, height: 800 },
 		deviceScaleFactor: 2,
@@ -116,7 +151,7 @@ try {
 	await waitForStorybook();
 	const browser = await chromium.launch();
 	try {
-		for (const theme of ["light", "dark"]) {
+		for (const theme of themes) {
 			for (const asset of exportsToCapture) {
 				await capture(browser, theme, asset.name, "desktop", asset.desktop);
 				if (asset.tablet) {

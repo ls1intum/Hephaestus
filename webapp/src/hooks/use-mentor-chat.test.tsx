@@ -99,6 +99,7 @@ function installFakeChat(initialStatus: ChatStatus = "ready"): FakeChat {
 		const [messages, setMessages] = useState<ChatMessage[]>(options.messages ?? []);
 		const [status, setStatus] = useState<ChatStatus>(initialStatus);
 		const [error, setError] = useState<Error | undefined>(undefined);
+		const addToolOutput = vi.fn();
 
 		fake.raiseError = (raised: Error) => {
 			setStatus("error");
@@ -134,8 +135,11 @@ function installFakeChat(initialStatus: ChatStatus = "ready"): FakeChat {
 			regenerate: vi.fn(),
 			clearError: vi.fn(),
 			resumeStream: vi.fn(),
-			addToolResult: vi.fn(),
-			addToolOutput: vi.fn(),
+			addToolOutput,
+			// `UseChatHelpers` still declares the older `addToolResult` name as a required member
+			// aliasing `addToolOutput`, so one spy backs both and a call through either is visible.
+			// oxlint-disable-next-line typescript/no-deprecated -- a fake has to implement the interface it stands in for
+			addToolResult: addToolOutput,
 			addToolApprovalResponse: vi.fn(),
 		};
 	});

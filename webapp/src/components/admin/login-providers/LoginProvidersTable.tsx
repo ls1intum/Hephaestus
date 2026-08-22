@@ -174,7 +174,7 @@ export function LoginProvidersTable({
 													<InputGroupButton
 														size="icon-xs"
 														aria-label={`Copy redirect URI for ${provider.displayName}`}
-														onClick={() => copyRedirect(provider.redirectUri)}
+														onClick={() => void copyRedirect(provider.redirectUri)}
 													>
 														<Copy aria-hidden />
 													</InputGroupButton>

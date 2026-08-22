@@ -114,7 +114,7 @@ function AdminLoginProvidersPage() {
 				isLoading={listQuery.isLoading}
 				isError={listQuery.isError}
 				error={listQuery.error}
-				onRetry={() => listQuery.refetch()}
+				onRetry={() => void listQuery.refetch()}
 				mutatingIds={mutatingIds}
 				onEdit={openEdit}
 				onToggleEnabled={handleToggleEnabled}

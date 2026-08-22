@@ -7,7 +7,7 @@ import {
 	Hammer,
 	Lightbulb,
 } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { motion, stagger, useReducedMotion } from "motion/react";
 import { LandingSignInCta } from "@/components/auth/LandingSignInCta";
 import { GithubIcon, GitlabIcon } from "@/components/icons/brand";
 import { MentorIcon } from "@/components/mentor/MentorIcon";
@@ -257,7 +257,7 @@ export function LandingHeroSection({
 						hidden: {},
 						visible: {
 							transition: {
-								staggerChildren: 0.09,
+								delayChildren: stagger(0.09),
 							},
 						},
 					}}

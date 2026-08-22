@@ -95,7 +95,7 @@ export function AdminDangerZoneSettings({ workspaceSlug }: AdminDangerZoneSettin
 								variant="outline"
 								className="w-full shrink-0 sm:mt-1 sm:w-auto"
 								disabled={isRoleFetching}
-								onClick={() => refetchRole()}
+								onClick={() => void refetchRole()}
 							>
 								{isRoleFetching && <Spinner aria-hidden />}
 								{isRoleFetching ? "Retrying…" : "Retry"}

@@ -279,7 +279,7 @@ function ScmIntegrationPage() {
 							isLoading={isResourcesLoading}
 							isError={isResourcesError}
 							error={resourcesError}
-							onRetry={() => refetchResources()}
+							onRetry={() => void refetchResources()}
 							resourceNoun="repository"
 							resourceNounPlural="repositories"
 							syncIntervalSeconds={status?.syncIntervalSeconds}
@@ -304,7 +304,7 @@ function ScmIntegrationPage() {
 					onRemoveRepository={(nameWithOwner) => {
 						removeRepository.mutate({ path: { workspaceSlug: slug }, query: { nameWithOwner } });
 					}}
-					onRetry={() => refetchRepositories()}
+					onRetry={() => void refetchRepositories()}
 				/>
 			)}
 
@@ -314,7 +314,7 @@ function ScmIntegrationPage() {
 					isLoading={isJobsLoading}
 					isError={isJobsError}
 					error={jobsError}
-					onRetry={() => refetchJobs()}
+					onRetry={() => void refetchJobs()}
 					page={jobsPage}
 					totalPages={jobsPageData?.totalPages ?? 1}
 					onPageChange={setJobsPage}

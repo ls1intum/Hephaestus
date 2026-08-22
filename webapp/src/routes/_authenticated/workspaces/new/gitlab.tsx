@@ -119,7 +119,7 @@ function GitLabLinkPrompt({
 								key={provider.registrationId}
 								variant={linked ? "outline" : "default"}
 								disabled={linked}
-								onClick={() => linkAccount(provider.registrationId)}
+								onClick={() => void linkAccount(provider.registrationId)}
 							>
 								{linked
 									? `${provider.displayName} — already linked`
