@@ -2,7 +2,9 @@ package de.tum.cit.aet.hephaestus.practices.observation;
 
 import de.tum.cit.aet.hephaestus.core.exception.AccessForbiddenException;
 import de.tum.cit.aet.hephaestus.evidence.SourceUsePurpose;
+import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.DeveloperPracticeSummaryDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationDetailDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ObservationListDTO;
@@ -18,9 +20,11 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirements;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -48,6 +52,7 @@ public class ObservationController {
 
     private final ObservationService observationService;
     private final EvidenceAuthorization evidenceAuthorization;
+    private final PracticeReflectionService practiceReflectionService;
 
     @GetMapping
     @Operation(
@@ -58,17 +63,16 @@ public class ObservationController {
     @SecurityRequirements
     public ResponseEntity<Page<ObservationListDTO>> listObservations(
         WorkspaceContext workspaceContext,
-        @Parameter(description = "Filter by practice slug") @RequestParam(required = false) String practiceSlug,
-        @Parameter(description = "Filter by presence") @RequestParam(required = false) Presence presence,
-        @RequestParam(defaultValue = "0") int page,
-        @RequestParam(defaultValue = "20") int size
+        @Valid @ParameterObject ObservationFeedFilterParams filter
     ) {
-        int safePage = Math.max(page, 0);
-        int pageSize = Math.max(1, Math.min(size, 100));
-        Pageable pageable = PageRequest.of(safePage, pageSize, Sort.by("observedAt").descending());
+        // The severity query carries its own ORDER BY; an additional pageable sort would conflict.
+        Pageable pageable =
+            filter.sort() == ObservationService.ObservationSort.SEVERITY
+                ? PageRequest.of(filter.page(), filter.size())
+                : PageRequest.of(filter.page(), filter.size(), Sort.by(filter.direction(), "observedAt"));
 
         Page<ObservationListDTO> observations = observationService
-            .getObservations(workspaceContext.id(), practiceSlug, presence, pageable)
+            .getObservations(workspaceContext.id(), filter.toQuery(), pageable)
             .map(ObservationListDTO::from);
         return ResponseEntity.ok(observations);
     }
@@ -108,7 +112,7 @@ public class ObservationController {
     )
     @SecurityRequirements
     public ResponseEntity<List<ReflectionPracticeDTO>> getReflection(WorkspaceContext workspaceContext) {
-        return ResponseEntity.ok(observationService.getReflection(workspaceContext.id()));
+        return ResponseEntity.ok(practiceReflectionService.getReflection(workspaceContext.id()));
     }
 
     @GetMapping("/{observationId}")
@@ -132,12 +136,15 @@ public class ObservationController {
         String deliveredFeedback = observationService
             .getDeliveredGuidance(workspaceContext.id(), observationId)
             .orElse(null);
+        String artifactUrl = observationService.getArtifactUrl(workspaceContext.id(), observation).orElse(null);
         boolean includeEvidence = evidenceAuthorization.permits(
             workspaceContext.id(),
             observation,
             SourceUsePurpose.PRACTICE_FEEDBACK_DELIVERY
         );
-        return ResponseEntity.ok(ObservationDetailDTO.from(observation, deliveredFeedback, includeEvidence));
+        return ResponseEntity.ok(
+            ObservationDetailDTO.from(observation, deliveredFeedback, artifactUrl, includeEvidence)
+        );
     }
 
     @GetMapping("/pull-request/{prId}")

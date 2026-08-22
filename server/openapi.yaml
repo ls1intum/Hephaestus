@@ -28,6 +28,59 @@ security:
 tags:
 - description: User achievement progress and unlocks
   name: Achievements
+- description: Per-workspace LLM spend rollup and budget status
+  name: LLM Usage
+- description: Manage practice areas
+  name: Practice Areas
+- description: Learner-facing practice-area detail views
+  name: Practice Area Detail
+- description: Workspace-scoped mentor chat threads
+  name: Mentor Threads
+- description: "User account management (settings, deletion)"
+  name: Account
+- description: Instance-admin account management
+  name: Admin
+- description: Current user's Slack privacy preferences
+  name: Slack User Preferences
+- description: Per-workspace Outline collection mirroring control plane
+  name: Outline collections
+- description: The starting catalog copied into new workspaces
+  name: Admin Practice Catalog
+- description: User profile and activity data
+  name: Profile
+- description: Instance-wide operator settings
+  name: Instance Settings
+- description: Current instance definitions visible to workspace administrators
+  name: Practice Catalog
+- description: Session lifecycle
+  name: Auth
+- description: Workspace-scoped practice-review policy
+  name: Practice Review Settings
+- description: Learner usefulness ratings for delivered practice feedback
+  name: Feedback Helpfulness
+- description: Workspace integration connection management
+  name: Connections
+- description: Up/down votes on mentor assistant messages
+  name: Mentor Votes
+- description: "Workspace-admin access to review runs, observations, and feedback\
+    \ delivery history"
+  name: Practice reviews
+- description: GDPR Art. 20 self-service data export
+  name: Account
+- description: Workspace-scoped history of admin configuration changes
+  name: Config Audit
+- description: |-
+    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
+     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
+     on both success and failure; only <code>Accept: application/json</code> requests get
+     4xx JSON.
+  name: o-auth-callback-controller
+- description: Recurring reviews of recent work
+  name: Practice Review Sweep
+- description: Developer reactions to delivered feedback
+  name: Feedback Reaction
+- description: Identity provider discovery (public)
+  name: Auth discovery
 - description: Global contributor information
   name: Contributors
 - description: User preferences
@@ -36,12 +89,6 @@ tags:
   name: Admin
 - description: Per-workspace Slack channel consent + activation
   name: Slack channel activation
-- description: Per-workspace LLM spend rollup and budget status
-  name: LLM Usage
-- description: Manage practice areas
-  name: Practice Areas
-- description: Workspace-scoped mentor chat threads
-  name: Mentor Threads
 - description: |-
     Workspace registry endpoints under /workspaces that operate outside of a specific workspace slug;
      slugged routes live in {@link WorkspaceController WorkspaceController} via <code>@WorkspaceScopedController</code>.
@@ -58,77 +105,34 @@ tags:
   name: Agent Jobs
 - description: Asking for a review of a piece of work by hand
   name: Practice review requests
-- description: "User account management (settings, deletion)"
-  name: Account
 - description: Read-only access to practice evaluation observations
   name: Practice Observations
-- description: Instance-admin account management
-  name: Admin
-- description: Current user's Slack privacy preferences
-  name: Slack User Preferences
-- description: Per-workspace Outline collection mirroring control plane
-  name: Outline collections
 - description: Team management within workspace
   name: Teams
-- description: The starting catalog copied into new workspaces
-  name: Admin Practice Catalog
 - description: The developer's own prepared practice feedback
   name: In-App Feedback
 - description: "Workspace-scoped \"bring your own\" AI provider connections, models\
     \ and settings"
   name: Workspace LLM
-- description: User profile and activity data
-  name: Profile
-- description: Instance-wide operator settings
-  name: Instance Settings
 - description: Contributor rankings and league statistics
   name: Leaderboard
 - description: Why each practice did or did not run on one piece of work; readable
     by any workspace member
   name: Practice review trace
-- description: Current instance definitions visible to workspace administrators
-  name: Practice Catalog
-- description: Session lifecycle
-  name: Auth
-- description: Workspace-scoped practice-review policy
-  name: Practice Review Settings
 - description: Active sessions
   name: Account
 - description: |-
     GitLab-specific REST endpoints used during the workspace creation wizard. Gated on the
      <code>GITLAB_WORKSPACE_CREATION</code> feature flag.
   name: git-lab-preflight-controller
-- description: Workspace integration connection management
-  name: Connections
 - description: Instance-admin LLM connection and settings management
   name: Admin LLM
-- description: Up/down votes on mentor assistant messages
-  name: Mentor Votes
-- description: "Workspace-admin access to review runs, observations, and feedback\
-    \ delivery history"
-  name: Practice reviews
 - description: Public JWK set for verifying Hephaestus session JWTs
   name: Auth discovery
-- description: GDPR Art. 20 self-service data export
-  name: Account
-- description: Workspace-scoped history of admin configuration changes
-  name: Config Audit
-- description: |-
-    Vendor OAuth redirect ingress at <code>/oauth/callback/{kind</code>}. Unauthenticated —
-     identity comes from the HMAC-signed <code>state</code> param. Browsers get 302 redirects
-     on both success and failure; only <code>Accept: application/json</code> requests get
-     4xx JSON.
-  name: o-auth-callback-controller
 - description: Manage practice definitions
   name: Practice Catalog
 - description: Workspace-scoped team settings management
   name: Team Settings
-- description: Recurring reviews of recent work
-  name: Practice Review Sweep
-- description: Developer reactions to delivered feedback
-  name: Feedback Reaction
-- description: Identity provider discovery (public)
-  name: Auth discovery
 - description: Integration sync observability and manual controls
   name: Sync
 - description: "Current user identity, linked accounts, deletion"
@@ -4101,6 +4105,34 @@ paths:
       summary: Reorder practice areas
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/status:
+    get:
+      description: "Aggregates the authenticated developer's latest-run findings across\
+        \ every active practice area into qualitative statuses, with supporting feedback\
+        \ items attached so each status stays traceable to real feedback. Without\
+        \ a displayable finding the status reports why: NOT_OBSERVED or NO_OPPORTUNITY."
+      operationId: getPracticeAreaStatuses
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PracticeAreaStatus"
+          description: Active-area statuses returned
+      security: []
+      summary: Derived practice-area statuses for the current developer
+      tags:
+      - Practice Areas
   /workspaces/{workspaceSlug}/practice-areas/{areaSlug}:
     delete:
       description: "Moves its practices to Unassigned, then deletes the area"
@@ -4228,6 +4260,114 @@ paths:
       summary: Set how much autonomy the system has over one area
       tags:
       - Practice Areas
+  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/review-history:
+    get:
+      description: Returns complete review runs newest first. Each moment contains
+        the concrete positive and negative findings that explain what the reviewer
+        observed.
+      operationId: listPracticeAreaReviewHistory
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: areaSlug
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: practiceSlug
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: artifactKinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - in: query
+        name: severities
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - in: query
+        name: size
+        required: false
+        schema:
+          type: integer
+          format: int32
+          maximum: 50
+          minimum: 1
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedModelPracticeAreaReviewMoment"
+          description: Paginated review moments returned
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ProblemDetail"
+          description: Invalid filter or pagination
+        "404":
+          description: Practice area not found
+      security: []
+      summary: List complete review moments for a practice area
+      tags:
+      - Practice Area Detail
+  /workspaces/{workspaceSlug}/practice-areas/{areaSlug}/trend:
+    get:
+      description: Returns the area direction and every eligible practice direction
+        with inspectable support.
+      operationId: listPracticeAreaTrend
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: areaSlug
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PracticeAreaTrend"
+          description: Practice-area trend returned
+        "404":
+          description: Practice area not found
+      security: []
+      summary: Get the evidence-supported trend for a practice area
+      tags:
+      - Practice Area Detail
   /workspaces/{workspaceSlug}/practice-catalog/practices/{slug}:
     get:
       description: The current instance-catalog definition for comparison with a workspace
@@ -4570,6 +4710,63 @@ paths:
       summary: The current developer's in-app feedback
       tags:
       - In-App Feedback
+  /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/helpfulness:
+    delete:
+      operationId: removeFeedbackHelpfulnessRating
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "204":
+          description: Rating removed or did not exist
+      summary: Remove a usefulness rating
+      tags:
+      - Feedback Helpfulness
+    post:
+      operationId: rateFeedbackHelpfulness
+      parameters:
+      - description: Workspace slug
+        in: path
+        name: workspaceSlug
+        required: true
+        schema:
+          type: string
+          pattern: "^[a-z0-9][a-z0-9-]{2,50}$"
+      - in: path
+        name: feedbackId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FeedbackHelpfulnessVoteRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeedbackHelpfulnessVote"
+          description: Rating recorded
+        "404":
+          description: Feedback not found
+      summary: Rate delivered practice feedback
+      tags:
+      - Feedback Helpfulness
   /workspaces/{workspaceSlug}/practices/feedback/{feedbackId}/reactions:
     get:
       description: "Returns the current user's most recent reaction to the specified\
@@ -4689,6 +4886,12 @@ paths:
         required: false
         schema:
           type: string
+      - description: Filter by the practice area the observed practice belongs to
+        in: query
+        name: areaSlug
+        required: false
+        schema:
+          type: string
       - description: Filter by presence
         in: query
         name: presence
@@ -4700,20 +4903,71 @@ paths:
           - ABSENT
           - NOT_APPLICABLE
           - INCONCLUSIVE
+      - description: Only observations on these artifact kinds (repeatable); omit
+          for all kinds
+        in: query
+        name: artifactKinds
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+      - description: Only observations with these severities (repeatable); omit for
+          all
+        in: query
+        name: severities
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - CRITICAL
+            - MAJOR
+            - MINOR
+            - INFO
+      - description: Drop NOT_APPLICABLE rows — only observations where the practice
+          actually applied
+        in: query
+        name: displayableOnly
+        required: false
+        schema:
+          type: boolean
+      - description: "Feed ordering: DATE (default) or SEVERITY (most severe first,\
+          \ ties newest-first)"
+        in: query
+        name: sort
+        required: false
+        schema:
+          type: string
+          enum:
+          - DATE
+          - SEVERITY
+      - description: "Ordering direction: for DATE newest/oldest first, for SEVERITY\
+          \ most/least severe first"
+        in: query
+        name: direction
+        required: false
+        schema:
+          type: string
+          enum:
+          - ASC
+          - DESC
       - in: query
         name: page
         required: false
         schema:
           type: integer
           format: int32
-          default: 0
+          minimum: 0
       - in: query
         name: size
         required: false
         schema:
           type: integer
           format: int32
-          default: 20
+          maximum: 100
+          minimum: 1
       responses:
         "200":
           content:
@@ -9183,6 +9437,44 @@ components:
           - DUPLICATE
           - INAPPROPRIATE_PLACEMENT
           - OTHER
+    FeedbackHelpfulnessVote:
+      type: object
+      description: Current usefulness rating for a delivered feedback unit
+      properties:
+        feedbackId:
+          type: string
+          format: uuid
+        helpful:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - feedbackId
+      - updatedAt
+    FeedbackHelpfulnessVoteRequest:
+      type: object
+      description: Rate whether delivered practice feedback was helpful
+      properties:
+        helpful:
+          type: boolean
+          description: "true when the feedback was helpful, false when it was not"
+      required:
+      - helpful
+    FeedbackSourceCount:
+      type: object
+      description: Distinct work artifacts of one kind that contributed feedback
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: Distinct artifacts of this kind in the selected time period
+        source:
+          type: string
+          description: The kind of work the feedback came from
+      required:
+      - count
+      - source
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -10078,6 +10370,10 @@ components:
         artifactKind:
           type: string
           description: Artifact type (e.g. PULL_REQUEST)
+        artifactUrl:
+          type: string
+          description: Link to the reviewed artifact on its platform (null when it
+            cannot be resolved)
         assessment:
           type: string
           description: "Assessment: GOOD or BAD; null when the presence carries no\
@@ -10244,6 +10540,30 @@ components:
       - practiceSlug
       - presence
       - summary
+    OutcomeVector:
+      type: object
+      properties:
+        commissionProblems:
+          type: integer
+          format: int32
+        demonstratedStrengths:
+          type: integer
+          format: int32
+        notApplicable:
+          type: integer
+          format: int32
+        omissionGaps:
+          type: integer
+          format: int32
+        safeAvoidances:
+          type: integer
+          format: int32
+      required:
+      - commissionProblems
+      - demonstratedStrengths
+      - notApplicable
+      - omissionGaps
+      - safeAvoidances
     OutlineCollection:
       type: object
       description: A mirrored Outline collection with its sync state and live document
@@ -10566,6 +10886,15 @@ components:
           $ref: "#/components/schemas/SortObject"
         unpaged:
           type: boolean
+    PagedModelPracticeAreaReviewMoment:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAreaReviewMoment"
+        page:
+          $ref: "#/components/schemas/PageMetadata"
     PagedModelReviewFeedback:
       type: object
       properties:
@@ -10747,6 +11076,189 @@ components:
       - name
       - slug
       - visibleInPracticeDashboards
+    PracticeAreaReviewArtifact:
+      type: object
+      description: The work artifact assessed in a learner-facing review moment
+      properties:
+        channelName:
+          type: string
+        id:
+          type: integer
+          format: int64
+        number:
+          type: integer
+          format: int32
+        provider:
+          type: string
+          enum:
+          - GITHUB
+          - GITLAB
+          - SLACK
+          - OUTLINE
+        repositoryName:
+          type: string
+        title:
+          type: string
+        type:
+          type: string
+        url:
+          type: string
+      required:
+      - id
+      - title
+      - type
+    PracticeAreaReviewFinding:
+      type: object
+      description: "One concrete, evidence-backed result inside a review moment"
+      properties:
+        assessment:
+          type: string
+          enum:
+          - GOOD
+          - BAD
+        feedbackId:
+          type: string
+          format: uuid
+        helpful:
+          type: boolean
+        observationId:
+          type: string
+          format: uuid
+        practiceName:
+          type: string
+        practiceSlug:
+          type: string
+        presence:
+          type: string
+          enum:
+          - PRESENT
+          - ABSENT
+          - NOT_APPLICABLE
+          - INCONCLUSIVE
+        recurrenceKey:
+          type: string
+        severity:
+          type: string
+          enum:
+          - CRITICAL
+          - MAJOR
+          - MINOR
+          - INFO
+        title:
+          type: string
+      required:
+      - assessment
+      - observationId
+      - practiceName
+      - practiceSlug
+      - presence
+      - title
+    PracticeAreaReviewMoment:
+      type: object
+      description: A complete review run in a learner's practice-area history
+      properties:
+        artifact:
+          $ref: "#/components/schemas/PracticeAreaReviewArtifact"
+        findings:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeAreaReviewFinding"
+        reviewId:
+          type: string
+          format: uuid
+        reviewedAt:
+          type: string
+          format: date-time
+      required:
+      - artifact
+      - findings
+      - reviewId
+      - reviewedAt
+    PracticeAreaStatus:
+      type: object
+      description: A developer's derived qualitative standing for one Area including
+        1<=n<many practices
+      properties:
+        areaName:
+          type: string
+          description: Area name
+        areaSlug:
+          type: string
+          description: Area slug
+        feedbackSince:
+          type: string
+          format: date-time
+          description: "Oldest contributing observation, for provenance only (null\
+            \ without a verdict)"
+        feedbackSpanDays:
+          type: integer
+          format: int32
+          description: "Calendar span covered by the feedback, for provenance only;\
+            \ never a trend-analysis unit"
+        guidance:
+          type: string
+          description: "Learner-facing guidance aggregated from the area's feedback\
+            \ (null unless the status is a verdict). The deterministic summary combines\
+            \ standing, next focus, and learner-facing catalog guidance; the same\
+            \ field carries AI-aggregated guidance when a provider supplies it."
+        guidanceSource:
+          type: string
+          description: How the guidance text was produced (null when there is no guidance)
+          enum:
+          - RULE_BASED
+          - AI_AGGREGATED
+        items:
+          type: array
+          description: Supporting feedback the status derives from (problems first);
+            empty without a verdict
+          items:
+            $ref: "#/components/schemas/ReflectionItem"
+        sources:
+          type: array
+          description: "Distinct work artifacts the feedback comes from, per kind\
+            \ (provenance, not a score); empty without a verdict"
+          items:
+            $ref: "#/components/schemas/FeedbackSourceCount"
+        status:
+          type: string
+          description: Derived qualitative status across the area's practices
+          enum:
+          - DEVELOPING
+          - STRENGTH
+          - MIXED
+          - NOT_OBSERVED
+          - NO_OPPORTUNITY
+        trajectory:
+          type: string
+          description: "Evidence-weighted, opportunity-indexed direction across the\
+            \ area's practices"
+          enum:
+          - IMPROVING
+          - STABLE
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        trendSupport:
+          $ref: "#/components/schemas/TrendSupport"
+          description: Evidence support and provenance for the trajectory
+      required:
+      - areaName
+      - areaSlug
+      - items
+      - sources
+      - status
+    PracticeAreaTrend:
+      type: object
+      properties:
+        area:
+          $ref: "#/components/schemas/PracticeTrend"
+        practices:
+          type: array
+          items:
+            $ref: "#/components/schemas/PracticeTrend"
+      required:
+      - area
+      - practices
     PracticeAutomatedReview:
       type: object
       description: Author-declared automated review and evidence sufficiency for one
@@ -11220,6 +11732,40 @@ components:
       - practiceSlug
       - watches
       - withheldReasons
+    PracticeTrend:
+      type: object
+      properties:
+        currentOutcomes:
+          $ref: "#/components/schemas/OutcomeVector"
+        direction:
+          type: string
+          enum:
+          - IMPROVING
+          - STABLE
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        opportunities:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendOpportunity"
+        previousOutcomes:
+          $ref: "#/components/schemas/OutcomeVector"
+        scope:
+          type: string
+          enum:
+          - AREA
+          - PRACTICE
+        slug:
+          type: string
+        support:
+          $ref: "#/components/schemas/TrendSupport"
+      required:
+      - direction
+      - opportunities
+      - scope
+      - slug
+      - support
     PracticeWorkTypeDefinitionOptions:
       type: object
       description: "Review timing, evidence choices, and recommended settings for\
@@ -11846,6 +12392,18 @@ components:
           description: Specific feedback to act on (highest-impact first)
           items:
             $ref: "#/components/schemas/ReflectionItem"
+        trajectory:
+          type: string
+          description: Opportunity-indexed direction of this practice's recent evidence
+          enum:
+          - IMPROVING
+          - STABLE
+          - DECLINING
+          - UNCERTAIN
+          - INSUFFICIENT_EVIDENCE
+        trendSupport:
+          $ref: "#/components/schemas/TrendSupport"
+          description: Evidence support and provenance for the trajectory
         whatGoodLooksLike:
           type: string
           description: A concrete picture of doing this well
@@ -13537,6 +14095,85 @@ components:
       - revision
       - signal
       - state
+    TrendOpportunity:
+      type: object
+      properties:
+        artifactId:
+          type: integer
+          format: int64
+        artifactKind:
+          type: string
+        bundle:
+          type: string
+          enum:
+          - PREVIOUS
+          - CURRENT
+          - OLDER
+        index:
+          type: integer
+          format: int32
+        occurredAt:
+          type: string
+          format: date-time
+        outcomes:
+          $ref: "#/components/schemas/OutcomeVector"
+      required:
+      - artifactId
+      - artifactKind
+      - bundle
+      - index
+      - occurredAt
+      - outcomes
+    TrendSupport:
+      type: object
+      properties:
+        bundleSize:
+          type: integer
+          format: int32
+        calendarSpanDays:
+          type: integer
+          format: int32
+        comparablePractices:
+          type: integer
+          format: int32
+        credibilityThreshold:
+          type: number
+          format: double
+        currentOpportunities:
+          type: integer
+          format: int32
+        eligiblePractices:
+          type: integer
+          format: int32
+        firstOpportunityAt:
+          type: string
+          format: date-time
+        lastOpportunityAt:
+          type: string
+          format: date-time
+        level:
+          type: string
+          enum:
+          - WELL_SUPPORTED
+          - TENTATIVE
+          - NONE
+        opportunitiesUntilComparable:
+          type: integer
+          format: int32
+        previousOpportunities:
+          type: integer
+          format: int32
+        ropeHalfWidth:
+          type: number
+          format: double
+      required:
+      - bundleSize
+      - credibilityThreshold
+      - currentOpportunities
+      - level
+      - opportunitiesUntilComparable
+      - previousOpportunities
+      - ropeHalfWidth
     TriggerSyncJobRequest:
       type: object
       description: Manual sync trigger request body

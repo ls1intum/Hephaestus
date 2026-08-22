@@ -131,6 +131,36 @@ public interface FeedbackObservationRepository extends JpaRepository<FeedbackObs
         String getBody();
     }
 
+    /** Newest delivered feedback unit that actually carried each observation to this learner. */
+    @Query(
+        value = """
+        SELECT DISTINCT ON (fo.observation_id)
+               fo.observation_id AS "observationId",
+               f.id AS "feedbackId",
+               v.helpful AS "helpful"
+        FROM feedback_observation fo
+        JOIN feedback f ON f.id = fo.feedback_id
+        LEFT JOIN feedback_helpfulness_vote v ON v.feedback_id = f.id
+        WHERE fo.observation_id IN (:observationIds)
+          AND f.workspace_id = :workspaceId
+          AND f.recipient_user_id = :recipientUserId
+          AND f.delivery_state = 'DELIVERED'
+        ORDER BY fo.observation_id, f.delivered_at DESC NULLS LAST, f.created_at DESC, f.id DESC
+        """,
+        nativeQuery = true
+    )
+    List<DeliveredFeedbackBinding> findDeliveredFeedbackBindings(
+        @Param("workspaceId") Long workspaceId,
+        @Param("recipientUserId") Long recipientUserId,
+        @Param("observationIds") Collection<UUID> observationIds
+    );
+
+    interface DeliveredFeedbackBinding {
+        UUID getObservationId();
+        UUID getFeedbackId();
+        Boolean getHelpful();
+    }
+
     // --- conversational feedback delivery loop ---
 
     /**

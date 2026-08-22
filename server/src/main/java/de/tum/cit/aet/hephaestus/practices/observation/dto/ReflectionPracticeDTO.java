@@ -1,5 +1,7 @@
 package de.tum.cit.aet.hephaestus.practices.observation.dto;
 
+import de.tum.cit.aet.hephaestus.practices.observation.trend.TrendDirection;
+import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendSupportDTO;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import org.jspecify.annotations.NonNull;
@@ -34,7 +36,14 @@ public record ReflectionPracticeDTO(
     @NonNull
     @Schema(description = "Specific feedback to act on (highest-impact first)")
     List<ReflectionItemDTO> toWorkOn,
-    @NonNull @Schema(description = "What the developer already does well here") List<ReflectionItemDTO> strengths
+    @NonNull @Schema(description = "What the developer already does well here") List<ReflectionItemDTO> strengths,
+    @Nullable
+    @Schema(
+        description = "Opportunity-indexed direction of this practice's recent evidence",
+        allowableValues = { "IMPROVING", "STABLE", "DECLINING", "UNCERTAIN", "INSUFFICIENT_EVIDENCE" }
+    )
+    TrendDirection trajectory,
+    @Nullable @Schema(description = "Evidence support and provenance for the trajectory") TrendSupportDTO trendSupport
 ) {
     /** Coarse, human standing derived from the developer's latest-run feedback on this practice. */
     public enum Standing {
