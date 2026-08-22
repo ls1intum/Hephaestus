@@ -62,8 +62,10 @@ const preview: CatalogAreaAdoptionPreview = {
 	],
 };
 
-const ready = (over: Partial<CatalogAreaAdoptionPreview> = {}, adding = false) =>
-	({ status: "ready", preview: { ...preview, ...over }, adding }) as const;
+const ready = (
+	over: Partial<CatalogAreaAdoptionPreview> = {},
+	action: "idle" | "adding" | "stale" = "idle",
+) => ({ status: "ready", preview: { ...preview, ...over }, action }) as const;
 
 /**
  * An area states each practice's outcome on the practice's own row, so the panel needs no prose
@@ -166,8 +168,23 @@ export const FailedToLoad: Story = {
 	},
 };
 
+/**
+ * The same recovery a single practice gets: the panel stays open with the refreshed plan, rather
+ * than closing and asking the reader to find their way back from a toast.
+ */
+export const PlanWentStale: Story = {
+	args: { state: ready({}, "stale") },
+	play: async () => {
+		const alert = await screen.findByRole("alert");
+		await expectSettledVisible(alert);
+		await expect(alert.textContent).toContain("The library changed while you were reading");
+		// Still actionable: the refreshed plan is on screen and can be applied as it now stands.
+		await expect(screen.getByRole("button", { name: "Add 1 practice" })).toBeEnabled();
+	},
+};
+
 export const Adding: Story = {
-	args: { state: ready({}, true) },
+	args: { state: ready({}, "adding") },
 	play: async () => {
 		await expectGenuinelyDisabled(await screen.findByRole("button", { name: "Adding…" }));
 	},

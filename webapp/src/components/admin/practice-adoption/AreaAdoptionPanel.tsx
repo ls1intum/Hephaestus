@@ -1,4 +1,4 @@
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, CircleAlert } from "lucide-react";
 import type { CatalogAreaAdoptionPreview } from "@/api/types.gen";
 import { AreaPill } from "@/components/admin/practice-catalog/AreaPill";
 import { LoadingBlock } from "@/components/common/LoadingBlock";
@@ -9,6 +9,7 @@ import {
 	CATALOG_AREA_CHANGE_ACTIONS,
 } from "@/components/practice-vocabulary/catalog-area-action-defs";
 import { StatusBadge } from "@/components/practice-vocabulary/StatusBadge";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { DrawerBody, DrawerDescription, DrawerFooter, DrawerTitle } from "@/components/ui/drawer";
 import {
@@ -24,7 +25,12 @@ import {
 export type AreaAdoptionState =
 	| { status: "loading" }
 	| { status: "error"; error: unknown; onRetry: () => void }
-	| { status: "ready"; preview: CatalogAreaAdoptionPreview; adding: boolean };
+	| {
+			status: "ready";
+			preview: CatalogAreaAdoptionPreview;
+			/** `stale` means a conditional add lost its race and the refreshed preview needs re-reading. */
+			action: "idle" | "adding" | "stale";
+	  };
 
 export interface AreaAdoptionPanelProps {
 	state: AreaAdoptionState;
@@ -78,6 +84,15 @@ export function AreaAdoptionPanel({
 			</DetailDrawerHeader>
 
 			<DrawerBody className="space-y-6">
+				{state.status === "ready" && state.action === "stale" && (
+					<Alert variant="warning">
+						<CircleAlert />
+						<AlertTitle>The library changed while you were reading</AlertTitle>
+						<AlertDescription>
+							This is the current plan for the area. Nothing was added.
+						</AlertDescription>
+					</Alert>
+				)}
 				{state.status === "loading" && <LoadingBlock size="sm" label="Loading area preview" />}
 				{state.status === "error" && (
 					<QueryErrorAlert
@@ -132,8 +147,8 @@ export function AreaAdoptionPanel({
 
 			{state.status === "ready" && (
 				<DrawerFooter>
-					<Button onClick={onConfirm} disabled={changes.length === 0 || state.adding}>
-						{state.adding
+					<Button onClick={onConfirm} disabled={changes.length === 0 || state.action === "adding"}>
+						{state.action === "adding"
 							? "Adding…"
 							: restoring
 								? "Restore area"

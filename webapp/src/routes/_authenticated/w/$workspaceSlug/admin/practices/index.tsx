@@ -120,13 +120,7 @@ function PracticeCatalogRoute() {
 			].filter(Boolean);
 			toast.success("Area updated", { description: changes.join(", ") });
 		},
-		onError: (error) => {
-			toast.error(
-				problemStatusOf(error) === 412
-					? "The library changed before the area was added. Review the current contents."
-					: "Couldn't add the area. Nothing was changed.",
-			);
-		},
+		onError: () => toast.error("Couldn't add the area. Nothing was changed."),
 	});
 	const adoptCatalogPractice = useMutation({
 		...adoptPracticeMutation(),
@@ -309,19 +303,34 @@ function PracticeCatalogRoute() {
 											: {
 													status: "ready",
 													preview: query.data as CatalogAreaAdoptionPreview,
-													adding: adoptCatalogArea.isPending,
+													action:
+														staleLevelKey === detailStackKey(entry)
+															? "stale"
+															: adoptCatalogArea.isPending
+																? "adding"
+																: "idle",
 												}
 								}
 								onOpenPractice={(catalogSlug) =>
 									stackControls.open({ kind: "catalog-practice", id: catalogSlug })
 								}
-								onConfirm={() => {
+								onConfirm={async () => {
 									const preview = query.data as CatalogAreaAdoptionPreview | undefined;
 									if (!preview) return;
-									adoptCatalogArea.mutate({
-										path: { workspaceSlug, slug: entry.id },
-										headers: { "If-Match": preview.etag },
-									});
+									setStaleLevelKey(null);
+									try {
+										await adoptCatalogArea.mutateAsync({
+											path: { workspaceSlug, slug: entry.id },
+											headers: { "If-Match": preview.etag },
+										});
+									} catch (error) {
+										// Same failure as a practice's, so the same recovery: refresh the plan in
+										// place rather than closing the panel and asking for it back in a toast.
+										if (problemStatusOf(error) !== 412) return;
+										const refreshed = await query.refetch();
+										if (refreshed.isSuccess) setStaleLevelKey(detailStackKey(entry));
+										else toast.error("The area plan changed but couldn't be refreshed");
+									}
 								}}
 							/>
 						);
