@@ -1,6 +1,6 @@
 // ── Vocabularies shared with Java ────────────────────────────────────────────
 // Each list mirrors an enum on the server. They are hand-maintained on both sides, so
-// PresenceVocabularyParityTest parses these literals and asserts equality with the Java enum's
+// AgentVocabularySyncTest parses these literals and asserts equality with the Java enum's
 // values(); it exists because presence drifted once and silently laundered INCONCLUSIVE into
 // NOT_APPLICABLE. Add a value here and to the Java enum in the same change, or the test fails.
 export const PRESENCE_VALUES = ["PRESENT", "ABSENT", "NOT_APPLICABLE", "INCONCLUSIVE"] as const;

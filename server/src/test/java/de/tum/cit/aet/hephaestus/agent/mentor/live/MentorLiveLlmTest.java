@@ -46,7 +46,7 @@ import tools.jackson.databind.node.ObjectNode;
  * <ol>
  *   <li>Ensures the Pi SDK is installed under {@code target/pi-sdk/node_modules} (idempotent;
  *       the install marker survives across test runs and parallel JVMs use a directory lock).</li>
- *   <li>Spawns {@code pi-mentor-runner.ts} directly with {@code node} — no Docker — and points
+ *   <li>Spawns {@code pi-mentor-runner.ts} directly with {@code bun} — no Docker — and points
  *       it at a real OpenAI-compatible endpoint via {@code OPENAI_BASE_URL} +
  *       {@code OPENAI_API_KEY}.</li>
  *   <li>Drives the JSON-RPC protocol the same way {@code MentorRunnerClient} drives it in prod
@@ -67,8 +67,8 @@ import tools.jackson.databind.node.ObjectNode;
 class MentorLiveLlmTest {
 
     private static final ObjectMapper MAPPER = new ObjectMapper();
-    /** Pi SDK version pinned in pi-mentor-runner.ts. Bump in lockstep with the runner. */
-    private static final String PI_SDK_VERSION = "0.74.0";
+    /** Must equal {@code ARG PI_VERSION} in docker/agents/pi/Dockerfile. */
+    private static final String PI_SDK_VERSION = "0.74.1";
 
     private static final Duration TURN_TIMEOUT = Duration.ofSeconds(90);
 

@@ -13,10 +13,7 @@ import java.util.Map;
  * that idles between turns. {@code --expose-gc} publishes {@code global.gc}, which
  * {@code pi-mentor-runner.ts} calls after a turn once the heap passes its watermark.
  *
- * <p>There is no per-process heap ceiling. Bun runs on JavaScriptCore and has no equivalent of
- * V8's {@code --max-old-space-size}; passing one would be accepted and ignored, which is worse than
- * not passing it, because the cap would appear to exist. A leaky session is bounded instead by the
- * sandbox's own memory limit, which caps the whole process rather than one heap generation.
+ * <p>The heap is bounded by the sandbox's memory limit, not by a per-process ceiling.
  */
 public final class MentorRunnerProfile implements PiRunnerProfile {
 
@@ -28,6 +25,7 @@ public final class MentorRunnerProfile implements PiRunnerProfile {
      * imported with relative specifiers, so both must be staged beside pi-mentor-runner.ts.
      */
     private static final List<String> SIDECARS = List.of(
+        "pi-error-text.ts",
         SandboxLayout.PROVIDER_HELPER_FILENAME,
         "pi-mentor-protocol.ts"
     );

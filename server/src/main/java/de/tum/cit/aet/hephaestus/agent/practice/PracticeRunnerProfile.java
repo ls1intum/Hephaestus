@@ -16,6 +16,7 @@ public final class PracticeRunnerProfile implements PiRunnerProfile {
 
     /** Imported by {@link #SCRIPT} with a relative specifier, so each must be staged beside it. */
     private static final List<String> SIDECARS = List.of(
+        "pi-error-text.ts",
         "pi-observation-normalize.ts",
         "pi-runner-usage.ts",
         "pi-runner-timings.ts",

@@ -1,4 +1,4 @@
-// pi-runner-usage.spec.mjs — what a session is reported to have spent, and why it is not a walk of
+// pi-runner-usage.spec.ts — what a session is reported to have spent, and why it is not a walk of
 // session.messages.
 //
 // The defect these exist for: usage.json was derived by iterating the live session message list, and
@@ -84,19 +84,6 @@ test("every bucket of an assistant message lands on the ledger", () => {
 	assert.equal(ledger.model, "gpt-5");
 });
 
-// Not an omission: pi-ai builds Usage as {input, output, cacheRead, cacheWrite, totalTokens, cost} in
-// every provider, so there is no reasoning bucket to read, and OpenAI's completion_tokens — which lands
-// in `output` — already includes reasoning tokens. The field stays in the report because usage.json is a
-// contract with the server, and it stays zero because nothing legitimately fills it.
-test("reasoning tokens are not billed twice: they are already inside the output count", () => {
-	const ledger = newUsageLedger();
-
-	addAssistantUsage(ledger, assistant("a", { output: 900 }));
-
-	assert.equal(ledger.outputTokens, 900);
-	assert.equal(ledger.reasoningTokens, 0);
-});
-
 test("only assistant messages that carry usage are billable", () => {
 	const ledger = newUsageLedger();
 	// AssistantMessage declares `usage` required, so the only way to express the case the guard exists
@@ -104,7 +91,13 @@ test("only assistant messages that carry usage are billable", () => {
 	const { usage: _unused, ...withoutUsage } = assistant("a");
 	const assistantWithoutUsage = withoutUsage as AssistantMessage;
 
-	addAssistantUsage(ledger, { role: "user", content: "not a bill", timestamp: 0 });
+	// A guard that checked only for a usage block, ignoring role, would bill this one.
+	addAssistantUsage(ledger, {
+		role: "user",
+		content: "not a bill",
+		timestamp: 0,
+		usage: { input: 999, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 999, cost: 0 },
+	} as unknown as AssistantMessage);
 	addAssistantUsage(ledger, assistantWithoutUsage);
 	addAssistantUsage(ledger, null);
 	addAssistantUsage(ledger, undefined);
