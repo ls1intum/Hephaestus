@@ -210,7 +210,7 @@ function GlobalCopilot() {
 			onOpenFullChat={() => {
 				const threadId = mentorChat.currentThreadId || mentorChat.id;
 				if (threadId && workspaceSlug) {
-					router.navigate({
+					void router.navigate({
 						to: "/w/$workspaceSlug/mentor/$threadId",
 						params: { threadId, workspaceSlug },
 					});
@@ -337,11 +337,11 @@ function AppSidebarContainer() {
 		selectWorkspace(ws.workspaceSlug);
 		const remainder = pathname.replace(/^\/w\/[^/]+/, "");
 		const target = `/w/${ws.workspaceSlug}${remainder || "/"}`;
-		navigate({ href: target, replace: true });
+		void navigate({ href: target, replace: true });
 	};
 
 	const handleAddWorkspace = () => {
-		navigate({ to: "/workspaces/new" });
+		void navigate({ to: "/workspaces/new" });
 	};
 
 	return (

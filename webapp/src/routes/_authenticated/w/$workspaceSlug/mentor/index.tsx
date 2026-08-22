@@ -49,7 +49,7 @@ function MentorContainer() {
 
 		// Navigate to thread page — the static <Greeting /> there renders on empty messages,
 		// then the user's first message starts the real chat turn.
-		navigate({
+		void navigate({
 			to: "/w/$workspaceSlug/mentor/$threadId",
 			params: { workspaceSlug: slug, threadId },
 			replace: true,

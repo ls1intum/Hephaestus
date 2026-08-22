@@ -132,17 +132,17 @@ function ScmIntegrationPage() {
 
 	const invalidateSyncState = () => {
 		if (connectionId == null) return;
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: getConnectionSyncStatusQueryKey({
 				path: { workspaceSlug: slug, connectionId },
 			}),
 		});
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: listConnectionSyncJobsQueryKey({
 				path: { workspaceSlug: slug, connectionId },
 			}),
 		});
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: listConnectionSyncResourcesQueryKey({
 				path: { workspaceSlug: slug, connectionId },
 			}),
@@ -150,7 +150,7 @@ function ScmIntegrationPage() {
 	};
 
 	const onRepositorySetChanged = () => {
-		queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: repositoriesQueryOptions.queryKey });
 		invalidateSyncState();
 	};
 
@@ -241,9 +241,9 @@ function ScmIntegrationPage() {
 				}
 				isCancelling={cancelJob.isPending}
 				onRetry={() => {
-					workspaceQuery.refetch();
-					catalogQuery.refetch();
-					statusQuery.refetch();
+					void workspaceQuery.refetch();
+					void catalogQuery.refetch();
+					void statusQuery.refetch();
 				}}
 				onSync={() => {
 					if (connectionId == null) return;

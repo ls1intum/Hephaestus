@@ -132,12 +132,12 @@ export function useMentorChat({
 
 	const handleFinish = useCallback(() => {
 		if (hasWorkspace) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listThreadsQueryKey({ path: { workspaceSlug: slug } }),
 			});
 		}
 		if (threadId || stableThreadId) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getThreadQueryKey({
 					path: { workspaceSlug: slug, threadId: threadId || stableThreadId || "" },
 				}),
@@ -225,7 +225,7 @@ export function useMentorChat({
 			return;
 		}
 
-		originalSendMessage({ text });
+		void originalSendMessage({ text });
 	};
 
 	// The new-thread "Hi! I'm your mentor" greeting is rendered statically by the route
@@ -260,7 +260,7 @@ export function useMentorChat({
 					});
 				},
 				onSettled: () => {
-					queryClient.invalidateQueries({
+					void queryClient.invalidateQueries({
 						queryKey: getThreadQueryKey({
 							path: {
 								workspaceSlug: slug,

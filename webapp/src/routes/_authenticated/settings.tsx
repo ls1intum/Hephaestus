@@ -83,7 +83,7 @@ function RouteComponent() {
 			queryClient.setQueryData(userSettingsQueryKey, data);
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: userSettingsQueryKey,
 			});
 		},
@@ -115,9 +115,9 @@ function RouteComponent() {
 	const unlinkMutation = useMutation({
 		...unlinkIdentityMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: listLinkedIdentitiesQueryKey({}) });
+			void queryClient.invalidateQueries({ queryKey: listLinkedIdentitiesQueryKey({}) });
 			// The primary identity (avatar, username) the app shows may have been the one removed.
-			queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: getCurrentUserQueryKey() });
 			toast.success("Account disconnected.");
 		},
 		onError: (error: DefaultError) => {
@@ -145,7 +145,7 @@ function RouteComponent() {
 						: [...workspaces, updatedWorkspace],
 				};
 			});
-			queryClient.invalidateQueries({ queryKey: slackPreferencesQueryKey });
+			void queryClient.invalidateQueries({ queryKey: slackPreferencesQueryKey });
 			toast.success(
 				updatedWorkspace.channelMessagesAllowed
 					? "Slack channel-message use is on."
@@ -175,8 +175,8 @@ function RouteComponent() {
 		isError: linkedIdentitiesQuery.isError || identityProvidersQuery.isError,
 		error: linkedIdentitiesQuery.error ?? identityProvidersQuery.error,
 		onRetry: () => {
-			linkedIdentitiesQuery.refetch();
-			identityProvidersQuery.refetch();
+			void linkedIdentitiesQuery.refetch();
+			void identityProvidersQuery.refetch();
 		},
 	};
 
@@ -200,7 +200,7 @@ function RouteComponent() {
 		canConnectSlack: Boolean(slackProvider?.registrationId),
 		onConnectSlack: () => {
 			if (slackProvider?.registrationId) {
-				linkAccount(slackProvider.registrationId, "/settings");
+				void linkAccount(slackProvider.registrationId, "/settings");
 			}
 		},
 		onToggleChannelMessages: (workspaceSlug, channelMessagesAllowed) => {

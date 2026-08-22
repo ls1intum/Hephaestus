@@ -84,13 +84,13 @@ export function useActiveWorkspaceSlug() {
 				// Redirect to the same relative path under a different workspace
 				const remainder = location.pathname.replace(/^\/w\/[^/]+/, "");
 				setSelectedSlug(fallbackSlug);
-				navigate({
+				void navigate({
 					to: `/w/${fallbackSlug}${remainder || "/"}` as never,
 					replace: true,
 				});
 			} else {
 				// No workspaces available, redirect to home
-				navigate({
+				void navigate({
 					to: "/",
 					replace: true,
 				});

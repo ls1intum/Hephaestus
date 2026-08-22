@@ -38,8 +38,8 @@ export function AdminDangerZoneSettings({ workspaceSlug }: AdminDangerZoneSettin
 			queryClient.setQueryData(listWorkspacesQueryKey(), (workspaces?: ListWorkspacesResponse) =>
 				workspaces?.filter((workspace) => workspace.workspaceSlug !== workspaceSlug),
 			);
-			navigate({ to: "/", replace: true });
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
+			void navigate({ to: "/", replace: true });
+			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 		},
 		onError: (e) => toast.error("Failed to delete workspace", { description: problemDetailOf(e) }),
 	});

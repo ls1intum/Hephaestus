@@ -69,11 +69,11 @@ export function ReviewsPopover({
 
 			navigator.clipboard.write([clipboardItem]).catch(() => {
 				// Fallback to plain text if html copying fails
-				navigator.clipboard.writeText(plainText);
+				void navigator.clipboard.writeText(plainText);
 			});
 		} catch (_e) {
 			// Basic fallback for older browsers
-			navigator.clipboard.writeText(plainText);
+			void navigator.clipboard.writeText(plainText);
 		}
 
 		setShowCopySuccess(true);

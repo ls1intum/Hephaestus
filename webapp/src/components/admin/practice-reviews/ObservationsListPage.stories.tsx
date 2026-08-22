@@ -247,7 +247,7 @@ export const SortByActionability: Story = {
 			text.includes("Needs improvement") ? [index] : [],
 		);
 		const strengths = titles.flatMap((text, index) => (text.includes("Strength") ? [index] : []));
-		expect(Math.min(...strengths)).toBeGreaterThan(Math.max(...problems));
+		await expect(Math.min(...strengths)).toBeGreaterThan(Math.max(...problems));
 	},
 };
 

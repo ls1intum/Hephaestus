@@ -61,7 +61,7 @@ function AdminAchievementsContainer() {
 			error={featureState.error ?? workspaceError ?? usersError}
 			onRetry={() => {
 				featureState.refetch();
-				refetchUsers();
+				void refetchUsers();
 			}}
 		/>
 	);

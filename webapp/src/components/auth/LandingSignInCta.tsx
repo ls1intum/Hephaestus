@@ -45,7 +45,7 @@ export function LandingSignInCta({
 		if (soleProvider) {
 			onSignIn(soleProvider);
 		} else {
-			navigate({ to: "/login" });
+			void navigate({ to: "/login" });
 		}
 	};
 

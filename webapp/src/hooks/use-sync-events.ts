@@ -110,7 +110,7 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		 */
 		const resyncIntegrationQueries = () => {
 			const familyIds = integrationQueryFamilyIds(workspaceSlug);
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				predicate: ({ queryKey }) => {
 					const [key] = queryKey;
 					if (!key || typeof key !== "object" || !("_id" in key)) return false;
@@ -130,22 +130,28 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		const applyHint = ({ scope, connectionId }: SyncEventHint) => {
 			switch (scope) {
 				case "job":
-					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
-					invalidate(listConnectionSyncJobsQueryKey({ path: { workspaceSlug, connectionId } }));
+					void invalidate(
+						getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
+					void invalidate(
+						listConnectionSyncJobsQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
 					break;
 				case "resources": {
-					invalidate(
+					void invalidate(
 						listConnectionSyncResourcesQueryKey({ path: { workspaceSlug, connectionId } }),
 					);
-					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
+					void invalidate(
+						getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
 					// Only the catalog for this connection's integration changed; a GitHub repo-sync
 					// hint says nothing about Slack channels or Outline collections.
 					const kind = connectionKindOf(queryClient, workspaceSlug, connectionId);
 					if (kind === "OUTLINE" || kind === undefined) {
-						invalidate(listOutlineCollectionsQueryKey({ path: { workspaceSlug } }));
+						void invalidate(listOutlineCollectionsQueryKey({ path: { workspaceSlug } }));
 					}
 					if (kind === "SLACK" || kind === undefined) {
-						invalidate(listSlackChannelsQueryKey({ path: { workspaceSlug } }));
+						void invalidate(listSlackChannelsQueryKey({ path: { workspaceSlug } }));
 					}
 					break;
 				}
@@ -155,7 +161,9 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 					resyncIntegrationQueries();
 					break;
 				case "activity":
-					invalidate(getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }));
+					void invalidate(
+						getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
+					);
 					break;
 				default:
 					break;

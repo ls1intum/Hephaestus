@@ -96,7 +96,7 @@ export function useReviewRunController(workspaceSlug: string, jobId: string): Re
 	 */
 	const updateJob = (job: AgentJob) => {
 		queryClient.setQueryData(getAgentJobQueryKey({ path: { workspaceSlug, jobId } }), job);
-		queryClient.invalidateQueries({
+		void queryClient.invalidateQueries({
 			queryKey: listPracticeReviewsQueryKey({ path: { workspaceSlug } }),
 		});
 	};

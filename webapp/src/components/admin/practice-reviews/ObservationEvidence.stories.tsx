@@ -141,7 +141,7 @@ export const EverySource: Story = {
 	play: async ({ canvas }) => {
 		// Compared whole rather than one `getByRole` per label, so a kind that arrives without words
 		// fails as an id this table does not list rather than going unasserted.
-		expect(
+		await expect(
 			canvas
 				.getAllByRole("heading", { level: 4 })
 				.map((heading) => heading.textContent)

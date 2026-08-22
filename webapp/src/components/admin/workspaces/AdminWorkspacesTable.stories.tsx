@@ -53,8 +53,8 @@ export const Default: Story = {
 		canvas.getByText("octocat");
 		const actions = canvas.getAllByRole("button", { name: "View as owner" });
 		await userEvent.click(actions[0]);
-		expect(args.onImpersonateOwner).toHaveBeenCalledWith(workspaces[0]);
-		expect(actions[1]).toBeDisabled();
+		await expect(args.onImpersonateOwner).toHaveBeenCalledWith(workspaces[0]);
+		await expect(actions[1]).toBeDisabled();
 	},
 };
 

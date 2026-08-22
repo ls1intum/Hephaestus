@@ -215,7 +215,7 @@ describe("useSyncEvents", () => {
 		expect(result.current).toBe(true);
 	});
 
-	it("waits out an exponential, jittered backoff that grows after each successive failure", () => {
+	it("waits out an exponential, jittered backoff that grows after each successive failure", async () => {
 		// Pin the jitter so the rungs are deterministic: delay = rung * (0.5 + 0.5·random) = rung · 0.75.
 		const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.5);
 		renderHook(() => useSyncEvents(WORKSPACE), { wrapper: wrapper(new QueryClient()) });
@@ -224,17 +224,17 @@ describe("useSyncEvents", () => {
 		// First failure sits on the 1s rung → 750ms; the 500ms checkpoint proves the delay is a real
 		// backoff, not a flat setTimeout(connect, 0) that would reopen after any advance at all.
 		act(() => latestSource().fail());
-		act(() => vi.advanceTimersByTime(500));
+		await act(() => vi.advanceTimersByTime(500));
 		expect(FakeEventSource.instances).toHaveLength(1);
-		act(() => vi.advanceTimersByTime(250));
+		await act(() => vi.advanceTimersByTime(250));
 		expect(FakeEventSource.instances).toHaveLength(2);
 
 		// The reconnect fails again before it can open, so the exponent climbs: 2s rung → 1500ms, which
 		// is strictly longer than the first delay — 750ms is no longer enough.
 		act(() => latestSource().fail());
-		act(() => vi.advanceTimersByTime(750));
+		await act(() => vi.advanceTimersByTime(750));
 		expect(FakeEventSource.instances).toHaveLength(2);
-		act(() => vi.advanceTimersByTime(750));
+		await act(() => vi.advanceTimersByTime(750));
 		expect(FakeEventSource.instances).toHaveLength(3);
 
 		randomSpy.mockRestore();

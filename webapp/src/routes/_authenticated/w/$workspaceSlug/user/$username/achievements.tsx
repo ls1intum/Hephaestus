@@ -22,7 +22,7 @@ function UserAchievementsPage() {
 
 	useEffect(() => {
 		if (!featureState.isLoading && !featureState.isError && achievementsEnabled === false) {
-			navigate({
+			void navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
 				replace: true,

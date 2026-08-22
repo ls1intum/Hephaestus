@@ -142,7 +142,7 @@ function UserProfile() {
 	});
 
 	const handleTimeframeChange = (nextAfter: string, nextBefore?: string) => {
-		navigate({
+		void navigate({
 			search: (prev: ProfileSearchParams) => ({
 				...prev,
 				after: nextAfter,
@@ -152,7 +152,7 @@ function UserProfile() {
 	};
 
 	const handleActivityMonitorFiltersChange = (filters: ActivityMonitorFilters) => {
-		navigate({
+		void navigate({
 			search: (prev: ProfileSearchParams) => ({
 				...prev,
 				monitorRepositories: serializeRepositoryIds(filters.repositoryIds),

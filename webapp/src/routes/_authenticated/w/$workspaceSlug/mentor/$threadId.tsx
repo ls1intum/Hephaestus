@@ -131,7 +131,7 @@ function ThreadContainer() {
 				onStop={mentorChat.stop}
 				onReload={() => {
 					mentorChat.clearError();
-					mentorChat.regenerate();
+					void mentorChat.regenerate();
 				}}
 				onFileUpload={() => Promise.resolve([])}
 				onAttachmentsChange={() => {}}

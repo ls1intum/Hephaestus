@@ -69,7 +69,7 @@ function AdminUsersPage() {
 	const { hasNextPage, isFetchingNextPage, fetchNextPage } = listQuery;
 	useEffect(() => {
 		if (deferredSearch.trim() && hasNextPage && !isFetchingNextPage) {
-			fetchNextPage();
+			void fetchNextPage();
 		}
 	}, [deferredSearch, hasNextPage, isFetchingNextPage, fetchNextPage]);
 

@@ -103,7 +103,7 @@ export function WorkspaceLlmProviderPanel({
 	const createConnection = useMutation({
 		...workspaceCreateLlmConnectionMutation(),
 		onSuccess: () => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Provider connected");
 		},
@@ -115,7 +115,7 @@ export function WorkspaceLlmProviderPanel({
 	const updateConnection = useMutation({
 		...filedUnder(connectionWriteKey, workspaceUpdateLlmConnectionMutation()),
 		onSuccess: () => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Provider updated");
 		},
@@ -125,8 +125,8 @@ export function WorkspaceLlmProviderPanel({
 	const deleteConnection = useMutation({
 		...filedUnder(connectionWriteKey, workspaceDeleteLlmConnectionMutation()),
 		onSuccess: () => {
-			invalidateConnections();
-			invalidateModels();
+			void invalidateConnections();
+			void invalidateModels();
 			toast.success("Provider disconnected");
 		},
 		onError: (error) =>
@@ -167,7 +167,7 @@ export function WorkspaceLlmProviderPanel({
 	const createModel = useMutation({
 		...workspaceCreateLlmModelMutation(),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			setModelDialogOpen(false);
 			toast.success("Model added");
 		},
@@ -179,7 +179,7 @@ export function WorkspaceLlmProviderPanel({
 	const updateModel = useMutation({
 		...filedUnder(modelWriteKey, workspaceUpdateLlmModelMutation()),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			setModelDialogOpen(false);
 			toast.success("Model updated");
 		},
@@ -189,7 +189,7 @@ export function WorkspaceLlmProviderPanel({
 	const deleteModel = useMutation({
 		...filedUnder(modelWriteKey, workspaceDeleteLlmModelMutation()),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			toast.success("Model deleted");
 		},
 		onError: (error) =>

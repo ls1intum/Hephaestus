@@ -88,9 +88,9 @@ function PracticeCatalogRoute() {
 					error={areasQuery.error ?? practicesQuery.error ?? definitionOptionsQuery.error}
 					title="Couldn't load practices"
 					onRetry={() => {
-						areasQuery.refetch();
-						practicesQuery.refetch();
-						definitionOptionsQuery.refetch();
+						void areasQuery.refetch();
+						void practicesQuery.refetch();
+						void definitionOptionsQuery.refetch();
 					}}
 				/>
 			) : (

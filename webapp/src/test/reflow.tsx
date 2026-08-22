@@ -29,7 +29,7 @@ export async function expectOverlayFollowsTrigger(
 	const triggerTopBefore = trigger.getBoundingClientRect().top;
 	scroll();
 	await waitFor(() => {
-		expect(
+		void expect(
 			Math.abs(trigger.getBoundingClientRect().top - triggerTopBefore),
 			"The scroll callback did not move the trigger, so the assertion below would prove nothing.",
 		).toBeGreaterThan(LAYOUT_SLACK_PX);
@@ -38,11 +38,11 @@ export async function expectOverlayFollowsTrigger(
 	// Base UI repositions on the next frame, not synchronously with the scroll event.
 	await waitFor(() => {
 		const after = offsetOf();
-		expect(
+		void expect(
 			Math.abs(after.x - before.x),
 			"The popup drifted horizontally off its trigger.",
 		).toBeLessThanOrEqual(LAYOUT_SLACK_PX);
-		expect(
+		void expect(
 			Math.abs(after.y - before.y),
 			"The popup drifted vertically off its trigger.",
 		).toBeLessThanOrEqual(LAYOUT_SLACK_PX);

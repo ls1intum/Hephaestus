@@ -45,7 +45,7 @@ function enteringAnimationsOf(element: Element): Animation[] {
  */
 export async function expectSettledVisible(element: HTMLElement): Promise<void> {
 	await waitFor(() => {
-		expect(
+		void expect(
 			element.closest("[data-starting-style]"),
 			"Still inside the overlay's starting-style frame, where everything in it is transparent.",
 		).toBeNull();

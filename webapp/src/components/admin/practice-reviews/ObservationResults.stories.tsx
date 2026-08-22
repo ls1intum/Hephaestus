@@ -49,12 +49,12 @@ export const Default: Story = {
 	play: async ({ canvas }) => {
 		// A shortfall shows its assessment and its severity; a presence that ends the question shows
 		// only itself.
-		expect(canvas.getAllByText("Needs improvement")).toHaveLength(6);
+		await expect(canvas.getAllByText("Needs improvement")).toHaveLength(6);
 		canvas.getByText("Critical");
 		canvas.getByText("Not applicable");
 		canvas.getByText("Could not be determined");
-		expect(canvas.getAllByText("From a review of past work")).toHaveLength(2);
-		expect(canvas.getAllByText("Requested by hand")).toHaveLength(2);
+		await expect(canvas.getAllByText("From a review of past work")).toHaveLength(2);
+		await expect(canvas.getAllByText("Requested by hand")).toHaveLength(2);
 		await expect(canvas.queryAllByText("No result")).toHaveLength(0);
 	},
 };

@@ -46,7 +46,7 @@ export function AdminAchievementsPage({
 			{
 				loading: "Reloading achievement definitions...",
 				success: () => {
-					queryClient.invalidateQueries({
+					void queryClient.invalidateQueries({
 						predicate: (query) => {
 							const id = (query.queryKey[0] as { _id?: string } | undefined)?._id;
 							return id === "getUserAchievements" || id === "getAllAchievementDefinitions";

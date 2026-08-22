@@ -99,12 +99,12 @@ describe("AdminLlmConnectionFormDialog", () => {
 		expect(onCreate).not.toHaveBeenCalled();
 	});
 
-	it("keeps a probe result while the connection is being named", () => {
+	it("keeps a probe result while the connection is being named", async () => {
 		const onProbe = vi.fn();
 		const onProbed = vi.fn();
 		renderDialog({ onProbe, onProbed });
 		fireEvent.click(screen.getByRole("button", { name: "Test & fetch models" }));
-		act(() => onProbe.mock.calls[0]?.[1].onSuccess({ reachable: true, models: ["gpt-5"] }));
+		await act(() => onProbe.mock.calls[0]?.[1].onSuccess({ reachable: true, models: ["gpt-5"] }));
 		screen.getByText("gpt-5");
 
 		fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Production" } });

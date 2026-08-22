@@ -105,7 +105,7 @@ function AdminLlmPage() {
 	const createConnection = useMutation({
 		...adminCreateLlmConnectionMutation(),
 		onSuccess: (created) => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			setSelectedConnectionId(created.id);
 			setProbedModels((current) =>
@@ -122,7 +122,7 @@ function AdminLlmPage() {
 	const updateConnection = useMutation({
 		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminUpdateLlmConnectionMutation()),
 		onSuccess: () => {
-			invalidateConnections();
+			void invalidateConnections();
 			setConnectionDialogOpen(false);
 			toast.success("Connection updated");
 		},
@@ -133,7 +133,7 @@ function AdminLlmPage() {
 	const deleteConnection = useMutation({
 		...filedUnder(CONNECTION_WRITE_MUTATION_KEY, adminDeleteLlmConnectionMutation()),
 		onSuccess: (_data, variables) => {
-			invalidateConnections();
+			void invalidateConnections();
 			if (variables.path.id === selectedConnectionId) setSelectedConnectionId(null);
 			toast.success("Connection deleted");
 		},
@@ -158,7 +158,7 @@ function AdminLlmPage() {
 	const deleteModel = useMutation({
 		...filedUnder(MODEL_WRITE_MUTATION_KEY, adminDeleteLlmModelMutation()),
 		onSuccess: () => {
-			invalidateModels();
+			void invalidateModels();
 			toast.success("Model deleted");
 		},
 		onError: (error) =>
@@ -173,7 +173,7 @@ function AdminLlmPage() {
 	const updateSettings = useMutation({
 		...adminUpdateLlmSettingsMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: adminGetLlmSettingsQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: adminGetLlmSettingsQueryKey() });
 			toast.success("Settings saved");
 		},
 		onError: (error) =>
@@ -203,11 +203,11 @@ function AdminLlmPage() {
 						updateSharing.mutateAsync({ path: { id }, body: sharing }),
 				},
 			});
-			invalidateModels();
+			void invalidateModels();
 			setModelDialogOpen(false);
 			toast.success(editingModel ? "Model updated" : "Model added");
 		} catch (error) {
-			invalidateModels();
+			void invalidateModels();
 			if (error instanceof AdminLlmModelSaveError && error.modelId != null) {
 				toast.error("Model saved inactive, but setup is incomplete", {
 					description: "Review the model and save again before activating it.",
@@ -391,7 +391,7 @@ function AdminLlmPage() {
 						{ path: { id: accessModel.id }, body },
 						{
 							onSuccess: () => {
-								invalidateModels();
+								void invalidateModels();
 								setAccessModel(null);
 								toast.success("Workspace access updated");
 							},

@@ -140,10 +140,10 @@ function SlackIntegrationPage() {
 	});
 
 	const invalidateSlackChannels = () => {
-		queryClient.invalidateQueries({ queryKey: slackChannelsQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: slackChannelCandidatesQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: slackChannelsQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: slackChannelCandidatesQueryOptions.queryKey });
 		if (connectionId != null) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listConnectionSyncResourcesQueryKey({
 					path: { workspaceSlug: slug, connectionId },
 				}),
@@ -171,7 +171,7 @@ function SlackIntegrationPage() {
 				toast.success("Channel updated");
 			}
 			invalidateSlackChannels();
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listSlackChannelConsentEventsQueryKey({
 					path: { workspaceSlug: slug, slackChannelId: variables.path.slackChannelId },
 				}),
@@ -190,12 +190,12 @@ function SlackIntegrationPage() {
 		...triggerSyncJobMutation(),
 		onSuccess: () => {
 			if (connectionId == null) return;
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getConnectionSyncStatusQueryKey({
 					path: { workspaceSlug: slug, connectionId },
 				}),
 			});
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listConnectionSyncJobsQueryKey({
 					path: { workspaceSlug: slug, connectionId },
 				}),
@@ -211,12 +211,12 @@ function SlackIntegrationPage() {
 		...updateConnectionSyncJobMutation(),
 		onSuccess: () => {
 			if (connectionId == null) return;
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getConnectionSyncStatusQueryKey({
 					path: { workspaceSlug: slug, connectionId },
 				}),
 			});
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listConnectionSyncJobsQueryKey({
 					path: { workspaceSlug: slug, connectionId },
 				}),
@@ -246,9 +246,9 @@ function SlackIntegrationPage() {
 					error={routeError}
 					title="We couldn't load the Slack connection"
 					onRetry={() => {
-						workspaceQuery.refetch();
-						catalogQuery.refetch();
-						statusQuery.refetch();
+						void workspaceQuery.refetch();
+						void catalogQuery.refetch();
+						void statusQuery.refetch();
 					}}
 				/>
 			)}
@@ -325,8 +325,8 @@ function SlackIntegrationPage() {
 					scheduleTime={workspaceData?.leaderboardScheduleTime ?? undefined}
 					channelCandidates={slackChannelCandidates ?? []}
 					onSaved={() => {
-						queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey });
-						queryClient.invalidateQueries({ queryKey: catalogQueryOptions.queryKey });
+						void queryClient.invalidateQueries({ queryKey: workspaceQueryOptions.queryKey });
+						void queryClient.invalidateQueries({ queryKey: catalogQueryOptions.queryKey });
 						invalidateSlackChannels();
 					}}
 				/>
@@ -343,8 +343,8 @@ function SlackIntegrationPage() {
 					}
 					isError={isConnectionActive && (isSlackChannelsError || isSlackChannelCandidatesError)}
 					onRetry={() => {
-						refetchSlackChannels();
-						refetchSlackChannelCandidates();
+						void refetchSlackChannels();
+						void refetchSlackChannelCandidates();
 					}}
 					onRegisterChannel={async ({
 						slackChannelId,

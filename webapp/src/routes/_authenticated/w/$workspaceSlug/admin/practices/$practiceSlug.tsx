@@ -98,7 +98,7 @@ function EditPracticeContainer() {
 		void queryClient.invalidateQueries({ queryKey: detailQueryKey });
 		void queryClient.invalidateQueries({ queryKey: listQueryKey });
 		toast.success("Practice saved");
-		navigate({ to: ".." });
+		void navigate({ to: ".." });
 	};
 
 	if (practiceQuery.isPending || areasQuery.isPending || definitionOptionsQuery.isPending) {
@@ -118,9 +118,9 @@ function EditPracticeContainer() {
 						error={practiceQuery.error ?? areasQuery.error ?? definitionOptionsQuery.error}
 						title="Couldn't load the practice"
 						onRetry={() => {
-							practiceQuery.refetch();
-							areasQuery.refetch();
-							definitionOptionsQuery.refetch();
+							void practiceQuery.refetch();
+							void areasQuery.refetch();
+							void definitionOptionsQuery.refetch();
 						}}
 					/>
 				</div>

@@ -99,6 +99,7 @@
 		"npm-run-all2": "8.0.4",
 		"oxc-transform-react": "0.145.0",
 		"oxlint": "1.79.0",
+		"oxlint-tsgolint": "7.0.2001",
 		"playwright": "1.60.0",
 		"storybook": "10.4.0",
 		"tailwindcss": "4.3.0",

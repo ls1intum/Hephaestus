@@ -107,12 +107,12 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		queryClient.invalidateQueries({ queryKey: connectionsQueryOptions.queryKey });
 
 	const invalidateOutline = () => {
-		queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: resourcesQueryOptions.queryKey });
-		queryClient.invalidateQueries({ queryKey: tokenStatusQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: collectionsQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: statusQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: resourcesQueryOptions.queryKey });
+		void queryClient.invalidateQueries({ queryKey: tokenStatusQueryOptions.queryKey });
 		if (connectionId != null) {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: listConnectionSyncJobsQueryKey({ path: { workspaceSlug, connectionId } }),
 			});
 		}
@@ -122,7 +122,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		...initiateMutation(),
 		onSuccess: () => {
 			toast.success("Outline connected");
-			invalidateConnections();
+			void invalidateConnections();
 			invalidateOutline();
 		},
 		onError: (e) => {
@@ -134,7 +134,7 @@ export function useOutlineIntegration(workspaceSlug: string) {
 		...updateConnectionStatusMutation(),
 		onSuccess: () => {
 			toast.success("Outline disconnected");
-			invalidateConnections();
+			void invalidateConnections();
 			invalidateOutline();
 		},
 		onError: (e) => {

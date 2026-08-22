@@ -38,7 +38,7 @@ async function expectOnlyCurrent(canvas: ReturnType<typeof within>, name: string
 	const nav = canvas.getByRole("navigation", {
 		name: "Practice review sections",
 	});
-	expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
+	await expect(within(nav).getAllByRole("link", { current: "page" })).toHaveLength(1);
 	within(nav).getByRole("link", { name, current: "page" });
 }
 
@@ -72,6 +72,6 @@ export const ReviewedWork: Story = {
 		const nav = canvas.getByRole("navigation", {
 			name: "Practice review sections",
 		});
-		expect(within(nav).queryAllByRole("link", { current: "page" })).toHaveLength(0);
+		await expect(within(nav).queryAllByRole("link", { current: "page" })).toHaveLength(0);
 	},
 };

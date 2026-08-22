@@ -192,7 +192,7 @@ export const APracticeWhoseAreaIsGone: Story = {
 			}),
 		);
 		await userEvent.click(await screen.findByRole("menuitemradio", { name: "Unassigned" }));
-		expect(args.onPlacePractice).toHaveBeenCalledWith("orphaned-practice", null, 1);
+		await expect(args.onPlacePractice).toHaveBeenCalledWith("orphaned-practice", null, 1);
 	},
 };
 

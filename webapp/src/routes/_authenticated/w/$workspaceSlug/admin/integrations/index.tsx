@@ -87,7 +87,7 @@ function IntegrationOverviewCardContainer({
 		...triggerSyncJobMutation(),
 		onSuccess: () => {
 			if (connectionId == null) return;
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getConnectionSyncStatusQueryKey({ path: { workspaceSlug, connectionId } }),
 			});
 			toast.success(`${entry.displayName} sync started`);

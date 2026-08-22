@@ -25,7 +25,7 @@ function AchievementsPage() {
 			achievementsEnabled === false &&
 			username
 		) {
-			navigate({
+			void navigate({
 				to: "/w/$workspaceSlug/user/$username",
 				params: { workspaceSlug, username },
 				replace: true,

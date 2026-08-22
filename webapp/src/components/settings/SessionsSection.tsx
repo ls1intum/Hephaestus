@@ -88,7 +88,7 @@ export function SessionsSection() {
 	const revokeOne = useMutation({
 		...revokeSessionMutation(),
 		onSuccess: () => {
-			invalidateSessions();
+			void invalidateSessions();
 			toast.success("Session revoked");
 		},
 		onError: (error) => {
@@ -100,7 +100,7 @@ export function SessionsSection() {
 	const revokeOthers = useMutation({
 		...revokeOtherSessionsMutation(),
 		onSuccess: () => {
-			invalidateSessions();
+			void invalidateSessions();
 			toast.success("Signed out of all other sessions");
 		},
 		onError: (error) => {

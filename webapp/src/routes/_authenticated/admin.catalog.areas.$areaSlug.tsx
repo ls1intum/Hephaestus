@@ -76,7 +76,7 @@ function LoadedEditCuratedAreaPage({ areaSlug, initialArea }: LoadedEditCuratedA
 			queryClient.setQueryData(detailQueryKey, updated);
 			invalidateCatalog();
 			toast.success("Area updated");
-			navigate({ to: "/admin/catalog" });
+			void navigate({ to: "/admin/catalog" });
 		},
 		onError: (error) => {
 			if (problemStatusOf(error) === 412) {

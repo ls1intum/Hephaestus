@@ -63,21 +63,21 @@ function AdminTeamsContainer() {
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
+			void queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
 	const addLabelToTeam = useMutation({
 		...addLabelToTeamMutation(),
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
+			void queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
 	const removeLabelFromTeam = useMutation({
 		...removeLabelFromTeamMutation(),
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
+			void queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
@@ -115,7 +115,7 @@ function AdminTeamsContainer() {
 			}
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: teamsQueryKey });
+			void queryClient.invalidateQueries({ queryKey: teamsQueryKey });
 		},
 	});
 
@@ -174,10 +174,10 @@ function AdminTeamsContainer() {
 			error={teamsQuery.error}
 			search={search.q ?? ""}
 			onSearchChange={(q) => {
-				navigate({ search: { q: q || undefined }, replace: true });
+				void navigate({ search: { q: q || undefined }, replace: true });
 			}}
 			onRetry={() => {
-				teamsQuery.refetch();
+				void teamsQuery.refetch();
 			}}
 			onHideTeam={handleHideTeam}
 			onToggleRepositoryVisibility={handleToggleRepositoryVisibility}

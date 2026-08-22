@@ -188,7 +188,7 @@ function LeaderboardContainer() {
 
 	useEffect(() => {
 		if (team && team !== "all" && !visibleTeams.includes(team)) {
-			navigate({
+			void navigate({
 				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					team: "all",
@@ -199,7 +199,7 @@ function LeaderboardContainer() {
 
 	useEffect(() => {
 		if (mode === "TEAM" && team !== "all") {
-			navigate({
+			void navigate({
 				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					team: "all",
@@ -210,7 +210,7 @@ function LeaderboardContainer() {
 
 	useEffect(() => {
 		if (mode === "TEAM" && sort !== "SCORE") {
-			navigate({
+			void navigate({
 				search: (prev: LeaderboardSearchParams) => ({
 					...prev,
 					sort: "SCORE" as LeaderboardSortType,
@@ -275,7 +275,7 @@ function LeaderboardContainer() {
 	}
 
 	const handleTeamChange = (team: string) => {
-		navigate({
+		void navigate({
 			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				team,
@@ -284,7 +284,7 @@ function LeaderboardContainer() {
 	};
 
 	const handleSortChange = (sort: LeaderboardSortType) => {
-		navigate({
+		void navigate({
 			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				sort,
@@ -293,7 +293,7 @@ function LeaderboardContainer() {
 	};
 
 	const handleTimeframeChange = (afterDate: string, beforeDate?: string) => {
-		navigate({
+		void navigate({
 			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				after: afterDate,
@@ -303,7 +303,7 @@ function LeaderboardContainer() {
 	};
 
 	const handleModeChange = (newMode: "INDIVIDUAL" | "TEAM") => {
-		navigate({
+		void navigate({
 			search: (prev: LeaderboardSearchParams) => ({
 				...prev,
 				mode: newMode,

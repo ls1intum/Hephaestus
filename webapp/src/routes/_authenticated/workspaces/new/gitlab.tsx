@@ -193,7 +193,7 @@ function GitLabWizardPage() {
 		onSuccess: (data) => {
 			setSelectedSlug(data.workspaceSlug);
 			toast.success(`Workspace "${data.displayName}" created`);
-			navigate({
+			void navigate({
 				to: "/w/$workspaceSlug",
 				params: { workspaceSlug: data.workspaceSlug },
 			});
@@ -213,7 +213,7 @@ function GitLabWizardPage() {
 			);
 		},
 		onSettled: () => {
-			queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
+			void queryClient.invalidateQueries({ queryKey: listWorkspacesQueryKey() });
 		},
 	});
 

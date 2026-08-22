@@ -72,7 +72,7 @@ function ModelsContainer() {
 		onSuccess: (saved, variables) => {
 			cacheSavedBinding(saved);
 			bumpSaveRevision(variables.path.purpose);
-			invalidateBindings();
+			void invalidateBindings();
 			toast.success(`${PURPOSE_TITLES[variables.path.purpose]} saved`);
 		},
 		onError: (error, variables) => {
@@ -87,7 +87,7 @@ function ModelsContainer() {
 		onSuccess: (_data, variables) => {
 			dropCachedBinding(variables.path.purpose);
 			bumpSaveRevision(variables.path.purpose);
-			invalidateBindings();
+			void invalidateBindings();
 			toast.success(`${PURPOSE_TITLES[variables.path.purpose]} turned off`);
 		},
 		onError: (error, variables) => {
@@ -123,7 +123,7 @@ function ModelsContainer() {
 			saveRevisions={saveRevisions}
 			onRetry={() => {
 				for (const query of pageQueries) {
-					query.refetch();
+					void query.refetch();
 				}
 			}}
 			onSave={(purpose, body) => configureAgent.mutate({ path: { workspaceSlug, purpose }, body })}

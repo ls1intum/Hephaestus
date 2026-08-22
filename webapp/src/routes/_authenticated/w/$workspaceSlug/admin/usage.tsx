@@ -49,7 +49,7 @@ function AdminUsageContainer() {
 	const updateOwnProviderCap = useMutation({
 		...updateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({ path: { workspaceSlug } }),
 			});
 			toast.success(

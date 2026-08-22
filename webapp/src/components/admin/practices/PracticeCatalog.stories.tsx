@@ -364,15 +364,15 @@ export const CrossAreaDrag: Story = {
 			},
 		]);
 		await expect(handle).toBeVisible();
-		const preview = await waitFor(() => {
+		const preview = await waitFor(async () => {
 			const rows = screen
 				.getAllByText(practice.name)
 				.map((name) => name.closest('[data-slot="item"]'))
 				.filter((row): row is HTMLElement => row instanceof HTMLElement && row !== sourceRow);
-			expect(rows).toHaveLength(1);
+			await expect(rows).toHaveLength(1);
 			return rows[0];
 		});
-		expect(
+		await expect(
 			Math.abs(preview.getBoundingClientRect().width - sourceRow.getBoundingClientRect().width),
 		).toBeLessThan(1);
 		await userEvent.pointer([

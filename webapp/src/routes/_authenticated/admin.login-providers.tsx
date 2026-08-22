@@ -45,7 +45,7 @@ function AdminLoginProvidersPage() {
 	const createMutation = useMutation({
 		...adminCreateLoginProviderMutation(),
 		onSuccess: () => {
-			invalidate();
+			void invalidate();
 			setDialogOpen(false);
 			toast.success("Login provider added");
 		},
@@ -55,7 +55,7 @@ function AdminLoginProvidersPage() {
 	const updateMutation = useMutation({
 		...filedUnder(PROVIDER_WRITE_MUTATION_KEY, adminUpdateLoginProviderMutation()),
 		onSuccess: () => {
-			invalidate();
+			void invalidate();
 			setDialogOpen(false);
 			toast.success("Login provider updated");
 		},
@@ -65,7 +65,7 @@ function AdminLoginProvidersPage() {
 	const deleteMutation = useMutation({
 		...filedUnder(PROVIDER_WRITE_MUTATION_KEY, adminDeleteLoginProviderMutation()),
 		onSuccess: () => {
-			invalidate();
+			void invalidate();
 			toast.success("Login provider deleted");
 		},
 		onError: (error) => toast.error(problemDetailOf(error, "Could not delete the login provider")),

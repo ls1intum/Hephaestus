@@ -63,8 +63,8 @@ function AdminInstanceUsagePage() {
 	const updateBudget = useMutation({
 		...adminUpdateWorkspaceLlmBudgetMutation(),
 		onSuccess: (_data, variables) => {
-			queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({ queryKey: adminGetLlmUsageReportQueryKey() });
+			void queryClient.invalidateQueries({
 				queryKey: getLlmUsageReportQueryKey({
 					path: { workspaceSlug: variables.path.workspaceSlug },
 				}),

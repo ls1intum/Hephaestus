@@ -30,7 +30,7 @@
 	// on this tree: `pnpm add -D oxlint-tsgolint && pnpm exec oxlint --type-aware` reports 461 findings
 	// across 15 rules (174 of them `no-floating-promises`) for +1.2s and +0.4GB. Adopting that is
 	// #1476. Until then, check whether a rule is type-aware before adding it here.
-	"options": { "reportUnusedDisableDirectives": "error" },
+	"options": { "reportUnusedDisableDirectives": "error", "typeAware": true },
 
 	// Read by `no-undef` alone, which is off — so this is forward-looking. Kept in step with
 	// `tsconfig.json`'s `lib`; turning `no-undef` on would also need `node` and the Vitest globals.
@@ -358,9 +358,15 @@
 			}
 		},
 		{
-			// A test that asserts a `javascript:` URL is rejected has to be able to name one.
-			"files": ["**/*.test.ts", "**/*.test.tsx"],
-			"rules": { "no-script-url": "off" }
+			// A test that asserts a `javascript:` URL is rejected has to be able to name one. And a fixture
+			// is a stub cast into shape — typescript-eslint says as much under `no-unsafe-type-assertion`'s
+			// "When Not To Use It": "If your project frequently stubs objects in test files … Consider
+			// disabling the rule for such files."
+			"files": ["**/*.test.ts", "**/*.test.tsx", "**/*.stories.tsx", "src/test/**", "src/mocks/**"],
+			"rules": {
+				"no-script-url": "off",
+				"typescript/no-unsafe-type-assertion": "off"
+			}
 		},
 		{
 			// Playwright, not React. Its fixture callback is named `use`, which the React plugin reads as

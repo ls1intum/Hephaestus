@@ -75,7 +75,7 @@ function AdminMembersContainer() {
 	const toggleHidden = useMutation({
 		...updateMemberVisibilityMutation(),
 		onSuccess: () => {
-			queryClient.invalidateQueries({
+			void queryClient.invalidateQueries({
 				queryKey: getUsersWithTeamsQueryKey({ path: { workspaceSlug: workspaceSlug ?? "" } }),
 			});
 		},
@@ -113,7 +113,7 @@ function AdminMembersContainer() {
 
 	useEffect(() => {
 		if (teamsData && !teamsError && search.team && selectedTeam === "all") {
-			navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
+			void navigate({ search: (previous) => ({ ...previous, team: undefined }), replace: true });
 		}
 	}, [navigate, search.team, selectedTeam, teamsData, teamsError]);
 
@@ -128,13 +128,13 @@ function AdminMembersContainer() {
 			isLoading={isLoading || !workspaceSlug}
 			error={workspaceError ?? usersError ?? teamsError}
 			onRetry={() => {
-				refetchUsers();
-				refetchTeams();
+				void refetchUsers();
+				void refetchTeams();
 			}}
 			onToggleHidden={handleToggleHidden}
 			view={view}
 			onViewChange={(patch) => {
-				navigate({
+				void navigate({
 					search: (previous) => {
 						const next = {
 							q: "",

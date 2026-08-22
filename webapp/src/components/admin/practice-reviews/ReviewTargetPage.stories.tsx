@@ -72,7 +72,7 @@ export const PullRequest: Story = {
 		// Nothing labels the page as "Reviewed work": the breadcrumb stops before the heading, and the
 		// work names itself.
 		await expect(canvas.queryAllByText("Reviewed work")).toHaveLength(0);
-		expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("ls1intum/Hephaestus · PR #1423").length).toBeGreaterThan(0);
 		await expectNoPageOverflow();
 	},
 };
@@ -103,7 +103,9 @@ export const MergeRequest: Story = {
 			name: "Move invoice numbering behind the billing boundary",
 			level: 2,
 		});
-		expect(canvas.getAllByText("platform/billing-service · MR !88").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("platform/billing-service · MR !88").length).toBeGreaterThan(
+			0,
+		);
 	},
 };
 
@@ -115,7 +117,7 @@ export const Conversation: Story = {
 			name: "How should we roll back the pricing migration?",
 			level: 2,
 		});
-		expect(canvas.getAllByText("#engineering").length).toBeGreaterThan(0);
+		await expect(canvas.getAllByText("#engineering").length).toBeGreaterThan(0);
 	},
 };
 
