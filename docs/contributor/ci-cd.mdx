@@ -246,7 +246,9 @@ pnpm run format && pnpm run check
 
 ```bash
 # Webapp
-pnpm run check:webapp          # Full check (format + lint + typecheck)
+pnpm run check:webapp          # Biome format check, then oxlint
+pnpm run check:webapp:fix      # Same, applying every safe fix
+pnpm run typecheck:webapp      # A separate leg — check:webapp does not run it
 pnpm run test:webapp           # Unit tests
 
 # Application Server (Java) — includes the integration.core.webhook receiver

@@ -265,11 +265,15 @@ function SidebarBody({
 				<SidebarGroup>
 					<SidebarGroupLabel>Recent Unlocks</SidebarGroupLabel>
 					<SidebarGroupContent className="space-y-1.5">
-						{[...achievements]
-							.filter((a) => a.status === "unlocked")
+						{achievements
+							.flatMap((achievement) =>
+								achievement.status === "unlocked" && achievement.unlockedAt
+									? [{ achievement, unlockedAt: achievement.unlockedAt }]
+									: [],
+							)
 							.sort((a, b) => b.unlockedAt.getTime() - a.unlockedAt.getTime())
 							.slice(0, 5)
-							.map((achievement) => {
+							.map(({ achievement }) => {
 								const rarity = achievement.rarity;
 								const Icon = achievement.icon;
 								return (

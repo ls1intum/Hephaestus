@@ -42,28 +42,32 @@ reflect the final state. Document any skipped gate in the PR description.
 | Command | Does |
 |---|---|
 | `pnpm run format` / `format:check` | Apply / verify formatting (Java + TypeScript) |
-| `pnpm run check` | The full gate: `check:server` + `check:client` + `check:agents` + `check:stories` + `check:components` + `check:diagrams` + `check:env` + `check:contracts` |
+| `pnpm run check` | The full gate — every leg it runs is listed as `check` in the root `package.json` |
 | `pnpm run test:webapp` | Vitest |
 | `pnpm run test:agents` | Agent runtime and precompute specs, on Bun |
 | `mvn test -P'!quick'` | Server unit tests — see `server/AGENTS.md` for the four tiers and why `!quick` is mandatory |
 
 Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints, `check` is the
-comprehensive verification. A `:webapp`, `:java` or `:agents` suffix scopes any of them.
+comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them.
 
-### Biome scopes
+### Lint and format scopes
 
-Two Biome configurations, one per tree, both on the pinned `@biomejs/biome` in the root
-`package.json`:
+Two TypeScript trees, and **the linter is not the same in both**:
 
-| Config | Covers | Scripts |
-|---|---|---|
-| `webapp/biome.json` | the SPA (`webapp/src/**`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| `biome.jsonc` (root) | the Bun agent runtime, its specs, both precompute trees, `scripts/**` | `format:agents`, `lint:agents`, `check:agents` |
+| Tree | Lints | Formats | Scripts |
+|---|---|---|---|
+| the SPA (`webapp/`) | oxlint (`webapp/.oxlintrc.json`) | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
+| the Bun agent runtime, its specs, both precompute trees, `scripts/**` | Biome (`biome.jsonc`) | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
 
-`biome.jsonc` is the monorepo root config and `webapp/biome.json` declares `"root": false`, so each
-tree keeps its own rules. The root file documents why each non-default rule is on; `check:agents`
-also runs `typecheck:agents` and `typecheck:scripts`, so lint, format and types cover the same
-surface. `pnpm run check:agents:fix` applies every safe fix.
+Both Biome configs run the pinned `@biomejs/biome` from the root `package.json`; `biome.jsonc` is the
+monorepo root config and `webapp/biome.jsonc` declares `"root": false`, so each tree keeps its own
+rules. Each config carries the reasoning for its own deltas — read it before switching a rule either
+way. `check:agents` also runs `typecheck:agents` and `typecheck:scripts`; `check:webapp` does **not** run
+`typecheck:webapp`, which is a separate leg. `check:webapp:fix` and `check:agents:fix` apply every
+safe fix.
+
+The SPA's house lint rules are oxlint JS plugins in `webapp/tools/oxlint/rules/`, each with a
+`RuleTester` suite beside it — `webapp/AGENTS.md` § Linting.
 
 ## Generated artefacts — never hand-edit, regenerate
 

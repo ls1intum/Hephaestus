@@ -14,7 +14,7 @@ pnpm run start
 To build this application for production:
 
 ```bash
-pnpm run build:prod
+pnpm run build
 ```
 
 ## Testing

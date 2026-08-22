@@ -1,6 +1,6 @@
 {
 	"$schema": "https://biomejs.dev/schemas/2.5.9/schema.json",
-	// Root of the Biome monorepo graph. `webapp/biome.json` is the one nested config; it declares
+	// Root of the Biome monorepo graph. `webapp/biome.jsonc` is the one nested config; it declares
 	// `"root": false` and keeps its own rules, so nothing here changes how the webapp is linted.
 	// This file governs every other TypeScript/JavaScript tree in the repo:
 	//   - the Bun agent runtime          server/src/main/resources/agent/**
@@ -29,7 +29,7 @@
 			"scripts/**/*.mjs"
 		]
 	},
-	// Byte-identical to webapp/biome.json's formatter so a contributor moving between the SPA and
+	// Byte-identical to webapp/biome.jsonc's formatter so a contributor moving between the SPA and
 	// the agent runtime never re-learns the house style.
 	"formatter": {
 		"enabled": true,

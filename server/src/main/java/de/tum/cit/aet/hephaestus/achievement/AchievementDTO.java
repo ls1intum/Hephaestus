@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.achievement;
 import de.tum.cit.aet.hephaestus.achievement.progress.AchievementProgress;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.Instant;
-import java.util.Optional;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
@@ -42,9 +41,9 @@ public record AchievementDTO(
     @NonNull
     @Schema(description = "The structured progress data based on the achievements evaluator")
     AchievementProgress progressData,
-    @NonNull
-    @Schema(description = "Optional of when the achievement was unlocked, empty() if not unlocked")
-    Optional<Instant> unlockedAt,
+    @Nullable
+    @Schema(description = "When the achievement was unlocked, absent while it is still locked")
+    Instant unlockedAt,
     @Schema(description = "Whether the achievement should be hidden until unlocked") boolean isHidden
 ) {
     /**
@@ -53,14 +52,14 @@ public record AchievementDTO(
      * @param definition   the achievement definition
      * @param progressData the data associated with this achievements progress
      * @param status       the computed status for this user
-     * @param unlockedAt   Optional of when the achievement was unlocked, or {@link Optional#empty()} if not unlocked
+     * @param unlockedAt   when the achievement was unlocked, or {@code null} while it is still locked
      * @return populated DTO
      */
     public static AchievementDTO fromDefinition(
         AchievementDefinition definition,
         AchievementStatus status,
         AchievementProgress progressData,
-        Optional<Instant> unlockedAt
+        @Nullable Instant unlockedAt
     ) {
         return new AchievementDTO(
             definition.id(),

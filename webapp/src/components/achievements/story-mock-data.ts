@@ -21,9 +21,6 @@ export type MockUIAchievement = UIAchievement & {
 	y?: number;
 };
 
-/** The server omits `unlockedAt`, and the generated response transformer turns that into an invalid Date. */
-const NEVER_UNLOCKED = new Date(Number.NaN);
-
 export const mockUser = {
 	name: "Hephaestus_Forge_Master",
 	avatarUrl: "https://github.com/github.png",
@@ -72,7 +69,6 @@ const hephaestusAutomaton: MockUIAchievement = {
 	status: "available",
 	isHidden: false,
 	icon: Zap,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "LinearAchievementProgress", current: 2, target: 5 },
 	x: -96,
 	y: -384,
@@ -88,7 +84,6 @@ export const apolloClarity: MockUIAchievement = {
 	status: "available",
 	isHidden: false,
 	icon: TrendingUp,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "LinearAchievementProgress", current: 250, target: 1000 },
 	x: 96,
 	y: -384,
@@ -119,7 +114,6 @@ const hermesCaduceus: MockUIAchievement = {
 	status: "available",
 	isHidden: false,
 	icon: Globe,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "LinearAchievementProgress", current: 45, target: 100 },
 	x: 336,
 	y: 0,
@@ -135,7 +129,6 @@ export const aresConflict: MockUIAchievement = {
 	status: "available",
 	isHidden: false,
 	icon: Github,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "LinearAchievementProgress", current: 3, target: 10 },
 	x: 240,
 	y: -96,
@@ -167,7 +160,6 @@ const athenaStrategy: MockUIAchievement = {
 	status: "unlocked",
 	isHidden: false,
 	icon: Shield,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "BinaryAchievementProgress", unlocked: true },
 	x: 0,
 	y: 264,
@@ -182,7 +174,6 @@ export const zeusThunderbolt: MockUIAchievement = {
 	status: "available",
 	isHidden: false,
 	icon: Zap,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "BinaryAchievementProgress", unlocked: false },
 	x: -144,
 	y: 0,
@@ -213,7 +204,6 @@ export const dionysusDeploy: MockUIAchievement = {
 	status: "locked",
 	isHidden: false,
 	icon: Zap,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "BinaryAchievementProgress", unlocked: false },
 	x: -216,
 	y: -216,
@@ -228,7 +218,6 @@ export const artemisHunt: MockUIAchievement = {
 	status: "available",
 	isHidden: false,
 	icon: Eye,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "LinearAchievementProgress", current: 0, target: 25 },
 	x: -240,
 	y: 96,
@@ -259,7 +248,6 @@ export const hadesSecret: MockUIAchievement = {
 	status: "hidden",
 	isHidden: true,
 	icon: Shield,
-	unlockedAt: NEVER_UNLOCKED,
 	progressData: { type: "BinaryAchievementProgress", unlocked: false },
 	x: -300,
 	y: -200,

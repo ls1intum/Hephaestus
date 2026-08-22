@@ -21,18 +21,12 @@ animation routinely. Any settle helper must `.catch()` the rejection and treat i
 oxlint runs the React hook rules as one fused pass, so `// oxlint-disable-next-line
 react-hooks/exhaustive-deps` above a dependency array turns off **every** hook rule for that
 `useEffect` — including `react/set-state-in-effect`, which reports on the `setState` line *above* the
-directive. `options.reportUnusedDisableDirectives` does not save you: it calls the directive unused
-while it is actively suppressing an error. One real finding in `TimeframeFilter.tsx` hid this way
-until the directive was removed. Prefer letting a hook finding land in `oxlint-suppressions.json`,
-where it is counted and reviewable, over a directive that takes its neighbours with it.
+directive. `options.reportUnusedDisableDirectives` does not save you either — it stays silent, so
+nothing marks the directive as doing more than it says. One real finding in `TimeframeFilter.tsx` hid
+this way until the directive was removed. Fix the effect rather than reach for the directive; there
+is no hook suppression left in the tree.
 
-## 4. `oxlint-suppressions.json` counts findings per file, not per line
-
-Fix one violation and introduce another of the same rule in the same file and the count is unchanged,
-so CI stays green and the diff is empty. The baseline gates *new files and new rules*, not churn
-inside an already-baselined file. Read a count that went up as a new bug, never as noise.
-
-## 5. One story's MSW handlers answer for the whole Docs page
+## 4. One story's MSW handlers answer for the whole Docs page
 
 Autodocs mounts every story of a file into **one** document, and `msw-storybook-addon` installs on a
 single global worker — so the last story's handlers serve every story on that page. One error story
@@ -41,21 +35,21 @@ snapshot, stays green. That is not hypothetical: it is what made a screen's Docs
 "Couldn't load this feedback". A story file installs no handlers at all;
 `scripts/check-presentational-components.mjs` enforces it.
 
-## 6. `test:storybook` does not run the README-export check — CI does, right after
+## 5. `test:storybook` does not run the README-export check — CI does, right after
 
 `.github/workflows/ci-tests.yml` runs `pnpm run export:readme-assets` after `test:storybook` and fails
 the job if `docs/images/readme` is dirty. So the storybook job can go red printing "1382 passed". If a
 change moves or renames a story that exports a README asset, run
 `pnpm --filter webapp run export:readme-assets` and commit the result.
 
-## 7. Storybook subcomponents get no Controls, and their `argTypes` cannot be overridden
+## 6. Storybook subcomponents get no Controls, and their `argTypes` cannot be overridden
 
 *"Subcomponents are only intended for documentation purposes and have some limitations: 1. The
 `argTypes` of subcomponents are inferred … and cannot be manually defined or overridden. 2. The table
 for each documented subcomponent does *not* include controls"*. This is the cost that decides whether a
 part becomes a compound subcomponent or stays a prop — see `rules/composition-and-slots.md` rule 3.
 
-## 8. A hand-rolled stateful wrapper swallows the spy in `meta.args`
+## 7. A hand-rolled stateful wrapper swallows the spy in `meta.args`
 
 If the wrapper passes its own `onChange` instead of `{...args}`, the `fn()` declared in `meta.args` can
 never be called, never be asserted, and never appears in the Actions panel — while the file looks fully
