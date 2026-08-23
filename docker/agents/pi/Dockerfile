@@ -105,5 +105,14 @@ RUN set -eu; \
     fi; \
     echo "OK: no node/npm in image; runtime is $(bun --version) at $(command -v bun)"
 
+# The build above proves the runtime contract — Bun resolves and imports the SDK exactly as
+# PiRuntimeFactory arranges it, and no Node survives. These labels are the only part of that proof a
+# server can read before it commits a job to a container: it compares the contract version against
+# SandboxLayout.RUNTIME_CONTRACT_VERSION, which AgentImageContractSyncTest pins to the line below.
+# Bump both together when an older image could no longer run the staged runners. ADR 0031.
+LABEL hephaestus.agent.runtime-contract=1
+LABEL hephaestus.agent.bun-version=${BUN_VERSION}
+LABEL hephaestus.agent.pi-version=${PI_VERSION}
+
 USER 1000:1000
 WORKDIR /workspace

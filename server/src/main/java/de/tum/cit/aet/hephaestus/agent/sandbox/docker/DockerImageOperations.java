@@ -1,5 +1,8 @@
 package de.tum.cit.aet.hephaestus.agent.sandbox.docker;
 
+import java.util.Map;
+import java.util.Optional;
+
 /**
  * Daemon-level Docker operations: connectivity check + image cache management. Split out from
  * {@link DockerContainerOperations} so the container-lifecycle interface stays under the ISP
@@ -24,6 +27,18 @@ interface DockerImageOperations {
      * @return {@code true} if the image is present locally, {@code false} if absent or on error
      */
     boolean imageIsPresent(String image);
+
+    /**
+     * Read the OCI labels of a locally cached image.
+     *
+     * <p>Answers "may I run my runners in this?" without starting a container: the agent image
+     * stamps the runtime contract it was built against, and an image the daemon cannot describe is
+     * reported as absent rather than as unlabelled.
+     *
+     * @return the image's labels, or {@link Optional#empty()} if it is not cached locally
+     *     or the daemon could not be reached (never empty labels vs. missing image conflated)
+     */
+    Optional<Map<String, String>> imageLabels(String image);
 
     /**
      * Ping the Docker daemon to verify connectivity.

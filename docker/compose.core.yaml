@@ -24,6 +24,27 @@ services:
       # NATS — reuses the existing `natsConnection` bean to publish inbound events.
       HEPHAESTUS_SYNC_NATS_ENABLED: "true"
       HEPHAESTUS_SYNC_NATS_SERVER: "nats://nats-server:4222"
+      # Stream bounds belong on THIS container. The beans that read hephaestus.webhook.stream.* are
+      # gated on the webhook role, so the same variables on application-server (which runs with the
+      # role off) would configure nothing at all. `check:env` fails the build if they drift back.
+      HEPHAESTUS_WEBHOOK_STREAM_MAX_AGE: ${HEPHAESTUS_WEBHOOK_STREAM_MAX_AGE:-180d}
+      HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES: ${HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES:-1GB}
+      # github carries essentially all of the traffic, so it is the only per-stream override and the
+      # only one worth moving. Raise it and NATS_JS_MAX_FILE_BYTES together.
+      HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB: ${HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB:-10GB}
+      # The loss counter charges dropped webhooks only to durables under this name, and
+      # application-server derives every durable it creates from the same value — so the two
+      # containers have to be given the same one.
+      NATS_DURABLE_CONSUMER_NAME: ${NATS_DURABLE_CONSUMER_NAME:-hephaestus}
+      # Startup refuses to boot if the stream bounds sum above this, so the broker can never be
+      # asked to hold more than its volume. Same value as the broker's own max_file below.
+      HEPHAESTUS_WEBHOOK_STREAM_STORAGE_BUDGET: ${NATS_JS_MAX_FILE_BYTES:-17179869184}
+      # Lowering a bound on a stream that has already outgrown it deletes the excess. Set true for
+      # one deliberate start-up to apply it; startup otherwise logs what it would cost and declines.
+      HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES: ${HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES:-false}
+      # Applying that bound sheds the excess before the broker replies, so the wait scales with the
+      # bytes deleted. Raise it on a stream large enough that 5 minutes is not enough.
+      HEPHAESTUS_WEBHOOK_STREAM_LIMIT_UPDATE_TIMEOUT: ${HEPHAESTUS_WEBHOOK_STREAM_LIMIT_UPDATE_TIMEOUT:-5m}
       # Shared webhook secret used for incoming HMAC / token verification.
       # WEBHOOK_EXTERNAL_URL is only used by auto-registration (server role) and is intentionally
       # not set on the webhook-server pod.
@@ -59,6 +80,10 @@ services:
       HEPHAESTUS_TRUSTED_PROXIES: ${HEPHAESTUS_TRUSTED_PROXIES:-}
       # AgentImagePinGuard loads in any prod pod; set false for non-release deploys that skip the pin.
       HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST: ${HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST:-true}
+      # AgentImageReferenceGuard is deliberately not role-gated (ADR 0031), so a reference the workers
+      # cannot run crash-loops this pod too — and the override has to reach here to fix it. Valueless,
+      # as in docker/compose.app.yaml.
+      HEPHAESTUS_AGENT_IMAGE_REFERENCE:
       # thc healthcheck target: readiness (reports unhealthy while NATS/JetStream is unavailable).
       THC_PORT: "8080"
       THC_PATH: /actuator/health/readiness
@@ -148,8 +173,16 @@ configs:
 
       http_port: 8222
 
+      # A message the receiver accepts but the broker refuses is verified, admitted and then lost.
+      # NATS defaults max_payload to 1MB, far below the 25 MiB hephaestus.webhook.http.max-payload-bytes
+      # admits, so it is pinned to the same number here and the receiver logs at ERROR if they differ.
+      max_payload: ${NATS_MAX_PAYLOAD_BYTES:-26214400}
+
       jetstream {
         store_dir: "/data"
         max_mem: ${NATS_JS_MAX_MEM:-4G}
-        max_file: ${NATS_JS_MAX_FILE:-50G}
+        # In bytes, and shared with HEPHAESTUS_WEBHOOK_STREAM_STORAGE_BUDGET above so the two cannot
+        # drift. A byte count is the one literal NATS and Spring read identically. Keep it under the
+        # free space on this volume — docs/admin/webhook-ingestion-operations says what happens if not.
+        max_file: ${NATS_JS_MAX_FILE_BYTES:-17179869184}
       }

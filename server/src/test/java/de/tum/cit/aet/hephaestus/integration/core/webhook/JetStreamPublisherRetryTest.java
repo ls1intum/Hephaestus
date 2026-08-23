@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookPropertiesFixture;
 import de.tum.cit.aet.hephaestus.testconfig.BaseUnitTest;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.retry.Retry;
@@ -29,7 +30,7 @@ class JetStreamPublisherRetryTest extends BaseUnitTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), Map.of(), 2_000_000L),
+        WebhookPropertiesFixture.stream(),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(26_214_400L)
     );

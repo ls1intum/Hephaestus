@@ -103,7 +103,6 @@ hephaestus:
         nats:
             enabled: false
             server: nats://localhost:4222
-            replay-timeframe-days: 1
             durable-consumer-name: test-consumer
     fabric:
         root: /tmp/hephaestus-test-git-repos

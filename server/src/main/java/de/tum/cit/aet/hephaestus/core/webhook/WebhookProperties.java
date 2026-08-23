@@ -1,10 +1,13 @@
 package de.tum.cit.aet.hephaestus.core.webhook;
 
+import jakarta.validation.constraints.AssertTrue;
 import java.time.Duration;
 import java.util.Map;
 import org.jspecify.annotations.Nullable;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
+import org.springframework.util.unit.DataSize;
+import org.springframework.validation.annotation.Validated;
 
 /**
  * Shared webhook configuration bound to {@code hephaestus.webhook.*}. The same {@code secret} is
@@ -16,6 +19,7 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * buffers the body — {@code server.tomcat.max-http-post-size} only enforces on form-encoded
  * payloads, so we don't rely on it for JSON webhooks.
  */
+@Validated
 @ConfigurationProperties(prefix = "hephaestus.webhook")
 public record WebhookProperties(
     @Nullable String externalUrl,
@@ -28,6 +32,34 @@ public record WebhookProperties(
 ) {
     /** Minimum HMAC-SHA256 secret length recommended by NIST SP 800-107. */
     public static final int MIN_SECRET_LENGTH = 32;
+
+    /** Maximum-size payloads a stream must be able to hold. */
+    public static final int MIN_PAYLOADS_PER_STREAM = 4;
+
+    /**
+     * Below one maximum payload the stream rejects everything {@code WebhookPayloadSizeFilter}
+     * accepted, which is a total ingestion outage behind a receiver that reports healthy. Bean
+     * Validation has no comparison constraint between two properties, so the one invariant that spans
+     * {@code stream} and {@code http} is asserted here — the shape {@code WorkspaceProperties} uses.
+     */
+    @AssertTrue(
+        message = "hephaestus.webhook.stream.max-bytes, and every max-bytes-by-stream entry, must be at least " +
+            "4 x hephaestus.webhook.http.max-payload-bytes; a smaller stream rejects payloads the receiver accepted"
+    )
+    private boolean isStreamAbleToHoldWhatTheReceiverAccepts() {
+        if (stream == null || http == null) {
+            return true;
+        }
+        long floor = Math.multiplyExact(http.maxPayloadBytes(), (long) MIN_PAYLOADS_PER_STREAM);
+        if (stream.maxBytes().toBytes() < floor) {
+            return false;
+        }
+        return stream
+            .maxBytesByStream()
+            .values()
+            .stream()
+            .allMatch(size -> size.toBytes() >= floor);
+    }
 
     /** {@code true} iff auto-registration with the provider can be attempted. Pure predicate — no side effects. */
     public boolean isConfigured() {
@@ -91,6 +123,20 @@ public record WebhookProperties(
         }
     }
 
+    /**
+     * Retention and storage bounds for the four webhook streams.
+     *
+     * <p>{@link #maxAge} is the retention <em>ceiling</em> and {@link #maxBytes} the disk-safety
+     * <em>floor</em> under it; which of the two binds is a function of a deployment's volume, and the
+     * answer for a given deployment is published as {@code webhook.stream.oldest.message.age} rather
+     * than predicted here. {@link #maxBytes} is sized against what a shed message costs: nightly
+     * {@code SyncJobType.RECONCILIATION} re-fetches over {@code hephaestus.sync.timeframe-days}, so
+     * inside that window a shed webhook is recoverable from the provider API and outside it, by
+     * nothing (ADR 0008: webhook deliveries are not redeliverable).
+     *
+     * @see <a href="https://ls1intum.github.io/Hephaestus/admin/webhook-ingestion-operations">Webhook
+     *     ingestion operations</a>
+     */
     public record Stream(
         // Replay-defense invariant: the JetStream dedup window MUST be >= the largest per-vendor
         // timestamp replay tolerance, otherwise a captured-but-still-timestamp-valid request can be
@@ -100,11 +146,32 @@ public record WebhookProperties(
         // its ONLY replay defense — plus provider redelivery horizons. See REPLAY_TOLERANCE_FLOOR.
         @DefaultValue("10m") Duration duplicateWindow,
         @DefaultValue("180d") Duration maxAge,
-        // Per-stream retention overrides keyed by stream name (e.g. slack: 72h). Streams whose payloads carry
-        // personal message content should expire quickly once consumed — the SQL substrate is the system of
-        // record, and GDPR erasure cannot reach inside a broker stream.
         @DefaultValue Map<String, Duration> maxAgeByStream,
-        @DefaultValue("2000000") long maxMessages
+        @DefaultValue("1GB") DataSize maxBytes,
+        /** Per-stream {@link #maxBytes} overrides keyed by stream name — {@code github} dwarfs the rest. */
+        @DefaultValue Map<String, DataSize> maxBytesByStream,
+        /**
+         * What the broker may hold for all webhook streams together, which must stay at or below the
+         * free space on its volume. Keeping the per-stream bounds inside it is what keeps a full
+         * stream a stream that refuses messages rather than a broker that cannot write at all.
+         */
+        @DefaultValue("16GB") DataSize storageBudget,
+        /**
+         * Lets startup apply a limit change that would delete messages the stream already holds.
+         * Off by default: bounding a stream that has outgrown the new limit deletes the excess
+         * immediately, so it is a decision an operator makes rather than one a deploy makes for them.
+         */
+        @DefaultValue("false") boolean allowDestructiveLimitUpdates,
+        /**
+         * How long startup waits for one stream limit update. Bounding a stream that has outgrown
+         * the new limit deletes the excess before the broker answers, so the work is proportional to
+         * the bytes being shed rather than to the size of the request — tens of GB take far longer
+         * than the request timeout the health probes want. This is deliberately separate from the
+         * consumer request timeout so a slow admin call cannot slow a readiness answer.
+         */
+        @DefaultValue("5m") Duration limitUpdateTimeout,
+        /** How often the stream monitor reads stream and consumer state. */
+        @DefaultValue("60s") Duration monitorInterval
     ) {
         /**
          * Lower bound for {@link #duplicateWindow}: the maximum per-vendor timestamp replay
@@ -151,14 +218,36 @@ public record WebhookProperties(
                     );
                 }
             }
-            if (maxMessages < 1) {
-                throw new IllegalArgumentException("stream.maxMessages must be >= 1, got: " + maxMessages);
+            requirePositive("stream.maxBytes", maxBytes);
+            maxBytesByStream = maxBytesByStream == null ? Map.of() : Map.copyOf(maxBytesByStream);
+            for (Map.Entry<String, DataSize> e : maxBytesByStream.entrySet()) {
+                requirePositive("stream.maxBytesByStream." + e.getKey(), e.getValue());
+            }
+            requirePositive("stream.storageBudget", storageBudget);
+            if (limitUpdateTimeout.isZero() || limitUpdateTimeout.isNegative()) {
+                throw new IllegalArgumentException(
+                    "stream.limitUpdateTimeout must be positive, got: " + limitUpdateTimeout
+                );
+            }
+            if (monitorInterval.isZero() || monitorInterval.isNegative()) {
+                throw new IllegalArgumentException("stream.monitorInterval must be positive, got: " + monitorInterval);
+            }
+        }
+
+        private static void requirePositive(String key, @Nullable DataSize size) {
+            if (size == null || size.toBytes() < 1) {
+                throw new IllegalArgumentException(key + " must be at least 1 byte, got: " + size);
             }
         }
 
         /** Effective retention for one stream: the per-stream override, else the shared {@link #maxAge}. */
         public Duration maxAgeFor(String streamName) {
             return maxAgeByStream.getOrDefault(streamName, maxAge);
+        }
+
+        /** Effective storage bound for one stream: the per-stream override, else the shared {@link #maxBytes}. */
+        public long maxBytesFor(String streamName) {
+            return maxBytesByStream.getOrDefault(streamName, maxBytes).toBytes();
         }
     }
 

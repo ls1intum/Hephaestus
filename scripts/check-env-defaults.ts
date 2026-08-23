@@ -11,8 +11,11 @@
  * application reads and Compose does not forward is a deployment choice, not a defect, so it is
  * reported at the end rather than failed on.
  *
- * Scoped to the production file. `docker/preview/` deliberately runs smaller than production — it
- * shares a host — so a difference there is the point rather than a defect; those are listed, not failed.
+ * Scoped to the production topology, which is `compose.app.yaml` and `compose.core.yaml` together:
+ * they are one deployment split by runtime role, and a variable that only the webhook container can
+ * read is only ever forwarded by the second. `docker/preview/` deliberately runs smaller than
+ * production — it shares a host — so a difference there is the point rather than a defect; those are
+ * listed, not failed. Which container may read what is `check-env-roles.ts`.
  */
 import { readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
@@ -20,7 +23,7 @@ import { join, resolve } from "node:path";
 /** Resolved from this file, so the gate answers the same whatever the working directory is. */
 const REPO_ROOT = resolve(import.meta.dirname, "..");
 const APPLICATION_YML = "server/src/main/resources/application.yml";
-const COMPOSE_FILES = ["docker/compose.app.yaml"];
+const COMPOSE_FILES = ["docker/compose.app.yaml", "docker/compose.core.yaml"];
 const DELIBERATE_OVERRIDES = ["docker/preview/compose.app.yaml"];
 
 /** `${VAR:default}` — Spring's syntax. Stops at `$` so a nested placeholder is skipped, not misread. */

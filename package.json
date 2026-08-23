@@ -72,7 +72,7 @@
 		"check:stories": "node scripts/check-story-prose.ts",
 		"check:components": "node scripts/check-presentational-components.ts",
 		"check:diagrams": "node scripts/check-mermaid-diagrams.ts",
-		"check:env": "node scripts/check-env-defaults.ts",
+		"check:env": "node scripts/check-env-defaults.ts && node scripts/check-env-roles.ts && node --test scripts/check-env-roles.test.ts",
 		"check:biome-pin": "node scripts/check-biome-pin.ts"
 	},
 	"devDependencies": {

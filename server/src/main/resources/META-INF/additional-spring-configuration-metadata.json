@@ -93,11 +93,6 @@
       "description": "Durable consumer name for JetStream subscriptions (empty for ephemeral)"
     },
     {
-      "name": "hephaestus.sync.nats.replay-timeframe-days",
-      "type": "java.lang.Integer",
-      "description": "Number of days to replay messages when starting a new consumer"
-    },
-    {
       "name": "hephaestus.posthog.enabled",
       "type": "java.lang.Boolean",
       "description": "Whether PostHog analytics is enabled"
@@ -202,8 +197,8 @@
       "name": "hephaestus.agent.image.reference",
       "values": [
         {
-          "value": "ghcr.io/ls1intum/hephaestus/agent-pi:latest",
-          "description": "Dev/local — tag-based, mutable"
+          "value": "ghcr.io/ls1intum/hephaestus/agent-pi:${spring.application.version}",
+          "description": "Default — follows this deployment's own image tag, so the pair always matches."
         },
         {
           "value": "ghcr.io/ls1intum/hephaestus/agent-pi@sha256:0000000000000000000000000000000000000000000000000000000000000000",

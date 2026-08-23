@@ -7,6 +7,7 @@ const sidebars: SidebarsConfig = {
     {type: 'doc', id: 'ai-providers', label: 'Connect an AI Provider'},
     {type: 'doc', id: 'practice-review', label: 'Practice Review'},
     {type: 'doc', id: 'practice-review-operations', label: 'Practice Review Operations'},
+    {type: 'doc', id: 'webhook-ingestion-operations', label: 'Webhook Ingestion Operations'},
     {type: 'doc', id: 'backup-restore', label: 'Backup & Restore'},
     {type: 'doc', id: 'production-setup', label: 'Integrations & Reference Deployment'},
     {type: 'doc', id: 'compatibility-policy', label: 'Compatibility Policy'},

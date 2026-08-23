@@ -64,7 +64,12 @@ import tools.jackson.databind.node.ObjectNode;
 @Tag("live")
 class DockerInteractiveSandboxLiveTest {
 
-    private static final String AGENT_PI_IMAGE = "ghcr.io/ls1intum/hephaestus/agent-pi:latest";
+    /** The image under test. A release-channel tag would test some other release's image (ADR 0031);
+     * point this at a locally built agent image, or export the reference a deployment would use. */
+    private static final String AGENT_PI_IMAGE = System.getenv().getOrDefault(
+        "HEPHAESTUS_AGENT_IMAGE_REFERENCE",
+        "ghcr.io/ls1intum/hephaestus/agent-pi:dev"
+    );
     private static final ObjectMapper MAPPER = new ObjectMapper();
 
     private DockerClient dockerClient;

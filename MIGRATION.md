@@ -65,6 +65,186 @@ Entries exist only for releases that need operator action. Everything else is in
 
 ### Next release
 
+#### 🔴 An agent image reference naming a channel tag is now refused
+
+**Affected**, and either one is enough:
+
+- `HEPHAESTUS_AGENT_IMAGE_REFERENCE` set to a channel tag — `:latest`, `:stable`, `:edge`, `:main`,
+  or a partial version such as `:0.73`, which we retag onto every patch release in that line — or to
+  a reference with no tag at all.
+- **`IMAGE_TAG=latest`** — which earlier versions of `docker/.env.example` shipped as the default —
+  or **`IMAGE_TAG=0.73`**. The reference now derives from `IMAGE_TAG`, so such a deployment resolves
+  `agent-pi:latest` or `agent-pi:0.73` without ever naming it, and the refusal applies just the same.
+
+Check both with `grep -E 'IMAGE_TAG|HEPHAESTUS_AGENT_IMAGE_REFERENCE'` over your deployment
+configuration before you upgrade. `AGENT_ENABLED=false` does **not** exempt you: the check runs at
+startup, whether or not the sandbox is ever used. A release deploy that leaves both alone takes the
+signed digest pin and is unaffected.
+
+The boot fails with one of:
+
+```
+hephaestus.agent.image.reference must not be a channel tag
+hephaestus.agent.image.reference names a version series rather than one release
+```
+
+**Before**: the agent sandbox image fell back to `ghcr.io/ls1intum/hephaestus/agent-pi:latest` when
+nothing else supplied a reference. `latest` tracks the newest **release**, so a deployment tracking
+`main` ran its application server against an agent image built from a different commit. Nothing
+reported it: practice reviews and mentor sessions simply failed inside the container.
+
+**After**: the reference follows your deployment's own `IMAGE_TAG`, so the sandbox image is the one
+built from the same commit as the application server. A channel tag is refused at startup with a
+message naming the fix, because it can only ever name a pairing no release produced.
+
+**Action**: set `IMAGE_TAG` to a full release version (`0.74.0`) or to a full commit SHA — never
+`latest`, and never the `0.74` series. Then, if you also set the reference override, remove it or
+replace it with a digest:
+
+```bash
+# either: remove the HEPHAESTUS_AGENT_IMAGE_REFERENCE line entirely (recommended) — do not
+# leave it present and empty, which binds an empty reference and fails the boot for a second reason
+#
+# or: pin the exact image you mean
+HEPHAESTUS_AGENT_IMAGE_REFERENCE=ghcr.io/ls1intum/hephaestus/agent-pi@sha256:<digest>
+```
+
+A deployment tracking `main` keeps `HEPHAESTUS_RELEASE_PIN_SKIP=true` and
+`HEPHAESTUS_AGENT_IMAGE_REQUIRE_DIGEST=false`; the derived reference is a matched tag, not a digest.
+See [Agent image digests](https://ls1intum.github.io/Hephaestus/admin/agent-image-digests).
+
+#### 🟡 Preview deployments name their own agent image
+
+**Affected**: preview stacks (`docker/preview/`) that run practice reviews or the mentor from a pull
+request which does not touch `docker/agents/**`.
+
+A preview now derives its agent image from its own commit, and CI publishes one at that commit only
+when the pull request changed the agent tree or a workflow. Previously such a preview silently used
+the last release's image. Set `HEPHAESTUS_AGENT_IMAGE_REFERENCE` in the preview's `.env` to the agent
+image you want it to exercise — `docker/preview/.env.example` shows the line.
+#### 🔴 `NATS_JS_MAX_FILE` is gone, and webhook streams now have a disk bound
+
+**Affected**: every deployment.
+
+**Do this before upgrading:**
+
+1. **If you set `NATS_JS_MAX_FILE`, replace it with `NATS_JS_MAX_FILE_BYTES`, in bytes.** The old
+   variable is no longer read by anything. Nothing warns you: a deployment that had `100G` silently
+   drops to the new 16 GiB default. `50G` becomes `NATS_JS_MAX_FILE_BYTES=53687091200`.
+2. **Check your current stream sizes** with `nats stream report`. A stream already larger than its
+   new ceiling is left exactly as it is and logs an error on every start until you decide — see
+   below.
+3. **Keep the per-stream ceilings totalling under `NATS_JS_MAX_FILE_BYTES`**, or the receiver refuses
+   to start.
+
+Everything else in this entry is context.
+
+---
+
+Webhook streams were bounded only by message count, which says nothing about disk: on one deployment
+2,000,000 GitHub deliveries came to 32.3 GB, filled the host, stopped the broker writing, and every
+inbound webhook was dropped until the broker was restarted by hand.
+
+**Two bounds now, not three.** `HEPHAESTUS_WEBHOOK_STREAM_MAX_AGE` stays at 180 days: it is the
+*ceiling*, the longest a delivery is kept if disk allows. `HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES`
+(1 GiB per stream) and `HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB` (10 GiB) are the *floor* under
+it, and on a busy deployment they are what actually decides retention. Both are true; which one binds
+is a function of your volume, and the server now publishes the answer as
+`webhook.stream.oldest.message.age{stream}`, in seconds, so you can read your own effective retention
+rather than infer it. The message-count bound is gone: a count describes neither disk nor time.
+
+The byte ceiling is sized against what a shed message costs, not against the age ceiling. The nightly
+reconciliation sync re-fetches the last `MONITORING_TIMEFRAME` days from the provider API, so a
+webhook shed inside that window is recoverable by other means and one shed outside it is recoverable
+by nothing. If you raise `MONITORING_TIMEFRAME`, raise the byte ceilings with it.
+
+`NATS_JS_MAX_FILE_BYTES` sets the broker's own budget and the application's from one value, and the
+server refuses to start if the per-stream bounds sum above it:
+
+```
+Webhook stream bounds total 21474836480 bytes, over the 17179869184-byte broker storage budget
+```
+
+Set it below the free space on the broker's volume. This is the difference between the broker filling
+its own budget — where it refuses new messages and recovers by itself — and filling the filesystem,
+where it cannot write its own metadata and stays wedged even after space is freed.
+
+**A stream that already exceeds its new bound is left exactly as it is.** Bounding it deletes the
+excess the moment it applies, so startup withholds the change and logs what it would cost:
+
+```
+Stream github limit change withheld because it would delete stored messages:
+[maxBytes -1 -> 10737418240 (32300000000 bytes stored, 21562581760 would be deleted)] —
+set hephaestus.webhook.stream.allow-destructive-limit-updates=true to apply it
+Stream github bound removal withheld because it would leave the stream unbounded:
+[maxMessages 2000000 -> -1 (no byte bound is in force to replace it)] —
+get hephaestus.webhook.stream.max-bytes[-by-stream] applied first
+```
+
+Decide the bound first — raise `HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB` if the size the log
+reports is legitimate for your traffic, keeping the total under `NATS_JS_MAX_FILE_BYTES`. Then set
+`HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES=true` for one start-up to apply it, and
+unset it again. Until you do, the stream keeps the message-count cap it already has: the count cap is
+only released once a byte ceiling is in force to replace it, so an upgrade cannot leave a stream with
+no limit at all.
+
+Streams that already fit inside the bound are bounded automatically, with nothing deleted. Subjects,
+retention mode, storage and discard policy are never rewritten by a deployment. A stream whose shape
+has drifted from what this deployment expects is left entirely alone and logged — repair it with
+`nats stream edit` before the bound can be applied.
+
+Full metric roster and the wedged-broker procedure:
+[Webhook ingestion operations](https://ls1intum.github.io/Hephaestus/admin/webhook-ingestion-operations).
+
+
+#### 🟡 Readiness now answers for more than "the process started"
+
+**Affected**: every deployment that monitors `/actuator/health/readiness`, and in particular any that
+runs webhook receiving in the same container as the application — a single-container install, or the
+preview stacks.
+
+`/actuator/health/readiness` was the stock probe group on every container: the process's own
+availability state and nothing else. The group meant to add the message-consumer, practice-review and
+webhook checks was written under a property path Spring does not bind, so it was silently ignored, and
+a container whose broker had stopped accepting writes answered 200 throughout. Those checks are now in
+the probe. Expect readiness to follow broker availability, and on a combined-role container expect a
+broker outage to take it out of load-balancer rotation until the broker returns.
+
+**Migration**: none, but re-read what you alert on. If your dashboards treated readiness as a liveness
+signal, it now reports operational dependencies as well, which is the point.
+
+#### 🟡 Message-queue consumers now expire after 30 days with nothing connected
+
+**Affected**: deployments that may be offline for more than 30 consecutive days and must resume
+exactly where they left off. Everything else needs no action.
+
+`HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD` previously defaulted to *never expire*. Nothing
+else removes a consumer, so any stack that shared a broker and was deleted rather than shut down — a
+preview, a test environment — left its consumers and their undrained backlogs on that broker
+permanently, one generation per deleted stack.
+
+**What it measures is connection, not traffic.** A running deployment holds standing requests against
+its consumers, so it resets the clock continuously even while its queues are completely silent. Only a
+deployment that no longer exists ages out, which is why 30 days is safe: no restart, deploy or incident
+reaches it.
+
+**Migration**: nothing to do, unless your deployment can be down for more than 30 days and must not
+skip what arrived meanwhile. In that case set `HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD=0s`
+before upgrading, which switches expiry off exactly as before. A consumer that does expire is recreated
+pointing at new messages only, so it skips anything that arrived while the deployment was gone.
+
+`0s` preserves the consumer's *position*, not the *messages*. Those expire on the stream's own
+retention, independently, so a deployment offline past the stream's byte or age ceiling comes back to
+a cursor pointing at messages the stream no longer holds — the loss counter will say so on the first
+poll. Switching expiry off buys you the stream's retention window, not an unbounded one.
+
+Values between `0s` and `1h` are now rejected at startup — a threshold that short expires a consumer
+across an ordinary restart, which is the data loss the setting exists to avoid:
+
+```
+inactive-threshold (PT30M) must be 0 to disable reaping, or at least PT1H
+```
+
 #### 🟡 Reviewer-side practices keep the old wording until you update them
 
 **Affected**: workspaces created before this release that use the shipped practices

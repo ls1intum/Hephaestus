@@ -117,7 +117,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             true,
             "nats://localhost:4222",
             null,
-            7,
             null
         );
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(
@@ -189,7 +188,6 @@ class GitLabWorkspaceInitializationServiceTest extends BaseUnitTest {
             false,
             "nats://localhost:4222",
             null,
-            7,
             null
         );
         SyncSchedulerProperties syncProps = new SyncSchedulerProperties(

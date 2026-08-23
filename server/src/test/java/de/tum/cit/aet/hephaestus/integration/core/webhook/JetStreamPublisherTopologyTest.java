@@ -1,23 +1,27 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookPropertiesFixture;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import io.nats.client.Connection;
 import io.nats.client.JetStream;
 import io.nats.client.JetStreamManagement;
+import io.nats.client.JetStreamOptions;
 import io.nats.client.api.DiscardPolicy;
 import io.nats.client.api.RetentionPolicy;
 import io.nats.client.api.StorageType;
 import io.nats.client.api.StreamConfiguration;
 import io.nats.client.api.StreamInfo;
 import java.time.Duration;
-import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.assertj.AssertableApplicationContext;
@@ -31,7 +35,7 @@ class JetStreamPublisherTopologyTest {
         null,
         new WebhookProperties.TokenRotation(7, 90),
         new WebhookProperties.Publish(Duration.ofSeconds(2), 3, Duration.ofMillis(10)),
-        new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), Map.of(), 2_000_000L),
+        WebhookPropertiesFixture.stream(),
         new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
         new WebhookProperties.Http(26_214_400L)
     );
@@ -40,6 +44,10 @@ class JetStreamPublisherTopologyTest {
         return new ApplicationContextRunner()
             .withUserConfiguration(WebhookConfiguration.class)
             .withBean(WebhookProperties.class, () -> properties)
+            // The stream monitor charges loss only to durables under this deployment's own name.
+            .withBean(NatsConnectionProperties.class, () ->
+                new NatsConnectionProperties(false, null, "hephaestus", null)
+            )
             .withBean(MeterRegistry.class, SimpleMeterRegistry::new);
     }
 
@@ -56,6 +64,8 @@ class JetStreamPublisherTopologyTest {
             when(jsm.getStreamInfo(anyString())).thenReturn(info);
             when(connection.jetStream()).thenReturn(jetStream);
             when(connection.jetStreamManagement()).thenReturn(jsm);
+            // The bootstrap takes its own handle with a longer request timeout than the probes want.
+            when(connection.jetStreamManagement(any(JetStreamOptions.class))).thenReturn(jsm);
             return connection;
         } catch (Exception e) {
             throw new IllegalStateException("failed to build NATS connection stub", e);
@@ -72,10 +82,12 @@ class JetStreamPublisherTopologyTest {
             .storageType(StorageType.File)
             .duplicateWindow(stream.duplicateWindow())
             .maxAge(stream.maxAge())
-            .maxMessages(stream.maxMessages())
+            .maxMessages(-1)
+            .maxBytes(stream.maxBytes().toBytes())
             .build();
         StreamInfo info = mock(StreamInfo.class);
-        when(info.getConfiguration()).thenReturn(config);
+        lenient().when(info.getConfiguration()).thenReturn(config);
+        lenient().when(info.getStreamState()).thenReturn(mock(io.nats.client.api.StreamState.class));
         return info;
     }
 
