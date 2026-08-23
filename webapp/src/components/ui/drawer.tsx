@@ -204,6 +204,10 @@ function DrawerBody({ className, ...props }: React.ComponentProps<"div">) {
 		<div
 			data-slot="drawer-body"
 			className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 pb-6", className)}
+			// A form disables every control while it submits, and then nothing in here is focusable —
+			// but the panel's overflow still has to be readable to the end. Same call as `ui/table`.
+			// biome-ignore lint/a11y/noNoninteractiveTabindex: the scroll region must stay keyboard-reachable.
+			tabIndex={0}
 			{...props}
 		/>
 	);

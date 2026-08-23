@@ -272,6 +272,53 @@ export const DismissedLevelDoesNotComeBack: Story = {
 	},
 };
 
+/**
+ * Every region a panel is built from reaches both edges of it, with nothing left over underneath.
+ * The footer is the one that goes wrong quietly: written as a sticky bar inside the scrolling body
+ * it inherits that body's padding, so it floats short of each edge and leaves a strip of dead space
+ * below itself at the end of the scroll.
+ */
+export const RegionsReachThePanelEdges: Story = {
+	parameters: { viewport: { defaultViewport: "reflow" }, chromatic: { disableSnapshot: true } },
+	args: {
+		children: (entry, level) => (
+			<>
+				<DetailDrawerHeader nested={level.nested}>
+					<DrawerTitle>{entry.id}</DrawerTitle>
+				</DetailDrawerHeader>
+				<DrawerBody>
+					{Array.from({ length: 20 }, (_, index) => (
+						<p key={index}>Enough content that the body genuinely scrolls.</p>
+					))}
+				</DrawerBody>
+				<DrawerFooter>
+					<Button variant="outline">Cancel</Button>
+					<Button>Save changes</Button>
+				</DrawerFooter>
+			</>
+		),
+	},
+	play: async () => {
+		await expectSettledVisible(await screen.findByText("describe-what-and-why"));
+		const [popup] = popups();
+		const panel = popup.getBoundingClientRect();
+		const region = (slot: string) =>
+			popup.querySelector<HTMLElement>(`[data-slot="${slot}"]`)?.getBoundingClientRect();
+
+		const insets = ["drawer-header", "drawer-body", "drawer-footer"].map((slot) => {
+			const box = region(slot);
+			// The 1px left is the panel's own border, which every region sits inside.
+			return `${slot} ${Math.round((box?.left ?? 0) - panel.left)}/${Math.round(panel.right - (box?.right ?? 0))}`;
+		});
+		await expect(insets).toEqual(["drawer-header 1/0", "drawer-body 1/0", "drawer-footer 1/0"]);
+		await expect(Math.round(panel.bottom - (region("drawer-footer")?.bottom ?? 0))).toBe(0);
+
+		// A form disables every control while it submits, and then nothing inside the scrolling
+		// region is focusable — so the region itself has to be.
+		await expect(popup.querySelector('[data-slot="drawer-body"]')).toHaveAttribute("tabindex", "0");
+	},
+};
+
 export const Closed: Story = {
 	args: { stack: [] },
 	play: async () => {

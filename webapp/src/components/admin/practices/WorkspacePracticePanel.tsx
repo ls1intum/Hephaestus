@@ -70,13 +70,15 @@ export function WorkspacePracticePanel({ state, nested }: WorkspacePracticePanel
 		<>
 			<DetailDrawerHeader nested={nested}>
 				<AreaPill size="lg" slug={practice.areaSlug} name={areaName} />
-				<div className="min-w-0 flex-1 space-y-0.5">
+				<div className="min-w-0 flex-1 space-y-1">
 					<DrawerTitle className="break-words">{practice.name}</DrawerTitle>
 					<DrawerDescription>
 						<WorkTypeLabel artifactKind={practice.artifactKind} />
 					</DrawerDescription>
+					{/* Under the title, not beside it: provenance is a sentence of its own, and a second
+					    text column would take the width the title needs. */}
+					<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" className="mt-1.5" />
 				</div>
-				<CatalogOriginBadge origin={practice.catalogOrigin} kind="practice" />
 			</DetailDrawerHeader>
 
 			<DrawerBody className="space-y-6">

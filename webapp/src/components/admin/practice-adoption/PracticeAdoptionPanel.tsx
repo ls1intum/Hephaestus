@@ -68,13 +68,15 @@ export function PracticeAdoptionPanel({ state, onAdopt, nested }: PracticeAdopti
 					icon={preview.area.definition?.icon}
 					color={preview.area.definition?.color}
 				/>
-				<div className="min-w-0 flex-1 space-y-0.5">
+				<div className="min-w-0 flex-1 space-y-1">
 					<DrawerTitle className="break-words">{preview.definition.name}</DrawerTitle>
 					<DrawerDescription>
 						<WorkTypeLabel artifactKind={preview.definition.artifactKind} />
 					</DrawerDescription>
+					{/* Under the title, not beside it: the badge is a sentence of its own, and a second text
+					    column would take the width the title needs to stay on one or two lines. */}
+					{availability.badged && <StatusBadge def={availability} className="mt-1.5" />}
 				</div>
-				{availability.badged && <StatusBadge def={availability} className="mt-0.5" />}
 			</DetailDrawerHeader>
 
 			<DrawerBody className="space-y-6">

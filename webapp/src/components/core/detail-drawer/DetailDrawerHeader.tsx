@@ -18,6 +18,10 @@ export interface DetailDrawerHeaderProps {
  *
  * The dismiss is a `DrawerClose`, so it closes through the same path as Escape, an outside press and
  * a swipe rather than a fourth one that can drift.
+ *
+ * The content row wraps. A drawer is the full viewport at 320px and the dismiss, the padding and a
+ * leading chip already spend 40% of it, so a third item beside the title leaves it a column too
+ * narrow to read — put anything that is itself text below the title rather than next to it.
  */
 export function DetailDrawerHeader({
 	nested = false,
@@ -30,7 +34,7 @@ export function DetailDrawerHeader({
 				{nested ? <ChevronLeft /> : <XIcon />}
 				<span className="sr-only">{nested ? "Back" : "Close"}</span>
 			</DrawerClose>
-			<div className="flex min-w-0 flex-1 items-start gap-3">{children}</div>
+			<div className="flex min-w-0 flex-1 flex-wrap items-start gap-x-3 gap-y-2">{children}</div>
 		</DrawerHeader>
 	);
 }

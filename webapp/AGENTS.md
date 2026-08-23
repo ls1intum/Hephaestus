@@ -273,6 +273,24 @@ Length is not a criterion. `DrawerBody` scrolls, and a form that is seven viewpo
 is seven viewport-heights on a page too — the scroll happens either way, and the drawer keeps the
 tree the entry belongs to on screen while it happens.
 
+### Panel regions
+
+A drawer level is three regions and nothing else: `DrawerHeader`, `DrawerBody`, `DrawerFooter`. Each
+reaches both edges of the panel; only `DrawerBody` scrolls.
+
+- **A form's actions are the level's `DrawerFooter`,** which means the `<form>` is the level: `flex
+  min-h-0 flex-1 flex-col`, wrapping its own `DrawerBody` and `DrawerFooter`. A sticky bar written
+  inside the body instead inherits that body's padding — it floats short of both edges and leaves a
+  strip of dead space beneath it at the end of the scroll. Negative margins to cancel the padding are
+  the same bug with a longer fuse.
+- **The panel is the measure.** A `max-w-*` on the controls is a page-era habit; inside a panel sized
+  for the form it only strands the footer's buttons to the right of the fields. Cap *prose* instead,
+  which is what `PracticeDefinitionPreview` does.
+- **The header content row is two columns at most**, and the second is the title block. A drawer is
+  the full viewport at 320px and the dismiss, the padding and a leading chip already spend 40% of it.
+  Anything that is itself text — a badge, a status, provenance — goes *below* the title, inside that
+  block. The row wraps as a backstop, but a third column is a design mistake, not a wrap case.
+
 ### Guarded levels
 
 A level whose kind is in the host's `guardedKinds` is not dismissed by Escape, by a press on the

@@ -55,6 +55,7 @@ import {
 	AlertDialogHeader,
 	AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { DrawerBody } from "@/components/ui/drawer";
 import { practiceCatalogStructureScope } from "@/hooks/practice-catalog-cache";
 import { usePracticeCatalogMutations } from "@/hooks/use-practice-catalog-mutations";
 import { usePracticeEditor } from "@/hooks/use-practice-editor";
@@ -430,7 +431,9 @@ function PracticeCatalogRoute() {
 								{editableAreas === undefined ||
 								definitionOptionsQuery.data === undefined ||
 								(!creating && editing === undefined) ? (
-									<PracticeDefinitionSkeleton />
+									<DrawerBody>
+										<PracticeDefinitionSkeleton />
+									</DrawerBody>
 								) : (
 									<PracticeForm
 										{...(creating

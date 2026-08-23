@@ -15,6 +15,7 @@ import { CuratedFormLevel } from "@/components/admin/curated-catalog/CuratedForm
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
+import { DrawerBody } from "@/components/ui/drawer";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export interface CuratedAreaEditLevelProps {
@@ -30,13 +31,17 @@ export function CuratedAreaEditLevel({ areaSlug, nested, onDone }: CuratedAreaEd
 	return (
 		<CuratedFormLevel kind="area-edit" nested={nested}>
 			{areaQuery.isPending ? (
-				<PracticeDefinitionSkeleton />
+				<DrawerBody>
+					<PracticeDefinitionSkeleton />
+				</DrawerBody>
 			) : areaQuery.isError ? (
-				<QueryErrorAlert
-					error={areaQuery.error}
-					title="Couldn't load the group"
-					onRetry={() => areaQuery.refetch()}
-				/>
+				<DrawerBody>
+					<QueryErrorAlert
+						error={areaQuery.error}
+						title="Couldn't load the group"
+						onRetry={() => areaQuery.refetch()}
+					/>
+				</DrawerBody>
 			) : (
 				<LoadedCuratedAreaEditor
 					key={areaSlug}

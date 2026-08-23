@@ -21,6 +21,7 @@ import { soleBinding } from "@/components/admin/practice-catalog/bindings";
 import { PracticeDefinitionSkeleton } from "@/components/admin/practices/PracticeSkeletons";
 import { QueryErrorAlert } from "@/components/common/QueryErrorAlert";
 import { LevelCancel } from "@/components/core/detail-drawer/LevelCancel";
+import { DrawerBody } from "@/components/ui/drawer";
 import { problemDetailOf, problemStatusOf } from "@/lib/problem-detail";
 
 export interface CuratedPracticeEditLevelProps {
@@ -44,17 +45,21 @@ export function CuratedPracticeEditLevel({
 	return (
 		<CuratedFormLevel kind="practice-edit" nested={nested}>
 			{practiceQuery.isPending || catalogQuery.isPending || definitionOptionsQuery.isPending ? (
-				<PracticeDefinitionSkeleton />
+				<DrawerBody>
+					<PracticeDefinitionSkeleton />
+				</DrawerBody>
 			) : practiceQuery.isError || catalogQuery.isError || definitionOptionsQuery.isError ? (
-				<QueryErrorAlert
-					error={practiceQuery.error ?? catalogQuery.error ?? definitionOptionsQuery.error}
-					title="Couldn't load the practice"
-					onRetry={() => {
-						practiceQuery.refetch();
-						catalogQuery.refetch();
-						definitionOptionsQuery.refetch();
-					}}
-				/>
+				<DrawerBody>
+					<QueryErrorAlert
+						error={practiceQuery.error ?? catalogQuery.error ?? definitionOptionsQuery.error}
+						title="Couldn't load the practice"
+						onRetry={() => {
+							practiceQuery.refetch();
+							catalogQuery.refetch();
+							definitionOptionsQuery.refetch();
+						}}
+					/>
+				</DrawerBody>
 			) : (
 				<LoadedCuratedPracticeEditor
 					key={practiceSlug}

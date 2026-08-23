@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { DetailDrawerHeader } from "@/components/core/detail-drawer/DetailDrawerHeader";
-import { DrawerBody, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
+import { DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
 import type { CuratedLevelKind } from "./curated-catalog-search";
 
 const TITLES: Record<CuratedLevelKind, { title: string; description: string }> = {
@@ -25,6 +25,7 @@ const TITLES: Record<CuratedLevelKind, { title: string; description: string }> =
 export interface CuratedFormLevelProps {
 	kind: CuratedLevelKind;
 	nested?: boolean;
+	/** The editor, which supplies the level's own `DrawerBody` and `DrawerFooter`. */
 	children: ReactNode;
 }
 
@@ -46,7 +47,7 @@ export function CuratedFormLevel({ kind, nested, children }: CuratedFormLevelPro
 					<DrawerDescription>{description}</DrawerDescription>
 				</div>
 			</DetailDrawerHeader>
-			<DrawerBody>{children}</DrawerBody>
+			{children}
 		</>
 	);
 }
