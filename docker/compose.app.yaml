@@ -202,6 +202,9 @@ services:
       # Default on: the integration event flow needs NATS in prod (the code-level fallback is off for local dev).
       NATS_ENABLED: ${NATS_ENABLED:-true}
       NATS_DURABLE_CONSUMER_NAME: ${NATS_DURABLE_CONSUMER_NAME:-hephaestus}
+      # How long this deployment's durables may go with nothing bound to them before JetStream
+      # deletes them. See docker/.env.example for what to set it to and when.
+      HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:-30d}
       MONITORING_TIMEFRAME: ${MONITORING_TIMEFRAME:-7}
       MONITORING_RUN_ON_STARTUP: ${MONITORING_RUN_ON_STARTUP:-true}
       MONITORING_SYNC_CRON: ${MONITORING_SYNC_CRON:-0 0 * * * *}

@@ -64,7 +64,7 @@ class IntegrationNatsConsumerTest {
     void purgeFenceRejectsQueuedConsumerRestart() {
         NatsSubscriptionProvider subscriptions = mock(NatsSubscriptionProvider.class);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
-            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
             NatsConsumerPropertiesFixture.defaults(),
             subscriptions,
             mock(IntegrationMessageDispatcher.class),
@@ -86,7 +86,7 @@ class IntegrationNatsConsumerTest {
     void rolledBackPurgeRestartsConsumption() throws Exception {
         CountDownLatch restarted = new CountDownLatch(1);
         IntegrationNatsConsumer consumer = new IntegrationNatsConsumer(
-            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+            new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
             NatsConsumerPropertiesFixture.defaults(),
             scopeId -> Optional.empty(),
             mock(IntegrationMessageDispatcher.class),
@@ -130,6 +130,19 @@ class IntegrationNatsConsumerTest {
 
         assertThat(config.getDeliverPolicy()).isEqualTo(DeliverPolicy.New);
         assertThat(config.getDurable()).isEqualTo("heph-slack");
+    }
+
+    @Test
+    void everyDurableCarriesAnInactiveThresholdUnderShippedDefaults() {
+        // Every durable, not only the ones a deployment remembers to configure — see
+        // NatsConsumerProperties for why an unreaped one is permanent.
+        var config = IntegrationNatsConsumer.newConsumerConfiguration(
+            new String[] { "github.>" },
+            NatsConsumerPropertiesFixture.defaults(),
+            "heph-github"
+        );
+
+        assertThat(config.getInactiveThreshold()).isNotNull().isPositive();
     }
 
     @Test
@@ -211,7 +224,7 @@ class IntegrationNatsConsumerTest {
             message = mock(Message.class);
             when(message.getSubject()).thenReturn("github.acme.repo.issues");
             return new IntegrationNatsConsumer(
-                new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+                new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
                 NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
                 scopeId -> Optional.empty(),
                 dispatcher,
@@ -347,7 +360,7 @@ class IntegrationNatsConsumerTest {
 
             FakeFleet(Set<String> failingStreams) {
                 super(
-                    new NatsConnectionProperties(true, "nats://localhost:4222", "heph", 7, null),
+                    new NatsConnectionProperties(true, "nats://localhost:4222", "heph", null),
                     NatsConsumerPropertiesFixture.withFastPoisonBackoff(),
                     scopeId ->
                         Optional.of(

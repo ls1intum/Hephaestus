@@ -69,7 +69,7 @@ class WorkspaceSyncTargetProviderReconcileTest extends BaseUnitTest {
             repositoryToMonitorRepository,
             workspaceScopeFilter,
             connectionService,
-            new NatsConnectionProperties(true, "nats://localhost:4222", null, 7, null),
+            new NatsConnectionProperties(true, "nats://localhost:4222", null, null),
             natsConsumerService
         );
     }

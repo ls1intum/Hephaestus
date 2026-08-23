@@ -13,8 +13,8 @@ import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Http;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Publish;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Shutdown;
-import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.Stream;
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties.TokenRotation;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookPropertiesFixture;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionConfig;
 import de.tum.cit.aet.hephaestus.integration.core.connection.ConnectionService;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ApiCredentialProvider.BearerToken;
@@ -95,7 +95,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
             SECRET,
             new TokenRotation(7, 90),
             new Publish(java.time.Duration.ofSeconds(9), 5, java.time.Duration.ofMillis(200)),
-            new Stream(java.time.Duration.ofMinutes(10), java.time.Duration.ofDays(180), Map.of(), 2_000_000L),
+            WebhookPropertiesFixture.stream(),
             new Shutdown(java.time.Duration.ofSeconds(15)),
             new Http(26_214_400L)
         );
@@ -314,7 +314,7 @@ class GitLabWebhookServiceTest extends BaseUnitTest {
                 "",
                 new TokenRotation(7, 90),
                 new Publish(java.time.Duration.ofSeconds(9), 5, java.time.Duration.ofMillis(200)),
-                new Stream(java.time.Duration.ofMinutes(10), java.time.Duration.ofDays(180), Map.of(), 2_000_000L),
+                WebhookPropertiesFixture.stream(),
                 new Shutdown(java.time.Duration.ofSeconds(15)),
                 new Http(26_214_400L)
             );

@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.webhook;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.integration.core.consumer.NatsConnectionProperties;
 import io.github.resilience4j.core.IntervalFunction;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryConfig;
@@ -20,6 +21,10 @@ import org.springframework.context.annotation.Bean;
  * <p><strong>Not component-scanned.</strong> This is a plain class with {@code @Bean} factory
  * methods (no {@code @Configuration}/{@code @Component} stereotype), so it is only contributed
  * via {@code @Import} from the webhook host config.
+ *
+ * <p>{@link WebhookStreamMonitor} and {@link WebhookPayloadCapacityCheck} are contributed here
+ * rather than beside the health indicator: both read the broker, and both report on ingestion
+ * rather than on the receiver's own liveness.
  */
 class WebhookProducerBeans {
 
@@ -60,6 +65,32 @@ class WebhookProducerBeans {
     @Bean
     WebhookJetStreamBootstrap webhookJetStreamBootstrap(JetStreamManagement jsm, WebhookProperties properties) {
         return new WebhookJetStreamBootstrap(jsm, properties);
+    }
+
+    @Bean
+    WebhookStreamMonitor webhookStreamMonitor(
+        JetStreamManagement jsm,
+        WebhookProperties properties,
+        NatsConnectionProperties natsProperties,
+        MeterRegistry meterRegistry
+    ) {
+        // The webhook and server containers must be given the same name, or the monitor charges loss
+        // to nothing: docker/compose.core.yaml forwards it to both for that reason.
+        String durableBase = natsProperties.durableConsumerName();
+        return new WebhookStreamMonitor(
+            jsm,
+            properties,
+            durableBase == null || durableBase.isBlank() ? "hephaestus" : durableBase,
+            meterRegistry
+        );
+    }
+
+    @Bean
+    WebhookPayloadCapacityCheck webhookPayloadCapacityCheck(
+        @Qualifier("natsConnection") Connection natsConnection,
+        WebhookProperties properties
+    ) {
+        return new WebhookPayloadCapacityCheck(natsConnection, properties);
     }
 
     @Bean

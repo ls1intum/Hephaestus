@@ -27,7 +27,7 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
-                Duration.ZERO,
+                Duration.ofDays(30),
                 null
             );
 
@@ -48,7 +48,7 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
                 Duration.ofMinutes(5),
                 500,
                 Duration.ofSeconds(2),
-                Duration.ZERO,
+                Duration.ofDays(30),
                 custom
             );
 
@@ -107,10 +107,41 @@ class NatsConsumerPropertiesTest extends BaseUnitTest {
         }
 
         @Test
-        void shouldDisableReapingWhenInactiveThresholdIsUnset() {
+        void shouldBoundDurableLifetimeWhenInactiveThresholdIsUnset() {
+            // The default is what a deployment that never configures this gets, and it is the only
+            // thing that ever reaps a durable.
             runner().run(context ->
-                assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isZero()
+                assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isEqualTo(
+                    Duration.ofDays(30)
+                )
             );
+        }
+
+        @Test
+        void shouldDisableReapingOnlyWhenAskedExplicitly() {
+            runner()
+                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=0s")
+                .run(context -> assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isZero());
+        }
+
+        @Test
+        void shouldRejectAThresholdShortEnoughToReapAcrossARestart() {
+            // 30m expires the durable during a slow deploy, and its replacement starts at
+            // DeliverPolicy.New — losing everything that arrived meanwhile.
+            runner()
+                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=30m")
+                .run(context -> assertThat(context).hasFailed());
+        }
+
+        @Test
+        void shouldAcceptAThresholdAtTheFloor() {
+            runner()
+                .withPropertyValues("hephaestus.integration.consumer.inactive-threshold=1h")
+                .run(context ->
+                    assertThat(context.getBean(NatsConsumerProperties.class).inactiveThreshold()).isEqualTo(
+                        Duration.ofHours(1)
+                    )
+                );
         }
 
         @Test

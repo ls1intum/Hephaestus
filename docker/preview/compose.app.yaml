@@ -231,6 +231,10 @@ services:
       # footprint (NATS + HTTP); give it headroom.
       JAVA_TOOL_OPTIONS: "-XX:MaxDirectMemorySize=${APP_MAX_DIRECT_MEMORY:-128M}"
       SPRING_PROFILES_ACTIVE: prod
+      # A preview shares staging's broker and its streams. Providers post to staging's receiver, not
+      # here (see the GitLab and Outline notes below), so this role would only ever reconcile stream
+      # limits it does not own — a throwaway stack rewriting the bounds of a long-lived one.
+      HEPHAESTUS_RUNTIME_WEBHOOK_ENABLED: "false"
       # prod runs forward-headers=native, so ProxyTrustGuard aborts the boot unless this is set.
       # Write this Tomcat internal-proxies regex WITHOUT backslashes: Coolify re-escapes them when
       # it writes the stack .env, so `172\.18\.` reaches the container doubled and matches nothing.
@@ -272,8 +276,9 @@ services:
       # competing for one and stealing each other's messages.
       NATS_DURABLE_CONSUMER_NAME: ${SERVICE_NAME_APPSERVER:-appserver}-consumer
       # A preview is deleted, not shut down, so it never removes the durables it created on the
-      # shared stream. Long enough that a redeploy, or a testing session paused overnight, resumes
-      # on its own cursor instead of skipping ahead to the head of the stream.
+      # shared stream. Far shorter than the 30d a long-lived deployment uses, because a preview is
+      # abandoned the day its pull request merges. Still long enough that a redeploy, or a testing
+      # session paused overnight, resumes on its own cursor instead of skipping to the head.
       HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:-72h}
       # Issuer is this deploy's own origin, so a preview's tokens validate against the deploy that
       # issued them (Hephaestus-native auth, ADR 0017).

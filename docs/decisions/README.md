@@ -43,10 +43,10 @@ do, its home is the Admin Guide (`docs/admin/`) and the runbook links to it.
 | [0002](0002-java-package-rename-to-aet-cit-tum.md) | Rename Java base package to `de.tum.cit.aet.hephaestus` | Accepted |
 | [0003](0003-spring-modulith-adoption.md) | Spring Modulith 2.0 adoption with pragmatic shared kernels | Accepted |
 | [0004](0004-sql-layer-tenancy-via-statement-inspector.md) | SQL-layer tenancy enforcement via WorkspaceStatementInspector | Accepted |
-| [0005](0005-two-role-runtime-via-conditional-on-property.md) | Two-role runtime topology via `@ConditionalOnProperty` | Accepted |
+| [0005](0005-two-role-runtime-via-conditional-on-property.md) | Two-role runtime topology via `@ConditionalOnProperty` | Accepted (amended 2026-05-20 #1110, 2026-07-20 / 2026-07-21 / 2026-07-22 #1368, 2026-08-22 — a setting must reach a container that can read it) |
 | [0006](0006-llm-proxy-on-coordinator-trust-model.md) | LLM proxy stays on the coordinator (BYO trust model); extended to the server-side OpenAI-compatible model catalog | Accepted (amended 2026-07-20 #1368, 2026-07-28 #1400) |
 | [0007](0007-sandbox-spi-shape.md) | Sandbox SPI shape — sealed VolumeMount + typed NetworkPolicy | Accepted |
-| [0008](0008-webhook-runtime-role.md) | Webhook as a third runtime role (`webhook-server` container) | Accepted |
+| [0008](0008-webhook-runtime-role.md) | Webhook as a third runtime role (`webhook-server` container) | Accepted (amended 2026-08-22 — webhook ingestion cannot fail silently) |
 | [0009](0009-worker-runtime-substrate-wss-control-channel.md) | Worker runtime substrate over WSS control channel | Accepted |
 | [0010](0010-outbound-oauth-state-handrolled.md) | Outbound OAuth state hand-rolled (HMAC-signed, no library) | Accepted |
 | [0011](0011-integration-identity-not-wired-from-sync.md) | `integration_identity` is OAuth-fed, not sync-fed | Superseded by [0016](0016-unified-identity-keycloak-as-truth.md) |

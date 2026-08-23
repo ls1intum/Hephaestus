@@ -113,7 +113,7 @@ jobs:
           pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
-          FMT_OK=true; BIOME_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true
+          FMT_OK=true; BIOME_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
           # Runs before the Biome step so a version skew is reported as a version skew rather than
@@ -136,6 +136,10 @@ jobs:
           pnpm run typecheck:scripts \
             || { SCRIPT_TYPES_OK=false; ISSUES_FOUND+=("scripts/ TypeScript errors. Run: pnpm run typecheck:scripts"); }
           pnpm run check:contracts || { CONTRACTS_OK=false; ISSUES_FOUND+=("Artifact-source contract validation failed. Run: pnpm run check:contracts"); }
+          # Reads application.yml against the compose files, both behind this job's path filter. It
+          # was reachable only from the pre-push hook, which --no-verify skips, so the gate written
+          # for a defect that reached production could not fail a required build.
+          pnpm run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
@@ -148,6 +152,7 @@ jobs:
             [[ "$TYPES_OK" == "false" ]] && echo "| Agent typecheck | :x: Failed | \`pnpm run typecheck:agents\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$SCRIPT_TYPES_OK" == "false" ]] && echo "| scripts/ typecheck | :x: Failed | \`pnpm run typecheck:scripts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`pnpm run check:env\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -164,7 +169,8 @@ jobs:
           BIOME_OK=true
           TYPES_OK=true
           # The webapp-scoped tree gates run here as well as in the pre-push hook, because a hook is
-          # skippable and a merge is not. check:env stays out: it reads server files this leg omits.
+          # skippable and a merge is not. check:env runs on the App Server leg, which has the server
+          # and compose files it reads.
           COMPONENTS_OK=true
           STORIES_OK=true
 
