@@ -162,6 +162,14 @@ public record WebhookProperties(
          * immediately, so it is a decision an operator makes rather than one a deploy makes for them.
          */
         @DefaultValue("false") boolean allowDestructiveLimitUpdates,
+        /**
+         * How long startup waits for one stream limit update. Bounding a stream that has outgrown
+         * the new limit deletes the excess before the broker answers, so the work is proportional to
+         * the bytes being shed rather than to the size of the request — tens of GB take far longer
+         * than the request timeout the health probes want. This is deliberately separate from the
+         * consumer request timeout so a slow admin call cannot slow a readiness answer.
+         */
+        @DefaultValue("5m") Duration limitUpdateTimeout,
         /** How often the stream monitor reads stream and consumer state. */
         @DefaultValue("60s") Duration monitorInterval
     ) {
@@ -216,6 +224,11 @@ public record WebhookProperties(
                 requirePositive("stream.maxBytesByStream." + e.getKey(), e.getValue());
             }
             requirePositive("stream.storageBudget", storageBudget);
+            if (limitUpdateTimeout.isZero() || limitUpdateTimeout.isNegative()) {
+                throw new IllegalArgumentException(
+                    "stream.limitUpdateTimeout must be positive, got: " + limitUpdateTimeout
+                );
+            }
             if (monitorInterval.isZero() || monitorInterval.isNegative()) {
                 throw new IllegalArgumentException("stream.monitorInterval must be positive, got: " + monitorInterval);
             }

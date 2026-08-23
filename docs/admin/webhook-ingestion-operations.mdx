@@ -124,6 +124,19 @@ To apply it deliberately:
 Leaving that flag set turns a one-time decision into standing permission for any future deploy to
 delete stored messages.
 
+Shedding the excess happens **before** the broker replies, so on a large stream the call takes as
+long as the deletion does. `HEPHAESTUS_WEBHOOK_STREAM_LIMIT_UPDATE_TIMEOUT` (default `5m`) is how
+long startup waits; raise it if your stream is too large to shed inside that. If it still runs out,
+startup reports the limits the stream actually has rather than assuming its own update failed —
+which matters, because a timed-out update is one the broker may well have applied:
+
+```text
+Failed to reconcile JetStream stream limits: name=github changed=[maxBytes -1 -> 10737418240]
+— live configuration is now maxAge=PT4320H maxBytes=10737418240 maxMessages=-1
+```
+
+That line says the change **did** land. Confirm with `nats stream info github` before retrying.
+
 If instead you see a shape-drift error, the stream is not what this deployment expects and no bound
 is written onto it at all:
 
@@ -212,6 +225,29 @@ silent. Only a deployment that no longer exists ages out.
 retention, so a deployment offline past the stream's byte or age bound comes back to a cursor pointing
 at messages the stream no longer holds — `webhook.stream.unacknowledged.deletions` will say so on the
 first poll.
+
+## Making a change actually reach the broker
+
+Two things in the deployment path will silently leave your change unapplied.
+
+**The webhook receiver and NATS are in the core stack, and staging CD deploys the app only.** A
+change to `hephaestus.webhook.stream.*` ships with the application server but does not reach the
+container that bootstraps the streams until core is deployed. CI warns when `docker/compose.core.yaml`
+changes; deploy it with **Deploy to Staging** and `deploy-core: true`.
+
+**Compose does not recreate NATS when only its config changes.** The broker's configuration is a
+Compose `configs:` block whose content renders to a bind-mounted file. Changing the content does not
+change the container's spec, so `docker compose up -d` reports no drift and the running broker keeps
+the config it started with — `max_payload` and `max_file` included. Force it:
+
+```bash
+docker compose -f compose.core.yaml up -d --force-recreate nats-server
+docker exec core-nats-server-1 cat /etc/nats/nats-server.conf   # confirm the value you set
+```
+
+Recreating the broker is safe for stored messages — JetStream data lives in the volume — but
+in-flight deliveries during the restart are lost, and webhooks are not redeliverable. Reconciliation
+covers `MONITORING_TIMEFRAME` days afterwards.
 
 ## Where these settings live
 
