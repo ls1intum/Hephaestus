@@ -159,6 +159,16 @@ class ConsumerSubjectMathTest extends BaseUnitTest {
         }
 
         @Test
+        void everyDurableNameStartsWithTheSharedPrefix() {
+            // WebhookStreamMonitor tells this deployment's durables from another's by this prefix
+            // alone. If a name stopped carrying it, the loss counter would silently charge nothing.
+            String prefix = ConsumerSubjectMath.durablePrefix("hephaestus-consumer");
+
+            assertThat(ConsumerSubjectMath.scopeConsumerName("hephaestus-consumer", 42L)).startsWith(prefix);
+            assertThat(ConsumerSubjectMath.installationConsumerName("hephaestus-consumer")).startsWith(prefix);
+        }
+
+        @Test
         void blankBaseNameIsRejected() {
             // Catching the misconfiguration here is cheaper than letting NATS reject a
             // consumer create with a partially-built name like "-scope-42".

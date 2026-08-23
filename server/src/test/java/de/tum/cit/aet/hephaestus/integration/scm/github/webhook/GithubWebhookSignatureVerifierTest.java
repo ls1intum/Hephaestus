@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.webhook;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import de.tum.cit.aet.hephaestus.core.webhook.WebhookProperties;
+import de.tum.cit.aet.hephaestus.core.webhook.WebhookPropertiesFixture;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.VerificationResult;
 import de.tum.cit.aet.hephaestus.integration.core.spi.WebhookSignatureVerifier.WebhookRequest;
@@ -128,7 +129,7 @@ class GithubWebhookSignatureVerifierTest extends BaseUnitTest {
             secret,
             new WebhookProperties.TokenRotation(7, 90),
             new WebhookProperties.Publish(Duration.ofSeconds(9), 5, Duration.ofMillis(200)),
-            new WebhookProperties.Stream(Duration.ofMinutes(10), Duration.ofDays(180), Map.of(), 2_000_000L),
+            WebhookPropertiesFixture.stream(),
             new WebhookProperties.Shutdown(Duration.ofSeconds(15)),
             new WebhookProperties.Http(26_214_400L)
         );

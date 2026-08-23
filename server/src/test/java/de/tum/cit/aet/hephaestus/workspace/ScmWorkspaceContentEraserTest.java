@@ -70,7 +70,7 @@ class ScmWorkspaceContentEraserTest extends BaseUnitTest {
             repositoryMonitorService,
             teamRepository,
             organizationMembershipRepository,
-            new NatsConnectionProperties(false, null, null, 7, null),
+            new NatsConnectionProperties(false, null, null, null),
             natsConsumerService,
             eventPublisher
         );

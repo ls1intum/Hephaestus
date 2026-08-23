@@ -128,6 +128,24 @@ management:
             show-details: when_authorized
             probes:
                 enabled: true
+            # Operational dependencies affect readiness, not process liveness. This group replaces the
+            # auto-configured readiness probe, which contains readinessState alone — on the
+            # webhook-only container that reduces the probe to "the Spring context started", and both
+            # the container healthcheck and Traefik read it.
+            #
+            # `webhook` is what makes ADR 0008's webhook-server-down alert able to fire: there it is
+            # the ONLY contributor that knows about NATS, so without it a total ingestion outage reads
+            # as 200. On a combined-role container it adds no new exposure — `integrationConsumer`
+            # already reports DOWN on the same disconnect.
+            group:
+                readiness:
+                    include: readinessState,integrationConsumer,webhook,practiceReview,catalogProvenanceBackfillStartup
+            # Most of the group is role-gated, and the default (true) aborts the refresh wherever a
+            # named contributor is absent — so every container the compose files ship, plus any deploy
+            # with NATS off, plus the specs and test profiles. What it removes is a spelling check, and
+            # WebhookIngestionCannotFailSilentlyTest runs that against every role at once rather than
+            # each container against only its own.
+            validate-group-membership: false
         # Disable potentially sensitive endpoints
         env:
             enabled: false
@@ -140,10 +158,6 @@ management:
             enabled: true
         readinessState:
             enabled: true
-        # Operational dependencies affect readiness, not process liveness.
-        group:
-            readiness:
-                include: readinessState,integrationConsumer,practiceReview,catalogProvenanceBackfillStartup
 
 springdoc:
     # Off unless a profile asks for it. SecurityConfig permitAll()s /v3/api-docs/** and /swagger-ui/**
@@ -311,7 +325,6 @@ hephaestus:
         # each profile can override; set them in application-local.yml to scope dev syncs.
         nats:
             enabled: false
-            replay-timeframe-days: 7
             durable-consumer-name: ${NATS_DURABLE_CONSUMER_NAME:hephaestus}
             server: ""
             consumer:
@@ -567,18 +580,39 @@ hephaestus:
             # no timestamp, so this dedup window keyed on X-GitHub-Delivery is its only replay
             # defense; 10m also covers provider redelivery horizons. See WebhookProperties.Stream.
             duplicate-window: 10m
-            max-age: 180d
+            # The retention CEILING: the longest a delivery is kept if disk allows. max-bytes below
+            # is the floor under it, and which of the two binds is a function of volume. Nothing here
+            # can predict that — `webhook.stream.oldest.message.age` reports the answer per stream.
+            max-age: ${HEPHAESTUS_WEBHOOK_STREAM_MAX_AGE:180d}
             # Streams whose messages carry real personal content, not just change pointers. SQL is the
-            # system of record and GDPR erasure cannot reach inside the broker, so these expire on a
-            # transport-buffer horizon rather than the 180d default:
+            # system of record and GDPR erasure cannot reach inside the broker, so these are capped
+            # at a transport-buffer horizon rather than the ceiling above:
             #   slack   — the envelope is the channel/DM message text itself.
             #   outline — an Outline webhook delivery embeds the whole document in payload.model.text
             #             (full Markdown body, plus author/collaborator ids), so an erased or corrected
-            #             document would otherwise survive in JetStream for six months.
+            #             document would otherwise stay readable in JetStream for months.
             max-age-by-stream:
                 slack: 72h
                 outline: 72h
-            max-messages: 2000000
+            # The disk-safety FLOOR. At the bound JetStream deletes the oldest messages to admit new
+            # ones, so it is sized to outlast what nightly RECONCILIATION can re-fetch
+            # (hephaestus.sync.timeframe-days): inside that window a shed webhook is recoverable from
+            # the provider API, outside it, it is recoverable by nothing. There is deliberately no
+            # message-count bound — a count says nothing about disk.
+            max-bytes: ${HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES:1GB}
+            max-bytes-by-stream:
+                # github carries the traffic; the others are a rounding error next to it.
+                github: ${HEPHAESTUS_WEBHOOK_STREAM_MAX_BYTES_GITHUB:10GB}
+            # What the broker may hold for all four streams together; startup refuses to run if their
+            # bounds sum above it. Must match the broker's own max_file and stay under the free space
+            # on the JetStream volume — docs/admin/webhook-ingestion-operations explains why.
+            storage-budget: ${HEPHAESTUS_WEBHOOK_STREAM_STORAGE_BUDGET:16GB}
+            # Startup keeps an existing stream's limits in step with this file, but only limits —
+            # subjects, retention, storage and discard are never rewritten. A change that would delete
+            # messages the stream already holds is withheld and logged rather than applied. Set this
+            # once, deliberately, to let that through.
+            allow-destructive-limit-updates: ${HEPHAESTUS_WEBHOOK_STREAM_ALLOW_DESTRUCTIVE_LIMIT_UPDATES:false}
+            monitor-interval: 60s
         shutdown:
             # Drain budget for in-flight publishes after HTTP closes. Docker stop_grace_period
             # must cover: Spring HTTP drain (server.shutdown=graceful + lifecycle timeout 20s)
@@ -610,10 +644,11 @@ hephaestus:
     # Flip `enabled` to `true` once credentials and redirect URLs are configured.
     integration:
         consumer:
-            # Lets JetStream delete a durable nothing has pulled from for this long. 0 disables it;
-            # set it only where the deployment is deleted rather than shut down, and so never gets
-            # to delete its own durables. A bare number is hours.
-            inactive-threshold: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:0s}
+            # Lets JetStream delete a durable nothing has been BOUND to for this long — see
+            # NatsConsumerProperties for what boundness measures and why 0 is the only value below 1h.
+            # Disposable stacks set something far shorter (docker/preview/compose.app.yaml).
+            # A bare number is hours.
+            inactive-threshold: ${HEPHAESTUS_INTEGRATION_CONSUMER_INACTIVE_THRESHOLD:30d}
         # ─── GitHub authentication (GitHubProperties) ───
         # Can be any OAuth token, such as the PAT.
         github:

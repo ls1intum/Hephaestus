@@ -5,7 +5,9 @@
 .ai/
 #  and can be added to the global gitignore or merged into this file.  For a more nuclear
 application-live-local.yml
+application-live-local.yaml
 application-local.yml
+# Spring reads both extensions, so a .yaml typo is a config file that works and is tracked.
 application-local.yaml
 **/atlassian-ide-plugin.xml
 # auto-import.

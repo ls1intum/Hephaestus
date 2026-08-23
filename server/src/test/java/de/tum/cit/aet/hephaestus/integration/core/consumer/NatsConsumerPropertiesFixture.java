@@ -7,8 +7,11 @@ final class NatsConsumerPropertiesFixture {
 
     private NatsConsumerPropertiesFixture() {}
 
+    /** The shipped default, so a test built on {@link #defaults()} sees what a deployment sees. */
+    static final Duration SHIPPED_INACTIVE_THRESHOLD = Duration.ofDays(30);
+
     static NatsConsumerProperties defaults() {
-        return withInactiveThreshold(Duration.ZERO);
+        return withInactiveThreshold(SHIPPED_INACTIVE_THRESHOLD);
     }
 
     static NatsConsumerProperties withInactiveThreshold(Duration inactiveThreshold) {
@@ -21,7 +24,7 @@ final class NatsConsumerPropertiesFixture {
     /** Poison backoff short enough that a redelivery loop finishes inside a unit test. */
     static NatsConsumerProperties withFastPoisonBackoff() {
         return build(
-            Duration.ZERO,
+            SHIPPED_INACTIVE_THRESHOLD,
             new NatsConsumerProperties.PoisonProperties(10, Duration.ofMillis(1), Duration.ofSeconds(1))
         );
     }
