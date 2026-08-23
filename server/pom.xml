@@ -1146,12 +1146,21 @@
                         catch blocks that dropped the original cause. Do not set this back to false;
                         argue the rule in pmd-ruleset.xml instead.
                     -->
+                    <!--
+                        PMD needs the compiled classes on its auxclasspath to resolve types. Without
+                        them it cannot see that an enum switch is exhaustive or that a wildcard import
+                        is used, and reports both as violations — so `lint:java` compiles first.
+                    -->
                     <failOnViolation>true</failOnViolation>
-                    <!-- Exclude generated code -->
+                    <!--
+                        Every generated root, not a list of the three we happen to know about: the
+                        annotation processors write Java under generated-sources/annotations during a
+                        real compile, which a local run with the `quick` profile never produces, so an
+                        enumerated list passes here and fails in CI.
+                    -->
                     <excludeRoots>
-                        <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>
-                        <excludeRoot>${project.build.directory}/generated-sources/graphql-gitlab</excludeRoot>
-                        <excludeRoot>${project.build.directory}/generated-sources/openapi-outline</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-sources</excludeRoot>
+                        <excludeRoot>${project.build.directory}/generated-test-sources</excludeRoot>
                     </excludeRoots>
                 </configuration>
             </plugin>
