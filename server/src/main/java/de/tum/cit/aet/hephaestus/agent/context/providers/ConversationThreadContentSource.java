@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.agent.context.providers;
 
 import static de.tum.cit.aet.hephaestus.agent.handler.spi.JobMetadataReader.requireText;
 
-import de.tum.cit.aet.hephaestus.agent.context.ContentSource;
 import de.tum.cit.aet.hephaestus.agent.context.ContextRequest;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceContribution;
 import de.tum.cit.aet.hephaestus.agent.context.EvidenceSource;

@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 // Selection must never move back onto `bg-*` — `--muted`, `--accent` and `--secondary` are the same
 // colour in this theme, so a pressed background is a hovered background. The weight is what carries
 // selection without colour, which is what WCAG 2.2 SC 1.4.1 requires of a state a hue would otherwise
-// be the only sign of. `aria-disabled` as well as `disabled`: Base UI strips the native attribute from
-// a disabled group item to keep it focusable, so a `disabled:` rule alone never reaches one.
+// be the only sign of. `aria-disabled` as well as `disabled`: a standalone toggle carries only the
+// native attribute, while one inside a group carries both, so neither variant covers the pair alone.
 const toggleVariants = cva(
 	"group/toggle inline-flex items-center justify-center gap-1 rounded-lg border border-transparent bg-clip-padding text-sm font-medium whitespace-nowrap outline-none transition-all hover:bg-muted hover:text-foreground aria-pressed:z-10 aria-pressed:border-primary aria-pressed:font-semibold aria-pressed:text-foreground focus-visible:ring-ring/50 focus-visible:ring-[3px] aria-invalid:border-destructive aria-invalid:ring-destructive/20 dark:aria-invalid:ring-destructive/40 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
 	{

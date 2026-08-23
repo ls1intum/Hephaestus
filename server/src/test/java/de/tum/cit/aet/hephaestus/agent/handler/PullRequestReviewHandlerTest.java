@@ -86,9 +86,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
     private PracticeDetectionResultParser resultParser;
     private TaskEnvelopeWriter taskEnvelopeWriter;
     private PullRequestReviewHandler handler;
-    private final org.springframework.context.ApplicationEventPublisher eventPublisher = org.mockito.Mockito.mock(
-        org.springframework.context.ApplicationEventPublisher.class
-    );
 
     @BeforeEach
     void setUp() {
@@ -119,7 +116,6 @@ class PullRequestReviewHandlerTest extends BaseUnitTest {
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 workspaceDefaults()
             ),
-            eventPublisher,
             org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
         lenient().when(cas.get(anyString())).thenReturn(java.util.Optional.of(new byte[0]));

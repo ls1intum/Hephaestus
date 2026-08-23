@@ -52,10 +52,9 @@ Naming: `format` applies, `format:check` verifies read-only for CI, `lint` lints
 comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes any of them; `:java`
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
-**`check` is a strict superset of CI, and the difference is only ever caught locally.** PMD
-(`lint:java`), `check:story-sort` and `check:diagrams` run in no workflow; the only thing that runs
-them before a merge is the `pre-push` hook, which `--no-verify` skips. Green CI is therefore not
-evidence that `pnpm run check` passes. Run it yourself before you claim it.
+**Every leg of `check` now runs in CI**, so a green build and a green `check` agree. The one thing
+CI cannot run is anything needing Docker or a live credential. Run `check` yourself before claiming
+it anyway — it is the same command, and it fails faster than a workflow does.
 
 ### Lint and format scopes
 
@@ -68,8 +67,9 @@ evidence that `pnpm run check` passes. Run it yourself before you claim it.
 | the Bun agent runtime and specs, both precompute trees, `scripts/**`, `.changeset/`, `.github/` and the root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
-`markdownlint-cli2`, and nothing in `pnpm run check` or in CI runs it. Run it by hand after editing
-`docs/`.
+`markdownlint-cli2`, configured by `docs/.markdownlint-cli2.jsonc`, which states both the file scope
+and the rules. It is the last leg of `pnpm run check` and runs on the App Server CI leg, which
+`docs/**` already triggers.
 
 **Start every oxlint run from the repo root.** A nested config *replaces* the root's rules for the
 files under it rather than merging, so each tree states its rule set in full — but `options`,

@@ -49,7 +49,7 @@ public class ObservationAdmissionController {
         try {
             return admission.admit(jobId, request.path("observations"));
         } catch (ObservationAdmissionService.AdmissionConflictException e) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Observations differ from the admitted payload");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Observations differ from the admitted payload", e);
         }
     }
 }

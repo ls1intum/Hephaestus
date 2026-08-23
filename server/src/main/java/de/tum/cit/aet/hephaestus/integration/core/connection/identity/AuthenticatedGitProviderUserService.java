@@ -177,7 +177,8 @@ public class AuthenticatedGitProviderUserService {
                 HttpStatus.CONFLICT,
                 "Linked " +
                     type +
-                    " identity has a non-numeric subject; the account must be re-linked. Go to Settings → Linked Accounts."
+                    " identity has a non-numeric subject; the account must be re-linked. Go to Settings → Linked Accounts.",
+                e
             );
         }
     }

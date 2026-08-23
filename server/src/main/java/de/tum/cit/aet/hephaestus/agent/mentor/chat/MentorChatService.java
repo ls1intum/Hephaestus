@@ -33,7 +33,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.mentor.ChatThread;
 import de.tum.cit.aet.hephaestus.mentor.ChatThreadRepository;
-import de.tum.cit.aet.hephaestus.workspace.Workspace;
 import io.micrometer.core.instrument.Timer;
 import java.time.Duration;
 import java.util.List;
@@ -201,7 +200,10 @@ public class MentorChatService implements MentorTurnRunner {
                 // Best-effort: the channel may already be closed.
             }
             // Re-throw Error subclasses (OOME, StackOverflowError) — JVM stability over metrics tidy-up.
-            if (t instanceof Error err) throw err;
+            // NOPMD PreserveStackTrace: `err` IS `t`, which PMD does not follow through the pattern
+            // binding. A non-Error escapee is logged above WITH the throwable and then deliberately
+            // swallowed — one turn's failure must not kill the dispatch loop.
+            if (t instanceof Error err) throw err; // NOPMD
         }
     }
 

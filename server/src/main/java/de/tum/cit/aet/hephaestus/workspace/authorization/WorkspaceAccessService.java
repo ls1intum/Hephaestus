@@ -140,11 +140,7 @@ public class WorkspaceAccessService {
         }
 
         // Super admins with membership can manage ADMIN and MEMBER roles (but not OWNER)
-        if (targetRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin()) {
-            return true;
-        }
-
-        return false;
+        return targetRole != WorkspaceRole.OWNER && SecurityUtils.isSuperAdmin();
     }
 
     /**

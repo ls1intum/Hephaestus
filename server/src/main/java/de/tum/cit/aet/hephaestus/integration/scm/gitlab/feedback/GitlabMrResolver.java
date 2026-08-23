@@ -83,7 +83,8 @@ class GitlabMrResolver {
             iid = Integer.parseInt(subjectExternalId.substring(bangIdx + 1));
         } catch (NumberFormatException e) {
             throw new FeedbackDeliveryException(
-                "Invalid GitLab MR subjectExternalId — iid must be integer: " + subjectExternalId
+                "Invalid GitLab MR subjectExternalId — iid must be integer: " + subjectExternalId,
+                e
             );
         }
         return new MrCoordinates(projectPath, iid);
@@ -138,7 +139,8 @@ class GitlabMrResolver {
             );
         } catch (NumberFormatException e) {
             throw new FeedbackDeliveryException(
-                "Invalid GitLab issue subjectExternalId — iid must be integer: " + subjectExternalId
+                "Invalid GitLab issue subjectExternalId — iid must be integer: " + subjectExternalId,
+                e
             );
         }
     }

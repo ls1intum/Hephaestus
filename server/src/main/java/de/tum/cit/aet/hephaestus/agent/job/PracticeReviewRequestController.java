@@ -140,7 +140,7 @@ public class PracticeReviewRequestController {
         try {
             return ArtifactKind.of(raw);
         } catch (IllegalArgumentException malformed) {
-            throw new IllegalArgumentException("Not an artifact kind: " + raw);
+            throw new IllegalArgumentException("Not an artifact kind: " + raw, malformed);
         }
     }
 

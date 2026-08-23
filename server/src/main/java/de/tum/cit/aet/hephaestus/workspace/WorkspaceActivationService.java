@@ -259,7 +259,7 @@ public class WorkspaceActivationService {
             String derived = deriveAccountLogin(workspace);
             if (!isBlank(derived)) {
                 workspace.setAccountLogin(derived);
-                workspace = workspaceRepository.save(workspace);
+                return workspaceRepository.save(workspace);
             }
         }
 

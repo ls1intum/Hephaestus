@@ -67,7 +67,6 @@ class JobTypeHandlerRegistryTest extends BaseUnitTest {
                 org.mockito.Mockito.mock(FeedbackLedgerRecorder.class),
                 workspaceDefaults()
             ),
-            org.mockito.Mockito.mock(ApplicationEventPublisher.class),
             org.mockito.Mockito.mock(de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.class)
         );
     }

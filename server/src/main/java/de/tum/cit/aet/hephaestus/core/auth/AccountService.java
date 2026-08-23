@@ -11,7 +11,6 @@ import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwt;
 import de.tum.cit.aet.hephaestus.core.auth.jwt.IssuedJwtRepository;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnServerRole;
 import java.time.Clock;
-import java.time.Instant;
 import java.util.List;
 import org.jspecify.annotations.Nullable;
 import org.springframework.data.domain.PageRequest;
@@ -152,7 +151,7 @@ public class AccountService {
             try {
                 role = Account.AppRole.valueOf(appRole);
             } catch (IllegalArgumentException e) {
-                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "unknown app role: " + appRole);
+                throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "unknown app role: " + appRole, e);
             }
             // Last-admin lockout guard: demoting the only remaining APP_ADMIN — or yourself —
             // would lock everyone out of /admin with no recovery.

@@ -48,6 +48,10 @@ public interface BackfillStateProvider {
         Instant lastRunAt
     );
 
+    /**
+     * Removes a sync target. Called when a repository no longer exists upstream (NOT_FOUND)
+     * to stop perpetual sync retries for a deleted repository.
+     */
     void removeSyncTarget(Long syncTargetId);
 
     /**

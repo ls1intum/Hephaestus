@@ -8,7 +8,7 @@
 The first AES-GCM credential-encryption implementation (commit `8c86831de`) used a
 *static context string* as AAD:
 
-```
+```text
 CONTEXT_AAD = "hephaestus-credential-bundle-v1"
 ```
 
@@ -40,7 +40,7 @@ identity row — only the AAD does.
 
 Blob format **v2**:
 
-```
+```text
 [0x02]                              format version byte
 [12-byte IV]                        96-bit random per encrypt, fresh each call
 [ciphertext + 128-bit GCM tag]
@@ -48,7 +48,7 @@ Blob format **v2**:
 
 AAD layout (computed at encrypt + decrypt time; **never persisted**):
 
-```
+```text
 "hephaestus-credential-bundle"      domain separator (28 bytes)
 0x02                                AAD schema version
 u16_be(len) || workspaceId_ascii    length-prefixed

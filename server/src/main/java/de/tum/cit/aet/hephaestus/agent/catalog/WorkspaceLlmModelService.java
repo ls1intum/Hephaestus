@@ -106,9 +106,9 @@ public class WorkspaceLlmModelService {
             saved = modelRepository.saveAndFlush(model);
         } catch (DataIntegrityViolationException e) {
             if (isUpstreamIdConflict(e)) {
-                throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId());
+                throw new LlmModelUpstreamIdConflictException(connectionId, request.upstreamModelId(), e);
             }
-            throw new LlmModelSlugConflictException(connectionId, slug);
+            throw new LlmModelSlugConflictException(connectionId, slug, e);
         }
         configAudit.record(
             ConfigAuditEntry.created(

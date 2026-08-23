@@ -247,17 +247,18 @@ public class GitLabPullRequestReviewThreadProcessor {
             changed = true;
         }
 
-        if (changed) {
-            existing.setUpdatedAt(Instant.now());
-            existing = threadRepository.save(existing);
-            log.debug("Updated thread: id={}, state={}", existing.getId(), newState);
-
-            // Publish domain events on state transitions
-            if (previousState != newState) {
-                publishThreadStateEvent(existing, pr, scopeId);
-            }
+        if (!changed) {
+            return existing;
         }
-        return existing;
+        existing.setUpdatedAt(Instant.now());
+        PullRequestReviewThread saved = threadRepository.save(existing);
+        log.debug("Updated thread: id={}, state={}", saved.getId(), newState);
+
+        // Publish domain events on state transitions
+        if (previousState != newState) {
+            publishThreadStateEvent(saved, pr, scopeId);
+        }
+        return saved;
     }
 
     private PullRequestReviewThread createThread(

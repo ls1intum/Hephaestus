@@ -121,7 +121,7 @@ public class RevocationAwareJwtDecoder implements JwtDecoder {
         try {
             jti = UUID.fromString(jtiClaim);
         } catch (IllegalArgumentException ex) {
-            throw new BadJwtException("malformed jti");
+            throw new BadJwtException("malformed jti", ex);
         }
         // Negative cache: only the REVOKED verdict is stored; ACTIVE always re-reads. See class Javadoc.
         Boolean revoked = (cache != null) ? cache.get(jti, Boolean.class) : null;

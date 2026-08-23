@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.agent.handler.inapp;
 
-import de.tum.cit.aet.hephaestus.agent.AgentJobType;
 import de.tum.cit.aet.hephaestus.agent.handler.FeedbackLedgerRecorder;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.ComposedFeedbackUnit;
 import de.tum.cit.aet.hephaestus.agent.handler.composition.FeedbackCompositionResultParser;
@@ -128,10 +127,6 @@ public class InAppCompositionListener {
         int prepared = route(sourceJobId, compositionJobId, workspaceId);
         agentJobRepository.markInAppPrepared(compositionJobId, Instant.now());
         return prepared;
-    }
-
-    private int route(UUID agentJobId, Long workspaceId) {
-        return route(agentJobId, agentJobId, workspaceId);
     }
 
     private int route(UUID agentJobId, UUID outputJobId, Long workspaceId) {

@@ -79,7 +79,8 @@ public class EgressPolicy {
         try {
             return new URI(baseUrl.trim());
         } catch (URISyntaxException e) {
-            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
+            // Uniform message on purpose (see NOT_PUBLIC_HTTPS): the cause reaches the log, never the caller.
+            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS, e);
         }
     }
 
@@ -88,7 +89,8 @@ public class EgressPolicy {
         try {
             addresses = InetAddress.getAllByName(host);
         } catch (UnknownHostException e) {
-            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS);
+            // Uniform message on purpose (see NOT_PUBLIC_HTTPS): the cause reaches the log, never the caller.
+            throw new IllegalArgumentException(NOT_PUBLIC_HTTPS, e);
         }
         for (InetAddress address : addresses) {
             if (PrivateAddressGuard.isNonPublic(address)) {

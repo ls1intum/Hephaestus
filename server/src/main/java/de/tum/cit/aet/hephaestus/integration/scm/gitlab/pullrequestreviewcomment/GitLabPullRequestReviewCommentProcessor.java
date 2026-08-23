@@ -173,20 +173,21 @@ public class GitLabPullRequestReviewCommentProcessor {
         if (data.updatedAt() != null) {
             existing.setUpdatedAt(data.updatedAt());
         }
-        if (!changedFields.isEmpty()) {
-            existing = commentRepository.save(existing);
-            log.debug("Updated diff note: nativeId={}", existing.getNativeId());
-
-            eventPublisher.publishEvent(
-                new ScmDomainEvent.ReviewCommentEdited(
-                    ScmEventPayload.ReviewCommentData.from(existing),
-                    pr.getId(),
-                    changedFields,
-                    createSyncContext(pr, scopeId)
-                )
-            );
+        if (changedFields.isEmpty()) {
+            return existing;
         }
-        return existing;
+        PullRequestReviewComment saved = commentRepository.save(existing);
+        log.debug("Updated diff note: nativeId={}", saved.getNativeId());
+
+        eventPublisher.publishEvent(
+            new ScmDomainEvent.ReviewCommentEdited(
+                ScmEventPayload.ReviewCommentData.from(saved),
+                pr.getId(),
+                changedFields,
+                createSyncContext(pr, scopeId)
+            )
+        );
+        return saved;
     }
 
     private PullRequestReviewComment createComment(long nativeId, DiffNoteData data, CommentContext context) {

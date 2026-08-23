@@ -1,7 +1,6 @@
 package de.tum.cit.aet.hephaestus.integration.slack.sync.status;
 
 import de.tum.cit.aet.hephaestus.integration.core.framework.CronSchedules;
-import de.tum.cit.aet.hephaestus.integration.core.spi.BackfillSummary;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;

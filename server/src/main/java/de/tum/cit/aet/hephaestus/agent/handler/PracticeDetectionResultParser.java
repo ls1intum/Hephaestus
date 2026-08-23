@@ -4,7 +4,6 @@ import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackSuppressionReason;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -160,7 +159,7 @@ public class PracticeDetectionResultParser {
                 throw new EntryValidationException("evidence exceeds " + MAX_EVIDENCE_BYTES + " bytes");
             }
         } catch (JacksonException e) {
-            throw new EntryValidationException("invalid evidence JSON");
+            throw new EntryValidationException("invalid evidence JSON", e);
         }
 
         String evidenceRationale = textField(entry, "evidenceRationale");
@@ -200,15 +199,6 @@ public class PracticeDetectionResultParser {
         return node.asString();
     }
 
-    private static String optionalTextField(JsonNode entry, String field) {
-        JsonNode node = entry.get(field);
-        if (node == null || node.isNull() || !node.isString()) {
-            return null;
-        }
-        String text = node.asString();
-        return text.isBlank() ? null : text;
-    }
-
     /**
      * A missing, null, or non-text value defaults to {@link Severity#INFO} rather than discarding the
      * observation: {@link ValidatedObservation#coerceCoherence(boolean, boolean)} re-derives the real band anyway. A
@@ -230,7 +220,7 @@ public class PracticeDetectionResultParser {
         try {
             return Enum.valueOf(enumType, node.asString().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
-            throw new EntryValidationException("invalid " + field + " value: '" + node.asString() + "'");
+            throw new EntryValidationException("invalid " + field + " value: '" + node.asString() + "'", e);
         }
     }
 
@@ -301,6 +291,10 @@ public class PracticeDetectionResultParser {
 
         EntryValidationException(String message) {
             super(message);
+        }
+
+        EntryValidationException(String message, Throwable cause) {
+            super(message, cause);
         }
 
         @Override

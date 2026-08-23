@@ -36,7 +36,6 @@ import java.util.Set;
 import org.jspecify.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -110,6 +109,7 @@ public final class ClasspathArtifactSourceCatalogRegistry implements ArtifactSou
      * connecting an integration and enabling a practice is what authorizes the everyday reading the product
      * exists to do.
      */
+    @Override
     public boolean isSourceUsePermitted(SourceContractVersion version, SourceKind kind, SourceUsePurpose purpose) {
         return requireSource(version, kind)
             .useDecisionIds()

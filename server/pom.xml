@@ -1139,7 +1139,14 @@
                     <includeTests>false</includeTests>
                     <linkXRef>false</linkXRef>
                     <printFailingErrors>true</printFailingErrors>
-                    <failOnViolation>false</failOnViolation>
+                    <!--
+                        The gate is armed. It was false from the day PMD was added, and `lint:java` adds
+                        -q, so `pmd:check` logged its findings at WARNING and returned BUILD SUCCESS —
+                        `pnpm run check` reported a clean Java lint over 234 real violations, 53 of them
+                        catch blocks that dropped the original cause. Do not set this back to false;
+                        argue the rule in pmd-ruleset.xml instead.
+                    -->
+                    <failOnViolation>true</failOnViolation>
                     <!-- Exclude generated code -->
                     <excludeRoots>
                         <excludeRoot>${project.build.directory}/generated-sources/graphql-github</excludeRoot>

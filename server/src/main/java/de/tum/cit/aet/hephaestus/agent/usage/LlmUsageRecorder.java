@@ -92,10 +92,9 @@ public class LlmUsageRecorder {
         );
     }
 
-    private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot price) {
-        if (isPricedWithARateMissing(sample, price)) {
-            price = asUnpriced(price);
-        }
+    private boolean persist(Long workspaceId, LlmUsageSample sample, LlmPriceSnapshot quoted) {
+        // A PRICED snapshot missing a rate would silently cost the tokens it does have a rate for.
+        LlmPriceSnapshot price = isPricedWithARateMissing(sample, quoted) ? asUnpriced(quoted) : quoted;
         LlmPriceSnapshot.Cost computed = price.calculateCost(
             sample.inputTokens(),
             sample.outputTokens(),

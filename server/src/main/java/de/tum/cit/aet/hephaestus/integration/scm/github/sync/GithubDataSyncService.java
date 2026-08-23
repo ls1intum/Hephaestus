@@ -53,7 +53,6 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
@@ -490,7 +489,13 @@ public class GithubDataSyncService {
                             Thread.sleep(waitTime.toMillis());
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();
-                            throw new SyncInterruptedException("Sync interrupted while waiting for rate limit", ie);
+                            SyncInterruptedException interrupted = new SyncInterruptedException(
+                                "Sync interrupted while waiting for rate limit",
+                                ie
+                            );
+                            // Keep the rate-limited failure we were backing off from.
+                            interrupted.addSuppressed(e);
+                            throw interrupted;
                         }
                     }
                 }
@@ -1323,7 +1328,13 @@ public class GithubDataSyncService {
                         ExponentialBackoff.sleep(attempt);
                     } catch (InterruptedException ie) {
                         Thread.currentThread().interrupt();
-                        throw new SyncInterruptedException("Interrupted while retrying " + description, ie);
+                        SyncInterruptedException interrupted = new SyncInterruptedException(
+                            "Interrupted while retrying " + description,
+                            ie
+                        );
+                        // Keep the transient failure the retry was for.
+                        interrupted.addSuppressed(e);
+                        throw interrupted;
                     }
                 } else {
                     log.error(

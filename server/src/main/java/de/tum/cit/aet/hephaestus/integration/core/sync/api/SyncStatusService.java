@@ -300,7 +300,8 @@ public class SyncStatusService {
                         active.getType(),
                         "conflictingJobStatus",
                         active.getStatus()
-                    )
+                    ),
+                    e
                 );
             }
             return new TriggerOutcome(SyncJobDTO.from(e.activeJob()), false);

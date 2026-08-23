@@ -199,10 +199,9 @@ public class LinkedWorkItemContentSource implements EvidenceSource {
                 Map.of(),
                 Map.of(KIND, items.isEmpty() ? SourceContentState.EMPTY : SourceContentState.NON_EMPTY)
             );
+        } catch (EvidenceCollectionException e) {
+            throw e;
         } catch (Exception e) {
-            if (e instanceof EvidenceCollectionException evidenceCollectionException) {
-                throw evidenceCollectionException;
-            }
             throw new EvidenceCollectionException("Linked-work-item collection failed", e);
         }
     }

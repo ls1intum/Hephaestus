@@ -124,18 +124,18 @@ final class SecretDiffScanner {
                 // the new-side counter, or every subsequent secret hit reports a line number off by one.
                 continue;
             }
+            if (raw.startsWith("-")) {
+                // Removed line — does not advance the new-side counter.
+                continue;
+            }
             if (raw.startsWith("+") && !raw.startsWith("+++")) {
                 String content = raw.substring(1);
                 if (currentPath != null) {
                     scanLine(currentPath, newLine, content, hits);
                 }
-                newLine++;
-            } else if (raw.startsWith("-")) {
-                // removed line — does not advance the new-side counter
-            } else {
-                // context line (leading space) or empty separator advances the new side
-                newLine++;
             }
+            // An added line, a context line (leading space) and an empty separator all advance the new side.
+            newLine++;
         }
         return hits;
     }

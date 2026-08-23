@@ -18,7 +18,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @ActiveProfiles("test")
 @Testcontainers
 @Tag("integration")
-class HephaestusApplicationTests {
+class HephaestusApplicationIntegrationTest {
 
     @DynamicPropertySource
     static void configureProperties(DynamicPropertyRegistry registry) {

@@ -5,6 +5,7 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import org.jspecify.annotations.Nullable;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -73,7 +74,7 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
         } catch (RuntimeException ex) {
             // Identity IS the product of this call — unlike GitHub's best-effort email enrichment,
             // an unreachable auth.info must fail the login, not proceed with an empty principal.
-            throw authError("outline_auth_info_unavailable", "Outline auth.info call failed: " + ex.getMessage());
+            throw authError("outline_auth_info_unavailable", "Outline auth.info call failed: " + ex.getMessage(), ex);
         }
         Map<String, Object> attributes = toAttributes(body);
         return new DefaultOAuth2User(Set.of(new SimpleGrantedAuthority("OAUTH2_USER")), attributes, SUBJECT_ATTRIBUTE);
@@ -108,7 +109,11 @@ public class OutlineAuthInfoUserService implements OAuth2UserService<OAuth2UserR
     }
 
     private static OAuth2AuthenticationException authError(String code, String description) {
-        return new OAuth2AuthenticationException(new OAuth2Error(code, description, null), description);
+        return authError(code, description, null);
+    }
+
+    private static OAuth2AuthenticationException authError(String code, String description, @Nullable Throwable cause) {
+        return new OAuth2AuthenticationException(new OAuth2Error(code, description, null), description, cause);
     }
 
     private static Map<String, Object> nestedObject(Map<String, Object> parent, String key) {

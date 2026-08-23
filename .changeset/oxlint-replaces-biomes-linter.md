@@ -17,6 +17,16 @@ Also fixed, all found by a stricter type and lint gate over the web app:
 - A theme, a workspace role or a feature flag that the browser or server reported as something this
   build does not recognise is now ignored rather than trusted: the theme falls back to the default,
   the role is refused, and the flag reads as off.
+- GitLab sub-issue sync could delete parent links it had never looked at. When a page walk stopped
+  early — an error, or a repository past the pagination ceiling — the cleanup step still ran against
+  the partial result and cleared the parent of every issue whose link lived on a page it never
+  fetched, then reported the sync as completed.
+- Server errors now keep their original stack trace. Fifty-two places caught an exception and threw a
+  new one without attaching the cause, so the log recorded where the failure was reported rather than
+  where it happened. Sign-in, token validation and Slack preference failures were all affected.
+- Scrollbars inside scrollable panels rendered 2px wide with no border instead of the intended 10px.
+- A checkbox or radio that is switched off now looks switched off: its label kept full contrast, and
+  the control itself showed neither the dimming nor the blocked cursor.
 - The primary button gave no hover feedback. The style was written so that it only applied when the
   button was rendered as a link, so the most-used button in the app looked inert under the cursor.
 - A mentor attachment that failed to upload disappeared with no message, leaving the sender believing

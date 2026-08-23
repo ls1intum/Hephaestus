@@ -15,7 +15,6 @@ import de.tum.cit.aet.hephaestus.integration.slack.channel.SlackChannelConsentSe
 import de.tum.cit.aet.hephaestus.integration.slack.domain.SlackMonitoredChannelRepository;
 import de.tum.cit.aet.hephaestus.integration.slack.sync.status.SlackIntegrationSyncRunner;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import net.javacrumbs.shedlock.spring.annotation.SchedulerLock;

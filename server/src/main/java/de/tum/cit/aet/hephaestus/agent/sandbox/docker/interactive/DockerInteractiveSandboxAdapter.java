@@ -36,7 +36,6 @@ public class DockerInteractiveSandboxAdapter implements InteractiveSandboxServic
     private static final Logger log = LoggerFactory.getLogger(DockerInteractiveSandboxAdapter.class);
 
     private static final String CONTAINER_USER = "1000:1000";
-    private static final String CONTAINER_ROOT_USER = "0:0";
     private static final String CONTAINER_HOSTNAME = "mentor";
     private static final String PROXY_URL_PLACEHOLDER = "{appServerIp}";
     private static final String MDC_SESSION_ID = "mentor.sessionId";

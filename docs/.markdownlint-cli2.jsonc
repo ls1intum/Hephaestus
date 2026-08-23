@@ -1,0 +1,106 @@
+// markdownlint configuration for the docs tree. Run by `pnpm --filter docs run lint:md`.
+//
+// This file holds BOTH the scope (`globs`/`ignores`) and the rules (`config`), because
+// markdownlint-cli2 does not support `.markdownlintignore` (see its README, "not supported"),
+// and a scope split across package.json and a dotfile is how `decisions/` went unlinted.
+//
+// Every deviation from the defaults below carries the count that justifies it, measured over
+// the whole tree. Re-measure before flipping one: a rule disabled without a number is a
+// baseline, not a decision.
+//
+// Two rules the previous config disabled are absent here, i.e. back on, because measuring them
+// showed the stated reason was false and the cost is zero:
+//   MD014 ("shell commands with $ prefix are common") — 0 violations; no such block exists.
+//   MD041 ("Docusaurus uses front matter, not H1") — 0 violations; MD041 already accepts a
+//         front-matter `title`, and every other file opens with an H1.
+{
+  "$schema": "https://raw.githubusercontent.com/DavidAnson/markdownlint-cli2/main/schema/markdownlint-cli2-config-schema.json",
+
+  // Lint EVERY markdown file in docs/, not just the three plugin-mounted guides.
+  // `decisions/` (33 ADRs) and `runbooks/` are mounted by no Docusaurus plugin, so the site
+  // build never compiles them and never link-checks them — the linter is their only gate.
+  "globs": ["**/*.md", "**/*.mdx"],
+  "ignores": ["node_modules", "build", ".docusaurus"],
+
+  "config": {
+    "default": true,
+
+    // === STYLE CHOICES ===
+    "MD003": { "style": "atx" },
+    "MD004": { "style": "dash" },
+    "MD007": { "indent": 2 },
+    "MD029": { "style": "ordered" },
+    "MD035": { "style": "---" },
+
+    // Measured over docs/**: 418 asterisk-delimited emphasis spans vs 84 underscore,
+    // and 3362 `**strong**` vs 0 `__strong__`. Asterisk is stated explicitly rather than
+    // left to the "consistent" default, which decides per file from whichever delimiter
+    // appears first and so gives two files opposite verdicts on the same markup.
+    "MD049": { "style": "asterisk" },
+    "MD050": { "style": "asterisk" },
+
+    // === MDX/DOCUSAURUS REQUIREMENTS ===
+    // Blank lines around blocks - CRITICAL for MDX parser
+    "MD022": { "lines_above": 1, "lines_below": 1 },
+    // Docusaurus uses front matter, not H1 as first line
+    "MD025": { "front_matter_title": "" },
+
+    // Duplicate headings produce duplicate anchors, which Docusaurus silently
+    // disambiguates with a `-1` suffix, so a `#heading` link lands on the wrong section.
+    // The previous `siblings_only: true` relaxation was protecting nothing: strict MD024
+    // finds 0 violations across all 92 files. Kept strict so it stays that way.
+    "MD024": true,
+
+    // === RELAXED FOR DOCUMENTATION ===
+
+    // 4767 violations. Prose is hard-wrapped near 110, but tables and JSX blocks cannot be
+    // wrapped at all without breaking them. Enabling this would require rewriting every
+    // table in the tree for no reader-visible gain.
+    "MD013": false,
+
+    // 33 violations against a hand-written name list, and the rule cannot express the
+    // exceptions: it cannot tell the product "Outline" from the English word
+    // ("Use Art. 13 GDPR as the outline", admin/legal-pages.mdx:97), and it flags
+    // identifiers inside inline code spans such as `de.tum.cit.aet.hephaestus` and link
+    // text that deliberately mirrors a URL (`github.com/settings/developers`).
+    // Left off because it is wrong here, not because it is noisy.
+    "MD044": false,
+
+    // 15 violations, all deliberate: contact addresses and instance URLs in the DSMS
+    // record-of-processing, where the URL is the datum, plus reference lists in ADRs.
+    // GFM autolinks a bare URL, so nothing renders broken; the `<...>` fix form would put
+    // angle brackets into MDX, which parses them as JSX.
+    "MD034": false,
+
+    // 9 violations, all `**Label**` lines used as field labels inside an existing section
+    // (DSMS record fields; ADR Positive/Negative consequence buckets). Promoting them to
+    // real headings would inject nine entries into the page table of contents.
+    "MD036": false,
+
+    // 108 violations across 16 files, and markdownlint supplies no fix for any of them
+    // (0 of 108 carry fixInfo). Purely table-pipe padding, invisible once rendered, and
+    // no formatter covers docs/ to keep it true — `.editorconfig` is the only thing here.
+    // Revisit if a markdown formatter is ever added to the repo.
+    "MD060": false,
+
+    // === JSX COMPONENTS WHITELIST ===
+    "MD033": {
+      "allowed_elements": [
+        "details",
+        "summary",
+        "Tabs",
+        "TabItem",
+        "Mermaid",
+        "a",
+        "img",
+        "br",
+        "sup",
+        "sub",
+        "kbd",
+        "div",
+        "span",
+        "iframe"
+      ]
+    }
+  }
+}

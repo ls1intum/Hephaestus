@@ -90,7 +90,8 @@ public class ConnectionPurgeContributor implements WorkspacePurgeContributor {
             throw new WorkspacePurgeBlockedException(
                 "Could not confirm disconnecting " +
                     providerName(connection.getKind()) +
-                    ". No local data was deleted; retry when the provider is available."
+                    ". No local data was deleted; retry when the provider is available.",
+                e
             );
         }
     }

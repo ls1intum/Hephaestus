@@ -59,8 +59,11 @@ jobs:
             echo "no_changes_detected=false" >> $GITHUB_OUTPUT
           fi
 
+      # No `always()`: when generation fails, `check_changes` is skipped and its output is the empty
+      # string, which passes `!= 'true'`. `generate:api` starts by deleting `webapp/src/api`, so an
+      # `always()` here commits that deletion to the contributor's branch.
       - name: Commit files
-        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
         run: |
           echo "Committing and pushing changes..."
           git config --local user.name "github-actions[bot]"
@@ -68,7 +71,7 @@ jobs:
           git commit -a -m "chore: update API specs and client"
 
       - name: Push changes
-        if: ${{ always() && contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'autocommit-openapi') && steps.check_changes.outputs.no_changes_detected != 'true' }}
         uses: ad-m/github-push-action@d91a481090679876dfc4178fef17f286781251df # v0.8.0
         with:
           github_token: ${{ secrets.GH_PAT }}

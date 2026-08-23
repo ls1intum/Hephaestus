@@ -1,9 +1,7 @@
 package de.tum.cit.aet.hephaestus.agent.mentor.chat.wire;
 
-import de.tum.cit.aet.hephaestus.agent.mentor.chat.wire.UIMessageChunk;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import org.jspecify.annotations.Nullable;

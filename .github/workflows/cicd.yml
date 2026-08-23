@@ -44,6 +44,15 @@ jobs:
             webapp:
               - 'webapp/**'
               - 'docs/images/readme/**'
+              # webapp/.oxlintrc.json carries no `options` block and webapp/biome.jsonc declares
+              # `root: false`, so `typeAware`, `reportUnusedDisableDirectives` and the Biome graph
+              # root all come from these two files — they decide the webapp's verdict from outside
+              # webapp/, and a change to either has to be able to trigger the leg that renders it.
+              - '.oxlintrc.json'
+              - 'biome.jsonc'
+              # check:components, check:stories and check:story-sort live here and run on the Webapp
+              # leg; a PR that edits only one of those gates would otherwise never execute it.
+              - 'scripts/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
               - 'pnpm-workspace.yaml'
@@ -68,7 +77,10 @@ jobs:
               - 'tsconfig.json'
               - 'package.json'
               - 'pnpm-lock.yaml'
-              # Linted by the same leg, and its own oxlint config decides that verdict.
+              # Linted by the same leg, and its own oxlint config decides that verdict. The same leg
+              # also parses every committed Mermaid diagram under here (check:diagrams) — this entry
+              # is the only thing that lets a docs-only PR reach either gate, since `any-code` does
+              # not name docs.
               - 'docs/**'
               - '.changeset/*.cjs'
               - 'commitlint.config.ts'
@@ -339,6 +351,10 @@ jobs:
               echo "| Lint errors (webapp) | \`pnpm run check:webapp:fix\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Lint errors (outside webapp) | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Java formatting | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Java lint (PMD) | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Storybook sidebar order | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Mermaid diagram parse errors | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
+              echo "| Stale \`routeTree.gen.ts\` | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
               echo "| OpenAPI out of sync | \`pnpm run generate:api\` |" >> $GITHUB_STEP_SUMMARY
               echo "| Database schema drift | \`pnpm run db:draft-changelog\` |" >> $GITHUB_STEP_SUMMARY
               echo "" >> $GITHUB_STEP_SUMMARY

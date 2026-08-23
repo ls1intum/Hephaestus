@@ -2,7 +2,6 @@ package de.tum.cit.aet.hephaestus.integration.scm.github.common;
 
 import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
-import de.tum.cit.aet.hephaestus.integration.scm.github.common.RateLimitTracker;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHRateLimit;
 import io.micrometer.core.instrument.Gauge;
 import io.micrometer.core.instrument.Meter;

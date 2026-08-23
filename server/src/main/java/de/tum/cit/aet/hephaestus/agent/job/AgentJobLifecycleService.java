@@ -97,7 +97,7 @@ public class AgentJobLifecycleService {
                 agentJobRepository.updateDeliveryStatus(jobId, DeliveryStatus.FAILED, job.getDeliveryCommentId())
             );
             log.warn("Delivery retry failed: jobId={}, error={}", jobId, e.getMessage(), e);
-            throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage());
+            throw new AgentJobStateConflictException("Delivery retry failed: " + e.getMessage(), e);
         }
 
         return transactionTemplate.execute(status -> requireJob(workspaceId, jobId));

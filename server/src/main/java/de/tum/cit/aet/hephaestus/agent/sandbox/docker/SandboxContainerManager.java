@@ -113,7 +113,7 @@ public class SandboxContainerManager {
             Thread.currentThread().interrupt();
             throw new SandboxInfrastructureException("Interrupted while waiting for container: " + containerId, e);
         } catch (ExecutionException e) {
-            throw new SandboxInfrastructureException("Error waiting for container: " + containerId, e.getCause());
+            throw new SandboxInfrastructureException("Error waiting for container: " + containerId, e);
         }
     }
 

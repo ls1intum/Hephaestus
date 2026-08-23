@@ -3,7 +3,6 @@ package de.tum.cit.aet.hephaestus.integration.outline.webhook;
 import de.tum.cit.aet.hephaestus.core.runtime.ConditionalOnWebhookRole;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SubjectKeyDeriver;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;

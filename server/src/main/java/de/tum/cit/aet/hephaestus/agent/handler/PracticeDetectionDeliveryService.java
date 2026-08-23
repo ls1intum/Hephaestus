@@ -23,7 +23,6 @@ import de.tum.cit.aet.hephaestus.practices.PracticeBinding;
 import de.tum.cit.aet.hephaestus.practices.PracticeRevisionRepository;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
-import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeRevision;
@@ -113,7 +112,7 @@ public class PracticeDetectionDeliveryService {
         } catch (IllegalArgumentException unknown) {
             // An unrecognized value is a newer writer, not license to guess: refuse rather than silently
             // filing the run under LIVE and polluting the only population treated as unbiased.
-            throw new JobDeliveryException("Unknown observation origin in job metadata: " + node.asString());
+            throw new JobDeliveryException("Unknown observation origin in job metadata: " + node.asString(), unknown);
         }
     }
 

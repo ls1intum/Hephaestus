@@ -9,7 +9,6 @@ import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncDetails;
 import de.tum.cit.aet.hephaestus.integration.core.spi.ConnectionSyncStateProvider;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationRef;
-import de.tum.cit.aet.hephaestus.integration.core.spi.RateLimitSnapshot;
 import de.tum.cit.aet.hephaestus.integration.core.spi.RepoBackfillProgress;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SyncResourceState;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.repository.Repository;

@@ -167,8 +167,8 @@ Both settings are defined in full, with their refusal semantics, in the
 Every started review is a model call, and there are exactly four things standing between a
 misconfiguration and a bill.
 
-1. **The monthly AI budget.** There are two, and they are never added together: the _instance_ budget caps
-   a workspace's spend on shared models you registered, and the _workspace's own_ budget caps its spend on
+1. **The monthly AI budget.** There are two, and they are never added together: the *instance* budget caps
+   a workspace's spend on shared models you registered, and the *workspace's own* budget caps its spend on
    its own connected provider. Each pauses only the work it funds. Setting either to exactly `0` is the
    supported way to hard-stop that purse mid-month; clearing the field removes the cap.
 2. **The cooldown.** The minimum gap between reviews of the same pull or merge request.
@@ -195,11 +195,11 @@ order. The campaign is on
 **Administration → Practices → Review → Past work**; the recurring check is on the same page's
 **When and where** section, beside the other things that start a review.
 
-**A campaign — _Past work_.** You choose a kind of work and a lookback window, press
+**A campaign — *Past work*.** You choose a kind of work and a lookback window, press
 **Estimate this backfill**, and see how many pieces of work are in range and what they are estimated to
 cost. Nothing is reviewed until you confirm. It is one bounded, priced, named decision, and it finishes.
 
-**A schedule — _Keep checking new work_.** You choose a kind of work, a cadence, and how far back each
+**A schedule — *Keep checking new work*.** You choose a kind of work, a cadence, and how far back each
 check reaches. This exists because work that never raised a notification is otherwise never reviewed and
 nothing says so.
 
@@ -207,8 +207,8 @@ nothing says so.
 A schedule opens each of its campaigns **directly in a running state**, using the authority of whoever
 created the schedule. There is no per-run estimate and no per-run confirmation, and no cap that is specific
 to sweeping — the only thing that stops it is the workspace's AI budget, the schedule's own scope, or
-switching it off. The screen says as much before you commit: _"This authorises the AI spend for every
-future check, not just the first."_ Treat creating one as an ongoing budget decision, not a one-off.
+switching it off. The screen says as much before you commit: *"This authorises the AI spend for every
+future check, not just the first."* Treat creating one as an ongoing budget decision, not a one-off.
 
 Stop it by **Pause** or **Remove** on the schedule, or by cancelling the campaign it opened. Windows
 overlap on purpose so that work missed once gets a second chance; work already reviewed is not paid for
@@ -238,7 +238,7 @@ budget was used up, you are done; go fix that. If it says nothing was recorded a
 upstream of practice review — check the integration's sync.
 
 1. **Is a review model bound and enabled?** Administration → **AI models**, the **Practice reviews** card.
-2. **Is the bound model still usable?** A model is usable only if the model _and_ its connection are
+2. **Is the bound model still usable?** A model is usable only if the model *and* its connection are
    enabled, the protocol is supported, and — for a shared instance model — the workspace still has a grant.
    Revoking a grant or disabling a connection stops every workspace bound to it, and the binding stays in
    place looking correct.
@@ -246,10 +246,10 @@ upstream of practice review — check the integration's sync.
    can lift it. `agent.queue.held` counts jobs parked on a cap; `agent.queue.depth` counts only what a
    worker could claim now, so alert on held rather than reading depth.
 4. **Is practice review, or the workspace, switched off?** The switch is **Start practice reviews** on
-   Administration → Practices → **Review → When and where** — _not_ on the Workspace settings page. A paused
+   Administration → Practices → **Review → When and where** — *not* on the Workspace settings page. A paused
    workspace runs nothing regardless of its AI configuration.
 5. **Is `AGENT_ENABLED=true` on every role that needs it?** It defaults to `false` and gates submission,
-   execution _and_ orphan recovery independently of the worker role. Set on the worker only, nothing is
+   execution *and* orphan recovery independently of the worker role. Set on the worker only, nothing is
    submitted; set on the server only, jobs queue and are never claimed. Confirm by presence, not value: if
    the flag never reached a pod, `agent.queue.depth`, `agent.queue.oldest_age_seconds` and
    `agent.queue.running` are **absent** from that pod's metrics rather than reading zero.

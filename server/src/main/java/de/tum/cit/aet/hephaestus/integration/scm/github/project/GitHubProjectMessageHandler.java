@@ -13,8 +13,6 @@ import de.tum.cit.aet.hephaestus.integration.scm.domain.common.NatsMessageDeseri
 import de.tum.cit.aet.hephaestus.integration.scm.domain.common.ProcessingContext;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventAction;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubEventType;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.Project;
-import de.tum.cit.aet.hephaestus.integration.scm.github.project.ProjectRepository;
 import de.tum.cit.aet.hephaestus.integration.scm.github.project.dto.GitHubProjectEventDTO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;

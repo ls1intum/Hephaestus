@@ -120,7 +120,7 @@ class PracticeCatalogInjector {
         try {
             files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
         } catch (JacksonException e) {
-            throw new JobPreparationException("Failed to serialize composition practice index: " + e.getMessage());
+            throw new JobPreparationException("Failed to serialize composition practice index: " + e.getMessage(), e);
         }
         files.put(
             SandboxLayout.PRACTICES_PREFIX + "all-criteria.md",
@@ -307,7 +307,7 @@ class PracticeCatalogInjector {
         try {
             files.put(SandboxLayout.PRACTICES_PREFIX + "index.json", objectMapper.writeValueAsBytes(index));
         } catch (JacksonException e) {
-            throw new JobPreparationException("Failed to serialize practice index.json: " + e.getMessage());
+            throw new JobPreparationException("Failed to serialize practice index.json: " + e.getMessage(), e);
         }
 
         StringBuilder bundle = new StringBuilder();

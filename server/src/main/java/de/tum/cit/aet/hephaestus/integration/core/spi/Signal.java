@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.integration.core.spi;
 
-import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.integration.core.signal.RevisionScheme;
 import de.tum.cit.aet.hephaestus.integration.core.signal.SignalName;
 import java.util.Objects;

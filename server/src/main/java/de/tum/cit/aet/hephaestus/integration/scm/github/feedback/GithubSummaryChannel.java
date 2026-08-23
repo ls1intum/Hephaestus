@@ -8,7 +8,6 @@ import de.tum.cit.aet.hephaestus.integration.core.egress.OutboundEgressSuppresse
 import de.tum.cit.aet.hephaestus.integration.core.spi.FeedbackDeliveryException;
 import de.tum.cit.aet.hephaestus.integration.core.spi.IntegrationKind;
 import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel;
-import de.tum.cit.aet.hephaestus.integration.core.spi.SummaryChannel.ExistingSummaryLookup;
 import de.tum.cit.aet.hephaestus.integration.scm.github.common.GitHubGraphQlClientProvider;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueComment;
 import de.tum.cit.aet.hephaestus.integration.scm.github.graphql.model.GHIssueCommentConnection;
@@ -372,7 +371,8 @@ public class GithubSummaryChannel implements SummaryChannel {
             number = Integer.parseInt(numberPart);
         } catch (NumberFormatException e) {
             throw new FeedbackDeliveryException(
-                "Invalid GitHub PR subjectExternalId — number must be integer: " + subjectExternalId
+                "Invalid GitHub PR subjectExternalId — number must be integer: " + subjectExternalId,
+                e
             );
         }
         return new PrCoordinates(parts[0], parts[1], number);

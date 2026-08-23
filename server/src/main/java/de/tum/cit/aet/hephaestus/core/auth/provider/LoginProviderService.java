@@ -391,7 +391,11 @@ public class LoginProviderService {
         try {
             ServerUrlValidator.validate(value);
         } catch (IllegalArgumentException e) {
-            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "invalid base URL: " + e.getMessage());
+            throw new ResponseStatusException(
+                HttpStatus.UNPROCESSABLE_ENTITY,
+                "invalid base URL: " + e.getMessage(),
+                e
+            );
         }
         if (type == LoginProvider.ProviderType.OUTLINE && !outlineOriginPolicy.allows(value)) {
             throw new ResponseStatusException(

@@ -11,7 +11,6 @@ import java.net.URI;
 import java.net.UnknownHostException;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -109,6 +108,10 @@ public class IssuerDiscoveryProbe {
         public IssuerValidationException(String message) {
             super(message);
         }
+
+        public IssuerValidationException(String message, Throwable cause) {
+            super(message, cause);
+        }
     }
 
     /** Validates the issuer; returns the parsed discovery document on success. */
@@ -158,9 +161,9 @@ public class IssuerDiscoveryProbe {
             throw e;
         } catch (java.io.InterruptedIOException e) {
             Thread.currentThread().interrupt();
-            throw new IssuerValidationException("OIDC discovery at " + discovery + " timed out");
+            throw new IssuerValidationException("OIDC discovery at " + discovery + " timed out", e);
         } catch (Exception e) {
-            throw new IssuerValidationException("OIDC discovery at " + discovery + " failed: " + e.getMessage());
+            throw new IssuerValidationException("OIDC discovery at " + discovery + " failed: " + e.getMessage(), e);
         }
     }
 
@@ -225,11 +228,12 @@ public class IssuerDiscoveryProbe {
         if (statusParts.length < 2 || !"200".equals(statusParts[1])) {
             throw new IssuerValidationException("OIDC discovery at " + target + " returned: " + statusLine.trim());
         }
-        // Skip headers up to the blank line.
-        String line;
-        while ((line = reader.readLine()) != null && !line.isEmpty()) {
-            // headers ignored — we read until EOF (Connection: close) and bound the size below
-        }
+        // Skip headers up to the blank line; nothing in them is trusted. The body is then read to EOF
+        // (the request sends Connection: close) and bounded by MAX_BODY_BYTES below.
+        String header;
+        do {
+            header = reader.readLine();
+        } while (header != null && !header.isEmpty());
         StringBuilder body = new StringBuilder();
         char[] buf = new char[8192];
         int n;
@@ -247,7 +251,7 @@ public class IssuerDiscoveryProbe {
         try {
             uri = URI.create(value.trim());
         } catch (IllegalArgumentException e) {
-            throw new IssuerValidationException(field + " is not a valid URL");
+            throw new IssuerValidationException(field + " is not a valid URL", e);
         }
         if (!"https".equalsIgnoreCase(uri.getScheme())) {
             throw new IssuerValidationException(field + " must use https");
@@ -283,7 +287,7 @@ public class IssuerDiscoveryProbe {
         try {
             addresses = resolver.resolve(host);
         } catch (UnknownHostException e) {
-            throw new IssuerValidationException("host " + host + " does not resolve");
+            throw new IssuerValidationException("host " + host + " does not resolve", e);
         }
         if (addresses == null || addresses.length == 0) {
             throw new IssuerValidationException("host " + host + " resolved to no addresses");

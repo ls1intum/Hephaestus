@@ -1,6 +1,7 @@
 package de.tum.cit.aet.hephaestus.integration.core.sync;
 
 import java.io.Serial;
+import org.jspecify.annotations.Nullable;
 
 /**
  * Thrown by {@link SyncJobService} when a connection already has an active (PENDING/RUNNING)
@@ -20,8 +21,13 @@ public class SyncJobConflictException extends RuntimeException {
     private final SyncJob activeJob;
 
     public SyncJobConflictException(SyncJob activeJob) {
+        this(activeJob, null);
+    }
+
+    public SyncJobConflictException(SyncJob activeJob, @Nullable Throwable cause) {
         super(
-            "Connection " + activeJob.getConnection().getId() + " already has an active sync job: " + activeJob.getId()
+            "Connection " + activeJob.getConnection().getId() + " already has an active sync job: " + activeJob.getId(),
+            cause
         );
         this.activeJob = activeJob;
     }

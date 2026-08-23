@@ -113,9 +113,13 @@ jobs:
           pnpm install --frozen-lockfile
 
           ISSUES_FOUND=()
-          FMT_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true
+          FMT_OK=true; PMD_OK=true; LINT_OK=true; PIN_OK=true; TESTS_OK=true; TYPES_OK=true; SCRIPT_TYPES_OK=true; CONTRACTS_OK=true; ENV_OK=true; DOCS_OK=true; DIAGRAMS_OK=true
 
           pnpm run format:java:check || { FMT_OK=false; ISSUES_FOUND+=("Java formatting failed. Run: pnpm run format:java"); }
+          # The only rule engine with an opinion about the Java source — 28 rules over server/**,
+          # none of which any other leg re-checks. It was reachable only from the pre-push hook,
+          # which --no-verify skips, so a rule it flags could reach main under a green build.
+          pnpm run lint:java || { PMD_OK=false; ISSUES_FOUND+=("PMD found violations. Run: pnpm run lint:java:report"); }
           # Runs before the Biome step so a version skew is reported as a version skew rather than
           # as a wall of formatting diffs from the wrong release.
           pnpm run check:biome-pin \
@@ -140,12 +144,22 @@ jobs:
           # was reachable only from the pre-push hook, which --no-verify skips, so the gate written
           # for a defect that reached production could not fail a required build.
           pnpm run check:env || { ENV_OK=false; ISSUES_FOUND+=("A setting does not reach a container that can read it. Run: pnpm run check:env"); }
+          # `decisions/` and `runbooks/` are mounted by no Docusaurus plugin, so the docs build never
+          # compiles them and never link-checks them. This is the only gate they have.
+          pnpm run docs:lint || { DOCS_OK=false; ISSUES_FOUND+=("docs/ markdown or typecheck failed. Run: pnpm run docs:lint"); }
+          # Docusaurus renders mermaid in the browser, so a diagram it cannot parse builds green and
+          # publishes as an error box — the docs deployment can never be the gate for it. This leg
+          # owns the check because docs/** is already behind its path filter (it is the tree
+          # lint:agents lints) and because the generated ERD it also parses is produced here.
+          pnpm run check:diagrams \
+            || { DIAGRAMS_OK=false; ISSUES_FOUND+=("A committed Mermaid diagram does not parse. Run: pnpm run check:diagrams"); }
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### App Server Quality" >> $GITHUB_STEP_SUMMARY
             echo "| Check | Status | Fix |" >> $GITHUB_STEP_SUMMARY
             echo "|-------|--------|-----|" >> $GITHUB_STEP_SUMMARY
             [[ "$FMT_OK" == "false" ]] && echo "| Java formatting | :x: Failed | \`pnpm run format:java\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$PMD_OK" == "false" ]] && echo "| Java lint (PMD) | :x: Failed | \`pnpm run lint:java:report\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$PIN_OK" == "false" ]] && echo "| Biome version pin | :x: Failed | \`pnpm run check:biome-pin\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$LINT_OK" == "false" ]] && echo "| Lint + format (outside webapp) | :x: Failed | \`pnpm run check:agents:fix\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$TESTS_OK" == "false" ]] && echo "| Agent runtime tests | :x: Failed | \`pnpm run test:agents\` |" >> $GITHUB_STEP_SUMMARY
@@ -153,6 +167,8 @@ jobs:
             [[ "$SCRIPT_TYPES_OK" == "false" ]] && echo "| scripts/ typecheck | :x: Failed | \`pnpm run typecheck:scripts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$CONTRACTS_OK" == "false" ]] && echo "| Artifact-source contracts | :x: Failed | \`pnpm run check:contracts\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$ENV_OK" == "false" ]] && echo "| Env delivery by runtime role | :x: Failed | \`pnpm run check:env\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$DOCS_OK" == "false" ]] && echo "| Docs lint + typecheck | :x: Failed | \`pnpm run docs:lint\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$DIAGRAMS_OK" == "false" ]] && echo "| Mermaid diagrams | :x: Failed | \`pnpm run check:diagrams\` |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi
@@ -173,11 +189,30 @@ jobs:
           # and compose files it reads.
           COMPONENTS_OK=true
           STORIES_OK=true
+          SORT_OK=true
+          BUILD_OK=true
+          ROUTES_OK=true
 
           pnpm run check || { LINT_OK=false; ISSUES_FOUND+=("Lint or formatting failed. Run: cd webapp && pnpm run check:fix"); }
           pnpm run typecheck || { TYPES_OK=false; ISSUES_FOUND+=("TypeScript errors found. Run: cd webapp && pnpm run typecheck"); }
           node ../scripts/check-presentational-components.ts || { COMPONENTS_OK=false; ISSUES_FOUND+=("Components must take data as props. Run: pnpm run check:components"); }
           node ../scripts/check-story-prose.ts || { STORIES_OK=false; ISSUES_FOUND+=("Story prose renders HTML paragraphs. Run: pnpm run check:stories"); }
+          # A story tree whose top-level segment `storySort.order` does not name sorts *below* every
+          # one it does — it never disappears, so no rendering test and no reviewer notices. Neither
+          # half of this is a property of a single file, so it can only be a whole-tree gate.
+          node ../scripts/check-story-sort.ts || { SORT_OK=false; ISSUES_FOUND+=("Storybook sidebar order is stale. Run: pnpm run check:story-sort"); }
+
+          # src/routeTree.gen.ts is written by the TanStack Router Vite plugin, so a build is the
+          # only thing that can say whether the committed copy is current — and until now the only
+          # build in CI happened inside the webapp image layer, where nothing could compare the
+          # result. A stale tree type-checks and tests green; the route it is missing simply 404s.
+          # This is also the only place CI compiles the SPA outside the Docker job, which does not
+          # run for a fork.
+          pnpm exec vite build || { BUILD_OK=false; ISSUES_FOUND+=("The webapp does not build. Run: cd webapp && pnpm run build"); }
+          if [ "$BUILD_OK" = "true" ] && ! git diff --exit-code -- src/routeTree.gen.ts; then
+            ROUTES_OK=false
+            ISSUES_FOUND+=("routeTree.gen.ts is stale. Run: cd webapp && pnpm run build, then commit the result")
+          fi
 
           if [ ${#ISSUES_FOUND[@]} -gt 0 ]; then
             echo "### Webapp Quality" >> $GITHUB_STEP_SUMMARY
@@ -187,6 +222,9 @@ jobs:
             [[ "$TYPES_OK" == "false" ]] && echo "| TypeScript | :x: Failed | \`cd webapp && pnpm run typecheck\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$COMPONENTS_OK" == "false" ]] && echo "| Presentational components | :x: Failed | \`pnpm run check:components\` |" >> $GITHUB_STEP_SUMMARY
             [[ "$STORIES_OK" == "false" ]] && echo "| Story prose | :x: Failed | \`pnpm run check:stories\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$SORT_OK" == "false" ]] && echo "| Storybook sidebar order | :x: Failed | \`pnpm run check:story-sort\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$BUILD_OK" == "false" ]] && echo "| Vite build | :x: Failed | \`cd webapp && pnpm run build\` |" >> $GITHUB_STEP_SUMMARY
+            [[ "$ROUTES_OK" == "false" ]] && echo "| routeTree.gen.ts up to date | :x: Stale | \`cd webapp && pnpm run build\` and commit |" >> $GITHUB_STEP_SUMMARY
             for issue in "${ISSUES_FOUND[@]}"; do echo "::error::$issue"; done
             exit 1
           fi

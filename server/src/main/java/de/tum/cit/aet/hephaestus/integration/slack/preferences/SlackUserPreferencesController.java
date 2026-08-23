@@ -38,7 +38,7 @@ abstract class SlackUserPreferencesController {
         try {
             return Long.parseLong(auth.getToken().getSubject());
         } catch (NumberFormatException e) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "not authenticated");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "not authenticated", e);
         }
     }
 }

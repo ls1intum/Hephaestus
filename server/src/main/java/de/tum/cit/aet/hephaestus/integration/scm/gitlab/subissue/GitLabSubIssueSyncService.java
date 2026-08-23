@@ -104,12 +104,13 @@ public class GitLabSubIssueSyncService {
         String cursor = null;
         String previousCursor = null;
         int page = 0;
-        boolean errorAborted = false;
+        boolean partialView = false;
 
         try {
             do {
                 if (page >= GitLabSyncConstants.MAX_PAGINATION_PAGES) {
                     log.warn("Reached max pagination: project={}", safeProjectPath);
+                    partialView = true;
                     break;
                 }
 
@@ -129,7 +130,7 @@ public class GitLabSubIssueSyncService {
                 }
                 if (handleResult.action() == GitLabGraphQlResponseHandler.HandleResult.Action.ABORT) {
                     graphQlClientProvider.recordFailure(new GitLabSyncException("Invalid GraphQL response"));
-                    errorAborted = true;
+                    partialView = true;
                     break;
                 }
 
@@ -151,15 +152,21 @@ public class GitLabSubIssueSyncService {
                 if (
                     responseHandler.isPaginationLoop(cursor, previousCursor, "sub-issues for " + safeProjectPath, log)
                 ) {
-                    errorAborted = true;
+                    partialView = true;
                     break;
                 }
                 previousCursor = cursor;
                 page++;
             } while (cursor != null);
 
-            // Stale parent cleanup: clear parentIssue for issues that no longer have a parent in GitLab
-            int staleCleared = clearStaleParents(issues, issuesWithParentInGitLab);
+            // Stale parent cleanup: clear parentIssue for issues that no longer have a parent in GitLab.
+            // Only safe on a COMPLETE walk — issuesWithParentInGitLab is built page by page, so on a run
+            // that stopped early every issue whose parent lived on an unfetched page looks parentless and
+            // would have its real link deleted. An incomplete walk leaves the existing links alone.
+            int staleCleared = partialView ? 0 : clearStaleParents(issues, issuesWithParentInGitLab);
+            if (partialView) {
+                log.warn("Skipping stale-parent cleanup after an incomplete walk: project={}", safeProjectPath);
+            }
 
             if (totalLinked > 0 || staleCleared > 0) {
                 log.info(

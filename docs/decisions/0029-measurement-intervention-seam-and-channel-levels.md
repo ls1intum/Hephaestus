@@ -135,5 +135,5 @@ results and recovery distinguishable.
 
 ## Sources
 
-- Hattie & Timperley, [_The Power of Feedback_](https://doi.org/10.3102/003465430298487), 2007.
-- Sadler, [_Formative assessment and the design of instructional systems_](https://doi.org/10.1007/BF00117714), 1989.
+- Hattie & Timperley, [*The Power of Feedback*](https://doi.org/10.3102/003465430298487), 2007.
+- Sadler, [*Formative assessment and the design of instructional systems*](https://doi.org/10.1007/BF00117714), 1989.
