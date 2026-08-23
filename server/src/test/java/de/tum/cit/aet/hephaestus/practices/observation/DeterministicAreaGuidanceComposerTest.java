@@ -6,6 +6,7 @@ import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.dto.PracticeAreaStatusDTO;
 import de.tum.cit.aet.hephaestus.practices.model.ArtifactKinds;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import java.util.List;
@@ -52,6 +53,34 @@ class DeterministicAreaGuidanceComposerTest {
 
         assertThat(guidance).isEqualTo(
             "Your recent feedback shows a strength in “Actionable Reviews”. Next, focus on “Test Coverage”."
+        );
+    }
+
+    @Test
+    void shouldNotNameAPracticeItsOwnStandingCallsFixedAsTheNextFocus() {
+        // A clean streak has already moved this practice to STRENGTH. The older problems still on its card
+        // must not name it as the area's next focus — the sentence would contradict the card beside it.
+        ReflectionPracticeDTO fixed = new ReflectionPracticeDTO(
+            "tests",
+            "Test Coverage",
+            "code-quality",
+            "Code Quality",
+            null,
+            null,
+            ReflectionPracticeDTO.Standing.STRENGTH,
+            List.of(item()),
+            List.of(item()),
+            null,
+            null
+        );
+
+        String guidance = DeterministicAreaGuidanceComposer.compose(
+            PracticeAreaStatusDTO.AreaStatus.STRENGTH,
+            List.of(fixed)
+        );
+
+        assertThat(guidance).isEqualTo(
+            "Your recent feedback shows a strength in “Test Coverage”. Keep building on it."
         );
     }
 
@@ -119,6 +148,7 @@ class DeterministicAreaGuidanceComposerTest {
             "Finding",
             null,
             null,
+            ObservationOutcome.OMISSION_GAP,
             ArtifactKinds.PULL_REQUEST,
             1L,
             null,

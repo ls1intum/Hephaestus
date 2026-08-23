@@ -41,9 +41,9 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * Functional coverage for {@code GET /practice-areas/status} — the current developer's
- * derived area standing. Verifies the status derivation (problems → DEVELOPING, strengths →
- * STRENGTH, both → MIXED), the two explicit no-verdict shapes, and that neither another contributor's nor
- * another workspace's findings leak into the caller's status.
+ * derived area standing. Verifies the status derivation (the share of the area's practices standing as a
+ * strength, a mixed practice counting half), the two explicit no-verdict shapes, and that neither another
+ * contributor's nor another workspace's findings leak into the caller's status.
  */
 class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest {
 
@@ -122,6 +122,32 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         p = practiceRepository.saveAndFlush(p);
         p.setCurrentRevision(practiceRevisionRepository.save(new PracticeRevision(p, 1)));
         return practiceRepository.saveAndFlush(p);
+    }
+
+    /** A practice in the fixture area whose only feedback is a strength — standing {@code STRENGTH}. */
+    private void persistStrengthPractice(String slug, String name, long artifactId) {
+        Practice target = persistPractice(workspace, area, slug, name);
+        insertFinding(agentJob, target, developer, "Strength in " + name, "PRESENT", null, artifactId);
+    }
+
+    /** A practice in the fixture area whose only feedback is a problem — standing {@code DEVELOPING}. */
+    private void persistDevelopingPractice(String slug, String name, long artifactId) {
+        Practice target = persistPractice(workspace, area, slug, name);
+        insertFinding(agentJob, target, developer, "Gap in " + name, "ABSENT", "MAJOR", artifactId);
+    }
+
+    /**
+     * A practice in the fixture area carrying both sides on ONE work item — standing {@code MIXED}.
+     *
+     * <p>Both findings share an artifact and a run on purpose, so they normalize into a single evidence
+     * opportunity whose positive share is exactly one half. That makes the fixture independent of insertion
+     * order: spread across two artifacts, recency weighting would decide the standing by whichever of the two
+     * happened to be written last.
+     */
+    private void persistMixedPractice(String slug, String name, long artifactId) {
+        Practice target = persistPractice(workspace, area, slug, name);
+        insertFinding(agentJob, target, developer, "Strength in " + name, "PRESENT", null, artifactId);
+        insertFinding(agentJob, target, developer, "Gap in " + name, "ABSENT", "MAJOR", artifactId);
     }
 
     private AgentJob persistAgentJob(Workspace ws) {
@@ -204,6 +230,33 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         return id;
     }
 
+    /**
+     * A run that looked and produced no verdict — the practice applied but the work offered nothing to judge.
+     * Carries no assessment, which the DB CHECK requires for a presence without valence.
+     */
+    private void insertInapplicableFinding(Practice targetPractice, String presence, Long artifactId) {
+        UUID id = UUID.randomUUID();
+        observationRepository.insertIfAbsent(
+            id,
+            "key-" + id,
+            agentJob.getId(),
+            targetPractice.getId(),
+            targetPractice.getCurrentRevision().getId(),
+            ArtifactKinds.PULL_REQUEST.value(),
+            artifactId,
+            developer.getId(),
+            "Nothing to judge here",
+            presence,
+            null,
+            null,
+            DIFF_EVIDENCE_JSON,
+            "Test reasoning for an inapplicable run",
+            null,
+            Instant.now(),
+            "LIVE"
+        );
+    }
+
     /** Persist a DELIVERED {@link Feedback} carrying {@code body} and bind it to {@code findingId} (ADR 0021). */
     private void deliverFeedbackFor(UUID findingId, String body) {
         Feedback feedback = feedbackRepository.save(
@@ -282,7 +335,7 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 // Provenance: the verdict rests on exactly one pull request.
                 .jsonPath("$[0].sources.length()")
                 .isEqualTo(1)
-                .jsonPath("$[0].sources[0].source")
+                .jsonPath("$[0].sources[0].artifactKind")
                 .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
                 .jsonPath("$[0].sources[0].count")
                 .isEqualTo(1);
@@ -321,11 +374,11 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 // Ordered by kind value: ArtifactKind is an open "<domain>.<kind>" vocabulary, so there is
                 // no declaration order left to render against, and "scm.issue" sorts before
                 // "scm.pull_request".
-                .jsonPath("$[0].sources[0].source")
+                .jsonPath("$[0].sources[0].artifactKind")
                 .isEqualTo(ArtifactKinds.ISSUE.value())
                 .jsonPath("$[0].sources[0].count")
                 .isEqualTo(1)
-                .jsonPath("$[0].sources[1].source")
+                .jsonPath("$[0].sources[1].artifactKind")
                 .isEqualTo(ArtifactKinds.PULL_REQUEST.value())
                 .jsonPath("$[0].sources[1].count")
                 .isEqualTo(2);
@@ -392,6 +445,73 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithUser
+        @DisplayName("returns NO_OPPORTUNITY when every practice ran but produced no verdict")
+        void shouldReturnNoOpportunityWhenEveryRunWasInapplicable() {
+            // The distinction this asserts is the whole point of separating the two no-verdict states: the
+            // review DID run here. Reporting NOT_OBSERVED would tell the developer their work was never looked
+            // at, which is the opposite of what happened.
+            insertInapplicableFinding(practice, "NOT_APPLICABLE", 1L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].areaSlug")
+                .isEqualTo("code-quality")
+                .jsonPath("$[0].status")
+                .isEqualTo("NO_OPPORTUNITY")
+                // No verdict means no guidance, and nothing displayable reached the learner surface.
+                .jsonPath("$[0].guidance")
+                .doesNotExist()
+                .jsonPath("$[0].items.length()")
+                .isEqualTo(0);
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("an INCONCLUSIVE run counts as an opportunity that produced no verdict")
+        void shouldReturnNoOpportunityForInconclusiveRun() {
+            insertInapplicableFinding(practice, "INCONCLUSIVE", 2L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("NO_OPPORTUNITY");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("an inapplicable run never displaces the verdict a real finding supports")
+        void shouldPreferVerdictOverInapplicableRuns() {
+            insertFinding(agentJob, practice, developer, "Coin-flip hunch", "ABSENT", "MINOR", 1L);
+            insertInapplicableFinding(practice, "NOT_APPLICABLE", 2L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("DEVELOPING")
+                .jsonPath("$[0].items.length()")
+                .isEqualTo(1);
+        }
+
+        @Test
+        @WithUser
         @DisplayName("a problem seen on a single work item still yields a verdict, not an empty state")
         void shouldReportDevelopingForSingleArtifactProblem() {
             // An earlier revision withheld this shape — one problem, one artifact — and reported the area as
@@ -447,6 +567,106 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
 
         @Test
         @WithUser
+        @DisplayName("reads as STRENGTH when nearly every practice in the area stands as one")
+        void shouldReadAsStrengthAboveTheStrengthShare() {
+            // Four strengths and one mixed practice: (4 + 0.5) / 5 = 0.9, above the 0.8 threshold. The area's
+            // sixth practice was never reviewed and is deliberately not counted — thin coverage must not read
+            // as evidence against the developer.
+            persistStrengthPractice("commit-messages", "Commit Messages", 1L);
+            persistStrengthPractice("review-comments", "Actionable Review Comments", 2L);
+            persistStrengthPractice("issue-descriptions", "Issue Descriptions", 3L);
+            persistStrengthPractice("test-coverage", "Test Coverage", 4L);
+            persistMixedPractice("documentation", "Documentation", 5L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("STRENGTH");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("stays MIXED when the strength share only reaches the threshold")
+        void shouldStayMixedAtTheStrengthShareThreshold() {
+            // Four of five practices stand as a strength: 0.8 exactly, which is not ABOVE the threshold. One
+            // practice still squarely in the amber is enough to keep the whole area off a strength verdict.
+            persistStrengthPractice("commit-messages", "Commit Messages", 1L);
+            persistStrengthPractice("review-comments", "Actionable Review Comments", 2L);
+            persistStrengthPractice("issue-descriptions", "Issue Descriptions", 3L);
+            persistStrengthPractice("test-coverage", "Test Coverage", 4L);
+            persistDevelopingPractice("documentation", "Documentation", 5L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("MIXED");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("reads as MIXED when every practice in the area is itself mixed")
+        void shouldReadAsMixedWhenEveryPracticeIsMixed() {
+            // A mixed practice counts as half a strength, so an area of nothing but balanced practices lands
+            // on exactly 0.5 and reports what its cards report. Counting only outright strengths would score
+            // this area 0 and call it DEVELOPING, silently discarding every strength the cards do show.
+            persistMixedPractice("commit-messages", "Commit Messages", 1L);
+            persistMixedPractice("review-comments", "Actionable Review Comments", 2L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("MIXED")
+                // Both practices are on both sides, so the guidance names them once instead of pretending one
+                // group is the strength and the other the gap.
+                .jsonPath("$[0].guidance")
+                .value(String.class, org.hamcrest.Matchers.startsWith("Your recent feedback is mixed in "))
+                .jsonPath("$[0].guidance")
+                .value(String.class, org.hamcrest.Matchers.containsString("with both strengths and room to grow."));
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("reads as DEVELOPING when fewer than half the practices stand as a strength")
+        void shouldReadAsDevelopingBelowTheMixedShare() {
+            // Two of five: 0.4. Strengths exist, but not enough of the area is standing for a mixed verdict.
+            persistStrengthPractice("commit-messages", "Commit Messages", 1L);
+            persistStrengthPractice("review-comments", "Actionable Review Comments", 2L);
+            persistDevelopingPractice("issue-descriptions", "Issue Descriptions", 3L);
+            persistDevelopingPractice("test-coverage", "Test Coverage", 4L);
+            persistDevelopingPractice("documentation", "Documentation", 5L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("DEVELOPING");
+        }
+
+        @Test
+        @WithUser
         @DisplayName("keeps evidence from both sides when a mixed area reaches the item cap")
         void shouldKeepStrengthEvidenceWhenMixedAreaReachesItemCap() {
             Practice reviewPractice = persistPractice(workspace, area, "review-comments", "Actionable Review Comments");
@@ -475,11 +695,13 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
         @WithUser
         @DisplayName("a thin record still yields a verdict, but never a direction")
         void shouldNotDeriveADirectionFromTwoObservations() {
-            // One strength and one problem: both are reported, so the verdict is MIXED. Two reviewed work
+            // A problem on the older work item and a strength on the newer one: the standing weighs the newer
+            // more heavily but not enough to clear the strength bar, so the verdict is MIXED. Two reviewed work
             // items are still far too little to say where the developer is heading, and a direction asserted
             // from them would read as a finding about the person rather than about the evidence.
-            insertFinding(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 1L);
-            insertFinding(agentJob, practice, developer, "Speculative gap", "ABSENT", "MINOR", 2L);
+            Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
+            insertFinding(agentJob, practice, developer, "Speculative gap", "ABSENT", "MINOR", 1L, previousDay);
+            insertFinding(agentJob, practice, developer, "Clear motivation section", "PRESENT", null, 2L);
 
             webTestClient
                 .get()
@@ -536,8 +758,12 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isOk()
                 .expectBody()
+                // The area follows its only practice, and four clean opportunities in a row have already
+                // earned that practice a STRENGTH standing. Reporting MIXED here — because older problems are
+                // still inside the look-back window — would have the area contradict the card it is built
+                // from, and would withhold the acknowledgement the developer has just earned.
                 .jsonPath("$[0].status")
-                .isEqualTo("MIXED")
+                .isEqualTo("STRENGTH")
                 .jsonPath("$[0].direction")
                 .isEqualTo("IMPROVING")
                 // Calendar time remains provenance; it does not define either bundle.
@@ -582,10 +808,108 @@ class PracticeAreaStatusIntegrationTest extends AbstractWorkspaceIntegrationTest
                 .expectStatus()
                 .isOk()
                 .expectBody()
+                // Every one of the four newest work items carried a problem, so the standing follows the
+                // recent record rather than averaging in the older clean run — the mirror image of the
+                // IMPROVING case above.
                 .jsonPath("$[0].status")
-                .isEqualTo("MIXED")
+                .isEqualTo("DEVELOPING")
                 .jsonPath("$[0].direction")
                 .isEqualTo("DECLINING");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("a later run that did not cover a practice does not erase what an earlier one found")
+        void shouldKeepFindingsARunNeverRevisited() {
+            Practice reviewPractice = persistPractice(workspace, area, "review-comments", "Actionable Review Comments");
+            Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
+            // The first run covered both practices on the same pull request.
+            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L, previousDay);
+            insertFinding(
+                agentJob,
+                reviewPractice,
+                developer,
+                "Concrete line references",
+                "PRESENT",
+                null,
+                1L,
+                previousDay
+            );
+            // The later run reached only one of them. A skip, a refusal, a timeout or an exhausted budget
+            // writes no row at all, so "the newest run for this pull request" is not evidence about the
+            // practice it never got to — and must not supersede the verdict that stands.
+            AgentJob laterJob = persistAgentJob(workspace);
+            insertFinding(laterJob, reviewPractice, developer, "Still concrete", "PRESENT", null, 1L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("MIXED")
+                .jsonPath("$[0].items.length()")
+                .isEqualTo(2)
+                .jsonPath("$[0].items[0].title")
+                .isEqualTo("Missing rollout plan");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("a later run that did cover the practice still supersedes what it found before")
+        void shouldSupersedeFindingsTheLaterRunRevisited() {
+            // The guarantee the correlation must not lose: re-reviewing the same work with the same practice
+            // replaces the older verdict rather than accumulating beside it.
+            Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
+            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L, previousDay);
+            AgentJob laterJob = persistAgentJob(workspace);
+            insertFinding(laterJob, practice, developer, "Rollout plan added", "PRESENT", null, 1L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("STRENGTH")
+                .jsonPath("$[0].items.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].items[0].title")
+                .isEqualTo("Rollout plan added");
+        }
+
+        @Test
+        @WithUser
+        @DisplayName("a later run about somebody else does not erase this developer's earlier finding")
+        void shouldKeepFindingsWhenTheLaterRunWasAboutAnotherDeveloper() {
+            // Same work item, same practice, but the newer run had something to say about a co-contributor
+            // and nothing about this developer. It is not a re-measurement of this developer's claim.
+            Instant previousDay = Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS);
+            insertFinding(agentJob, practice, developer, "Missing rollout plan", "ABSENT", "MAJOR", 1L, previousDay);
+            User otherContributor = persistUser("other-contributor");
+            AgentJob laterJob = persistAgentJob(workspace);
+            insertFinding(laterJob, practice, otherContributor, "Someone else's gap", "ABSENT", "MAJOR", 1L);
+
+            webTestClient
+                .get()
+                .uri(STATUS_URI, workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$[0].status")
+                .isEqualTo("DEVELOPING")
+                .jsonPath("$[0].items.length()")
+                .isEqualTo(1)
+                .jsonPath("$[0].items[0].title")
+                .isEqualTo("Missing rollout plan");
         }
 
         @Test

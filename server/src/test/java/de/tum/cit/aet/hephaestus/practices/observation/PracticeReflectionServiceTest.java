@@ -170,7 +170,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
 
     @Test
     @DisplayName("two clean newer work items restore STRENGTH even though an older review found a problem")
-    void recentCleanStreakOutranksTheOlderRecord() {
+    void recentCleanEvidenceOutweighsTheOlderRecord() {
         Practice practice = practice("robust-error-handling");
         // Oldest work item carried a confident problem; the two after it were clean.
         when(
@@ -195,7 +195,7 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("one clean work item after a problem is not a streak — the standing stays MIXED")
+    @DisplayName("one clean work item after a problem does not outweigh it — the standing stays MIXED")
     void singleCleanOpportunityDoesNotRestoreStrength() {
         Practice practice = practice("robust-error-handling");
         when(
@@ -214,6 +214,69 @@ class PracticeReflectionServiceTest extends BaseUnitTest {
 
         assertThat(cards).hasSize(1);
         assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.MIXED);
+    }
+
+    @Test
+    @DisplayName("a problem on the newest work item outweighs three older clean ones")
+    void aFreshProblemOutweighsTheOlderCleanRecord() {
+        Practice practice = practice("robust-error-handling");
+        // The mirror image of the recovery case: recency cuts both ways, so a regression is acknowledged as
+        // quickly as a fix. Under the previous existence rule this read MIXED — one problem and one strength
+        // both existed somewhere in the window, and nothing asked which of them was the more recent.
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(
+            List.of(good(practice, 41L), good(practice, 42L), good(practice, 43L), bad(practice, Severity.MAJOR, 44L))
+        );
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
+
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.DEVELOPING);
+    }
+
+    @Test
+    @DisplayName("only the newest four work items decide the standing, however long the older record is")
+    void olderWorkItemsFallOutOfTheStandingWindow() {
+        Practice practice = practice("robust-error-handling");
+        when(
+            observationRepository.findRecentByDeveloperAndWorkspace(
+                eq(USER_ID),
+                eq(WORKSPACE_ID),
+                any(Instant.class),
+                any(Pageable.class)
+            )
+        ).thenReturn(
+            List.of(
+                bad(practice, Severity.MAJOR, 31L),
+                bad(practice, Severity.MAJOR, 32L),
+                bad(practice, Severity.MAJOR, 33L),
+                bad(practice, Severity.MAJOR, 34L),
+                bad(practice, Severity.MAJOR, 35L),
+                good(practice, 41L),
+                good(practice, 42L),
+                good(practice, 43L),
+                good(practice, 44L)
+            )
+        );
+        when(feedbackObservationRepository.findLatestFeedbackBodiesByObservationIds(any(), any(), any())).thenReturn(
+            List.of()
+        );
+
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.STRENGTH);
+        // The standing describes the window; the list stays the complete record of what the 90 days raised.
+        assertThat(cards.get(0).toWorkOn()).hasSize(5);
     }
 
     @Test

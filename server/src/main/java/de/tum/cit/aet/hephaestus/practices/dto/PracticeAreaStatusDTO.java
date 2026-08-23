@@ -53,6 +53,12 @@ public record PracticeAreaStatusDTO(
     /**
      * Coarse, human standing for the area, aggregated from the per-practice reflection cards.
      *
+     * <p>The area is the layer ABOVE the practices and reads nothing but their standings: it averages how
+     * positive each practice's recent evidence was and puts the result on the same scale the practices use.
+     * Deriving it from the practice standings rather than from their underlying findings is what keeps the two
+     * surfaces from contradicting each other — a practice the reflection page shows as a strength can never be
+     * counted against its own area.
+     *
      * <p>The first three are verdicts. The last two are the reasons there is NO verdict, and they are
      * deliberately separate: a learner cannot act on an empty state that means "nothing was reviewed" and
      * "your work offered no opportunity" interchangeably. This mirrors the trend surface's split of
@@ -60,11 +66,11 @@ public record PracticeAreaStatusDTO(
      * claim of absence.
      */
     public enum AreaStatus {
-        /** Only problems surfaced across the area's practices — the focus of attention. */
+        /** Fewer than half the area's practices stand as a strength — the focus of attention. */
         DEVELOPING,
-        /** Only strengths — confirmed good habits across the area. */
+        /** Nearly every practice in the area stands as a strength — confirmed good habits. */
         STRENGTH,
-        /** Both problems and strengths across the area's practices. */
+        /** Real strengths across the area, and enough still to work on. */
         MIXED,
         /** No observation reached any practice in this area (also: caller not yet a synced developer). */
         NOT_OBSERVED,

@@ -26,13 +26,25 @@ final class DeterministicAreaGuidanceComposer {
             return null;
         }
 
-        List<ReflectionPracticeDTO> strengths = cards
+        // Partitioned by standing, exactly as the area status is: a practice whose recent evidence already
+        // earned it a STRENGTH standing must not be named as the area's next focus merely because older items
+        // are still on its card, and the sentence would otherwise contradict the status it explains. A MIXED
+        // practice belongs on both sides — that is what makes it mixed.
+        //
+        // Non-verdict practices are dropped FIRST. Their standing is neither DEVELOPING nor STRENGTH, so a
+        // negated filter would put a practice with nothing to say on both sides at once and name it as a
+        // strength and a gap in the same sentence.
+        List<ReflectionPracticeDTO> verdicts = cards
             .stream()
-            .filter(card -> !card.strengths().isEmpty())
+            .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
             .toList();
-        List<ReflectionPracticeDTO> gaps = cards
+        List<ReflectionPracticeDTO> strengths = verdicts
             .stream()
-            .filter(card -> !card.toWorkOn().isEmpty())
+            .filter(card -> card.standing() != ReflectionPracticeDTO.Standing.DEVELOPING)
+            .toList();
+        List<ReflectionPracticeDTO> gaps = verdicts
+            .stream()
+            .filter(card -> card.standing() != ReflectionPracticeDTO.Standing.STRENGTH)
             .toList();
 
         StringBuilder summary = new StringBuilder();

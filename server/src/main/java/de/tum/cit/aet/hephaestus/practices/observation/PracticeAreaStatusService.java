@@ -45,9 +45,9 @@ public class PracticeAreaStatusService {
     private final Clock clock;
 
     /**
-     * Derives one status per requested area from the same learner-safe reflection snapshot used by the
-     * per-practice surface. Findings are loaded once for the workspace and partitioned in memory, avoiding
-     * one observation query per card.
+     * Derives one status per requested area by rolling up the practice standings of the same learner-safe
+     * reflection snapshot the per-practice surface renders. Findings are loaded once for the workspace and
+     * partitioned in memory, avoiding one observation query per card.
      *
      * <p>When no practice in the area has a displayable finding, the status reports WHY rather than a single
      * empty state: {@code NO_OPPORTUNITY} or {@code NOT_OBSERVED} (which also covers
@@ -73,43 +73,18 @@ public class PracticeAreaStatusService {
             areas
         );
 
-        // Rolled up from the practice census, NOT from the evidence map: an area whose only observations
-        // produced no card (every strength suppressed, nothing else) has EMPTY evidence, so it never reaches
-        // areaSignals and would otherwise read as NOT_OBSERVED — the state it must be distinguished from.
-        Map<String, PracticeReflectionService.EvidenceCensus> censusByArea = censusByArea(
-            snapshot.censusByPractice(),
-            snapshot.eligiblePracticesByArea()
-        );
-
         return areas
             .stream()
             .map(area ->
                 toAreaStatus(
                     area,
                     cardsByArea.getOrDefault(area.getSlug(), List.of()),
+                    snapshot.standingShareByPractice(),
                     signalsByArea.getOrDefault(area.getSlug(), AreaSignal.NONE),
-                    censusByArea.getOrDefault(area.getSlug(), PracticeReflectionService.EvidenceCensus.NONE),
                     guidanceByArea.get(area.getSlug())
                 )
             )
             .toList();
-    }
-
-    private static Map<String, PracticeReflectionService.EvidenceCensus> censusByArea(
-        Map<String, PracticeReflectionService.EvidenceCensus> censusByPractice,
-        Map<String, List<String>> eligiblePracticesByArea
-    ) {
-        Map<String, PracticeReflectionService.EvidenceCensus> byArea = new LinkedHashMap<>();
-        for (Map.Entry<String, List<String>> entry : eligiblePracticesByArea.entrySet()) {
-            PracticeReflectionService.EvidenceCensus total = PracticeReflectionService.EvidenceCensus.NONE;
-            for (String practiceSlug : entry.getValue()) {
-                total = total.plus(
-                    censusByPractice.getOrDefault(practiceSlug, PracticeReflectionService.EvidenceCensus.NONE)
-                );
-            }
-            byArea.put(entry.getKey(), total);
-        }
-        return byArea;
     }
 
     private static Map<String, List<ReflectionPracticeDTO>> cardsByArea(List<ReflectionPracticeDTO> cards) {
@@ -141,14 +116,16 @@ public class PracticeAreaStatusService {
     private static PracticeAreaStatusDTO toAreaStatus(
         PracticeArea area,
         List<ReflectionPracticeDTO> cards,
+        Map<String, Double> standingShareByPractice,
         AreaSignal signal,
-        PracticeReflectionService.EvidenceCensus census,
         AreaGuidanceProvider.@Nullable AreaGuidance aggregatedGuidance
     ) {
+        PracticeAreaStatusDTO.AreaStatus status = areaStatus(cards, standingShareByPractice);
+        boolean hasDisplayableData = PracticeAreaStatusDTO.isVerdict(status);
+        // Item-level, unlike the status: the question here is which KINDS of evidence exist to show, which a
+        // practice standing has already abstracted away.
         boolean hasProblems = cards.stream().anyMatch(card -> !card.toWorkOn().isEmpty());
         boolean hasStrengths = cards.stream().anyMatch(card -> !card.strengths().isEmpty());
-        PracticeAreaStatusDTO.AreaStatus status = areaStatus(hasProblems, hasStrengths, census);
-        boolean hasDisplayableData = PracticeAreaStatusDTO.isVerdict(status);
 
         String guidance = null;
         PracticeAreaStatusDTO.GuidanceSource guidanceSource = null;
@@ -178,32 +155,56 @@ public class PracticeAreaStatusService {
     }
 
     /**
-     * A verdict when any practice in the area produced displayable feedback; otherwise the REASON there is
-     * none.
+     * A verdict aggregated from the standings of the area's practices; otherwise the REASON there is none.
+     *
+     * <p>The area reads its practices, not their findings. A practice standing is the single authority on
+     * where that practice stands — it already weighs recent evidence against the older record — so going back
+     * to the underlying items here would let an area contradict the very cards it is built from, and a
+     * practice the reflection page acknowledges as fixed would keep dragging its area down for the rest of the
+     * look-back window.
+     *
+     * <p>It aggregates the CONTINUOUS standing, not the rendered label, and then applies
+     * {@link StandingScale} once. Averaging labels would classify twice: a practice at 0.79 and one at 0.51
+     * are both {@code MIXED}, and collapsing them to a single weight before averaging discards exactly the
+     * resolution the practice rule computed. One classification, at the end.
+     *
+     * <p>Only practices that reached a VERDICT are counted. Weighing an unreviewed practice as "not a strength"
+     * would turn thin coverage into a negative verdict about the developer, which is the one thing a formative
+     * surface must never do.
      *
      * <p>Reason precedence is deliberate and orders by how much the learner can act on it: a review that ran
      * and found nothing to report ({@code NO_OPPORTUNITY}) outranks never having been looked at
      * ({@code NOT_OBSERVED}). Collapsing these back into one state would make a working detector
-     * indistinguishable from an unconfigured one.
+     * indistinguishable from an unconfigured one. Both answers come from the practices themselves, which is
+     * why this needs no separate census of what the reviews did: a practice that knows why it has nothing to
+     * say is a practice its area can simply ask.
      */
     private static PracticeAreaStatusDTO.AreaStatus areaStatus(
-        boolean hasProblems,
-        boolean hasStrengths,
-        PracticeReflectionService.EvidenceCensus census
+        List<ReflectionPracticeDTO> cards,
+        Map<String, Double> standingShareByPractice
     ) {
-        if (hasProblems && hasStrengths) {
-            return PracticeAreaStatusDTO.AreaStatus.MIXED;
+        List<ReflectionPracticeDTO> verdicts = cards
+            .stream()
+            .filter(card -> ReflectionPracticeDTO.isVerdict(card.standing()))
+            .toList();
+        if (verdicts.isEmpty()) {
+            return cards.stream().anyMatch(card -> card.standing() == ReflectionPracticeDTO.Standing.NO_OPPORTUNITY)
+                ? PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY
+                : PracticeAreaStatusDTO.AreaStatus.NOT_OBSERVED;
         }
-        if (hasProblems) {
-            return PracticeAreaStatusDTO.AreaStatus.DEVELOPING;
-        }
-        if (hasStrengths) {
-            return PracticeAreaStatusDTO.AreaStatus.STRENGTH;
-        }
-        if (census.hasAnyEvidence()) {
-            return PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY;
-        }
-        return PracticeAreaStatusDTO.AreaStatus.NOT_OBSERVED;
+        double areaShare = verdicts
+            .stream()
+            .mapToDouble(card -> standingShareByPractice.getOrDefault(card.slug(), 0.0))
+            .average()
+            .orElseThrow();
+        return switch (StandingScale.classify(areaShare)) {
+            case STRENGTH -> PracticeAreaStatusDTO.AreaStatus.STRENGTH;
+            case MIXED -> PracticeAreaStatusDTO.AreaStatus.MIXED;
+            case DEVELOPING -> PracticeAreaStatusDTO.AreaStatus.DEVELOPING;
+            case NOT_OBSERVED, NO_OPPORTUNITY -> throw new IllegalStateException(
+                "StandingScale only classifies verdicts"
+            );
+        };
     }
 
     /**

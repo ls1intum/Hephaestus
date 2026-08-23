@@ -235,13 +235,20 @@ class PracticeReflectionVisibilityTest extends BaseUnitTest {
     }
 
     @Test
-    @DisplayName("a defect detector's (PRESENT, GOOD) is still withheld, and an empty card is not emitted")
+    @DisplayName("a defect detector's (PRESENT, GOOD) is still withheld, but the card says the detector ran")
     void defectDetectorPresentGoodIsStillWithheld() {
         Practice practice = defectDetector("handles-errors-instead-of-swallowing-them");
         feeds(strength(practice, Presence.PRESENT));
 
-        // Nothing survives, so there is no card at all rather than a contentless one.
-        assertThat(practiceReflectionService.getReflection(WORKSPACE_ID)).isEmpty();
+        List<ReflectionPracticeDTO> cards = practiceReflectionService.getReflection(WORKSPACE_ID);
+
+        // The suppression holds: an incoherent strength never becomes one. But the run is still evidence that
+        // the practice was exercised, so the card reports NO_OPPORTUNITY rather than vanishing — silently
+        // dropping it would make a working detector read exactly like one that was never configured.
+        assertThat(cards).hasSize(1);
+        assertThat(cards.get(0).standing()).isEqualTo(ReflectionPracticeDTO.Standing.NO_OPPORTUNITY);
+        assertThat(cards.get(0).strengths()).isEmpty();
+        assertThat(cards.get(0).toWorkOn()).isEmpty();
     }
 
     @Test

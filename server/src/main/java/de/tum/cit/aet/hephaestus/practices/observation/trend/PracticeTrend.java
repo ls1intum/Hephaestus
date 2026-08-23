@@ -5,6 +5,7 @@ import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.PracticeTrendDT
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendOpportunityDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.dto.TrendSupportDTO;
 import java.util.List;
+import java.util.OptionalDouble;
 import org.jspecify.annotations.Nullable;
 
 /** Complete internal trend result; learner DTOs intentionally omit its scalar posterior diagnostics. */
@@ -52,26 +53,44 @@ public final class PracticeTrend {
     }
 
     /**
-     * How many of the newest evidence opportunities carry no problem, counted back from the latest.
+     * The recency-weighted share of positive outcomes across the newest {@code window} evidence opportunities,
+     * or empty when none of them produced a verdict.
      *
-     * <p>Opportunity-indexed like the trend itself, so a single busy day cannot mint a streak and a quiet
-     * week cannot break one — the unit is a reviewed work item, never a calendar bin. Opportunities that
-     * carry no applicable outcome are neither clean nor dirty and are skipped rather than counted, so a
-     * practice a review had no chance to exercise does not silently extend the streak.
+     * <p>Opportunity-indexed like the trend itself, so a single busy day cannot manufacture a standing and a
+     * quiet week cannot erode one — the unit is a reviewed work item, never a calendar bin. Opportunities that
+     * carry no applicable outcome are skipped rather than counted as either side, so a review that had no
+     * chance to exercise the practice neither helps nor hurts, and it does not push genuine evidence out of
+     * the window either.
+     *
+     * <p>Each opportunity contributes its own {@link OutcomeVector#positiveShare()}, not a clean/dirty bit, so
+     * a work item that went half well is counted as half well rather than rounded to a problem.
+     *
+     * <p>Weights fall geometrically with age ({@code decay^0, decay^1, …} from the newest), which is what lets
+     * one rule do the job two used to: recent evidence dominates, so a fixed habit is acknowledged within a
+     * couple of reviews without a separate streak override, and a fresh regression is visible just as fast.
+     * A {@code decay} strictly below 0.5 is what makes the two newest opportunities outweigh everything older
+     * — see the caller that chooses it.
+     *
+     * @param window how many of the newest applicable opportunities to consider, at least one
+     * @param decay per-opportunity weight factor in {@code (0,1]}; 1.0 is an unweighted mean
      */
-    public int trailingCleanOpportunities() {
-        int streak = 0;
-        for (int index = opportunities.size() - 1; index >= 0; index--) {
-            EvidenceOpportunity opportunity = opportunities.get(index);
-            if (!opportunity.applicable()) {
-                continue;
-            }
-            if (opportunity.outcomes().negatives() > 0) {
-                break;
-            }
-            streak++;
+    public OptionalDouble recentPositiveShare(int window, double decay) {
+        List<EvidenceOpportunity> applicable = opportunities.stream().filter(EvidenceOpportunity::applicable).toList();
+        if (applicable.isEmpty()) {
+            return OptionalDouble.empty();
         }
-        return streak;
+        List<EvidenceOpportunity> recent = applicable.subList(
+            Math.max(0, applicable.size() - window),
+            applicable.size()
+        );
+        double weighted = 0.0;
+        double totalWeight = 0.0;
+        for (int index = recent.size() - 1, age = 0; index >= 0; index--, age++) {
+            double weight = Math.pow(decay, age);
+            weighted += weight * recent.get(index).outcomes().positiveShare();
+            totalWeight += weight;
+        }
+        return OptionalDouble.of(weighted / totalWeight);
     }
 
     TrendScope scope() {

@@ -5,13 +5,13 @@ import de.tum.cit.aet.hephaestus.practices.PracticeRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackChannel;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository;
 import de.tum.cit.aet.hephaestus.practices.feedback.FeedbackObservationRepository.ObservationFeedbackBody;
-import de.tum.cit.aet.hephaestus.practices.model.Assessment;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
 import de.tum.cit.aet.hephaestus.practices.model.Practice;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeArea;
 import de.tum.cit.aet.hephaestus.practices.model.PracticeAutonomy;
-import de.tum.cit.aet.hephaestus.practices.model.Presence;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
+import de.tum.cit.aet.hephaestus.practices.observation.ObservationRepository.PracticeInapplicableCount;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionItemDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.dto.ReflectionPracticeDTO;
 import de.tum.cit.aet.hephaestus.practices.observation.trend.PracticeTrend;
@@ -25,8 +25,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -51,12 +49,20 @@ public class PracticeReflectionService {
     /** Per-practice cap on "to work on" items — the highest-impact few, not an exhaustive log. */
     private static final int MAX_ITEMS_PER_PRACTICE = 5;
     /**
-     * Consecutive problem-free reviewed work items that make a practice read as a strength again, however
-     * long its earlier record in the window is. Two, not one: a single clean review is routinely just a work
-     * item that barely touched the practice, while two in a row is the smallest streak that is hard to get by
-     * accident.
+     * How many of the newest reviewed work items a standing is read off. Four, matching the trend's bundle
+     * size, so both surfaces on a card answer their question from the same stretch of work. Fewer is fine:
+     * a standing derived from one opportunity is thin, and the card says so through its trend support rather
+     * than by withholding the standing.
      */
-    private static final int CLEAN_OPPORTUNITIES_FOR_STRENGTH = 2;
+    private static final int STANDING_WINDOW = 4;
+    /**
+     * Per-opportunity weight decay, newest first. Derived, not picked: the design requirement carried over
+     * from the previous iteration is that TWO problem-free work items in a row must be enough to acknowledge a
+     * fixed habit. With weights {@code 1, d, d², d³} that holds exactly when {@code (1 + d) > 4·(d² + d³)},
+     * i.e. {@code d < 0.5}; 0.4 takes that with margin. The consequence is symmetric and intended — the newest
+     * opportunity carries the majority of the weight, so a fresh regression shows up as fast as a fresh fix.
+     */
+    private static final double STANDING_DECAY = 0.4;
     /** Per-practice cap on acknowledged strengths — enough to affirm without drowning the signal. */
     private static final int MAX_STRENGTHS_PER_PRACTICE = 3;
 
@@ -70,7 +76,7 @@ public class PracticeReflectionService {
     private final Clock clock;
 
     /**
-     * Returns practice cards built from each target's latest review run. {@code NOT_APPLICABLE} observations
+     * Returns practice cards built from each target's latest review run. Observations that produced no verdict
      * do not reach this learner-facing surface, and neither does anything the caller is not cleared to see;
      * every problem that survives both is shown, worst severity first.
      */
@@ -79,7 +85,16 @@ public class PracticeReflectionService {
         return getReflectionSnapshot(workspaceId).cards();
     }
 
-    /** Shared evidence snapshot used by both the practice reflection and practice-area status surfaces. */
+    /**
+     * Shared evidence snapshot used by both the practice reflection and practice-area status surfaces.
+     *
+     * <p>Three passes, in this order and for this reason: classify every practice's observations, derive the
+     * trends from what the classification kept, then build each card once with its final standing. The standing
+     * rule needs the trend (only the trend carries the recent-evidence streak) and the trend needs the
+     * classification, so a card cannot be built before both exist.
+     *
+     * <p>Assumes a caller-provided transaction — it navigates lazy {@code Observation.practice} relationships.
+     */
     public ReflectionSnapshot getReflectionSnapshot(Long workspaceId) {
         Optional<Long> currentDeveloperId = currentDeveloperLookup.currentDeveloperId();
         if (currentDeveloperId.isEmpty()) {
@@ -118,35 +133,48 @@ public class PracticeReflectionService {
                 .add(observation);
         }
 
-        List<ReflectionPracticeDTO> cards = new ArrayList<>();
-        Map<String, List<Observation>> evidenceByPractice = new LinkedHashMap<>();
-        Map<String, EvidenceCensus> censusByPractice = new LinkedHashMap<>();
+        Map<String, PracticeEvidence> evidenceBySlug = new LinkedHashMap<>();
         for (List<Observation> group : byPractice.values()) {
-            addPracticeCard(group, deliveredGuidance, cards, evidenceByPractice, censusByPractice);
+            PracticeEvidence evidence = PracticeEvidence.classify(group);
+            evidenceBySlug.put(evidence.slug(), evidence);
         }
+        Map<String, List<Observation>> evidenceByPractice = evidenceBySlug
+            .entrySet()
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    entry -> entry.getValue().assessed(),
+                    (left, ignored) -> left,
+                    LinkedHashMap::new
+                )
+            );
 
         Map<String, PracticeTrend> trends = practiceTrendService.calculatePractices(evidenceByPractice);
-        cards = cards
+        Map<String, Double> standingShareByPractice = evidenceBySlug
+            .values()
             .stream()
-            .map(card -> withTrend(card, trends.get(card.slug())))
-            .collect(Collectors.toCollection(ArrayList::new));
-        cards.sort(
-            Comparator.<ReflectionPracticeDTO>comparingInt(card -> standingRank(card.standing())).thenComparingInt(
-                PracticeReflectionService::worstSeverityOrdinal
-            )
-        );
+            .filter(PracticeEvidence::hasCard)
+            .collect(
+                Collectors.toMap(
+                    PracticeEvidence::slug,
+                    evidence -> standingShare(evidence, trends.get(evidence.slug())),
+                    (left, ignored) -> left,
+                    LinkedHashMap::new
+                )
+            );
         // "Eligible" is an autonomy question, not a boolean: a practice contributes to its area's coverage
         // when review is admitted for it at all. AutonomyResolver already folds in the area's and the
         // workspace's answer, so an area silenced upstream drops out with its practices.
         PracticeAutonomy workspaceDefault = workspaceReviewDefaultsProvider.forWorkspace(workspaceId).defaultAutonomy();
-        Map<String, List<String>> eligiblePracticesByArea = practiceRepository
+        List<Practice> eligiblePractices = practiceRepository
             .findByWorkspaceId(workspaceId)
             .stream()
-            .filter(
-                practice ->
-                    practice.getArea() != null &&
-                    AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault).admitsReview()
-            )
+            .filter(practice -> AutonomyResolver.effectiveAutonomyOf(practice, workspaceDefault).admitsReview())
+            .toList();
+        Map<String, List<String>> eligiblePracticesByArea = eligiblePractices
+            .stream()
+            .filter(practice -> practice.getArea() != null)
             .collect(
                 Collectors.groupingBy(
                     practice -> practice.getArea().getSlug(),
@@ -154,201 +182,261 @@ public class PracticeReflectionService {
                     Collectors.mapping(Practice::getSlug, Collectors.toList())
                 )
             );
+
+        Map<String, Integer> inapplicableByPractice = inapplicableByPractice(developerId, workspaceId, since);
+        List<ReflectionPracticeDTO> cards = cards(
+            evidenceBySlug,
+            eligiblePractices,
+            trends,
+            standingShareByPractice,
+            inapplicableByPractice,
+            deliveredGuidance
+        );
+
         return new ReflectionSnapshot(
             developerId,
             cards,
             evidenceByPractice,
             eligiblePracticesByArea,
-            censusByPractice
+            standingShareByPractice
         );
     }
 
-    private static void addPracticeCard(
-        List<Observation> group,
-        Map<UUID, String> deliveredGuidance,
-        List<ReflectionPracticeDTO> cards,
-        Map<String, List<Observation>> evidenceByPractice,
-        Map<String, EvidenceCensus> censusByPractice
+    /**
+     * Every practice the developer should see, whether or not it has anything to say.
+     *
+     * <p>The set is the UNION of two groups, and both are needed. The eligible practices are what the
+     * workspace currently watches — they belong on the surface even with nothing to report, because
+     * "no observation reached this" and "the reviews ran and found nothing" are different answers to
+     * "how am I doing here", and a surface that shows neither leaves the learner unable to tell them apart.
+     * The practices that produced a card are added even when review is no longer admitted for them: that
+     * feedback was raised and delivered, and switching a practice off does not un-say it.
+     */
+    private static List<ReflectionPracticeDTO> cards(
+        Map<String, PracticeEvidence> evidenceBySlug,
+        List<Practice> eligiblePractices,
+        Map<String, PracticeTrend> trends,
+        Map<String, Double> standingShareByPractice,
+        Map<String, Integer> inapplicableByPractice,
+        Map<UUID, String> deliveredGuidance
     ) {
-        Practice practice = group.get(0).getPractice();
-        List<Observation> visibleBad = visibleProblems(group);
-        List<Observation> allGood = group
-            .stream()
-            .filter(observation -> observation.getAssessment() == Assessment.GOOD)
-            .toList();
-        // A defect-detector practice hunts an undesirable behaviour, so a PRESENT, GOOD row is incoherent —
-        // what would be present is the defect — and must not surface as a false strength. Its ABSENT, GOOD
-        // rows are the opposite case and belong here: the harmful behaviour could have appeared in the corpus
-        // the practice bounds and did not, proven against the search the observation carries.
-        List<Observation> visibleStrengths = allGood
-            .stream()
-            .filter(observation -> !practice.isDefectDetector() || observation.getPresence() == Presence.ABSENT)
-            .toList();
-        List<Observation> notApplicable = group
-            .stream()
-            .filter(observation -> observation.getAssessment() == null)
-            .toList();
+        Map<String, Practice> subjects = new LinkedHashMap<>();
+        eligiblePractices.forEach(practice -> subjects.put(practice.getSlug(), practice));
+        evidenceBySlug.values().forEach(evidence -> subjects.putIfAbsent(evidence.slug(), evidence.practice()));
 
-        censusByPractice.merge(
-            practice.getSlug(),
-            new EvidenceCensus(
-                visibleBad.size() + visibleStrengths.size(),
-                notApplicable.size(),
-                allGood.size() - visibleStrengths.size()
-            ),
-            EvidenceCensus::plus
-        );
-
-        // Inapplicable observations never create a reflection card, but they remain part of the
-        // shared evidence snapshot so trend coverage can distinguish "not assessed" from absent data.
-        List<Observation> practiceEvidence = Stream.concat(
-            Stream.concat(visibleBad.stream(), visibleStrengths.stream()),
-            notApplicable.stream()
-        ).toList();
-        evidenceByPractice.put(practice.getSlug(), practiceEvidence);
-
-        List<ReflectionItemDTO> toWorkOn = visibleBad
+        return subjects
+            .entrySet()
             .stream()
-            .limit(MAX_ITEMS_PER_PRACTICE)
-            .map(observation -> ReflectionItemDTO.from(observation, deliveredGuidance.get(observation.getId())))
-            .toList();
-        List<ReflectionItemDTO> strengths = visibleStrengths
-            .stream()
-            .limit(MAX_STRENGTHS_PER_PRACTICE)
-            .map(observation -> ReflectionItemDTO.from(observation, deliveredGuidance.get(observation.getId())))
-            .toList();
-        if (toWorkOn.isEmpty() && strengths.isEmpty()) {
-            return;
-        }
-
-        // Provisional: the whole-window rule. `withTrend` re-derives it once the recent-evidence streak is
-        // known, which is the only place that can see it.
-        ReflectionPracticeDTO.Standing standing = standing(toWorkOn, strengths, null);
-        PracticeArea area = practice.getArea();
-        cards.add(
-            new ReflectionPracticeDTO(
-                practice.getSlug(),
-                practice.getName(),
-                area != null ? area.getSlug() : null,
-                area != null ? area.getName() : null,
-                practice.getWhyItMatters(),
-                practice.getWhatGoodLooksLike(),
-                standing,
-                toWorkOn,
-                strengths,
-                null,
-                null
+            .map(entry -> {
+                PracticeEvidence evidence = evidenceBySlug.get(entry.getKey());
+                Double share = standingShareByPractice.get(entry.getKey());
+                return evidence != null && share != null
+                    ? toCard(evidence, trends.get(entry.getKey()), deliveredGuidance, share)
+                    : silentCard(entry.getValue(), evidence, inapplicableByPractice.getOrDefault(entry.getKey(), 0));
+            })
+            .sorted(
+                Comparator.<ReflectionPracticeDTO>comparingInt(card -> standingRank(card.standing())).thenComparingInt(
+                    PracticeReflectionService::worstSeverityOrdinal
+                )
             )
-        );
-    }
-
-    /**
-     * Attaches the trend AND re-derives the standing from it — the trend result is the only carrier of the
-     * recent-evidence streak the standing rule needs.
-     */
-    private static ReflectionPracticeDTO withTrend(ReflectionPracticeDTO card, @Nullable PracticeTrend trend) {
-        return new ReflectionPracticeDTO(
-            card.slug(),
-            card.name(),
-            card.areaSlug(),
-            card.areaName(),
-            card.whyItMatters(),
-            card.whatGoodLooksLike(),
-            standing(card.toWorkOn(), card.strengths(), trend),
-            card.toWorkOn(),
-            card.strengths(),
-            trend == null ? null : trend.direction(),
-            trend == null ? null : TrendSupportDTO.from(trend.support())
-        );
-    }
-
-    /**
-     * Every problem the practice raised, worst severity first. Nothing is withheld: an earlier revision
-     * suppressed single-artifact problems below a model-reported confidence floor, but that column was
-     * dropped after validation found it carried no discriminating information, and the per-locus
-     * corroboration meant to stand in for it cannot be satisfied — {@code recurrenceKey} hashes the
-     * artifact, so a locus is single-artifact by construction. Showing the record and letting the surface
-     * say how often something was seen is the honest version of that intent.
-     */
-    private static List<Observation> visibleProblems(List<Observation> group) {
-        return group
-            .stream()
-            .filter(observation -> observation.getAssessment() == Assessment.BAD)
-            .sorted(Comparator.comparingInt(PracticeReflectionService::severityOrdinal))
             .toList();
     }
 
     /**
-     * A practice's standing, with recent evidence outranking the whole-window record.
+     * A practice with nothing to report, carrying WHICH silence it is.
      *
-     * <p>A clean streak wins: once the newest {@link #CLEAN_OPPORTUNITIES_FOR_STRENGTH} reviewed work items
-     * that could exercise this practice carried no problem, it reads as a strength even though older reviews
-     * in the window did. The whole-window rule alone made green a 90-day clean sheet, so a developer who
-     * FIXED a habit stayed amber for three months and the surface never acknowledged the fix — the opposite
-     * of what a formative surface is for.
+     * <p>{@code NO_OPPORTUNITY} outranks {@code NOT_OBSERVED} because it is the more actionable of the two: a
+     * review that ran and found nothing to say is a working instrument, and collapsing it into "never looked
+     * at" would make it indistinguishable from an unconfigured one. Suppressed strengths count as evidence for
+     * exactly that reason — a defect-detector's silence is not a demonstrated behaviour, but it does prove the
+     * detector ran.
      *
-     * <p>The streak is opportunity-indexed (see {@link PracticeTrend#trailingCleanOpportunities()}), so it is
-     * deliberately independent of calendar days: two clean reviews on one busy afternoon count exactly like
-     * two clean reviews a fortnight apart. Only visible evidence feeds it — a quarantined problem was never
-     * shown to the developer, so it cannot secretly hold the standing back either.
+     * <p>No trend either: a direction over evidence that produced no verdict would be a claim about nothing.
      */
-    private static ReflectionPracticeDTO.Standing standing(
-        List<ReflectionItemDTO> toWorkOn,
-        List<ReflectionItemDTO> strengths,
-        @Nullable PracticeTrend trend
+    private static ReflectionPracticeDTO silentCard(
+        Practice practice,
+        @Nullable PracticeEvidence evidence,
+        int notApplicable
     ) {
-        if (trend != null && trend.trailingCleanOpportunities() >= CLEAN_OPPORTUNITIES_FOR_STRENGTH) {
-            return ReflectionPracticeDTO.Standing.STRENGTH;
-        }
-        if (!toWorkOn.isEmpty() && !strengths.isEmpty()) {
-            return ReflectionPracticeDTO.Standing.MIXED;
-        }
-        if (!toWorkOn.isEmpty()) {
-            return ReflectionPracticeDTO.Standing.DEVELOPING;
-        }
-        return ReflectionPracticeDTO.Standing.STRENGTH;
+        boolean exercised = notApplicable > 0 || (evidence != null && evidence.suppressedStrengths() > 0);
+        PracticeArea area = practice.getArea();
+        return new ReflectionPracticeDTO(
+            practice.getSlug(),
+            practice.getName(),
+            area != null ? area.getSlug() : null,
+            area != null ? area.getName() : null,
+            practice.getWhyItMatters(),
+            practice.getWhatGoodLooksLike(),
+            exercised ? ReflectionPracticeDTO.Standing.NO_OPPORTUNITY : ReflectionPracticeDTO.Standing.NOT_OBSERVED,
+            List.of(),
+            List.of(),
+            null,
+            null
+        );
     }
 
+    /**
+     * One card, complete on first construction.
+     *
+     * <p>The trend is required, not optional: every practice that has a card has an entry in the evidence map
+     * the trends were derived from, so a missing trend is a programming error rather than a state to render
+     * around.
+     */
+    private static ReflectionPracticeDTO toCard(
+        PracticeEvidence evidence,
+        PracticeTrend trend,
+        Map<UUID, String> deliveredGuidance,
+        double standingShare
+    ) {
+        Practice practice = evidence.practice();
+        PracticeArea area = practice.getArea();
+        return new ReflectionPracticeDTO(
+            practice.getSlug(),
+            practice.getName(),
+            area != null ? area.getSlug() : null,
+            area != null ? area.getName() : null,
+            practice.getWhyItMatters(),
+            practice.getWhatGoodLooksLike(),
+            StandingScale.classify(standingShare),
+            items(evidence.problems(), MAX_ITEMS_PER_PRACTICE, deliveredGuidance),
+            items(evidence.strengths(), MAX_STRENGTHS_PER_PRACTICE, deliveredGuidance),
+            trend.direction(),
+            TrendSupportDTO.from(trend.support())
+        );
+    }
+
+    private static List<ReflectionItemDTO> items(
+        List<Observation> observations,
+        int cap,
+        Map<UUID, String> deliveredGuidance
+    ) {
+        return observations
+            .stream()
+            .limit(cap)
+            .map(observation -> ReflectionItemDTO.from(observation, deliveredGuidance.get(observation.getId())))
+            .toList();
+    }
+
+    /**
+     * How positive this practice's recent evidence was, in {@code [0,1]} — the continuous value the standing
+     * label is only a rendering of.
+     *
+     * <p>One rule, one unit, one denominator. It replaced a pair of rules that disagreed about both: an
+     * existence test over ITEMS ("any problem at all in 90 days") that could not tell one problem from fifty,
+     * plus a clean-streak override over OPPORTUNITIES that could. Reading the whole
+     * {@link de.tum.cit.aet.hephaestus.practices.observation.trend.OutcomeVector} of the newest
+     * {@link #STANDING_WINDOW} opportunities answers both questions at once, and the recency weighting keeps
+     * the property the streak existed for: a fixed habit is acknowledged within two reviews.
+     *
+     * <p>The area consumes this number rather than the label, so the resolution won here is not quantised away
+     * one level up.
+     *
+     * <p>The fallback is unreachable while the reflection look-back and the trend horizon are both
+     * {@link #LOOKBACK_DAYS} days: a card exists only if some observation produced a verdict, and any such
+     * observation is an applicable opportunity. It mirrors what the same rule would yield from the card's own
+     * items, so even the impossible case cannot contradict the rule.
+     */
+    private static double standingShare(PracticeEvidence evidence, PracticeTrend trend) {
+        return trend
+            .recentPositiveShare(STANDING_WINDOW, STANDING_DECAY)
+            .orElseGet(() -> evidence.problems().isEmpty() ? 1.0 : 0.0);
+    }
+
+    /**
+     * One practice's window of observations, split by what each one says about the developer.
+     *
+     * <p>The split happens once and feeds everything downstream — the card's two lists, the trend's evidence,
+     * and the census. Deriving each of those from the raw group separately is what previously required three
+     * output parameters and a provisional card.
+     */
+    private record PracticeEvidence(
+        Practice practice,
+        List<Observation> problems,
+        List<Observation> strengths,
+        int suppressedStrengths
+    ) {
+        /**
+         * Splits one practice's group on {@link ObservationOutcome}, which is the only place the
+         * presence × assessment matrix is read.
+         *
+         * <p>Every problem the practice raised is kept, worst severity first. Nothing is withheld: an earlier
+         * revision suppressed single-artifact problems below a model-reported confidence floor, but that column
+         * was dropped after validation found it carried no discriminating information, and the per-locus
+         * corroboration meant to stand in for it cannot be satisfied — {@code recurrenceKey} hashes the
+         * artifact, so a locus is single-artifact by construction. Showing the record and letting the surface
+         * say how often something was seen is the honest version of that intent.
+         *
+         * <p>Positive evidence is partitioned rather than filtered, because a defect-detector practice's
+         * incoherent strengths are not noise to discard: they still prove the detector ran, which is what
+         * separates {@code NO_OPPORTUNITY} from {@code NOT_OBSERVED} for its area.
+         */
+        static PracticeEvidence classify(List<Observation> group) {
+            Practice practice = group.get(0).getPractice();
+            boolean defectDetector = practice.isDefectDetector();
+            List<Observation> problems = group
+                .stream()
+                .filter(observation -> ObservationOutcome.of(observation).isNegative())
+                .sorted(Comparator.comparingInt(PracticeReflectionService::severityOrdinal))
+                .toList();
+            Map<Boolean, List<Observation>> positives = group
+                .stream()
+                .filter(observation -> ObservationOutcome.of(observation).isPositive())
+                .collect(
+                    Collectors.partitioningBy(observation ->
+                        ObservationOutcome.of(observation).isCoherentStrengthFor(defectDetector)
+                    )
+                );
+            return new PracticeEvidence(practice, problems, positives.get(true), positives.get(false).size());
+        }
+
+        String slug() {
+            return practice.getSlug();
+        }
+
+        /**
+         * Everything that produced a verdict, which is exactly the trend's input. Observations that produced
+         * none are counted in the census instead: they are filtered out before bundling, so including them
+         * here could not move a trend, and they carry nothing a learner could read.
+         */
+        List<Observation> assessed() {
+            return Stream.concat(problems.stream(), strengths.stream()).toList();
+        }
+
+        /** Whether this practice has anything to say to the learner at all. */
+        boolean hasCard() {
+            return !problems.isEmpty() || !strengths.isEmpty();
+        }
+    }
+
+    private Map<String, Integer> inapplicableByPractice(Long developerId, Long workspaceId, Instant since) {
+        return observationRepository
+            .countInapplicableByDeveloperAndWorkspace(developerId, workspaceId, since)
+            .stream()
+            .collect(
+                Collectors.toMap(
+                    PracticeInapplicableCount::getPracticeSlug,
+                    count -> Math.toIntExact(count.getCount()),
+                    (left, ignored) -> left,
+                    LinkedHashMap::new
+                )
+            );
+    }
+
+    /**
+     * @param standingShareByPractice the continuous standing of every practice that produced a card, keyed by
+     *     slug. The area aggregates THIS rather than the cards' labels: rounding each practice to one of three
+     *     labels and then averaging those would throw away the resolution the practice rule just computed, and
+     *     0.79 and 0.51 would weigh the same. It stays out of {@link ReflectionPracticeDTO} on purpose — the
+     *     learner-facing card carries no raw score.
+     */
     public record ReflectionSnapshot(
         @Nullable Long developerId,
         List<ReflectionPracticeDTO> cards,
         Map<String, List<Observation>> evidenceByPractice,
         Map<String, List<String>> eligiblePracticesByArea,
-        Map<String, EvidenceCensus> censusByPractice
+        Map<String, Double> standingShareByPractice
     ) {
         static final ReflectionSnapshot EMPTY = new ReflectionSnapshot(null, List.of(), Map.of(), Map.of(), Map.of());
-    }
-
-    /**
-     * Why a practice produced the card it did — the input a no-verdict area status needs to say WHICH kind of
-     * silence it is.
-     *
-     * <p>Without this, "no observation at all", "the work offered no opportunity", and "we saw problems but
-     * none confident enough to report" all collapse into one indistinguishable empty state. That is the same
-     * conflation the trend surface removes by separating {@code STABLE} from {@code INSUFFICIENT_EVIDENCE}.
-     *
-     * @param displayable applicable findings that reached the learner surface
-     * @param notApplicable findings where the practice had no opportunity in the reviewed work
-     * @param quarantined applicable problems withheld by the confidence/corroboration floor
-     * @param suppressedStrengths clean runs of a defect-detector practice — the detector applied and raised
-     *     nothing. Deliberately not a strength (a detector's silence is not a demonstrated behaviour), but it
-     *     is still evidence that the practice was exercised, so it must not read as "never observed".
-     */
-    public record EvidenceCensus(int displayable, int notApplicable, int suppressedStrengths) {
-        public static final EvidenceCensus NONE = new EvidenceCensus(0, 0, 0);
-
-        EvidenceCensus plus(EvidenceCensus other) {
-            return new EvidenceCensus(
-                displayable + other.displayable,
-                notApplicable + other.notApplicable,
-                suppressedStrengths + other.suppressedStrengths
-            );
-        }
-
-        /** Any observation reached this practice, whether or not it produced a card. */
-        public boolean hasAnyEvidence() {
-            return displayable > 0 || notApplicable > 0 || suppressedStrengths > 0;
-        }
     }
 
     /**
@@ -372,11 +460,14 @@ public class PracticeReflectionService {
             .collect(Collectors.toMap(ObservationFeedbackBody::getObservationId, ObservationFeedbackBody::getBody));
     }
 
+    /** Verdicts first and worst first, because they are what a learner can act on; silences last. */
     private static int standingRank(ReflectionPracticeDTO.Standing standing) {
         return switch (standing) {
             case DEVELOPING -> 0;
             case MIXED -> 1;
             case STRENGTH -> 2;
+            case NO_OPPORTUNITY -> 3;
+            case NOT_OBSERVED -> 4;
         };
     }
 

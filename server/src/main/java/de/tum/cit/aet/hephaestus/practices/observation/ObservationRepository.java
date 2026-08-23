@@ -593,6 +593,15 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * totals still reach the mentor via the presence-count summary; this list stays recency-ordered, not
      * re-ordered by severity, to preserve its "what happened lately" purpose.
      *
+     * <p><strong>"Latest run" means the latest run that actually said something about THIS claim</strong> —
+     * the subquery correlates on practice, subject, artifact and origin class together. Correlating on the
+     * artifact alone would let any later run supersede a verdict it never re-examined, and a run covers only
+     * the practices it got to: {@code PracticeTraceOutcome} lists seven ways one drops out of a run —
+     * {@code SKIPPED}, {@code NOT_ASSESSABLE}, {@code TURNED_OFF}, {@code NOT_OCCASIONED}, {@code DORMANT},
+     * {@code LAPSED}, {@code FAILED} — none of which writes a row. A partial capture, a refusal, an exhausted
+     * budget or a timeout would then read exactly like a fixed habit, which is the conflation that enum exists
+     * to prevent: telemetry about our instrument is not a measurement of anybody's behaviour.
+     *
      * <p><strong>Backfilled observations are included, partitioned by origin class</strong> — a campaign's
      * {@code BAD} observation on a developer's own work is exactly what "what should I work on" is asking for,
      * and excluding it made a campaign produce nothing any developer could see. The latest-run correlation is
@@ -601,9 +610,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
      * already-delivered live feedback from the list. {@code ReflectionItemDTO.origin()} carries the class
      * through so the surface can label a backfilled item rather than pass it off as live.
      *
-     * <p>Aggregate policy deliberately DIVERGES from {@link #findSummaryByDeveloperAndWorkspace} here: the
-     * summary is a per-practice good/bad ratio read as a trend, and a hindsight campaign is not a point on a
-     * trend line.
+     * <p>Aggregate policy deliberately DIVERGES from {@link #findSummaryByDeveloperAndWorkspace} here in two
+     * ways. The first is backfill, above. The second is the correlation grain: the mentor aggregates still
+     * correlate on the artifact alone, so they keep the older, coarser meaning of "latest run". That is a known
+     * gap, not a considered difference — the argument above applies to them too — but the learner surfaces were
+     * corrected on their own so a change in the numbers the mentor speaks from stays a separate, deliberate
+     * decision. Do not "restore consistency" by copying either form across without making that decision.
      */
     @Query(
         value = """
@@ -625,8 +637,8 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
           AND f.presence IN ('PRESENT', 'ABSENT')
           AND f.agent_job_id = (
               SELECT f2.agent_job_id FROM observation f2
-              JOIN practice p2 ON p2.id = f2.practice_id
-              WHERE p2.workspace_id = p.workspace_id
+              WHERE f2.practice_id = f.practice_id
+                AND f2.about_user_id = f.about_user_id
                 AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
                 AND (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')
               ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
@@ -640,6 +652,62 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
         @Param("workspaceId") Long workspaceId,
         @Param("since") Instant since,
         Pageable pageable
+    );
+
+    /**
+     * Per-practice count of the opportunities {@link #findRecentByDeveloperAndWorkspace} deliberately drops:
+     * the runs where a practice looked and produced no verdict.
+     *
+     * <p>The reflection surface must not list these — an inapplicable row is nothing a learner can act on, and
+     * the sibling query's javadoc explains why it filters them. But dropping them entirely made "no observation
+     * ever reached this area" and "the practices ran and your work offered no relevant opportunity" collapse
+     * into one indistinguishable empty state, which is the conflation
+     * {@code PracticeAreaStatusDTO.AreaStatus.NO_OPPORTUNITY} exists to remove. Counting them here keeps the
+     * cards clean while giving the area status the fact it needs.
+     *
+     * <p>Counts, not rows, because that is all the census consumes: an inapplicable opportunity is filtered out
+     * before bundling, so it can never reach a trend, and it carries nothing displayable.
+     *
+     * <p><b>Every predicate below mirrors {@link #findRecentByDeveloperAndWorkspace} except the presence
+     * filter, which is its exact complement.</b> The latest-run correlated subquery in particular must stay
+     * identical — a divergent copy would let the two queries disagree about which run is current and report a
+     * census for a run whose cards are not shown.
+     */
+    @Query(
+        value = """
+        SELECT p.slug AS practiceSlug, COUNT(f.id) AS count
+        FROM observation f
+        JOIN practice p ON p.id = f.practice_id
+        WHERE f.about_user_id = :aboutUserId
+          AND p.workspace_id = :workspaceId
+          AND NOT EXISTS (
+              SELECT 1
+              FROM issue target_artifact
+              JOIN workspace_team_repository_settings wtrs
+                ON wtrs.workspace_id = p.workspace_id
+               AND wtrs.repository_id = target_artifact.repository_id
+               AND wtrs.hidden_from_contributions = true
+              WHERE f.artifact_kind IN ('scm.pull_request', 'scm.issue')
+                AND target_artifact.id = f.artifact_id
+          )
+          AND f.observed_at >= :since
+          AND f.presence NOT IN ('PRESENT', 'ABSENT')
+          AND f.agent_job_id = (
+              SELECT f2.agent_job_id FROM observation f2
+              WHERE f2.practice_id = f.practice_id
+                AND f2.about_user_id = f.about_user_id
+                AND f2.artifact_kind = f.artifact_kind AND f2.artifact_id = f.artifact_id
+                AND (f2.origin = 'BACKFILL') = (f.origin = 'BACKFILL')
+              ORDER BY f2.observed_at DESC, f2.agent_job_id DESC LIMIT 1
+          )
+        GROUP BY p.slug
+        """,
+        nativeQuery = true
+    )
+    List<PracticeInapplicableCount> countInapplicableByDeveloperAndWorkspace(
+        @Param("aboutUserId") Long aboutUserId,
+        @Param("workspaceId") Long workspaceId,
+        @Param("since") Instant since
     );
 
     /**
@@ -816,6 +884,12 @@ public interface ObservationRepository extends JpaRepository<Observation, UUID> 
     /** Projection: presence → count. */
     interface PresenceCount {
         Presence getPresence();
+        Long getCount();
+    }
+
+    /** Projection: practice slug → how many of its latest-run observations produced no verdict. */
+    interface PracticeInapplicableCount {
+        String getPracticeSlug();
         Long getCount();
     }
 

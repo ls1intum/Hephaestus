@@ -27,5 +27,5 @@ public interface CurrentDeveloperLookup {
      * @throws EntityNotFoundException when the caller is not a synced developer — for a write there is
      *     no meaningful empty answer, since the row would have no owner.
      */
-    Long currentDeveloperIdElseThrow();
+    long currentDeveloperIdElseThrow();
 }

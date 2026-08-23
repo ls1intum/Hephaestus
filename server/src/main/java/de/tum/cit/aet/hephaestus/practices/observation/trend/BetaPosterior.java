@@ -14,16 +14,6 @@ final class BetaPosterior {
 
     static final int GRID_SIZE = 256;
     private static final double JEFFREYS_PRIOR = 0.5;
-    private static final double[] LANCZOS = {
-        676.5203681218851,
-        -1259.1392167224028,
-        771.32342877765313,
-        -176.61502916214059,
-        12.507343278686905,
-        -0.13857109526572012,
-        9.9843695780195716e-6,
-        1.5056327351493116e-7,
-    };
 
     private final double alpha;
     private final double beta;
@@ -80,13 +70,22 @@ final class BetaPosterior {
         return variance;
     }
 
+    /**
+     * The density on a midpoint grid, normalised to sum to one.
+     *
+     * <p>Only the unnormalised kernel is evaluated. The beta normaliser {@code B(α, β)} is one constant
+     * subtracted from every grid point, and both the max-shift below and the final division by the total
+     * remove any constant — computing it (a log-gamma approximation) could not change a single output.
+     *
+     * <p>Midpoints, not cell edges: with the Jeffreys prior {@code α} and {@code β} can be below one, so
+     * the density diverges at 0 and 1. A grid that evaluated the edges would produce infinities.
+     */
     private double[] gridMass(int gridSize) {
         double[] logs = new double[gridSize];
         double max = Double.NEGATIVE_INFINITY;
-        double logNormalizer = logGamma(alpha) + logGamma(beta) - logGamma(alpha + beta);
         for (int index = 0; index < gridSize; index++) {
             double point = (index + 0.5) / gridSize;
-            logs[index] = (alpha - 1.0) * Math.log(point) + (beta - 1.0) * Math.log1p(-point) - logNormalizer;
+            logs[index] = (alpha - 1.0) * Math.log(point) + (beta - 1.0) * Math.log1p(-point);
             max = Math.max(max, logs[index]);
         }
         double[] mass = new double[gridSize];
@@ -98,19 +97,6 @@ final class BetaPosterior {
         final double total = sum;
         Arrays.setAll(mass, index -> mass[index] / total);
         return mass;
-    }
-
-    private static double logGamma(double value) {
-        if (value < 0.5) {
-            return Math.log(Math.PI) - Math.log(Math.sin(Math.PI * value)) - logGamma(1.0 - value);
-        }
-        double shifted = value - 1.0;
-        double series = 0.99999999999980993;
-        for (int index = 0; index < LANCZOS.length; index++) {
-            series += LANCZOS[index] / (shifted + index + 1.0);
-        }
-        double t = shifted + LANCZOS.length - 0.5;
-        return 0.5 * Math.log(2.0 * Math.PI) + (shifted + 0.5) * Math.log(t) - t + Math.log(series);
     }
 
     record Difference(double mean, double variance, double[] currentMass, double[] previousMass, int gridSize) {
@@ -126,16 +112,36 @@ final class BetaPosterior {
             return Math.max(0.0, 1.0 - probabilityAbove(halfWidth) - probabilityBelow(-halfWidth));
         }
 
+        /**
+         * The mass of the product grid on one side of {@code boundary}, in one pass instead of the full
+         * {@code gridSize²} product.
+         *
+         * <p>For a fixed current point the condition is an interval on the previous point, so its mass is a
+         * prefix sum. The interval's edge moves monotonically with the current point, which lets a single
+         * forward pointer find it — each grid point is visited once per axis rather than once per pair.
+         * The comparisons are the same ones the pairwise form made, so cells on the edge fall the same way.
+         */
         private double probabilityWhere(double boundary, boolean above) {
+            double[] previousPrefix = new double[gridSize + 1];
+            for (int previous = 0; previous < gridSize; previous++) {
+                previousPrefix[previous + 1] = previousPrefix[previous] + previousMass[previous];
+            }
             double probability = 0.0;
+            int edge = 0;
             for (int current = 0; current < gridSize; current++) {
-                double currentPoint = (current + 0.5) / gridSize;
-                for (int previous = 0; previous < gridSize; previous++) {
-                    double previousPoint = (previous + 0.5) / gridSize;
-                    double delta = currentPoint - previousPoint;
-                    if (above ? delta > boundary : delta < boundary) {
-                        probability += currentMass[current] * previousMass[previous];
+                double threshold = ((current + 0.5) / gridSize) - boundary;
+                if (above) {
+                    // current - previous > boundary  ⟺  previous < threshold
+                    while (edge < gridSize && ((edge + 0.5) / gridSize) < threshold) {
+                        edge++;
                     }
+                    probability += currentMass[current] * previousPrefix[edge];
+                } else {
+                    // current - previous < boundary  ⟺  previous > threshold
+                    while (edge < gridSize && ((edge + 0.5) / gridSize) <= threshold) {
+                        edge++;
+                    }
+                    probability += currentMass[current] * (1.0 - previousPrefix[edge]);
                 }
             }
             return probability;

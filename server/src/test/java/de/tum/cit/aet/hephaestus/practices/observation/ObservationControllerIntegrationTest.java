@@ -1422,6 +1422,54 @@ class ObservationControllerIntegrationTest extends AbstractWorkspaceIntegrationT
         }
 
         @Test
+        @WithUser
+        @DisplayName("a watched practice with nothing to say appears, and says which silence it is")
+        void shouldReportWhyAWatchedPracticeHasNothingToSay() {
+            // A practice the workspace reviews but that has never produced an observation about this
+            // developer. Leaving it off the surface would make "we are watching this and it has not come up"
+            // indistinguishable from "this is not being looked at", which is precisely what the learner needs
+            // to tell apart. It carries no items and no trajectory: a direction over nothing is a claim
+            // about nothing.
+            insertFinding(
+                practiceA,
+                developer,
+                "Thin PR description",
+                "ABSENT",
+                "MAJOR",
+                0.9f,
+                "scm.pull_request",
+                1L,
+                Instant.now()
+            );
+
+            webTestClient
+                .get()
+                .uri(BASE_URI + "/reflection", workspace.getWorkspaceSlug())
+                .headers(TestAuthUtils.withCurrentUser())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectBody()
+                .jsonPath("$.length()")
+                .isEqualTo(2)
+                // Verdicts lead, silences sort last — the order is what a learner can act on.
+                .jsonPath("$[0].slug")
+                .isEqualTo(practiceA.getSlug())
+                .jsonPath("$[0].standing")
+                .isEqualTo("DEVELOPING")
+                .jsonPath("$[1].slug")
+                .isEqualTo(practiceB.getSlug())
+                .jsonPath("$[1].standing")
+                .isEqualTo("NOT_OBSERVED")
+                .jsonPath("$[1].toWorkOn.length()")
+                .isEqualTo(0)
+                .jsonPath("$[1].strengths.length()")
+                .isEqualTo(0)
+                .jsonPath("$[1].trajectory")
+                .doesNotExist();
+        }
+
+        @Test
         void shouldReturn401ForUnauthenticated() {
             webTestClient
                 .get()

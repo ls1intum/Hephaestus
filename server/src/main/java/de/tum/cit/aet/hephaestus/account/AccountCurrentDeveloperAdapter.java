@@ -1,6 +1,5 @@
 package de.tum.cit.aet.hephaestus.account;
 
-import de.tum.cit.aet.hephaestus.core.WorkspaceAgnostic;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.User;
 import de.tum.cit.aet.hephaestus.integration.scm.domain.user.UserRepository;
 import de.tum.cit.aet.hephaestus.practices.spi.CurrentDeveloperLookup;
@@ -20,7 +19,6 @@ import org.springframework.stereotype.Service;
  * depends on it in return.
  */
 @Service
-@WorkspaceAgnostic("Identifies the caller, who is the same person in every workspace")
 public class AccountCurrentDeveloperAdapter implements CurrentDeveloperLookup {
 
     private final UserRepository userRepository;
@@ -35,7 +33,7 @@ public class AccountCurrentDeveloperAdapter implements CurrentDeveloperLookup {
     }
 
     @Override
-    public Long currentDeveloperIdElseThrow() {
+    public long currentDeveloperIdElseThrow() {
         return userRepository.getCurrentUserElseThrow().getId();
     }
 }

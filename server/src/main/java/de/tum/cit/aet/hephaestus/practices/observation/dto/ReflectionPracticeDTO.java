@@ -29,8 +29,8 @@ public record ReflectionPracticeDTO(
     @Nullable @Schema(description = "A concrete picture of doing this well") String whatGoodLooksLike,
     @NonNull
     @Schema(
-        description = "Where the developer stands on this practice",
-        allowableValues = { "DEVELOPING", "STRENGTH", "MIXED" }
+        description = "Where the developer stands on this practice, or why no standing could be formed",
+        allowableValues = { "DEVELOPING", "STRENGTH", "MIXED", "NOT_OBSERVED", "NO_OPPORTUNITY" }
     )
     Standing standing,
     @NonNull
@@ -45,13 +45,37 @@ public record ReflectionPracticeDTO(
     TrendDirection trajectory,
     @Nullable @Schema(description = "Evidence support and provenance for the trajectory") TrendSupportDTO trendSupport
 ) {
-    /** Coarse, human standing derived from the developer's latest-run feedback on this practice. */
+    /**
+     * Coarse, human standing derived from the developer's most recent evidence for this practice.
+     *
+     * <p>The first three are verdicts, read off the share of that evidence that was positive. The last two are
+     * the reasons there is NO verdict, and they are deliberately separate: a learner cannot act on an empty
+     * state that means "nothing was reviewed" and "your work offered no opportunity" interchangeably. The same
+     * split runs through the area status and, as {@code STABLE} against {@code INSUFFICIENT_EVIDENCE}, through
+     * the trend — absence of a claim is not the same fact as a claim of absence.
+     *
+     * <p>Carrying the non-verdicts HERE rather than beside the cards is what lets the area be a pure roll-up of
+     * its practices. It costs a longer list: a practice the workspace watches appears even when it has nothing
+     * to say yet, which is also the honest answer to "what is being looked at".
+     */
     public enum Standing {
-        /** Only problems (no strengths surfaced) — the focus of attention. */
+        /** Recent evidence was mostly problems — the focus of attention. */
         DEVELOPING,
-        /** Only strengths — a confirmed good habit. */
+        /** Recent evidence was almost entirely positive — a confirmed good habit. */
         STRENGTH,
-        /** Both problems and strengths across the developer's work. */
+        /** Recent evidence carries both sides in comparable measure. */
         MIXED,
+        /** No observation reached this practice at all. */
+        NOT_OBSERVED,
+        /**
+         * The practice was evaluated but produced nothing to report: the reviewed work offered no relevant
+         * opportunity, the evidence did not settle the question, or a defect-detector practice ran clean.
+         */
+        NO_OPPORTUNITY,
+    }
+
+    /** Whether this standing is a claim about the developer's work, rather than a reason none could be made. */
+    public static boolean isVerdict(Standing standing) {
+        return standing == Standing.DEVELOPING || standing == Standing.MIXED || standing == Standing.STRENGTH;
     }
 }

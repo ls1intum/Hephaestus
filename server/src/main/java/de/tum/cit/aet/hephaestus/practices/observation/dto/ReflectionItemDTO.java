@@ -3,6 +3,7 @@ package de.tum.cit.aet.hephaestus.practices.observation.dto;
 import de.tum.cit.aet.hephaestus.integration.core.signal.ArtifactKind;
 import de.tum.cit.aet.hephaestus.practices.model.Observation;
 import de.tum.cit.aet.hephaestus.practices.model.ObservationOrigin;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
 import de.tum.cit.aet.hephaestus.practices.model.Severity;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.UUID;
@@ -18,6 +19,14 @@ public record ReflectionItemDTO(
     @Schema(description = "What to do — the delivered feedback for this observation (null if nothing was delivered)")
     String deliveredFeedback,
     @Nullable @Schema(description = "Impact level (null unless assessed BAD)") Severity severity,
+    @NonNull
+    @Schema(
+        description = "What this item says about the developer, which selects how to read it: a behaviour " +
+            "demonstrated, a trap avoided, something harmful done, or something needed left out. A card's " +
+            "lists only separate positive from negative, so this is what tells the two kinds of each apart.",
+        allowableValues = { "DEMONSTRATED_STRENGTH", "SAFE_AVOIDANCE", "COMMISSION_PROBLEM", "OMISSION_GAP" }
+    )
+    ObservationOutcome outcome,
     @NonNull @Schema(description = "The kind of work this is about (PR / issue)") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Id of the PR / issue this is about") Long artifactId,
     @Nullable @Schema(description = "Where in the work, e.g. \"FrameRecorder.swift:212\", when known") String locator,
@@ -34,6 +43,7 @@ public record ReflectionItemDTO(
             observation.getSummary(),
             deliveredFeedback,
             observation.getSeverity(),
+            ObservationOutcome.of(observation),
             observation.getArtifactKind(),
             observation.getArtifactId(),
             locatorOf(observation.getEvidence()),

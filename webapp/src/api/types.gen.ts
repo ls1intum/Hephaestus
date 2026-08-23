@@ -2567,9 +2567,9 @@ export type ReflectionPractice = {
      */
     slug: string;
     /**
-     * Where the developer stands on this practice
+     * Where the developer stands on this practice, or why no standing could be formed
      */
-    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED';
+    standing: 'DEVELOPING' | 'STRENGTH' | 'MIXED' | 'NOT_OBSERVED' | 'NO_OPPORTUNITY';
     /**
      * What the developer already does well here
      */
@@ -2624,6 +2624,10 @@ export type ReflectionItem = {
      * What occasioned the measurement. BACKFILL means it came from a review of past work rather than from something that just happened, and nothing was posted anywhere at the time.
      */
     origin: 'LIVE' | 'MANUAL' | 'BACKFILL';
+    /**
+     * What this item says about the developer, which selects how to read it: a behaviour demonstrated, a trap avoided, something harmful done, or something needed left out. A card's lists only separate positive from negative, so this is what tells the two kinds of each apart.
+     */
+    outcome: 'DEMONSTRATED_STRENGTH' | 'SAFE_AVOIDANCE' | 'COMMISSION_PROBLEM' | 'OMISSION_GAP';
     /**
      * Impact level (null unless assessed BAD)
      */
@@ -3314,13 +3318,13 @@ export type PracticeAreaStatus = {
  */
 export type FeedbackSourceCount = {
     /**
+     * The kind of work the feedback came from
+     */
+    artifactKind: string;
+    /**
      * Distinct artifacts of this kind in the selected time period
      */
     count: number;
-    /**
-     * The kind of work the feedback came from
-     */
-    source: string;
 };
 
 /**
@@ -3337,7 +3341,10 @@ export type PracticeAreaReviewMoment = {
  * One concrete, evidence-backed result inside a review moment
  */
 export type PracticeAreaReviewFinding = {
-    assessment: 'GOOD' | 'BAD';
+    /**
+     * Good or bad for the developer; null when the review could not decide (INCONCLUSIVE)
+     */
+    assessment?: 'GOOD' | 'BAD';
     feedbackId?: string;
     observationId: string;
     practiceName: string;

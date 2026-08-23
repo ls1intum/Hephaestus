@@ -9480,16 +9480,16 @@ components:
       type: object
       description: Distinct work artifacts of one kind that contributed feedback
       properties:
+        artifactKind:
+          type: string
+          description: The kind of work the feedback came from
         count:
           type: integer
           format: int64
           description: Distinct artifacts of this kind in the selected time period
-        source:
-          type: string
-          description: The kind of work the feedback came from
       required:
+      - artifactKind
       - count
-      - source
     FxRateInfo:
       type: object
       description: "Display-only currency conversion for the USD amounts in this response.\
@@ -11128,6 +11128,8 @@ components:
       properties:
         assessment:
           type: string
+          description: Good or bad for the developer; null when the review could not
+            decide (INCONCLUSIVE)
           enum:
           - GOOD
           - BAD
@@ -11168,7 +11170,6 @@ components:
         title:
           type: string
       required:
-      - assessment
       - observationId
       - practiceName
       - practiceSlug
@@ -12361,6 +12362,17 @@ components:
           - LIVE
           - MANUAL
           - BACKFILL
+        outcome:
+          type: string
+          description: "What this item says about the developer, which selects how\
+            \ to read it: a behaviour demonstrated, a trap avoided, something harmful\
+            \ done, or something needed left out. A card's lists only separate positive\
+            \ from negative, so this is what tells the two kinds of each apart."
+          enum:
+          - DEMONSTRATED_STRENGTH
+          - SAFE_AVOIDANCE
+          - COMMISSION_PROBLEM
+          - OMISSION_GAP
         severity:
           type: string
           description: Impact level (null unless assessed BAD)
@@ -12377,6 +12389,7 @@ components:
       - artifactKind
       - observationId
       - origin
+      - outcome
       - title
     ReflectionPractice:
       type: object
@@ -12396,11 +12409,14 @@ components:
           description: Practice slug
         standing:
           type: string
-          description: Where the developer stands on this practice
+          description: "Where the developer stands on this practice, or why no standing\
+            \ could be formed"
           enum:
           - DEVELOPING
           - STRENGTH
           - MIXED
+          - NOT_OBSERVED
+          - NO_OPPORTUNITY
         strengths:
           type: array
           description: What the developer already does well here

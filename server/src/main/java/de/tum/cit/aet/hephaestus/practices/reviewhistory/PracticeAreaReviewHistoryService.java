@@ -57,6 +57,11 @@ public class PracticeAreaReviewHistoryService {
 
         boolean hasArtifactKinds = artifactKinds != null && !artifactKinds.isEmpty();
         boolean hasSeverities = severities != null && !severities.isEmpty();
+        // Placeholders, never evaluated: each query gates its IN clause on the matching flag, so with the flag
+        // false the predicate short-circuits before the list is read. They are nonetheless non-empty because
+        // `findReviewHistoryRuns` is a native query whose collection parameter is expanded into the SQL text —
+        // an empty one yields `IN ()`, which Postgres rejects at parse time, before any short-circuit applies.
+        // These are NOT defaults: an unfiltered request still returns issues and conversation threads.
         List<ArtifactKind> artifactFilter = hasArtifactKinds ? artifactKinds : List.of(ArtifactKinds.PULL_REQUEST);
         List<Severity> severityFilter = hasSeverities ? severities : List.of(Severity.INFO);
 

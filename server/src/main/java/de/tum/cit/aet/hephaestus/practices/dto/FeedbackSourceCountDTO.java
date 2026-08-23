@@ -10,6 +10,6 @@ import org.jspecify.annotations.NonNull;
  */
 @Schema(description = "Distinct work artifacts of one kind that contributed feedback")
 public record FeedbackSourceCountDTO(
-    @NonNull @Schema(description = "The kind of work the feedback came from") ArtifactKind source,
+    @NonNull @Schema(description = "The kind of work the feedback came from") ArtifactKind artifactKind,
     @NonNull @Schema(description = "Distinct artifacts of this kind in the selected time period") Long count
 ) {}

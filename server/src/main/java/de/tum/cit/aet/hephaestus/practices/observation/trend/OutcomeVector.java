@@ -1,7 +1,9 @@
 package de.tum.cit.aet.hephaestus.practices.observation.trend;
 
 import de.tum.cit.aet.hephaestus.practices.model.Assessment;
+import de.tum.cit.aet.hephaestus.practices.model.ObservationOutcome;
 import de.tum.cit.aet.hephaestus.practices.model.Presence;
+import org.jspecify.annotations.Nullable;
 
 /** Complete presence-assessment outcome distribution for one or more evidence opportunities. */
 public record OutcomeVector(
@@ -25,30 +27,28 @@ public record OutcomeVector(
         }
     }
 
+    /** The one-hot vector for a single observation's two measurement axes. */
+    public static OutcomeVector of(Presence presence, @Nullable Assessment assessment) {
+        return of(ObservationOutcome.of(presence, assessment));
+    }
+
     /**
-     * {@code NOT_APPLICABLE} and {@code INCONCLUSIVE} both land in {@code notApplicable}: they are different
-     * facts for a reader — "there was nothing here to judge" versus "the practice looked and could not tell" —
-     * but neither is an outcome, so neither may move a trend in either direction. Only the surfaces that
-     * explain a review distinguish them; the trend counts them alike as an opportunity that produced no verdict.
+     * The one-hot vector for one observation's outcome — this record is that outcome counted rather than
+     * named, so the two stay in step by construction.
+     *
+     * <p>{@code NOT_APPLICABLE} covers both {@link Presence#NOT_APPLICABLE} and {@link Presence#INCONCLUSIVE}:
+     * they are different facts for a reader — "there was nothing here to judge" versus "the practice looked
+     * and could not tell" — but neither is an outcome, so neither may move a trend in either direction. Only
+     * the surfaces that explain a review distinguish them; the trend counts them alike as an opportunity that
+     * produced no verdict.
      */
-    public static OutcomeVector of(Presence presence, Assessment assessment) {
-        if (presence == Presence.NOT_APPLICABLE || presence == Presence.INCONCLUSIVE) {
-            if (assessment != null) {
-                throw new IllegalArgumentException(presence + " must not carry an assessment");
-            }
-            return new OutcomeVector(0, 0, 0, 0, 1);
-        }
-        if (assessment == null) {
-            throw new IllegalArgumentException("Applicable presence requires an assessment");
-        }
-        return switch (presence) {
-            case PRESENT -> assessment == Assessment.GOOD
-                ? new OutcomeVector(1, 0, 0, 0, 0)
-                : new OutcomeVector(0, 0, 1, 0, 0);
-            case ABSENT -> assessment == Assessment.GOOD
-                ? new OutcomeVector(0, 1, 0, 0, 0)
-                : new OutcomeVector(0, 0, 0, 1, 0);
-            case NOT_APPLICABLE, INCONCLUSIVE -> throw new IllegalStateException("Handled above");
+    public static OutcomeVector of(ObservationOutcome outcome) {
+        return switch (outcome) {
+            case DEMONSTRATED_STRENGTH -> new OutcomeVector(1, 0, 0, 0, 0);
+            case SAFE_AVOIDANCE -> new OutcomeVector(0, 1, 0, 0, 0);
+            case COMMISSION_PROBLEM -> new OutcomeVector(0, 0, 1, 0, 0);
+            case OMISSION_GAP -> new OutcomeVector(0, 0, 0, 1, 0);
+            case NOT_APPLICABLE -> new OutcomeVector(0, 0, 0, 0, 1);
         };
     }
 
