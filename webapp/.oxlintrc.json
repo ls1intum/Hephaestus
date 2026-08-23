@@ -18,7 +18,7 @@
 		"restriction": "off"
 	},
 
-	// The globals a rule may assume exist. Kept in step with `tsconfig.json`'s `lib`.
+	// Kept in step with `tsconfig.json`'s `lib`.
 	"env": { "browser": true, "es2022": true },
 	"settings": {
 		"react": { "version": "19.2" },
@@ -54,8 +54,10 @@
 		"typescript/no-unsafe-member-access": "error",
 		// Without it, `!` is an unchecked way to make the claim `no-unsafe-type-assertion` rejects.
 		"typescript/no-non-null-assertion": "error",
-		// `FC` types the return rather than the props, forces `children` onto components that take
-		// none, and cannot express a generic component.
+		// `FC` annotates the binding rather than the props, so it only reaches an arrow assigned to a
+		// `const`; its call signature returns `ReactNode | Promise<ReactNode>`, so an accidentally
+		// `async` component type-checks; and it has nowhere to bind a type parameter, so a generic
+		// component cannot be spelled with it at all.
 		"typescript/no-restricted-types": [
 			"error",
 			{
@@ -199,11 +201,10 @@
 		"prefer-numeric-literals": "error",
 		"prefer-exponentiation-operator": "error",
 		"prefer-arrow-callback": "error",
+		// `@/` is the house spelling, and a `../` survives moving the file only by accident.
+		"import/no-relative-parent-imports": "error",
 		// `import/no-duplicates` accepts a type-only import standing beside a value import from the same
 		// module; `no-duplicate-imports` does not, and one import list per module is the point.
-		// `@/` is the house spelling: 2,700 aliased imports against a handful of parent-relative
-		// ones. A `../` also survives moving a file only by accident.
-		"import/no-relative-parent-imports": "error",
 		"import/no-duplicates": "error",
 		"no-duplicate-imports": "error",
 		"import/no-mutable-exports": "error",
@@ -342,13 +343,14 @@
 		// `toBeTruthy()`, which also passes on `1`, `"false"` and `{}`. Both cannot be on.
 		"vitest/prefer-to-be-truthy": "off",
 		"vitest/prefer-to-be-falsy": "off",
-		// React Compiler's own effect check, and it disagrees with the effects here in both directions
-		// — extra dependencies called on purpose, and one it reads as missing. Either way, clearing what
-		// it reports changes when the effect fires.
+		// Every effect it reports here lists a value it deliberately does not read — a ref reset keyed on
+		// the location, focus keyed on the wizard step — which reads to the rule as an extra dependency.
+		// Dropping one changes when the effect fires, which is the reason it is listed.
 		"react/exhaustive-effect-dependencies": "off",
-		// The rule's tag mapping is wrong for two shapes used throughout: it wants `<output>` for
-		// `role="status"`, which carries form-association semantics a live region does not, and `<img>`
-		// for `role="img"` on an inline SVG, which is how you give one a name.
+		// It maps a role to a tag without asking whether that tag's other semantics fit. Most of what it
+		// reports is one of two shapes: `<output>` for `role="status"`, which carries a form association
+		// a live region does not, and `<img>` for `role="img"` on an inline SVG, which is how you name
+		// one. The rest — `group`, `listitem`, `region` — are wrong the same way.
 		"jsx-a11y/prefer-tag-over-role": "off",
 		// Base UI passes the control through `render=` and keeps the label in the wrapper's children,
 		// where no jsx-a11y rule can see it. It also does not model `<datalist>`, where a valueless
@@ -356,8 +358,8 @@
 		"jsx-a11y/control-has-associated-label": "off",
 		// Same shape, plus `renderPageLink`: the `<a>`'s content comes from whoever renders it.
 		"jsx-a11y/anchor-has-content": "off",
-		// Placeholder rows and decorative layers have no identity but their position, and even a
-		// composite `${id}:${index}` key still trips it.
+		// Skeleton rows, decorative layers and rendered strings have no identity but their position, and
+		// even a composite `${id}:${index}` key still trips it.
 		"react/no-array-index-key": "off",
 		// `rows.length ? … : …` on a value that is only ever an array reads fine.
 		"unicorn/explicit-length-check": "off",
@@ -375,23 +377,26 @@
 		// module-level icons. `react/no-unstable-nested-components` still catches a component defined
 		// inside another's body.
 		"react/static-components": "off",
-		// A handler defined next to the JSX that uses it is the point, and the rule cannot tell it from
-		// a genuinely hoistable helper.
+		// It reports the enclosing function, not the helper, and most of what it finds is a helper
+		// deliberately scoped to the block that owns it — a test's `describe` more often than anything
+		// else. Hoisting those widens what they are visible to and buys nothing.
 		"unicorn/consistent-function-scoping": "off",
 		// Server field names (`_id`), test hooks (`__resetSessionRecoveryForTests`), the runtime config
 		// global (`__ENV__`), exhaustiveness bindings (`_exhaustive`) and XSS sentinels a test has to name.
 		"no-underscore-dangle": "off",
 
 		// -- Options ---------------------------------------------------------------------------------
-		// `ignoreNonDOM: true` would make this rule blind to every use here, all of which are spelled
-		// on a component (`<Input autoFocus/>`). The overlay-field cases are suppressed at the call site.
+		// Every `autoFocus` here is spelled on a component — `<Input>`, `<Textarea>`, `<Calendar>` — so
+		// `ignoreNonDOM: true` would make the rule blind to all of them. Each already carries a
+		// suppression stating why, and `reportUnusedDisableDirectives` would then fail every one.
 		"jsx-a11y/no-autofocus": ["error", { "ignoreNonDOM": false }],
 		// TanStack Table column defs are `cell: ({ row }) => <Badge …/>` — a component passed as a prop.
 		"react/no-unstable-nested-components": ["error", { "allowAsProps": true }],
 		// `void somePromise.then(sideEffect)` is fire-and-forget; only a chain's interior needs a return.
 		"promise/always-return": ["error", { "ignoreLastCallback": true }],
-		// Vitest's `expect(actual, message)` takes a second argument; the rule is ported from Jest, whose
-		// default of 1 rejects it. Load-bearing — three assertions inside loops label themselves that way.
+		// Vitest's `expect(actual, message)` takes a second argument, which the default of 1 rejects. A
+		// literal message is tolerated even at 1, so this is load-bearing only where the label is
+		// computed — which is every assertion inside a loop, the shape that needs a label most.
 		"vitest/valid-expect": ["error", { "maxArgs": 2 }],
 		// CSS side effects and module augmentation.
 		"import/no-unassigned-import": ["error", { "allow": ["**/*.css", "@tanstack/react-router", "react"] }],
@@ -419,7 +424,7 @@
 		],
 		"no-console": "error",
 		// A circular import leaves one side reading `undefined` at module-init time, and which side
-		// depends on entry order. None exist; the rule keeps it that way.
+		// depends on entry order.
 		"import/no-cycle": "error",
 		// `AGENTS.md` § Testing states the query priority. A `data-testid` skips straight past it, and
 		// the accessible name it stands in for is the thing a screen reader needs anyway.
@@ -452,18 +457,12 @@
 			}
 		],
 
-		// -- House rules, defined in `tools/oxlint/` -------------------------------------------------
-		// A hand-written key stops matching the generated one silently: no failure, just an
-		// invalidation that no longer invalidates.
+		// -- House rules, defined in `tools/oxlint/` --------------------------------------------------
+		// Each states in its own `meta.docs.description` what it asks and why no shipped rule does.
 		"hephaestus/no-manual-query-key": "error",
-		// Biome's `useFilenamingConvention` asked this through `requireAscii`; `unicorn/filename-case`
-		// checks a name's shape and not its alphabet, so nothing else in the migration covers it.
 		"hephaestus/no-non-ascii-filename": "error",
-		// `new Date()` is invisible to every shipped rule: oxlint has no `no-restricted-syntax`
-		// (oxc#7342, `not_planned`) and `no-restricted-properties` cannot see a constructor call.
 		"hephaestus/no-nondeterministic-render": "error",
 		"hephaestus/no-redundant-in-the-document": "error",
-		// No jsx-a11y rule asks this, and an unnamed icon is invisible to a screen reader.
 		"hephaestus/svg-needs-accessible-name": "error"
 		// The other four read a Storybook story object and are scoped to story files in `overrides`.
 	},
@@ -479,7 +478,7 @@
 			"rules": { "import/no-relative-parent-imports": "off" }
 		},
 		{
-			// `src/lib/utils.ts` gets the entry below instead; `excludeFiles` keeps the two from colliding.
+			// `src/lib/utils.ts` gets the entry below instead; `excludeFiles` keeps the two apart.
 			"files": ["src/lib/**", "src/stores/**"],
 			"excludeFiles": ["src/lib/utils.ts"],
 			"rules": {
@@ -556,8 +555,7 @@
 			}
 		},
 		{
-			// A UI primitive gets the stricter entry above instead; `excludeFiles` keeps the two from
-			// colliding, since a second matching override would replace its options rather than add.
+			// A UI primitive gets the stricter entry above instead; `excludeFiles` keeps the two apart.
 			"files": ["src/components/**"],
 			"excludeFiles": ["src/components/ui/**"],
 			"rules": {
@@ -656,13 +654,15 @@
 			// All four read a Storybook story object, and only a story file holds one. `parameters.a11y`
 			// is also how `.storybook/preview.tsx` sets the project-wide bar none of them may lower; a
 			// `play` property elsewhere belongs to a media element; `canvasElement` exists only inside a
-			// play; and a domain type named `Meta` — a pagination envelope, say — is not Storybook's.
+			// play; and `meta`/`Meta` are recognised by name, which is Storybook's convention and
+			// nobody else's promise.
 			"files": ["**/*.stories.tsx"],
 			"rules": {
 				// `vitest/expect-expect` cannot see these: a play is a property on a story object, not a
-				// body inside `test()`. The list below is a subset of the rule's own, which adds the
-				// `expect*` and `assert*` prefixes that reach `src/test/`'s helpers; that relation — not
-				// the text, which JSON and TypeScript cannot share — is pinned by `play-must-assert.test.ts`.
+				// body inside `test()`. This rule carries its own list, which is `assertFunctionNames`
+				// above widened to the `expect*` and `assert*` prefixes that reach `src/test/`'s helpers,
+				// so anything counted there is counted here. A literal cannot be shared across JSON and
+				// TypeScript, so it is that relation `play-must-assert.test.ts` pins.
 				"hephaestus/play-must-assert": "error",
 				// One story quietly exempting itself leaves the whole suite green.
 				"hephaestus/no-story-a11y-override": "error",

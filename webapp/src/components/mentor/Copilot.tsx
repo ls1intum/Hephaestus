@@ -20,9 +20,6 @@ type BodyScrollRef = RefObject<BodyScrollStyles | null>;
  * Freeze the page behind the popover, compensating for the scrollbar it removes so the layout does
  * not shift sideways. Re-entrant: a second lock while one is held is a no-op, so the styles captured
  * are always the page's own rather than the frozen ones.
- *
- * Both halves touch nothing but `document.body` and the ref they are handed, which is why they sit
- * outside the component — nothing about them varies per render.
  */
 function lockBodyScroll(previous: BodyScrollRef): void {
 	if (previous.current) return;

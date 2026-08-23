@@ -47,7 +47,7 @@ export const svgNeedsAccessibleName = defineRule({
 		type: "problem",
 		docs: {
 			description:
-				'An inline `<svg>` is either named or explicitly hidden. Left as neither it reaches the accessibility tree as an unlabelled graphic, which a screen reader announces as "image" and nothing more — worse than absent, because it interrupts. `role="img"` alone does not help: it supplies the role the graphic already had and no name. No shipped `jsx-a11y` rule asks this of `<svg>`, and `webapp/AGENTS.md` has carried it as a review-time convention with nothing enforcing it.',
+				'An inline `<svg>` is either named or explicitly hidden. Left as neither it reaches the accessibility tree as an unlabelled graphic, which a screen reader announces as "image" and nothing more — worse than absent, because it interrupts. `role="img"` alone does not help: it supplies the role the graphic already had and no name. No shipped `jsx-a11y` rule asks this of `<svg>`.',
 		},
 		messages: {
 			unnamed:

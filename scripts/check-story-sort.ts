@@ -109,7 +109,7 @@ if (order.length === 0) {
 }
 
 const entries = await readdir(join(REPO_ROOT, STORIES_ROOT), { recursive: true });
-const files = entries.filter((entry) => entry.endsWith(STORY_SUFFIX)).sort();
+const files = entries.filter((entry) => entry.endsWith(STORY_SUFFIX)).toSorted();
 if (files.length === 0) {
 	fail(`No story files under ${STORIES_ROOT} — this check would pass without checking.`);
 }

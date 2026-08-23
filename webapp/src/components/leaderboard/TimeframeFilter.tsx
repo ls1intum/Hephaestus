@@ -10,7 +10,7 @@ import {
 	subDays,
 } from "date-fns";
 import { CalendarDays, CalendarIcon, CalendarRange, Clock } from "lucide-react";
-// oxlint-disable-next-line no-restricted-imports -- `schedule` below is a dependency of the emitting effect and is rebuilt from three scalars every render, so its identity is what decides whether that effect re-runs. `react-hooks/exhaustive-deps` reports it the moment the memo goes.
+// oxlint-disable-next-line no-restricted-imports -- `schedule` below is a dependency of the emitting effect, so its identity decides whether that effect re-runs; see the note there.
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { DateRange } from "react-day-picker";
 import { useNow } from "@/components/common/use-now";
@@ -83,9 +83,8 @@ export function TimeframeFilter({
 	openEndedPresets = false,
 	enableAllActivityOption = false,
 }: TimeframeFilterProps) {
-	// Callers pass `leaderboardSchedule` as an inline object, so the memo keys on the fields rather
-	// than on the caller's render: `schedule` is a dependency of the emitting effect below, and an
-	// identity that changed every render would re-run that effect every render.
+	// Keyed on the three scalars, not on `leaderboardSchedule`: callers pass that inline, and a fresh
+	// identity each render would re-run the emitting effect below each render.
 	const scheduleDay = leaderboardSchedule?.day ?? DEFAULT_SCHEDULE.day;
 	const scheduleHour = leaderboardSchedule?.hour ?? DEFAULT_SCHEDULE.hour;
 	const scheduleMinute = leaderboardSchedule?.minute ?? DEFAULT_SCHEDULE.minute;
@@ -95,8 +94,8 @@ export function TimeframeFilter({
 	);
 
 	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
-	// The emitted range is measured from this instant, and it ticks, so a week or month boundary
-	// crossed with the page open rolls the range over instead of stranding it in the old period.
+	// Ticks, so a week or month boundary crossed with the page open rolls the emitted range over
+	// instead of stranding it in the period that ended.
 	const nowMs = useNow();
 	const now = new Date(nowMs);
 
@@ -295,7 +294,7 @@ export function TimeframeFilter({
 							/>
 							<PopoverContent className="w-auto p-0" align="start">
 								<Calendar
-									// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" on the leaderboard timeframe filter opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
+									// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
 									autoFocus
 									mode="range"
 									defaultMonth={customRange?.from}

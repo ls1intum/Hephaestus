@@ -58,7 +58,7 @@ export function DateRangeFacet({ title, value, onChange }: DateRangeFacetProps) 
 			<PopoverContent className="w-auto p-0" align="start">
 				<PopoverTitle className="sr-only">Choose a {title.toLowerCase()} date range</PopoverTitle>
 				<Calendar
-					// oxlint-disable-next-line jsx-a11y/no-autofocus -- The toolbar facet's popover holds nothing but this calendar, so opening it puts the arrow keys on the day grid instead of a tab away.
+					// oxlint-disable-next-line jsx-a11y/no-autofocus -- The popover holds nothing but this calendar, so opening it puts the arrow keys on the day grid.
 					autoFocus
 					mode="range"
 					defaultMonth={value?.from}

@@ -182,8 +182,8 @@ function GitLabWizardPage() {
 
 	const stepAnnouncement = `Step ${state.step} of 3: ${STEP_META[state.step].title}`;
 
-	// A failure is read off `listGroups.isError` below, which renders the alert next to step 1's
-	// server URL and token — the two fields the user can act on.
+	// No `onError`: the alert is rendered off `listGroups.isError` beside step 1's server URL and
+	// token, the two fields a reader can act on.
 	const listGroups = useMutation(listGitLabGroupsMutation());
 
 	const createWorkspace = useMutation({

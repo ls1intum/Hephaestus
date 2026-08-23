@@ -339,7 +339,7 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 
 		if (extractedExamples.size > 0) {
 			logger.info("New examples created:");
-			for (const filename of [...extractedExamples.keys()].sort()) {
+			for (const filename of [...extractedExamples.keys()].toSorted()) {
 				logger.info(` - ${filename}`);
 			}
 		}
@@ -350,7 +350,8 @@ async function extractWebhookExamples(options: ExtractOptions, logger: Logger) {
 				logger.debug(`Consumer deleted: ${consumerName ?? "unknown"}`);
 			}
 		} catch {
-			// ignore
+			// A consumer that is already gone, or a connection that dropped first, is the state this
+			// was reaching for. Whatever brought the run here is the failure to report.
 		}
 		if (nc) {
 			await nc.close();

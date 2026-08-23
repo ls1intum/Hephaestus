@@ -2,9 +2,7 @@
 // Storybook browser worker (see `.storybook/preview.tsx`), so mocked auth behaviour is
 // identical across stories and unit tests.
 //
-// Wired into Vitest via `src/test/setup-msw.ts` (registered as a `setupFiles` entry in
-// `vite.config.ts`): `beforeAll(server.listen)`, `afterEach(server.resetHandlers)`,
-// `afterAll(server.close)`.
+// `src/test/setup-msw.ts` starts, resets and closes it around the Vitest run.
 
 import { setupServer } from "msw/node";
 import { handlers } from "./handlers";

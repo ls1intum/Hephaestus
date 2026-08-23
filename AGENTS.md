@@ -31,7 +31,7 @@ Load these rather than reasoning from scratch.
 | `/storybook-components` | Component props, stories, play functions, a11y posture; grading a webapp diff |
 | `/composition-patterns` | Compound components, render props, React 19 API shape |
 | `/web-design-guidelines` | UI accessibility and UX review |
-| `/react-best-practices` | Frontend performance (~40% Next.js-specific — check applicability) |
+| `/react-best-practices` | Frontend performance — a vendored Vercel pack; read its applicability table first, since much of it is Next.js-only |
 | `/fix-ci`, `/land-pr`, `/resolve-review` | CI triage, opening a PR, answering review comments |
 | `/gh-stack` | Creating and maintaining stacked pull requests |
 
@@ -53,9 +53,9 @@ comprehensive verification. A `:webapp`, `:server` or `:agents` suffix scopes an
 scopes `format` and `lint` only — the Java leg of `check` is `check:server`.
 
 **`check` is a strict superset of CI, and the difference is only ever caught locally.** PMD
-(`lint:java`), `check:diagrams`, `check:env` and `check:story-sort` run in no workflow; the only thing
-that runs them before a merge is the `pre-push` hook, which `--no-verify` skips. Green CI is therefore
-not evidence that `pnpm run check` passes. Run it yourself before you claim it.
+(`lint:java`), `check:story-sort` and `check:diagrams` run in no workflow; the only thing that runs
+them before a merge is the `pre-push` hook, which `--no-verify` skips. Green CI is therefore not
+evidence that `pnpm run check` passes. Run it yourself before you claim it.
 
 ### Lint and format scopes
 
@@ -64,35 +64,27 @@ not evidence that `pnpm run check` passes. Run it yourself before you claim it.
 | Tree | oxlint config | Formatted by | Scripts |
 |---|---|---|---|
 | the SPA (`webapp/`) | `webapp/.oxlintrc.json` | Biome (`webapp/biome.jsonc`) | `format:webapp`, `lint:webapp`, `check:webapp` |
-| the docs site (`docs/`) | `docs/.oxlintrc.json` | its own tooling | linted by `lint:agents`, which passes `docs` as a path |
-| the Bun agent runtime and specs, both precompute trees, `scripts/**`, and the repo-root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
+| the docs site (`docs/`) | `docs/.oxlintrc.json` | nothing — only `.editorconfig` | linted by `lint:agents`, which passes `docs` as a path |
+| the Bun agent runtime and specs, both precompute trees, `scripts/**`, `.changeset/`, `.github/` and the root config files | `.oxlintrc.json` | Biome (`biome.jsonc`) | `format:agents`, `lint:agents`, `check:agents` |
 
 `docs:lint` is **not** the oxlint leg — it is the docs package's own `typecheck` plus
 `markdownlint-cli2`, and nothing in `pnpm run check` or in CI runs it. Run it by hand after editing
 `docs/`.
 
-A nested config **replaces** the root's rules for the files under it rather than merging, so each
-tree states its rule set in full. `options` — including `typeAware` and
-`reportUnusedDisableDirectives` — is declared only in the repo-root config and reaches a nested tree
-only while that file is the discovered root, which is why every lint script starts from the repo
-root. Each config carries the reasoning for its own deltas; read it before switching a rule either
-way.
-
-The two Biome configs run the pinned `@biomejs/biome` from the root `package.json`, and
-`webapp/biome.jsonc` declares `"root": false`. `check:agents` also runs `typecheck:agents` and
-`typecheck:scripts`; `check:webapp` does **not** run `typecheck:webapp`, which is a separate leg.
-`check:webapp:fix` and `check:agents:fix` apply every safe fix.
+**Start every oxlint run from the repo root.** A nested config *replaces* the root's rules for the
+files under it rather than merging, so each tree states its rule set in full — but `options`,
+including `typeAware` and `reportUnusedDisableDirectives`, is honoured only from the config oxlint
+discovers as the *root*. Start it inside `webapp/` and every type-aware rule reads as enabled and
+checks nothing.
 
 Type-aware rules need a project, and oxlint finds one by looking for a file named exactly
 `tsconfig.json`. The root stub exists only so the Bun trees — configured by `tsconfig.agents.json` —
 have one; without it every ambient global resolves to an error type there.
 
-The house lint rules are oxlint JS plugins in `webapp/tools/oxlint/rules/`, registered by
-`webapp/tools/oxlint/index.ts` and each with a `RuleTester` suite beside it. They live under `webapp/`
-but are not the SPA's alone: all three configs load that one plugin, so a rule is available to every
-tree and each config chooses which to turn on — `no-non-ascii-filename` is on in all three, the
-story-shaped ones only in the SPA. Adding a rule there does not enable it anywhere.
-`webapp/AGENTS.md` § Linting has the rest.
+Each config carries the reasoning for its own deltas; read it before switching a rule either way. The
+house rules are oxlint JS plugins under `webapp/tools/oxlint/`, registered by its `index.ts`. They
+live under `webapp/` but all three configs load that one plugin and each chooses which to turn on, so
+adding a rule there enables it nowhere. `webapp/AGENTS.md` § Linting has the rest.
 
 ## Generated artefacts — never hand-edit, regenerate
 

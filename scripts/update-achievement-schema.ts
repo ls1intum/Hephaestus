@@ -8,21 +8,20 @@ const PACKAGE_PREFIX = "de.tum.cit.aet.hephaestus.achievement.evaluator.";
 
 function updateSchema(): void {
 	try {
-		// 1. Find all evaluators
 		const files = readdirSync(EVALUATOR_PKG_PATH);
 		const evaluators = files
 			.filter((file) => file.endsWith(".java") && file !== "AchievementEvaluator.java")
 			.map((file) => basename(file, ".java"))
-			.sort();
+			.toSorted();
 
+		// Both spellings of every evaluator: the catalogue writes the bare class name, and the
+		// fully qualified one is accepted too, so the enum has to hold each twice.
 		const fullPaths = evaluators.map((name) => PACKAGE_PREFIX + name);
 		const allOptions = [...evaluators, ...fullPaths];
 
-		// 2. Read schema
 		const schemaContent = readFileSync(SCHEMA_PATH, "utf8");
 		const schema = asRecord(parseJson(schemaContent), SCHEMA_PATH);
 
-		// 3. Update evaluatorClass enum
 		const evaluatorClass = at(
 			schema,
 			["definitions", "achievement", "properties", "evaluatorClass"],
@@ -34,7 +33,6 @@ function updateSchema(): void {
 		}
 		evaluatorClass.enum = allOptions;
 
-		// 4. Write back
 		writeFileSync(SCHEMA_PATH, `${JSON.stringify(schema, null, "\t")}\n`);
 		console.log(`Successfully updated ${SCHEMA_PATH} with ${evaluators.length} evaluators.`);
 	} catch (error) {

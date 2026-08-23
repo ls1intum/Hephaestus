@@ -44,8 +44,12 @@ pnpm run check:agents          # Biome format, then oxlint, then both typechecks
 pnpm run check:agents:fix      # Apply every safe fix
 pnpm run check:webapp          # The SPA: Biome format check, then oxlint
 pnpm run typecheck:webapp      # The SPA's typecheck — a separate leg, not part of check:webapp
-pnpm run check                 # Everything, the way CI runs it
+pnpm run check                 # Everything — a strict superset of CI
 ```
+
+`check` is a superset, not a copy: PMD (`lint:java`), `check:story-sort` and `check:diagrams` run in
+no workflow, so green CI is not evidence that `check` passes. The `pre-push` hook is the only thing
+that runs them before a merge, and `--no-verify` skips it.
 
 JetBrains alternatives such as IntelliJ (Java) and WebStorm (React/TypeScript) work equally well.
 

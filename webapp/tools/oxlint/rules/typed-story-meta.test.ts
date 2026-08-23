@@ -24,7 +24,8 @@ ruleTester.run("typed-story-meta", typedStoryMeta, {
 		"export default meta;",
 		// A key computed from an expression names whatever that evaluates to, which is unreadable here.
 		"const meta = { [key]: Button } satisfies Meta;",
-		// `typescript/no-explicit-any` reports the `any` itself, five columns away.
+		// A type argument is stated, which is all this rule asks; `typescript/no-explicit-any` owns
+		// the question of what was put in it.
 		"const meta = { component: Button } satisfies Meta<any>;",
 	],
 	invalid: [

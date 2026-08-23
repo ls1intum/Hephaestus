@@ -28,21 +28,20 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 
 // jsdom has no `matchMedia`; the toaster asks it for `prefers-reduced-motion` on mount.
 if (typeof window !== "undefined" && typeof window.matchMedia !== "function") {
-	window.matchMedia = (query: string) =>
-		({
-			matches: false,
-			media: query,
-			onchange: null,
-			// `MediaQueryList` still declares the pre-`addEventListener` pair, and library code
-			// feature-detects it, so the stand-in has to answer to it as well.
-			// oxlint-disable-next-line typescript/no-deprecated -- a polyfill has to implement the interface it stands in for
-			addListener: () => {},
-			// oxlint-disable-next-line typescript/no-deprecated -- a polyfill has to implement the interface it stands in for
-			removeListener: () => {},
-			addEventListener: () => {},
-			removeEventListener: () => {},
-			dispatchEvent: () => false,
-		}) as MediaQueryList;
+	window.matchMedia = (query: string) => ({
+		matches: false,
+		media: query,
+		onchange: null,
+		// `MediaQueryList` still declares the pre-`addEventListener` pair, and library code
+		// feature-detects it, so the stand-in has to answer to it as well.
+		// oxlint-disable-next-line typescript/no-deprecated -- a polyfill has to implement the interface it stands in for
+		addListener: () => {},
+		// oxlint-disable-next-line typescript/no-deprecated -- a polyfill has to implement the interface it stands in for
+		removeListener: () => {},
+		addEventListener: () => {},
+		removeEventListener: () => {},
+		dispatchEvent: () => false,
+	});
 }
 
 // jsdom has no scrollIntoView either; Base UI calls it to keep the highlighted option in view.

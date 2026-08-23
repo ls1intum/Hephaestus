@@ -14,8 +14,7 @@ const recommended = mockPullRequestWorkType.recommendedPolicy;
 
 /**
  * The editor is controlled, so what it emits is only observable through the state it writes back.
- * These `output` probes publish that state as named readings the assertions can query the same way
- * they query the editor itself.
+ * These `output` probes publish that state as named readings an assertion can query by label.
  */
 function Controlled({ initial = recommended }: { initial?: PracticeAutomatedReviewPolicy }) {
 	const [value, setValue] = useState(initial);

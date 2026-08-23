@@ -75,7 +75,6 @@ function SidebarProvider({
 			_setOpen(openState);
 		}
 
-		// Persist the state so a reload restores the sidebar the user left behind.
 		document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
 	};
 
@@ -83,9 +82,8 @@ function SidebarProvider({
 		return isMobile ? setOpenMobile((wasOpen) => !wasOpen) : setOpen((wasOpen) => !wasOpen);
 	};
 
-	// Reaches the current `toggleSidebar` without becoming a dependency of the effect below, so the
-	// `window` listener is bound once for the sidebar's lifetime instead of being torn down and
-	// re-subscribed every time the sidebar opens or closes.
+	// Keeps the effect below off `toggleSidebar`, so the `window` listener is bound once rather than
+	// re-subscribed on every open and close.
 	const onShortcut = useEffectEvent(() => {
 		toggleSidebar();
 	});

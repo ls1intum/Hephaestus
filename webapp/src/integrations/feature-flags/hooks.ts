@@ -4,7 +4,6 @@ import { getUserFeatures } from "@/api/sdk.gen";
 import type { FeatureFlags } from "@/api/types.gen";
 import { useAuth } from "@/integrations/auth/AuthContext";
 
-/** Widens when a new flag reaches `FeatureFlagsDTO` and the generated client is regenerated. */
 export type FeatureFlagName = keyof Required<FeatureFlags>;
 
 type FeatureFlagsResponse = Record<FeatureFlagName, boolean>;
@@ -12,9 +11,9 @@ type FeatureFlagsResponse = Record<FeatureFlagName, boolean>;
 const FEATURE_FLAGS_QUERY_KEY = ["user", "features"] as const;
 
 /**
- * Every flag is optional on the wire — an older server simply omits one it has never heard of — so
- * each is parsed down to a definite boolean and absent reads as off. Leaving a flag out here fails
- * to satisfy `FeatureFlagsResponse`, so a new backend flag cannot silently go unparsed.
+ * Every flag is optional on the wire — an older server omits one it has never heard of — so each is
+ * parsed to a definite boolean with absent reading as off. Spelling them out rather than deriving
+ * them is what makes that safe: omit one and `fetchFeatureFlags` stops satisfying its return type.
  */
 const featureFlagsSchema = z.object({
 	ADMIN: z.boolean().catch(false),

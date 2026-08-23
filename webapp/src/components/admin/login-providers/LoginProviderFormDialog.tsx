@@ -62,8 +62,8 @@ export function LoginProviderFormDialog({
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
 			<DialogContent className="sm:max-w-lg">
-				{/* The popup unmounts on close and the key remounts the form when the target record
-				    changes, so the fields below start from `editing` and never need re-seeding. */}
+				{/* The popup unmounts on close and the key remounts on a change of record, so the fields
+				    always start from `editing` and never need re-seeding in an effect. */}
 				<ProviderForm
 					key={editing?.registrationId ?? "new"}
 					editing={editing}

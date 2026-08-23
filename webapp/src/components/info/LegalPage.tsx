@@ -85,9 +85,7 @@ function LegalContent({ page, profile, resolver }: LegalContentProps) {
 				setResolved(content);
 				if (content.source === "disclaimer" && !warnedDisclaimer.has(page)) {
 					warnedDisclaimer.add(page);
-					// The banner below tells the reader the page is a placeholder; this tells whoever deployed
-					// the instance what to do about it, which is not something a reader's alert can carry.
-					// oxlint-disable-next-line no-console -- Remediation instructions addressed to the operator, deduplicated per page; the reader's half of this is the disclaimer banner.
+					// oxlint-disable-next-line no-console -- Remediation addressed to whoever deployed the instance, once per page; the reader's half of this is the disclaimer banner.
 					console.warn(
 						`[legal] Disclaimer fallback served for page=${page}. Configure LEGAL_PROFILE or mount /legal-overrides/. See docs/admin/legal-pages.`,
 					);

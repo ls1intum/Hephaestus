@@ -4,9 +4,8 @@ import type { DateRange } from "react-day-picker";
 const DAY = "yyyy-MM-dd";
 
 /**
- * `parse` only consults its reference date for fields the format omits, and `DAY` names every field
- * down to the day while the time-of-day setters default to midnight. A fixed instant therefore parses
- * identically to the current one, and keeps this module a pure function of the URL.
+ * A fixed reference keeps this module a pure function of the URL: `parse` only consults it for fields
+ * the format omits, and `DAY` names every field down to the day, below which the setters take midnight.
  */
 const DAY_PARSE_REFERENCE = new Date(0);
 

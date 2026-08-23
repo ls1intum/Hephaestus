@@ -79,8 +79,7 @@ function DiagnosticItem({
  *     remaining, and never `— / N` which reads as a gauge.
  *  4. Nothing renderable → `null`.
  *
- * `now` decides only whether branch 1 is still live, and is passed in so the reading is a function of
- * the snapshot and one instant the caller chose, rather than of the moment this happened to render.
+ * `now` decides only whether branch 1 is still live.
  */
 function rateLimitReading(rateLimit: RateLimitSnapshot, now: number): ReactNode {
 	const throttledUntil = asDate(rateLimit.throttledUntil);
@@ -118,8 +117,7 @@ function rateLimitReading(rateLimit: RateLimitSnapshot, now: number): ReactNode 
 }
 
 function ConnectionDiagnostics({ status }: { status: ConnectionSyncStatus }) {
-	// A live back-off lapses while the card is on screen, so the rate-limit reading is derived from the
-	// shared clock and re-renders itself out of the throttled branch when the deadline passes.
+	// Ticks so that a back-off lapsing while the card is on screen re-renders it out of branch 1.
 	const now = useNow();
 
 	// A thin vertical rule separates each fact so the diagnostics scan as one grouped row. The rule is

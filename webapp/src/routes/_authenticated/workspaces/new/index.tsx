@@ -17,9 +17,8 @@ interface Provider {
 	name: string;
 	description: string;
 	/**
-	 * Lucide glyphs and the in-house brand glyphs are separate component types, and this slot takes
-	 * either — naming only `LucideIcon` would pin `BrandIcon` to Lucide's exact shape. All the slot
-	 * asks of a glyph is that it render from `className`, which both do.
+	 * Lucide and the in-house brand glyphs are separate component types, and this slot takes either.
+	 * All it asks of a glyph is that it render from `className`, which both do.
 	 */
 	icon: LucideIcon | BrandIcon;
 	to: string;

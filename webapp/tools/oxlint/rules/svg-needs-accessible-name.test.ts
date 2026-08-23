@@ -32,7 +32,7 @@ ruleTester.run("svg-needs-accessible-name", svgNeedsAccessibleName, {
 		},
 		{
 			// `role="img"` gives the graphic a role and no name, so a screen reader still says
-			// "image" and stops. The pair below shows the fix.
+			// "image" and stops. `b` above is the same tag with the name added.
 			code: 'const n = <svg role="img"><path d="M0 0" /></svg>;',
 			errors: [{ messageId: "unnamed" }],
 		},

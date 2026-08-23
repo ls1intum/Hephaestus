@@ -45,8 +45,8 @@ export function statusToneClass(variant: BadgeVariant): string {
 }
 
 /**
- * The registry's values in declaration order, as a non-empty tuple so it drops straight into
- * `z.enum(...)`, which will not take a plain array.
+ * The registry's values in declaration order, typed as a non-empty tuple: a registry with no values
+ * is a programming error, and the throw below is what backs that type up at runtime.
  */
 export function statusValues<TValue extends string>(
 	defs: StatusDefs<TValue>,

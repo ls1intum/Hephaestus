@@ -4,7 +4,6 @@ import { AchievementNode } from "@/components/achievements/AchievementNode";
 import {
 	apolloClarity,
 	aresConflict,
-	asUI,
 	hephaestusInit,
 	hermesSprint,
 	poseidonTrident,
@@ -76,7 +75,7 @@ type Story = StoryObj<typeof meta>;
 export const Common: Story = {
 	args: {
 		id: "rarity-common",
-		data: { achievement: asUI({ ...hephaestusInit, status: "unlocked" }) },
+		data: { achievement: { ...hephaestusInit, status: "unlocked" } },
 		...sharedNodeProps,
 	},
 };
@@ -87,7 +86,7 @@ export const Common: Story = {
 export const Uncommon: Story = {
 	args: {
 		id: "rarity-uncommon",
-		data: { achievement: asUI({ ...hermesSprint, status: "unlocked" }) },
+		data: { achievement: { ...hermesSprint, status: "unlocked" } },
 		...sharedNodeProps,
 	},
 };
@@ -98,7 +97,7 @@ export const Uncommon: Story = {
 export const Rare: Story = {
 	args: {
 		id: "rarity-rare",
-		data: { achievement: asUI({ ...aresConflict, status: "unlocked" }) },
+		data: { achievement: { ...aresConflict, status: "unlocked" } },
 		...sharedNodeProps,
 	},
 };
@@ -109,7 +108,7 @@ export const Rare: Story = {
 export const Epic: Story = {
 	args: {
 		id: "rarity-epic",
-		data: { achievement: asUI({ ...apolloClarity, status: "unlocked" }) },
+		data: { achievement: { ...apolloClarity, status: "unlocked" } },
 		...sharedNodeProps,
 	},
 };
@@ -120,7 +119,7 @@ export const Epic: Story = {
 export const Legendary: Story = {
 	args: {
 		id: "rarity-legendary",
-		data: { achievement: asUI({ ...poseidonTrident, status: "unlocked" }) },
+		data: { achievement: { ...poseidonTrident, status: "unlocked" } },
 		...sharedNodeProps,
 	},
 };
@@ -131,7 +130,7 @@ export const Legendary: Story = {
 export const Mythic: Story = {
 	args: {
 		id: "rarity-mythic",
-		data: { achievement: asUI({ ...zeusThunderbolt, status: "unlocked" }) },
+		data: { achievement: { ...zeusThunderbolt, status: "unlocked" } },
 		...sharedNodeProps,
 	},
 };

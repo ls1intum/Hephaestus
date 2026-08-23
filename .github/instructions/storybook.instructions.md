@@ -4,11 +4,11 @@ applyTo: "**/*.stories.ts,**/*.stories.tsx"
 # Storybook
 
 The full conventions — props shape, slots, story titles, args and Controls, play assertions, the
-accessibility posture, and a grading rubric — live in `.claude/skills/storybook-components/`. Read the
-file there that answers your question rather than reasoning from Storybook's own docs, which do not
-know what this repo has been burned by.
+accessibility posture, the silent traps, and a grading rubric — live in
+`.claude/skills/storybook-components/`. Read the file there that answers your question rather than
+reasoning from Storybook's own docs, which do not know what this repo has been burned by.
 
-This file is the short version: what a story here owes, and what fails the build if it does not.
+This file is the short version: what a story here owes, and what no gate can tell you.
 
 ## What a story is for
 
@@ -24,8 +24,6 @@ question, not a story's.
 ## Shape
 
 - Colocate: `Component.stories.tsx` beside `Component.tsx`.
-- A `meta` that names a `component` is `satisfies Meta<typeof Component>`. A gallery meta naming no
-  component may be bare `Meta`.
 - Set defaults with `args` at the meta level, never `argTypes.defaultValue`.
 - Keep at least one story per file driven by meta args (`export const Default: Story = {};`). A
   `render` that ignores `args` disables the Controls panel, which is most of a story's value.
@@ -38,8 +36,7 @@ question, not a story's.
 Most files omit `title` and are filed by their path under `src`, which cannot go stale. Declare an
 explicit `title` when the file layout cannot express where a reader looks for the thing — a product
 surface assembled from several directories, or one an admin knows by the screen it is on. Sentence
-case, and every top-level segment must appear in `storySort.order` in `.storybook/preview.tsx`.
-`rules/story-titles.md` in the skill has the namespaces.
+case. `rules/story-titles.md` in the skill has the namespaces and the sidebar-ordering gate.
 
 ## Published prose
 
@@ -52,23 +49,10 @@ If the stories render a test harness rather than the component, either point `co
 component or drop `autodocs`; do not publish the harness's props as if they were the API. A file that
 opts out says why in its meta.
 
-## These fail the build, not review
+## Gates
 
-- A story that installs MSW handlers (`scripts/check-presentational-components.ts`). Autodocs mounts
-  every story of a file into one document over a single global worker, so the last story's handlers
-  answer for the whole page.
-- `parameters.a11y` or `globals.a11y` on a meta or a story (`hephaestus/no-story-a11y-override`).
-  `.storybook/preview.tsx` sets `a11y: { test: "error" }` project-wide and anything local can only
-  lower it. A genuine misfire is exempted once, in `preview.tsx`, with the upstream link beside it.
-- A `play` function that never reaches an assertion (`hephaestus/play-must-assert`), and
-  `expect(getBy…).toBeInTheDocument()` (`hephaestus/no-redundant-in-the-document`).
-- `within(canvasElement)` when the play was handed `canvas` (`hephaestus/no-within-canvas-element`).
-- Reading the clock at module scope or during render (`hephaestus/no-nondeterministic-render`).
-  Timestamps in a story come from `STORY_NOW` and the relative helpers in
-  `@/components/common/story-clock`, so a rendered phrase is identical on every run.
-- A `<p>` tag in a comment Storybook publishes (`scripts/check-story-prose.ts`). Storybook renders
-  these blocks with `markdown-to-jsx`; separate paragraphs with a blank comment line.
-- A title whose top-level segment is missing from `storySort.order`, and an `order` entry that matches
-  no story (`scripts/check-story-sort.ts`). Both directions cost the same: the first buries a tree at
-  the bottom of the sidebar looking deliberate, the second leaves a renamed segment ordering nothing.
-  The check reads `title` as a string literal, so a title assembled at runtime fails it by design.
+Several of the conventions above are enforced by house oxlint rules and by `check:stories`,
+`check:story-sort` and `check:components`. Each states itself at the call site when it fires and
+carries its own reasoning, so read the diagnostic rather than looking for the rule restated here.
+The one thing no gate can see is whether a `play` function asserts the **outcome** of what it did
+rather than merely reaching an assertion.

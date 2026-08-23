@@ -7,10 +7,9 @@
  * as an error box on the page. That is how the generated ER schema shipped unreadable: the resolved
  * mermaid rejected `NUMERIC(12,6)`, and nothing in the toolchain had an opinion about it.
  *
- * The fenced blocks are the ones a person edits by hand, and for a long time this gate did not read
- * them: it reported "1 diagram(s) parse" while ten hand-written diagrams went unchecked, so a
- * hand-edited flowchart could publish as an error box with every gate green. Whatever narrows the scope
- * of this file again, it must not be that distinction.
+ * The fenced blocks are the ones a person edits by hand and the only ones with a way to be wrong, so
+ * a version of this gate that reads only the generated `.mmd` file checks almost nothing while still
+ * printing a count. Whatever narrows the scope of this file, it must not be that distinction.
  *
  * Two regressions are in scope, which is why this reads the resolved package rather than pinning a
  * version here: a column type the generator emits that mermaid cannot read, and a transitive bump

@@ -67,9 +67,8 @@ const EXPIRY_WARNING_DAYS = 14;
  * When disconnected it is the connect form (server URL + API token). When connected it names the
  * linked instance and shows the stored token's health plus a guarded disconnect; the connection plane
  * itself — health, freshness, webhook diagnostics, running-job progress and the Sync/Cancel controls —
- * lives in the shared {@link import("@/components/admin/integrations/SyncStatusHeader").SyncStatusHeader} above this card, and which
- * collections are mirrored is managed in {@link import("./OutlineCollectionsSection").OutlineCollectionsSection}
- * below it. Pure presentation.
+ * lives in the shared `SyncStatusHeader` above this card, and which collections are mirrored is
+ * managed in `OutlineCollectionsSection` below it. Pure presentation.
  */
 export function OutlineConnectCard({
 	connected,
@@ -249,8 +248,6 @@ interface OutlineTokenPanelProps {
  * is warn early. Rejection and imminent expiry both silently kill the mirror, so both are alerts, not muted text.
  */
 function OutlineTokenPanel({ tokenStatus, isLoading }: OutlineTokenPanelProps) {
-	// The expiry countdown has to age while the page stays open, so it comes from the shared ticking
-	// clock rather than a reading taken during this render.
 	const now = useNow();
 	if (isLoading) {
 		return <Skeleton className="h-5 w-64" />;

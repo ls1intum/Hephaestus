@@ -72,11 +72,8 @@ function LeaderboardContainer() {
 
 	const schedule = resolveLeaderboardSchedule(workspaceQuery.data);
 
-	/**
-	 * One reading for the whole render, from the clock the rest of the app shares. Every window
-	 * derived from it below lands on a scheduled week boundary, so the query keys it feeds only move
-	 * when the leaderboard week does — not on the tick.
-	 */
+	// Every window derived from this lands on a scheduled week boundary, so the query keys below move
+	// when the leaderboard week does rather than on the clock's tick.
 	const now = new Date(useNow());
 
 	const getEffectiveDates = () => {

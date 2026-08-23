@@ -42,7 +42,7 @@ const contractsRoot = path.join(root, "server/src/main/resources/contracts/artif
 const contractVersions = (await readdir(contractsRoot, { withFileTypes: true }))
 	.filter((entry) => entry.isDirectory())
 	.map((entry) => entry.name)
-	.sort();
+	.toSorted();
 if (contractVersions.length === 0) throw new Error("No artifact-source contract versions found");
 const schemaId = (version: string, file: string): string =>
 	`https://hephaestus.aet.cit.tum.de/contracts/artifact-source/${version}/${file}`;
@@ -149,8 +149,8 @@ const expectRejection = (id: string, value: unknown, label: string): void => {
 };
 
 const sameSet = (actual: readonly string[], expected: readonly string[]): boolean => {
-	const left = [...new Set(actual)].sort();
-	const right = [...new Set(expected)].sort();
+	const left = [...new Set(actual)].toSorted();
+	const right = [...new Set(expected)].toSorted();
 	return left.length === right.length && left.every((value, index) => value === right[index]);
 };
 
@@ -452,8 +452,8 @@ const validatePolicySchema = (version: string): void => {
 			"limitations on a practice it does not review",
 			{ ...reviewed, automatedReview: { mode: "NONE", evidenceSufficiency: "NONE" } },
 		],
-		// The reason a person is needed is the one field an operator asked about; folding it back into
-		// the limitation list is how it stopped being answerable the first time.
+		// The reason a person is needed is its own field. Folded back into the limitation list it stops
+		// being answerable, which is the question an operator actually asks of this record.
 		[
 			"insufficient evidence with no reason a person is needed",
 			{
@@ -469,7 +469,7 @@ const validatePolicySchema = (version: string): void => {
 			{ ...reviewed, insufficiencyReason: reason },
 		],
 		["a retired evidence profile", { ...reviewed, evidenceProfile: "pull-request-review" }],
-		// The sources a review reads moved onto the bindings, because they depend on what occasioned it.
+		// The sources a review reads live on the bindings, because they depend on what occasioned it.
 		[
 			"evidence needs on the policy",
 			{ ...reviewed, needs: [{ sourceKind: "scm.pull-request.core", stance: "REQUIRED" }] },

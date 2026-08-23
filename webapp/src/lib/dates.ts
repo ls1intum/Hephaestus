@@ -1,18 +1,15 @@
 export type DateLike = Date | string | undefined | null;
 
 /**
- * Narrow a timestamp — absent, a string, or a `Date` that may not be a usable one — to a `Date` the
- * caller can format, or `undefined`.
+ * Narrow a timestamp to a `Date` the caller can format, or `undefined`. It exists for the two things
+ * the type `Date | undefined` cannot say, both of which reach the screen as visible nonsense:
  *
- * It exists for the two things the type `Date | undefined` cannot say, both of which reach the screen
- * as visible nonsense if nobody handles them:
+ * - An Invalid Date is still a `Date`, and `.toLocaleDateString()` on one renders the literal text
+ *   "Invalid Date".
+ * - A value that never passed through a generated response transformer — a hand-written fixture, a
+ *   cache entry set directly — is still the ISO string its type calls a `Date`.
  *
- * - An **Invalid Date is still a `Date`**, and `.toLocaleDateString()` on one renders the literal
- *   text "Invalid Date". Only a range check catches that, never a type.
- * - A value that never passed through a generated response transformer — a fixture written by hand,
- *   a cache entry set directly — is **still the ISO string** its type calls a `Date`.
- *
- * Both degrade to `undefined` rather than to a fabricated `now`, so the caller's own fallback shows:
+ * Both degrade to `undefined` rather than to a fabricated `now`, leaving the caller its own fallback:
  * `asDate(value)?.toLocaleDateString() ?? "–"`.
  */
 export function asDate(value: DateLike): Date | undefined {

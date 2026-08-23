@@ -1,10 +1,7 @@
 #!/usr/bin/env node
 /**
- * Cross-platform Maven wrapper runner.
- * Resolves ./mvnw (Unix) or mvnw.cmd (Windows) automatically.
- *
- * Usage: node --import tsx scripts/run-mvnw.ts [maven-args...]
- * Example: node --import tsx scripts/run-mvnw.ts pmd:check -q
+ * Runs `server/mvnw` from anywhere, under either wrapper name. A package script cannot pick the
+ * right one, and `./mvnw` on Windows is a filename that does not exist.
  */
 
 import { spawnSync } from "node:child_process";
@@ -24,8 +21,7 @@ function main(): void {
 	});
 
 	if (result.error) {
-		const errCode = (result.error as NodeJS.ErrnoException).code;
-		if (errCode === "ENOENT") {
+		if ("code" in result.error && result.error.code === "ENOENT") {
 			console.error(`Maven wrapper not found in ${mvnwDir}. Is the Maven wrapper installed?`);
 		} else {
 			console.error(`Failed to run Maven wrapper: ${result.error.message}`);

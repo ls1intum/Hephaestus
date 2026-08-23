@@ -16,26 +16,21 @@ matches, and forcing every duration to 1ms does not fix it. Use `expectSettledVi
 animation routinely. Any settle helper must `.catch()` the rejection and treat it as an outcome
 (`webapp/src/test/overlay.ts`). Without the catch the helper throws on the ordinary path.
 
-## 3. `react-hooks/exhaustive-deps` in a directive turns off hook linting for the whole component
+## 3. A hook suppression lands on the wrong line, and the legacy rule name takes the pass with it
 
-Spell a suppression the way the diagnostic prints it. oxlint reports the React hook rules as
-`react(exhaustive-effect-dependencies)` and `react(set-state-in-effect)`, and a directive naming
-either of those suppresses **only that rule, only on the line it points at** — `set-state-in-effect`
-still fails a build whose `exhaustive-effect-dependencies` was silenced.
+`react/set-state-in-effect` reports on the **`setState` call inside the effect body**, not on the
+`useEffect` line. So the obvious placement — a `disable-next-line` above the effect — points at the
+`useEffect` and suppresses nothing; the diagnostic still fires and the directive is additionally
+reported as `Unused oxlint-disable directive`. Put the directive above the reported line, or, better,
+fix the effect.
 
-`react-hooks/exhaustive-deps` is a different, legacy name, and it does not behave that way. One
-`// oxlint-disable-next-line react-hooks/exhaustive-deps` **anywhere inside a component body**
-suppresses every React hook diagnostic in that component — both rules, every effect in it, whichever
-line the directive sits above. Neighbouring components in the same file keep reporting, so the file
-does not look disabled.
+Spelling it as the legacy `react-hooks/…` name is worse. One such directive anywhere in a component
+body suppresses **every** React hook diagnostic in that component, whichever line it sits above —
+neighbouring components in the same file keep reporting, so the file does not look disabled.
 
-`options.reportUnusedDisableDirectives` does not close this one. It catches a directive that
-suppresses nothing — including one naming a rule that does not exist, reported as
-`Unused oxlint-disable directive` and failing the build. But `react-hooks/exhaustive-deps` really
-does suppress its own warning, so it counts as used and the collateral goes unremarked. The run
-exits 0.
-
-Fix the effect rather than reach for the directive.
+`options.reportUnusedDisableDirectives` does catch both shapes: either way the run exits 1. The cost
+is not a silent pass, it is a misleading one — the build fails complaining about an unused directive
+while the diagnostic you meant to suppress has quietly gone somewhere else.
 
 ## 4. One story's MSW handlers answer for the whole Docs page
 
@@ -53,14 +48,7 @@ the job if `docs/images/readme` is dirty. So the storybook job can go red having
 change moves or renames a story that exports a README asset, run
 `pnpm --filter webapp run export:readme-assets` and commit the result.
 
-## 6. Storybook subcomponents get no Controls, and their `argTypes` cannot be overridden
-
-*"Subcomponents are only intended for documentation purposes and have some limitations: 1. The
-`argTypes` of subcomponents are inferred … and cannot be manually defined or overridden. 2. The table
-for each documented subcomponent does *not* include controls"*. This is the cost that decides whether a
-part becomes a compound subcomponent or stays a prop — see `rules/composition-and-slots.md` rule 3.
-
-## 7. A hand-rolled stateful wrapper swallows the spy in `meta.args`
+## 6. A hand-rolled stateful wrapper swallows the spy in `meta.args`
 
 If the wrapper passes its own `onChange` instead of `{...args}`, the `fn()` declared in `meta.args` can
 never be called, never be asserted, and never appears in the Actions panel — while the file looks fully

@@ -10,9 +10,9 @@ const subscribe = (onStoreChange: () => void) => {
 };
 
 /**
- * Reads the viewport through `useSyncExternalStore` rather than mirroring it into state from an
- * effect. The state-and-effect version reported desktop on the first render and corrected itself on
- * the second, so a sidebar mounted on a phone rendered its desktop layout once before switching.
+ * Read through `useSyncExternalStore`, not mirrored into state from an effect: the effect version
+ * answers desktop on the first render and corrects itself on the second, so a sidebar mounted on a
+ * phone paints its desktop layout once before switching.
  */
 export function useIsMobile() {
 	return useSyncExternalStore(

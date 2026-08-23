@@ -22,7 +22,7 @@ export const noRedundantInTheDocument = defineRule({
 		type: "problem",
 		docs: {
 			description:
-				"Do not wrap a query that already throws in a matcher that can never fail. `toBeVisible()` is a real strengthening, but it reads a just-opened Base UI overlay as invisible for one frame, so reach for `expectSettledVisible` from `@/test/overlay` when the target sits inside an overlay.",
+				"Do not wrap a query that already throws in a matcher that can never fail. In a story, where jest-dom is registered, `toBeVisible()` is a real strengthening — but it reads a just-opened Base UI overlay as invisible for one frame, so reach for `expectSettledVisible` from `@/test/overlay` when the target sits inside one. A Vitest file has neither matcher and asserts on the value instead.",
 		},
 		messages: {
 			vacuous:

@@ -71,9 +71,9 @@ function ToggleGroupItem({
 			data-spacing={context.spacing}
 			// Match the axis on `data-orientation`, never `data-horizontal`: Base UI writes non-boolean
 			// state as `data-<key>="<value>"`, so a `group-data-horizontal/…` variant compiles to
-			// `[data-horizontal]` and matches nothing — that is how joined groups came to render
-			// square-cornered with a doubled border down every seam. Joined segments overlap by a pixel
-			// rather than dropping a border, so a selected one keeps an edge on all four sides.
+			// `[data-horizontal]` and matches nothing — which leaves joined groups square-cornered with a
+			// doubled border down every seam. Joined segments overlap by a pixel rather than dropping a
+			// border, so a selected one keeps an edge on all four sides.
 			className={cn(
 				"group-data-[spacing=0]/toggle-group:rounded-none group-data-[spacing=0]/toggle-group:px-2 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:first:rounded-l-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:first:rounded-t-lg group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:last:rounded-r-lg group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:last:rounded-b-lg shrink-0 focus:z-10 focus-visible:z-10 group-data-[orientation=horizontal]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-ml-px group-data-[orientation=vertical]/toggle-group:data-[spacing=0]:data-[variant=outline]:not-first:-mt-px",
 				toggleVariants({

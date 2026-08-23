@@ -30,9 +30,6 @@ type BucketName = "Today" | "Yesterday" | "Last 7 days" | "Last 30 days" | "Olde
  * within each bucket).
  *
  * The Pi mentor returns a flat list, so we bucket locally for the same UX.
- *
- * `now` is an argument because every bucket is relative to it: the caller supplies one instant for
- * the whole list, which keeps the buckets consistent with each other and the grouping reproducible.
  */
 function bucketThreads(threads: ChatThreadSummary[], now: number): ThreadGroupData[] {
 	const buckets: Record<BucketName, ChatThreadSummary[]> = {

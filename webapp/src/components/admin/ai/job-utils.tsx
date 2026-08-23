@@ -8,9 +8,6 @@ export type JobWait = { kind: "hold"; reason: string } | { kind: "backoff" };
  * `null` for a run that is simply claimable: `availableAt` is in the past for almost every run, so a
  * "due …" line on every queued row would be noise. A hold is keyed off `holdReason` alone, not the
  * clock — the server re-parks a still-capped run each time its `availableAt` lapses.
- *
- * `now` is supplied by the caller rather than read here, so the answer is a function of its inputs:
- * a rendering caller passes the shared clock (`useNow`), and a test passes a fixed instant.
  */
 export function jobWait(
 	job: Pick<AgentJob, "status" | "holdReason" | "availableAt">,

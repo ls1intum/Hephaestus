@@ -25,11 +25,7 @@ interface UseMentorChatOptions {
 	onError?: (error: Error) => void;
 }
 
-/**
- * `addToolResult` is dropped alongside the re-typed `sendMessage`: it is the AI SDK's older name for
- * `addToolOutput`, which is forwarded, and carrying both would let a caller settle a tool call
- * through a name the SDK is retiring.
- */
+/** `addToolResult` is dropped because it is the SDK's deprecated alias for the forwarded `addToolOutput`. */
 interface UseMentorChatReturn
 	extends Omit<UseChatHelpers<ChatMessage>, "sendMessage" | "addToolResult"> {
 	sendMessage: (text: string) => void;
@@ -55,10 +51,8 @@ export function useMentorChat({
 	const slug = workspaceSlug ?? "";
 	const hasWorkspace = Boolean(workspaceSlug);
 
-	// Generate a stable chat ID for this hook lifecycle
 	const [stableThreadId] = useState(() => threadId ?? uuidv4());
 
-	// Fetch thread detail if threadId is provided; avoid immediate refetch on mount
 	const threadQueryKey = getThreadQueryKey({
 		path: { workspaceSlug: slug, threadId: threadId ?? "" },
 	});
@@ -69,10 +63,6 @@ export function useMentorChat({
 		enabled: Boolean(threadId) && hasWorkspace,
 		initialData: () =>
 			hasWorkspace ? queryClient.getQueryData<ChatThreadDetail>(threadQueryKey) : undefined,
-		// A function, not a call: `Date.now()` here would run on every render, and React Compiler
-		// treats an impure call during render as a bailout.
-		// oxlint-disable-next-line no-restricted-properties -- The freshness stamp TanStack Query ages `staleTime` against has to be the same wall clock the cache itself uses; a ticking React clock would age it by whole render intervals.
-		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
 		refetchOnWindowFocus: false,
@@ -81,30 +71,26 @@ export function useMentorChat({
 
 	const { data: threadDetail, isLoading: isThreadLoading, error: threadError } = threadQuery;
 
-	// Fetch threads for sidebar/navigation; avoid immediate refetch on mount
 	const threadsKey = listThreadsQueryKey({ path: { workspaceSlug: slug } });
 	const { data: threads, isLoading: isThreadsLoading } = useQuery({
 		...listThreadsOptions({ path: { workspaceSlug: slug } }),
 		enabled: hasWorkspace,
 		initialData: () =>
 			hasWorkspace ? queryClient.getQueryData<ChatThreadSummary[]>(threadsKey) : undefined,
-		// oxlint-disable-next-line no-restricted-properties -- Same freshness stamp as the thread query above, read from the same wall clock TanStack Query compares `staleTime` against.
-		initialDataUpdatedAt: () => Date.now(),
 		staleTime: 60_000,
 		refetchOnMount: false,
 		refetchOnWindowFocus: false,
 		refetchOnReconnect: false,
 	});
 
-	// Vote message mutation
 	const voteMessageMut = useMutation(voteMutation());
 
-	// Votes cast here, kept apart from the server's record and laid over it: an entry wins while
-	// its mutation is in flight, and dropping it on failure falls straight back to the server.
+	// Overlaid on the server's record: an entry wins while its mutation is in flight, so dropping it
+	// on failure falls straight back to the server without a second request.
 	const [castVotes, setCastVotes] = useState<Record<string, boolean>>({});
 
-	// A thread carries its own votes, so switching threads drops them. Keyed by the id the votes
-	// were cast against, which means a brand-new thread learning its id is not a switch.
+	// Keyed by the id the votes were cast against rather than by `threadId`, so a brand-new thread
+	// learning its id does not read as a thread switch and discard them.
 	const voteThreadId = threadId ?? stableThreadId;
 	const [votedThreadId, setVotedThreadId] = useState(voteThreadId);
 	if (votedThreadId !== voteThreadId) {
@@ -118,23 +104,19 @@ export function useMentorChat({
 	}
 	Object.assign(voteState, castVotes);
 
-	// `updatedAt` is the server's stamp on a stored vote and nothing renders it, so an overlay
-	// entry — which exists precisely because the server has not recorded it yet — leaves it unset
-	// rather than inventing an instant that would differ on every render.
+	// `updatedAt` stays unset: it is the server's stamp on a stored vote, and no surface renders it.
 	const votes: ChatMessageVote[] = Object.entries(voteState)
 		.filter((entry): entry is [string, boolean] => entry[1] !== undefined)
 		.map(([messageId, isUpvoted]) => ({ messageId, isUpvoted }));
 
-	// `useChat` builds its `Chat` instance from these options on mount and rebuilds it only when
-	// `id` changes, so it reads the transport once and the identity of a later one is never a
-	// dependency of anything.
+	// Unmemoised on purpose: `useChat` builds its `Chat` from these options into a ref and rebuilds it
+	// only when `id` changes, so the transport is read once and a later instance is never looked at.
 	const transport = new DefaultChatTransport<ChatMessage>({
 		api: `${environment.serverUrl}/workspaces/${slug}/mentor/chat`,
 		prepareSendMessagesRequest: ({ id, messages }) => {
 			const effectiveId = id || stableThreadId;
-			// Only send the latest message; backend reconstructs context from thread id.
-			// Parent-message linkage lives on the server via the chat_message tree, so we
-			// don't ship a `previousMessageId` (it would be a no-op the server ignores).
+			// Only the latest message travels: the server rebuilds context and parent linkage from the
+			// thread id, so anything else in `messages` is bytes it ignores.
 			const lastMessage = messages.at(-1);
 			return {
 				body: { id: effectiveId, message: lastMessage },
@@ -146,8 +128,8 @@ export function useMentorChat({
 		},
 	});
 
-	// `useChat` re-reads both handlers into a ref on every render and calls through that ref, so
-	// each one only has to be the current closure — never a stable reference.
+	// Unmemoised on purpose: `useChat` copies both handlers into a ref every render and calls through
+	// it, so each only has to be the current closure — a stable reference would go stale.
 	const handleFinish = () => {
 		if (hasWorkspace) {
 			void queryClient.invalidateQueries({
@@ -182,21 +164,18 @@ export function useMentorChat({
 		addToolApprovalResponse,
 		id,
 	} = useChat<ChatMessage>({
-		id: stableThreadId, // Use stable ID that never changes
-		messages: initialMessages, // Start with initial messages only - backend will provide thread history
-		generateId: () => uuidv4(), // Generate UUID for all messages
-		// experimental_throttle batches React re-renders, but Pi's text-delta cadence is already
-		// LLM-bound (~10-30/s). Adding 100 ms batches on top makes tokens stall in chunks of
-		// 1-3 deltas, breaking the "live typing" feel users expect from streaming. The webapp's
-		// markdown renderer is cheap enough to handle every delta without throttling.
+		id: stableThreadId,
+		// Only a seed: the server's stored transcript replaces this once the thread query lands.
+		messages: initialMessages,
+		generateId: () => uuidv4(),
+		// No `experimental_throttle`: the mentor's delta cadence is already LLM-bound, so batching
+		// re-renders on top of it makes tokens arrive in visible clumps instead of typing out. The
+		// markdown renderer is cheap enough to take every delta.
 		transport,
 		onFinish: handleFinish,
 		onError: handleError,
-		// The Pi mentor only streams text/reasoning parts today. If/when typed
-		// data parts return (e.g. token usage, custom UI events), wire them here.
 	});
 
-	// Hydrate thread messages once when loaded and not streaming
 	const hydratedRef = useRef<string | null>(null);
 	useEffect(() => {
 		if (!threadId) return;
@@ -204,9 +183,8 @@ export function useMentorChat({
 		if (status === "streaming" || status === "submitted") return;
 		if (!threadDetail?.messages) return;
 
-		// Validate messages before setting state. A thread whose stored transcript does not parse
-		// would otherwise render as an empty conversation with nothing to explain it, so say so —
-		// keyed on the thread, which keeps a re-run of this effect updating one toast, not stacking.
+		// A transcript that will not parse would otherwise render as an empty conversation with nothing
+		// to explain it. Keyed on the thread, so a re-run of this effect updates one toast, not stacks.
 		const validatedMessages = parseThreadMessages(threadDetail.messages);
 		if (!validatedMessages) {
 			toast.error("Couldn't load this conversation's earlier messages.", {
@@ -219,7 +197,6 @@ export function useMentorChat({
 		hydratedRef.current = threadId;
 	}, [threadId, threadDetail?.messages, status, setMessages]);
 
-	// Send message function
 	const sendMessage = (text: string) => {
 		if (!text.trim() || !hasWorkspace) {
 			return;
@@ -228,13 +205,10 @@ export function useMentorChat({
 		void originalSendMessage({ text });
 	};
 
-	// The new-thread "Hi! I'm your mentor" greeting is rendered statically by the route
-	// component when `messages.length === 0` (see Greeting.tsx). The previous implementation
-	// did a separate POST to /mentor/chat with `{greeting: true}` to stream a server-generated
-	// greeting; the server has no greeting flag, so the round-trip silently short-circuited as
-	// "User message text is empty." The static greeting matches the UX without an API call.
+	// No greeting request: the server has no greeting flag, so a POST asking for one comes back
+	// "User message text is empty." The new-thread greeting is static, rendered by the route when
+	// `messages.length === 0`.
 
-	// Vote message function
 	const voteMessage = (messageId: string, isUpvoted: boolean) => {
 		if (!hasWorkspace) {
 			return;
@@ -242,7 +216,6 @@ export function useMentorChat({
 		if (!voteThreadId) {
 			return;
 		}
-		// Optimistically set local vote state
 		setCastVotes((prev) => ({ ...prev, [messageId]: isUpvoted }));
 		voteMessageMut.mutate(
 			{
@@ -251,7 +224,6 @@ export function useMentorChat({
 			},
 			{
 				onError: () => {
-					// Rollback optimistic update on error
 					setCastVotes((prev) => {
 						const next = { ...prev };
 						delete next[messageId];
@@ -272,16 +244,13 @@ export function useMentorChat({
 		);
 	};
 
-	// Compute loading states
 	const isLoading =
 		isWorkspaceLoading ||
 		status === "submitted" ||
 		(status === "streaming" && messages.length === 0) ||
 		(!!threadId && isThreadLoading);
 
-	// Return object without memoization to avoid dependency issues
 	const result: UseMentorChatReturn = {
-		// Core chat functionality
 		messages,
 		status,
 		error,
@@ -293,23 +262,15 @@ export function useMentorChat({
 		addToolApprovalResponse,
 		id,
 		clearError,
-
-		// Send function
 		sendMessage,
-
-		// Thread management
 		threadDetail,
 		isThreadLoading,
 		threadError: threadError,
 		threads,
 		isThreadsLoading,
 		currentThreadId: threadId ?? id,
-
-		// Voting
 		voteMessage,
 		votes,
-
-		// Loading state
 		isLoading,
 	};
 

@@ -699,8 +699,8 @@ void test("every vocabulary value carries a description", () => {
 	];
 	for (const { values, descriptions, label } of vocabularies) {
 		assert.deepEqual(
-			Object.keys(descriptions).sort(),
-			[...values].sort(),
+			Object.keys(descriptions).toSorted(),
+			[...values].toSorted(),
 			`${label} descriptions must cover exactly ${label} values`,
 		);
 	}

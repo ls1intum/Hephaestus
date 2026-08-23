@@ -4,7 +4,6 @@ import { AchievementNode } from "@/components/achievements/AchievementNode";
 import {
 	apolloClarity,
 	aresConflict,
-	asUI,
 	hephaestusInit,
 	hermesSprint,
 	poseidonTrident,
@@ -66,12 +65,12 @@ const sharedNodeProps = {
 const rarities = ["common", "uncommon", "rare", "epic", "legendary", "mythic"] as const;
 
 const rarityMocks: Record<(typeof rarities)[number], UIAchievement> = {
-	common: asUI(hephaestusInit),
-	uncommon: asUI(hermesSprint),
-	rare: asUI(aresConflict),
-	epic: asUI(apolloClarity),
-	legendary: asUI(poseidonTrident),
-	mythic: asUI(zeusThunderbolt),
+	common: hephaestusInit,
+	uncommon: hermesSprint,
+	rare: aresConflict,
+	epic: apolloClarity,
+	legendary: poseidonTrident,
+	mythic: zeusThunderbolt,
 };
 
 /**

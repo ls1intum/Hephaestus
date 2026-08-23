@@ -18,7 +18,7 @@ export const noManualQueryKey = defineRule({
 		},
 		messages: {
 			handWritten:
-				"A hand-built key stops matching the generated one silently, and the invalidation becomes a no-op. Pass the generated key — `getThingQueryKey({ path: … })` — or spread the generated options.",
+				"Pass the generated key — `getThingQueryKey({ path: … })` — or spread the generated options, so this stays in step with what the query was cached under.",
 		},
 	},
 	create(context) {

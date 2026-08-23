@@ -78,7 +78,7 @@ describe("grep", () => {
 		});
 
 		expect(matches).toHaveLength(2);
-		const files = matches.map((m) => m.file).sort();
+		const files = matches.map((m) => m.file).toSorted();
 		expect(files).toContain("RootFile.swift");
 		expect(files).toContain("src/Views/ContentView.swift");
 	});

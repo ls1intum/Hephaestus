@@ -22,13 +22,8 @@ import { queryOperationId } from "@/lib/query-operation-id";
 
 /**
  * The reads a league reset moves: the board itself, and the standing computed per user beside it.
- *
- * The arguments below are placeholders required by the helpers' signatures — each builds them into
- * the key object it returns. Only `_id`, the operation tag, is read back off that object, so the
- * placeholder values never reach the set and the predicate below matches every cached variant of
- * these two queries whatever its timeframe, team or sort. Taking the tag off the generated helper
- * rather than writing the string means a renamed operation breaks the build instead of silently
- * stopping the invalidation.
+ * Only `_id` is taken off each key, so the arguments below are placeholders the signatures demand —
+ * and a renamed operation breaks the build rather than silently stopping the invalidation.
  */
 const RESET_QUERY_FAMILY_IDS: ReadonlySet<string> = new Set(
 	[
@@ -70,8 +65,8 @@ function AdminSettings() {
 		...resetAndRecalculateLeaguesMutation(),
 		onSuccess: (_data, variables) => {
 			const resetSlug = variables.path.workspaceSlug;
-			// Every cached read of those families for this workspace, whatever timeframe, team, sort or
-			// user it carries — a generated key pins all of those, so the match is on the operation.
+			// Matching on the operation rather than the key reaches every cached timeframe, team, sort
+			// and user, all of which a generated key pins.
 			void queryClient.invalidateQueries({
 				predicate: ({ queryKey }) => {
 					const id = queryOperationId(queryKey);

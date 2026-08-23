@@ -23,7 +23,7 @@ export interface ModelPickerProps {
 	disabled?: boolean;
 	invalid?: boolean;
 	"aria-describedby"?: string;
-	/** Ids the caller's visible label — only the caller can say what the popup listbox is a list of. */
+	/** Points at the caller's visible label; only the caller can say what the listbox is a list of. */
 	"aria-labelledby": string;
 }
 

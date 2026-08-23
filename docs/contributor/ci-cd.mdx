@@ -71,7 +71,7 @@ Before any release, code must pass:
 | Java formatting | Prettier (`prettier-plugin-java`) | Code style |
 | Java lint       | PMD         | Static analysis      |
 | Webapp TypeScript | oxlint + Biome (`webapp/biome.jsonc`) + tsc | Lint + format + typecheck |
-| Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | Lint + format + typecheck for the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files |
+| Everything else TypeScript | oxlint (`.oxlintrc.json`) + Biome (`biome.jsonc`) + tsc | oxlint reaches the Bun runtime, its specs, both precompute trees, `scripts/**`, `docs/` and the repo-root config files; Biome formats all of those except `docs/`, which has its own config (`docs/.oxlintrc.json`) and no formatter |
 | Agent runtime   | Bun         | Runner and precompute specs, on the Bun the sandbox ships — CI reads `ARG BUN_VERSION` out of `docker/agents/pi/Dockerfile` rather than hard-coding it, and fails closed if that line is missing |
 
 ## 🔒 Security

@@ -22,8 +22,6 @@ function createGitLabIcon(pathData: string, displayName: string) {
 	const Icon = ({ size = 16, ...rest }: GitLabIconProps) => {
 		const labelled = hasText(rest["aria-label"]) || hasText(rest["aria-labelledby"]);
 		return (
-			// Accessibility is handled conditionally below: `aria-hidden` when decorative,
-			// `role="img"` + `aria-label` when labelled. No linter checks this.
 			<svg
 				width={size}
 				height={size}

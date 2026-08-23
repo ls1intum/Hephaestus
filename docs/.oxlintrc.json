@@ -1,6 +1,8 @@
 {
 	"$schema": "../node_modules/oxlint/configuration_schema.json",
-	// Only the file-naming rule is enabled from the SPA's house plugin; the rest are about React.
+	// Only the file-naming rule is enabled from the SPA's house plugin. The rest hold the SPA's own
+	// conventions — its Storybook stories, its Testing Library queries, its query keys, its clock —
+	// and a Docusaurus site is not held to them.
 	"jsPlugins": ["../webapp/tools/oxlint/index.ts"],
 
 	"plugins": [
@@ -277,18 +279,6 @@
 		"unicorn/consistent-template-literal-escape": "error",
 		"unicorn/text-encoding-identifier-case": "error",
 		"react/react-in-jsx-scope": "off",
-		"react/exhaustive-effect-dependencies": "off",
-		"jsx-a11y/prefer-tag-over-role": "off",
-		"jsx-a11y/control-has-associated-label": "off",
-		"jsx-a11y/anchor-has-content": "off",
-		"react/no-array-index-key": "off",
-		"unicorn/explicit-length-check": "off",
-		"unicorn/no-array-sort": "off",
-		"unicorn/no-array-reverse": "off",
-		"typescript/consistent-return": "off",
-		"react/static-components": "off",
-		"unicorn/consistent-function-scoping": "off",
-		"no-underscore-dangle": "off",
 		"jsx-a11y/no-autofocus": [
 			"error",
 			{

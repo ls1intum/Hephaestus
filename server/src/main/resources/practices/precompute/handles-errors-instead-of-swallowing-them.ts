@@ -100,7 +100,7 @@ function consecutiveWindows(added: Map<number, string>): Array<{ start: number; 
 	// The open window carries its own first and last line number, so "is there a window" and "what does
 	// it end at" are one nullable value rather than length checks against a scratch array.
 	let open: { start: number; end: number; lines: string[] } | null = null;
-	for (const n of [...added.keys()].sort((a, b) => a - b)) {
+	for (const n of [...added.keys()].toSorted((a, b) => a - b)) {
 		if (open !== null && n !== open.end + 1) {
 			windows.push({ start: open.start, lines: open.lines });
 			open = null;

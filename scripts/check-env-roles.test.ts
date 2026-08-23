@@ -219,7 +219,7 @@ hephaestus:
             enabled: true
 `);
 
-	assert.deepEqual([...disabled].sort(), ["server", "webhook"]);
+	assert.deepEqual([...disabled].toSorted(), ["server", "webhook"]);
 });
 
 await test("a scope naming a path application.yml does not have is a failure", () => {

@@ -1,17 +1,11 @@
 /**
- * Update the vendored Outline OpenAPI spec from the official repository.
+ * Refreshes the vendored Outline OpenAPI spec, which the openapi-generator Maven plugin turns into
+ * the client models. Vendoring makes each refresh a reviewable diff instead of a build that changes
+ * under you, and the content is checked before it reaches disk for the reason `update-github-schema`
+ * gives: a public URL can answer 200 with something that is not the document.
  *
- * Usage: pnpm run outline:update-spec
- *
- * This script fetches Outline's maintained OpenAPI 3 specification and updates the local
- * vendored copy under server/src/main/resources/openapi/outline/spec3.yml. The spec is the
- * machine-readable contract the openapi-generator Maven plugin turns into the Outline client
- * models — vendoring it makes every refresh a deliberate, reviewable diff (mirroring
- * update-github-schema.ts / update-gitlab-schema.ts for the GraphQL vendors).
- *
- * Note: the hand-authored outline-supplement.yaml sitting beside spec3.yml is NOT touched by
- * this script — it carries the four endpoints Outline has not yet documented upstream and is
- * deleted once they land in spec3.yml.
+ * `outline-supplement.yaml` beside it is hand-authored and untouched here. It carries the endpoints
+ * Outline has not documented upstream, and each entry is deleted as it lands in `spec3.yml`.
  */
 
 import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
@@ -19,17 +13,13 @@ import { join, resolve } from "node:path";
 
 const SPEC_DIR = resolve(import.meta.dirname, "../server/src/main/resources/openapi/outline");
 const SPEC_FILE = join(SPEC_DIR, "spec3.yml");
-// Official Outline OpenAPI spec — the only trusted source.
 const SPEC_URL = "https://raw.githubusercontent.com/outline/openapi/main/spec3.yml";
 
-// Validation constants — the Outline spec is ~250KB.
+// The spec runs a few hundred kilobytes; an error page or a redirect notice is nowhere near.
 const MIN_SIZE_BYTES = 50_000;
 const MAX_SIZE_BYTES = 10_000_000;
 
-/**
- * Validates that the content appears to be Outline's OpenAPI 3 spec before writing it to disk.
- * A security measure so we never persist arbitrary fetched content.
- */
+/** Cheapest checks first: a wrong body is usually the wrong size, and never reaches the regexes. */
 function validateSpec(content: string): { valid: boolean; reason?: string } {
 	if (content.length < MIN_SIZE_BYTES) {
 		return {
@@ -106,7 +96,7 @@ async function main(): Promise<void> {
 		try {
 			unlinkSync(tempFile);
 		} catch {
-			// Ignore cleanup errors.
+			// The write is the failure worth reporting; a failed cleanup must not replace it.
 		}
 		throw error;
 	}

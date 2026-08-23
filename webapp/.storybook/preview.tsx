@@ -105,7 +105,6 @@ const StorybookThemeProvider = ({
 	return (
 		<ThemeProvider
 			key={theme}
-			// The toolbar only offers the two themes configured below; light is the default there too.
 			defaultTheme={theme === "dark" ? "dark" : "light"}
 			storageKey="storybook-theme"
 		>
@@ -132,10 +131,9 @@ const preview: Preview = {
 			storySort: {
 				// Product surfaces first, roughly outside-in by who opens them, then the shared kit, then
 				// the auto-titled path trees, then cross-cutting regression suites. Every top-level
-				// segment any story declares has to appear here — an unnamed one sorts alphabetically
-				// after all of these, which is how `Workspace admin` ended up below `Shared`. That
-				// applies to derived titles too: `integrations` is the auto-title of the two
-				// feature-flag stories, and was missing.
+				// segment any story declares has to appear here — one that does not sorts alphabetically
+				// below every segment that does, silently. That includes segments nobody wrote: a story
+				// with no explicit title gets one derived from its path.
 				order: [
 					"Workspace admin",
 					"Instance admin",
@@ -206,8 +204,8 @@ const preview: Preview = {
 				dark: { name: "dark" },
 			},
 			defaultTheme: "light",
-			// The addon types `Provider` as `any` and hands it whichever entry of `themes` above the
-			// toolbar selected, so the shape it is called with is declared here.
+			// The addon types `Provider` as `any`, so the shape it is called with — one entry of
+			// `themes` above — is declared here.
 			Provider: ({ theme, children }: { theme: { name: string }; children: React.ReactNode }) => (
 				<StorybookThemeProvider theme={theme.name}>{children}</StorybookThemeProvider>
 			),

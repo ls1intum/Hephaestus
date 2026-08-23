@@ -21,8 +21,8 @@ type ThemeProviderState = {
 };
 
 /**
- * The context default, so a theme-aware component rendered on its own — in a test or a story, with
- * no shell around it — reads the system theme instead of throwing.
+ * A working default rather than a sentinel `useTheme` would throw on: a theme-aware component has to
+ * render on its own in a test or a story, with no shell around it.
  */
 const NO_PROVIDER: ThemeProviderState = {
 	theme: "system",

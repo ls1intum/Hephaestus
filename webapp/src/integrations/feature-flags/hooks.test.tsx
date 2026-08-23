@@ -16,8 +16,7 @@ function wrapper(queryClient: QueryClient) {
 }
 
 describe("useFeatureFlags", () => {
-	// A flag the server spells with something other than `true`/`false` is one flag going wrong, not
-	// the flag service going down: the gate it guards closes, and every other flag still answers.
+	// One flag going wrong is not the flag service going down: its gate closes, the rest still answer.
 	it("reads a flag the server did not send as a boolean as off, and keeps the rest of the map", async () => {
 		server.use(
 			http.get("*/user/features", () =>
@@ -30,8 +29,8 @@ describe("useFeatureFlags", () => {
 		});
 
 		await waitFor(() => expect(result.current.flags?.ADMIN).toBe(false));
-		// Both of the well-formed flags, so "keeps the rest of the map" covers each answer the coercion
-		// could have flattened: a `true` that survives, and a `false` the malformed one is mistaken for.
+		// Both well-formed flags: a `true` that has to survive, and the `false` the malformed one
+		// collapses to, which a blanket coercion would flatten together.
 		expect(result.current.flags?.MENTOR_ACCESS).toBe(true);
 		expect(result.current.flags?.NOTIFICATION_ACCESS).toBe(false);
 	});

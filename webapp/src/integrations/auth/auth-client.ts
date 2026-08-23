@@ -124,7 +124,7 @@ export const authClient = {
 	 * rather than a render, which is why it is a direct request instead of a generated mutation.
 	 */
 	async devLogin(username: string, admin: boolean, returnTo?: string): Promise<void> {
-		// oxlint-disable-next-line no-restricted-globals -- `/auth/dev-login` is absent from `openapi.yaml`, so the generated client has no operation for it, and the call ends in a full page load that discards any cache the query layer could have held.
+		// oxlint-disable-next-line no-restricted-globals -- `/auth/dev-login` is absent from `openapi.yaml`, so no generated operation exists, and the call ends in a full page load that discards the cache anyway.
 		const response = await fetch(`${serverUrl()}/auth/dev-login`, {
 			method: "POST",
 			credentials: "include",
@@ -145,7 +145,7 @@ export const authClient = {
 	 */
 	async logout(): Promise<void> {
 		try {
-			// oxlint-disable-next-line no-restricted-globals -- Sign-out ends in `window.location.assign`, which tears the SPA down: there is no cache left for the query layer to update and no component left to render an error. `/auth/*` is likewise exempt from the 401 handler in `main.tsx` for the same reason.
+			// oxlint-disable-next-line no-restricted-globals -- Sign-out tears the SPA down in the `finally` below, leaving no cache to update and no component to render an error; `/auth/*` is exempt from the 401 handler for the same reason.
 			await fetch(`${serverUrl()}/auth/logout`, {
 				method: "POST",
 				credentials: "include",

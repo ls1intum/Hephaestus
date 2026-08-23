@@ -238,7 +238,7 @@ export function normalizeSearch(search: unknown): RecordedSearch {
 		throw new Error("search.consulted must name at least one source you searched");
 	if (!lookedFor) throw new Error("search.lookedFor is required");
 	if (!boundary) throw new Error("search.boundary is required");
-	return { consulted: [...new Set(consulted)].sort(), lookedFor, boundary };
+	return { consulted: [...new Set(consulted)].toSorted(), lookedFor, boundary };
 }
 
 /**
@@ -272,7 +272,7 @@ export function normalizeInapplicability(inapplicability: unknown): RecordedInap
 			"inapplicability.ruledOutBy is required: state the fact about THIS work that means the subject " +
 				"cannot occur in it. If you are merely unsure, the answer is INCONCLUSIVE, not NOT_APPLICABLE",
 		);
-	return { consulted: [...new Set(consulted)].sort(), subject, ruledOutBy };
+	return { consulted: [...new Set(consulted)].toSorted(), subject, ruledOutBy };
 }
 
 export function normalizeEvidence(evidence: unknown, presence: Presence): NormalizedEvidence {
@@ -562,7 +562,7 @@ export function validateSearchScope(
 	}
 	const unsearched = [...exhaustiveSourceKinds]
 		.filter((sourceKind) => !consulted.has(sourceKind))
-		.sort();
+		.toSorted();
 	if (unsearched.length > 0) {
 		throw new Error(
 			`cannot conclude ABSENT for '${observation.practiceSlug}' without searching ${unsearched.join(", ")} — ` +

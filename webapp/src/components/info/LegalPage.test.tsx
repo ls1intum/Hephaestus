@@ -143,8 +143,8 @@ describe("LegalPage — XSS guardrail", () => {
 		const { findByRole } = render(
 			<LegalPage page="imprint" title={LEGAL_PAGE_TITLES.imprint} resolver={resolver} />,
 		);
-		// The banner's copy is the whole point of it — a bare "an alert rendered" would pass just as
-		// happily on the "unable to load" alert, which says the opposite about the deployment.
+		// Asserted on the copy: a bare "an alert rendered" passes just as happily on the "unable to
+		// load" alert, which says the opposite about the deployment.
 		const banner = await findByRole("alert");
 		expect(banner.textContent).toMatch(/has not been configured with a legal profile/i);
 		expect(warn).toHaveBeenCalled();

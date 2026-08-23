@@ -11,10 +11,7 @@ const WORKSPACE_ROLE_RANK: Record<WorkspaceRole, number> = {
 const isWorkspaceRole = (value: string): value is WorkspaceRole =>
 	Object.hasOwn(WORKSPACE_ROLE_RANK, value);
 
-/**
- * Gates fail closed: no role, and a role only the server knows about, both rank as unranked — a
- * server that ships a new role before the client knows it must not be let in.
- */
+/** Gates fail closed: no role and a role only the server knows about both rank as unranked. */
 export function hasMinimumWorkspaceRole(
 	role: string | null | undefined,
 	minRole: WorkspaceRole,

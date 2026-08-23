@@ -88,8 +88,8 @@ export function useActiveWorkspaceSlug() {
 				// Redirect to the same relative path under a different workspace
 				const remainder = location.pathname.replace(/^\/w\/[^/]+/, "");
 				setSelectedSlug(fallbackSlug);
-				// `href` is how the router takes a path built at runtime; a relative one still
-				// navigates in-app, only an absolute URL would reload the document.
+				// `href` is how the router takes a path built at runtime. Keep it relative: `navigate`
+				// treats an href that parses as an absolute URL as a document reload.
 				void navigate({
 					href: `/w/${fallbackSlug}${remainder || "/"}`,
 					replace: true,

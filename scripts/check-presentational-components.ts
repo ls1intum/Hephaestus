@@ -80,7 +80,7 @@ const listFiles = async (directory: string, suffixes: readonly string[]): Promis
 	return entries
 		.filter((entry) => entry.isFile() && suffixes.some((suffix) => entry.name.endsWith(suffix)))
 		.map((entry) => join(entry.parentPath, entry.name).slice(`${REPO_ROOT}/`.length))
-		.sort();
+		.toSorted();
 };
 
 const readSource = async (path: string): Promise<string> => readFile(join(REPO_ROOT, path), "utf8");

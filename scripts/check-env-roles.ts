@@ -44,10 +44,10 @@ const COMPOSE_FILES = ["docker/compose.app.yaml", "docker/compose.core.yaml"];
 /** The runtime roles a container can be given. A scope claiming any other name does not compile. */
 type Role = "server" | "worker" | "webhook";
 
-/** An `application.yml` path, the one role whose beans read it, and why that is where it is read. */
 interface RoleScope {
 	readonly path: string;
 	readonly role: Role;
+	/** Named beans, so a reader can check the claim rather than take it. Quoted back in every failure. */
 	readonly why: string;
 }
 
@@ -146,7 +146,7 @@ export function composeDefault(raw: string): string {
 	return groups?.dash === undefined ? "" : (groups.fallback ?? "");
 }
 
-/** One `key: value`, with the keys above it. Keys are joined into a path by whoever needs one. */
+/** One `key: value`. `path` ends in `key`; callers that want a dotted path join it themselves. */
 interface MappingEntry {
 	readonly path: readonly string[];
 	readonly key: string;
@@ -172,7 +172,6 @@ function* mappingEntries(text: string): Generator<MappingEntry, void, undefined>
 	}
 }
 
-/** The key paths `application.yml` declares, and the `${VAR}` placeholders those paths carry. */
 interface ApplicationConfig {
 	readonly paths: ReadonlySet<string>;
 	/** Variable name to the path it binds. */
@@ -191,7 +190,7 @@ export function readApplicationConfig(text: string): ApplicationConfig {
 	return { paths, placeholders };
 }
 
-/** One Compose service: the environment keys it delivers, and what its own keys resolve to. */
+/** `env` is every key the service delivers, merges included; `flags` is only what it spells itself. */
 export interface ComposeService {
 	readonly name: string;
 	readonly env: Set<string>;
@@ -287,7 +286,6 @@ export function readDisabledRoles(text: string): Set<string> {
 	return disabled;
 }
 
-/** A Compose file: the label failures name it by, and its text. */
 export type ComposeFile = readonly [label: string, text: string];
 
 /** A service that sets a role-scoped variable, named the way a failure has to name it. */
@@ -318,7 +316,7 @@ export function analyse(
 	const { paths, placeholders } = readApplicationConfig(applicationText);
 
 	// Longest path first so a nested scope wins over its parent.
-	const scopeOrder = [...ROLE_SCOPES].sort((a, b) => b.path.length - a.path.length);
+	const scopeOrder = [...ROLE_SCOPES].toSorted((a, b) => b.path.length - a.path.length);
 	const ownership = new Map<string, RoleScope>();
 	for (const [variable, path] of placeholders) {
 		const scope = scopeOrder.find((s) => path === s.path || path.startsWith(`${s.path}.`));

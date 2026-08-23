@@ -14,7 +14,4 @@ applyTo: "**"
 ## Error Handling
 - Use try/catch blocks for async operations
 - Implement proper error boundaries in React components
-- Always log errors with contextual information
-
-## Testing Expectations
-- Name Spring integration tests with the `*IntegrationTest` suffix and reuse the shared abstract bases (for example, `AbstractWorkspaceIntegrationTest` + `WebTestClient` for workspace controllers) so security and persistence assertions stay consistent.
+- Always log errors with contextual information — never a token, a secret or a raw request body

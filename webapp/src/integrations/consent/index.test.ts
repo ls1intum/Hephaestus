@@ -40,9 +40,8 @@ describe("consent store", () => {
 		expect(getStoredConsent()).toBeNull();
 	});
 
-	// Anything can write this key, and what comes back out is what gates PostHog and Sentry. A
-	// complete-looking decision whose flags are strings must be re-asked, not read for truthiness —
-	// `"false"` is truthy, so trusting it would turn analytics on for someone who declined.
+	// `"false"` is truthy, so reading this key for truthiness would turn analytics on for someone
+	// who declined — and anything can write the key.
 	it("treats a decision whose flags are not booleans as no decision, rather than taking it as given", () => {
 		localStorage.setItem(
 			CONSENT_STORAGE_KEY,

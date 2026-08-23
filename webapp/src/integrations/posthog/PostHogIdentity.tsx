@@ -32,7 +32,7 @@ export function PostHogIdentity() {
 			: participatesInResearch !== true;
 
 	useEffect(() => {
-		if (!posthog || !isPosthogEnabled) {
+		if (!isPosthogEnabled) {
 			return;
 		}
 

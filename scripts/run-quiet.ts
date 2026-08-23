@@ -1,20 +1,11 @@
 #!/usr/bin/env node
 /**
- * Quiet runner for noisy CLI tools.
+ * Runs a tool and drops the lines nobody reads, so a failure is not buried under a page of routine
+ * output. Prettier names every file it looked at; the OpenAPI generator logs one INFO line per
+ * artefact plus a donation banner. Both are the only thing on screen when a run goes wrong.
  *
- * Wraps commands to reduce output noise for AI agents and humans alike.
- * Filters out verbose logging while preserving essential information.
- *
- * Usage:
- *   node --import tsx scripts/run-quiet.ts [tool] [args...]
- *
- * Supported tools:
- *   prettier      - Filters unchanged file listings, shows only changed/errors
- *   openapi-gen   - Filters INFO logs, keeps WARN/ERROR and summary
- *
- * Examples:
- *   node --import tsx scripts/run-quiet.ts prettier --write "src/file.java"
- *   node --import tsx scripts/run-quiet.ts openapi-gen generate -i spec.yaml -g java -o out
+ * Every line the child writes is kept for the summary, whether or not it was printed, and the exit
+ * code is the child's own — a filtered line never changes the verdict.
  */
 
 import { spawn } from "node:child_process";
@@ -28,45 +19,26 @@ type FilterConfig = {
 	summary?: (lines: string[], exitCode: number) => string;
 };
 
-/**
- * Prettier filter: Only show files that were actually changed or have errors.
- * Filters out "(unchanged)" lines that flood the output.
- */
+/** Prettier prints one line per file it looked at; only the ones it changed or refused are news. */
 function prettierFilter(line: string): boolean {
-	// Always show errors and warnings
 	if (line.includes("[error]") || line.includes("[warn]")) {
 		return true;
 	}
 
-	// Filter out "(unchanged)" lines - this is the main noise source
 	if (line.includes("(unchanged)")) {
 		return false;
 	}
 
-	// Filter out "Checking formatting..." boilerplate
 	if (line.trim() === "Checking formatting...") {
 		return false;
 	}
 
-	// Show everything else (changed files, errors, summaries)
 	return true;
 }
 
-/**
- * Transform prettier output to be more concise.
- */
-function prettierTransform(line: string): string {
-	// Remove timing info for cleaner output: "file.java 40ms" -> "file.java"
-	// But keep it for actually changed files so we know something happened
-	return line;
-}
-
-/**
- * Summary for prettier runs.
- */
 function prettierSummary(lines: string[], exitCode: number): string {
 	const changedFiles = lines.filter((l) => {
-		// Exclude warning/error lines first to avoid false positives
+		// `[warn] src/A.java` ends in a source extension too, so the diagnostics go first.
 		if (l.includes("[warn]") || l.includes("[error]")) {
 			return false;
 		}
@@ -95,10 +67,11 @@ function prettierSummary(lines: string[], exitCode: number): string {
 }
 
 /**
- * OpenAPI Generator filter: Remove verbose INFO logs, keep warnings and errors.
+ * Order matters: the three suppressed groups are all spelled as warnings the generator emits on every
+ * run whatever the spec says, so each has to be matched before the generic WARN clause keeps it.
  */
 function openApiGenFilter(line: string): boolean {
-	// Filter out Java deprecation warnings (sun.misc.Unsafe) - check first
+	// The JVM's own `sun.misc.Unsafe` deprecation notice, from a dependency this repo does not own.
 	if (
 		line.includes("sun.misc.Unsafe") ||
 		line.includes("terminally deprecated") ||
@@ -107,7 +80,6 @@ function openApiGenFilter(line: string): boolean {
 		return false;
 	}
 
-	// Filter out the donation/thanks message
 	if (
 		line.includes("###") ||
 		line.includes("opencollective") ||
@@ -117,47 +89,35 @@ function openApiGenFilter(line: string): boolean {
 		return false;
 	}
 
-	// Filter out all repetitive 3.1.0 warnings; these are very long, add little value,
-	// and appear multiple times in a single run.
+	// A paragraph-long caveat about the generator's OpenAPI 3.1 support, repeated per operation.
 	if (line.includes("3.1.0 specs is in development")) {
 		return false;
 	}
 
-	// Filter out routine INFO logs (the main noise source)
 	if (line.includes("[main] INFO")) {
-		// Keep the generator identification line only
+		// The generator's own name and version, which is worth one line of the run.
 		if (line.includes("OpenAPI Generator:")) return true;
 		return false;
 	}
 
-	// Show actual errors and warnings (except filtered ones above)
 	if (line.includes("[main] WARN") || line.includes("[main] ERROR")) {
 		return true;
 	}
 
-	// Filter empty lines and hash decorations
 	if (line.trim() === "" || line.trim().match(/^#+$/)) {
 		return false;
 	}
 
-	// Keep everything else
 	return true;
 }
 
-/**
- * Transform OpenAPI generator output.
- */
+/** The generator logs absolute paths; the caller is standing in the directory they start from. */
 function openApiGenTransform(line: string): string {
-	// Shorten absolute paths to relative
 	const cwdPrefix = `${process.cwd()}/`;
 	return line.replaceAll(cwdPrefix, "");
 }
 
-/**
- * Summary for OpenAPI generator runs.
- */
 function openApiGenSummary(lines: string[], exitCode: number): string {
-	// Count generated files by counting "written file" lines
 	const generatedFilesCount = lines.filter((l) => l.includes("written file")).length;
 	if (generatedFilesCount > 0) {
 		return `Generated ${generatedFilesCount} files.`;
@@ -173,7 +133,6 @@ function openApiGenSummary(lines: string[], exitCode: number): string {
 const TOOL_CONFIGS: Record<string, Omit<FilterConfig, "command" | "args">> = {
 	prettier: {
 		filter: prettierFilter,
-		transform: prettierTransform,
 		summary: prettierSummary,
 	},
 	"openapi-gen": {
@@ -191,18 +150,9 @@ async function run(tool: string, args: string[]): Promise<number> {
 		return 1;
 	}
 
-	// Determine actual command to run
-	let command: string;
-	let commandArgs: string[];
-
-	if (tool === "prettier") {
-		command = "npx";
-		commandArgs = ["prettier", ...args];
-	} else {
-		// openapi-gen
-		command = "npx";
-		commandArgs = ["openapi-generator-cli", ...args];
-	}
+	const command = "npx";
+	const commandArgs =
+		tool === "prettier" ? ["prettier", ...args] : ["openapi-generator-cli", ...args];
 
 	return new Promise((resolve) => {
 		const proc = spawn(command, commandArgs, {
@@ -217,17 +167,15 @@ async function run(tool: string, args: string[]): Promise<number> {
 			for (const rawLine of lines) {
 				if (!rawLine) continue;
 
+				// Recorded before filtering: the summary counts what the tool did, not what got printed.
 				allLines.push(rawLine);
 
-				// Apply filter
 				if (!config.filter(rawLine)) {
 					continue;
 				}
 
-				// Apply transform
 				const line = config.transform ? config.transform(rawLine) : rawLine;
 
-				// Output to appropriate stream
 				if (isStderr) {
 					console.error(line);
 				} else {
@@ -242,7 +190,6 @@ async function run(tool: string, args: string[]): Promise<number> {
 		proc.on("close", (code) => {
 			const exitCode = code ?? 0;
 
-			// Print summary if available
 			if (config.summary) {
 				const summary = config.summary(allLines, exitCode);
 				if (summary) {

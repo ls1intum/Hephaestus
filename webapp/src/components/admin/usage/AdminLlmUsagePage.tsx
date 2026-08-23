@@ -37,7 +37,7 @@ export interface AdminLlmUsagePageProps {
 	error: unknown;
 	onRetry?: () => void;
 	onEditOwnProviderCap: () => void;
-	/** The instant the projection is measured against. The caller owns it, so that rendering reads no clock. */
+	/** The instant the projection is measured against. */
 	now: Date;
 }
 

@@ -447,7 +447,6 @@ describe("Outline integration — with live push down, polling keeps a running s
 		const collectionsRef = { current: [engineering] as unknown[] };
 		let statusReads = 0;
 		useConnectedHandlers(collectionsRef);
-		// The reconcile is running on the first read and finished by the second.
 		const SYNC_STATUS = "*/workspaces/demo/connections/7/sync";
 		server.use(
 			http.get(

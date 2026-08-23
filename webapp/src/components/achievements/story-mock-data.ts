@@ -14,7 +14,7 @@ import { Github } from "@/components/icons/brand";
 
 /**
  * A {@link UIAchievement} plus the coordinates skill-tree stories pin nodes at. Ids must be the
- * catalogue's own: the tree keys nodes and edges by id, so an invented one is unreachable in the app.
+ * catalogue's own: the tree keys nodes and edges by id, so an invented one draws no edges.
  */
 export type MockUIAchievement = UIAchievement & {
 	x?: number;
@@ -268,9 +268,4 @@ const mythicAchievements: MockUIAchievement[] = [
 	dionysusDeploy,
 ];
 
-/** Retypes a mock for args declared as `UIAchievement`; the coordinates are still on it at runtime. */
-export function asUI(mock: MockUIAchievement): UIAchievement {
-	return mock;
-}
-
-export const mythicAchievementsUI: UIAchievement[] = mythicAchievements.map(asUI);
+export const mythicAchievementsUI: UIAchievement[] = mythicAchievements;

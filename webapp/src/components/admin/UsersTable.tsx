@@ -11,7 +11,7 @@ import {
 	type VisibilityState,
 } from "@tanstack/react-table";
 import { ArrowUpDown, ChevronDown, EyeIcon, EyeOffIcon, Filter, Search, Users } from "lucide-react";
-// oxlint-disable-next-line no-restricted-imports -- `useReactTable` below opts this component out of React Compiler entirely (`react/incompatible-library` names the same fact), so the two values TanStack Table keys its own memoisation on keep hand-written memos. See `columns` and `filteredData`.
+// oxlint-disable-next-line no-restricted-imports -- The compiler skips this component (see `useReactTable` below), so the memos on `columns` and `filteredData` are written by hand.
 import { type ComponentProps, type ReactElement, useEffect, useMemo, useState } from "react";
 import type { TeamInfo } from "@/api/types.gen";
 import { TablePagination } from "@/components/common/TablePagination";
@@ -74,8 +74,8 @@ export function UsersTable({
 	const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({});
 	const sorting: SortingState = [{ id: view.sort, desc: view.desc }];
 
-	// TanStack Table rebuilds its column model, and with it every row model downstream, whenever this
-	// array's identity changes — and nothing else memoises it here, so the memo is load-bearing.
+	// TanStack Table caches its column model — and every row model derived from it — against the
+	// identity of this array, so a fresh one each render rebuilds all of them.
 	const columns = useMemo<ColumnDef<ExtendedUserTeams>[]>(
 		() => [
 			{
@@ -142,8 +142,8 @@ export function UsersTable({
 		[onToggleHidden],
 	);
 
-	// The table's `data`, memoised for the same reason as `columns`: a fresh array on every render
-	// would make TanStack Table recompute every row model on every render.
+	// The table's `data`, keyed the same way `columns` is: the core row model is cached against this
+	// array's identity.
 	const filteredData = useMemo(
 		() =>
 			users.filter((user) => {
@@ -165,7 +165,7 @@ export function UsersTable({
 		label: `${size}`,
 	}));
 
-	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency, and React Compiler opts this component out entirely
+	// oxlint-disable-next-line react/incompatible-library -- TanStack Table is a deliberate dependency; the compiler bail-out it causes is why `columns` and `filteredData` above are memoised by hand.
 	const table = useReactTable({
 		data: filteredData,
 		columns,

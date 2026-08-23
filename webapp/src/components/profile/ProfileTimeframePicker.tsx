@@ -57,8 +57,8 @@ export function ProfileTimeframePicker({
 	schedule = DEFAULT_SCHEDULE,
 }: ProfileTimeframePickerProps) {
 	const [chosenPreset, setChosenPreset] = useState<TimeframePreset>();
-	// The emitted range is measured from this instant, and it ticks, so a week or month boundary
-	// crossed with the page open rolls the range over instead of stranding it in the old period.
+	// Ticks, so a week or month boundary crossed with the page open rolls the emitted range over
+	// instead of stranding it in the period that ended.
 	const nowMs = useNow();
 	const now = new Date(nowMs);
 
@@ -219,7 +219,7 @@ export function ProfileTimeframePicker({
 					/>
 					<PopoverContent className="w-auto p-0" align="start">
 						<Calendar
-							// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" on the profile timeframe picker opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
+							// oxlint-disable-next-line jsx-a11y/no-autofocus -- Choosing "custom" opens this popover for the sole purpose of picking a range, so the day grid takes focus with it.
 							autoFocus
 							mode="range"
 							defaultMonth={customRange?.from}

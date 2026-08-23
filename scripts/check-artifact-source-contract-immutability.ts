@@ -7,9 +7,9 @@ const env = Object.fromEntries(
 	Object.entries(process.env).filter(([key]) => !key.startsWith("GIT_")),
 );
 
-// Anchored on the repository root rather than the caller's cwd: resolving the contract path
-// relatively made the check pass vacuously whenever it ran from a subdirectory, and a guard that
-// silently verifies nothing is worse than no guard.
+// Anchored on the repository root, not the caller's cwd. A relative contract path resolves to
+// nothing from a subdirectory, and `git diff` over a path that matches no file reports no
+// difference — so the check would pass having compared nothing, and say so in the same words.
 const repoRoot = execFileSync("git", ["rev-parse", "--show-toplevel"], {
 	encoding: "utf8",
 	env,

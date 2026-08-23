@@ -1,10 +1,11 @@
 /**
- * Update GitHub GraphQL schema from official docs
+ * Refreshes the vendored GitHub GraphQL schema, which the Maven codegen turns into the client the
+ * server compiles against. Vendoring makes each refresh a reviewable diff instead of a build that
+ * changes under you.
  *
- * Usage: pnpm run github:update-schema
- *
- * This script fetches the official GitHub GraphQL schema and updates the local copy.
- * It includes validation to ensure the downloaded content is a valid GraphQL schema.
+ * Everything downloaded is checked before it reaches disk. An unauthenticated fetch of a public URL
+ * can return a login wall, a CDN error page or a truncated body with a 200, and each of those would
+ * otherwise land in the tree as the schema and fail much later as a codegen error.
  */
 
 import { renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
@@ -12,26 +13,20 @@ import { join, resolve } from "node:path";
 
 const SCHEMA_DIR = resolve(import.meta.dirname, "../server/src/main/resources/graphql/github");
 const SCHEMA_FILE = join(SCHEMA_DIR, "schema.github.graphql");
-// Official GitHub GraphQL schema URL - this is the only trusted source
 const SCHEMA_URL = "https://docs.github.com/public/fpt/schema.docs.graphql";
 
-// Validation constants
-const MIN_SIZE_BYTES = 1_000_000; // 1MB - GitHub schema is typically ~15MB
-const MAX_SIZE_BYTES = 50_000_000; // 50MB - reasonable upper limit to prevent DoS
+// An error page or a login wall is orders of magnitude smaller than the schema, so size alone
+// rejects most of what can come back instead of it.
+const MIN_SIZE_BYTES = 1_000_000;
+const MAX_SIZE_BYTES = 50_000_000;
 
-// GraphQL schema validation patterns
-// The GitHub schema always starts with directive definitions
 const STARTS_WITH_DOC_COMMENT = /^\s*"""/;
 const HAS_DIRECTIVE = /directive\s+@/;
 const HAS_TYPE = /^type\s+\w+/m;
 const HAS_INPUT = /^input\s+\w+/m;
 
-/**
- * Validates that the content appears to be a valid GraphQL schema.
- * This is a security measure to ensure we don't write arbitrary content to disk.
- */
+/** Cheapest checks first: a wrong body is usually the wrong size, and never reaches the regexes. */
 function validateGraphQLSchema(content: string): { valid: boolean; reason?: string } {
-	// Check for minimum content length (quick check before regex)
 	if (content.length < MIN_SIZE_BYTES) {
 		return {
 			valid: false,
@@ -39,7 +34,6 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 		};
 	}
 
-	// Check for maximum content length to prevent DoS
 	if (content.length > MAX_SIZE_BYTES) {
 		return {
 			valid: false,
@@ -47,7 +41,6 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 		};
 	}
 
-	// Verify content starts with expected GraphQL patterns
 	if (!STARTS_WITH_DOC_COMMENT.test(content)) {
 		return {
 			valid: false,
@@ -55,7 +48,6 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 		};
 	}
 
-	// Verify essential GraphQL constructs are present
 	const hasDirective = HAS_DIRECTIVE.test(content);
 	const hasType = HAS_TYPE.test(content);
 	const hasInput = HAS_INPUT.test(content);
@@ -72,12 +64,11 @@ function validateGraphQLSchema(content: string): { valid: boolean; reason?: stri
 		return { valid: false, reason: "Content missing GraphQL input definitions" };
 	}
 
-	// Check for known GitHub schema markers
+	// Some other GraphQL schema would pass every check above; these two directives are GitHub's.
 	if (!content.includes("@preview") && !content.includes("@possibleTypes")) {
 		return { valid: false, reason: "Content missing expected GitHub-specific directives" };
 	}
 
-	// Ensure content is valid UTF-8 text (no binary data or null bytes)
 	if (content.includes("\0")) {
 		return { valid: false, reason: "Content contains null bytes (possible binary data)" };
 	}
@@ -96,8 +87,6 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
-	// Validate Content-Type header
-	// GitHub returns application/octet-stream for the schema file download
 	const contentType = response.headers.get("content-type") ?? "";
 	const acceptableContentTypes = [
 		"text/",
@@ -112,7 +101,6 @@ async function main(): Promise<void> {
 
 	const content = await response.text();
 
-	// Validate the content before writing to disk
 	console.log("Validating schema content...");
 	const validation = validateGraphQLSchema(content);
 
@@ -121,7 +109,8 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 
-	// Write to temp file first for atomic update
+	// Written beside the target and renamed over it, so an interrupted run leaves the committed
+	// schema whole rather than half a download.
 	const tempFile = `${SCHEMA_FILE}.tmp`;
 
 	try {
@@ -130,17 +119,15 @@ async function main(): Promise<void> {
 		const stats = statSync(tempFile);
 		console.log(`Downloaded ${Math.round(stats.size / 1_048_576)}MB`);
 
-		// Atomic rename
 		renameSync(tempFile, SCHEMA_FILE);
 
 		console.log(`Schema updated successfully: ${SCHEMA_FILE}`);
 		console.log("\nTo regenerate types: cd server && ./mvnw compile -DskipTests");
 	} catch (error) {
-		// Clean up temp file on error
 		try {
 			unlinkSync(tempFile);
 		} catch {
-			// Ignore cleanup errors
+			// The write is the failure worth reporting; a failed cleanup must not replace it.
 		}
 		throw error;
 	}

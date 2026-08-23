@@ -1058,7 +1058,7 @@ function composablePracticeSlugs(): string[] {
 	} catch (e) {
 		console.error(`[pi-runner] observation history unreadable for composition: ${errorText(e)}`);
 	}
-	return [...slugs].sort();
+	return [...slugs].toSorted();
 }
 
 // Supersession is limited to unread thread keys present in this snapshot.

@@ -43,11 +43,7 @@ import { asDate } from "@/lib/dates";
 import { getProviderLabel } from "@/lib/provider";
 import { firstNonBlank } from "@/lib/text";
 
-/**
- * Lucide glyphs and the in-house brand glyphs are separate component types, and this slot takes
- * either — naming only `LucideIcon` would pin `BrandIcon` to Lucide's exact shape. All the slot asks
- * of a glyph is that it render from `className`, which both do.
- */
+/** Both types are named because `BrandIcon` is a plain component and `LucideIcon` is not. */
 const PROVIDER_ICONS: Record<string, LucideIcon | BrandIcon> = {
 	GITHUB: GithubIcon,
 	GITLAB: GitlabIcon,

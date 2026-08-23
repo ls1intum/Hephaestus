@@ -28,7 +28,7 @@ export interface AdminInstanceLlmUsageTableProps {
 	rows: AdminWorkspaceLlmUsage[];
 	/** ISO `yyyy-MM`. */
 	month: string;
-	/** The instant the projection is measured against. The caller owns it, so that rendering reads no clock. */
+	/** The instant the projection is measured against. */
 	now: Date;
 	fx?: Fx;
 	/** UTC. The verdicts read *current* caps, so only the current month can show a real pause. */

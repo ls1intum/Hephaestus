@@ -36,12 +36,11 @@ live case: a facet with a control and no pill is invisible on a phone, and no ty
 
 **Do not** reach for it when the structure is derived from one record. A `<DeliveryTrace.Step>` API
 would let a caller build a trace that contradicts the record it was built from. A deliberately
-*closed* structure — `ReflectionMessage`, whose doc comment enumerates what it must make
-unrepresentable — is a design, and a slot API reopens exactly what the design closed.
+*closed* structure — `FeedbackResultsState`, a union in which a filtered empty state cannot exist
+without the callback that clears the filter — is a design, and a slot API reopens what it closed.
 
 **The local cost, which decides borderline cases.** Storybook subcomponents documented via
-`subcomponents` get **no Controls**, and their `argTypes` *"are inferred … and cannot be manually
-defined or overridden"*. So a part that needs its own controls stays a prop. A component with no
+`subcomponents` get **no Controls**, and their `argTypes` are inferred rather than declared. So a part that needs its own controls stays a prop. A component with no
 story file pays nothing, which is often what makes the call.
 
 Prefer the cheap version first: a `const FACETS = [...]` descriptor array mapped twice removes the

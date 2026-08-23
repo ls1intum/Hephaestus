@@ -9,7 +9,7 @@ export function filedUnder<TOptions extends object>(
 }
 
 /**
- * The mutation cache holds every mutation the app has fired, so it types `variables` as `unknown` —
+ * The mutation cache holds every mutation the app has fired, so it types `variables` as `unknown`:
  * filtering by key narrows which mutations come back, not what they carry.
  */
 function pathParam(variables: unknown, field: string): unknown {

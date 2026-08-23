@@ -70,8 +70,8 @@ pnpm run generate:api:application-server:client
 **Ask first** — schema changes · security configuration · a new `pom.xml` dependency · workspace
 authorization logic.
 
-**Never** — commit credentials · `System.out.println` (use `@Slf4j` with `{}` placeholders, and never
-log tokens) · `@Transactional` on a controller (service layer only) · expose an entity from a
+**Never** — commit credentials · `System.out.println` (log through SLF4J with `{}` placeholders, and
+never log a token) · `@Transactional` on a controller (service layer only) · expose an entity from a
 controller.
 
 ## Test tiers
@@ -85,6 +85,11 @@ controller.
 
 Live tests need GitHub App credentials in `application-live-local.yml` (gitignored); the Maven profile
 is the only guard.
+
+**An integration test's *filename* decides whether it ever runs.** Failsafe includes
+`**/*IntegrationTest.java` and `**/*LiquibaseTest.java` and nothing else, so a `@Tag("integration")`
+class named anything else is silently never executed by `mvn verify` — it fails no build and reports
+no skip.
 
 Name tests `should[ExpectedBehavior]When[Condition]`. Controller-level integration tests extend
 `AbstractWorkspaceIntegrationTest` (or a domain-specific base) and exercise access control through
@@ -106,7 +111,8 @@ annotation. Assume data from previous tests may exist; do not write cleanup that
   changelog passes every tier. Validate with `mvn liquibase:update` against real Postgres.
 - **A native `@Query` may not contain an apostrophe inside a `--` comment.** Hibernate reads it as the
   start of a string literal and the whole `ApplicationContext` fails to build, naming something else.
-  `IssueRepository.java:325` and `PullRequestRepository.java:218` carry the warning in place.
+  `NativeQueryCommentArchTest` enforces it, so the failure arrives as a named test rather than as a
+  mystery at boot; the two queries that were bitten carry the warning in place.
 - **`EntityManager` is injected as a `@PersistenceContext` field**, not through the constructor
   (`WorkspaceMembershipService`, `GitHubUserProcessor`). Everything else is constructor injection via
   `@RequiredArgsConstructor`.

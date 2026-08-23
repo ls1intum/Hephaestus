@@ -3,7 +3,6 @@ import { AchievementProgressDisplay } from "@/components/achievements/Achievemen
 import {
 	apolloClarity,
 	artemisHunt,
-	asUI,
 	athenaReview,
 	dionysusDeploy,
 	hermesSprint,
@@ -44,7 +43,7 @@ type Story = StoryObj<typeof meta>;
  */
 export const LinearPartialProgress: Story = {
 	args: {
-		achievement: asUI(apolloClarity),
+		achievement: apolloClarity,
 	},
 };
 
@@ -53,7 +52,7 @@ export const LinearPartialProgress: Story = {
  */
 export const LinearCompleted: Story = {
 	args: {
-		achievement: asUI(athenaReview),
+		achievement: athenaReview,
 	},
 };
 
@@ -62,7 +61,7 @@ export const LinearCompleted: Story = {
  */
 export const BinaryLockedMilestone: Story = {
 	args: {
-		achievement: asUI(dionysusDeploy),
+		achievement: dionysusDeploy,
 	},
 };
 
@@ -71,18 +70,18 @@ export const BinaryLockedMilestone: Story = {
  */
 export const BinaryUnlockedMilestone: Story = {
 	args: {
-		achievement: asUI(hermesSprint),
+		achievement: hermesSprint,
 	},
 };
 
 export const ZeroProgress: Story = {
 	args: {
-		achievement: asUI(artemisHunt),
+		achievement: artemisHunt,
 	},
 };
 
 export const LongTextOverflow: Story = {
 	args: {
-		achievement: asUI(prometheusLongName),
+		achievement: prometheusLongName,
 	},
 };

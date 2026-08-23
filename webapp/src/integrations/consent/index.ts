@@ -37,7 +37,6 @@ export const CONSENT_VERSION = 1;
 export interface CookieConsent {
 	analytics: boolean;
 	errorMonitoring: boolean;
-	/** ISO timestamp. */
 	decidedAt: string;
 	/** The {@link CONSENT_VERSION} this decision was made against. */
 	version: number;
@@ -125,9 +124,7 @@ export function setStoredConsent(consent: ConsentChoice) {
 	emitChange();
 }
 
-// Edit-mode reopen: set when the user clicks "Cookie preferences". The banner then shows even though
-// a decision exists, and is cancelable (so backing out keeps the prior choice). This is NOT a
-// passive first-visit appearance.
+// Set while the banner is showing because the user asked for it, not because no decision exists yet.
 let reopenRequested = false;
 
 /**

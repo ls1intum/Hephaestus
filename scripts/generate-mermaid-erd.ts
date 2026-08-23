@@ -373,7 +373,7 @@ class MermaidErdGenerator {
 		_parentTable: string,
 		_parentColumns: string[],
 	): Promise<RelationshipCardinality> {
-		const sortedChildColumns = [...childColumns].sort();
+		const sortedChildColumns = [...childColumns].toSorted();
 		const uniqueQuery = `
 			SELECT COUNT(*) FROM (
 				SELECT tc.constraint_name

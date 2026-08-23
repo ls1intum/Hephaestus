@@ -2,10 +2,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Hephaestus Achievement Formatter
- *
- * This script enforces a consistent, human-readable property order for achievements.yml.
- * Preferred order: id, parent, rarity, isHidden, category, triggerEvents, evaluatorClass, requirements
+ * Puts every achievement's properties in one order, so a diff shows what changed rather than where
+ * the author happened to type it. Lines are moved, never rewritten: a property the order below does
+ * not name keeps its text and follows the named ones, so this cannot lose a field it has not met.
  */
 
 const ACHIEVEMENTS_FILE = path.join(
@@ -49,7 +48,7 @@ function formatYaml(): void {
 	for (const line of lines) {
 		const trimmed = line.trim();
 
-		// Detect start of achievement
+		// `id` is the first property of every entry, so it is also what starts a new one.
 		if (trimmed.startsWith("- id:")) {
 			if (currentAchievement) flushAchievement(currentAchievement, result);
 			currentAchievement = { properties: new Map() };
@@ -57,7 +56,8 @@ function formatYaml(): void {
 			continue;
 		}
 
-		// Detect properties inside achievement
+		// An entry's own properties sit at six spaces — but so do the children of `requirements`,
+		// which is why that one is claimed whole below rather than read key by key.
 		if (
 			currentAchievement &&
 			line.startsWith("      ") &&
@@ -73,7 +73,6 @@ function formatYaml(): void {
 			continue;
 		}
 
-		// Collect requirements content
 		if (inRequirements) {
 			if (line.startsWith("          ")) {
 				currentAchievement?.properties.get("requirements")?.push(line);
@@ -82,7 +81,8 @@ function formatYaml(): void {
 			inRequirements = false;
 		}
 
-		// Collect triggerEvents content (arrays)
+		// A list item carries no `:`, so the property branch above passed it by; the last property
+		// read is the only thing that says which list it belongs to.
 		if (currentAchievement?.lastProperty === "triggerEvents" && trimmed.startsWith("- ")) {
 			currentAchievement.properties.get("triggerEvents")?.push(line);
 			continue;

@@ -37,8 +37,9 @@ function isSyncEventScope(value: unknown): value is SyncEventScope {
 }
 
 /**
- * Drops a hint whose shape does not match. Dropping is not free: with the stream healthy and no job
- * running, the surface only catches up on the next poll or navigation.
+ * Drops a hint whose shape does not match. Dropping is not free: `syncPollInterval` turns polling
+ * off entirely while the stream is healthy and no job is running, so nothing refetches the queries
+ * that hint would have refreshed until the next hint, or a navigation.
  */
 function parseHint(payload: string): SyncEventHint | undefined {
 	let decoded: unknown;
@@ -116,8 +117,9 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 	const queryClient = useQueryClient();
 	const [livePushUnavailable, setLivePushUnavailable] = useState(false);
 
-	// Each workspace gets its own stream, so the failures counted against the previous one say
-	// nothing about this one — clear the flag as the switch happens, not a paint later.
+	// Each workspace gets its own stream, so the previous one's failures say nothing about this one.
+	// Reset during render rather than in the effect below, which would report the old stream degraded
+	// for one paint after the switch.
 	const [streamedSlug, setStreamedSlug] = useState(workspaceSlug);
 	if (streamedSlug !== workspaceSlug) {
 		setStreamedSlug(workspaceSlug);
@@ -201,8 +203,6 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		};
 
 		const handleHint = (event: MessageEvent<string>) => {
-			// A hint is only ever a nudge to refetch, so one this client cannot read costs nothing to
-			// drop: the queries it would have refreshed are still refreshed by the next readable hint.
 			const hint = parseHint(event.data);
 			if (!hint) return;
 
@@ -221,10 +221,9 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 		};
 
 		/**
-		 * One controller per connection, not one per hook: an `AbortSignal` is one-shot. A single
-		 * controller reused across reconnects is already aborted by the time the next `connect()` calls
-		 * `addEventListener(…, { signal })`, and an aborted signal makes that call attach nothing at
-		 * all — silently. Every stream after the first failure would be deaf.
+		 * One controller per connection, not one per hook: an `AbortSignal` is one-shot, and
+		 * `addEventListener(…, { signal })` with an already-aborted signal attaches nothing at all,
+		 * silently. Reusing a controller across reconnects leaves every stream after the first deaf.
 		 */
 		const controllers = new WeakMap<EventSource, AbortController>();
 
@@ -250,7 +249,7 @@ export function useSyncEvents(workspaceSlug: string | undefined): boolean {
 					consecutiveFailures = 0;
 					setLivePushUnavailable(false);
 
-					// oxlint-disable-next-line no-restricted-properties -- Throttles one stream re-open against the last, inside the `open` listener; a clock that only ticks with React would let a burst of reconnects through together.
+					// oxlint-disable-next-line no-restricted-properties -- Measures RESYNC_THROTTLE_MS from the previous open, inside a DOM listener; `useNow`'s shared tick is the same order as that window and could not resolve it.
 					const now = Date.now();
 					// The first open races the page's own mount fetches, which are already loading this
 					// data — resyncing here would cancel and restart them. Record the timestamp anyway so

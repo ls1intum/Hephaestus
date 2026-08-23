@@ -254,7 +254,7 @@ const MVN_PAIR_WINDOW = 2;
 function collectMavenDeps(df: DiffFile, side: "added" | "removed"): Map<string, string> {
 	const out = new Map<string, string>();
 	const lines = side === "added" ? df.addedLines : df.removedLines;
-	const ordered = [...lines.entries()].sort((a, b) => a[0] - b[0]);
+	const ordered = [...lines.entries()].toSorted((a, b) => a[0] - b[0]);
 	let pendingName: string | null = null;
 	let pendingLine = 0;
 	for (const [ln, content] of ordered) {

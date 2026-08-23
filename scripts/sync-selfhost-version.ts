@@ -1,8 +1,9 @@
-// Keeps the self-hosted install's pinned release version in step with the root
-// package version. Run by the `changeset:version` script (see package.json) as
-// part of the Version PR, so `IMAGE_TAG` in the self-host .env.example and the
-// `VERSION=` example in the install guide always match the release being cut —
-// no manual bump, no drift. CI (ci-compose-validate) fails if they diverge.
+// Rewrites the release version wherever an operator copies it out of the docs — `IMAGE_TAG` in the
+// self-host `.env.example`, `VERSION=` in the install guide — from the root package version. Run by
+// `changeset:version`, so the Version PR carries them; `ci-compose-validate` fails if they diverge.
+//
+// A pattern that matches nothing throws rather than writing: a silent no-op here ships an install
+// guide pinned to the previous release.
 import { readFileSync, writeFileSync } from "node:fs";
 import { asRecord, asString, parseJson } from "./lib/json.ts";
 

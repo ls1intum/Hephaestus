@@ -85,7 +85,7 @@ export function ImpersonateDialog({
 							value={reason}
 							onChange={(event) => setReason(event.target.value)}
 							placeholder="e.g. Investigating support ticket #1234"
-							// oxlint-disable-next-line jsx-a11y/no-autofocus -- The impersonation dialog cannot be submitted until this required reason is typed, so it opens with the caret in the box.
+							// oxlint-disable-next-line jsx-a11y/no-autofocus -- The impersonation dialog cannot be submitted until this required reason is typed.
 							autoFocus
 						/>
 					</div>

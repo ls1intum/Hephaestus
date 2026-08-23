@@ -92,7 +92,7 @@ function FieldContent({ className, ...props }: React.ComponentProps<"div">) {
 
 function FieldLabel({ className, ...props }: React.ComponentProps<typeof Label>) {
 	return (
-		// oxlint-disable-next-line jsx-a11y/label-has-associated-control -- a pass-through wrapper; the `htmlFor` or nested control arrives from its own caller, which the same rule checks
+		// oxlint-disable-next-line jsx-a11y/label-has-associated-control -- A pass-through wrapper; `settings.jsx-a11y.components` maps `FieldLabel` back to `label`, so its call sites are the ones this rule checks.
 		<Label
 			data-slot="field-label"
 			className={cn(

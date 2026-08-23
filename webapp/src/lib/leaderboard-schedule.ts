@@ -6,8 +6,7 @@ type ScheduledWorkspace = Pick<Workspace, "leaderboardScheduleDay" | "leaderboar
 
 /**
  * The stored time is free text, so each half of `HH:mm` is defaulted on its own: `"9"` carries no
- * minutes at all, and letting that half through as `undefined` would put an `Invalid Date` into
- * every boundary derived from it.
+ * minutes, and a `NaN` minute makes an Invalid Date of every week boundary derived from it.
  */
 export function resolveLeaderboardSchedule(
 	workspace: ScheduledWorkspace | undefined,

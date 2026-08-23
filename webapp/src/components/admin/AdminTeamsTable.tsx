@@ -25,9 +25,8 @@ export interface TeamsTableProps {
 }
 
 /**
- * The ids the tree still shows for a given search: a team whose own name matches, plus every ancestor
- * on the way down to it, so a deep match is reachable rather than orphaned out of its branch. An
- * empty search shows everything.
+ * The ids the tree still shows: a team whose own name matches, plus every ancestor down to it, so a
+ * deep match stays reachable inside its branch. An empty search shows everything.
  */
 function teamsMatchingSearch(
 	search: string,

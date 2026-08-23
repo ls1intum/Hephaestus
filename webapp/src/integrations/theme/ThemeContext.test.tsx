@@ -9,8 +9,8 @@ describe("ThemeProvider", () => {
 		document.documentElement.removeAttribute("data-color-mode");
 	});
 
-	// `localStorage` is user-writable and outlives any rename of the themes, so a value from another
-	// build — or one typed in by hand — must not reach the document as a class nobody styles.
+	// `localStorage` outlives any rename of the themes, so a value from an older build must not reach
+	// the document as a class nobody styles.
 	it("falls back to the default theme when the stored one is not a theme this build knows", () => {
 		localStorage.setItem("theme", "solarized");
 

@@ -3,7 +3,9 @@
 
 	// Everything outside `webapp/` and `docs/`, both of which carry their own config. A nested config
 	// REPLACES this one for the files under it rather than merging, so each tree states its rules in full.
-	// Only the file-naming rule is enabled from the SPA's house plugin; the rest are about React.
+	// Only the file-naming rule is enabled from the SPA's house plugin. The rest hold the SPA's own
+	// conventions — its Storybook stories, its Testing Library queries, its query keys, its clock —
+	// and nothing out here renders anything.
 	"jsPlugins": ["./webapp/tools/oxlint/index.ts"],
 
 	"plugins": ["typescript", "unicorn", "oxc", "import", "promise"],
@@ -245,11 +247,13 @@
 		"unicorn/prefer-string-trim-start-end": "error",
 		"unicorn/consistent-template-literal-escape": "error",
 		"unicorn/text-encoding-identifier-case": "error",
+		// Reads as a truthiness test on a count that is genuinely being tested for emptiness —
+		// `if (!findings.length) return` says what it means without naming a comparison.
 		"unicorn/explicit-length-check": "off",
-		"unicorn/no-array-sort": "off",
-		"unicorn/no-array-reverse": "off",
-		"typescript/consistent-return": "off",
+		// It reports the *enclosing* function, not the helper, and what it finds here is a helper
+		// deliberately scoped to the practice script that owns it — hoisting would widen its reach.
 		"unicorn/consistent-function-scoping": "off",
+		// GraphQL introspection names its own fields: a schema query asks for `__schema`.
 		"no-underscore-dangle": "off",
 		"promise/always-return": [
 		"error",

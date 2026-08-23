@@ -3,9 +3,9 @@ import type { ChatMessage } from "@/lib/types";
 
 /**
  * Unknown keys survive: the mentor streams part kinds this client does not model, and stripping
- * their payload would leave the renderer nothing to narrow. `text` is the one payload checked,
- * because the renderer reads it unguarded — the AI SDK types it as always present, so a text part
- * that omits it would reach `String.prototype.replaceAll` and take the conversation down.
+ * their payload would leave the renderer nothing to narrow on. `text` is the one payload checked,
+ * because the AI SDK types it as always present and the renderer reads it unguarded — a text part
+ * that omitted it would throw mid-transcript rather than render short.
  */
 const messagePartSchema = z
 	.looseObject({ type: z.string() })
@@ -13,10 +13,7 @@ const messagePartSchema = z
 		message: "A text part must carry its text",
 	});
 
-/**
- * Unknown keys survive here too: the AI SDK hangs its own bookkeeping off a message and the chat UI
- * passes those fields straight back.
- */
+/** Loose again: the AI SDK hangs its own bookkeeping off a message and the chat UI passes it back. */
 const chatMessageSchema = z.looseObject({
 	id: z.uuid(),
 	role: z.enum(["system", "user", "assistant"]),
@@ -30,10 +27,6 @@ function isChatMessageArray(value: unknown): value is ChatMessage[] {
 	return chatMessagesArraySchema.safeParse(value).success;
 }
 
-/**
- * `undefined` is the whole report a rejected transcript gets: the caller is the only place that
- * knows whether a thread that will not parse is worth telling the reader about.
- */
 export function parseThreadMessages(messages: unknown): ChatMessage[] | undefined {
 	return isChatMessageArray(messages) ? messages : undefined;
 }
@@ -45,10 +38,7 @@ const voteSchema = z.object({
 
 const votesArraySchema = z.array(voteSchema);
 
-/**
- * Votes are decoration on a transcript, so every shape this cannot read degrades to "no votes" —
- * a thread still renders in full without its thumbs.
- */
+/** Votes are decoration, so anything unreadable degrades to "no votes" and the transcript still renders. */
 export function extractVotesFromThreadDetail(
 	threadDetail: unknown,
 ): Array<{ messageId?: string; isUpvoted?: boolean }> {

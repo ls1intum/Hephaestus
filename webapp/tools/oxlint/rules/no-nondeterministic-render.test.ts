@@ -24,7 +24,7 @@ ruleTester.run("no-nondeterministic-render", noNondeterministicRender, {
 		// -- Inside a component, but not during its render ------------------------------------------
 		"function Card() { return <button onClick={() => setAt(Date.now())} />; }",
 		"function Card() { useEffect(() => { setNow(new Date()); }, []); return null; }",
-		// The case a sibling agent found: a mutation callback that must share TanStack Query's clock.
+		// A mutation callback fires when the mutation does, not when the component renders.
 		"function DangerZone() { const m = useMutation({ onMutate: () => setRequestedAt(Date.now()) }); return null; }",
 		// A lazy initializer runs inside its own function, and is the sanctioned way to seed state
 		// from the clock once. The eager spelling of this is reported below.

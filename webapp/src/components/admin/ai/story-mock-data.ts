@@ -128,9 +128,8 @@ export const mockJobQueued: AgentJob = {
 };
 
 /**
- * A run waiting on the clock has to be minutes from *now* or its "due …" phrase reads as history, so
- * this fixture and the two below anchor `availableAt` to the story clock rather than to the
- * otherwise fixed 2026-05-20 scene.
+ * A run waiting on the clock anchors `availableAt` to the story clock, not to the otherwise fixed
+ * scene date: an `availableAt` in the past renders the "due …" phrase as history.
  */
 export const mockJobHeldOnBudget: AgentJob = {
 	id: "job-held-budget-1",

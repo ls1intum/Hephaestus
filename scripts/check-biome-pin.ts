@@ -10,8 +10,8 @@
  * A stale $schema is the dangerous one: `pnpm install --frozen-lockfile` already refuses a
  * package.json/lockfile disagreement, but an editor pointed at another release's schema
  * happily writes rules the pinned binary formats differently, so the next `format --write`
- * rewrites files nobody touched. Comparing all four keeps a version bump honest — bumping
- * the dependency without the schema URLs now fails here instead of in someone's diff.
+ * rewrites files nobody touched. Comparing all four is what makes a version bump that misses one
+ * of them fail here rather than in the next person's diff.
  */
 import { readFileSync } from "node:fs";
 import { asRecord, asString, isRecord, parseJson } from "./lib/json.ts";

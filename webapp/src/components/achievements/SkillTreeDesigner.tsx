@@ -47,13 +47,11 @@ type NodeCoordinates = Record<string, { x: number; y: number }>;
 
 /**
  * Hand the laid-out positions to the `save-achievement-layout` Vite middleware (`vite.config.ts`),
- * which writes them into `coordinates.json` beside this file.
- *
- * That middleware edits a source file, so it is a design-time tool rather than a feature: it is
- * mounted only while `vite` is serving, and the caller reaches this line only under `import.meta.env.DEV`.
+ * which writes them into `coordinates.json` beside this file. Editing a source file makes this a
+ * design-time tool rather than a feature, so the middleware is mounted only while `vite` serves.
  */
 async function postCoordinatesToDevServer(coordinates: NodeCoordinates): Promise<void> {
-	// oxlint-disable-next-line no-restricted-globals -- `/__save-coordinates` is a Vite dev-server middleware, not an application-server route, so `openapi.yaml` has no operation for it to generate and there is no server state for TanStack Query to cache.
+	// oxlint-disable-next-line no-restricted-globals -- A dev-server middleware, not an application-server route: `openapi.yaml` has no operation to generate a client from, and there is no server state to cache.
 	await fetch("/__save-coordinates", {
 		method: "POST",
 		body: JSON.stringify(coordinates, null, 2),
@@ -127,7 +125,6 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 			return coords;
 		}, {});
 
-		// The endpoint behind this is part of the dev server, so a production build has nowhere to save to.
 		if (import.meta.env.DEV) {
 			await postCoordinatesToDevServer(layoutMap);
 			toast.success("Layout saved to coordinates.json!");
@@ -192,8 +189,8 @@ export function SkillTreeDesigner({ user, allDefinitions }: SkillTreeDesignerPro
 
 			<ReactFlow
 				nodes={nodes.map((n) => {
-					// One branch per node kind: spreading the union merges the two `data` shapes into one
-					// that fits neither.
+					// The two bodies look mergeable and are not: spreading the union collapses the two
+					// `data` shapes into one that fits neither.
 					if (n.type === "achievement") return { ...n, data: { ...n.data, showTooltips } };
 					if (n.type === "avatar") return { ...n, data: { ...n.data, showTooltips } };
 					return n;

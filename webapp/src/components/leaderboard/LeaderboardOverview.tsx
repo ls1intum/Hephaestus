@@ -57,8 +57,8 @@ export function LeaderboardOverview({
 	const [leagueInfoOpen, setLeagueInfoOpen] = useState(false);
 	const user = leaderboardEntry.user;
 
-	// The interval only runs while the label can still change: an absent or passed deadline costs no
-	// renders, and the render that first sees the deadline pass clears the timer.
+	// The per-second interval runs only while the label can still change; the render that first sees
+	// the deadline pass clears it.
 	const [now, setNow] = useState(() => new Date());
 	const counting = leaderboardEnd !== undefined && !isPast(new Date(leaderboardEnd));
 

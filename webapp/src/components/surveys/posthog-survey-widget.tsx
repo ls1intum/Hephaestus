@@ -184,18 +184,19 @@ export function PostHogSurveyWidget({
 	}, [isVisible]);
 
 	useEffect(() => {
-		if (!posthog || !autoOpen) {
+		if (!autoOpen) {
 			return;
 		}
 
-		let active = true;
-		// A function, not `active` itself: TypeScript narrows the boolean at the first check and would
-		// then hide a cleanup that landed while an `await` below was in flight.
-		const isActive = () => active;
-		let latestRequestId = 0;
+		const cancellation = new AbortController();
+		// Two lookups can overlap inside one effect run — the 100ms kick-off and an `onSurveysLoaded`
+		// refresh — so the newest one wins even though neither has been cancelled.
+		const inFlight = { latestRequestId: 0 };
+		const isSuperseded = (signal: AbortSignal, requestId: number) =>
+			signal.aborted || requestId !== inFlight.latestRequestId;
 
-		const resolveSurvey = async (surveys: PostHogSurveyRaw[]) => {
-			if (!isActive()) {
+		const resolveSurvey = async (surveys: PostHogSurveyRaw[], signal: AbortSignal) => {
+			if (signal.aborted) {
 				return;
 			}
 
@@ -205,9 +206,6 @@ export function PostHogSurveyWidget({
 				: eligible;
 
 			if (candidates.length === 0) {
-				if (!isActive()) {
-					return;
-				}
 				setIsVisible(false);
 				setSurvey(null);
 				setSubmissionId(null);
@@ -215,13 +213,14 @@ export function PostHogSurveyWidget({
 				return;
 			}
 
-			const requestId = ++latestRequestId;
+			inFlight.latestRequestId += 1;
+			const requestId = inFlight.latestRequestId;
 
 			for (const candidate of candidates) {
 				try {
 					const reason = await posthog.canRenderSurveyAsync(candidate.id);
 
-					if (!isActive() || requestId !== latestRequestId) {
+					if (isSuperseded(signal, requestId)) {
 						return;
 					}
 
@@ -254,20 +253,16 @@ export function PostHogSurveyWidget({
 					hasTrackedShown.current = false;
 					return;
 				} catch (error) {
-					// A survey that fails its own eligibility check is not the reader's problem — a toast about
-					// it would interrupt them over a widget they never asked for — but swallowing it silently
-					// leaves a misconfigured survey with no symptom at all. The console is the only channel
-					// that reaches whoever authored the survey without reaching the reader.
-					// oxlint-disable-next-line no-console -- Diagnostic for the survey author; the reader has nothing to act on and must not be interrupted.
+					// oxlint-disable-next-line no-console -- Addressed to whoever authored the survey; a toast would interrupt a reader over a widget they never asked for, and silence would leave a misconfigured survey with no symptom at all.
 					console.error("[PostHogSurveyWidget] Error checking survey:", error);
 
-					if (!isActive() || requestId !== latestRequestId) {
+					if (isSuperseded(signal, requestId)) {
 						return;
 					}
 				}
 			}
 
-			if (!isActive() || requestId !== latestRequestId) {
+			if (isSuperseded(signal, requestId)) {
 				return;
 			}
 
@@ -278,33 +273,33 @@ export function PostHogSurveyWidget({
 		};
 
 		const unsubscribe = posthog.onSurveysLoaded(() => {
-			if (!isActive()) {
+			if (cancellation.signal.aborted) {
 				return;
 			}
 			posthog.getSurveys((updatedSurveys) => {
-				void resolveSurvey(updatedSurveys);
+				void resolveSurvey(updatedSurveys, cancellation.signal);
 			}, false);
 		});
 
 		const initTimeout = setTimeout(() => {
-			if (!isActive()) {
+			if (cancellation.signal.aborted) {
 				return;
 			}
 
 			posthog.getSurveys((surveys) => {
-				void resolveSurvey(surveys);
+				void resolveSurvey(surveys, cancellation.signal);
 			}, false);
 		}, 100);
 
 		return () => {
-			active = false;
+			cancellation.abort();
 			clearTimeout(initTimeout);
 			unsubscribe();
 		};
 	}, [autoOpen, posthog, surveyId]);
 
 	useEffect(() => {
-		if (!posthog || !survey || !isVisible || !showWithDelay || hasTrackedShown.current) {
+		if (!survey || !isVisible || !showWithDelay || hasTrackedShown.current) {
 			return;
 		}
 
@@ -332,7 +327,7 @@ export function PostHogSurveyWidget({
 	};
 
 	const handleDismiss = (step: number) => {
-		if (!survey || !posthog) {
+		if (!survey) {
 			return;
 		}
 
@@ -351,7 +346,7 @@ export function PostHogSurveyWidget({
 	};
 
 	const handleProgress = (responses: Record<string, SurveyResponse>) => {
-		if (!survey || !posthog) {
+		if (!survey) {
 			return;
 		}
 		if (survey.enable_partial_responses === false || Object.keys(responses).length === 0) {
@@ -370,7 +365,7 @@ export function PostHogSurveyWidget({
 	};
 
 	const handleComplete = (responses: Record<string, SurveyResponse>) => {
-		if (!survey || !posthog) {
+		if (!survey) {
 			return;
 		}
 		const id = ensureSubmissionId();

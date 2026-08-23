@@ -26,7 +26,7 @@ function userPayload(expiresInSec: number) {
 		impersonating: false,
 		linkedProviders: [],
 		roles: [],
-		// oxlint-disable-next-line no-restricted-properties -- The hook schedules against the wall clock, so a fixture expiry has to be stated relative to that same clock or the renewal is due in the past.
+		// oxlint-disable-next-line no-restricted-properties -- The hook schedules against the wall clock, so a fixture expiry has to be stated against it or the renewal is already due.
 		accessTokenExpiresAt: Math.floor(Date.now() / 1000) + expiresInSec,
 	};
 }
@@ -40,9 +40,9 @@ describe("useSessionKeepAlive", () => {
 	it("proactively rotates the access cookie before it expires while the user is active", async () => {
 		let userCalls = 0;
 		let refreshCalls = 0;
-		// First load: expiry ~61s out → renewal due in ~1s. After the first rotation the refetched
-		// /user reports a far-future expiry, so the scheduler settles and the test sees exactly one
-		// proactive refresh (proving it renews early — and doesn't storm).
+		// First load: expiry just past the refresh skew, so a renewal is due almost at once. The
+		// refetched /user then reports a far-future expiry, settling the scheduler — so one proactive
+		// refresh proves both that it renews early and that it does not storm.
 		server.use(
 			http.get(
 				"*/user",

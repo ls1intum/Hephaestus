@@ -12,8 +12,8 @@ export const Route = createFileRoute("/_authenticated/w/$workspaceSlug/mentor/$t
 function ThreadContainer() {
 	const { threadId } = Route.useParams();
 
-	// No `onError`: `Chat` reads the failure off `status` and renders it in the transcript, where the
-	// user is already looking, rather than as a notice away from the conversation that failed.
+	// No `onError`: `Chat` renders `status === "error"` inside the transcript, where the reader
+	// already is, rather than as a toast away from the conversation that failed.
 	const mentorChat = useMentorChat({ threadId });
 
 	const handleMessageSubmit = ({ text }: { text: string }) => {

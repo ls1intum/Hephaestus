@@ -5,12 +5,11 @@ import type { ReactElement, SVGProps } from "react";
 // callsites that previously imported `GithubIcon`/`GitlabIcon` from lucide-react
 // can drop-in replace by switching the import path.
 
-/** Lucide's `size` shorthand on top of the SVG props, which already carry `ref`. */
 type BrandIconProps = SVGProps<SVGSVGElement> & { size?: number | string };
 
 /**
- * A plain component, so a slot that accepts one has to name `BrandIcon` alongside `LucideIcon`
- * rather than relying on Lucide's `ForwardRefExoticComponent` shape.
+ * A plain function component. Lucide's icons are `ForwardRefExoticComponent`s, so a slot that takes
+ * either has to name both types rather than reusing Lucide's.
  */
 export type BrandIcon = {
 	(props: BrandIconProps): ReactElement;

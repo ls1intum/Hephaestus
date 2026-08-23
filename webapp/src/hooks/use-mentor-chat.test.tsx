@@ -135,8 +135,7 @@ function installFakeChat(initialStatus: ChatStatus = "ready"): FakeChat {
 			clearError: vi.fn(),
 			resumeStream: vi.fn(),
 			addToolOutput,
-			// `UseChatHelpers` still declares the older `addToolResult` name as a required member
-			// aliasing `addToolOutput`, so one spy backs both and a call through either is visible.
+			// Still a required member of `UseChatHelpers`, aliasing `addToolOutput`, so one spy backs both.
 			// oxlint-disable-next-line typescript/no-deprecated -- a fake has to implement the interface it stands in for
 			addToolResult: addToolOutput,
 			addToolApprovalResponse: vi.fn(),

@@ -73,10 +73,7 @@ function DataExportRow() {
 		onSuccess: (data) => {
 			if (typeof data.id === "number") {
 				setExportId(data.id);
-				// Stamped in the mutation callback, not during a render, and deliberately from the same
-				// clock TanStack Query stamps `dataUpdatedAt` with — the stall check below subtracts one
-				// from the other, so a second clock would make that difference meaningless.
-				// oxlint-disable-next-line no-restricted-properties -- Reads the clock once on an event, and must match the clock behind `dataUpdatedAt` for the elapsed-time comparison to hold.
+				// oxlint-disable-next-line no-restricted-properties -- Read once on an event, and necessarily the same clock TanStack Query stamps `dataUpdatedAt` with: the stall check below subtracts one from the other.
 				setRequestedAt(Date.now());
 			} else {
 				toast.error("Export request did not return an identifier.");

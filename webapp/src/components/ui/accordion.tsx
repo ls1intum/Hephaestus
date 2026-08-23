@@ -24,13 +24,11 @@ function AccordionItem({ className, ...props }: AccordionPrimitive.Item.Props) {
 
 function AccordionTrigger({ className, children, ...props }: AccordionPrimitive.Trigger.Props) {
 	return (
-		// `w-full min-w-0 flex-1`, not the bare `flex` shadcn ships. The header is an implementation
-		// detail of this component — a caller writes `<AccordionTrigger className="…">` and expects it to
-		// size the thing they can see. It did not: the trigger carries `flex-1`, but that landed on the
-		// button *inside* a content-sized header, so an accordion placed in a flex row got a trigger as
-		// wide as its own text. Two call sites had worked around it from outside, one of them reaching
-		// through the component with `[&>h3]:flex-1`. Sizing the header here is inert in block and grid
-		// flow, where it was already full width, and is the fix in a flex row.
+		// `w-full min-w-0 flex-1`, not the bare `flex` shadcn ships. Base UI's Header renders an `<h3>`
+		// wrapping the trigger, so a caller's `<AccordionTrigger className="…">` lands on the button
+		// *inside* it: wherever the header is the layout item rather than a full-width block — a flex
+		// row, a grid cell — the trigger is only as wide as its own text and the caller cannot widen it
+		// from outside. Sizing the header here restores that control, and is inert in block flow.
 		<AccordionPrimitive.Header className="flex w-full min-w-0 flex-1">
 			<AccordionPrimitive.Trigger
 				data-slot="accordion-trigger"

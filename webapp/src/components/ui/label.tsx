@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 function Label({ className, ...props }: React.ComponentProps<"label">) {
 	return (
-		// oxlint-disable-next-line jsx-a11y/label-has-associated-control -- the primitive; `settings.jsx-a11y.components` maps it back to `label` so its call sites are the ones checked
+		// oxlint-disable-next-line jsx-a11y/label-has-associated-control -- The primitive; `settings.jsx-a11y.components` maps `Label` back to `label`, so its call sites are the ones this rule checks.
 		<label
 			data-slot="label"
 			className={cn(

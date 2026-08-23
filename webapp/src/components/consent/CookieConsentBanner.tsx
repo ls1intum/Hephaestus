@@ -55,8 +55,7 @@ export function CookieConsentBanner() {
 		return null;
 	}
 
-	// A fresh mount per appearance, so the toggles seed from the stored decision and are never
-	// re-seeded in place.
+	// A fresh mount per appearance, so the toggles seed from the stored decision and never re-seed.
 	return <ConsentForm decision={consent} reopened={reopen} />;
 }
 
